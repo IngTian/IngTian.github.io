@@ -5,13 +5,13 @@ export const script: Script = {
   pairs: {
     now: {
       id: 'now',
-      question: 'what are you researching right now?',
+      question: 'what are you working on?',
       answer: {
         lines: [
           { kind: 'tool', label: 'Searched memory (research-log.md)' },
           { kind: 'tool', label: 'Read 3 notes · 412 tokens' },
-          { kind: 'text', content: 'Two threads right now: regime detection in volatility surfaces — clustering implied-vol term structures to flag when the market quietly changes character — and market-making under inventory risk, revisiting Avellaneda–Stoikov and skewing quotes with position.' },
-          { kind: 'text', content: 'On the side: relearning measure-theoretic probability properly.' },
+          { kind: 'text', content: 'My research thread is portfolio construction — I co-authored RL-BHRP, a reinforcement-learning-embedded Bayesian Hierarchical Risk Parity method (arXiv:2508.11856). The pull is allocation that learns instead of assuming.' },
+          { kind: 'text', content: 'Day to day before that: ML systems at TikTok — dual-tower vision embeddings and billion-scale vector retrieval feeding the ads engine in real time.' },
         ],
       },
       followups: [
@@ -26,12 +26,12 @@ export const script: Script = {
       answer: {
         lines: [
           { kind: 'tool', label: 'Read skills.toml' },
-          { kind: 'text', content: 'Research: Python, numpy, polars, jax, statsmodels. Build: TypeScript, React, Astro, FastAPI, SQLite.' },
-          { kind: 'text', content: 'This site is Astro + React with no backend — so the answers here are scripted, for now.' },
+          { kind: 'text', content: 'Systems: C/C++, Go, Java, gRPC — the 50k-QPS services. ML & quant: Python with PyTorch, TensorFlow, scikit-learn, numpy/pandas. Retrieval: Faiss and friends.' },
+          { kind: 'text', content: 'Web: TypeScript, React, Astro. This site is Astro + React with no backend — so the answers here are scripted, for now.' },
         ],
       },
       followups: [
-        { label: 'what are you researching?', goto: 'now' },
+        { label: 'what are you working on?', goto: 'now' },
         { label: 'tell me something fun', goto: 'fun' },
       ],
     },
@@ -41,7 +41,7 @@ export const script: Script = {
       answer: {
         lines: [
           { kind: 'thinking' },
-          { kind: 'text', content: 'Because markets are the one place where a clean idea, rigorously tested, meets reality the next morning and tells you — without mercy or flattery — whether you were right. I like that honesty.' },
+          { kind: 'text', content: 'I came up building large ML systems, where success is a dashboard you argue about for weeks. Markets are the opposite: a clean idea, rigorously tested, meets reality the next morning and tells you — without mercy or flattery — whether you were right. I like that honesty.' },
         ],
       },
       followups: [
@@ -59,7 +59,7 @@ export const script: Script = {
       },
       followups: [
         { label: 'why quant?', goto: 'why' },
-        { label: 'what are you researching?', goto: 'now' },
+        { label: 'what are you working on?', goto: 'now' },
       ],
     },
   },
