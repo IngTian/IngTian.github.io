@@ -1,1 +1,32 @@
 @import "tailwindcss";
+@import "./tokens.css";
+
+/* expose tokens to Tailwind v4 utilities */
+@theme {
+  --color-paper: #efe9dd;
+  --color-ink-1: #16140f;
+  --color-ink-2: #2f2b24;
+  --color-ink-3: #5a544a;
+  --color-ink-4: #8c8576;
+  --color-ink-5: #b8b1a1;
+  --color-ochre: #c8a36a;
+  --color-indigo: #6d7689;
+  --color-seal: #b23a2e;
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+html { scroll-behavior: smooth; }
+body { background: var(--paper); color: var(--ink-1); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+
+/* motion is OFF by default; opt in only when the user has no reduced-motion preference.
+   Phase 3 wraps all scroll animations in this query. */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

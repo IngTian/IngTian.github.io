@@ -1,0 +1,17 @@
+:root {
+  /* palette — the ONLY colors on the site */
+  --paper: #efe9dd;
+  --ink-1: #16140f;
+  --ink-2: #2f2b24;
+  --ink-3: #5a544a;
+  --ink-4: #8c8576;
+  --ink-5: #b8b1a1;
+  --ochre: #c8a36a;
+  --indigo: #6d7689;
+  --seal: #b23a2e;
+
+  /* fonts (families resolved via astro:fonts in Task 3) */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
