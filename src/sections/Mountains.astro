@@ -2,16 +2,17 @@
 import Timeline from '../components/Timeline.astro';
 import Buffalo from '../components/Buffalo.astro';
 ---
-<section id="mountains" class="relative px-[7vw] py-[14vh]">
+<section id="mountains" class="relative px-[7vw] pt-[14vh] pb-[26vh] sm:pb-[14vh]">
   <div class="relative z-10 max-w-[760px] mx-auto">
     <p class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/55">The story so far</p>
-    <h2 class="font-display italic text-[30px] text-paper mt-3 leading-snug">
+    <h2 class="font-display italic text-[26px] sm:text-[30px] text-paper mt-3 leading-snug">
       A researcher who thinks in distributions,<br />a builder who ships the whole stack.
     </h2>
     <Timeline />
   </div>
-  <!-- lone ink water buffalo anchors the lower-right, in the mist -->
-  <div id="buffalo-slot" class="pointer-events-none absolute right-[6vw] bottom-[10vh] w-[min(300px,40vw)]">
+  <!-- lone ink water buffalo anchors the lower-right, in the mist.
+       Larger + fainter on mobile where it sits below the timeline. -->
+  <div id="buffalo-slot" class="pointer-events-none absolute right-[6vw] bottom-[6vh] w-[58vw] opacity-70 sm:w-[min(300px,40vw)] sm:bottom-[10vh] sm:opacity-100">
     <Buffalo />
   </div>
 </section>
