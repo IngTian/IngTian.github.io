@@ -18,7 +18,43 @@
 }
 
 html { scroll-behavior: smooth; }
-body { background: var(--paper); color: var(--ink-1); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+body { background: var(--ink-1); color: var(--ink-1); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+
+/* ============================================================
+   The Descent — one continuous sky, scrolled through.
+   The gradient lives on a wrapper as tall as ALL the content, so
+   scrolling literally moves you down through it — no seams, no
+   per-section backgrounds. Reads top→bottom: dawn paper → warming
+   ochre → cool indigo dusk → grey ink mountains → near-black ground.
+   ============================================================ */
+.descent {
+  position: relative;
+  background:
+    linear-gradient(
+      180deg,
+      #f3eee3 0%,            /* heights: pale dawn paper */
+      #efe9dd 10%,           /* paper */
+      #ecdfcb 24%,           /* warm ochre mist */
+      #dccdbe 34%,
+      #c3bdbf 44%,           /* cool turn */
+      #9ea1aa 56%,           /* indigo-grey dusk */
+      #6f6f73 67%,
+      #474640 78%,           /* grey ink */
+      #28251f 89%,
+      #16140f 100%           /* ground: near-black ink */
+    );
+}
+/* soft dawn glow in the heights, upper-right; scrolls away naturally */
+.descent::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 110vh;
+  pointer-events: none;
+  background:
+    radial-gradient(58% 40% at 74% 16%, rgba(200,163,106,0.30), transparent 70%),
+    radial-gradient(48% 30% at 20% 30%, rgba(109,118,137,0.14), transparent 70%);
+}
 
 /* motion is OFF by default; opt in only when the user has no reduced-motion preference.
    Phase 3 wraps all scroll animations in this query. */
