@@ -1,5 +1,20 @@
 ---
+import { links } from '../data/profile';
+import SealMark from '../components/SealMark.astro';
 ---
-<section id="signature" class="relative px-[7vw] py-12 bg-ink-1 text-paper">
-  <!-- Task 7: links + seal -->
+<section id="signature" class="relative px-[7vw] py-14 bg-ink-1 text-paper flex justify-between items-end flex-wrap gap-7">
+  <nav class="flex gap-3 flex-wrap">
+    {links.map((l) => (
+      <a href={l.href}
+         class:list={[
+           'text-[12.5px] px-4 py-2 rounded-full no-underline transition-colors border',
+           l.primary
+             ? 'bg-ochre text-ink-1 border-ochre font-semibold'
+             : 'text-paper/80 border-ochre/25 hover:border-ochre hover:text-paper',
+         ]}>
+        {l.label}{l.primary ? ' ↓' : ''}
+      </a>
+    ))}
+  </nav>
+  <SealMark />
 </section>
