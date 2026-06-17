@@ -1,5 +1,7 @@
 ---
 import Timeline from '../components/Timeline.astro';
+import Publications from '../components/Publications.astro';
+import Awards from '../components/Awards.astro';
 ---
 <section id="mountains" class="relative px-[7vw] py-[14vh]">
   <div class="relative z-10 max-w-[760px] mx-auto">
@@ -7,6 +9,16 @@ import Timeline from '../components/Timeline.astro';
     <h2 class="font-display italic text-[26px] sm:text-[30px] text-paper mt-3 leading-snug">
       A researcher who thinks in distributions,<br />a builder who ships the whole stack.
     </h2>
+
+    <!-- Publications — the distinctive research signal, given prominence -->
+    <h3 class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-14 mb-2">Selected writing</h3>
+    <Publications />
+
+    <!-- Experience -->
+    <h3 class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-14 mb-2">Experience</h3>
     <Timeline />
+
+    <!-- Awards — compact strip -->
+    <Awards />
   </div>
 </section>

@@ -1,0 +1,30 @@
+---
+import { publications } from '../data/profile';
+---
+<div class="max-w-[680px]">
+  {publications.map((p) => {
+    const Tag = p.href ? 'a' : 'div';
+    return (
+      <Tag
+        href={p.href}
+        target={p.href ? '_blank' : undefined}
+        rel={p.href ? 'noopener noreferrer' : undefined}
+        class:list={[
+          'group block py-5 border-t border-paper/15 no-underline',
+          p.href && 'transition-colors',
+        ]}
+      >
+        <div class="flex items-baseline justify-between gap-4">
+          <span class="font-mono text-[11px] text-paper/60">{p.authors}</span>
+          <span class="font-mono text-[11px] text-paper/60 shrink-0">{p.year}</span>
+        </div>
+        <h3 class="text-[15px] font-medium text-paper mt-2 leading-snug group-hover:text-ochre transition-colors">
+          {p.title}
+        </h3>
+        <p class="text-[12.5px] italic text-paper/70 mt-1">
+          {p.venue}{p.href && <span class="not-italic text-ochre"> ↗</span>}
+        </p>
+      </Tag>
+    );
+  })}
+</div>

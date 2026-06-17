@@ -33,15 +33,16 @@ body { background: var(--ink-1); color: var(--ink-1); font-family: var(--font-bo
     linear-gradient(
       180deg,
       #f4efe4 0%,            /* heights: luminous dawn paper */
-      #f0eadf 10%,           /* paper */
-      #efe6d4 20%,           /* warm peach-ochre haze (Monet) */
-      #e7d8c4 30%,
-      #d9c9c1 40%,           /* rose-grey turn */
-      #b9b3bd 50%,           /* lavender-grey */
-      #989aa6 60%,           /* indigo dusk */
-      #6f6f76 70%,
-      #4a4944 80%,           /* grey ink */
-      #2a2720 90%,
+      #f0eadf 8%,            /* paper */
+      #efe6d4 15%,           /* warm peach-ochre haze (Monet) */
+      #e2d2c2 23%,
+      #cbc0c2 30%,           /* rose-grey turn */
+      #a7a4af 37%,           /* lavender-grey */
+      #7d7e88 44%,           /* indigo dusk */
+      #565660 52%,
+      #3a3833 62%,           /* grey ink — content sits on this, high contrast */
+      #2a2720 78%,
+      #1d1b16 90%,
       #16140f 100%           /* ground: near-black ink */
     );
 }
