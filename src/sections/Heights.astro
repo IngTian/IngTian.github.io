@@ -1,5 +1,5 @@
 ---
-import { name, roles } from '../data/profile';
+import { name, roles, rolesSub } from '../data/profile';
 ---
 <section id="heights" class="relative min-h-[108vh] flex items-center justify-center px-[7vw]">
   <div class="hero-rise text-center">
@@ -8,6 +8,7 @@ import { name, roles } from '../data/profile';
       {name.first} <em class="italic text-ink-3 font-medium">{name.last}</em>
     </h1>
     <p class="font-display italic text-ink-3 mt-6 text-[clamp(15px,2.2vw,21px)]">{roles}</p>
+    <p class="font-mono uppercase tracking-[0.22em] text-ink-4/80 mt-3 text-[11px]">{rolesSub}</p>
   </div>
   <div class="scroll-cue absolute bottom-8 left-1/2 -translate-x-1/2 font-mono text-ink-4 text-[11px] tracking-[0.2em]">scroll</div>
 </section>

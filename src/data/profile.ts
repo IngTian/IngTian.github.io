@@ -20,7 +20,8 @@ export interface Award {
 
 export const name = { first: 'Ing', last: 'Tian' } as const;
 
-export const roles = 'Quant Researcher · Full-stack Developer';
+export const roles = 'Quant Researcher · Portfolio Optimization';
+export const rolesSub = 'Full-stack SDE';
 
 export const timeline: TimelineEntry[] = [
   { period: '2023 — 25', title: 'Senior Software Engineer · TikTok', detail: 'ML systems for ads. Built a dual-tower vision pipeline with billion-scale vector search (Faiss) that enabled quarterly tracking of $200M in creative spend, and a C++ / gRPC ad-signature service sustaining 50k QPS for real-time delivery.', kind: 'work' },
