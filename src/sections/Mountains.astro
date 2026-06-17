@@ -1,7 +1,16 @@
 ---
+import { Image } from 'astro:assets';
 import Timeline from '../components/Timeline.astro';
+import fankuan from '../assets/ink/fankuan-travelers.jpg';
 ---
-<section id="mountains" class="relative px-[7vw] py-[14vh]">
+<section id="mountains" class="relative px-[7vw] py-[16vh] overflow-hidden">
+  <!-- A real Song-dynasty hanging scroll (Fan Kuan, c. 1000 CE) emerging from
+       the mist on the right. Masked top+bottom so it dissolves into the descent
+       gradient; desaturated to sit in the ink palette. Decorative. -->
+  <div class="ink-scroll" aria-hidden="true">
+    <Image src={fankuan} alt="" widths={[480, 720, 960]} sizes="(max-width: 640px) 70vw, 38vw" loading="lazy" />
+  </div>
+
   <div class="relative z-10 max-w-[760px] mx-auto">
     <p class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/55">The story so far</p>
     <h2 class="font-display italic text-[26px] sm:text-[30px] text-paper mt-3 leading-snug">
@@ -10,3 +19,36 @@ import Timeline from '../components/Timeline.astro';
     <Timeline />
   </div>
 </section>
+
+<style>
+  .ink-scroll {
+    position: absolute;
+    top: -10vh;
+    right: -4vw;
+    width: min(560px, 52vw);
+    z-index: 0;
+    pointer-events: none;
+    /* desaturate + lift the warm silk toward the ink palette */
+    filter: grayscale(0.5) brightness(1.04) contrast(1.06);
+    opacity: 0.82;
+    /* the aged-silk ground is darker than our sky, so screen-blend:
+       the dark ink stays, the ground lightens into the mist */
+    mix-blend-mode: screen;
+    /* dissolve top + bottom (and a little left) into the descent so there's
+       no hard rectangle and it melts toward the text as mist */
+    -webkit-mask-image:
+      linear-gradient(to bottom, transparent 0%, black 18%, black 78%, transparent 100%),
+      linear-gradient(to right, transparent 0%, black 30%, black 100%);
+            mask-image:
+      linear-gradient(to bottom, transparent 0%, black 18%, black 78%, transparent 100%),
+      linear-gradient(to right, transparent 0%, black 30%, black 100%);
+    -webkit-mask-composite: source-in;
+            mask-composite: intersect;
+  }
+  .ink-scroll :global(img) { display: block; width: 100%; height: auto; }
+
+  @media (max-width: 640px) {
+    /* on mobile, sit it behind the text more faintly so it never competes */
+    .ink-scroll { opacity: 0.4; right: -10vw; width: 70vw; }
+  }
+</style>
