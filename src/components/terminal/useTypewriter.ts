@@ -1,7 +1,7 @@
 import { useEffect, useReducer } from 'react';
 import type { Script, Line } from './terminal.types';
 
-export interface RenderedLine { kind: Line['kind']; text: string; revealed: number; done: boolean }
+export interface RenderedLine { kind: Line['kind']; text: string; revealed: number; done: boolean; isQuestion?: boolean }
 
 export interface TerminalState {
   script: Script;
@@ -52,12 +52,13 @@ export function terminalReducer(state: TerminalState, action: TerminalAction): T
     case 'ASK': {
       const pair = state.script.pairs[action.pairId];
       if (!pair) return state;
-      // Question line is fully revealed immediately
+      // Question line is fully revealed immediately, marked as question
       const question: InternalRenderedLine = {
         kind: 'text',
         text: pair.question,
         revealed: pair.question.length,
         done: true,
+        isQuestion: true,
         _full: pair.question,
       };
       return {

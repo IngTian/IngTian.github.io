@@ -43,9 +43,9 @@ export default function Terminal() {
       <div className="mt-6 rounded-xl overflow-hidden border border-ochre/20"
            style={{ background: 'linear-gradient(180deg, rgba(40,36,30,0.7), rgba(20,18,15,0.92))', boxShadow: '0 30px 70px rgba(0,0,0,0.5)' }}>
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b border-ochre/15">
-          <i className="w-2.5 h-2.5 rounded-full" style={{ background: '#c56e62' }} />
-          <i className="w-2.5 h-2.5 rounded-full" style={{ background: '#c8a36a' }} />
-          <i className="w-2.5 h-2.5 rounded-full" style={{ background: '#8aa98f' }} />
+          <i className="w-2.5 h-2.5 rounded-full bg-ink-3" />
+          <i className="w-2.5 h-2.5 rounded-full bg-ochre" />
+          <i className="w-2.5 h-2.5 rounded-full bg-ink-4" />
           <span className="ml-2 font-mono text-[11px] text-ink-5">ingtian@research — ask-me</span>
         </div>
         <div ref={bodyRef} className="p-4 font-mono text-[13px] leading-relaxed min-h-[160px] max-h-[340px] overflow-y-auto">
@@ -55,19 +55,28 @@ export default function Terminal() {
               if (l.kind === 'tool') return <div key={i} className="text-ink-5 mt-2"><span className="text-ochre">●</span> {l.text}</div>;
               if (l.kind === 'thinking') return <div key={i} className="text-ink-5/70 mt-2">…</div>;
               if (l.kind === 'divider') return <hr key={i} className="my-2 border-ochre/15" />;
-              // text — first line of a pair is the echoed question (prefix '>')
-              const isQuestion = i === 0 || state.transcript[i - 1]?.kind === 'divider';
+              // text — use explicit isQuestion flag
+              const isQuestion = l.isQuestion === true;
               return (
                 <div key={i} className={isQuestion ? 'text-paper' : 'text-paper/85 mt-2'}>
-                  {isQuestion && <span className="text-[#8aa98f] mr-2">&gt;</span>}{l.text}
+                  {isQuestion && <span className="text-ochre mr-2">&gt;</span>}{l.text}
                   {!l.done && <span className="inline-block w-2 h-4 align-[-2px] ml-0.5 bg-ochre animate-pulse" />}
                 </div>
               );
             })}
           </div>
-          {/* screen-reader mirror: full text, announced once per completed run */}
+          {/* screen-reader mirror: announce only the current pair (last question + following answer lines) */}
           <div className="sr-only" aria-live="polite">
-            {state.status === 'done' && state.transcript.filter((l) => l.kind === 'text').map((l) => l.text).join(' ')}
+            {state.status === 'done' && (() => {
+              // Find the last question line
+              const lastQIndex = state.transcript.findLastIndex((l) => l.isQuestion === true);
+              if (lastQIndex === -1) return '';
+              // Slice from that question to the end (current pair)
+              const currentPair = state.transcript.slice(lastQIndex).filter((l) => l.kind === 'text');
+              const question = currentPair.find((l) => l.isQuestion);
+              const answers = currentPair.filter((l) => !l.isQuestion);
+              return `Question: ${question?.text || ''}. Answer: ${answers.map((l) => l.text).join(' ')}`;
+            })()}
           </div>
         </div>
       </div>

@@ -75,4 +75,22 @@ describe('terminalReducer', () => {
     const textLine = s.transcript.find((l, i) => l.kind === 'text' && i > 0); // not the question
     expect(textLine?.text).toBe('yo');
   });
+
+  it('second question is flagged as isQuestion', () => {
+    let s = terminalReducer(initialState(script), { type: 'ASK', pairId: 'a' });
+    // first question should be flagged
+    expect(s.transcript[0].isQuestion).toBe(true);
+    expect(s.transcript[0].text).toBe('hi?');
+
+    // drive first pair to done
+    s = terminalReducer(s, { type: 'COMPLETE' });
+    expect(s.status).toBe('done');
+
+    // ask second question
+    s = terminalReducer(s, { type: 'ASK', pairId: 'b' });
+    // find the second question in the transcript
+    const questions = s.transcript.filter((l) => l.isQuestion === true);
+    expect(questions.length).toBe(2);
+    expect(questions[1].text).toBe('more?');
+  });
 });
