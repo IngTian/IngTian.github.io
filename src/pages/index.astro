@@ -1,9 +1,16 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Heights from '../sections/Heights.astro';
+import Clouds from '../sections/Clouds.astro';
+import Mountains from '../sections/Mountains.astro';
+import Ground from '../sections/Ground.astro';
+import Signature from '../sections/Signature.astro';
 ---
 
 <BaseLayout>
-  <main class="grid min-h-screen place-items-center">
-    <h1 class="font-display text-6xl" style="font-variation-settings:'opsz' 144,'SOFT' 50;">Ing <em>Tian</em></h1>
-  </main>
+  <Heights />
+  <Clouds />
+  <Mountains />
+  <Ground />
+  <Signature />
 </BaseLayout>
