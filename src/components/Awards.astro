@@ -1,0 +1,14 @@
+---
+import { awards } from '../data/profile';
+---
+<div class="mt-12 max-w-[860px]">
+  <p class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45">Recognition</p>
+  <ul class="mt-4 flex flex-col gap-2.5">
+    {awards.map((a) => (
+      <li class="flex items-baseline gap-4 text-[13px]">
+        <span class="font-mono text-[11px] text-paper/45 w-[56px] shrink-0">{a.year}</span>
+        <span class="text-paper/75">{a.title}</span>
+      </li>
+    ))}
+  </ul>
+</div>

@@ -1,1 +1,72 @@
 @import "tailwindcss";
+@import "./tokens.css";
+
+/* expose tokens to Tailwind v4 utilities */
+@theme {
+  --color-paper: #efe9dd;
+  --color-ink-1: #16140f;
+  --color-ink-2: #2f2b24;
+  --color-ink-3: #5a544a;
+  --color-ink-4: #8c8576;
+  --color-ink-5: #b8b1a1;
+  --color-ochre: #c8a36a;
+  --color-indigo: #6d7689;
+  --color-seal: #b23a2e;
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+html { scroll-behavior: smooth; }
+body { background: var(--ink-1); color: var(--ink-1); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+
+/* ============================================================
+   The Descent — one continuous sky, scrolled through.
+   The gradient lives on a wrapper as tall as ALL the content, so
+   scrolling literally moves you down through it — no seams, no
+   per-section backgrounds. Reads top→bottom: dawn paper → warming
+   ochre → cool indigo dusk → grey ink mountains → near-black ground.
+   ============================================================ */
+.descent {
+  position: relative;
+  background:
+    linear-gradient(
+      180deg,
+      #f4efe4 0%,            /* heights: luminous dawn paper */
+      #f0eadf 8%,            /* paper */
+      #efe6d4 15%,           /* warm peach-ochre haze (Monet) */
+      #e2d2c2 23%,
+      #cbc0c2 30%,           /* rose-grey turn */
+      #a7a4af 37%,           /* lavender-grey */
+      #7d7e88 44%,           /* indigo dusk */
+      #565660 52%,
+      #3a3833 62%,           /* grey ink — content sits on this, high contrast */
+      #2a2720 78%,
+      #1d1b16 90%,
+      #16140f 100%           /* ground: near-black ink */
+    );
+}
+/* soft Monet light: a warm sun-glow upper-right + a cool counter-wash,
+   painted on the heights and scrolling away naturally. */
+.descent::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 120vh;
+  pointer-events: none;
+  background:
+    radial-gradient(54% 38% at 76% 14%, rgba(214,178,120,0.34), transparent 68%),
+    radial-gradient(46% 30% at 18% 26%, rgba(150,160,180,0.16), transparent 70%),
+    radial-gradient(40% 26% at 60% 48%, rgba(220,200,170,0.14), transparent 72%);
+}
+
+/* motion is OFF by default; opt in only when the user has no reduced-motion preference.
+   Phase 3 wraps all scroll animations in this query. */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

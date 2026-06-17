@@ -22,3 +22,12 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# brainstorming visual-companion artifacts (ephemeral, never committed)
+.superpowers/
+
+# local-only paper trail (spec/plan/notes — between me and Claude)
+docs/specs/
+docs/plans/
+docs/notes/
+docs/superpowers/
