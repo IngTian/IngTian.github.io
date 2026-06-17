@@ -20,8 +20,9 @@ pnpm-debug.log*
 # macOS-specific files
 .DS_Store
 
-# jetbrains setting folder
+# editor setting folders
 .idea/
+.vscode/
 
 # brainstorming visual-companion artifacts (ephemeral, never committed)
 .superpowers/
