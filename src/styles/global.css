@@ -32,28 +32,31 @@ body { background: var(--ink-1); color: var(--ink-1); font-family: var(--font-bo
   background:
     linear-gradient(
       180deg,
-      #f3eee3 0%,            /* heights: pale dawn paper */
-      #efe9dd 10%,           /* paper */
-      #ecdfcb 24%,           /* warm ochre mist */
-      #dccdbe 34%,
-      #c3bdbf 44%,           /* cool turn */
-      #9ea1aa 56%,           /* indigo-grey dusk */
-      #6f6f73 67%,
-      #474640 78%,           /* grey ink */
-      #28251f 89%,
+      #f4efe4 0%,            /* heights: luminous dawn paper */
+      #f0eadf 10%,           /* paper */
+      #efe6d4 20%,           /* warm peach-ochre haze (Monet) */
+      #e7d8c4 30%,
+      #d9c9c1 40%,           /* rose-grey turn */
+      #b9b3bd 50%,           /* lavender-grey */
+      #989aa6 60%,           /* indigo dusk */
+      #6f6f76 70%,
+      #4a4944 80%,           /* grey ink */
+      #2a2720 90%,
       #16140f 100%           /* ground: near-black ink */
     );
 }
-/* soft dawn glow in the heights, upper-right; scrolls away naturally */
+/* soft Monet light: a warm sun-glow upper-right + a cool counter-wash,
+   painted on the heights and scrolling away naturally. */
 .descent::before {
   content: "";
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 110vh;
+  height: 120vh;
   pointer-events: none;
   background:
-    radial-gradient(58% 40% at 74% 16%, rgba(200,163,106,0.30), transparent 70%),
-    radial-gradient(48% 30% at 20% 30%, rgba(109,118,137,0.14), transparent 70%);
+    radial-gradient(54% 38% at 76% 14%, rgba(214,178,120,0.34), transparent 68%),
+    radial-gradient(46% 30% at 18% 26%, rgba(150,160,180,0.16), transparent 70%),
+    radial-gradient(40% 26% at 60% 48%, rgba(220,200,170,0.14), transparent 72%);
 }
 
 /* motion is OFF by default; opt in only when the user has no reduced-motion preference.

@@ -1,0 +1,24 @@
+---
+// A short, quiet transition between the hero and the experience — a single
+// editorial statement set in the warming Monet sky. Swiss restraint: one line,
+// generous space, no ornament. Replaces the old (weak) painted-cloud section.
+---
+<section id="interlude" class="relative min-h-[78vh] flex items-center justify-center px-[8vw]">
+  <p class="statement max-w-[26ch] text-center font-display italic text-ink-2 leading-[1.35] text-[clamp(22px,3.4vw,38px)]">
+    Engineer by training, researcher by pull — I build systems that learn, and lately, ones that invest.
+  </p>
+</section>
+
+<style>
+  @media (prefers-reduced-motion: no-preference) {
+    .statement {
+      animation: statement-in linear both;
+      animation-timeline: view();
+      animation-range: entry 5% cover 38%;
+    }
+    @keyframes statement-in {
+      from { opacity: 0.15; transform: translate3d(0, 28px, 0); }
+      to   { opacity: 1;    transform: translate3d(0, 0, 0); }
+    }
+  }
+</style>
