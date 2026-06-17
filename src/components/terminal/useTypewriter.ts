@@ -189,9 +189,11 @@ export function useTypewriter(script: Script) {
   useEffect(() => {
     if (state.status !== 'typing') return;
     const last = state.transcript[state.transcript.length - 1];
-    // tool/marker lines advance fast; text chars ~22ms ±30% jitter
-    const base = last && !last.done && last.kind === 'text' ? 22 : 220;
-    const delay = base + (Math.random() * 0.6 - 0.3) * base;
+    // Smooth & steady cadence: text chars ~34ms with only ±6% jitter (near-even
+    // rhythm reads as smooth — heavy randomness was what felt jittery before).
+    // Tool/marker lines still advance with a longer beat between them.
+    const base = last && !last.done && last.kind === 'text' ? 34 : 220;
+    const delay = base + (Math.random() * 0.12 - 0.06) * base;
     const t = setTimeout(() => dispatch({ type: 'TICK' }), delay);
     return () => clearTimeout(t);
   }, [state]);

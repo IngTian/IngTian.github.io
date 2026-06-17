@@ -29,6 +29,7 @@ body { background: var(--ink-1); color: var(--ink-1); font-family: var(--font-bo
    ============================================================ */
 .descent {
   position: relative;
+  z-index: 0;                /* stacking context so ::after can sit behind content */
   background:
     linear-gradient(
       180deg,
@@ -46,8 +47,10 @@ body { background: var(--ink-1); color: var(--ink-1); font-family: var(--font-bo
       #16140f 100%           /* ground: near-black ink */
     );
 }
-/* soft Monet light: a warm sun-glow upper-right + a cool counter-wash,
-   painted on the heights and scrolling away naturally. */
+
+/* ── Atmosphere, upper sky (heights → interlude). Normal blend: these are warm
+   LIGHT washes + a soft horizon haze that read on the pale paper. Localized to
+   the top, they scroll away naturally. ── */
 .descent::before {
   content: "";
   position: absolute;
@@ -55,9 +58,50 @@ body { background: var(--ink-1); color: var(--ink-1); font-family: var(--font-bo
   height: 120vh;
   pointer-events: none;
   background:
-    radial-gradient(54% 38% at 76% 14%, rgba(214,178,120,0.34), transparent 68%),
-    radial-gradient(46% 30% at 18% 26%, rgba(150,160,180,0.16), transparent 70%),
-    radial-gradient(40% 26% at 60% 48%, rgba(220,200,170,0.14), transparent 72%);
+    /* sun-glow, upper-right — lifted so the Monet light actually registers */
+    radial-gradient(54% 38% at 76% 14%, rgba(214,178,120,0.40), transparent 68%),
+    /* cool counter-wash, upper-left */
+    radial-gradient(46% 30% at 18% 26%, rgba(150,160,180,0.18), transparent 70%),
+    /* mid warm haze */
+    radial-gradient(40% 26% at 60% 48%, rgba(220,200,170,0.14), transparent 72%),
+    /* hero horizon mist — a wide, soft ground-plane low in the heights so the
+       name has something to stand on instead of floating in a void */
+    radial-gradient(125% 10% at 50% 80%, rgba(244,238,225,0.16), transparent 72%);
+}
+
+/* ── Atmosphere, mid → deep sky. Screen blend lightens the darker gradient to
+   suggest vapor catching light. z-index:-1 keeps it behind all content but
+   above the gradient. Full-height so % positions map to scroll zones. ── */
+.descent::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background:
+    /* interlude vapor — a soft cloud the tagline floats inside */
+    radial-gradient(52% 16% at 38% 32%, rgba(238,232,222,0.15), transparent 74%),
+    /* dark-gap fog — rising haze through the dusk→ink void before the terminal.
+       Higher alpha than the light-zone washes: screen blend over near-black
+       needs more to register without reading as a grey smudge. Taller spread so
+       it reads as fog filling the void rather than a band. */
+    radial-gradient(90% 22% at 54% 68%, rgba(156,164,186,0.34), transparent 80%);
+}
+
+/* slow drift — transform/opacity only, never blur. The static state above is
+   the finished composition (also the Firefox / reduced-motion fallback). */
+@media (prefers-reduced-motion: no-preference) {
+  .descent::before { will-change: transform; animation: sky-drift-a 34s ease-in-out infinite alternate; }
+  .descent::after  { will-change: transform; animation: sky-drift-b 46s ease-in-out infinite alternate; }
+  @keyframes sky-drift-a {
+    from { transform: translate3d(0, 0, 0); }
+    to   { transform: translate3d(-10px, 7px, 0); }
+  }
+  @keyframes sky-drift-b {
+    from { transform: translate3d(0, 0, 0); }
+    to   { transform: translate3d(8px, -8px, 0); }
+  }
 }
 
 /* motion is OFF by default; opt in only when the user has no reduced-motion preference.
