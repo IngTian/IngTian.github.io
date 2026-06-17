@@ -56,4 +56,23 @@ describe('terminalReducer', () => {
     for (let i = 0; i < 20; i++) s = terminalReducer(s, { type: 'TICK' });
     expect(s.status).toBe('done');
   });
+
+  it('COMPLETE instantly reveals all remaining content', () => {
+    let s = terminalReducer(initialState(script), { type: 'ASK', pairId: 'a' });
+    // state now has question + queued [tool, text]
+    expect(s.status).toBe('typing');
+    expect(s.queue.length).toBe(2);
+
+    // COMPLETE should instantly finish everything
+    s = terminalReducer(s, { type: 'COMPLETE' });
+    expect(s.status).toBe('done');
+    expect(s.queue.length).toBe(0);
+    // transcript should have: question (already done) + tool + text, all done
+    expect(s.transcript.length).toBe(3);
+    expect(s.transcript.every(l => l.done)).toBe(true);
+    const toolLine = s.transcript.find(l => l.kind === 'tool');
+    expect(toolLine?.text).toBe('Read x');
+    const textLine = s.transcript.find((l, i) => l.kind === 'text' && i > 0); // not the question
+    expect(textLine?.text).toBe('yo');
+  });
 });

@@ -14,6 +14,7 @@ export interface TerminalState {
 export type TerminalAction =
   | { type: 'ASK'; pairId: string }
   | { type: 'TICK' }
+  | { type: 'COMPLETE' }
   | { type: 'RESET' };
 
 export function initialState(script: Script): TerminalState {
@@ -65,6 +66,61 @@ export function terminalReducer(state: TerminalState, action: TerminalAction): T
         queue: [...pair.answer.lines],
         status: 'typing',
         currentPairId: action.pairId,
+      };
+    }
+
+    case 'COMPLETE': {
+      if (state.status !== 'typing') return state;
+      const transcript = [...state.transcript] as InternalRenderedLine[];
+      const last = transcript[transcript.length - 1];
+
+      // Complete the current line if it's unfinished
+      if (last && !last.done && last.kind === 'text') {
+        const full = last._full;
+        transcript[transcript.length - 1] = {
+          ...last,
+          text: full,
+          revealed: full.length,
+          done: true,
+        };
+      }
+
+      // Add all remaining queued lines fully revealed
+      for (const line of state.queue) {
+        if (line.kind === 'thinking' || line.kind === 'divider') {
+          transcript.push({
+            kind: line.kind,
+            text: '',
+            revealed: 0,
+            done: true,
+            _full: '',
+          });
+        } else if (line.kind === 'tool') {
+          const full = line.label;
+          transcript.push({
+            kind: 'tool',
+            text: full,
+            revealed: full.length,
+            done: true,
+            _full: full,
+          });
+        } else if (line.kind === 'text') {
+          const full = line.content;
+          transcript.push({
+            kind: 'text',
+            text: full,
+            revealed: full.length,
+            done: true,
+            _full: full,
+          });
+        }
+      }
+
+      return {
+        ...state,
+        transcript,
+        queue: [],
+        status: 'done',
       };
     }
 
