@@ -1,5 +1,6 @@
 ---
 import Timeline from '../components/Timeline.astro';
+import Buffalo from '../components/Buffalo.astro';
 ---
 <section id="mountains" class="relative px-[7vw] py-[14vh]">
   <div class="relative z-10 max-w-[760px] mx-auto">
@@ -9,6 +10,8 @@ import Timeline from '../components/Timeline.astro';
     </h2>
     <Timeline />
   </div>
-  <!-- Phase 3: lone ink water buffalo anchors here -->
-  <div id="buffalo-slot" class="pointer-events-none absolute right-[6vw] bottom-[12vh] w-[min(280px,38vw)]"></div>
+  <!-- lone ink water buffalo anchors the lower-right, in the mist -->
+  <div id="buffalo-slot" class="pointer-events-none absolute right-[6vw] bottom-[10vh] w-[min(300px,40vw)]">
+    <Buffalo />
+  </div>
 </section>
