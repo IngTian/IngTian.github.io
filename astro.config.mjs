@@ -1,13 +1,18 @@
 // @ts-check
-import { defineConfig } from 'astro/config';
+import { defineConfig, fontProviders } from 'astro/config';
 
 import tailwindcss from '@tailwindcss/vite';
 import react from '@astrojs/react';
 
 // https://astro.build/config
 export default defineConfig({
-  // User site served at the root domain — no `base` needed (that's for project sites).
   site: 'https://ingtian.github.io',
+
+  fonts: [
+    { provider: fontProviders.google(), name: 'Fraunces', cssVariable: '--font-display', weights: [300, 400, 500, 600], styles: ['normal', 'italic'] },
+    { provider: fontProviders.google(), name: 'Inter', cssVariable: '--font-body', weights: [300, 400, 500] },
+    { provider: fontProviders.google(), name: 'JetBrains Mono', cssVariable: '--font-mono', weights: [400, 500] },
+  ],
 
   vite: {
     plugins: [tailwindcss()]
