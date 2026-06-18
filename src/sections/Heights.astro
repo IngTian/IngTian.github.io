@@ -1,5 +1,6 @@
 ---
 import { name, roles, rolesSub, phd, bio } from '../data/profile';
+import TerrainHero from '../components/TerrainHero.astro';
 
 // Build the bio as HTML with the "strong" phrases wrapped in medium weight.
 // Plain string replace is safe here: content is static and trusted (our own data).
@@ -9,6 +10,10 @@ for (const phrase of bio.strong) {
 }
 ---
 <section id="heights" class="relative min-h-[108vh] px-[7vw] pb-[12vh]">
+  <TerrainHero />
+  <!-- legibility: soft paper fades behind the name (bottom-left) and bio (top-right) -->
+  <div class="hero-legibility" aria-hidden="true"></div>
+
   <!-- about-me, floated top-right; the empty diagonal to the name IS the composition -->
   <div class="hero-bio absolute top-[22vh] right-[7vw] max-w-[32ch] text-right">
     <p class="font-body text-ink-2/90 leading-[1.6] text-[clamp(13px,1.25vw,15.5px)]" set:html={bioHtml}></p>
@@ -28,6 +33,16 @@ for (const phrase of bio.strong) {
 </section>
 
 <style>
+  /* TerrainHero is position:absolute inset:0 z-0; keep text above it. */
+  #heights { position: relative; }
+  #heights .hero-rise, #heights .hero-bio { position: absolute; z-index: 2; }
+  .hero-legibility {
+    position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background:
+      radial-gradient(38% 30% at 22% 82%, rgba(244,239,228,0.85), transparent 70%),
+      radial-gradient(30% 22% at 82% 22%, rgba(244,239,228,0.7), transparent 72%);
+  }
+
   /* Mobile: a diagonal can't hold — collapse to a single LEFT-aligned stack
      (bio under the name), never re-centered. Static flow replaces the absolute
      positioning below the sm breakpoint. */
@@ -37,6 +52,8 @@ for (const phrase of bio.strong) {
     #heights .hero-rise { position: static; inset: auto; max-width: 100%; text-align: left; right: auto; }
     #heights .hero-bio { order: 2; }
     #heights .hero-rise { order: 1; }
+    #heights .hero-legibility { display: none; }
+    #heights .terrain-canvas { opacity: 0.5; }
   }
 
   @media (prefers-reduced-motion: no-preference) {
