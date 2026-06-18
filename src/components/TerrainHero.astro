@@ -148,16 +148,22 @@ const bubbles = JSON.stringify([
       } else { bubbleEl!.classList.remove('show'); bubbleEl!.dataset.key = ''; }
     }
 
-    // reduced-motion: paint ONE finished static frame, no loop.
-    if (reduce) {
-      frame(0, false);
-    } else {
-      // animate only while the hero is on-screen (perf: pause offscreen)
-      let running = false, rafId = 0;
-      const loop = (ts: number) => { frame(ts, true); rafId = requestAnimationFrame(loop); };
+    // Paint one finished frame immediately — instant LCP, and the guaranteed
+    // baseline for reduced-motion / before the loop spins up.
+    frame(0, false);
+
+    // Under reduced-motion we stop here (static frame is the finished state).
+    // Otherwise run the animation, paused while the hero is offscreen, and
+    // throttled to ~30fps — imperceptible for this gentle motion, half the cost.
+    if (!reduce) {
+      let running = false, rafId = 0, last = 0;
+      const loop = (ts: number) => {
+        if (ts - last > 33) { frame(ts, true); last = ts; }
+        rafId = requestAnimationFrame(loop);
+      };
       const io = new IntersectionObserver((entries) => {
         const visible = entries[0].isIntersecting;
-        if (visible && !running) { running = true; rafId = requestAnimationFrame(loop); }
+        if (visible && !running) { running = true; last = 0; rafId = requestAnimationFrame(loop); }
         else if (!visible && running) { running = false; cancelAnimationFrame(rafId); }
       }, { threshold: 0 });
       io.observe(cvs);

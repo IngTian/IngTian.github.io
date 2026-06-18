@@ -15,7 +15,7 @@ export const BUMPS: Bump[] = [
 
 export const ZSCALE = 1.7;   // amplify relief so hills/valleys read in 3D
 export const RANGE = 2.6;    // world half-extent in x,y
-export const STEP = 0.13;    // dot-grid spacing
+export const STEP = 0.16;    // dot-grid spacing (tuned up from 0.13 for perf)
 
 // deterministic-ish descent spawn points (varied), cycled by the renderer
 export const SPAWNS: [number, number][] = [
