@@ -1,0 +1,166 @@
+---
+import { EQUATIONS } from '../lib/equations';
+// Bubbles: mostly silent; rare Easter eggs. `word` = the cow; `mathml` = baked.
+const bubbles = JSON.stringify([
+  null, null, null, null,
+  { word: '<span class="m">●</span> Moo!' },
+  { mathml: EQUATIONS.gradZero },
+  { mathml: EQUATIONS.gradZero },
+  { mathml: EQUATIONS.kkt },
+]);
+---
+<canvas id="terrain" class="terrain-canvas" aria-hidden="true" data-bubbles={bubbles}></canvas>
+<div class="terrain-bubble" id="terrain-bubble" aria-hidden="true"></div>
+
+<style>
+  .terrain-canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    z-index: 0; pointer-events: none; display: block;
+  }
+  .terrain-bubble {
+    position: absolute; z-index: 1; color: var(--ink-1);
+    background: rgba(244,239,228,.9); border: 1px solid rgba(109,118,137,.45);
+    border-radius: 999px; padding: 4px 13px; white-space: nowrap;
+    opacity: 0; transform: translateY(5px); pointer-events: none;
+    box-shadow: 0 6px 18px rgba(22,20,15,.10);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .terrain-bubble { transition: opacity .45s, transform .45s; }
+  }
+  .terrain-bubble.show { opacity: 1; transform: none; }
+  .terrain-bubble.word { font-family: var(--font-display); font-style: italic; font-size: 16px; }
+  .terrain-bubble .m { color: var(--indigo); font-style: normal; }
+  .terrain-bubble math { color: var(--ink-1); font-size: 1.05em; }
+</style>
+
+<script>
+  import { field, grad, runDescent, colormap, project, SPAWNS, RANGE, STEP } from '../lib/terrain';
+
+  const cvs = document.getElementById('terrain') as HTMLCanvasElement | null;
+  const bubbleEl = document.getElementById('terrain-bubble') as HTMLElement | null;
+  if (cvs && bubbleEl) {
+    const ctx = cvs.getContext('2d')!;
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const BUBBLES = JSON.parse(cvs.dataset.bubbles || '[]') as Array<null | { word?: string; mathml?: string }>;
+
+    let W = 0, Hh = 0, DPR = 1;
+    function resize() {
+      DPR = Math.min(2, window.devicePixelRatio || 1);
+      const r = cvs!.getBoundingClientRect();
+      W = cvs!.width = Math.round(r.width * DPR);
+      Hh = cvs!.height = Math.round(r.height * DPR);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    // dot grid over the field
+    const dots: Array<{ x: number; y: number }> = [];
+    for (let x = -RANGE; x <= RANGE; x += STEP) for (let y = -RANGE; y <= RANGE; y += STEP) dots.push({ x, y });
+
+    // descent walkers
+    interface Walker { pts: Array<{x:number;y:number}>; born: number; done: boolean; doneAt: number; retire: boolean; bubble: null | {word?:string;mathml?:string}; }
+    const walkers: Walker[] = [];
+    let spawnIx = 0, nextSpawnAt = 600;
+    const STEP_MS = 680;
+    function maybeSpawn(ts: number) {
+      if (ts < nextSpawnAt) return;
+      if (walkers.length && !walkers[walkers.length - 1].done) { nextSpawnAt = ts + 400; return; }
+      const [sx, sy] = SPAWNS[spawnIx % SPAWNS.length];
+      const bubble = BUBBLES[(spawnIx * 3 + 1) % BUBBLES.length];
+      spawnIx++;
+      walkers.push({ pts: runDescent(sx, sy), born: ts, done: false, doneAt: 0, retire: false, bubble });
+      nextSpawnAt = ts + 4200 + (spawnIx % 3) * 900;
+    }
+
+    const ZR = 1.55;
+    function frame(ts: number, animate: boolean) {
+      ctx.clearRect(0, 0, W, Hh);
+      const tsec = ts / 1000;
+      const breathAmp = animate ? 0.04 : 0;
+      const breathHz = 0.4;
+
+      // terrain dots, painter-sorted by depth
+      const rd: Array<{ sx:number; sy:number; depth:number; z:number }> = [];
+      for (const d of dots) {
+        let z = field(d.x, d.y);
+        z += breathAmp * Math.sin(tsec * breathHz + d.x * 0.7 + d.y * 0.6);
+        const [sx, sy, depth] = project(d.x, d.y, z, W, Hh);
+        rd.push({ sx, sy, depth, z });
+      }
+      rd.sort((p, q) => p.depth - q.depth);
+      for (const p of rd) {
+        if (p.sx < -20 || p.sx > W + 20 || p.sy < -20 || p.sy > Hh + 20) continue;
+        const hn = Math.max(0, Math.min(1, (p.z + ZR) / (2 * ZR)));
+        const r = (2.9 - hn * 1.6) * DPR;
+        const alpha = 0.30 + (1 - hn) * 0.45;
+        const [cr, cg, cb] = colormap(hn);
+        ctx.beginPath(); ctx.arc(p.sx, p.sy, Math.max(0.5, r), 0, 7);
+        ctx.fillStyle = `rgba(${cr|0},${cg|0},${cb|0},${alpha.toFixed(3)})`; ctx.fill();
+      }
+
+      // walkers (only when animating; static frame shows terrain only)
+      let anyBubble: null | { x:number; y:number; b:{word?:string;mathml?:string} } = null;
+      if (animate) {
+        maybeSpawn(ts);
+        const APPEAR = 160, TAIL = 4600, HOLD = 1600;
+        for (const wk of walkers) {
+          const elapsed = ts - wk.born;
+          const shown = Math.min(wk.pts.length, Math.floor(elapsed / STEP_MS) + 1);
+          if (shown >= wk.pts.length && !wk.done) { wk.done = true; wk.doneAt = ts; }
+          let maxAlpha = 0;
+          for (let i = 0; i < shown; i++) {
+            const pt = wk.pts[i];
+            const z = field(pt.x, pt.y) + breathAmp * Math.sin(tsec * breathHz + pt.x * 0.7 + pt.y * 0.6);
+            const [sx, sy] = project(pt.x, pt.y, z + 0.06, W, Hh);
+            const isLast = i === wk.pts.length - 1;
+            const age = ts - (wk.born + i * STEP_MS);
+            const appear = Math.min(1, age / APPEAR);
+            const life = (isLast && wk.done)
+              ? Math.max(0, 1 - Math.max(0, age - HOLD) / 700)
+              : Math.max(0, 1 - age / TAIL);
+            const a = appear * life;
+            if (a <= 0.01) continue;
+            maxAlpha = Math.max(maxAlpha, a);
+            const rr = (isLast ? 5.2 : 3.8) * DPR;
+            ctx.beginPath(); ctx.arc(sx, sy, rr * 1.9, 0, 7); ctx.fillStyle = `rgba(244,239,228,${0.5 * a})`; ctx.fill();
+            ctx.beginPath(); ctx.arc(sx, sy, rr, 0, 7);
+            ctx.fillStyle = isLast && wk.done ? `rgba(200,163,106,${0.95 * a})` : `rgba(92,108,140,${a})`;
+            ctx.fill();
+            if (isLast && wk.done && a > 0.5 && wk.bubble) anyBubble = { x: sx, y: sy, b: wk.bubble };
+          }
+          if (wk.done && maxAlpha <= 0.01) wk.retire = true;
+        }
+        for (let i = walkers.length - 1; i >= 0; i--) if (walkers[i].retire) walkers.splice(i, 1);
+      }
+
+      // rare Easter-egg bubble
+      if (anyBubble) {
+        const b = anyBubble.b;
+        const key = b.mathml || b.word || '';
+        if (bubbleEl!.dataset.key !== key) {
+          bubbleEl!.dataset.key = key;
+          bubbleEl!.classList.toggle('word', !!b.word);
+          bubbleEl!.innerHTML = b.word || b.mathml || '';
+        }
+        bubbleEl!.style.left = (anyBubble.x / DPR + 12) + 'px';
+        bubbleEl!.style.top = (anyBubble.y / DPR - 44) + 'px';
+        bubbleEl!.classList.add('show');
+      } else { bubbleEl!.classList.remove('show'); bubbleEl!.dataset.key = ''; }
+    }
+
+    // reduced-motion: paint ONE finished static frame, no loop.
+    if (reduce) {
+      frame(0, false);
+    } else {
+      // animate only while the hero is on-screen (perf: pause offscreen)
+      let running = false, rafId = 0;
+      const loop = (ts: number) => { frame(ts, true); rafId = requestAnimationFrame(loop); };
+      const io = new IntersectionObserver((entries) => {
+        const visible = entries[0].isIntersecting;
+        if (visible && !running) { running = true; rafId = requestAnimationFrame(loop); }
+        else if (!visible && running) { running = false; cancelAnimationFrame(rafId); }
+      }, { threshold: 0 });
+      io.observe(cvs);
+    }
+  }
+</script>
