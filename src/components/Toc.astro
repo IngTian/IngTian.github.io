@@ -1,0 +1,161 @@
+---
+// Thin left-margin table of contents — a "whisper" of wayfinding over the
+// single-scroll descent. Renders fully as a static clickable list with no JS;
+// an inline IntersectionObserver progressively enhances it with an active-state
+// highlight and fades it in only after you leave the hero. No React island.
+//
+// Each stop carries a `zone` (light|dark) so the label color adapts to the
+// gradient sky beneath it — dark ink on the pale top, paper on the dark bottom.
+const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
+  { label: 'About', href: '#heights',   zone: 'light' },
+  { label: 'Work',  href: '#mountains', zone: 'light' },
+  { label: 'Ask',   href: '#ground',    zone: 'dark'  },
+  { label: 'Links', href: '#signature', zone: 'dark'  },
+];
+---
+<nav class="toc" aria-label="Sections" data-toc>
+  <ul>
+    {stops.map((s) => (
+      <li>
+        <a href={s.href} data-zone={s.zone}>
+          <span class="rule" aria-hidden="true"></span>
+          <span class="dot" aria-hidden="true"></span>
+          <span class="label">{s.label}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</nav>
+
+<style>
+  .toc {
+    position: fixed;
+    left: clamp(14px, 2.4vw, 34px);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 30;
+    pointer-events: none; /* container ignores; links re-enable */
+    /* Hidden until JS reveals it after the hero. No-JS fallback re-shows it
+       (see :root:not(.js) rule below) so it never stays invisible. */
+    opacity: 0;
+    transition: opacity 0.6s ease;
+  }
+  .toc.toc--visible { opacity: 1; }
+
+  .toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+
+  .toc a {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  /* lead-in rule — grows when active */
+  .rule { width: 0; height: 1px; background: currentColor; opacity: 0.5; transition: width 0.4s ease; }
+  /* tick dot — shown on mobile, hidden on desktop (labels carry it there) */
+  .dot { display: none; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.4; transition: opacity 0.3s ease, transform 0.3s ease; }
+  .label { transition: opacity 0.3s ease; }
+
+  /* zone-adaptive base color (dimmed) */
+  .toc a[data-zone="light"] { color: var(--ink-3); }
+  .toc a[data-zone="dark"]  { color: var(--ink-5); }
+  .toc a { opacity: 0.4; }
+
+  /* active state — full opacity ink/paper + extended rule */
+  .toc a.is-active { opacity: 1; }
+  .toc a[data-zone="light"].is-active { color: var(--ink-1); }
+  .toc a[data-zone="dark"].is-active  { color: var(--paper); }
+  .toc a.is-active .rule { width: 18px; }
+
+  /* hover affordance for the dimmed ones */
+  @media (hover: hover) {
+    .toc a:hover { opacity: 0.85; }
+  }
+
+  /* Mobile: dots only, no labels, tighter — a minimal progress cue */
+  @media (max-width: 640px) {
+    .toc { left: 12px; }
+    .toc ul { gap: 16px; }
+    .toc .rule, .toc .label { display: none; }
+    .toc .dot { display: block; }
+    .toc a.is-active .dot { opacity: 1; transform: scale(1.5); }
+  }
+
+  /* Reduced motion: no growth/fade transitions; the static (visible) state is
+     finished. We still reveal it (JS adds --visible) but without animating. */
+  @media (prefers-reduced-motion: reduce) {
+    .toc, .toc .rule, .toc .dot, .toc .label { transition: none; }
+  }
+
+  /* No-JS fallback: if the enhancement never runs, keep the rail visible at a
+     readable mid opacity rather than hidden. (.no-toc-js set on <html> until
+     the script clears it — inverse-guard pattern.) */
+  :global(html.no-toc-js) .toc { opacity: 1; }
+</style>
+
+<script>
+  // Progressive enhancement. Mark that JS is handling the TOC; if this script
+  // never runs, the CSS no-JS fallback keeps the rail visible.
+  document.documentElement.classList.add('no-toc-js');
+
+  function initToc() {
+    const toc = document.querySelector<HTMLElement>('[data-toc]');
+    if (!toc || !('requestAnimationFrame' in window)) return; // CSS fallback stays
+    document.documentElement.classList.remove('no-toc-js');
+
+    const links = Array.from(toc.querySelectorAll<HTMLAnchorElement>('a'));
+    // resolve each stop's section element, in document order
+    const stops = links
+      .map((a) => ({ a, el: document.getElementById(a.getAttribute('href')?.slice(1) ?? '') }))
+      .filter((s): s is { a: HTMLAnchorElement; el: HTMLElement } => !!s.el);
+    const hero = document.getElementById('heights');
+
+    function update() {
+      const vh = window.innerHeight;
+      // show the rail only after we've scrolled past most of the hero
+      const heroPast = !hero || hero.getBoundingClientRect().bottom < vh * 0.5;
+      toc.classList.toggle('toc--visible', heroPast);
+
+      // scrollspy: active = the last stop whose top has crossed a reference
+      // line near the top of the viewport. Robust to wildly different section
+      // heights (the short footer no longer loses a ratio contest).
+      const refLine = vh * 0.4;
+      let activeIdx = 0;
+      stops.forEach((s, i) => {
+        if (s.el.getBoundingClientRect().top <= refLine) activeIdx = i;
+      });
+      // bottom guard: a short final section (e.g. the footer) may never reach
+      // the reference line. Once we're within ~2px of the page bottom, force
+      // the last stop active so "Links" can light up.
+      const atBottom = window.scrollY + vh >= document.documentElement.scrollHeight - 2;
+      if (atBottom) activeIdx = stops.length - 1;
+
+      stops.forEach((s, i) => {
+        const on = heroPast && i === activeIdx;
+        s.a.classList.toggle('is-active', on);
+        if (on) s.a.setAttribute('aria-current', 'true');
+        else s.a.removeAttribute('aria-current');
+      });
+    }
+
+    let ticking = false;
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => { update(); ticking = false; });
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    update();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initToc);
+  else initToc();
+</script>
