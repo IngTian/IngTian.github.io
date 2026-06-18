@@ -1,21 +1,47 @@
 ---
-import { name, roles, rolesSub } from '../data/profile';
+import { name, roles, rolesSub, phd, bio } from '../data/profile';
+
+// Build the bio as HTML with the "strong" phrases wrapped in medium weight.
+// Plain string replace is safe here: content is static and trusted (our own data).
+let bioHtml = bio.text;
+for (const phrase of bio.strong) {
+  bioHtml = bioHtml.replace(phrase, `<strong class="font-medium text-ink-2">${phrase}</strong>`);
+}
 ---
-<section id="heights" class="relative min-h-[108vh] flex items-center justify-center px-[7vw]">
-  <div class="hero-rise text-center">
-    <h1 class="font-display text-ink-1 leading-[0.92] tracking-[-0.02em] text-[clamp(58px,11vw,128px)]"
+<section id="heights" class="relative min-h-[108vh] px-[7vw] pb-[12vh]">
+  <!-- about-me, floated top-right; the empty diagonal to the name IS the composition -->
+  <div class="hero-bio absolute top-[22vh] right-[7vw] max-w-[32ch] text-right">
+    <p class="font-body text-ink-2/90 leading-[1.6] text-[clamp(13px,1.25vw,15.5px)]" set:html={bioHtml}></p>
+  </div>
+
+  <!-- name anchored bottom-left -->
+  <div class="hero-rise absolute bottom-[16vh] left-[7vw] max-w-[88vw]">
+    <h1 class="font-display text-ink-1 leading-[0.9] tracking-[-0.02em] text-[clamp(64px,12vw,132px)]"
         style="font-variation-settings:'opsz' 144,'SOFT' 60; text-shadow: 0 1px 18px rgba(22,20,15,0.06);">
       {name.first} <em class="italic text-ink-3 font-medium">{name.last}</em>
     </h1>
-    <p class="font-display italic text-ink-3 mt-6 text-[clamp(15px,2.2vw,21px)]">{roles}</p>
-    <p class="font-mono uppercase tracking-[0.22em] text-ink-4/80 mt-3 text-[11px]">{rolesSub}</p>
+    <p class="font-display italic text-ink-3 mt-5 text-[clamp(15px,2.2vw,21px)]">{roles}</p>
+    <p class="font-mono uppercase tracking-[0.22em] text-ink-4/80 mt-2.5 text-[11px]">{phd} &nbsp;·&nbsp; {rolesSub}</p>
   </div>
+
   <div class="scroll-cue absolute bottom-8 left-1/2 -translate-x-1/2 font-mono text-ink-4 text-[11px] tracking-[0.2em]">scroll</div>
 </section>
 
 <style>
+  /* Mobile: a diagonal can't hold — collapse to a single LEFT-aligned stack
+     (bio under the name), never re-centered. Static flow replaces the absolute
+     positioning below the sm breakpoint. */
+  @media (max-width: 640px) {
+    #heights { display: flex; flex-direction: column; justify-content: flex-end; gap: 1.75rem; padding-bottom: 16vh; }
+    #heights .hero-bio,
+    #heights .hero-rise { position: static; inset: auto; max-width: 100%; text-align: left; right: auto; }
+    #heights .hero-bio { order: 2; }
+    #heights .hero-rise { order: 1; }
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .hero-rise { animation: hero-rise 1.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+    .hero-bio  { animation: hero-rise 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both; }
     @keyframes hero-rise {
       from { opacity: 0; transform: translate3d(0, 16px, 0); }
       to   { opacity: 1; transform: translate3d(0, 0, 0); }

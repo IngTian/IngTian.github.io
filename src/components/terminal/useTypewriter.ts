@@ -1,7 +1,7 @@
 import { useEffect, useReducer } from 'react';
 import type { Script, Line } from './terminal.types';
 
-export interface RenderedLine { kind: Line['kind']; text: string; revealed: number; done: boolean; isQuestion?: boolean }
+export interface RenderedLine { kind: Line['kind']; text: string; revealed: number; done: boolean; isQuestion?: boolean; href?: string }
 
 export interface TerminalState {
   script: Script;
@@ -41,6 +41,7 @@ function createRenderedLine(line: Line, revealed: number): InternalRenderedLine 
     revealed,
     done,
     _full: full,
+    href: line.kind === 'text' ? line.href : undefined,
   };
 }
 
@@ -113,6 +114,7 @@ export function terminalReducer(state: TerminalState, action: TerminalAction): T
             revealed: full.length,
             done: true,
             _full: full,
+            href: line.href,
           });
         }
       }
