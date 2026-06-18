@@ -34,7 +34,7 @@ const bubbles = JSON.stringify([
 </style>
 
 <script>
-  import { field, grad, runDescent, colormap, project, SPAWNS, RANGE, STEP } from '../lib/terrain';
+  import { field, runDescent, colormap, project, SPAWNS, RANGE, STEP } from '../lib/terrain';
 
   const cvs = document.getElementById('terrain') as HTMLCanvasElement | null;
   const bubbleEl = document.getElementById('terrain-bubble') as HTMLElement | null;
@@ -51,14 +51,13 @@ const bubbles = JSON.stringify([
       Hh = cvs!.height = Math.round(r.height * DPR);
     }
     resize();
-    window.addEventListener('resize', resize);
 
     // dot grid over the field
     const dots: Array<{ x: number; y: number }> = [];
     for (let x = -RANGE; x <= RANGE; x += STEP) for (let y = -RANGE; y <= RANGE; y += STEP) dots.push({ x, y });
 
     // descent walkers
-    interface Walker { pts: Array<{x:number;y:number}>; born: number; done: boolean; doneAt: number; retire: boolean; bubble: null | {word?:string;mathml?:string}; }
+    interface Walker { pts: Array<{x:number;y:number}>; born: number; done: boolean; retire: boolean; bubble: null | {word?:string;mathml?:string}; }
     const walkers: Walker[] = [];
     let spawnIx = 0, nextSpawnAt = 600;
     const STEP_MS = 680;
@@ -68,7 +67,7 @@ const bubbles = JSON.stringify([
       const [sx, sy] = SPAWNS[spawnIx % SPAWNS.length];
       const bubble = BUBBLES[(spawnIx * 3 + 1) % BUBBLES.length];
       spawnIx++;
-      walkers.push({ pts: runDescent(sx, sy), born: ts, done: false, doneAt: 0, retire: false, bubble });
+      walkers.push({ pts: runDescent(sx, sy), born: ts, done: false, retire: false, bubble });
       nextSpawnAt = ts + 4200 + (spawnIx % 3) * 900;
     }
 
@@ -94,7 +93,7 @@ const bubbles = JSON.stringify([
         const r = (2.9 - hn * 1.6) * DPR;
         const alpha = 0.30 + (1 - hn) * 0.45;
         const [cr, cg, cb] = colormap(hn);
-        ctx.beginPath(); ctx.arc(p.sx, p.sy, Math.max(0.5, r), 0, 7);
+        ctx.beginPath(); ctx.arc(p.sx, p.sy, Math.max(0.5, r), 0, 2 * Math.PI);
         ctx.fillStyle = `rgba(${cr|0},${cg|0},${cb|0},${alpha.toFixed(3)})`; ctx.fill();
       }
 
@@ -106,7 +105,7 @@ const bubbles = JSON.stringify([
         for (const wk of walkers) {
           const elapsed = ts - wk.born;
           const shown = Math.min(wk.pts.length, Math.floor(elapsed / STEP_MS) + 1);
-          if (shown >= wk.pts.length && !wk.done) { wk.done = true; wk.doneAt = ts; }
+          if (shown >= wk.pts.length && !wk.done) { wk.done = true; }
           let maxAlpha = 0;
           for (let i = 0; i < shown; i++) {
             const pt = wk.pts[i];
@@ -122,8 +121,8 @@ const bubbles = JSON.stringify([
             if (a <= 0.01) continue;
             maxAlpha = Math.max(maxAlpha, a);
             const rr = (isLast ? 5.2 : 3.8) * DPR;
-            ctx.beginPath(); ctx.arc(sx, sy, rr * 1.9, 0, 7); ctx.fillStyle = `rgba(244,239,228,${0.5 * a})`; ctx.fill();
-            ctx.beginPath(); ctx.arc(sx, sy, rr, 0, 7);
+            ctx.beginPath(); ctx.arc(sx, sy, rr * 1.9, 0, 2 * Math.PI); ctx.fillStyle = `rgba(244,239,228,${0.5 * a})`; ctx.fill();
+            ctx.beginPath(); ctx.arc(sx, sy, rr, 0, 2 * Math.PI);
             ctx.fillStyle = isLast && wk.done ? `rgba(200,163,106,${0.95 * a})` : `rgba(92,108,140,${a})`;
             ctx.fill();
             if (isLast && wk.done && a > 0.5 && wk.bubble) anyBubble = { x: sx, y: sy, b: wk.bubble };
@@ -151,6 +150,13 @@ const bubbles = JSON.stringify([
     // Paint one finished frame immediately — instant LCP, and the guaranteed
     // baseline for reduced-motion / before the loop spins up.
     frame(0, false);
+
+    // Resize handler: canvas resize clears the backing store, so repaint the
+    // static frame under reduced-motion (otherwise the animation loop repaints).
+    window.addEventListener('resize', () => {
+      resize();
+      if (reduce) frame(0, false);
+    });
 
     // Under reduced-motion we stop here (static frame is the finished state).
     // Otherwise run the animation, paused while the hero is offscreen, and
