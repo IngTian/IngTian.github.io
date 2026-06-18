@@ -55,6 +55,7 @@ export const script: Script = {
       answer: {
         lines: [
           { kind: 'text', content: 'I play guqin and practice calligraphy — Chinese and English. And I like cows: the one on the mountain above is a water buffalo, not a bull — the quant who rides the humble ox, not the bull market.' },
+          { kind: 'text', content: "If you spot a stuffed cow in my profiles, that's a Cows.ca cow — arguably the best ice cream in Canada. And who says cows aren't good at music?", href: 'https://www.youtube.com/watch?v=lXKDu6cdXLI' },
         ],
       },
       followups: [

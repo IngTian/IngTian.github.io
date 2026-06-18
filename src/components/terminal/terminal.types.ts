@@ -1,5 +1,6 @@
 export type Line =
-  | { kind: 'text'; content: string }
+  // `href` (optional) turns the whole line into a link once it's fully typed.
+  | { kind: 'text'; content: string; href?: string }
   | { kind: 'tool'; label: string }
   | { kind: 'thinking'; ms?: number }
   | { kind: 'divider' };

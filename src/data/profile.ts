@@ -22,6 +22,15 @@ export const name = { first: 'Ing', last: 'Tian' } as const;
 
 export const roles = 'Quant Researcher · Portfolio Optimization';
 export const rolesSub = 'ex Full-stack SDE / MLE';
+// promoted into the hero subline — the highest-status current affiliation
+export const phd = 'PhD · University of Toronto';
+
+// About-me, shown top-right in the hero (layout B). First-person, quant-first.
+// `strong` marks the phrases set in medium weight (UofT + the research focus).
+export const bio: { text: string; strong: string[] } = {
+  text: 'Quant researcher & PhD student at the University of Toronto, working on multi-period portfolio optimization. Before the PhD: full-stack SDE / MLE at TikTok, Ericsson, and Amazon. Also a guqin player and calligraphy practitioner.',
+  strong: ['University of Toronto', 'multi-period portfolio optimization'],
+};
 
 export const timeline: TimelineEntry[] = [
   { period: '2023 — 25', title: 'Senior Software Engineer · TikTok', detail: 'ML systems for ads. Built a dual-tower vision pipeline with billion-scale vector search (Faiss) that enabled quarterly tracking of $200M in creative spend, and a C++ / gRPC ad-signature service sustaining 50k QPS for real-time delivery.', kind: 'work' },

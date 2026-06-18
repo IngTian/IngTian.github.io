@@ -57,9 +57,13 @@ export default function Terminal() {
               if (l.kind === 'divider') return <hr key={i} className="my-2 border-ochre/15" />;
               // text — use explicit isQuestion flag
               const isQuestion = l.isQuestion === true;
+              // once a text line with an href is fully typed, render it as a link
+              const body = l.href && l.done
+                ? <a href={l.href} target="_blank" rel="noopener noreferrer" className="text-ochre underline decoration-ochre/40 underline-offset-2 hover:decoration-ochre">{l.text}</a>
+                : l.text;
               return (
                 <div key={i} className={isQuestion ? 'text-paper' : 'text-paper/85 mt-2'}>
-                  {isQuestion && <span className="text-ochre mr-2">&gt;</span>}{l.text}
+                  {isQuestion && <span className="text-ochre mr-2">&gt;</span>}{body}
                   {!l.done && <span className="inline-block w-2 h-4 align-[-2px] ml-0.5 bg-ochre animate-pulse" />}
                 </div>
               );
