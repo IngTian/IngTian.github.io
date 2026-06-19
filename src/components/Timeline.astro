@@ -7,6 +7,7 @@ import { timeline } from '../data/profile';
       <div class="font-mono text-[12px] text-paper/50 w-[104px] shrink-0 pt-1">{e.period}</div>
       <div>
         <h3 class="text-[16px] font-semibold text-paper">{e.title}</h3>
+        {e.sub && <p class="text-[12px] text-paper/45 mt-0.5 italic">{e.sub}</p>}
         <p class="text-[13px] text-paper/65 mt-1 leading-relaxed">{e.detail}</p>
       </div>
     </div>
