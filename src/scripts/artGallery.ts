@@ -1,4 +1,6 @@
 import { justifyRows } from '../lib/justify';
+import { activeStopIndex } from '../lib/scrollspy';
+import { prefersReducedMotion } from '../lib/motion';
 
 // Re-init on first load AND after every View Transition swap (astro:page-load
 // fires in both). Without this, navigating TO /art via a transition would never
@@ -11,7 +13,7 @@ function initArtGallery() {
   galleryTeardown?.();
   galleryTeardown = null;
 
-const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reduce = prefersReducedMotion();
 
 // ---------- gentle fade-in as each image decodes (no pop) ----------
 // Mark a tile loaded once its <img> is ready; cached images resolve instantly.
@@ -61,39 +63,42 @@ window.addEventListener('resize', buildRows, { passive: true });
 
 // ---------- placard controller ----------
 const placard = document.getElementById('art-placard');
-const elK = placard?.querySelector('.pl-kicker') as HTMLElement;
-const elT = placard?.querySelector('.pl-title') as HTMLElement;
-const elY = placard?.querySelector('.pl-year') as HTMLElement;
-const elD = placard?.querySelector('.pl-desc') as HTMLElement;
-let curKey: string | null = null;
+const elKicker = placard?.querySelector('.pl-kicker') as HTMLElement;
+const elTitle = placard?.querySelector('.pl-title') as HTMLElement;
+const elMeta = placard?.querySelector('.pl-meta') as HTMLElement;
+const elDesc = placard?.querySelector('.pl-desc') as HTMLElement;
+let currentKey: string | null = null;
 
-interface Card { key: string; kicker: string; title: string; year: string; desc: string; }
+// `meta` is the third placard line — the medium ("clerical script · ink on
+// paper") for calligraphy, empty for photographs. (Not a year; named for what
+// it holds.)
+interface Card { key: string; kicker: string; title: string; meta: string; desc: string; }
 function setPlacard(card: Card, dark: boolean) {
   if (!placard) return;
   placard.classList.toggle('dark', dark);
-  if (card.key === curKey) return;
-  curKey = card.key;
-  const apply = () => { elK.textContent = card.kicker; elT.textContent = card.title; elY.textContent = card.year; elD.textContent = card.desc; placard.classList.remove('fade'); };
+  if (card.key === currentKey) return;
+  currentKey = card.key;
+  const apply = () => { elKicker.textContent = card.kicker; elTitle.textContent = card.title; elMeta.textContent = card.meta; elDesc.textContent = card.desc; placard.classList.remove('fade'); };
   if (reduce) { apply(); return; }
   placard.classList.add('fade');
   setTimeout(apply, 150);
 }
 
 const photoRowsEl = document.getElementById('photo-rows');
-const DEF: Card = {
+const DEFAULT_CARD: Card = {
   key: 'def',
   kicker: photoRowsEl?.dataset.defKicker || 'Photography',
   title: photoRowsEl?.dataset.defTitle || '',
-  year: '',
+  meta: '',
   desc: photoRowsEl?.dataset.defNote || '',
 };
 const calBlocks = Array.from(document.querySelectorAll<HTMLElement>('.cal-block'));
 function calCard(b: HTMLElement): Card {
-  return { key: 'c' + b.dataset.i, kicker: b.dataset.kicker || '', title: b.dataset.title || '', year: b.dataset.year || '', desc: b.dataset.note || '' };
+  return { key: 'c' + b.dataset.i, kicker: b.dataset.kicker || '', title: b.dataset.title || '', meta: b.dataset.meta || '', desc: b.dataset.note || '' };
 }
 function photoCard(t: HTMLElement): Card {
   const note = t.dataset.note || '';
-  return { key: 'p' + t.dataset.i, kicker: 'Photography', title: t.dataset.title || 'Untitled', year: '', desc: note || DEF.desc };
+  return { key: 'p' + t.dataset.i, kicker: 'Photography', title: t.dataset.title || 'Untitled', meta: '', desc: note || DEFAULT_CARD.desc };
 }
 
 let hovering: HTMLElement | null = null;
@@ -103,7 +108,7 @@ function updatePlacard() {
   const inPhoto = photoLabel.getBoundingClientRect().top < window.innerHeight * 0.45;
   if (inPhoto) {
     if (hovering) setPlacard(photoCard(hovering), true);
-    else setPlacard(DEF, true);
+    else setPlacard(DEFAULT_CARD, true);
   } else {
     let best = calBlocks[0]; let bestD = Infinity;
     calBlocks.forEach((b) => {
@@ -126,10 +131,13 @@ const stops = tocLinks
   .map((a) => ({ a, el: document.getElementById(a.dataset.target || '') }))
   .filter((s): s is { a: HTMLAnchorElement; el: HTMLElement } => !!s.el);
 function updateToc() {
-  const ref = window.innerHeight * 0.4;
-  let idx = 0;
-  stops.forEach((s, i) => { if (s.el.getBoundingClientRect().top <= ref) idx = i; });
-  if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2) idx = stops.length - 1;
+  // shared pure rule (see lib/scrollspy.ts) — same active-stop logic as the homepage TOC
+  const idx = activeStopIndex(
+    stops.map((s) => s.el.getBoundingClientRect().top),
+    window.innerHeight,
+    window.scrollY,
+    document.documentElement.scrollHeight,
+  );
   stops.forEach((s, i) => s.a.classList.toggle('is-active', i === idx));
 }
 

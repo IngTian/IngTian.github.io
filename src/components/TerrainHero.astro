@@ -35,6 +35,7 @@ const bubbles = JSON.stringify([
 
 <script>
   import { field, runDescent, colormap, project, SPAWNS, RANGE, STEP } from '../lib/terrain';
+  import { prefersReducedMotion } from '../lib/motion';
 
   // Teardown handle for the previous init — re-init runs on every page load AND
   // after each View Transition swap (astro:page-load), so we must dispose the
@@ -52,7 +53,7 @@ const bubbles = JSON.stringify([
     if (!cvs || !bubbleEl) return;
 
     const ctx = cvs.getContext('2d')!;
-    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduce = prefersReducedMotion();
     const BUBBLES = JSON.parse(cvs.dataset.bubbles || '[]') as Array<null | { word?: string; mathml?: string }>;
 
     let W = 0, Hh = 0, DPR = 1;

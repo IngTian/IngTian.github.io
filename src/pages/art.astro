@@ -25,7 +25,7 @@ import SkyWash from '../components/SkyWash.astro';
       <div class="pl-inner">
         <div class="pl-kicker"></div>
         <p class="pl-title"></p>
-        <div class="pl-year"></div>
+        <div class="pl-meta"></div>
         <p class="pl-desc"></p>
       </div>
     </aside>
@@ -41,7 +41,7 @@ import SkyWash from '../components/SkyWash.astro';
       <div id="cal-host">
         {calligraphy.map((w, i) => (
           <div class="cal-block" data-i={i}
-               data-kicker={w.kicker} data-title={w.title} data-year={w.medium} data-note={w.note}>
+               data-kicker={w.kicker} data-title={w.title} data-meta={w.medium} data-note={w.note}>
             <figure class:list={["cal", w.treatment]} data-zoom={w.src.src} data-alt={w.alt}>
               <Image src={w.src} alt={w.alt} widths={[480, 900, w.src.width]} sizes="(max-width:1024px) 80vw, 40vw" />
             </figure>
@@ -94,10 +94,10 @@ import SkyWash from '../components/SkyWash.astro';
   .placard.fade .pl-inner { opacity: 0; transform: translateY(8px); }
   .pl-kicker { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-4); }
   .pl-title { font-family: var(--font-display); font-weight: 500; font-size: 28px; line-height: 1.15; margin: 13px 0 5px; font-variation-settings: 'SOFT' 40; }
-  .pl-year { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--ink-4); margin-bottom: 16px; }
+  .pl-meta { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--ink-4); margin-bottom: 16px; }
   .pl-desc { font-size: 15px; line-height: 1.75; color: var(--ink-3); }
   .placard.dark .pl-title { color: var(--paper); }
-  .placard.dark .pl-kicker, .placard.dark .pl-year { color: var(--ink-5); }
+  .placard.dark .pl-kicker, .placard.dark .pl-meta { color: var(--ink-5); }
   .placard.dark .pl-desc { color: rgba(239, 233, 221, 0.7); }
 
   /* Works column: left edge clears the rail+placard; right edge stays anchored
