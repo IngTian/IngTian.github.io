@@ -37,8 +37,8 @@ body { background: var(--ink-1); color: var(--ink-1); font-family: var(--font-bo
       #f0eadf 8%,            /* paper */
       #efe6d4 15%,           /* warm peach-ochre haze (Monet) */
       #e2d2c2 23%,
-      #cbc0c2 30%,           /* rose-grey turn */
-      #a7a4af 37%,           /* lavender-grey */
+      #ccc4b6 30%,           /* warm taupe (was rose #cbc0c2 — drop the mauve B-lift) */
+      #a6a8ad 37%,           /* cool-neutral grey (was lavender #a7a4af — kill the violet R>G) */
       #7d7e88 44%,           /* indigo dusk */
       #565660 52%,
       #3a3833 62%,           /* grey ink — content sits on this, high contrast */
@@ -63,10 +63,10 @@ body { background: var(--ink-1); color: var(--ink-1); font-family: var(--font-bo
     /* cool counter-wash, upper-left */
     radial-gradient(46% 30% at 18% 26%, rgba(150,160,180,0.18), transparent 70%),
     /* mid warm haze */
-    radial-gradient(40% 26% at 60% 48%, rgba(220,200,170,0.14), transparent 72%),
-    /* hero horizon mist — a wide, soft ground-plane low in the heights so the
-       name has something to stand on instead of floating in a void */
-    radial-gradient(125% 10% at 50% 80%, rgba(244,238,225,0.16), transparent 72%);
+    radial-gradient(40% 26% at 60% 48%, rgba(220,200,170,0.14), transparent 72%);
+    /* (removed the wide "horizon mist" streak at 50% 80% — its 125%×10% band
+       read as a faint horizontal divider at the hero/interlude seam. The terrain
+       bowl already gives the name its ground plane, so the streak was redundant.) */
 }
 
 /* ── Atmosphere, mid → deep sky. Screen blend lightens the darker gradient to

@@ -100,8 +100,9 @@ const bubbles = JSON.stringify([
       }
       rd.sort((p, q) => p.depth - q.depth);
       // Fade dots out over the bottom ~16% of the canvas so the bowl dissolves
-      // into the gradient instead of ending in a dense dark dot-band right at
-      // the hero/interlude seam (that band read as a faint "divider").
+      // softly into the gradient instead of ending in an abrupt dot-band at the
+      // hero's lower edge. (The faint hero/interlude "divider" itself was a
+      // separate cause — a wide horizon-mist wash in global.css, now removed.)
       const fadeStart = Hh * 0.84;
       for (const p of rd) {
         if (p.sx < -20 || p.sx > W + 20 || p.sy < -20 || p.sy > Hh + 20) continue;
