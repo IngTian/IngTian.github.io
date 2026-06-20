@@ -55,7 +55,8 @@ import { calligraphy, photography, photoDefault } from '../data/artworks';
                   data-ar={(p.src.width / p.src.height).toFixed(4)}
                   data-zoom={p.src.src} data-alt={p.alt}
                   data-title={p.title ?? ''} data-note={p.note ?? ''}>
-            <Image src={p.src} alt={p.alt} widths={[300, 600, 900]} sizes="(max-width:1024px) 45vw, 30vw" />
+            <Image src={p.src} alt={p.alt} widths={[300, 600, 900]} sizes="(max-width:1024px) 45vw, 30vw"
+                   loading={i < 9 ? 'eager' : 'lazy'} decoding="async" />
           </figure>
         ))}
       </div>
@@ -111,10 +112,13 @@ import { calligraphy, photography, photoDefault } from '../data/artworks';
     margin: 7vh 0 3vh; color: var(--ink-4); }
   .seclabel.dark { color: rgba(239, 233, 221, 0.5); }
 
-  /* calligraphy sits at the LEFT of its column — same left edge as the photo
-     grid below, so its gap from the placard matches photography's (the
-     right-hung version left too much air between label and work). */
-  .cal-block { min-height: 74vh; display: flex; align-items: center; justify-content: flex-start; }
+  /* calligraphy sits CENTERED in the space between the placard and the viewport's
+     right edge. The works column's left margin (clears the placard) is larger
+     than its right margin, so plain centering drifts right; the negative
+     right-margin re-balances the cal-block against the true available span so
+     the gaps on both sides match. */
+  .cal-block { min-height: 74vh; display: flex; align-items: center; justify-content: center;
+    margin-right: calc(-1 * clamp(40px, 7vw, 180px)); }
   .cal { margin: 0; line-height: 0; cursor: zoom-in; }
   .cal :global(img) { display: block; width: auto; max-width: 100%;
     max-height: min(82vh, 820px); transition: transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
@@ -126,6 +130,13 @@ import { calligraphy, photography, photoDefault } from '../data/artworks';
   figure.tile { margin: 0; overflow: hidden; border-radius: 2px; position: relative; cursor: zoom-in; background: rgba(0,0,0,0.06);
     flex: 1 1 auto; height: 320px; }
   figure.tile :global(img) { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 0.9s cubic-bezier(0.2,0.7,0.2,1); }
+  /* Gentle fade-in so images don't pop as they decode. JS adds .is-loaded on
+     load (and immediately for already-cached imgs). No-JS / reduced-motion =
+     fully visible, no fade. */
+  @media (prefers-reduced-motion: no-preference) {
+    figure.tile :global(img) { opacity: 0; transition: opacity 0.6s ease, transform 0.9s cubic-bezier(0.2,0.7,0.2,1); }
+    figure.tile.is-loaded :global(img) { opacity: 1; }
+  }
   figure.tile::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.07); transition: box-shadow 0.4s; pointer-events: none; }
   .art-foot { padding: 13vh 0 18vh; }
   .art-foot .back { color: rgba(239, 233, 221, 0.5); }

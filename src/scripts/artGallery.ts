@@ -2,6 +2,19 @@ import { justifyRows } from '../lib/justify';
 
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// ---------- gentle fade-in as each image decodes (no pop) ----------
+// Mark a tile loaded once its <img> is ready; cached images resolve instantly.
+function markLoaded(fig: HTMLElement) { fig.classList.add('is-loaded'); }
+document.querySelectorAll<HTMLElement>('figure.tile').forEach((fig) => {
+  const img = fig.querySelector('img');
+  if (!img) { markLoaded(fig); return; }
+  if (img.complete && img.naturalWidth > 0) markLoaded(fig);
+  else {
+    img.addEventListener('load', () => markLoaded(fig), { once: true });
+    img.addEventListener('error', () => markLoaded(fig), { once: true });
+  }
+});
+
 // ---------- justified photo rows ----------
 const rowsEl = document.getElementById('photo-rows');
 function buildRows() {
