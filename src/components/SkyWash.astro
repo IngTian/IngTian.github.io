@@ -58,4 +58,28 @@
     background: radial-gradient(34% 18% at 80% 9%, rgba(255,224,160,1), transparent 64%);
     transform-origin: 80% 9%;
   }
+
+  /* Gentle breathe — warm & cool pulse OUT OF PHASE (as warm swells, cool
+     recedes, then they trade), so the sky's temperature visibly shifts even
+     while the viewer holds still. transform/opacity only; long mismatched
+     durations so it never resyncs into an obvious loop. Gated: the static state
+     above is the finished reduced-motion / Firefox / no-JS fallback. */
+  @media (prefers-reduced-motion: no-preference) {
+    .sky-warm { animation: sky-breathe-warm 20s ease-in-out infinite alternate; }
+    .sky-cool { animation: sky-breathe-cool 26s ease-in-out infinite alternate; }
+    .sky-sun  { animation: sky-breathe-sun  16s ease-in-out infinite alternate; }
+
+    @keyframes sky-breathe-warm {
+      from { transform: scale(1);    opacity: 0.66; }
+      to   { transform: scale(1.12) translate3d(-20px, 15px, 0); opacity: 0.95; }
+    }
+    @keyframes sky-breathe-cool {
+      from { transform: scale(1.10) translate3d(18px, -12px, 0); opacity: 0.95; }
+      to   { transform: scale(1);    opacity: 0.64; }
+    }
+    @keyframes sky-breathe-sun {
+      from { transform: scale(1);    opacity: 0.60; }
+      to   { transform: scale(1.08); opacity: 0.95; }
+    }
+  }
 </style>
