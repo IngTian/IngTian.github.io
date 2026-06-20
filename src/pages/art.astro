@@ -6,6 +6,8 @@ import { calligraphy, photography, photoDefault } from '../data/artworks';
 <BaseLayout
   title="An artist by night — Ing Tian"
   description="Calligraphy and photography by Ing Tian (Zeying Tian)."
+  veilLine="an artist by night"
+  veilOnLoad={true}
 >
   <main class="art descent">
     <!-- TOC rail -->
@@ -84,13 +86,13 @@ import { calligraphy, photography, photoDefault } from '../data/artworks';
   @media (hover: hover) { .art-toc a:hover { opacity: 0.85; } }
 
   .placard { position: fixed; left: clamp(120px, 12vw, 200px); top: 50%; transform: translateY(-50%);
-    width: clamp(220px, 18vw, 290px); z-index: 20; }
+    width: clamp(240px, 20vw, 320px); z-index: 20; }
   .pl-inner { transition: opacity 0.22s ease, transform 0.22s ease; }
   .placard.fade .pl-inner { opacity: 0; transform: translateY(8px); }
-  .pl-kicker { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-4); }
-  .pl-title { font-family: var(--font-display); font-weight: 500; font-size: 23px; line-height: 1.15; margin: 12px 0 4px; font-variation-settings: 'SOFT' 40; }
-  .pl-year { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--ink-4); margin-bottom: 14px; }
-  .pl-desc { font-size: 13px; line-height: 1.7; color: var(--ink-3); }
+  .pl-kicker { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-4); }
+  .pl-title { font-family: var(--font-display); font-weight: 500; font-size: 28px; line-height: 1.15; margin: 13px 0 5px; font-variation-settings: 'SOFT' 40; }
+  .pl-year { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--ink-4); margin-bottom: 16px; }
+  .pl-desc { font-size: 15px; line-height: 1.75; color: var(--ink-3); }
   .placard.dark .pl-title { color: var(--paper); }
   .placard.dark .pl-kicker, .placard.dark .pl-year { color: var(--ink-5); }
   .placard.dark .pl-desc { color: rgba(239, 233, 221, 0.7); }
@@ -99,23 +101,23 @@ import { calligraphy, photography, photoDefault } from '../data/artworks';
      to the viewport (margin-right, no max-width) so on wide monitors the work
      fills toward the right instead of drifting left of a capped box. */
   .art-wrap { margin-right: clamp(40px, 7vw, 180px); margin-left: clamp(420px, 34vw, 620px); }
-  .art-head { padding: 15vh 0 8vh; }
+  .art-head { padding: 13vh 0 5vh; }
   .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
   .back:hover { color: var(--seal); }
   .art h1 { font-family: var(--font-display); font-weight: 500; font-size: clamp(38px, 5vw, 60px); line-height: 1.04;
     letter-spacing: -0.01em; font-variation-settings: 'SOFT' 60; margin-top: 16px; color: var(--ink-1); }
   .lede { font-size: 14px; color: var(--ink-3); margin-top: 16px; line-height: 1.7; max-width: 48ch; }
   .seclabel { font-family: var(--font-mono); font-weight: 400; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase;
-    margin: 10vh 0 4vh; color: var(--ink-4); }
+    margin: 7vh 0 3vh; color: var(--ink-4); }
   .seclabel.dark { color: rgba(239, 233, 221, 0.5); }
 
-  /* calligraphy hangs to the RIGHT of its column — the placard (left) reads as
-     the museum wall label, the work hangs opposite with the sky breathing
-     between them. Right edge aligns with the photo grid below. */
-  .cal-block { min-height: 86vh; display: flex; align-items: center; justify-content: flex-end; }
+  /* calligraphy sits at the LEFT of its column — same left edge as the photo
+     grid below, so its gap from the placard matches photography's (the
+     right-hung version left too much air between label and work). */
+  .cal-block { min-height: 74vh; display: flex; align-items: center; justify-content: flex-start; }
   .cal { margin: 0; line-height: 0; cursor: zoom-in; }
   .cal :global(img) { display: block; width: auto; max-width: 100%;
-    max-height: min(80vh, 760px); transition: transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
+    max-height: min(82vh, 820px); transition: transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
   .cal.stele :global(img) { filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.55)); }
   .cal.paper :global(img) { border: 1px solid rgba(255, 255, 255, 0.16); box-shadow: 0 24px 60px -22px rgba(20, 18, 14, 0.5); }
 

@@ -6,11 +6,17 @@ import { ClientRouter } from 'astro:transitions';
 interface Props {
   title?: string;
   description?: string;
+  /** Line shown on the descent veil for this page. */
+  veilLine?: string;
+  /** Play the veil on a FRESH load of this page? (Transitions always play it.) */
+  veilOnLoad?: boolean;
 }
 
 const {
   title = 'Ing Tian — Quant Researcher & Full-stack Developer',
   description = 'Ing Tian (Zeying Tian) — quant researcher in portfolio optimization, incoming Operations Research PhD at the University of Toronto, and full-stack developer. Toronto.',
+  veilLine = 'a researcher by day',
+  veilOnLoad = false,
 } = Astro.props;
 ---
 
@@ -35,13 +41,19 @@ const {
   </head>
   <body>
     <slot />
-    {/* "The Descent" loader: a night veil covering the page lifts upward to
-        reveal it — on first load and on every home<->/art navigation. Pure CSS
-        so it runs with no JS; ClientRouter re-triggers it on view transitions.
-        Reduced-motion / no-animation-support never sees it (the finished state
-        is simply the page, uncovered). */}
-    <div class="descent-veil" aria-hidden="true">
-      <span class="descent-veil__line">an artist by night</span>
+    {/* "The Descent" loader: a night veil covering the page wipes DOWNWARD off
+        the bottom to reveal it. It plays on every home<->/art navigation, and on
+        a fresh load only when this page opts in (veilOnLoad) — so entering the
+        home page directly shows no veil, but the gallery (and all transitions)
+        do. Each page carries its own line. transform/opacity only; gated behind
+        prefers-reduced-motion (finished state = uncovered page). */}
+    <div
+      class="descent-veil"
+      aria-hidden="true"
+      data-veil
+      data-veil-on-load={veilOnLoad ? 'true' : 'false'}
+    >
+      <span class="descent-veil__line">{veilLine}</span>
     </div>
   </body>
 </html>
@@ -56,7 +68,9 @@ const {
     align-items: center;
     justify-content: center;
     background: linear-gradient(180deg, #1d1b16, #16140f);
-    transform: translateY(0);
+    /* default: parked off the bottom — so with no JS / reduced-motion the page
+       is simply shown, never covered. .is-playing covers then wipes down. */
+    transform: translateY(100%);
   }
   .descent-veil__line {
     font-family: var(--font-display), Georgia, serif;
@@ -67,26 +81,58 @@ const {
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .descent-veil {
-      animation: descent-veil-lift 1.1s cubic-bezier(0.7, 0, 0.2, 1) forwards;
+    /* is-playing forces the covering state statically (flash-free even before
+       the first animation frame), then the wipe animation drives it DOWN off
+       the bottom; fill-mode forwards holds it cleared. */
+    .descent-veil.is-playing {
+      transform: translateY(0);
+      animation: descent-veil-wipe 1.1s cubic-bezier(0.7, 0, 0.2, 1) forwards;
     }
-    .descent-veil__line {
-      animation: descent-veil-fade 0.5s ease forwards;
+    .descent-veil.is-playing .descent-veil__line {
+      animation: descent-veil-fade 0.55s ease forwards;
     }
-    @keyframes descent-veil-lift {
-      to { transform: translateY(-100%); }
+    @keyframes descent-veil-wipe {
+      from { transform: translateY(0); }
+      to   { transform: translateY(100%); }
     }
     @keyframes descent-veil-fade {
-      to { opacity: 0; }
+      from { opacity: 0.5; }
+      to   { opacity: 0; }
     }
   }
 
-  /* No motion preference (and Firefox / no-JS): never show the veil — the
-     finished state is the uncovered page. */
   @media (prefers-reduced-motion: reduce) {
     .descent-veil { display: none; }
   }
-
-  /* On view transitions, ClientRouter swaps <body>; the fresh veil animates
-     again. Persist nothing — each navigation re-runs the lift. */
 </style>
+
+<script is:inline>
+  // Synchronous (parses before first paint) so a fresh opted-in load covers
+  // with NO flash. `__descentVeilInit` (on window, which survives view
+  // transitions) tells a fresh load apart from a transition re-run, so this and
+  // the after-swap listener below never double-fire.
+  (function () {
+    function play() {
+      var v = document.querySelector('[data-veil]');
+      if (!v) return;
+      v.classList.remove('is-playing');
+      void v.offsetWidth; // restart the animation
+      v.classList.add('is-playing');
+    }
+    window.__descentVeilPlay = play;
+    if (!window.__descentVeilInit) {
+      window.__descentVeilInit = true; // first load only
+      var v = document.querySelector('[data-veil]');
+      if (v && v.dataset.veilOnLoad === 'true') play(); // only /art opts in
+    }
+    // else: a transition re-run — the after-swap listener handles it.
+  })();
+</script>
+
+<script>
+  // Persists across view transitions (module scripts run once). Plays the
+  // destination page's veil on every client-side navigation (both directions).
+  document.addEventListener('astro:after-swap', () => {
+    (window as unknown as { __descentVeilPlay?: () => void }).__descentVeilPlay?.();
+  });
+</script>
