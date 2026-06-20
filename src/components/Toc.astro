@@ -17,7 +17,7 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
   <ul>
     {stops.map((s) => (
       <li>
-        <a href={s.href} data-zone={s.zone}>
+        <a href={s.href} data-zone={s.zone} aria-label={s.label}>
           <span class="rule" aria-hidden="true"></span>
           <span class="dot" aria-hidden="true"></span>
           <span class="label">{s.label}</span>
