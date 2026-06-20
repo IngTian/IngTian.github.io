@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { Image } from 'astro:assets';
 import { calligraphy, photography, photoDefault } from '../data/artworks';
+import SkyWash from '../components/SkyWash.astro';
 ---
 <BaseLayout
   title="An artist by night — Ing Tian"
@@ -10,6 +11,7 @@ import { calligraphy, photography, photoDefault } from '../data/artworks';
   veilOnLoad={true}
 >
   <main class="art descent">
+    <SkyWash />
     <!-- TOC rail -->
     <nav class="art-toc" id="art-toc" aria-label="Sections">
       <ul>

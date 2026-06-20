@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Grain from '../components/Grain.astro';
 import Toc from '../components/Toc.astro';
+import SkyWash from '../components/SkyWash.astro';
 import Heights from '../sections/Heights.astro';
 import Interlude from '../sections/Interlude.astro';
 import Mountains from '../sections/Mountains.astro';
@@ -11,6 +12,7 @@ import Signature from '../sections/Signature.astro';
 
 <BaseLayout veilLine="a researcher by day" veilOnLoad={false}>
   <main class="descent">
+    <SkyWash />
     <Heights />
     <Interlude />
     <Mountains />

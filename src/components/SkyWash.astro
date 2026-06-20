@@ -1,0 +1,61 @@
+---
+// The living Monet sky — woven warm/cool broken color over the .descent gradient.
+// MUST render inside <main class="descent"> (a child), so its z-index:-1 tucks
+// behind content within .descent's z-index:0 stacking context — a BaseLayout
+// sibling would fall behind the opaque gradient and vanish. Pure CSS, no JS.
+// Breathe animation is added in a later step (see <style>); this static state
+// (woven color, no motion) is also the reduced-motion / Firefox fallback.
+---
+<div class="sky-wash" aria-hidden="true">
+  <div class="sky-warm"></div>
+  <div class="sky-cool"></div>
+  <div class="sky-sun"></div>
+</div>
+
+<style>
+  .sky-wash {
+    position: absolute;
+    inset: 0;
+    z-index: -1;            /* behind content, above the gradient — like .descent::after */
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .sky-wash > div {
+    position: absolute;
+    inset: 0;
+    will-change: transform, opacity;
+  }
+
+  /* warm woven strokes — golds / ambers / rose, down a left-ish axis */
+  .sky-warm {
+    mix-blend-mode: soft-light;
+    opacity: 0.95;
+    background:
+      radial-gradient(40% 13% at 20% 7%,  rgba(245,190,95,1),  transparent 70%),
+      radial-gradient(48% 14% at 33% 21%, rgba(234,140,80,1),  transparent 72%),
+      radial-gradient(50% 15% at 28% 38%, rgba(220,120,130,1), transparent 74%),
+      radial-gradient(52% 16% at 38% 58%, rgba(186,128,150,1), transparent 78%),
+      radial-gradient(58% 18% at 45% 84%, rgba(170,150,165,1), transparent 82%);
+    transform-origin: 30% 40%;
+  }
+
+  /* cool woven strokes — blues / indigos, down a right-ish axis */
+  .sky-cool {
+    mix-blend-mode: soft-light;
+    opacity: 0.95;
+    background:
+      radial-gradient(44% 14% at 82% 13%, rgba(120,150,215,1), transparent 72%),
+      radial-gradient(42% 13% at 74% 28%, rgba(120,128,205,1), transparent 74%),
+      radial-gradient(46% 14% at 68% 47%, rgba(96,124,200,1),  transparent 76%),
+      radial-gradient(48% 15% at 66% 70%, rgba(86,112,196,1),  transparent 80%);
+    transform-origin: 72% 55%;
+  }
+
+  /* luminous sun glow, upper-right */
+  .sky-sun {
+    mix-blend-mode: screen;
+    opacity: 0.95;
+    background: radial-gradient(34% 18% at 80% 9%, rgba(255,224,160,1), transparent 64%);
+    transform-origin: 80% 9%;
+  }
+</style>
