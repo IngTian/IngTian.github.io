@@ -10,8 +10,8 @@ export const script: Script = {
         lines: [
           { kind: 'tool', label: 'Searched memory (research-log.md)' },
           { kind: 'tool', label: 'Read 3 notes · 412 tokens' },
-          { kind: 'text', content: 'My research thread is portfolio construction — I co-authored RL-BHRP, a reinforcement-learning-embedded Bayesian Hierarchical Risk Parity method (arXiv:2508.11856). The pull is allocation that learns instead of assuming.' },
-          { kind: 'text', content: 'Day to day before that: ML systems at TikTok — dual-tower vision embeddings and billion-scale vector retrieval feeding the ads engine in real time.' },
+          { kind: 'text', content: 'My research thread is multi-period portfolio optimization — I co-authored RL-BHRP, a reinforcement-learning-embedded Bayesian Hierarchical Risk Parity method for adaptive allocation (arXiv:2508.11856). The pull is allocation that learns instead of assuming.' },
+          { kind: 'text', content: 'By day I build large-scale recommendation systems as a software engineer at EA — retrieval and ranking that has to hold up in production, in real time.' },
         ],
       },
       followups: [
@@ -41,7 +41,7 @@ export const script: Script = {
       answer: {
         lines: [
           { kind: 'thinking' },
-          { kind: 'text', content: 'I came up building large ML systems, where success is a dashboard you argue about for weeks. Markets are the opposite: a clean idea, rigorously tested, meets reality the next morning and tells you — without mercy or flattery — whether you were right. I like that honesty.' },
+          { kind: 'text', content: "I'm a mathematician at heart — optimization under uncertainty is the problem I actually want to think about. Markets are an honest test of it: a clean idea, rigorously formulated, meets reality the next morning and tells you — without mercy or flattery — whether you were right." },
         ],
       },
       followups: [
