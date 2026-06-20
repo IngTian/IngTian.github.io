@@ -101,6 +101,8 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
 </style>
 
 <script>
+  import { activeStopIndex } from '../lib/scrollspy';
+
   // Progressive enhancement. Mark that JS is handling the TOC; if this script
   // never runs, the CSS no-JS fallback keeps the rail visible.
   document.documentElement.classList.add('no-toc-js');
@@ -123,19 +125,15 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
       const heroPast = !hero || hero.getBoundingClientRect().bottom < vh * 0.5;
       toc.classList.toggle('toc--visible', heroPast);
 
-      // scrollspy: active = the last stop whose top has crossed a reference
-      // line near the top of the viewport. Robust to wildly different section
-      // heights (the short footer no longer loses a ratio contest).
-      const refLine = vh * 0.4;
-      let activeIdx = 0;
-      stops.forEach((s, i) => {
-        if (s.el.getBoundingClientRect().top <= refLine) activeIdx = i;
-      });
-      // bottom guard: a short final section (e.g. the footer) may never reach
-      // the reference line. Once we're within ~2px of the page bottom, force
-      // the last stop active so "Links" can light up.
-      const atBottom = window.scrollY + vh >= document.documentElement.scrollHeight - 2;
-      if (atBottom) activeIdx = stops.length - 1;
+      // scrollspy: shared pure rule (see lib/scrollspy.ts) — active = the last
+      // stop whose top crossed the reference line, with a page-bottom guard so
+      // a short final section (e.g. the footer / "Links") can still light up.
+      const activeIdx = activeStopIndex(
+        stops.map((s) => s.el.getBoundingClientRect().top),
+        vh,
+        window.scrollY,
+        document.documentElement.scrollHeight,
+      );
 
       stops.forEach((s, i) => {
         const on = heroPast && i === activeIdx;

@@ -2,10 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useTypewriter } from './useTypewriter';
 import { script } from '../../data/script';
 import type { Followup } from './terminal.types';
-
-function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
+import { prefersReducedMotion } from '../../lib/motion';
 
 export default function Terminal() {
   const { state, dispatch } = useTypewriter(script);
