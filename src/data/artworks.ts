@@ -1,6 +1,7 @@
 import type { ImageMetadata } from 'astro';
 import steleSrc from '../assets/art/spring-couplet-stele.jpg';
 import poemSrc from '../assets/art/running-script-poem.jpg';
+import { photoNotes } from './photoNotes';
 
 export type ArtCategory = 'Calligraphy' | 'Photography';
 
@@ -38,8 +39,9 @@ export const calligraphy: Artwork[] = [
   },
 ];
 
-// Photos: glob the assets dir, sort by filename for stable order. alt is generic
-// (no per-photo titles yet); notes added later via a parallel map keyed by file.
+// Photos: glob the assets dir, sort by filename for stable order. Per-photo
+// title/note/alt come from photoNotes (keyed by filename); any file without an
+// entry falls back to a generic alt and the default placard.
 const photoFiles = import.meta.glob<{ default: ImageMetadata }>(
   '../assets/art/photos/*.{jpg,jpeg,JPG,JPEG}',
   { eager: true },
@@ -47,11 +49,17 @@ const photoFiles = import.meta.glob<{ default: ImageMetadata }>(
 
 export const photography: Artwork[] = Object.keys(photoFiles)
   .sort()
-  .map((path) => ({
-    src: photoFiles[path].default,
-    alt: 'Photograph by Ing Tian',
-    category: 'Photography' as const,
-  }));
+  .map((path) => {
+    const file = path.split('/').pop() ?? '';
+    const meta = photoNotes[file];
+    return {
+      src: photoFiles[path].default,
+      alt: meta?.alt ?? 'Photograph by Ing Tian',
+      category: 'Photography' as const,
+      title: meta?.title,
+      note: meta?.note,
+    };
+  });
 
 export const photoDefault = {
   kicker: 'Photography',

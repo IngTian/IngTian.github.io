@@ -95,7 +95,10 @@ import { calligraphy, photography, photoDefault } from '../data/artworks';
   .placard.dark .pl-kicker, .placard.dark .pl-year { color: var(--ink-5); }
   .placard.dark .pl-desc { color: rgba(239, 233, 221, 0.7); }
 
-  .art-wrap { max-width: 1320px; margin-right: clamp(24px, 4vw, 84px); margin-left: clamp(420px, 35vw, 560px); }
+  /* Works column: left edge clears the rail+placard; right edge stays anchored
+     to the viewport (margin-right, no max-width) so on wide monitors the work
+     fills toward the right instead of drifting left of a capped box. */
+  .art-wrap { margin-right: clamp(40px, 7vw, 180px); margin-left: clamp(420px, 34vw, 620px); }
   .art-head { padding: 15vh 0 8vh; }
   .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
   .back:hover { color: var(--seal); }
@@ -106,9 +109,13 @@ import { calligraphy, photography, photoDefault } from '../data/artworks';
     margin: 10vh 0 4vh; color: var(--ink-4); }
   .seclabel.dark { color: rgba(239, 233, 221, 0.5); }
 
-  .cal-block { min-height: 86vh; display: flex; align-items: center; justify-content: flex-start; }
+  /* calligraphy hangs to the RIGHT of its column — the placard (left) reads as
+     the museum wall label, the work hangs opposite with the sky breathing
+     between them. Right edge aligns with the photo grid below. */
+  .cal-block { min-height: 86vh; display: flex; align-items: center; justify-content: flex-end; }
   .cal { margin: 0; line-height: 0; cursor: zoom-in; }
-  .cal :global(img) { display: block; width: auto; max-height: 80vh; transition: transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .cal :global(img) { display: block; width: auto; max-width: 100%;
+    max-height: min(80vh, 760px); transition: transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
   .cal.stele :global(img) { filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.55)); }
   .cal.paper :global(img) { border: 1px solid rgba(255, 255, 255, 0.16); box-shadow: 0 24px 60px -22px rgba(20, 18, 14, 0.5); }
 
