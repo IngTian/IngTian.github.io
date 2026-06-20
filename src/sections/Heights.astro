@@ -38,7 +38,12 @@ for (const phrase of bio.strong) {
   .hero-legibility {
     position: absolute; inset: 0; z-index: 1; pointer-events: none;
     background:
-      radial-gradient(38% 30% at 22% 82%, rgba(244,239,228,0.85), transparent 70%),
+      /* name halo, bottom-left. Pulled up to 74% and tightened so the wash
+         reaches fully transparent (~94% of the box) BEFORE the #heights bottom
+         edge (108vh). Otherwise it was still ~0.12 opaque at the box boundary
+         and got clipped in a straight horizontal line — that hard cut read as
+         a faint divider at the hero/interlude seam. */
+      radial-gradient(40% 26% at 22% 74%, rgba(244,239,228,0.85), transparent 66%),
       radial-gradient(30% 22% at 82% 22%, rgba(244,239,228,0.7), transparent 72%);
   }
 

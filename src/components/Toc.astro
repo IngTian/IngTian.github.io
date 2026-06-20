@@ -17,7 +17,7 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
   <ul>
     {stops.map((s) => (
       <li>
-        <a href={s.href} data-zone={s.zone}>
+        <a href={s.href} data-zone={s.zone} aria-label={s.label}>
           <span class="rule" aria-hidden="true"></span>
           <span class="dot" aria-hidden="true"></span>
           <span class="label">{s.label}</span>
@@ -154,8 +154,22 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll, { passive: true });
     update();
+
+    // dispose on the next swap so listeners don't leak / duplicate across
+    // View Transition navigations (and don't reference a swapped-out rail).
+    tocTeardown = () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initToc);
-  else initToc();
+  // Re-init on first load AND after every View Transition swap (astro:page-load
+  // fires in both cases). Without this the rail's scrollspy goes dead when you
+  // navigate back to the homepage from /art.
+  let tocTeardown: (() => void) | null = null;
+  document.addEventListener('astro:page-load', () => {
+    tocTeardown?.();
+    tocTeardown = null;
+    initToc();
+  });
 </script>

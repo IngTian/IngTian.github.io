@@ -36,9 +36,21 @@ const bubbles = JSON.stringify([
 <script>
   import { field, runDescent, colormap, project, SPAWNS, RANGE, STEP } from '../lib/terrain';
 
-  const cvs = document.getElementById('terrain') as HTMLCanvasElement | null;
-  const bubbleEl = document.getElementById('terrain-bubble') as HTMLElement | null;
-  if (cvs && bubbleEl) {
+  // Teardown handle for the previous init — re-init runs on every page load AND
+  // after each View Transition swap (astro:page-load), so we must dispose the
+  // prior instance's listeners / rAF loop / observer or they leak across
+  // navigations and reference a stale (swapped-out) canvas. Without this, the
+  // bowl field renders blank when you navigate back to home.
+  let teardown: (() => void) | null = null;
+
+  function initTerrain() {
+    teardown?.();
+    teardown = null;
+
+    const cvs = document.getElementById('terrain') as HTMLCanvasElement | null;
+    const bubbleEl = document.getElementById('terrain-bubble') as HTMLElement | null;
+    if (!cvs || !bubbleEl) return;
+
     const ctx = cvs.getContext('2d')!;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const BUBBLES = JSON.parse(cvs.dataset.bubbles || '[]') as Array<null | { word?: string; mathml?: string }>;
@@ -87,11 +99,18 @@ const bubbles = JSON.stringify([
         rd.push({ sx, sy, depth, z });
       }
       rd.sort((p, q) => p.depth - q.depth);
+      // Fade dots out over the bottom ~16% of the canvas so the bowl dissolves
+      // softly into the gradient instead of ending in an abrupt dot-band at the
+      // hero's lower edge. (The faint hero/interlude "divider" itself was a
+      // separate cause — a wide horizon-mist wash in global.css, now removed.)
+      const fadeStart = Hh * 0.84;
       for (const p of rd) {
         if (p.sx < -20 || p.sx > W + 20 || p.sy < -20 || p.sy > Hh + 20) continue;
         const hn = Math.max(0, Math.min(1, (p.z + ZR) / (2 * ZR)));
         const r = (2.9 - hn * 1.6) * DPR;
-        const alpha = 0.30 + (1 - hn) * 0.45;
+        let alpha = 0.30 + (1 - hn) * 0.45;
+        if (p.sy > fadeStart) alpha *= Math.max(0, 1 - (p.sy - fadeStart) / (Hh - fadeStart));
+        if (alpha <= 0.004) continue;
         const [cr, cg, cb] = colormap(hn);
         ctx.beginPath(); ctx.arc(p.sx, p.sy, Math.max(0.5, r), 0, 2 * Math.PI);
         ctx.fillStyle = `rgba(${cr|0},${cg|0},${cb|0},${alpha.toFixed(3)})`; ctx.fill();
@@ -153,26 +172,39 @@ const bubbles = JSON.stringify([
 
     // Resize handler: canvas resize clears the backing store, so repaint the
     // static frame under reduced-motion (otherwise the animation loop repaints).
-    window.addEventListener('resize', () => {
-      resize();
-      if (reduce) frame(0, false);
-    });
+    const onResize = () => { resize(); if (reduce) frame(0, false); };
+    window.addEventListener('resize', onResize);
 
     // Under reduced-motion we stop here (static frame is the finished state).
     // Otherwise run the animation, paused while the hero is offscreen, and
     // throttled to ~30fps — imperceptible for this gentle motion, half the cost.
+    let rafId = 0;
+    let io: IntersectionObserver | null = null;
     if (!reduce) {
-      let running = false, rafId = 0, last = 0;
+      let running = false, last = 0;
       const loop = (ts: number) => {
         if (ts - last > 33) { frame(ts, true); last = ts; }
         rafId = requestAnimationFrame(loop);
       };
-      const io = new IntersectionObserver((entries) => {
+      io = new IntersectionObserver((entries) => {
         const visible = entries[0].isIntersecting;
         if (visible && !running) { running = true; last = 0; rafId = requestAnimationFrame(loop); }
         else if (!visible && running) { running = false; cancelAnimationFrame(rafId); }
       }, { threshold: 0 });
       io.observe(cvs);
     }
+
+    // Dispose everything this instance attached, so a later re-init (View
+    // Transition swap) doesn't leave a stale rAF loop / observer / listener
+    // pointing at the old canvas.
+    teardown = () => {
+      window.removeEventListener('resize', onResize);
+      if (rafId) cancelAnimationFrame(rafId);
+      io?.disconnect();
+    };
   }
+
+  // Run on first load and after every View Transition swap. astro:page-load
+  // fires in both cases; if ClientRouter isn't present it still fires once.
+  document.addEventListener('astro:page-load', initTerrain);
 </script>

@@ -1,5 +1,16 @@
 import { justifyRows } from '../lib/justify';
 
+// Re-init on first load AND after every View Transition swap (astro:page-load
+// fires in both). Without this, navigating TO /art via a transition would never
+// run the gallery setup, and window-level listeners from a prior visit would
+// leak. teardown() removes the only listeners attached to persistent objects
+// (window); element listeners die with the swapped-out DOM.
+let galleryTeardown: (() => void) | null = null;
+
+function initArtGallery() {
+  galleryTeardown?.();
+  galleryTeardown = null;
+
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ---------- gentle fade-in as each image decodes (no pop) ----------
@@ -168,3 +179,14 @@ lb?.addEventListener('wheel', (e) => {
 lbImg?.addEventListener('pointerdown', (e) => { if (zs <= 1) return; drag = true; px = e.clientX; py = e.clientY; lbImg.setPointerCapture(e.pointerId); e.stopPropagation(); });
 lbImg?.addEventListener('pointermove', (e) => { if (!drag) return; zx += e.clientX - px; zy += e.clientY - py; px = e.clientX; py = e.clientY; tf(); });
 lbImg?.addEventListener('pointerup', () => { drag = false; });
+
+  // Dispose window-level listeners on the next swap (element listeners go away
+  // with the swapped-out DOM, so only these need removing).
+  galleryTeardown = () => {
+    window.removeEventListener('resize', buildRows);
+    window.removeEventListener('scroll', onScroll);
+    window.removeEventListener('resize', onScroll);
+  };
+}
+
+document.addEventListener('astro:page-load', initArtGallery);
