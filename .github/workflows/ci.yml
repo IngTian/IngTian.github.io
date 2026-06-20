@@ -1,0 +1,36 @@
+name: CI
+
+# Build + test gate. Runs on every PR and on pushes to main, so a branch must
+# be green before it is merged (enable "Require status checks to pass" on the
+# main branch protection rule to enforce it). Deploy lives in deploy.yml and
+# runs only after a merge to main.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same branch/PR cancels the in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc # single source of truth for the Node version
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (type-checked)
+        run: npm run build
+
+      - name: Test
+        run: npm test
