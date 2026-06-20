@@ -66,6 +66,7 @@ export const awards: Award[] = [
 
 export const links: { label: string; href: string; primary?: boolean }[] = [
   { label: 'Download CV', href: '/cv.pdf', primary: true },
+  { label: 'Art', href: '/art' },
   { label: 'Email', href: 'mailto:zeying.tian@mail.mcgill.ca' },
   { label: 'GitHub', href: 'https://github.com/IngTian' },
   { label: 'LinkedIn', href: 'https://www.linkedin.com/in/ing-tian-1b2610149/' },

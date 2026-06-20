@@ -5,11 +5,15 @@
 ---
 <section id="interlude" class="relative min-h-[78vh] flex items-center justify-center px-[8vw]">
   <p class="statement max-w-[20ch] text-center font-display italic text-ink-2 leading-[1.35] text-[clamp(24px,3.6vw,40px)]">
-    A researcher by day, an artist by night, and a mathematician at heart.
+    A researcher by day, <a class="art-link" href="/art">an artist by night</a>, and a mathematician at heart.
   </p>
 </section>
 
 <style>
+  .art-link { color: inherit; text-decoration: none; transition: color 0.25s ease; }
+  .art-link:hover, .art-link:focus-visible { color: var(--seal); }
+  .art-link:focus-visible { outline: 2px solid var(--seal); outline-offset: 3px; border-radius: 2px; }
+
   @media (prefers-reduced-motion: no-preference) {
     .statement {
       animation: statement-in linear both;
