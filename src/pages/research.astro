@@ -1,0 +1,144 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SkyWash from '../components/SkyWash.astro';
+import { publications } from '../data/profile';
+
+const featured = publications.filter((p) => p.featured);
+const others = publications.filter((p) => !p.featured);
+---
+<BaseLayout
+  title="Research — Ing Tian"
+  description="Selected research by Ing Tian (Zeying Tian) — portfolio optimization and machine learning. Featuring RL-BHRP, a reinforcement-learning-embedded Bayesian Hierarchical Risk Parity approach to adaptive allocation."
+  veilLine="a researcher by day"
+  veilOnLoad={true}
+>
+  <main class="research descent">
+    <SkyWash />
+    <div class="research-wrap">
+      <header class="research-head">
+        <a class="back" href="/">← back</a>
+        <h1>Selected research</h1>
+        <p class="lede">Work in portfolio optimization and machine learning — the idea, the result, the paper.</p>
+      </header>
+
+      {featured.map((p) => (
+        <article class="paper">
+          <p class="kicker">{p.subject ?? 'Research'}</p>
+          <h2>{p.title}</h2>
+          <p class="byline">{p.authors} · {p.venue}{p.arxivId && <> · arXiv:{p.arxivId}</>} · {p.year}</p>
+
+          {p.idea && (
+            <section class="block">
+              <h3>The idea</h3>
+              <p>{p.idea}</p>
+            </section>
+          )}
+
+          {p.takeaway && <p class="takeaway">{p.takeaway}</p>}
+
+          {p.results && p.results.length > 0 && (
+            <section class="block">
+              <h3>Out-of-sample results</h3>
+              <dl class="results">
+                {p.results.map((r) => (
+                  <div class="result">
+                    <dt>{r.value}</dt>
+                    <dd>{r.label}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
+
+          {p.abstract && (
+            <section class="block">
+              <h3>Abstract</h3>
+              <p class="abstract">{p.abstract}</p>
+            </section>
+          )}
+
+          <div class="links">
+            {p.href && <a class="paper-link" href={p.href} target="_blank" rel="noopener noreferrer">arXiv ↗</a>}
+            {p.pdfHref && <a class="paper-link" href={p.pdfHref} target="_blank" rel="noopener noreferrer">PDF ↗</a>}
+          </div>
+        </article>
+      ))}
+
+      {others.length > 0 && (
+        <section class="more">
+          <h3 class="more-label">Earlier work</h3>
+          {others.map((p) => {
+            const Tag = p.href ? 'a' : 'div';
+            return (
+              <Tag class="entry" href={p.href} target={p.href ? '_blank' : undefined} rel={p.href ? 'noopener noreferrer' : undefined}>
+                <div class="entry-meta"><span>{p.authors}</span><span>{p.year}</span></div>
+                <p class="entry-title">{p.title}{p.href && <span class="arr"> ↗</span>}</p>
+                <p class="entry-venue">{p.venue}</p>
+              </Tag>
+            );
+          })}
+        </section>
+      )}
+
+      <footer class="research-foot"><a class="back" href="/">← back to the descent</a></footer>
+    </div>
+  </main>
+</BaseLayout>
+
+<style>
+  .research { position: relative; z-index: 0; min-height: 100vh; }
+  /* a single calm reading column, centered — a quiet room, like /art */
+  .research-wrap { max-width: 760px; margin: 0 auto; padding: 0 26px; }
+  .research-head { padding: 14vh 0 6vh; }
+  .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
+  .back:hover { color: var(--seal); }
+  .research h1 { font-family: var(--font-display); font-weight: 500; font-size: clamp(38px, 5vw, 58px);
+    line-height: 1.04; letter-spacing: -0.01em; font-variation-settings: 'SOFT' 60; margin-top: 16px; color: var(--ink-1); }
+  .lede { font-size: 14px; color: var(--ink-3); margin-top: 16px; line-height: 1.7; max-width: 52ch; }
+
+  .paper { padding: 2vh 0 4vh; }
+  .kicker { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-4); }
+  .paper h2 { font-family: var(--font-display); font-weight: 500; font-size: clamp(24px, 3.2vw, 34px);
+    line-height: 1.18; color: var(--ink-1); margin: 14px 0 0; font-variation-settings: 'SOFT' 40; }
+  .byline { font-family: var(--font-mono); font-size: 11px; color: var(--ink-4); letter-spacing: 0.02em; margin-top: 14px; }
+
+  .block { margin-top: 5vh; }
+  .block h3 { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--ink-4); margin-bottom: 14px; }
+  .block p { font-size: 16px; line-height: 1.72; color: var(--ink-2); }
+
+  .takeaway { font-family: var(--font-display); font-style: italic; font-size: clamp(18px, 2.4vw, 23px);
+    line-height: 1.4; color: var(--ink-1); margin-top: 4vh; padding-left: 20px; border-left: 2px solid var(--ochre); }
+
+  /* results: a quiet stat strip */
+  .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 22px; margin: 0; }
+  .result dt { font-family: var(--font-display); font-weight: 600; font-size: 30px; color: var(--ink-1); font-variation-settings: 'SOFT' 30; }
+  .result dd { margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: var(--ink-3); }
+
+  .abstract { font-size: 14.5px; line-height: 1.8; color: var(--ink-3); }
+
+  .links { margin-top: 5vh; display: flex; gap: 12px; flex-wrap: wrap; }
+  .paper-link { font-family: var(--font-mono); font-size: 12.5px; letter-spacing: 0.04em; text-decoration: none;
+    color: var(--ink-1); border: 1px solid var(--ink-4); border-radius: 999px; padding: 8px 18px; transition: border-color 0.3s, color 0.3s; }
+  .paper-link:hover { border-color: var(--seal); color: var(--seal); }
+
+  .more { margin-top: 8vh; border-top: 1px solid rgba(90, 84, 74, 0.25); padding-top: 4vh; }
+  .more-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 2vh; }
+  .entry { display: block; padding: 18px 0; border-top: 1px solid rgba(90, 84, 74, 0.16); text-decoration: none; }
+  .entry:first-of-type { border-top: 0; }
+  .entry-meta { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; color: var(--ink-4); }
+  .entry-title { font-size: 15px; font-weight: 500; color: var(--ink-1); margin-top: 8px; line-height: 1.4; }
+  .entry:hover .entry-title { color: var(--seal); }
+  .arr { color: var(--ochre); }
+  .entry-venue { font-size: 12.5px; font-style: italic; color: var(--ink-3); margin-top: 4px; }
+
+  .research-foot { padding: 10vh 0 16vh; }
+
+  /* deep-sky reading: the gradient is pale up here, so ink text holds; if the
+     page is short the lower gradient never shows, which is fine — it's a calm
+     top-of-descent room. */
+  @media (prefers-reduced-motion: no-preference) {
+    .paper, .more { animation: research-in 0.7s ease both; }
+    @keyframes research-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  }
+</style>

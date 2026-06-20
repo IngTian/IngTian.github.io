@@ -3,15 +3,21 @@ import { publications } from '../data/profile';
 ---
 <div class="max-w-[860px]">
   {publications.map((p) => {
-    const Tag = p.href ? 'a' : 'div';
+    // Featured papers deep-link to the /research page (internal); others link
+    // straight to their external href (arXiv etc.); a paper with neither is a
+    // plain card.
+    const internal = p.featured ? '/research' : undefined;
+    const dest = internal ?? p.href;
+    const external = !internal && !!p.href;
+    const Tag = dest ? 'a' : 'div';
     return (
       <Tag
-        href={p.href}
-        target={p.href ? '_blank' : undefined}
-        rel={p.href ? 'noopener noreferrer' : undefined}
+        href={dest}
+        target={external ? '_blank' : undefined}
+        rel={external ? 'noopener noreferrer' : undefined}
         class:list={[
           'group block py-5 border-t border-paper/15 no-underline',
-          p.href && 'transition-colors',
+          dest && 'transition-colors',
         ]}
       >
         <div class="flex items-baseline justify-between gap-4">
@@ -22,7 +28,9 @@ import { publications } from '../data/profile';
           {p.title}
         </h3>
         <p class="text-[12.5px] italic text-paper/70 mt-1">
-          {p.venue}{p.href && <span class="not-italic text-ochre"> ↗</span>}
+          {p.venue}
+          {external && <span class="not-italic text-ochre"> ↗</span>}
+          {internal && <span class="not-italic text-ochre"> · read more →</span>}
         </p>
       </Tag>
     );
