@@ -1,0 +1,12 @@
+{
+  "name": "Ing Tian",
+  "short_name": "Ing Tian",
+  "description": "Quant researcher in portfolio optimization — Ing Tian (Zeying Tian).",
+  "icons": [
+    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512" }
+  ],
+  "theme_color": "#16140f",
+  "background_color": "#efe9dd",
+  "display": "browser"
+}

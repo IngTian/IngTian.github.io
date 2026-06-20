@@ -24,8 +24,9 @@ jobs:
       - name: Build with Astro
         uses: withastro/action@v3
         with:
-          # Astro 6 requires Node >=22.12; the action defaults to 20.
-          node-version: 22
+          # Astro 6 requires Node >=22.12; the action defaults to 20. Keep this
+          # in step with .nvmrc (local) and ci.yml.
+          node-version: 24
         # Installs deps, runs `astro build`, and uploads the Pages artifact.
 
   deploy:
