@@ -22,14 +22,14 @@ export interface Award {
 export const name = { first: 'Ing', last: 'Tian' } as const;
 
 export const roles = 'Quant Researcher · Portfolio Optimization';
-export const rolesSub = 'Software Engineer';
+export const rolesSub = 'Full-stack SDE / MLE';
 // promoted into the hero subline — incoming OR PhD (starts Fall 2027), kept honest
 export const phd = 'Incoming PhD · University of Toronto';
 
 // About-me, shown top-right in the hero (layout B). First-person, quant-first.
 // `strong` marks the phrases set in medium weight (UofT + the research focus).
 export const bio: { text: string; strong: string[] } = {
-  text: 'Quant researcher and incoming Operations Research PhD at the University of Toronto, working on multi-period portfolio optimization. By day, a software engineer building recommendation systems. Also a guqin player and calligraphy practitioner.',
+  text: 'Quant researcher and incoming Operations Research PhD at the University of Toronto, working on multi-period portfolio optimization. By day, a full-stack software and ML engineer building recommendation systems at scale. Also a guqin player and calligraphy practitioner.',
   strong: ['University of Toronto', 'multi-period portfolio optimization'],
 };
 
