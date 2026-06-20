@@ -37,7 +37,6 @@ window.addEventListener('resize', buildRows, { passive: true });
 
 // ---------- placard controller ----------
 const placard = document.getElementById('art-placard');
-const plInner = placard?.querySelector('.pl-inner') as HTMLElement | undefined;
 const elK = placard?.querySelector('.pl-kicker') as HTMLElement;
 const elT = placard?.querySelector('.pl-title') as HTMLElement;
 const elY = placard?.querySelector('.pl-year') as HTMLElement;
