@@ -24,15 +24,26 @@ const {
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
+
+    {/* Favicons. SVG for crisp browser tabs; PNG fallbacks because Google Search
+        renders a RASTER favicon (it does not use the SVG) — the 48px is its
+        baseline, the 192/512 cover higher-DPI surfaces and PWA installs. */}
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
     <meta name="description" content={description} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://ingtian.github.io" />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta property="og:image" content="https://ingtian.github.io/icon-512.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:image" content="https://ingtian.github.io/icon-512.png" />
     <Font cssVariable="--font-display" preload />
     <Font cssVariable="--font-body" preload />
     <Font cssVariable="--font-mono" />
