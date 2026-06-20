@@ -99,11 +99,17 @@ const bubbles = JSON.stringify([
         rd.push({ sx, sy, depth, z });
       }
       rd.sort((p, q) => p.depth - q.depth);
+      // Fade dots out over the bottom ~16% of the canvas so the bowl dissolves
+      // into the gradient instead of ending in a dense dark dot-band right at
+      // the hero/interlude seam (that band read as a faint "divider").
+      const fadeStart = Hh * 0.84;
       for (const p of rd) {
         if (p.sx < -20 || p.sx > W + 20 || p.sy < -20 || p.sy > Hh + 20) continue;
         const hn = Math.max(0, Math.min(1, (p.z + ZR) / (2 * ZR)));
         const r = (2.9 - hn * 1.6) * DPR;
-        const alpha = 0.30 + (1 - hn) * 0.45;
+        let alpha = 0.30 + (1 - hn) * 0.45;
+        if (p.sy > fadeStart) alpha *= Math.max(0, 1 - (p.sy - fadeStart) / (Hh - fadeStart));
+        if (alpha <= 0.004) continue;
         const [cr, cg, cb] = colormap(hn);
         ctx.beginPath(); ctx.arc(p.sx, p.sy, Math.max(0.5, r), 0, 2 * Math.PI);
         ctx.fillStyle = `rgba(${cr|0},${cg|0},${cb|0},${alpha.toFixed(3)})`; ctx.fill();
