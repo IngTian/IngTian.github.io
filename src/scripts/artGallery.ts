@@ -125,14 +125,14 @@ const lb = document.getElementById('art-lightbox') as HTMLDialogElement | null;
 const lbImg = document.getElementById('lb-img') as HTMLImageElement | null;
 let zx = 0, zy = 0, zs = 1, drag = false, px = 0, py = 0;
 function tf() { if (lbImg) lbImg.style.transform = `translate(${zx}px,${zy}px) scale(${zs})`; }
-function openLB(src: string) {
+function openLB(src: string, alt: string) {
   if (!lb || !lbImg) return;
-  lbImg.src = src; zs = 1; zx = 0; zy = 0; tf();
+  lbImg.src = src; lbImg.alt = alt; zs = 1; zx = 0; zy = 0; tf();
   lb.showModal();
 }
 function closeLB() { lb?.close(); }
 document.querySelectorAll<HTMLElement>('[data-zoom]').forEach((el) => {
-  el.addEventListener('click', () => openLB(el.dataset.zoom || ''));
+  el.addEventListener('click', () => openLB(el.dataset.zoom || '', el.dataset.alt || ''));
 });
 document.getElementById('lb-close')?.addEventListener('click', closeLB);
 lb?.addEventListener('click', (e) => { if (e.target === lb) closeLB(); });
@@ -142,8 +142,11 @@ lb?.addEventListener('wheel', (e) => {
   const f = e.deltaY < 0 ? 1.12 : 0.89;
   const ns = Math.min(6, Math.max(1, zs * f));
   const r = lbImg.getBoundingClientRect();
-  const mx = e.clientX - (r.left + r.width / 2) - zx;
-  const my = e.clientY - (r.top + r.height / 2) - zy;
+  // transform-origin is 0 0, so r.left/r.top already include the current pan:
+  // the image-local point under the cursor is (clientX - r.left) / zs. Keep it
+  // pinned across the zoom: zx -= (clientX - r.left) * (k - 1).
+  const mx = e.clientX - r.left;
+  const my = e.clientY - r.top;
   const k = ns / zs;
   zx -= mx * (k - 1); zy -= my * (k - 1); zs = ns;
   if (zs === 1) { zx = 0; zy = 0; }

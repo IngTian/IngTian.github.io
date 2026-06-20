@@ -20,7 +20,7 @@ import { calligraphy, photography, photoDefault } from '../data/artworks';
     <aside class="placard" id="art-placard" aria-live="polite">
       <div class="pl-inner">
         <div class="pl-kicker"></div>
-        <h2 class="pl-title"></h2>
+        <p class="pl-title"></p>
         <div class="pl-year"></div>
         <p class="pl-desc"></p>
       </div>
@@ -38,7 +38,7 @@ import { calligraphy, photography, photoDefault } from '../data/artworks';
         {calligraphy.map((w, i) => (
           <div class="cal-block" data-i={i}
                data-kicker={w.kicker} data-title={w.title} data-year={w.medium} data-note={w.note}>
-            <figure class:list={["cal", w.treatment]} data-zoom={w.src.src}>
+            <figure class:list={["cal", w.treatment]} data-zoom={w.src.src} data-alt={w.alt}>
               <Image src={w.src} alt={w.alt} widths={[480, 900, w.src.width]} sizes="(max-width:1024px) 80vw, 40vw" />
             </figure>
           </div>
@@ -51,7 +51,7 @@ import { calligraphy, photography, photoDefault } from '../data/artworks';
         {photography.map((p, i) => (
           <figure class="tile" data-i={i}
                   data-ar={(p.src.width / p.src.height).toFixed(4)}
-                  data-zoom={p.src.src}
+                  data-zoom={p.src.src} data-alt={p.alt}
                   data-title={p.title ?? ''} data-note={p.note ?? ''}>
             <Image src={p.src} alt={p.alt} widths={[300, 600, 900]} sizes="(max-width:1024px) 45vw, 30vw" />
           </figure>
