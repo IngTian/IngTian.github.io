@@ -1,0 +1,147 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { Image } from 'astro:assets';
+import { calligraphy, photography, photoDefault } from '../data/artworks';
+---
+<BaseLayout
+  title="An artist by night — Ing Tian"
+  description="Calligraphy and photography by Ing Tian (Zeying Tian)."
+>
+  <main class="art descent">
+    <!-- TOC rail -->
+    <nav class="art-toc" id="art-toc" aria-label="Sections">
+      <ul>
+        <li><a href="#calligraphy" data-target="calligraphy"><span class="rule" aria-hidden="true"></span><span>Calligraphy</span></a></li>
+        <li><a href="#photography" data-target="photography"><span class="rule" aria-hidden="true"></span><span>Photography</span></a></li>
+      </ul>
+    </nav>
+
+    <!-- Wall-label placard -->
+    <aside class="placard" id="art-placard" aria-live="polite">
+      <div class="pl-inner">
+        <div class="pl-kicker"></div>
+        <h2 class="pl-title"></h2>
+        <div class="pl-year"></div>
+        <p class="pl-desc"></p>
+      </div>
+    </aside>
+
+    <div class="art-wrap">
+      <header class="art-head">
+        <a class="back" href="/">← back</a>
+        <h1>An artist by night</h1>
+        <p class="lede">Calligraphy and photographs — seen, as in a quiet room, one at a time.</p>
+      </header>
+
+      <h2 class="seclabel" id="calligraphy">Calligraphy</h2>
+      <div id="cal-host">
+        {calligraphy.map((w, i) => (
+          <div class="cal-block" data-i={i}
+               data-kicker={w.kicker} data-title={w.title} data-year={w.medium} data-note={w.note}>
+            <figure class:list={["cal", w.treatment]} data-zoom={w.src.src}>
+              <Image src={w.src} alt={w.alt} widths={[480, 900, w.src.width]} sizes="(max-width:1024px) 80vw, 40vw" />
+            </figure>
+          </div>
+        ))}
+      </div>
+
+      <h2 class="seclabel dark" id="photography">Photography</h2>
+      <div class="photo-rows" id="photo-rows"
+           data-def-kicker={photoDefault.kicker} data-def-title={photoDefault.title} data-def-note={photoDefault.note}>
+        {photography.map((p, i) => (
+          <figure class="tile" data-i={i}
+                  data-ar={(p.src.width / p.src.height).toFixed(4)}
+                  data-zoom={p.src.src}
+                  data-title={p.title ?? ''} data-note={p.note ?? ''}>
+            <Image src={p.src} alt={p.alt} widths={[300, 600, 900]} sizes="(max-width:1024px) 45vw, 30vw" />
+          </figure>
+        ))}
+      </div>
+
+      <footer class="art-foot"><a class="back" href="/">← back to the descent</a></footer>
+    </div>
+
+    <!-- Silent deep-zoom lightbox -->
+    <dialog class="lightbox" id="art-lightbox" aria-label="Artwork detail">
+      <button class="lb-close" id="lb-close" aria-label="Close">✕ close</button>
+      <img id="lb-img" src="" alt="" />
+      <p class="lb-hint">scroll to zoom · drag to pan · click to close</p>
+    </dialog>
+  </main>
+</BaseLayout>
+
+<style>
+  /* three zones: rail · placard · works */
+  .art { position: relative; z-index: 0; min-height: 100vh; }
+  .art-toc { position: fixed; left: clamp(18px, 2.4vw, 38px); top: 50%; transform: translateY(-50%); z-index: 30; }
+  .art-toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+  .art-toc a { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--font-mono);
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; line-height: 1; color: var(--ink-3); opacity: 0.45;
+    transition: opacity 0.3s, color 0.3s; }
+  .art-toc .rule { width: 0; height: 1px; background: currentColor; opacity: 0.55; transition: width 0.4s ease; }
+  .art-toc a.is-active { opacity: 1; color: var(--ink-1); }
+  .art-toc a.is-active .rule { width: 20px; }
+  @media (hover: hover) { .art-toc a:hover { opacity: 0.85; } }
+
+  .placard { position: fixed; left: clamp(120px, 12vw, 200px); top: 50%; transform: translateY(-50%);
+    width: clamp(220px, 18vw, 290px); z-index: 20; }
+  .pl-inner { transition: opacity 0.22s ease, transform 0.22s ease; }
+  .placard.fade .pl-inner { opacity: 0; transform: translateY(8px); }
+  .pl-kicker { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-4); }
+  .pl-title { font-family: var(--font-display); font-weight: 500; font-size: 23px; line-height: 1.15; margin: 12px 0 4px; font-variation-settings: 'SOFT' 40; }
+  .pl-year { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--ink-4); margin-bottom: 14px; }
+  .pl-desc { font-size: 13px; line-height: 1.7; color: var(--ink-3); }
+  .placard.dark .pl-title { color: var(--paper); }
+  .placard.dark .pl-kicker, .placard.dark .pl-year { color: var(--ink-5); }
+  .placard.dark .pl-desc { color: rgba(239, 233, 221, 0.7); }
+
+  .art-wrap { max-width: 1320px; margin-right: clamp(24px, 4vw, 84px); margin-left: clamp(420px, 35vw, 560px); }
+  .art-head { padding: 15vh 0 8vh; }
+  .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
+  .back:hover { color: var(--seal); }
+  .art h1 { font-family: var(--font-display); font-weight: 500; font-size: clamp(38px, 5vw, 60px); line-height: 1.04;
+    letter-spacing: -0.01em; font-variation-settings: 'SOFT' 60; margin-top: 16px; color: var(--ink-1); }
+  .lede { font-size: 14px; color: var(--ink-3); margin-top: 16px; line-height: 1.7; max-width: 48ch; }
+  .seclabel { font-family: var(--font-mono); font-weight: 400; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase;
+    margin: 10vh 0 4vh; color: var(--ink-4); }
+  .seclabel.dark { color: rgba(239, 233, 221, 0.5); }
+
+  .cal-block { min-height: 86vh; display: flex; align-items: center; justify-content: flex-start; }
+  .cal { margin: 0; line-height: 0; cursor: zoom-in; }
+  .cal :global(img) { display: block; width: auto; max-height: 80vh; transition: transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .cal.stele :global(img) { filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.55)); }
+  .cal.paper :global(img) { border: 1px solid rgba(255, 255, 255, 0.16); box-shadow: 0 24px 60px -22px rgba(20, 18, 14, 0.5); }
+
+  /* photo grid: SSR fallback = flex-wrap; JS upgrades to exact justified rows */
+  .photo-rows { display: flex; flex-wrap: wrap; gap: 14px; }
+  figure.tile { margin: 0; overflow: hidden; border-radius: 2px; position: relative; cursor: zoom-in; background: rgba(0,0,0,0.06);
+    flex: 1 1 auto; height: 320px; }
+  figure.tile :global(img) { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 0.9s cubic-bezier(0.2,0.7,0.2,1); }
+  figure.tile::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.07); transition: box-shadow 0.4s; pointer-events: none; }
+  .art-foot { padding: 13vh 0 18vh; }
+  .art-foot .back { color: rgba(239, 233, 221, 0.5); }
+
+  /* lightbox */
+  .lightbox { border: 0; padding: 0; margin: 0; max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh;
+    background: rgba(16,15,12,0.97); }
+  .lightbox::backdrop { background: rgba(16,15,12,0.97); }
+  .lightbox[open] { display: flex; align-items: center; justify-content: center; }
+  #lb-img { max-width: 94vw; max-height: 94vh; will-change: transform; cursor: grab; transform-origin: 0 0;
+    box-shadow: 0 40px 120px -30px rgba(0,0,0,0.8); }
+  .lb-close { position: fixed; top: 20px; right: 24px; font-family: var(--font-mono); font-size: 13px; color: rgba(239,233,221,0.7);
+    background: none; border: 0; cursor: pointer; }
+  .lb-hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); font-family: var(--font-mono); font-size: 11px;
+    color: rgba(239,233,221,0.5); letter-spacing: 0.06em; pointer-events: none; }
+
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    figure.tile:hover :global(img) { transform: scale(1.06); }
+    figure.tile:hover::after { box-shadow: inset 0 0 0 1px rgba(239,233,221,0.3); }
+    .cal:hover :global(img) { transform: scale(1.035); }
+  }
+
+  @media (max-width: 1024px) {
+    .art-toc, .placard { display: none; }
+    .art-wrap { margin: 0 auto; max-width: 900px; padding: 0 22px; }
+    .cal-block { min-height: auto; justify-content: center; padding: 5vh 0; }
+  }
+</style>
