@@ -5,6 +5,15 @@ import { publications } from '../data/profile';
 
 const featured = publications.filter((p) => p.featured);
 const others = publications.filter((p) => !p.featured);
+
+// TOC stops, built from what the featured paper(s) actually carry. Section IDs
+// assume a single featured paper (current data); revisit the rail if a second
+// featured paper is added.
+const stops: { label: string; target: string }[] = [];
+if (featured.some((p) => p.idea)) stops.push({ label: 'The idea', target: 'r-idea' });
+if (featured.some((p) => p.results?.length)) stops.push({ label: 'Results', target: 'r-results' });
+if (featured.some((p) => p.abstract)) stops.push({ label: 'Abstract', target: 'r-abstract' });
+if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
 ---
 <BaseLayout
   title="Research — Ing Tian"
@@ -14,6 +23,21 @@ const others = publications.filter((p) => !p.featured);
 >
   <main class="research descent">
     <SkyWash />
+
+    {stops.length > 0 && (
+      <nav class="research-toc" id="research-toc" aria-label="On this page">
+        <ul>
+          {stops.map((s) => (
+            <li>
+              <a href={`#${s.target}`} data-target={s.target}>
+                <span class="rule" aria-hidden="true"></span><span>{s.label}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    )}
+
     <div class="research-wrap">
       <header class="research-head">
         <a class="back" href="/">← back</a>
@@ -28,7 +52,7 @@ const others = publications.filter((p) => !p.featured);
           <p class="byline">{p.authors} · {p.venue}{p.arxivId && <> · arXiv:{p.arxivId}</>} · {p.year}</p>
 
           {p.idea && (
-            <section class="block">
+            <section class="block" id="r-idea">
               <h3>The idea</h3>
               <p>{p.idea}</p>
             </section>
@@ -37,7 +61,7 @@ const others = publications.filter((p) => !p.featured);
           {p.takeaway && <p class="takeaway">{p.takeaway}</p>}
 
           {p.results && p.results.length > 0 && (
-            <section class="block">
+            <section class="block" id="r-results">
               <h3>Out-of-sample results</h3>
               <dl class="results">
                 {p.results.map((r) => (
@@ -51,7 +75,7 @@ const others = publications.filter((p) => !p.featured);
           )}
 
           {p.abstract && (
-            <section class="block">
+            <section class="block" id="r-abstract">
               <h3>Abstract</h3>
               <p class="abstract">{p.abstract}</p>
             </section>
@@ -65,7 +89,7 @@ const others = publications.filter((p) => !p.featured);
       ))}
 
       {others.length > 0 && (
-        <section class="more">
+        <section class="more" id="r-earlier">
           <h3 class="more-label">Earlier work</h3>
           {others.map((p) => {
             const Tag = p.href ? 'a' : 'div';
@@ -87,8 +111,36 @@ const others = publications.filter((p) => !p.featured);
 
 <style>
   .research { position: relative; z-index: 0; min-height: 100vh; }
-  /* a single calm reading column, centered — a quiet room, like /art */
-  .research-wrap { max-width: 760px; margin: 0 auto; padding: 0 26px; }
+
+  /* /research is a READING page, so it stays in the luminous range top-to-bottom
+     — the full descent (which sinks to near-black) made ink text unreadable in
+     the lower half. This keeps the warm→cool drift (still "the descent") but
+     never dark enough to lose contrast: ink-3 holds ≥5:1 all the way down. */
+  .research.descent {
+    background: linear-gradient(
+      168deg,
+      #f4efe4 0%,
+      #f1ebe0 24%,
+      #efe6d4 48%,
+      #e7ddce 74%,
+      #dcd5cf 100%
+    );
+  }
+
+  /* left TOC rail — mirrors /art and the homepage Toc */
+  .research-toc { position: fixed; left: clamp(18px, 2.4vw, 38px); top: 50%; transform: translateY(-50%); z-index: 30; }
+  .research-toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+  .research-toc a { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--font-mono);
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; line-height: 1; color: var(--ink-3); opacity: 0.45;
+    transition: opacity 0.3s, color 0.3s; }
+  .research-toc .rule { width: 0; height: 1px; background: currentColor; opacity: 0.55; transition: width 0.4s ease; }
+  .research-toc a.is-active { opacity: 1; color: var(--ink-1); }
+  .research-toc a.is-active .rule { width: 20px; }
+  @media (hover: hover) { .research-toc a:hover { opacity: 0.85; } }
+
+  /* reading column, shifted RIGHT to clear the rail (a moderate offset — this is
+     a reading page, not the gallery's far-right column) */
+  .research-wrap { max-width: 700px; margin-left: clamp(150px, 20vw, 380px); margin-right: clamp(32px, 5vw, 100px); }
   .research-head { padding: 14vh 0 6vh; }
   .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
   .back:hover { color: var(--seal); }
@@ -102,7 +154,7 @@ const others = publications.filter((p) => !p.featured);
     line-height: 1.18; color: var(--ink-1); margin: 14px 0 0; font-variation-settings: 'SOFT' 40; }
   .byline { font-family: var(--font-mono); font-size: 11px; color: var(--ink-4); letter-spacing: 0.02em; margin-top: 14px; }
 
-  .block { margin-top: 5vh; }
+  .block { margin-top: 5vh; scroll-margin-top: 12vh; }
   .block h3 { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase;
     color: var(--ink-4); margin-bottom: 14px; }
   .block p { font-size: 16px; line-height: 1.72; color: var(--ink-2); }
@@ -122,7 +174,7 @@ const others = publications.filter((p) => !p.featured);
     color: var(--ink-1); border: 1px solid var(--ink-4); border-radius: 999px; padding: 8px 18px; transition: border-color 0.3s, color 0.3s; }
   .paper-link:hover { border-color: var(--seal); color: var(--seal); }
 
-  .more { margin-top: 8vh; border-top: 1px solid rgba(90, 84, 74, 0.25); padding-top: 4vh; }
+  .more { margin-top: 8vh; border-top: 1px solid rgba(90, 84, 74, 0.25); padding-top: 4vh; scroll-margin-top: 12vh; }
   .more-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 2vh; }
   .entry { display: block; padding: 18px 0; border-top: 1px solid rgba(90, 84, 74, 0.16); text-decoration: none; }
   .entry:first-of-type { border-top: 0; }
@@ -134,11 +186,63 @@ const others = publications.filter((p) => !p.featured);
 
   .research-foot { padding: 10vh 0 16vh; }
 
-  /* deep-sky reading: the gradient is pale up here, so ink text holds; if the
-     page is short the lower gradient never shows, which is fine — it's a calm
-     top-of-descent room. */
+  /* narrow screens: drop the rail, center the reading column */
+  @media (max-width: 1024px) {
+    .research-toc { display: none; }
+    .research-wrap { margin: 0 auto; padding: 0 24px; max-width: 720px; }
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .paper, .more { animation: research-in 0.7s ease both; }
     @keyframes research-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
   }
 </style>
+
+<script>
+  import { activeStopIndex } from '../lib/scrollspy';
+
+  // TOC scrollspy — same shared rule as the homepage TOC and the /art rail.
+  // Re-inits on astro:page-load (View Transitions) with teardown so listeners
+  // don't leak or point at a swapped-out rail.
+  let teardown: (() => void) | null = null;
+
+  function initResearchToc() {
+    teardown?.();
+    teardown = null;
+
+    const toc = document.getElementById('research-toc');
+    if (!toc) return;
+    const links = Array.from(toc.querySelectorAll<HTMLAnchorElement>('a'));
+    const stops = links
+      .map((a) => ({ a, el: document.getElementById(a.dataset.target || '') }))
+      .filter((s): s is { a: HTMLAnchorElement; el: HTMLElement } => !!s.el);
+    if (!stops.length) return;
+
+    function update() {
+      const idx = activeStopIndex(
+        stops.map((s) => s.el.getBoundingClientRect().top),
+        window.innerHeight,
+        window.scrollY,
+        document.documentElement.scrollHeight,
+      );
+      stops.forEach((s, i) => s.a.classList.toggle('is-active', i === idx));
+    }
+
+    let ticking = false;
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => { update(); ticking = false; });
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    update();
+
+    teardown = () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }
+
+  document.addEventListener('astro:page-load', initResearchToc);
+</script>
