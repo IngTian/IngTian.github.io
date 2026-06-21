@@ -1,0 +1,337 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SkyWash from '../components/SkyWash.astro';
+import { publications } from '../data/profile';
+import { PAPER_EQUATIONS } from '../lib/equations';
+
+const featured = publications.filter((p) => p.featured);
+const others = publications.filter((p) => !p.featured);
+const hasMath = featured.length > 0;
+
+// The formal-method equations — verified from arXiv:2508.11856, each with a
+// plain gloss. MathML is baked at build time (no KaTeX shipped to the client).
+const showcase: { html: string; gloss: string }[] = [
+  { html: PAPER_EQUATIONS.weightMap, gloss: 'Two-level weights — each holding is its sector’s share times its share within that sector.' },
+  { html: PAPER_EQUATIONS.reward, gloss: 'The learning signal: gross return, minus turnover cost, minus a risk-dispersion penalty.' },
+  { html: PAPER_EQUATIONS.riskConservation, gloss: 'Risk contributions sum exactly to portfolio variance — the basis for parity.' },
+  { html: PAPER_EQUATIONS.sectorCov, gloss: 'Within-sector weights aggregate asset covariance up to the sector level.' },
+];
+
+// TOC stops, built from what the featured paper(s) actually carry.
+const stops: { label: string; target: string }[] = [];
+if (featured.some((p) => p.idea)) stops.push({ label: 'The idea', target: 'r-idea' });
+if (hasMath) stops.push({ label: 'Method', target: 'r-math' });
+if (featured.some((p) => p.results?.length || p.metrics)) stops.push({ label: 'Results', target: 'r-results' });
+if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
+---
+<BaseLayout
+  title="Research — Ing Tian"
+  description="Selected research by Ing Tian (Zeying Tian) — portfolio optimization and machine learning. Featuring RL-BHRP, a reinforcement-learning-embedded Bayesian Hierarchical Risk Parity approach to adaptive allocation."
+  veilLine="a researcher by day"
+  veilOnLoad={true}
+>
+  <main class="research descent">
+    <SkyWash />
+
+    {stops.length > 0 && (
+      <nav class="research-toc" id="research-toc" aria-label="On this page">
+        <ul>
+          {stops.map((s) => (
+            <li>
+              <a href={`#${s.target}`} data-target={s.target}>
+                <span class="rule" aria-hidden="true"></span><span>{s.label}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    )}
+
+    <div class="research-block">
+      <header class="research-head">
+        <a class="back" href="/">← back</a>
+        <h1>Selected research</h1>
+        <p class="lede">Work in portfolio optimization and machine learning — the idea, the method, the result.</p>
+      </header>
+
+      {featured.map((p) => (
+        <article class="paper">
+          <!-- title + byline span both columns, like a paper masthead -->
+          <div class="paper-head">
+            <p class="kicker">{p.subject ?? 'Research'}</p>
+            <h2>{p.title}</h2>
+            <p class="byline">{p.authors} · {p.venue}{p.arxivId && <> · arXiv:{p.arxivId}</>} · {p.year}</p>
+          </div>
+
+          <!-- two columns: LEFT = idea + formal method (math); RIGHT = results -->
+          <div class="paper-body">
+            <div class="paper-left">
+              {p.idea && (
+                <section class="block" id="r-idea">
+                  <h3>The idea</h3>
+                  <p>{p.idea}</p>
+                  {p.takeaway && <p class="takeaway">{p.takeaway}</p>}
+                </section>
+              )}
+
+              {hasMath && (
+                <section class="block math" id="r-math">
+                  <h3>The method, formally</h3>
+                  {showcase.map((eq) => (
+                    <figure class="eq">
+                      <div class="eq-math" set:html={eq.html}></div>
+                      <figcaption>{eq.gloss}</figcaption>
+                    </figure>
+                  ))}
+                  <p class="math-foot">Equations from arXiv:2508.11856.</p>
+                </section>
+              )}
+            </div>
+
+            <div class="paper-right">
+              {(p.results?.length || p.metrics) && (
+                <section class="block" id="r-results">
+                  <h3>Results · out-of-sample</h3>
+                  {p.results && p.results.length > 0 && (
+                    <dl class="results">
+                      {p.results.map((r) => (
+                        <div class="result">
+                          <dt>{r.value}</dt>
+                          <dd>{r.label}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                  {p.metrics && (
+                    <figure class="metrics">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th scope="col" class="m-name">Metric</th>
+                            {p.metrics.columns.map((c, i) => <th scope="col" class={i === 0 ? 'm-lead' : ''}>{c}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {p.metrics.rows.map((row) => (
+                            <tr class={row.highlight ? 'hl' : ''}>
+                              <th scope="row" class="m-name">{row.metric}</th>
+                              {row.values.map((v, i) => <td class={i === 0 ? 'm-lead' : ''}>{v}</td>)}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <figcaption>{p.metrics.caption}</figcaption>
+                    </figure>
+                  )}
+                  <div class="links">
+                    {p.href && <a class="paper-link" href={p.href} target="_blank" rel="noopener noreferrer">Read the paper · arXiv ↗</a>}
+                    {p.pdfHref && <a class="paper-link" href={p.pdfHref} target="_blank" rel="noopener noreferrer">PDF ↗</a>}
+                  </div>
+                </section>
+              )}
+            </div>
+          </div>
+        </article>
+      ))}
+
+      {others.length > 0 && (
+        <section class="more" id="r-earlier">
+          <h3 class="more-label">Earlier work</h3>
+          {others.map((p) => {
+            const Tag = p.href ? 'a' : 'div';
+            return (
+              <Tag class="entry" href={p.href} target={p.href ? '_blank' : undefined} rel={p.href ? 'noopener noreferrer' : undefined}>
+                <div class="entry-meta"><span>{p.authors}</span><span>{p.year}</span></div>
+                <p class="entry-title">{p.title}{p.href && <span class="arr"> ↗</span>}</p>
+                <p class="entry-venue">{p.venue}</p>
+              </Tag>
+            );
+          })}
+        </section>
+      )}
+
+      <footer class="research-foot"><a class="back" href="/">← back to the descent</a></footer>
+    </div>
+  </main>
+</BaseLayout>
+
+<style>
+  .research { position: relative; z-index: 0; min-height: 100vh; }
+
+  /* /research is a READING page, so it stays in the luminous range top-to-bottom
+     — the full descent (which sinks to near-black) made ink text unreadable in
+     the lower half. This keeps the warm→cool drift (still "the descent") but
+     never dark enough to lose contrast: ink-3 holds ≥5:1 all the way down. */
+  .research.descent {
+    background: linear-gradient(
+      168deg,
+      #f4efe4 0%,
+      #f1ebe0 24%,
+      #efe6d4 48%,
+      #e7ddce 74%,
+      #dcd5cf 100%
+    );
+  }
+
+  /* left TOC rail — mirrors /art and the homepage Toc */
+  .research-toc { position: fixed; left: clamp(18px, 2.4vw, 38px); top: 50%; transform: translateY(-50%); z-index: 30; }
+  .research-toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+  .research-toc a { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--font-mono);
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; line-height: 1; color: var(--ink-3); opacity: 0.45;
+    transition: opacity 0.3s, color 0.3s; }
+  .research-toc .rule { width: 0; height: 1px; background: currentColor; opacity: 0.55; transition: width 0.4s ease; }
+  .research-toc a.is-active { opacity: 1; color: var(--ink-1); }
+  .research-toc a.is-active .rule { width: 20px; }
+  @media (hover: hover) { .research-toc a:hover { opacity: 0.85; } }
+
+  /* The paper block — held RIGHT-of-center at any width. A percentage left
+     margin (NOT a clamp that caps out and drifts left on wide monitors) keeps
+     ~34% of the viewport as empty margin on the left, where the TOC rail lives. */
+  .research-block {
+    width: min(64%, 1180px);
+    margin-left: 34%;
+    margin-right: clamp(24px, 4vw, 90px);
+    box-sizing: border-box;
+  }
+
+  .research-head { padding: 14vh 0 6vh; }
+  .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
+  .back:hover { color: var(--seal); }
+  .research h1 { font-family: var(--font-display); font-weight: 500; font-size: clamp(38px, 5vw, 58px);
+    line-height: 1.04; letter-spacing: -0.01em; font-variation-settings: 'SOFT' 60; margin-top: 16px; color: var(--ink-1); }
+  .lede { font-size: 14px; color: var(--ink-3); margin-top: 16px; line-height: 1.7; max-width: 52ch; }
+
+  /* paper masthead — spans both columns */
+  .paper-head { padding-bottom: 1vh; }
+  .kicker { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-4); }
+  .paper-head h2 { font-family: var(--font-display); font-weight: 500; font-size: clamp(24px, 3vw, 34px);
+    line-height: 1.18; color: var(--ink-1); margin: 14px 0 0; font-variation-settings: 'SOFT' 40; max-width: 40ch; }
+  .byline { font-family: var(--font-mono); font-size: 11px; color: var(--ink-4); letter-spacing: 0.02em; margin-top: 14px; }
+
+  /* two columns: LEFT (idea + formal math) is wider so equations show in full;
+     RIGHT (results) is the narrower numeric column. */
+  .paper-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: clamp(32px, 3.4vw, 60px);
+    align-items: start;
+    margin-top: 5vh;
+  }
+  .paper-left, .paper-right { min-width: 0; }
+
+  .block { scroll-margin-top: 12vh; }
+  .block + .block { margin-top: 6vh; }
+  .block h3 { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--ink-4); margin-bottom: 14px; }
+  .block > p { font-size: 16px; line-height: 1.72; color: var(--ink-2); }
+
+  .takeaway { font-family: var(--font-display); font-style: italic; font-size: clamp(19px, 2.4vw, 24px);
+    line-height: 1.4; color: var(--ink-1); margin-top: 4vh; padding-left: 20px; border-left: 2px solid var(--ochre); }
+
+  /* formal-method equations — full size to match the body type, never folded */
+  .math .eq { margin: 0 0 30px; }
+  .math .eq:first-of-type { margin-top: 2vh; }
+  .eq-math { color: var(--ink-1); overflow-x: auto; overflow-y: hidden; }
+  .eq-math :global(math) { font-size: 1.18em; }            /* as prominent as the prose */
+  .eq figcaption { font-size: 13px; line-height: 1.6; color: var(--ink-3); margin-top: 12px; }
+  .math-foot { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em; color: var(--ink-4);
+    margin-top: 6px; padding-top: 16px; border-top: 1px solid rgba(90,84,74,0.18); }
+
+  /* results: stat strip + full table (right column) */
+  .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 18px; margin: 2vh 0 4vh; }
+  .result dt { font-family: var(--font-display); font-weight: 600; font-size: 26px; color: var(--ink-1); font-variation-settings: 'SOFT' 30; }
+  .result dd { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--ink-3); }
+
+  .metrics { margin: 0; }
+  .metrics table { width: 100%; border-collapse: collapse; }
+  .metrics th, .metrics td { text-align: right; padding: 8px 8px; font-family: var(--font-mono); font-size: 11.5px; }
+  .metrics thead th { color: var(--ink-4); font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase;
+    font-size: 9.5px; border-bottom: 1px solid rgba(90,84,74,0.3); }
+  .metrics .m-name { text-align: left; color: var(--ink-3); font-weight: 400; }
+  .metrics tbody th.m-name { color: var(--ink-2); }
+  .metrics tbody tr { border-bottom: 1px solid rgba(90,84,74,0.12); }
+  .metrics td { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .metrics td.m-lead { color: var(--ink-1); font-weight: 500; } /* RL-BHRP column, foregrounded */
+  .metrics tr.hl td.m-lead { color: var(--seal); }              /* headline metrics in the seal accent */
+  .metrics figcaption { margin-top: 12px; font-size: 11px; font-style: italic; color: var(--ink-4); line-height: 1.5; }
+
+  .links { margin-top: 4vh; display: flex; gap: 12px; flex-wrap: wrap; }
+  .paper-link { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.04em; text-decoration: none;
+    color: var(--ink-1); border: 1px solid var(--ink-4); border-radius: 999px; padding: 8px 16px; transition: border-color 0.3s, color 0.3s; }
+  .paper-link:hover { border-color: var(--seal); color: var(--seal); }
+
+  .more { margin-top: 8vh; border-top: 1px solid rgba(90, 84, 74, 0.25); padding-top: 4vh; scroll-margin-top: 12vh; }
+  .more-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 2vh; }
+  .entry { display: block; padding: 18px 0; border-top: 1px solid rgba(90, 84, 74, 0.16); text-decoration: none; max-width: 620px; }
+  .entry:first-of-type { border-top: 0; }
+  .entry-meta { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; color: var(--ink-4); }
+  .entry-title { font-size: 15px; font-weight: 500; color: var(--ink-1); margin-top: 8px; line-height: 1.4; }
+  .entry:hover .entry-title { color: var(--seal); }
+  .arr { color: var(--ochre); }
+  .entry-venue { font-size: 12.5px; font-style: italic; color: var(--ink-3); margin-top: 4px; }
+
+  .research-foot { padding: 10vh 0 16vh; }
+
+  /* narrow / tablet: drop the rail; collapse to one column (idea → method →
+     results, in reading order). */
+  @media (max-width: 1100px) {
+    .research-toc { display: none; }
+    .research-block { width: auto; margin: 0 auto; padding: 0 24px; max-width: 760px; }
+    .paper-body { grid-template-columns: 1fr; gap: 0; }
+    .paper-right { margin-top: 6vh; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .paper, .more { animation: research-in 0.7s ease both; }
+    @keyframes research-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  }
+</style>
+
+<script>
+  import { activeStopIndex } from '../lib/scrollspy';
+
+  // TOC scrollspy — same shared rule as the homepage TOC and the /art rail.
+  // Re-inits on astro:page-load (View Transitions) with teardown so listeners
+  // don't leak or point at a swapped-out rail.
+  let teardown: (() => void) | null = null;
+
+  function initResearchToc() {
+    teardown?.();
+    teardown = null;
+
+    const toc = document.getElementById('research-toc');
+    if (!toc) return;
+    const links = Array.from(toc.querySelectorAll<HTMLAnchorElement>('a'));
+    const stops = links
+      .map((a) => ({ a, el: document.getElementById(a.dataset.target || '') }))
+      .filter((s): s is { a: HTMLAnchorElement; el: HTMLElement } => !!s.el);
+    if (!stops.length) return;
+
+    function update() {
+      const idx = activeStopIndex(
+        stops.map((s) => s.el.getBoundingClientRect().top),
+        window.innerHeight,
+        window.scrollY,
+        document.documentElement.scrollHeight,
+      );
+      stops.forEach((s, i) => s.a.classList.toggle('is-active', i === idx));
+    }
+
+    let ticking = false;
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => { update(); ticking = false; });
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    update();
+
+    teardown = () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }
+
+  document.addEventListener('astro:page-load', initResearchToc);
+</script>

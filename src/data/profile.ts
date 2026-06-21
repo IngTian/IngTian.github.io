@@ -6,12 +6,34 @@ export interface TimelineEntry {
   kind: 'work' | 'education';
 }
 
+export interface PublicationResult {
+  value: string; // e.g. "~120%"
+  label: string; // e.g. "adaptive (out-of-sample 2020–25)"
+}
+
+// A full results table: one row per metric, compared across columns (models).
+export interface MetricsTable {
+  caption: string;
+  columns: string[];          // e.g. ['RL-BHRP', 'BHRP', 'Benchmark']
+  rows: { metric: string; values: string[]; highlight?: boolean }[];
+}
+
 export interface Publication {
   authors: string;
   title: string;
   venue: string;
   year: string;
-  href?: string;
+  href?: string;          // primary link (arXiv abstract page, etc.)
+  // ── richer fields, surfaced on the /research page (all optional) ──
+  arxivId?: string;       // e.g. "2508.11856"
+  pdfHref?: string;       // direct PDF link
+  subject?: string;       // e.g. "q-fin.PM (Portfolio Management)"
+  idea?: string;          // plain-language "what it is"
+  takeaway?: string;      // one-line "why it matters"
+  results?: PublicationResult[]; // headline numbers, shown as a stat strip
+  metrics?: MetricsTable; // full results table (verbatim from the paper)
+  abstract?: string;      // verbatim abstract
+  featured?: boolean;     // gets the full treatment on /research
 }
 
 export interface Award {
@@ -49,6 +71,37 @@ export const publications: Publication[] = [
     venue: 'arXiv preprint',
     year: '2025',
     href: 'https://arxiv.org/abs/2508.11856',
+    arxivId: '2508.11856',
+    pdfHref: 'https://arxiv.org/pdf/2508.11856',
+    subject: 'q-fin.PM · Portfolio Management',
+    featured: true,
+    idea: 'Most portfolios either assume a fixed model of risk or chase returns directly. RL-BHRP does neither: it spreads risk hierarchically across sectors and the stocks within them, then uses reinforcement learning to adapt those exposures as market conditions shift — learning how to allocate, rather than assuming.',
+    takeaway: 'Allocation that learns instead of assuming — diversified and investable, not a backtest curiosity.',
+    results: [
+      { value: '~120%', label: 'wealth compounded, out-of-sample 2020–25 (vs 101% static, 91% sector ETF)' },
+      { value: '~15% / yr', label: 'average annual growth (vs 13% and 12%)' },
+      { value: 'comparable', label: 'drawdowns — value added while staying diversified' },
+    ],
+    // Verbatim from Table 2 (67 periods, 2020-02-29 → 2025-08-31). Values
+    // rounded for display from the paper's reported figures.
+    metrics: {
+      caption: 'Full period · 2020-02 to 2025-08 · RL-BHRP vs static BHRP vs sector benchmark',
+      columns: ['RL-BHRP', 'BHRP', 'Benchmark'],
+      rows: [
+        { metric: 'Cumulative return', values: ['1.20', '1.01', '0.91'], highlight: true },
+        { metric: 'CAGR', values: ['15.2%', '13.4%', '12.3%'], highlight: true },
+        { metric: 'Annual volatility', values: ['17.4%', '16.5%', '17.3%'] },
+        { metric: 'Sharpe', values: ['0.90', '0.85', '0.76'], highlight: true },
+        { metric: 'Sortino', values: ['1.65', '1.53', '1.37'] },
+        { metric: 'Max drawdown', values: ['−20.3%', '−19.1%', '−18.3%'] },
+        { metric: 'Calmar', values: ['0.75', '0.70', '0.67'] },
+        { metric: 'Information ratio', values: ['0.69', '0.22', '—'] },
+        { metric: 'CVaR 5%', values: ['−10.2%', '−9.7%', '−10.3%'] },
+        { metric: 'Hit rate (>0)', values: ['64.2%', '64.2%', '62.7%'] },
+      ],
+    },
+    abstract:
+      'We propose a two-level, learning-based portfolio method (RL-BHRP) that spreads risk across sectors and stocks, and adjusts exposures as market conditions change. Using U.S. Equities from 2012 to mid-2025, we design the model using 2012 to 2019 data, and evaluate it out-of-sample from 2020 to 2025 against a sector index built from exchange-traded funds and a static risk-balanced portfolio. Over the test window, the adaptive portfolio compounds wealth by approximately 120 percent, compared with 101 percent for the static comparator and 91 percent for the sector benchmark. The average annual growth is roughly 15 percent, compared to 13 percent and 12 percent, respectively. Gains are achieved without significant deviations from the benchmark and with peak-to-trough losses comparable to those of the alternatives, indicating that the method adds value while remaining diversified and investable. Weight charts show gradual shifts rather than abrupt swings, reflecting disciplined rebalancing and the cost-aware design. Overall, the results support risk-balanced, adaptive allocation as a practical approach to achieving stronger and more stable long-term performance.',
   },
   {
     authors: 'D. Li, Z. Tian, Y. Duan',
@@ -66,6 +119,7 @@ export const awards: Award[] = [
 
 export const links: { label: string; href: string; primary?: boolean }[] = [
   { label: 'Download CV', href: '/cv.pdf', primary: true },
+  { label: 'Research', href: '/research' },
   { label: 'Art', href: '/art' },
   { label: 'Email', href: 'mailto:zeying.tian@mail.mcgill.ca' },
   { label: 'GitHub', href: 'https://github.com/IngTian' },
