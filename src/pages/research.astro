@@ -2,13 +2,22 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import SkyWash from '../components/SkyWash.astro';
 import { publications } from '../data/profile';
+import { PAPER_EQUATIONS } from '../lib/equations';
 
 const featured = publications.filter((p) => p.featured);
 const others = publications.filter((p) => !p.featured);
+const hasMath = featured.some((p) => p.featured); // the showcase pairs with the featured paper
 
-// TOC stops, built from what the featured paper(s) actually carry. Section IDs
-// assume a single featured paper (current data); revisit the rail if a second
-// featured paper is added.
+// The right-column math showcase — verified equations from arXiv:2508.11856,
+// each with a plain gloss. MathML is baked at build time (no KaTeX shipped).
+const showcase: { html: string; gloss: string }[] = [
+  { html: PAPER_EQUATIONS.weightMap, gloss: 'Two-level weights — each holding is its sector’s share times its share within that sector.' },
+  { html: PAPER_EQUATIONS.reward, gloss: 'The learning signal: gross return, minus turnover cost, minus a risk-dispersion penalty.' },
+  { html: PAPER_EQUATIONS.riskConservation, gloss: 'Risk contributions sum exactly to portfolio variance — the basis for parity.' },
+  { html: PAPER_EQUATIONS.sectorCov, gloss: 'Within-sector weights aggregate asset covariance up to the sector level.' },
+];
+
+// TOC stops, built from what the featured paper(s) actually carry.
 const stops: { label: string; target: string }[] = [];
 if (featured.some((p) => p.idea)) stops.push({ label: 'The idea', target: 'r-idea' });
 if (featured.some((p) => p.results?.length)) stops.push({ label: 'Results', target: 'r-results' });
@@ -38,73 +47,113 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
       </nav>
     )}
 
-    <div class="research-wrap">
-      <header class="research-head">
-        <a class="back" href="/">← back</a>
-        <h1>Selected research</h1>
-        <p class="lede">Work in portfolio optimization and machine learning — the idea, the result, the paper.</p>
-      </header>
+    <div class="research-layout">
+      <div class="research-col">
+        <header class="research-head">
+          <a class="back" href="/">← back</a>
+          <h1>Selected research</h1>
+          <p class="lede">Work in portfolio optimization and machine learning — the idea, the result, the paper.</p>
+        </header>
 
-      {featured.map((p) => (
-        <article class="paper">
-          <p class="kicker">{p.subject ?? 'Research'}</p>
-          <h2>{p.title}</h2>
-          <p class="byline">{p.authors} · {p.venue}{p.arxivId && <> · arXiv:{p.arxivId}</>} · {p.year}</p>
+        {featured.map((p) => (
+          <article class="paper">
+            <p class="kicker">{p.subject ?? 'Research'}</p>
+            <h2>{p.title}</h2>
+            <p class="byline">{p.authors} · {p.venue}{p.arxivId && <> · arXiv:{p.arxivId}</>} · {p.year}</p>
 
-          {p.idea && (
-            <section class="block" id="r-idea">
-              <h3>The idea</h3>
-              <p>{p.idea}</p>
-            </section>
-          )}
+            {p.idea && (
+              <section class="block" id="r-idea">
+                <h3>The idea</h3>
+                <p>{p.idea}</p>
+              </section>
+            )}
 
-          {p.takeaway && <p class="takeaway">{p.takeaway}</p>}
+            {p.takeaway && <p class="takeaway">{p.takeaway}</p>}
 
-          {p.results && p.results.length > 0 && (
-            <section class="block" id="r-results">
-              <h3>Out-of-sample results</h3>
-              <dl class="results">
-                {p.results.map((r) => (
-                  <div class="result">
-                    <dt>{r.value}</dt>
-                    <dd>{r.label}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-          )}
+            {(p.results?.length || p.metrics) && (
+              <section class="block" id="r-results">
+                <h3>Out-of-sample results</h3>
+                {p.results && p.results.length > 0 && (
+                  <dl class="results">
+                    {p.results.map((r) => (
+                      <div class="result">
+                        <dt>{r.value}</dt>
+                        <dd>{r.label}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+                {p.metrics && (
+                  <figure class="metrics">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th scope="col" class="m-name">Metric</th>
+                          {p.metrics.columns.map((c, i) => <th scope="col" class={i === 0 ? 'm-lead' : ''}>{c}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {p.metrics.rows.map((row) => (
+                          <tr class={row.highlight ? 'hl' : ''}>
+                            <th scope="row" class="m-name">{row.metric}</th>
+                            {row.values.map((v, i) => <td class={i === 0 ? 'm-lead' : ''}>{v}</td>)}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <figcaption>{p.metrics.caption}</figcaption>
+                  </figure>
+                )}
+              </section>
+            )}
 
-          {p.abstract && (
-            <section class="block" id="r-abstract">
-              <h3>Abstract</h3>
-              <p class="abstract">{p.abstract}</p>
-            </section>
-          )}
+            {p.abstract && (
+              <section class="block" id="r-abstract">
+                <h3>Abstract</h3>
+                <p class="abstract">{p.abstract}</p>
+              </section>
+            )}
 
-          <div class="links">
-            {p.href && <a class="paper-link" href={p.href} target="_blank" rel="noopener noreferrer">arXiv ↗</a>}
-            {p.pdfHref && <a class="paper-link" href={p.pdfHref} target="_blank" rel="noopener noreferrer">PDF ↗</a>}
+            <div class="links">
+              {p.href && <a class="paper-link" href={p.href} target="_blank" rel="noopener noreferrer">arXiv ↗</a>}
+              {p.pdfHref && <a class="paper-link" href={p.pdfHref} target="_blank" rel="noopener noreferrer">PDF ↗</a>}
+            </div>
+          </article>
+        ))}
+
+        {others.length > 0 && (
+          <section class="more" id="r-earlier">
+            <h3 class="more-label">Earlier work</h3>
+            {others.map((p) => {
+              const Tag = p.href ? 'a' : 'div';
+              return (
+                <Tag class="entry" href={p.href} target={p.href ? '_blank' : undefined} rel={p.href ? 'noopener noreferrer' : undefined}>
+                  <div class="entry-meta"><span>{p.authors}</span><span>{p.year}</span></div>
+                  <p class="entry-title">{p.title}{p.href && <span class="arr"> ↗</span>}</p>
+                  <p class="entry-venue">{p.venue}</p>
+                </Tag>
+              );
+            })}
+          </section>
+        )}
+
+        <footer class="research-foot"><a class="back" href="/">← back to the descent</a></footer>
+      </div>
+
+      {hasMath && (
+        <aside class="math-panel" aria-label="Key equations from the paper">
+          <div class="math-sticky">
+            <p class="math-label">The method, formally</p>
+            {showcase.map((eq) => (
+              <figure class="eq">
+                <div class="eq-math" set:html={eq.html}></div>
+                <figcaption>{eq.gloss}</figcaption>
+              </figure>
+            ))}
+            <p class="math-foot">Equations from arXiv:2508.11856.</p>
           </div>
-        </article>
-      ))}
-
-      {others.length > 0 && (
-        <section class="more" id="r-earlier">
-          <h3 class="more-label">Earlier work</h3>
-          {others.map((p) => {
-            const Tag = p.href ? 'a' : 'div';
-            return (
-              <Tag class="entry" href={p.href} target={p.href ? '_blank' : undefined} rel={p.href ? 'noopener noreferrer' : undefined}>
-                <div class="entry-meta"><span>{p.authors}</span><span>{p.year}</span></div>
-                <p class="entry-title">{p.title}{p.href && <span class="arr"> ↗</span>}</p>
-                <p class="entry-venue">{p.venue}</p>
-              </Tag>
-            );
-          })}
-        </section>
+        </aside>
       )}
-
-      <footer class="research-foot"><a class="back" href="/">← back to the descent</a></footer>
     </div>
   </main>
 </BaseLayout>
@@ -138,9 +187,18 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
   .research-toc a.is-active .rule { width: 20px; }
   @media (hover: hover) { .research-toc a:hover { opacity: 0.85; } }
 
-  /* reading column, shifted RIGHT to clear the rail (a moderate offset — this is
-     a reading page, not the gallery's far-right column) */
-  .research-wrap { max-width: 700px; margin-left: clamp(150px, 20vw, 380px); margin-right: clamp(32px, 5vw, 100px); }
+  /* two columns: reading text + a sticky math showcase. Left margin clears the
+     TOC rail; the grid fills the formerly-empty right side. */
+  .research-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 26vw, 360px);
+    gap: clamp(36px, 5vw, 80px);
+    align-items: start;
+    margin-left: clamp(140px, 17vw, 320px);
+    margin-right: clamp(32px, 5vw, 96px);
+  }
+  .research-col { min-width: 0; max-width: 680px; }
+
   .research-head { padding: 14vh 0 6vh; }
   .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
   .back:hover { color: var(--seal); }
@@ -163,9 +221,23 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
     line-height: 1.4; color: var(--ink-1); margin-top: 4vh; padding-left: 20px; border-left: 2px solid var(--ochre); }
 
   /* results: a quiet stat strip */
-  .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 22px; margin: 0; }
+  .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 22px; margin: 0 0 5vh; }
   .result dt { font-family: var(--font-display); font-weight: 600; font-size: 30px; color: var(--ink-1); font-variation-settings: 'SOFT' 30; }
   .result dd { margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: var(--ink-3); }
+
+  /* full results table — quiet, hairline rules, mono numerals, highlighted rows */
+  .metrics { margin: 0; }
+  .metrics table { width: 100%; border-collapse: collapse; }
+  .metrics th, .metrics td { text-align: right; padding: 9px 10px; font-family: var(--font-mono); font-size: 12px; }
+  .metrics thead th { color: var(--ink-4); font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase;
+    font-size: 10px; border-bottom: 1px solid rgba(90,84,74,0.3); }
+  .metrics .m-name { text-align: left; color: var(--ink-3); font-weight: 400; }
+  .metrics tbody th.m-name { color: var(--ink-2); }
+  .metrics tbody tr { border-bottom: 1px solid rgba(90,84,74,0.12); }
+  .metrics td { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .metrics td.m-lead { color: var(--ink-1); font-weight: 500; } /* RL-BHRP column, foregrounded */
+  .metrics tr.hl td.m-lead { color: var(--seal); }              /* headline metrics in the seal accent */
+  .metrics figcaption { margin-top: 12px; font-size: 11px; font-style: italic; color: var(--ink-4); line-height: 1.5; }
 
   .abstract { font-size: 14.5px; line-height: 1.8; color: var(--ink-3); }
 
@@ -186,10 +258,28 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
 
   .research-foot { padding: 10vh 0 16vh; }
 
-  /* narrow screens: drop the rail, center the reading column */
-  @media (max-width: 1024px) {
+  /* right-column math showcase — sticky so it rides alongside the reading text */
+  .math-panel { min-width: 0; }
+  .math-sticky { position: sticky; top: 12vh; padding-top: 14vh; }
+  .math-label { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--ink-4); margin-bottom: 26px; }
+  .eq { margin: 0 0 30px; }
+  /* MathML can be wider than the panel (the reward eq is long); allow it to
+     shrink to fit so nothing clips, and let the rare overflow scroll rather
+     than spill. */
+  .eq-math { color: var(--ink-1); overflow-x: auto; overflow-y: hidden; }
+  .eq-math :global(math) { font-size: 0.98em; max-width: 100%; }
+  .eq figcaption { font-size: 12.5px; line-height: 1.55; color: var(--ink-3); margin-top: 10px; }
+  .math-foot { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em; color: var(--ink-4);
+    margin-top: 8px; padding-top: 16px; border-top: 1px solid rgba(90,84,74,0.18); }
+
+  /* narrow / tablet: drop the rail; the math panel falls below the text instead
+     of sticking beside it (single column). */
+  @media (max-width: 1100px) {
     .research-toc { display: none; }
-    .research-wrap { margin: 0 auto; padding: 0 24px; max-width: 720px; }
+    .research-layout { grid-template-columns: 1fr; margin: 0 auto; padding: 0 24px; max-width: 760px; gap: 0; }
+    .math-sticky { position: static; padding-top: 6vh; margin-top: 6vh; border-top: 1px solid rgba(90,84,74,0.2); }
+    .math-label { padding-top: 4vh; }
   }
 
   @media (prefers-reduced-motion: no-preference) {
