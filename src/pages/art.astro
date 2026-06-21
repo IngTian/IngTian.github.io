@@ -183,7 +183,10 @@ import SkyWash from '../components/SkyWash.astro';
   @media (max-width: 1024px) {
     .art-toc, .placard { display: none; }
     .art-wrap { margin: 0 auto; max-width: 900px; padding: 0 22px; }
-    .cal-block { min-height: auto; justify-content: center; padding: 5vh 0; }
+    /* drop the desktop negative right-margin (it re-balanced against the
+       placard, which is hidden here) — otherwise the stele bleeds off the
+       right edge and the page scrolls horizontally on phones. */
+    .cal-block { min-height: auto; justify-content: center; padding: 5vh 0; margin-right: 0; }
   }
 </style>
 
