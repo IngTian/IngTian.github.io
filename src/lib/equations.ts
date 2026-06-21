@@ -22,8 +22,8 @@ export const PAPER_EQUATIONS = {
   // Two-level composition: final asset weight = sector weight × within-sector weight.
   weightMap: katex.renderToString('w_i = W_{g(i)}\\,\\eta_{i\\mid g(i)}', display),
   // Average-reward MDP reward: gross return − transaction cost − risk-dispersion
-  // penalty. Broken across two aligned lines — it's too wide for the narrow
-  // showcase column on one line.
+  // penalty. Even in the wide left column this is too long for one line at full
+  // body size, so it breaks across two aligned lines at the second minus.
   reward: katex.renderToString(
     '\\begin{aligned} U_{t+1} = {}& w_t^{\\top} R_{t+1} - c\\lVert w_t - w_{t-1}\\rVert_1 \\\\ &{} - \\lambda\\big[\\alpha V_{\\text{within}} + (1-\\alpha) V_{\\text{across}}\\big] \\end{aligned}',
     display,
