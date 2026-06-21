@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Alias for the conventional /sitemap.xml name. Astro's @astrojs/sitemap
+     generates /sitemap-index.xml (which references /sitemap-0.xml with all
+     routes). Google Search Console (and people) often submit "sitemap.xml" by
+     habit; without this they'd get a 404 → "couldn't fetch". This static index
+     points at the generated child sitemap, so BOTH names resolve. It references
+     sitemap-0.xml directly (not sitemap-index.xml) to avoid a nested-index
+     indirection, and stays valid as long as the generated child keeps its name. -->
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://ingtian.github.io/sitemap-0.xml</loc>
+  </sitemap>
+</sitemapindex>
