@@ -1,6 +1,11 @@
 ---
 import { links } from '../data/profile';
 import SealMark from '../components/SealMark.astro';
+
+// Auto-derived at build time so the copyright year never goes stale. Legal
+// name (matches the README license note); the seal/hero carry "Ing Tian".
+// "All rights reserved" is intentionally omitted — legally meaningless.
+const year = new Date().getFullYear();
 ---
 <section id="signature" class="relative px-[7vw] py-14 text-paper flex justify-between items-end flex-wrap gap-7">
   <nav class="flex gap-3 flex-wrap">
@@ -15,6 +20,9 @@ import SealMark from '../components/SealMark.astro';
         {l.label}{l.primary ? ' ↓' : ''}
       </a>
     ))}
+    <span class="font-mono text-[11px] tracking-[0.04em] text-paper/40 self-center ml-1">
+      © {year} Zeying Tian
+    </span>
   </nav>
   <SealMark />
 </section>
