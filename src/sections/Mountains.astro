@@ -2,6 +2,7 @@
 import Timeline from '../components/Timeline.astro';
 import Publications from '../components/Publications.astro';
 import Awards from '../components/Awards.astro';
+import { researchInterests } from '../data/profile';
 ---
 <section id="mountains" class="relative px-[7vw] py-[14vh]">
   <div class="relative z-10 max-w-[920px] mx-auto">
@@ -9,6 +10,21 @@ import Awards from '../components/Awards.astro';
     <h2 class="font-display italic text-[26px] sm:text-[30px] text-paper mt-3 leading-snug">
       A researcher who thinks in distributions,<br />a builder who ships the whole stack.
     </h2>
+
+    <!-- Research interests — teaser; full themed list lives on /research -->
+    <h3 class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-14 mb-3">
+      Research interests
+    </h3>
+    <ul class="flex flex-wrap gap-x-3 gap-y-2.5 max-w-[760px]">
+      {researchInterests.map((it) => (
+        <li class="font-mono text-[12px] text-paper/75 border border-ochre/25 rounded-full px-3.5 py-1.5">
+          {it.label}
+        </li>
+      ))}
+    </ul>
+    <a href="/research" class="research-more inline-block mt-5 font-mono text-[12px] text-ochre/90 no-underline">
+      Read the research →
+    </a>
 
     <!-- Publications — the distinctive research signal, given prominence -->
     <h3 class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-14 mb-2">Selected writing</h3>
@@ -22,3 +38,10 @@ import Awards from '../components/Awards.astro';
     <Awards />
   </div>
 </section>
+
+<style>
+  .research-more { transition: color 0.3s, letter-spacing 0.3s; }
+  @media (hover: hover) {
+    .research-more:hover { color: var(--ochre); letter-spacing: 0.02em; }
+  }
+</style>

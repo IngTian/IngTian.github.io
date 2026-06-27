@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import SkyWash from '../components/SkyWash.astro';
-import { publications } from '../data/profile';
+import { publications, researchInterests } from '../data/profile';
 import { PAPER_EQUATIONS } from '../lib/equations';
 
 const featured = publications.filter((p) => p.featured);
@@ -17,8 +17,9 @@ const showcase: { html: string; gloss: string }[] = [
   { html: PAPER_EQUATIONS.sectorCov, gloss: 'Within-sector weights aggregate asset covariance up to the sector level.' },
 ];
 
-// TOC stops, built from what the featured paper(s) actually carry.
+// TOC stops, built from what the page actually carries.
 const stops: { label: string; target: string }[] = [];
+if (researchInterests.length) stops.push({ label: 'Interests', target: 'r-interests' });
 if (featured.some((p) => p.idea)) stops.push({ label: 'The idea', target: 'r-idea' });
 if (hasMath) stops.push({ label: 'Method', target: 'r-math' });
 if (featured.some((p) => p.results?.length || p.metrics)) stops.push({ label: 'Results', target: 'r-results' });
@@ -50,9 +51,25 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
     <div class="research-block">
       <header class="research-head">
         <a class="back" href="/">← back</a>
-        <h1>Selected research</h1>
-        <p class="lede">Work in portfolio optimization and machine learning — the idea, the method, the result.</p>
+        <h1>Research</h1>
+        <p class="lede">Portfolio optimization at the seam of operations research and machine learning — what I work on, and what I've published.</p>
       </header>
+
+      {researchInterests.length > 0 && (
+        <section class="interests" id="r-interests">
+          <h2 class="section-label">Research interests</h2>
+          <ul class="interest-list">
+            {researchInterests.map((it) => (
+              <li class="interest">
+                <span class="interest-label">{it.label}</span>
+                <span class="interest-gloss">{it.gloss}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <h2 class="section-label section-label--major" id="r-selected">Selected research</h2>
 
       {featured.map((p) => (
         <article class="paper">
@@ -201,6 +218,20 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
     line-height: 1.04; letter-spacing: -0.01em; font-variation-settings: 'SOFT' 60; margin-top: 16px; color: var(--ink-1); }
   .lede { font-size: 14px; color: var(--ink-3); margin-top: 16px; line-height: 1.7; max-width: 52ch; }
 
+  /* section labels (mono eyebrows) — quiet wayfinding between blocks */
+  .section-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em;
+    text-transform: uppercase; color: var(--ink-4); scroll-margin-top: 12vh; }
+  .section-label--major { margin-top: 9vh; padding-top: 4vh; border-top: 1px solid rgba(90,84,74,0.22); }
+
+  /* research interests — themed list, each a label + one-line gloss */
+  .interests { margin-top: 4vh; scroll-margin-top: 12vh; }
+  .interest-list { list-style: none; margin: 3vh 0 0; padding: 0;
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 48px; max-width: 940px; }
+  .interest { border-top: 1px solid rgba(90,84,74,0.2); padding-top: 14px; }
+  .interest-label { display: block; font-family: var(--font-display); font-weight: 500; font-size: 18px;
+    color: var(--ink-1); line-height: 1.25; font-variation-settings: 'SOFT' 40; }
+  .interest-gloss { display: block; font-size: 13.5px; line-height: 1.6; color: var(--ink-3); margin-top: 8px; }
+
   /* paper masthead — spans both columns */
   .paper-head { padding-bottom: 1vh; }
   .kicker { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-4); }
@@ -279,6 +310,9 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
     .research-block { width: auto; margin: 0 auto; padding: 0 24px; max-width: 760px; }
     .paper-body { grid-template-columns: 1fr; gap: 0; }
     .paper-right { margin-top: 6vh; }
+  }
+  @media (max-width: 640px) {
+    .interest-list { grid-template-columns: 1fr; gap: 22px; }
   }
 
   @media (prefers-reduced-motion: no-preference) {

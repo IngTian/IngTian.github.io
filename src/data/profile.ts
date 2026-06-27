@@ -41,6 +41,11 @@ export interface Award {
   title: string;
 }
 
+export interface ResearchInterest {
+  label: string;
+  gloss: string;
+}
+
 export const name = { first: 'Ing', last: 'Tian' } as const;
 
 export const roles = 'Quant Researcher · Portfolio Optimization';
@@ -54,6 +59,16 @@ export const bio: { text: string; strong: string[] } = {
   text: 'Quant researcher and incoming Operations Research PhD at the University of Toronto, working on multi-period portfolio optimization. By day, a full-stack software and ML engineer building recommendation systems at scale. Also a guqin player and calligraphy practitioner.',
   strong: ['University of Toronto', 'multi-period portfolio optimization'],
 };
+
+// Research interests — shown as themed entries atop /research, with a one-line
+// teaser linking in from the homepage. Grounded in the RL-BHRP paper + the
+// incoming OR PhD focus; kept to areas actually worked in.
+export const researchInterests: ResearchInterest[] = [
+  { label: 'Multi-period portfolio optimization', gloss: 'Allocation across horizons, rebalancing as conditions change — not single-shot mean–variance.' },
+  { label: 'Risk parity & hierarchical methods', gloss: 'Distributing risk across structure — sectors, then assets — rather than chasing returns.' },
+  { label: 'Reinforcement learning for allocation', gloss: 'Policies that learn to allocate under uncertainty, instead of assuming a fixed model.' },
+  { label: 'Operations research & convex optimization', gloss: 'The constraints, duality, and structure underneath it all — the OR core of the PhD.' },
+];
 
 export const timeline: TimelineEntry[] = [
   { period: '2026 —', title: 'Software Engineer · Electronic Arts', sub: 'Contracted via Hatch Innovations Canada', detail: 'Recommendation systems for EA’s AI-driven social app (Project Air) and mobile game (Project Nava) — dual-tower retrieval and ranking, end-to-end indexing & serving in Golang, training pipelines in Python over Elasticsearch / vector search, decoupled with Kafka & NATS.', kind: 'work' },
