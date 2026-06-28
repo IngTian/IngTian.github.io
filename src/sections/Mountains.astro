@@ -15,13 +15,28 @@ import { researchInterests } from '../data/profile';
     <h3 class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-14 mb-3">
       Research interests
     </h3>
-    <ul class="flex flex-wrap gap-x-3 gap-y-2.5 max-w-[760px]">
+    <ul class="flex flex-wrap gap-x-3 gap-y-2.5 max-w-[760px]" data-ri>
       {researchInterests.map((it) => (
-        <li class="font-mono text-[12px] text-paper/75 border border-ochre/25 rounded-full px-3.5 py-1.5">
-          {it.label}
+        <li>
+          <button
+            type="button"
+            class="ri-pill font-mono text-[12px] text-paper/75 border border-ochre/25 rounded-full px-3.5 py-1.5"
+            aria-expanded="false"
+            aria-controls="ri-gloss"
+            data-gloss={it.gloss}
+          >
+            {it.label}
+          </button>
         </li>
       ))}
     </ul>
+    <!-- One shared reveal region — the clicked pill's one-line gloss. The grid
+         wrapper animates its row 0fr→1fr so opening eases the height open and the
+         link / writing / experience below glide down rather than jump. Announced
+         to AT via aria-live. -->
+    <div class="ri-gloss-wrap" data-ri-gloss-wrap>
+      <p id="ri-gloss" class="ri-gloss" aria-live="polite"></p>
+    </div>
     <a href="/research" class="research-more inline-block mt-5 font-mono text-[12px] text-ochre/90 no-underline">
       Read the research →
     </a>
@@ -44,4 +59,150 @@ import { researchInterests } from '../data/profile';
   @media (hover: hover) {
     .research-more:hover { color: var(--ochre); letter-spacing: 0.02em; }
   }
+
+  /* Research-interest pills — buttons that lift & brighten on hover, and open a
+     one-line gloss on click. The OPEN pill carries the vermilion seal dot (the
+     site's one saturated color), reserved here for the meaningful "this is open"
+     state rather than spent on hover. */
+  .ri-pill {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    transition: color 0.35s, border-color 0.35s, background-color 0.35s,
+                transform 0.35s cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  @media (hover: hover) {
+    .ri-pill:hover {
+      color: var(--paper);
+      border-color: rgba(200, 163, 106, 0.55); /* ochre, firmed */
+      background-color: rgba(200, 163, 106, 0.08);
+    }
+  }
+
+  /* Seal dot — always present (as ::before) but collapsed to zero width, so on
+     open it GROWS in. Animating its width drives the pill's own width, which makes
+     the flex row reflow each frame: the neighbour eases over instead of jumping. */
+  .ri-pill::before {
+    content: '';
+    flex: 0 0 auto;
+    width: 0;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--seal);
+    opacity: 0;
+    margin-right: 0;
+    transition: width 0.42s cubic-bezier(0.2, 0.7, 0.3, 1),
+                margin-right 0.42s cubic-bezier(0.2, 0.7, 0.3, 1),
+                opacity 0.3s ease;
+  }
+
+  /* Open state — brightened + ochre wash + the grown seal dot. */
+  .ri-pill.open {
+    color: var(--paper);
+    border-color: rgba(200, 163, 106, 0.55);
+    background-color: rgba(200, 163, 106, 0.1);
+  }
+  .ri-pill.open::before {
+    width: 6px;
+    margin-right: 7px;
+    opacity: 1;
+  }
+
+  /* The shared gloss line — serif, left-ruled. A grid wrapper animates its single
+     row 0fr→1fr, so opening eases the gloss height open and everything below it
+     (the link, Selected writing, Experience) glides down instead of jumping. The
+     text itself fades in over the same beat. */
+  .ri-gloss-wrap {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.45s cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+  .ri-gloss-wrap.show { grid-template-rows: 1fr; }
+
+  .ri-gloss {
+    overflow: hidden;
+    min-height: 0; /* let the grid item collapse below its content height */
+    max-width: 520px;
+    padding: 14px 0 0 14px;
+    border-left: 1px solid rgba(200, 163, 106, 0.4);
+    font-family: var(--font-display);
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: rgba(239, 233, 221, 0.74); /* paper, dimmed */
+    opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+  .ri-gloss-wrap.show .ri-gloss { opacity: 1; }
+
+  /* Motion gate — the lift, the dot's growth, and the reflow it drives are motion;
+     the no-motion state (instant color/border change, dot simply present) still
+     reads as finished. */
+  @media (prefers-reduced-motion: reduce) {
+    .ri-pill, .ri-pill::before, .ri-gloss-wrap, .ri-gloss { transition: none; }
+  }
+  @media (prefers-reduced-motion: no-preference) and (hover: hover) {
+    .ri-pill:hover { transform: translateY(-2px); }
+  }
 </style>
+
+<script>
+  // Click-to-reveal for the research-interest pills. One shared gloss region:
+  // opening a pill shows its gloss and marks it with the seal dot; clicking the
+  // open pill (or another) toggles/switches. Vanilla, no island — re-inits after
+  // every View Transition swap with a teardown so handlers don't leak.
+  function initResearchPills() {
+    const list = document.querySelector<HTMLElement>('[data-ri]');
+    const wrap = document.querySelector<HTMLElement>('[data-ri-gloss-wrap]');
+    const gloss = document.getElementById('ri-gloss');
+    if (!list || !wrap || !gloss) return;
+
+    const pills = Array.from(list.querySelectorAll<HTMLButtonElement>('.ri-pill'));
+
+    function onClick(e: MouseEvent) {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.ri-pill');
+      if (!btn) return;
+      const wasOpen = btn.classList.contains('open');
+
+      pills.forEach((p) => {
+        p.classList.remove('open');
+        p.setAttribute('aria-expanded', 'false');
+      });
+
+      if (wasOpen) {
+        wrap!.classList.remove('show');
+        // keep the text through the collapse; clear once it finishes (or now, if
+        // motion is reduced and there's no transition to wait on) so AT doesn't
+        // read a hidden line.
+        if (parseFloat(getComputedStyle(wrap!).transitionDuration) === 0) gloss!.textContent = '';
+        return;
+      }
+
+      btn.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+      gloss!.textContent = btn.dataset.gloss ?? '';
+      wrap!.classList.add('show');
+    }
+
+    // clear the gloss text only after the collapse animation lands
+    function onEnd(e: TransitionEvent) {
+      if (e.propertyName === 'grid-template-rows' && !wrap!.classList.contains('show')) {
+        gloss!.textContent = '';
+      }
+    }
+
+    list.addEventListener('click', onClick);
+    wrap.addEventListener('transitionend', onEnd);
+    riTeardown = () => {
+      list.removeEventListener('click', onClick);
+      wrap.removeEventListener('transitionend', onEnd);
+    };
+  }
+
+  let riTeardown: (() => void) | null = null;
+  document.addEventListener('astro:page-load', () => {
+    riTeardown?.();
+    riTeardown = null;
+    initResearchPills();
+  });
+</script>
