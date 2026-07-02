@@ -71,6 +71,7 @@ export const researchInterests: ResearchInterest[] = [
 ];
 
 export const timeline: TimelineEntry[] = [
+  { period: 'Fall 2027 —', title: 'Incoming PhD, Operations Research · University of Toronto', sub: 'Advised by Prof. Roy H. Kwon', detail: 'Doctoral research in operations research — multi-period portfolio optimization, and the convex-optimization and duality structure beneath it.', kind: 'education' },
   { period: '2026 —', title: 'Software Engineer · Electronic Arts', sub: 'Contracted via Hatch Innovations Canada', detail: 'Recommendation systems for EA’s AI-driven products — dual-tower retrieval and ranking, end-to-end indexing & serving in Golang, training pipelines in Python over Elasticsearch / vector search, decoupled with Kafka & NATS.', kind: 'work' },
   { period: '2023 — 25', title: 'Quantitative Researcher · Independent', detail: 'Built an end-to-end quant trading system (Forex, commodities, indices via OANDA) with a collaborator — signal research in Python, execution engine in Golang, deployed on AWS (ECS, SageMaker). Authored the RL-BHRP portfolio-construction paper (arXiv:2508.11856).', kind: 'work' },
   { period: '2023 — 25', title: 'Senior Software Engineer · TikTok', detail: 'ML systems for ads (Exceptional review — top rating). Built a dual-tower vision pipeline with billion-scale vector search (Faiss) tracking $200M in creative spend, and a C++ / gRPC ad-signature service sustaining 50k QPS for real-time delivery.', kind: 'work' },
