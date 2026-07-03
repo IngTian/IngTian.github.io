@@ -53,8 +53,11 @@ const items: Item[] = [
           aria-label={it.label}
           {...(it.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
         >
-          <svg class="ic" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" set:html={it.icon}></svg>
-          <span class="label">{it.label}</span>
+          <span class="pill" aria-hidden="true"></span>
+          <span class="content">
+            <svg class="ic" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" set:html={it.icon}></svg>
+            <span class="label">{it.label}</span>
+          </span>
         </a>
       </li>
     ))}
@@ -67,63 +70,103 @@ const items: Item[] = [
     top: clamp(14px, 2vw, 22px);
     right: clamp(14px, 7vw, 64px);
     z-index: 40;                 /* above Toc (30) and content */
-    pointer-events: none;        /* container ignores; links re-enable */
-  }
-  .cnav ul {
-    list-style: none; margin: 0; padding: 0;
-    display: flex; align-items: center; gap: clamp(10px, 1.4vw, 20px);
   }
 
+  /* ── The frosted-glass capsule. A rounded, lucid panel the links sit inside
+     — translucent so the Monet sky reads through it, with a static backdrop
+     blur (blur is BAKED via backdrop-filter, never animated — taste rule) and
+     a hairline rim. Zone-adaptive: paper-frost on the pale hero, ink-frost on
+     the deep bottom (like the reference). The frosted panel also lifts the
+     background locally, which fixes the mid-grey dusk contrast band the old
+     text-halo was patching — so the halo is gone. ── */
+  .cnav ul {
+    list-style: none; margin: 0; padding: 4px;
+    display: flex; align-items: center; gap: 2px;
+    border-radius: 999px;
+    /* light-zone frost (default at top): warm paper glass */
+    background: rgba(244, 239, 228, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 2px 10px rgba(22, 20, 15, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    -webkit-backdrop-filter: blur(14px) saturate(1.15);
+    backdrop-filter: blur(14px) saturate(1.15);
+    transition: background 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
+  }
+  /* dark-zone frost: the sky has sunk into dusk/ink — a cool dark glass */
+  .cnav[data-zone="dark"] ul {
+    background: rgba(22, 20, 15, 0.42);
+    border: 1px solid rgba(184, 177, 161, 0.22);
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .cnav li { display: flex; }
+
   .cnav a {
-    pointer-events: auto;
+    position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 7px;
     text-decoration: none;
     font-family: var(--font-mono);
     font-size: 12px;
     letter-spacing: 0.06em;
     line-height: 1;
-    /* light-zone base (default at top of page). ink-1 (not ink-2) so contrast
-       holds AA against the pale→dusk sky down to the flip point; measured
-       ≥4.5:1 through frac 0.55 (see the contrast probe). The soft feel is
-       carried by opacity + a paper halo, not by a weaker ink. */
-    color: var(--ink-1);
-    opacity: 0.82;
-    /* Adaptive legibility halo — a whisper of the OPPOSITE tone. On the pale
-       upper sky a paper glow is invisible; through the mid-grey dusk "dead
-       band" (where a hard flip can hold neither ink nor paper at full 4.5:1)
-       it lifts the dark text off the grey. Static shadow (never animated). */
-    text-shadow: 0 0 9px rgba(239, 233, 221, 0.55);
-    transition: color 0.4s ease, opacity 0.3s ease, text-shadow 0.4s ease;
+    padding: 9px 14px;
+    border-radius: 999px;
+    color: var(--ink-1);         /* light-zone ink */
+    transition: color 0.35s ease;
+    isolation: isolate;          /* keep the bloom pill under .content */
   }
+  .cnav[data-zone="dark"] a { color: var(--paper); }
+
+  /* content sits above the bloom pill */
+  .cnav .content { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; }
   .cnav .ic { flex: none; display: block; }
-  .cnav .label { transition: color 0.4s ease; }
 
-  /* dark-zone: sky behind the nav has sunk into dusk → paper for legibility,
-     with an ink halo that lifts paper text off the mid-grey on the way down. */
-  .cnav[data-zone="dark"] a {
-    color: var(--paper);
-    text-shadow: 0 0 9px rgba(22, 20, 15, 0.6);
+  /* ── The bloom pill — an ochre capsule that grows in behind the item on
+     hover/focus, inverting the text to dark ink. Ochre is the site's one
+     interaction accent, so this reads as an evolution of the old "text turns
+     ochre" hover, not a new color. transform/opacity only. ── */
+  .cnav .pill {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: 999px;
+    background: var(--ochre);
+    opacity: 0;
+    transform: scale(0.72);
+    transition: opacity 0.32s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
   }
 
-  /* hover — the site's lone interaction accent */
   @media (hover: hover) {
-    .cnav a:hover { opacity: 1; color: var(--ochre); }
-    .cnav[data-zone="dark"] a:hover { color: var(--ochre); }
+    .cnav a:hover .pill { opacity: 1; transform: scale(1); }
+    .cnav a:hover { color: var(--ink-1); }              /* dark ink reads on ochre */
+    .cnav[data-zone="dark"] a:hover { color: var(--ink-1); }
+    .cnav a:hover .content { animation: cnav-nudge 0.32s ease; }
   }
-  .cnav a:focus-visible { opacity: 1; color: var(--ochre); outline: 1px solid var(--ochre); outline-offset: 4px; border-radius: 2px; }
+  .cnav a:focus-visible { outline: none; color: var(--ink-1); }
+  .cnav a:focus-visible .pill { opacity: 1; transform: scale(1); box-shadow: 0 0 0 2px rgba(200, 163, 106, 0.45); }
 
-  /* Mobile: icons only, tighter — labels would crowd the top edge */
+  @keyframes cnav-nudge {
+    0% { transform: translateY(0); }
+    45% { transform: translateY(-1.5px); }
+    100% { transform: translateY(0); }
+  }
+
+  /* Mobile: icons only, tighter capsule — labels would crowd the top edge */
   @media (max-width: 640px) {
     .cnav { top: 12px; right: 14px; }
-    .cnav ul { gap: 16px; }
+    .cnav ul { padding: 3px; }
+    .cnav a { padding: 9px 10px; }
     .cnav .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-    .cnav a { opacity: 0.8; }
+    .cnav .content { gap: 0; }
   }
 
+  /* Reduced motion: no bloom scale / nudge — the pill still appears (instant)
+     so the hover affordance survives, but nothing animates. */
   @media (prefers-reduced-motion: reduce) {
-    .cnav a, .cnav .label { transition: none; }
+    .cnav ul, .cnav a, .cnav .pill { transition: none; }
+    .cnav a:hover .content, .cnav a:focus-visible .content { animation: none; }
+    .cnav .pill { transform: scale(1); }   /* no scale-in; just fade via opacity */
   }
 </style>
 
