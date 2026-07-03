@@ -1,0 +1,72 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SkyWash from '../components/SkyWash.astro';
+import ProjectCard from '../components/ProjectCard.astro';
+import { projects } from '../data/profile';
+---
+<BaseLayout
+  title="Projects — Ing Tian"
+  description="Selected projects by Ing Tian (Zeying Tian) — shipped tools and systems. Featuring claude-witness, a Go plugin that keeps a person-centric archive of how you think and grow as you code."
+  veilLine="a builder by trade"
+  veilOnLoad={true}
+  navZone="light"
+>
+  <main class="projects descent">
+    <SkyWash />
+
+    <div class="projects-block">
+      <header class="projects-head">
+        <a class="back" href="/">← back</a>
+        <h1>Projects</h1>
+        <p class="lede">Shipped tools and systems — built end to end. Fewer, but finished; each one solves a problem I actually had.</p>
+      </header>
+
+      <div class="project-list">
+        {projects.map((p) => <ProjectCard project={p} variant="full" />)}
+      </div>
+
+      <footer class="projects-foot"><a class="back" href="/">← back to the descent</a></footer>
+    </div>
+  </main>
+</BaseLayout>
+
+<style>
+  .projects { position: relative; z-index: 0; min-height: 100vh; }
+
+  /* Like /research, this is a READING page — hold the luminous range top to
+     bottom so text stays legible (the full descent sinks to near-black). Same
+     warm→cool drift, never dark enough to lose contrast. */
+  .projects.descent {
+    background: linear-gradient(168deg, #f4efe4 0%, #f1ebe0 30%, #efe6d4 62%, #e7ddce 100%);
+  }
+  /* Dark theme: an even cool charcoal, matching /research's reading-page dark. */
+  :global(html[data-theme='dark']) .projects.descent {
+    background: linear-gradient(168deg, #14171b 0%, #131619 55%, #111417 100%);
+  }
+
+  /* Centered reading column (no TOC rail — the list is short). */
+  .projects-block {
+    width: min(760px, 100%);
+    margin: 0 auto;
+    padding: 0 clamp(24px, 6vw, 40px);
+    box-sizing: border-box;
+  }
+
+  .projects-head { padding: 14vh 0 5vh; }
+  .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
+  .back:hover { color: var(--seal); }
+  .projects h1 {
+    font-family: var(--font-display); font-weight: 500; font-size: clamp(38px, 5vw, 58px);
+    line-height: 1.04; letter-spacing: -0.01em; font-variation-settings: 'SOFT' 60; margin-top: 16px; color: var(--ink-1);
+  }
+  .lede { font-size: 14px; color: var(--ink-3); margin-top: 16px; line-height: 1.7; max-width: 54ch; }
+
+  .project-list { display: grid; gap: 22px; }
+
+  .projects-foot { padding: 10vh 0 16vh; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .project-list > :global(.pcard) { animation: projects-in 0.7s ease both; }
+    @keyframes projects-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  }
+</style>

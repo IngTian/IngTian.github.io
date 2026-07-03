@@ -1,0 +1,192 @@
+---
+// A repo/terminal-style project card. Two variants:
+//  - teaser (homepage Mountains): name · year, tagline, stack row, links.
+//  - full (/projects): adds the highlights list.
+// Palette-pure: the "language dot" is the site's own terminal ● motif in the
+// accent color (ochre light / phosphor-green dark), NOT GitHub's brand colors —
+// holds the palette-discipline rule and re-themes for free via var(--ochre).
+// No React island; static markup only.
+import type { Project } from '../data/profile';
+
+interface Props {
+  project: Project;
+  variant?: 'teaser' | 'full';
+}
+const { project, variant = 'teaser' } = Astro.props;
+const isFull = variant === 'full';
+---
+<article class:list={['pcard', isFull && 'pcard--full']}>
+  <header class="pcard-head">
+    <span class="dot" aria-hidden="true">●</span>
+    <h3 class="pcard-name">{project.name}</h3>
+    <span class="pcard-year">{project.year}</span>
+  </header>
+
+  <p class="pcard-tagline">{project.tagline}</p>
+  {isFull && <p class="pcard-blurb">{project.blurb}</p>}
+
+  {isFull && project.highlights && project.highlights.length > 0 && (
+    <ul class="pcard-highlights">
+      {project.highlights.map((h) => (
+        <li><span class="hl-mark" aria-hidden="true">→</span>{h}</li>
+      ))}
+    </ul>
+  )}
+
+  <ul class="pcard-stack" aria-label="Stack">
+    {project.stack.map((s) => <li>{s}</li>)}
+  </ul>
+
+  <div class="pcard-links">
+    {project.links.map((l) => (
+      <a href={l.href} target="_blank" rel="noopener noreferrer" class="pcard-link">
+        {l.label} <span aria-hidden="true">↗</span>
+      </a>
+    ))}
+  </div>
+</article>
+
+<style>
+  /* Two background contexts, two color schemes — this is why the card carries
+     its own text colors instead of naively using the ink ramp:
+       • TEASER lives in the homepage Mountains section, which sits on the DARK
+         part of the descent gradient in BOTH themes (its siblings use text-paper).
+         So the teaser is ALWAYS light-on-dark — using --ink-* (dark in light
+         theme) would render invisible dark text on the dark gradient.
+       • FULL lives on /projects, a reading page that flips light⇄dark. There the
+         ink ramp is correct (dark ink on the pale page, light ink on the dark),
+         and the surface must DARKEN to separate the card from the pale page.
+     Local vars set per-variant keep the rest of the rules identical. */
+  /* ── Liquid-glass surface (Apple-style), tech-flavored. Same recipe as the
+     CornerNav capsule: a STATIC backdrop blur (baked, never animated — taste
+     rule), a translucent tint, a bright inset edge-highlight, and a soft drop
+     shadow — plus a diagonal specular sheen (::before) that reads as light
+     catching the pane. --pc-fill / --pc-edge / --pc-shadow are set per context
+     so the glass sits right on each background. ── */
+  .pcard {
+    /* teaser defaults: light-on-dark, tuned for the dark Mountains gradient */
+    --pc-name: var(--paper);
+    --pc-body: rgba(239, 233, 221, 0.82);
+    --pc-muted: rgba(239, 233, 221, 0.5);
+    --pc-border: rgba(239, 233, 221, 0.18);
+    --pc-fill: rgba(239, 233, 221, 0.06);
+    --pc-chip-border: rgba(239, 233, 221, 0.22);
+    --pc-edge: rgba(255, 255, 255, 0.14);       /* inset top edge-highlight */
+    --pc-shadow: rgba(0, 0, 0, 0.28);
+    --pc-sheen: rgba(255, 255, 255, 0.10);       /* diagonal specular streak */
+
+    position: relative;
+    overflow: hidden;                            /* clip the sheen to the radius */
+    isolation: isolate;                          /* keep sheen under content */
+    border: 1px solid var(--pc-border);
+    border-radius: 14px;
+    padding: 22px 24px;
+    background: var(--pc-fill);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    backdrop-filter: blur(16px) saturate(1.4);
+    box-shadow: 0 10px 30px -12px var(--pc-shadow), inset 0 1px 0 var(--pc-edge);
+    transition: border-color 0.35s ease, transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1),
+                box-shadow 0.35s ease;
+  }
+  /* the specular sheen — a soft diagonal band of light across the upper-left,
+     the "liquid glass" tell. Static; opacity/position fixed. */
+  .pcard::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(135deg, var(--pc-sheen) 0%, transparent 42%),
+      radial-gradient(120% 80% at 0% 0%, var(--pc-sheen) 0%, transparent 55%);
+    opacity: 0.9;
+  }
+  /* content rides above the sheen */
+  .pcard > * { position: relative; z-index: 1; }
+
+  /* full card (/projects) — LIGHT theme. Liquid glass is a dark-background
+     material: on the pale cream reading page the glossy sheen has nothing to
+     catch and reads as a cheap washed-out blob. So on light we render the
+     honest light-mode form of the SAME family — a warm frosted-white panel that
+     RAISES above the page (fill lighter than the cream), with a crisp edge and
+     a soft warm shadow, and the glossy sheen killed (--pc-sheen: transparent).
+     Still glass; just the version that belongs on a light field. */
+  .pcard--full {
+    --pc-name: var(--ink-1);
+    --pc-body: var(--ink-2);
+    --pc-muted: var(--ink-4);
+    --pc-border: rgba(255, 255, 255, 0.7);
+    --pc-fill: rgba(255, 253, 248, 0.55);        /* warm frosted white, lifts off cream */
+    --pc-chip-border: color-mix(in oklab, var(--ink-4) 34%, transparent);
+    --pc-edge: rgba(255, 255, 255, 0.85);        /* crisp bright top rim */
+    --pc-shadow: rgba(70, 60, 42, 0.13);         /* soft WARM lift shadow */
+    --pc-sheen: transparent;                     /* no glossy streak on light */
+  }
+  /* on the DARK reading page the ink surface would sink into the void; flip to a
+     faint light glass + hairline so the tile still separates from the charcoal */
+  :global(html[data-theme='dark']) .pcard--full {
+    --pc-fill: rgba(255, 255, 255, 0.04);
+    --pc-border: rgba(220, 225, 220, 0.16);
+    --pc-edge: rgba(255, 255, 255, 0.12);
+    --pc-shadow: rgba(0, 0, 0, 0.5);
+    --pc-sheen: rgba(255, 255, 255, 0.08);
+  }
+
+  @media (hover: hover) {
+    .pcard:hover {
+      border-color: color-mix(in oklab, var(--ochre) 55%, transparent);
+      transform: translateY(-3px);
+      box-shadow: 0 18px 42px -14px var(--pc-shadow), inset 0 1px 0 var(--pc-edge);
+    }
+  }
+
+  .pcard-head { display: flex; align-items: baseline; gap: 10px; }
+  .dot { color: var(--ochre); font-size: 10px; line-height: 1; transform: translateY(-2px); }
+  .pcard-name {
+    font-family: var(--font-mono); font-size: 15px; font-weight: 500; letter-spacing: 0.01em;
+    color: var(--pc-name); margin: 0;
+  }
+  .pcard-year {
+    margin-left: auto; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em;
+    color: var(--pc-muted);
+  }
+
+  /* tagline — the lead line on both variants */
+  .pcard-tagline { font-size: 14px; line-height: 1.65; color: var(--pc-body); margin: 13px 0 0; max-width: 62ch; }
+  .pcard--full .pcard-tagline {
+    font-family: var(--font-display); font-style: italic; font-size: clamp(16px, 2vw, 19px);
+    line-height: 1.45; color: var(--pc-name);
+  }
+  /* blurb (full only) — the prose paragraph under the tagline */
+  .pcard-blurb { font-size: 15px; line-height: 1.7; color: var(--pc-body); margin: 14px 0 0; max-width: 66ch; }
+
+  /* highlights (full variant) — evidence bullets with a mono arrow mark */
+  .pcard-highlights { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 11px; }
+  .pcard-highlights li {
+    position: relative; padding-left: 22px; font-size: 13.5px; line-height: 1.6; color: var(--pc-body);
+    max-width: 68ch;
+  }
+  .hl-mark { position: absolute; left: 0; top: 0; color: var(--ochre); font-family: var(--font-mono); }
+
+  /* stack row — mono tag chips */
+  .pcard-stack {
+    list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 7px;
+  }
+  .pcard-stack li {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.02em; color: var(--pc-muted);
+    border: 1px solid var(--pc-chip-border);
+    border-radius: 6px; padding: 3px 9px;
+  }
+
+  .pcard-links { margin-top: 18px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .pcard-link {
+    font-family: var(--font-mono); font-size: 12.5px; letter-spacing: 0.02em; text-decoration: none;
+    color: var(--ochre); transition: opacity 0.3s ease;
+  }
+  @media (hover: hover) { .pcard-link:hover { opacity: 0.72; } }
+  .pcard-link:focus-visible { outline: 1px solid var(--ochre); outline-offset: 3px; border-radius: 2px; }
+
+  @media (max-width: 640px) {
+    .pcard { padding: 18px 18px; }
+  }
+</style>
