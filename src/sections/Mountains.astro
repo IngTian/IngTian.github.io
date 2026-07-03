@@ -91,11 +91,11 @@ import { researchInterests, projects } from '../data/profile';
     align-items: center;
     cursor: pointer;
     color: var(--paper);                          /* light text — the band is mid-slate, so it renders */
-    border-color: rgba(255, 255, 255, 0.16);
-    background-color: rgba(22, 20, 15, 0.28);     /* just a WHISPER of tint — the blur is the glass, not a slab (paper 4.85:1) */
+    border-color: rgba(255, 255, 255, 0.24);      /* firmer rim carries the chip since the fill is barely there */
+    background-color: rgba(22, 20, 15, 0.18);     /* the lightest lucid tint — mostly just the blur */
     -webkit-backdrop-filter: blur(14px) saturate(1.3);
     backdrop-filter: blur(14px) saturate(1.3);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
     transition: color 0.35s, border-color 0.35s, background-color 0.35s,
                 box-shadow 0.35s, transform 0.35s cubic-bezier(0.2, 0.7, 0.3, 1);
   }
