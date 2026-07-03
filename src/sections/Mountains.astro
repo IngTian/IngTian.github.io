@@ -90,12 +90,12 @@ import { researchInterests, projects } from '../data/profile';
     display: inline-flex;
     align-items: center;
     cursor: pointer;
-    color: var(--ink-2);                          /* softer warm dark-grey ink (6.4:1 — not harsh black) */
-    border-color: rgba(255, 255, 255, 0.42);
-    background-color: rgba(255, 253, 248, 0.35);  /* more transparent frost — the gradient reads through */
+    color: var(--paper);                          /* light text on a translucent dark frost (5.9:1) */
+    border-color: rgba(255, 255, 255, 0.16);
+    background-color: rgba(22, 20, 15, 0.4);      /* dark frost — the gradient still reads through */
     -webkit-backdrop-filter: blur(12px) saturate(1.3);
     backdrop-filter: blur(12px) saturate(1.3);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 14px -10px rgba(70, 60, 42, 0.35);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 4px 14px -10px rgba(0, 0, 0, 0.4);
     transition: color 0.35s, border-color 0.35s, background-color 0.35s,
                 box-shadow 0.35s, transform 0.35s cubic-bezier(0.2, 0.7, 0.3, 1);
   }
