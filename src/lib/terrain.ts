@@ -64,10 +64,19 @@ export function runDescent(x0: number, y0: number): Array<{ x: number; y: number
 function lp(a: number[], b: number[], t: number): [number, number, number] {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
-export function colormap(hn: number): [number, number, number] {
+
+// A terrain palette = three ramp stops (valley → mid → hilltop) as RGB triples.
+// The canvas is JS-painted, so it can't inherit CSS tokens; each theme passes
+// its own ramp here. Default is the shipped LIGHT ramp — keeping colormap()'s
+// zero-arg signature intact for the unit test and existing callers.
+export interface TerrainRamp { valley: [number, number, number]; mid: [number, number, number]; peak: [number, number, number] }
+export const TERRAIN_LIGHT: TerrainRamp = { valley: [150, 110, 58], mid: [120, 112, 96], peak: [109, 118, 137] };       // warm ochre valleys → cool indigo heights
+export const TERRAIN_TERMINAL: TerrainRamp = { valley: [70, 120, 92], mid: [78, 150, 150], peak: [95, 190, 170] };      // phosphor-green low → cyan heights (the "star field")
+
+export function colormap(hn: number, ramp: TerrainRamp = TERRAIN_LIGHT): [number, number, number] {
   return hn < 0.5
-    ? lp([150, 110, 58], [120, 112, 96], hn / 0.5)
-    : lp([120, 112, 96], [109, 118, 137], (hn - 0.5) / 0.5);
+    ? lp(ramp.valley, ramp.mid, hn / 0.5)
+    : lp(ramp.mid, ramp.peak, (hn - 0.5) / 0.5);
 }
 
 // 3D projection (fixed yaw + tilt isometric). z is height (up).

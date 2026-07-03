@@ -1,5 +1,5 @@
 :root {
-  /* palette — the ONLY colors on the site */
+  /* palette — the LIGHT theme (the shipped warm "Descent") */
   --paper: #efe9dd;
   --ink-1: #16140f;
   --ink-2: #2f2b24;
@@ -10,8 +10,68 @@
   --indigo: #6d7689;
   --seal: #b23a2e;
 
-  /* fonts (families resolved via astro:fonts in Task 3) */
+  /* Role tokens that must NOT flip with the ink ramp:
+     --bg        page base behind the gradient (overscroll / loader); always
+                 dark, so it never flashes bright. In light theme it = ink-1.
+     --on-accent text sitting ON the accent chip (CV button, nav bloom). The
+                 accent is a LIGHT color in both themes (ochre / phosphor
+                 green), so text on it stays dark in both themes. */
+  --bg: #16140f;
+  --on-accent: #16140f;
+
+  /* The Descent gradient, tokenized so the dark theme can redefine it wholesale. */
+  --descent-grad: linear-gradient(
+    180deg,
+    #f4efe4 0%,            /* heights: luminous dawn paper */
+    #f0eadf 8%,
+    #efe6d4 15%,           /* warm peach-ochre haze (Monet) */
+    #e2d2c2 23%,
+    #ccc4b6 30%,           /* warm taupe */
+    #a6a8ad 37%,           /* cool-neutral grey */
+    #7d7e88 44%,           /* indigo dusk */
+    #565660 52%,
+    #3a3833 62%,           /* grey ink — content sits on this */
+    #2a2720 78%,
+    #1d1b16 90%,
+    #16140f 100%           /* ground: near-black ink */
+  );
+
+  /* fonts (families resolved via astro:fonts) */
   --font-display: 'Fraunces', Georgia, serif;
   --font-body: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* ============================================================
+   DARK — "Terminal galaxy"
+   A flat charcoal void where the hero's terrain dots read as a STAR FIELD,
+   with a refined phosphor-emerald accent replacing ochre and a cool near-white
+   ink ramp. This DELIBERATELY breaks the "seal is the only saturated color"
+   rule (see CLAUDE.md) — the accent green is the terminal signature. The
+   vermilion seal remains the brand mark. Additive: the light theme above is
+   untouched — toggling never degrades it.
+   ============================================================ */
+html[data-theme='dark'] {
+  --paper: #dfe3df;
+  --ink-1: #dce1dc;   /* primary text — cool near-white */
+  --ink-2: #b7beb8;
+  --ink-3: #8b938c;   /* secondary cool grey */
+  --ink-4: #646b64;   /* muted labels */
+  --ink-5: #4a4f4a;   /* faintest */
+  --ochre: #66c28c;   /* phosphor emerald — the terminal accent (refined, not neon) */
+  --indigo: #5fb2c9;  /* cyan for the cool terrain heights */
+  --seal: #e0574a;    /* brightened vermilion for the dark ground */
+
+  --bg: #08090b;
+  --on-accent: #0b1410;  /* deep green-black for text on the phosphor accent */
+
+  --descent-grad: linear-gradient(
+    180deg,
+    #16191d 0%,        /* charcoal, faint cool cast — the night void */
+    #131619 20%,
+    #111417 40%,
+    #0e1013 60%,
+    #0b0d0f 80%,
+    #08090b 100%
+  );
 }

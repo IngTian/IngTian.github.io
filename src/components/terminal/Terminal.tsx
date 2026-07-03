@@ -37,8 +37,8 @@ export default function Terminal() {
       <p className="font-mono text-[11px] tracking-[0.18em] uppercase text-ochre">Now</p>
       <h2 className="font-display text-[27px] font-medium text-paper mt-2">What I'm working on. Just ask.</h2>
 
-      <div className="mt-6 rounded-xl overflow-hidden border border-ochre/20"
-           style={{ background: 'linear-gradient(180deg, rgba(40,36,30,0.7), rgba(20,18,15,0.92))', boxShadow: '0 30px 70px rgba(0,0,0,0.5)' }}>
+      <div className="terminal-chrome mt-6 rounded-xl overflow-hidden border border-ochre/20"
+           style={{ boxShadow: '0 30px 70px rgba(0,0,0,0.5)' }}>
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b border-ochre/15">
           <i className="w-2.5 h-2.5 rounded-full bg-ink-3" />
           <i className="w-2.5 h-2.5 rounded-full bg-ochre" />

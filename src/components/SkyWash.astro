@@ -63,6 +63,14 @@
     transform-origin: 80% 9%;
   }
 
+  /* Dark theme: the warm Monet broken-color washes would muddy the charcoal
+     void, so kill the warm entirely and leave only a whisper of cool nebular
+     tint. Uses :global so it reaches this scoped component from the <html>
+     theme attribute. */
+  :global(html[data-theme='dark']) .sky-warm { opacity: 0; }
+  :global(html[data-theme='dark']) .sky-cool { opacity: 0.06; }
+  :global(html[data-theme='dark']) .sky-sun  { opacity: 0; }
+
   /* Gentle breathe — warm & cool pulse OUT OF PHASE (as warm swells, cool
      recedes, then they trade), so the sky's temperature visibly shifts even
      while the viewer holds still. transform/opacity only; long mismatched

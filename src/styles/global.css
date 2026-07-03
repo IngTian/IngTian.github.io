@@ -1,24 +1,29 @@
 @import "tailwindcss";
 @import "./tokens.css";
 
-/* expose tokens to Tailwind v4 utilities */
+/* Expose tokens to Tailwind v4 utilities. These reference the tokens.css
+   custom properties (NOT literal hexes) so that overriding the palette under
+   html[data-theme=…] re-themes every Tailwind utility (text-ink-1, bg-ochre,
+   text-paper/80 → color-mix, …) for free — no component edits. */
 @theme {
-  --color-paper: #efe9dd;
-  --color-ink-1: #16140f;
-  --color-ink-2: #2f2b24;
-  --color-ink-3: #5a544a;
-  --color-ink-4: #8c8576;
-  --color-ink-5: #b8b1a1;
-  --color-ochre: #c8a36a;
-  --color-indigo: #6d7689;
-  --color-seal: #b23a2e;
+  --color-paper: var(--paper);
+  --color-ink-1: var(--ink-1);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-ink-5: var(--ink-5);
+  --color-ochre: var(--ochre);
+  --color-indigo: var(--indigo);
+  --color-seal: var(--seal);
   --font-display: 'Fraunces', Georgia, serif;
   --font-body: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
 html { scroll-behavior: smooth; }
-body { background: var(--ink-1); color: var(--ink-1); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+/* base behind the gradient (overscroll / loader) — a role token that stays
+   dark in every theme, so it never inverts to a bright flash. */
+body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
 
 /* ============================================================
    The Descent — one continuous sky, scrolled through.
@@ -30,22 +35,9 @@ body { background: var(--ink-1); color: var(--ink-1); font-family: var(--font-bo
 .descent {
   position: relative;
   z-index: 0;                /* stacking context so ::after can sit behind content */
-  background:
-    linear-gradient(
-      180deg,
-      #f4efe4 0%,            /* heights: luminous dawn paper */
-      #f0eadf 8%,            /* paper */
-      #efe6d4 15%,           /* warm peach-ochre haze (Monet) */
-      #e2d2c2 23%,
-      #ccc4b6 30%,           /* warm taupe (was rose #cbc0c2 — drop the mauve B-lift) */
-      #a6a8ad 37%,           /* cool-neutral grey (was lavender #a7a4af — kill the violet R>G) */
-      #7d7e88 44%,           /* indigo dusk */
-      #565660 52%,
-      #3a3833 62%,           /* grey ink — content sits on this, high contrast */
-      #2a2720 78%,
-      #1d1b16 90%,
-      #16140f 100%           /* ground: near-black ink */
-    );
+  /* The whole sky, as a token — each theme redefines --descent-grad wholesale
+     (light dawn→dusk, or the night-descent / terminal variants). */
+  background: var(--descent-grad);
 }
 
 /* ── Atmosphere, upper sky (heights → interlude). Normal blend: these are warm
@@ -88,6 +80,25 @@ body { background: var(--ink-1); color: var(--ink-1); font-family: var(--font-bo
        it reads as fog filling the void rather than a band. */
     radial-gradient(90% 22% at 54% 68%, rgba(156,164,186,0.34), transparent 80%);
 }
+
+/* ── Dark-theme atmosphere. The light washes are warm sun-glow — wrong over a
+   charcoal void — so nearly kill them: just a whisper of phosphor haze
+   upper-right and a faint cyan fog in the mid-gap, so the void isn't dead flat
+   but the terrain "stars" stay the star of the show. ── */
+html[data-theme='dark'] .descent::before {
+  background:
+    radial-gradient(50% 32% at 78% 10%, rgba(102,194,140,0.06), transparent 72%);
+}
+html[data-theme='dark'] .descent::after {
+  background:
+    radial-gradient(90% 20% at 54% 66%, rgba(95,178,201,0.10), transparent 82%);
+}
+
+/* Terminal chrome fill (Terminal.tsx is a React island with no <style>, so its
+   panel background lives here). Light: warm ink glass. Dark: cool charcoal so
+   it sits in the void rather than glowing warm. */
+.terminal-chrome { background: linear-gradient(180deg, rgba(40,36,30,0.7), rgba(20,18,15,0.92)); }
+html[data-theme='dark'] .terminal-chrome { background: linear-gradient(180deg, rgba(24,28,30,0.78), rgba(10,12,13,0.95)); }
 
 /* slow drift — transform/opacity only, never blur. The static state above is
    the finished composition (also the Firefox / reduced-motion fallback). */

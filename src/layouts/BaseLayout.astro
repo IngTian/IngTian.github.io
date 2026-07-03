@@ -25,6 +25,22 @@ const {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    {/* Theme init — runs synchronously BEFORE first paint so there's no flash of
+        the wrong theme. Resolves: explicit saved choice (localStorage) first,
+        else the visitor's OS preference (prefers-color-scheme). Only 'dark' sets
+        the attribute; light is the default (no attribute). The toggle in the
+        corner nav writes localStorage and flips this attribute live. */}
+    <script is:inline>
+      (function () {
+        try {
+          var saved = localStorage.getItem('theme'); // 'dark' | 'light' | null
+          var dark = saved ? saved === 'dark'
+                           : matchMedia('(prefers-color-scheme: dark)').matches;
+          if (dark) document.documentElement.dataset.theme = 'dark';
+        } catch (e) {}
+      })();
+    </script>
     <meta name="generator" content={Astro.generator} />
 
     {/* Favicons. SVG for crisp browser tabs; PNG fallbacks because Google Search

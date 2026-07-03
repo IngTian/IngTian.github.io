@@ -18,24 +18,37 @@ const bubbles = JSON.stringify([
     z-index: 0; pointer-events: none; display: block;
   }
   .terrain-bubble {
-    position: absolute; z-index: 1; color: var(--ink-1);
-    background: rgba(244,239,228,.9); border: 1px solid rgba(109,118,137,.45);
+    position: absolute; z-index: 1; color: var(--on-accent);
+    background: var(--ochre); border: 1px solid color-mix(in oklab, var(--indigo) 55%, transparent);
     border-radius: 999px; padding: 4px 13px; white-space: nowrap;
     opacity: 0; transform: translateY(5px); pointer-events: none;
-    box-shadow: 0 6px 18px rgba(22,20,15,.10);
+    box-shadow: 0 6px 18px rgba(0,0,0,.18);
   }
   @media (prefers-reduced-motion: no-preference) {
     .terrain-bubble { transition: opacity .45s, transform .45s; }
   }
   .terrain-bubble.show { opacity: 1; transform: none; }
   .terrain-bubble.word { font-family: var(--font-display); font-style: italic; font-size: 16px; }
-  .terrain-bubble .m { color: var(--indigo); font-style: normal; }
-  .terrain-bubble math { color: var(--ink-1); font-size: 1.05em; }
+  .terrain-bubble .m { color: color-mix(in oklab, var(--on-accent) 70%, var(--indigo)); font-style: normal; }
+  .terrain-bubble math { color: var(--on-accent); font-size: 1.05em; }
 </style>
 
 <script>
-  import { field, runDescent, colormap, project, SPAWNS, RANGE, STEP } from '../lib/terrain';
+  import { field, runDescent, colormap, project, SPAWNS, RANGE, STEP,
+           TERRAIN_LIGHT, TERRAIN_TERMINAL, type TerrainRamp } from '../lib/terrain';
   import { prefersReducedMotion } from '../lib/motion';
+
+  // The canvas is JS-painted, so it can't inherit CSS tokens — pick the ramp +
+  // walker colors from the active theme (data-theme on <html>). Read fresh on
+  // each init so a View-Transition swap or a live theme toggle repaints correctly.
+  // Dark = the "terminal galaxy": phosphor-green terrain dots read as a star
+  // field on the charcoal void, green settled-minima, cyan descending trails.
+  type WalkerPalette = { glow: [number,number,number]; settled: [number,number,number]; trail: [number,number,number] };
+  function themePalette(): { ramp: TerrainRamp; walker: WalkerPalette } {
+    if (document.documentElement.dataset.theme === 'dark')
+      return { ramp: TERRAIN_TERMINAL, walker: { glow: [220,225,220], settled: [102,194,140], trail: [95,178,201] } };
+    return { ramp: TERRAIN_LIGHT, walker: { glow: [244,239,228], settled: [200,163,106], trail: [92,108,140] } };
+  }
 
   // Teardown handle for the previous init — re-init runs on every page load AND
   // after each View Transition swap (astro:page-load), so we must dispose the
@@ -55,6 +68,10 @@ const bubbles = JSON.stringify([
     const ctx = cvs.getContext('2d')!;
     const reduce = prefersReducedMotion();
     const BUBBLES = JSON.parse(cvs.dataset.bubbles || '[]') as Array<null | { word?: string; mathml?: string }>;
+    const { ramp, walker } = themePalette();
+    const [gr, gg, gb] = walker.glow;      // walker head-glow
+    const [sr, sg, sb] = walker.settled;   // settled-at-minimum accent
+    const [tr, tg, tb] = walker.trail;      // descending trail
 
     let W = 0, Hh = 0, DPR = 1;
     function resize() {
@@ -112,7 +129,7 @@ const bubbles = JSON.stringify([
         let alpha = 0.30 + (1 - hn) * 0.45;
         if (p.sy > fadeStart) alpha *= Math.max(0, 1 - (p.sy - fadeStart) / (Hh - fadeStart));
         if (alpha <= 0.004) continue;
-        const [cr, cg, cb] = colormap(hn);
+        const [cr, cg, cb] = colormap(hn, ramp);
         ctx.beginPath(); ctx.arc(p.sx, p.sy, Math.max(0.5, r), 0, 2 * Math.PI);
         ctx.fillStyle = `rgba(${cr|0},${cg|0},${cb|0},${alpha.toFixed(3)})`; ctx.fill();
       }
@@ -141,9 +158,9 @@ const bubbles = JSON.stringify([
             if (a <= 0.01) continue;
             maxAlpha = Math.max(maxAlpha, a);
             const rr = (isLast ? 5.2 : 3.8) * DPR;
-            ctx.beginPath(); ctx.arc(sx, sy, rr * 1.9, 0, 2 * Math.PI); ctx.fillStyle = `rgba(244,239,228,${0.5 * a})`; ctx.fill();
+            ctx.beginPath(); ctx.arc(sx, sy, rr * 1.9, 0, 2 * Math.PI); ctx.fillStyle = `rgba(${gr},${gg},${gb},${0.5 * a})`; ctx.fill();
             ctx.beginPath(); ctx.arc(sx, sy, rr, 0, 2 * Math.PI);
-            ctx.fillStyle = isLast && wk.done ? `rgba(200,163,106,${0.95 * a})` : `rgba(92,108,140,${a})`;
+            ctx.fillStyle = isLast && wk.done ? `rgba(${sr},${sg},${sb},${0.95 * a})` : `rgba(${tr},${tg},${tb},${a})`;
             ctx.fill();
             if (isLast && wk.done && a > 0.5 && wk.bubble) anyBubble = { x: sx, y: sy, b: wk.bubble };
           }
