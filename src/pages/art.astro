@@ -126,6 +126,11 @@ import SkyWash from '../components/SkyWash.astro';
      than its right margin, so plain centering drifts right; the negative
      right-margin re-balances the cal-block against the true available span so
      the gaps on both sides match. */
+  /* Calligraphy works stack in a column with a real gap between them — the
+     min-height alone gave almost no separation when consecutive works are tall
+     (the image max-height 82vh can exceed the block's 74vh min-height, so two
+     tall works nearly touched). The gap guarantees breathing room regardless. */
+  #cal-host { display: flex; flex-direction: column; gap: clamp(6vh, 9vh, 120px); }
   .cal-block { min-height: 74vh; display: flex; align-items: center; justify-content: center;
     margin-right: calc(-1 * clamp(40px, 7vw, 180px)); }
   .cal { margin: 0; line-height: 0; cursor: zoom-in; }

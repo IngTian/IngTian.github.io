@@ -21,7 +21,7 @@ import { researchInterests, projects } from '../data/profile';
         <li>
           <button
             type="button"
-            class="ri-pill font-mono text-[12px] text-paper/75 border border-ochre/25 rounded-full px-3.5 py-1.5"
+            class="ri-pill font-mono text-[12px] border rounded-full px-3.5 py-1.5"
             aria-expanded="false"
             aria-controls="ri-gloss"
             data-gloss={it.gloss}
@@ -80,19 +80,32 @@ import { researchInterests, projects } from '../data/profile';
      one-line gloss on click. The OPEN pill carries the vermilion seal dot (the
      site's one saturated color), reserved here for the meaningful "this is open"
      state rather than spent on hover. */
+  /* The Mountains band is paper-on-dark by design, BUT in the LIGHT theme the
+     atmosphere fog wash lightens this stretch to a mid-slate (~#7d8592), where
+     thin paper pill text washed out (measured 2.4:1). Fix: give each pill its
+     own translucent DARK chip fill so full-opacity paper text reads on it
+     (ink@0.35 over that band → 5.5:1 AA), and firm the resting border. In the
+     DARK theme the fill flips to a faint light tint so the chip still reads on
+     the void. Also makes the pills look more like the tappable buttons they are. */
   .ri-pill {
     display: inline-flex;
     align-items: center;
     cursor: pointer;
+    color: var(--paper);
+    border-color: rgba(200, 163, 106, 0.4);
+    background-color: rgba(22, 20, 15, 0.35);   /* dark chip so paper reads on the light-theme band */
     transition: color 0.35s, border-color 0.35s, background-color 0.35s,
                 transform 0.35s cubic-bezier(0.2, 0.7, 0.3, 1);
   }
+  /* Dark theme: the page is a near-black void, so an ink fill would vanish —
+     use a faint light tint so the chip is still visible. */
+  :global(html[data-theme='dark']) .ri-pill { background-color: rgba(220, 225, 220, 0.05); }
 
   @media (hover: hover) {
     .ri-pill:hover {
       color: var(--paper);
-      border-color: rgba(200, 163, 106, 0.55); /* ochre, firmed */
-      background-color: rgba(200, 163, 106, 0.08);
+      border-color: rgba(200, 163, 106, 0.6); /* ochre, firmed */
+      background-color: rgba(200, 163, 106, 0.14);
     }
   }
 
