@@ -81,27 +81,27 @@ import { researchInterests, projects } from '../data/profile';
      site's one saturated color), reserved here for the meaningful "this is open"
      state rather than spent on hover. */
   /* Frosted-GLASS pills — the same liquid-glass material as the ProjectCard /
-     CornerNav, which is exactly right here: the Mountains band is a mid-slate in
-     light theme (fog-lightened) where flat fills looked like a patch, but a
-     translucent frosted chip with a backdrop blur + edge highlight sits
-     naturally on the gradient AND lifts the paper text to legible. Static blur
-     (baked, never animated — taste rule). paper text in both themes; the frost
-     is a touch darker in light so paper reads on the lighter band. */
+     CornerNav, and it FOLLOWS the theme like they do: a LIGHT frosted-white chip
+     with dark ink text in the light theme (mirrors ProjectCard --full light),
+     and a dark-tinted frost with paper text in the dark theme. Static backdrop
+     blur (baked, never animated — taste rule) + edge highlight so the chip reads
+     as glass on the gradient rather than a flat patch. */
   .ri-pill {
     display: inline-flex;
     align-items: center;
     cursor: pointer;
-    color: var(--paper);
-    border-color: rgba(255, 255, 255, 0.22);
-    background-color: rgba(22, 20, 15, 0.22);
+    color: var(--ink-1);                          /* dark ink on the light frost (10.9:1) */
+    border-color: rgba(255, 255, 255, 0.6);
+    background-color: rgba(255, 253, 248, 0.55);  /* warm frosted white — lighter than the band */
     -webkit-backdrop-filter: blur(10px) saturate(1.3);
     backdrop-filter: blur(10px) saturate(1.3);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 4px 14px -8px rgba(0, 0, 0, 0.4);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 4px 14px -10px rgba(70, 60, 42, 0.4);
     transition: color 0.35s, border-color 0.35s, background-color 0.35s,
                 box-shadow 0.35s, transform 0.35s cubic-bezier(0.2, 0.7, 0.3, 1);
   }
-  /* Dark theme: lighter frost tint so the chip reads on the near-black void. */
+  /* Dark theme: a dark-tinted frost + paper text so the chip reads on the void. */
   :global(html[data-theme='dark']) .ri-pill {
+    color: var(--paper);
     border-color: rgba(220, 225, 220, 0.14);
     background-color: rgba(220, 225, 220, 0.05);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 4px 14px -8px rgba(0, 0, 0, 0.5);
@@ -109,8 +109,8 @@ import { researchInterests, projects } from '../data/profile';
 
   @media (hover: hover) {
     .ri-pill:hover {
-      border-color: rgba(200, 163, 106, 0.55);
-      background-color: rgba(200, 163, 106, 0.14);
+      border-color: rgba(200, 163, 106, 0.7);
+      background-color: rgba(200, 163, 106, 0.16);
     }
   }
 
