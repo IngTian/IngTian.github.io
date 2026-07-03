@@ -42,8 +42,14 @@ import SkyWash from '../components/SkyWash.astro';
         {calligraphy.map((w, i) => (
           <div class="cal-block" data-i={i}
                data-kicker={w.kicker} data-title={w.title} data-meta={w.medium} data-note={w.note}>
-            <figure class:list={["cal", w.treatment]} data-zoom={w.src.src} data-alt={w.alt}>
-              <Image src={w.src} alt={w.alt} widths={[480, 900, w.src.width]} sizes="(max-width:1024px) 80vw, 40vw" />
+            <figure class:list={["cal", w.treatment]} data-zoom={w.src.src} data-alt={w.alt}
+                    role="button" tabindex="0" aria-label={`View ${w.title} — full screen`}>
+              {/* The first calligraphy work is the /art LCP — load it eagerly
+                  with high priority; later works stay lazy. (Astro <Image>
+                  defaults to loading="lazy", which previously deferred the
+                  above-the-fold hero.) */}
+              <Image src={w.src} alt={w.alt} widths={[480, 900, w.src.width]} sizes="(max-width:1024px) 80vw, 40vw"
+                     loading={i === 0 ? 'eager' : 'lazy'} fetchpriority={i === 0 ? 'high' : undefined} />
             </figure>
           </div>
         ))}
@@ -56,7 +62,8 @@ import SkyWash from '../components/SkyWash.astro';
           <figure class="tile" data-i={i}
                   data-ar={(p.src.width / p.src.height).toFixed(4)}
                   data-zoom={p.src.src} data-alt={p.alt}
-                  data-title={p.title ?? ''} data-note={p.note ?? ''}>
+                  data-title={p.title ?? ''} data-note={p.note ?? ''}
+                  role="button" tabindex="0" aria-label={`View photograph${p.title ? ' — ' + p.title : ''} — full screen`}>
             <Image src={p.src} alt={p.alt} widths={[300, 600, 900]} sizes="(max-width:1024px) 45vw, 30vw"
                    loading={i < 9 ? 'eager' : 'lazy'} decoding="async" />
           </figure>

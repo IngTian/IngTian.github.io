@@ -36,11 +36,17 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
     z-index: 30;
     pointer-events: none; /* container ignores; links re-enable */
     /* Hidden until JS reveals it after the hero. No-JS fallback re-shows it
-       (see :root:not(.js) rule below) so it never stays invisible. */
+       (see :root:not(.js) rule below) so it never stays invisible.
+       `visibility: hidden` (not just opacity:0) also pulls the links OUT of the
+       keyboard tab order while invisible — otherwise a keyboard user could Tab
+       to fully-transparent links at the top of the page. It's delayed so it
+       flips only AFTER the fade completes (visible→hidden), and immediately on
+       the way in. */
     opacity: 0;
-    transition: opacity 0.6s ease;
+    visibility: hidden;
+    transition: opacity 0.6s ease, visibility 0s linear 0.6s;
   }
-  .toc.toc--visible { opacity: 1; }
+  .toc.toc--visible { opacity: 1; visibility: visible; transition: opacity 0.6s ease, visibility 0s; }
 
   .toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
 
@@ -97,7 +103,7 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
   /* No-JS fallback: if the enhancement never runs, keep the rail visible at a
      readable mid opacity rather than hidden. (.no-toc-js set on <html> until
      the script clears it — inverse-guard pattern.) */
-  :global(html.no-toc-js) .toc { opacity: 1; }
+  :global(html.no-toc-js) .toc { opacity: 1; visibility: visible; }
 </style>
 
 <script>

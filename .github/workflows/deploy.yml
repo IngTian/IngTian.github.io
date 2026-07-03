@@ -17,7 +17,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Gate the deploy on the SAME test suite CI runs. deploy.yml triggers on push
+  # to main independently of ci.yml, so without this a red `npm test` could still
+  # ship. build (and therefore deploy) waits on this passing.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc # single source of truth (matches ci.yml)
+          cache: npm
+      - run: npm ci
+      - name: Test
+        run: npm test
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

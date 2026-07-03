@@ -19,6 +19,13 @@
   --bg: #16140f;
   --on-accent: #16140f;
 
+  /* Hairline rules (section dividers, table borders) as an R,G,B triple so each
+     use sets its own alpha: `border: 1px solid rgba(var(--hairline-rgb), .2)`.
+     Light = ink-3 (#5a544a = 90,84,74), the warm-grey the reading pages used as
+     raw literals. Redefined per theme (dark below) so hairlines re-theme with
+     the palette instead of needing a hand-maintained :global override list. */
+  --hairline-rgb: 90, 84, 74;
+
   /* The Descent gradient, tokenized so the dark theme can redefine it wholesale. */
   --descent-grad: linear-gradient(
     180deg,
@@ -64,6 +71,7 @@ html[data-theme='dark'] {
 
   --bg: #08090b;
   --on-accent: #0b1410;  /* deep green-black for text on the phosphor accent */
+  --hairline-rgb: 184, 177, 161;  /* cool light hairline on the dark ground (was the :global override literal) */
 
   --descent-grad: linear-gradient(
     180deg,
