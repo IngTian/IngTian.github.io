@@ -57,40 +57,82 @@ const isFull = variant === 'full';
          ink ramp is correct (dark ink on the pale page, light ink on the dark),
          and the surface must DARKEN to separate the card from the pale page.
      Local vars set per-variant keep the rest of the rules identical. */
+  /* ── Liquid-glass surface (Apple-style), tech-flavored. Same recipe as the
+     CornerNav capsule: a STATIC backdrop blur (baked, never animated — taste
+     rule), a translucent tint, a bright inset edge-highlight, and a soft drop
+     shadow — plus a diagonal specular sheen (::before) that reads as light
+     catching the pane. --pc-fill / --pc-edge / --pc-shadow are set per context
+     so the glass sits right on each background. ── */
   .pcard {
     /* teaser defaults: light-on-dark, tuned for the dark Mountains gradient */
     --pc-name: var(--paper);
     --pc-body: rgba(239, 233, 221, 0.82);
     --pc-muted: rgba(239, 233, 221, 0.5);
-    --pc-border: rgba(239, 233, 221, 0.16);
-    --pc-fill: rgba(239, 233, 221, 0.05);
+    --pc-border: rgba(239, 233, 221, 0.18);
+    --pc-fill: rgba(239, 233, 221, 0.06);
     --pc-chip-border: rgba(239, 233, 221, 0.22);
+    --pc-edge: rgba(255, 255, 255, 0.14);       /* inset top edge-highlight */
+    --pc-shadow: rgba(0, 0, 0, 0.28);
+    --pc-sheen: rgba(255, 255, 255, 0.10);       /* diagonal specular streak */
 
+    position: relative;
+    overflow: hidden;                            /* clip the sheen to the radius */
+    isolation: isolate;                          /* keep sheen under content */
     border: 1px solid var(--pc-border);
-    border-radius: 12px;
+    border-radius: 14px;
     padding: 22px 24px;
     background: var(--pc-fill);
-    transition: border-color 0.35s ease, transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    backdrop-filter: blur(16px) saturate(1.4);
+    box-shadow: 0 10px 30px -12px var(--pc-shadow), inset 0 1px 0 var(--pc-edge);
+    transition: border-color 0.35s ease, transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1),
+                box-shadow 0.35s ease;
   }
-  /* full card (/projects): use the ink ramp (flips per theme) + a surface that
-     darkens over the pale reading page so the card reads as a real tile. */
+  /* the specular sheen — a soft diagonal band of light across the upper-left,
+     the "liquid glass" tell. Static; opacity/position fixed. */
+  .pcard::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(135deg, var(--pc-sheen) 0%, transparent 42%),
+      radial-gradient(120% 80% at 0% 0%, var(--pc-sheen) 0%, transparent 55%);
+    opacity: 0.9;
+  }
+  /* content rides above the sheen */
+  .pcard > * { position: relative; z-index: 1; }
+
+  /* full card (/projects): use the ink ramp (flips per theme) + a glass tint
+     that darkens over the pale reading page so the tile reads as real glass. */
   .pcard--full {
     --pc-name: var(--ink-1);
     --pc-body: var(--ink-2);
     --pc-muted: var(--ink-4);
-    --pc-border: color-mix(in oklab, var(--ink-3) 30%, transparent);
-    --pc-fill: color-mix(in oklab, var(--ink-1) 5%, transparent);
+    --pc-border: color-mix(in oklab, var(--ink-3) 34%, transparent);
+    --pc-fill: color-mix(in oklab, var(--ink-1) 6%, transparent);
     --pc-chip-border: color-mix(in oklab, var(--ink-4) 40%, transparent);
+    --pc-edge: rgba(255, 255, 255, 0.55);        /* crisp light rim on the pale page */
+    --pc-shadow: rgba(22, 20, 15, 0.14);
+    --pc-sheen: rgba(255, 255, 255, 0.35);
   }
-  /* on the DARK reading page the ink surface would darken into the void; flip to
-     a faint light fill + hairline so the tile still separates from the charcoal */
+  /* on the DARK reading page the ink surface would sink into the void; flip to a
+     faint light glass + hairline so the tile still separates from the charcoal */
   :global(html[data-theme='dark']) .pcard--full {
-    --pc-fill: rgba(255, 255, 255, 0.03);
-    --pc-border: rgba(220, 225, 220, 0.14);
+    --pc-fill: rgba(255, 255, 255, 0.04);
+    --pc-border: rgba(220, 225, 220, 0.16);
+    --pc-edge: rgba(255, 255, 255, 0.12);
+    --pc-shadow: rgba(0, 0, 0, 0.5);
+    --pc-sheen: rgba(255, 255, 255, 0.08);
   }
 
   @media (hover: hover) {
-    .pcard:hover { border-color: color-mix(in oklab, var(--ochre) 55%, transparent); transform: translateY(-2px); }
+    .pcard:hover {
+      border-color: color-mix(in oklab, var(--ochre) 55%, transparent);
+      transform: translateY(-3px);
+      box-shadow: 0 18px 42px -14px var(--pc-shadow), inset 0 1px 0 var(--pc-edge);
+    }
   }
 
   .pcard-head { display: flex; align-items: baseline; gap: 10px; }
