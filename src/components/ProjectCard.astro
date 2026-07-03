@@ -104,18 +104,23 @@ const isFull = variant === 'full';
   /* content rides above the sheen */
   .pcard > * { position: relative; z-index: 1; }
 
-  /* full card (/projects): use the ink ramp (flips per theme) + a glass tint
-     that darkens over the pale reading page so the tile reads as real glass. */
+  /* full card (/projects) — LIGHT theme. Liquid glass is a dark-background
+     material: on the pale cream reading page the glossy sheen has nothing to
+     catch and reads as a cheap washed-out blob. So on light we render the
+     honest light-mode form of the SAME family — a warm frosted-white panel that
+     RAISES above the page (fill lighter than the cream), with a crisp edge and
+     a soft warm shadow, and the glossy sheen killed (--pc-sheen: transparent).
+     Still glass; just the version that belongs on a light field. */
   .pcard--full {
     --pc-name: var(--ink-1);
     --pc-body: var(--ink-2);
     --pc-muted: var(--ink-4);
-    --pc-border: color-mix(in oklab, var(--ink-3) 34%, transparent);
-    --pc-fill: color-mix(in oklab, var(--ink-1) 6%, transparent);
-    --pc-chip-border: color-mix(in oklab, var(--ink-4) 40%, transparent);
-    --pc-edge: rgba(255, 255, 255, 0.55);        /* crisp light rim on the pale page */
-    --pc-shadow: rgba(22, 20, 15, 0.14);
-    --pc-sheen: rgba(255, 255, 255, 0.35);
+    --pc-border: rgba(255, 255, 255, 0.7);
+    --pc-fill: rgba(255, 253, 248, 0.55);        /* warm frosted white, lifts off cream */
+    --pc-chip-border: color-mix(in oklab, var(--ink-4) 34%, transparent);
+    --pc-edge: rgba(255, 255, 255, 0.85);        /* crisp bright top rim */
+    --pc-shadow: rgba(70, 60, 42, 0.13);         /* soft WARM lift shadow */
+    --pc-sheen: transparent;                     /* no glossy streak on light */
   }
   /* on the DARK reading page the ink surface would sink into the void; flip to a
      faint light glass + hairline so the tile still separates from the charcoal */
