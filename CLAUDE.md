@@ -118,6 +118,40 @@ condition) or "Moo!".
   DPR≤2; a finished static frame is painted first (instant LCP) and is the
   reduced-motion / no-JS state.
 
+## Themes (light ⇄ dark)
+
+Two themes, driven by `html[data-theme]` (absent = light, `'dark'` = terminal
+galaxy). The whole system is **token override**, not per-component branching:
+
+- **How it flips:** `tokens.css` defines the palette in `:root` (light) and
+  re-declares it under `html[data-theme='dark']`. `global.css` `@theme` maps
+  `--color-*` → those tokens, so **every Tailwind utility and hand-written
+  `var(--ink-*)` re-themes for free** — no component edits for the ~90% that
+  just uses tokens. Only redefine a surface explicitly when it hardcodes a
+  color a token can't reach.
+- **Role tokens that must NOT flip with the ink ramp:** `--bg` (page base
+  behind the gradient — always dark, never flashes bright), `--on-accent` (dark
+  ink for text ON the accent chip — the accent is a light color in both themes,
+  so text on it stays dark), and `--descent-grad` (the whole sky, redefined
+  wholesale per theme).
+- **Surfaces that can't inherit CSS tokens** (handle per-theme by hand):
+  the **terrain canvas** (JS-painted — `TerrainHero.astro` picks a `TerrainRamp`
+  + walker palette off `data-theme`; dark = green "stars"), the **SkyWash** +
+  `.descent::before/::after` washes (raw rgba — dark nearly kills the warm
+  Monet strokes), the **hero legibility halo** (paper→dark veil), the
+  **terminal chrome** fill (`.terminal-chrome` in global.css), and the
+  **corner-nav glass** (forced dark-frost in dark theme).
+- **Default + persistence:** an inline no-FOUC head script in `BaseLayout`
+  resolves theme *before first paint* — explicit `localStorage.theme` first,
+  else `prefers-color-scheme` (so a first-time visitor matches their OS). The
+  toggle (a real `<button>` in `CornerNav`, sun/moon by action) writes
+  `localStorage` and flips the attribute live, then re-fires `astro:page-load`
+  so the canvas repaints for the new palette.
+- **Additive rule (load-bearing):** the dark theme must NEVER degrade the
+  shipped light Descent. Light is the base; dark is an override layer. When
+  touching themes, verify BOTH — build breaks and contrast regressions hide in
+  the theme you didn't screenshot.
+
 ## Conventions
 
 - **Node:** Astro 6 rejects Node 20. Use `nvm use` (`.nvmrc` pins 24) before any
@@ -144,8 +178,15 @@ condition) or "Moo!".
 ## Taste rules (these define the look — hold the line)
 
 - **Palette discipline:** ONLY the tokens in `tokens.css` (paper, ink-1..5,
-  ochre, indigo, seal). The vermilion **seal** (`--seal #b23a2e`) is the ONLY
-  saturated color on the whole site. Never pure `#fff` / `#f00`.
+  ochre, indigo, seal). In the **light** theme the vermilion **seal**
+  (`--seal #b23a2e`) is the ONLY saturated color. Never pure `#fff` / `#f00`.
+  **Deliberate exception — the dark theme.** `html[data-theme='dark']` is the
+  "terminal galaxy": it intentionally swaps the ochre accent for a phosphor
+  **emerald** (`--ochre: #66c28c` under dark) — a second saturated color, on
+  purpose, because the terminal/coder identity is the whole point of dark mode
+  (the user chose it seeing both this and a "night descent" variant live). Do
+  NOT "fix" this back to ochre. The seal red stays the brand mark in both
+  themes. See the Themes section below.
 - **Motion:** animate only `transform` / `opacity`; NEVER animate `filter: blur`
   (bake it). ALL motion is gated behind `@media (prefers-reduced-motion:
   no-preference)` via `lib/motion.ts`. The no-motion state must look *finished* —

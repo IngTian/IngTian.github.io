@@ -42,9 +42,19 @@ for (const phrase of bio.strong) {
          reaches fully transparent (~94% of the box) BEFORE the #heights bottom
          edge (108vh). Otherwise it was still ~0.12 opaque at the box boundary
          and got clipped in a straight horizontal line — that hard cut read as
-         a faint divider at the hero/interlude seam. */
-      radial-gradient(40% 26% at 22% 74%, rgba(244,239,228,0.85), transparent 66%),
-      radial-gradient(30% 22% at 82% 22%, rgba(244,239,228,0.7), transparent 72%);
+         a faint divider at the hero/interlude seam.
+         Uses --paper so it lifts the LIGHT text on the pale dawn; dark themes
+         override below to a soft DARKEN behind the now-light text instead. */
+      radial-gradient(40% 26% at 22% 74%, color-mix(in oklab, var(--paper) 85%, transparent), transparent 66%),
+      radial-gradient(30% 22% at 82% 22%, color-mix(in oklab, var(--paper) 70%, transparent), transparent 72%);
+  }
+  /* Dark themes: the halo must DARKEN behind the light hero text, not brighten
+     — a paper blob on a night sky would be a glaring smear. Swap to a soft
+     near-black veil at the same anchor points. */
+  :global(html[data-theme='dark']) .hero-legibility {
+    background:
+      radial-gradient(44% 30% at 22% 74%, color-mix(in oklab, var(--bg) 62%, transparent), transparent 68%),
+      radial-gradient(34% 24% at 82% 22%, color-mix(in oklab, var(--bg) 46%, transparent), transparent 74%);
   }
 
   /* Mobile: a diagonal can't hold — collapse to a single LEFT-aligned stack

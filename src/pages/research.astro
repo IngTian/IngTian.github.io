@@ -30,6 +30,7 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
   description="Selected research by Ing Tian (Zeying Tian) — portfolio optimization and machine learning. Featuring RL-BHRP, a reinforcement-learning-embedded Bayesian Hierarchical Risk Parity approach to adaptive allocation."
   veilLine="a researcher by day"
   veilOnLoad={true}
+  navZone="light"
 >
   <main class="research descent">
     <SkyWash />
@@ -189,6 +190,23 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
       #dcd5cf 100%
     );
   }
+  /* Dark theme: /research is a reading page, so it keeps a gentle, EVEN dark
+     field (not the homepage's deep void) — cool charcoal top to bottom so the
+     light ink ramp holds contrast the whole way down, same intent as the light
+     override above (never dark enough to lose text, never bright enough to
+     glare). */
+  :global(html[data-theme='dark']) .research.descent {
+    background: linear-gradient(168deg, #14171b 0%, #131619 48%, #111417 100%);
+  }
+  /* the hairline rules use warm-grey rgba literals tuned for paper; lift them
+     to a cool light-on-dark hairline under the dark theme */
+  :global(html[data-theme='dark']) .section-label--major,
+  :global(html[data-theme='dark']) .more,
+  :global(html[data-theme='dark']) .interest,
+  :global(html[data-theme='dark']) .entry,
+  :global(html[data-theme='dark']) .math-foot,
+  :global(html[data-theme='dark']) .metrics thead th,
+  :global(html[data-theme='dark']) .metrics tbody tr { border-color: rgba(184,177,161,0.16); }
 
   /* left TOC rail — mirrors /art and the homepage Toc */
   .research-toc { position: fixed; left: clamp(18px, 2.4vw, 38px); top: 50%; transform: translateY(-50%); z-index: 30; }

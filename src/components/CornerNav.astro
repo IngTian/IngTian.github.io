@@ -16,6 +16,14 @@
 // theme toggle drops in as one more item with no restructuring.
 import { links } from '../data/profile';
 
+interface Props {
+  /** 'scroll' = flip text color by the descent fraction behind the nav (home,
+   *  /art). 'light' = pin to dark text (pages that stay pale in light theme,
+   *  e.g. /research). Only affects the LIGHT theme; dark is always light text. */
+  navZone?: 'scroll' | 'light';
+}
+const { navZone = 'scroll' } = Astro.props;
+
 // Resolve hrefs from the profile links by label — keeps URLs in one place.
 const href = (label: string) => links.find((l) => l.label === label)?.href ?? '#';
 
@@ -43,7 +51,7 @@ const items: Item[] = [
   },
 ];
 ---
-<nav class="cnav" aria-label="Contact and profiles" data-cnav>
+<nav class="cnav" aria-label="Contact and profiles" data-cnav data-nav-mode={navZone}>
   <ul>
     {items.map((it) => (
       <li>
@@ -61,6 +69,28 @@ const items: Item[] = [
         </a>
       </li>
     ))}
+    <li class="sep" aria-hidden="true"></li>
+    <li>
+      {/* Theme toggle. A real <button> (not a link) so it's keyboard-operable
+          and announced correctly. Shows the moon (→ go dark) in light theme and
+          the sun (→ go light) in dark theme; CSS swaps which glyph is visible
+          off the <html data-theme>. Label + pressed state kept in sync by the
+          inline script below. */}
+      <button type="button" class="toggle" data-theme-toggle aria-label="Switch to dark theme" aria-pressed="false">
+        <span class="pill" aria-hidden="true"></span>
+        <span class="content">
+          <svg class="ic ic-moon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+            <path fill="currentColor" d="M6.2 1.6a6.4 6.4 0 1 0 8.2 8.2A5 5 0 0 1 6.2 1.6Z"/>
+          </svg>
+          <svg class="ic ic-sun" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+            <circle cx="8" cy="8" r="3.1" fill="currentColor"/>
+            <g stroke="currentColor" stroke-width="1.3" stroke-linecap="round">
+              <path d="M8 .9v2.0M8 13.1v2.0M.9 8h2.0M13.1 8h2.0M2.9 2.9l1.4 1.4M11.7 11.7l1.4 1.4M13.1 2.9l-1.4 1.4M4.3 11.7l-1.4 1.4"/>
+            </g>
+          </svg>
+        </span>
+      </button>
+    </li>
   </ul>
 </nav>
 
@@ -98,9 +128,22 @@ const items: Item[] = [
     box-shadow: 0 2px 14px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
+  /* Dark THEME: the whole page is a dark void top-to-bottom, so the light-zone
+     (top-of-page) paper frost would be a bright blob. Force dark glass for BOTH
+     zones; text is already light via the flipped tokens. */
+  :global(html[data-theme='dark']) .cnav ul {
+    background: rgba(12, 12, 16, 0.5);
+    border: 1px solid rgba(184, 177, 161, 0.18);
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  /* the light text should stay light in the top zone under the dark theme */
+  :global(html[data-theme='dark']) .cnav a,
+  :global(html[data-theme='dark']) .cnav .toggle { color: var(--ink-1); }
+
   .cnav li { display: flex; }
 
-  .cnav a {
+  /* links AND the theme-toggle button share one capsule-item base */
+  .cnav a, .cnav .toggle {
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -115,16 +158,26 @@ const items: Item[] = [
     transition: color 0.35s ease;
     isolation: isolate;          /* keep the bloom pill under .content */
   }
-  .cnav[data-zone="dark"] a { color: var(--paper); }
+  .cnav .toggle { background: none; border: 0; cursor: pointer; -webkit-appearance: none; appearance: none; padding: 9px 12px; }
+  .cnav[data-zone="dark"] a, .cnav[data-zone="dark"] .toggle { color: var(--paper); }
+
+  /* thin separator before the toggle — sets the utility control apart */
+  .cnav .sep { width: 1px; align-self: stretch; margin: 4px 3px; background: currentColor; opacity: 0.18; }
 
   /* content sits above the bloom pill */
   .cnav .content { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; }
   .cnav .ic { flex: none; display: block; }
 
-  /* ── The bloom pill — an ochre capsule that grows in behind the item on
-     hover/focus, inverting the text to dark ink. Ochre is the site's one
-     interaction accent, so this reads as an evolution of the old "text turns
-     ochre" hover, not a new color. transform/opacity only. ── */
+  /* sun/moon swap: show the glyph for the ACTION (moon = go dark in light
+     theme; sun = go light in dark theme). Default (light) shows moon. */
+  .cnav .toggle .ic-sun { display: none; }
+  :global(html[data-theme='dark']) .cnav .toggle .ic-moon { display: none; }
+  :global(html[data-theme='dark']) .cnav .toggle .ic-sun { display: block; }
+
+  /* ── The bloom pill — an accent capsule that grows in behind the item on
+     hover/focus, inverting the text to dark ink. The accent (ochre light /
+     phosphor-green dark) is the site's one interaction accent, so this reads
+     as an evolution of the old "text turns accent" hover. transform/opacity. ── */
   .cnav .pill {
     position: absolute;
     inset: 0;
@@ -138,13 +191,16 @@ const items: Item[] = [
   }
 
   @media (hover: hover) {
-    .cnav a:hover .pill { opacity: 1; transform: scale(1); }
-    .cnav a:hover { color: var(--ink-1); }              /* dark ink reads on ochre */
-    .cnav[data-zone="dark"] a:hover { color: var(--ink-1); }
-    .cnav a:hover .content { animation: cnav-nudge 0.32s ease; }
+    .cnav a:hover .pill, .cnav .toggle:hover .pill { opacity: 1; transform: scale(1); }
+    .cnav a:hover, .cnav .toggle:hover { color: var(--on-accent); }   /* dark ink reads on the accent */
+    .cnav[data-zone="dark"] a:hover, .cnav[data-zone="dark"] .toggle:hover { color: var(--on-accent); }
+    .cnav a:hover .content, .cnav .toggle:hover .content { animation: cnav-nudge 0.32s ease; }
   }
-  .cnav a:focus-visible { outline: none; color: var(--ink-1); }
-  .cnav a:focus-visible .pill { opacity: 1; transform: scale(1); box-shadow: 0 0 0 2px rgba(200, 163, 106, 0.45); }
+  .cnav a:focus-visible, .cnav .toggle:focus-visible { outline: none; color: var(--on-accent); }
+  .cnav a:focus-visible .pill, .cnav .toggle:focus-visible .pill {
+    opacity: 1; transform: scale(1);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--ochre) 55%, transparent);
+  }
 
   @keyframes cnav-nudge {
     0% { transform: translateY(0); }
@@ -156,7 +212,7 @@ const items: Item[] = [
   @media (max-width: 640px) {
     .cnav { top: 12px; right: 14px; }
     .cnav ul { padding: 3px; }
-    .cnav a { padding: 9px 10px; }
+    .cnav a, .cnav .toggle { padding: 9px 10px; }
     .cnav .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     .cnav .content { gap: 0; }
   }
@@ -164,13 +220,16 @@ const items: Item[] = [
   /* Reduced motion: no bloom scale / nudge — the pill still appears (instant)
      so the hover affordance survives, but nothing animates. */
   @media (prefers-reduced-motion: reduce) {
-    .cnav ul, .cnav a, .cnav .pill { transition: none; }
-    .cnav a:hover .content, .cnav a:focus-visible .content { animation: none; }
+    .cnav ul, .cnav a, .cnav .toggle, .cnav .pill { transition: none; }
+    .cnav a:hover .content, .cnav a:focus-visible .content,
+    .cnav .toggle:hover .content, .cnav .toggle:focus-visible .content { animation: none; }
     .cnav .pill { transform: scale(1); }   /* no scale-in; just fade via opacity */
   }
 </style>
 
 <script>
+  import { prefersReducedMotion } from '../lib/motion';
+
   // Zone the nav by the gradient fraction painted directly behind it. The
   // .descent gradient spans the full content height, so the sky color at the
   // nav's fixed top position maps to (scrollY + probe) / descentHeight — the
@@ -196,31 +255,85 @@ const items: Item[] = [
     const nav = document.querySelector<HTMLElement>('[data-cnav]');
     if (!nav || !('requestAnimationFrame' in window)) return;
     const descent = document.querySelector<HTMLElement>('.descent');
-    if (!descent) return;
 
-    // document-y behind the nav's vertical center (fixed near the top edge)
-    const probe = () => (nav.getBoundingClientRect().top + nav.getBoundingClientRect().bottom) / 2;
+    // Zone = which LIGHT-theme text color the nav uses. Two modes:
+    //  - 'light': pinned dark text (pages that stay pale — /research). Set once.
+    //  - 'scroll': flip dark→paper by the descent fraction behind the nav (home,
+    //    /art, which ride the full dawn→night gradient). Needs a .descent el.
+    // (Dark theme forces light text via CSS regardless of this attribute.)
+    const mode = nav.dataset.navMode === 'light' ? 'light' : 'scroll';
 
-    function update() {
-      const h = descent.offsetHeight;
-      if (!h) return;
-      const frac = (window.scrollY + probe()) / h;
-      nav.dataset.zone = frac > DARK_FROM ? 'dark' : 'light';
+    let onScroll: (() => void) | null = null;
+    if (mode === 'light' || !descent) {
+      nav.dataset.zone = 'light';
+    } else {
+      // document-y behind the nav's vertical center (fixed near the top edge)
+      const probe = () => (nav.getBoundingClientRect().top + nav.getBoundingClientRect().bottom) / 2;
+      const update = () => {
+        const h = descent.offsetHeight;
+        if (!h) return;
+        const frac = (window.scrollY + probe()) / h;
+        nav.dataset.zone = frac > DARK_FROM ? 'dark' : 'light';
+      };
+      let ticking = false;
+      onScroll = () => {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(() => { update(); ticking = false; });
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll, { passive: true });
+      update();
     }
 
-    let ticking = false;
-    function onScroll() {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => { update(); ticking = false; });
+    // ── Theme toggle ──────────────────────────────────────────────────────
+    // Flip data-theme on <html>, persist the explicit choice, and keep the
+    // button's a11y state in sync. The terrain canvas reads its palette from
+    // data-theme once per init, so re-fire astro:page-load to make it (and any
+    // other page-load-driven vanilla script) repaint for the new theme.
+    const toggle = nav.querySelector<HTMLButtonElement>('[data-theme-toggle]');
+    function syncToggle() {
+      const dark = document.documentElement.dataset.theme === 'dark';
+      if (!toggle) return;
+      toggle.setAttribute('aria-pressed', String(dark));
+      toggle.setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme');
     }
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll, { passive: true });
-    update();
+    syncToggle();
+
+    // The actual flip: swap the attribute, persist, sync a11y, and repaint the
+    // canvas-based / page-load-driven pieces (terrain) for the new palette.
+    function flipTheme() {
+      const dark = document.documentElement.dataset.theme === 'dark';
+      if (dark) { delete document.documentElement.dataset.theme; }
+      else { document.documentElement.dataset.theme = 'dark'; }
+      try { localStorage.setItem('theme', dark ? 'light' : 'dark'); } catch (e) {}
+      syncToggle();
+      document.dispatchEvent(new Event('astro:page-load'));
+    }
+
+    function onToggle() {
+      // Animate the change as a full-page crossfade via the View Transitions
+      // API — the whole site (gradient, text, canvas) dissolves from one theme
+      // to the other. Falls back to an instant flip where the API is missing
+      // (Firefox) or the user prefers reduced motion. The ::view-transition
+      // fade timing is themed in global.css and gated on reduced-motion there.
+      const startVT = (document as any).startViewTransition?.bind(document);
+      if (startVT && !prefersReducedMotion()) {
+        document.documentElement.classList.add('theme-vt');
+        const t = startVT(flipTheme);
+        t.finished.finally(() => document.documentElement.classList.remove('theme-vt'));
+      } else {
+        flipTheme();
+      }
+    }
+    toggle?.addEventListener('click', onToggle);
 
     teardown = () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
+      if (onScroll) {
+        window.removeEventListener('scroll', onScroll);
+        window.removeEventListener('resize', onScroll);
+      }
+      toggle?.removeEventListener('click', onToggle);
     };
   }
 
