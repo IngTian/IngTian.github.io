@@ -176,28 +176,11 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
 <style>
   .research { position: relative; z-index: 0; min-height: 100vh; }
 
-  /* /research is a READING page, so it stays in the luminous range top-to-bottom
-     — the full descent (which sinks to near-black) made ink text unreadable in
-     the lower half. This keeps the warm→cool drift (still "the descent") but
-     never dark enough to lose contrast: ink-3 holds ≥5:1 all the way down. */
-  .research.descent {
-    background: linear-gradient(
-      168deg,
-      #f4efe4 0%,
-      #f1ebe0 24%,
-      #efe6d4 48%,
-      #e7ddce 74%,
-      #dcd5cf 100%
-    );
-  }
-  /* Dark theme: /research is a reading page, so it keeps a gentle, EVEN dark
-     field (not the homepage's deep void) — cool charcoal top to bottom so the
-     light ink ramp holds contrast the whole way down, same intent as the light
-     override above (never dark enough to lose text, never bright enough to
-     glare). */
-  :global(html[data-theme='dark']) .research.descent {
-    background: linear-gradient(168deg, #14171b 0%, #131619 48%, #111417 100%);
-  }
+  /* /research is a READING page — it holds the luminous range top-to-bottom
+     (never sinking to near-black) so ink text stays legible all the way down.
+     The gradient (light + dark twin) is the shared --reading-grad token in
+     tokens.css, so /research and /projects can't drift apart again. */
+  .research.descent { background: var(--reading-grad); }
   /* (Hairlines now use var(--hairline-rgb), which flips per theme in tokens.css
      — no hand-maintained dark-theme border override needed here anymore.) */
 

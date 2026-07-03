@@ -33,16 +33,11 @@ import { projects } from '../data/profile';
 <style>
   .projects { position: relative; z-index: 0; min-height: 100vh; }
 
-  /* Like /research, this is a READING page — hold the luminous range top to
-     bottom so text stays legible (the full descent sinks to near-black). Same
-     warm→cool drift, never dark enough to lose contrast. */
-  .projects.descent {
-    background: linear-gradient(168deg, #f4efe4 0%, #f1ebe0 30%, #efe6d4 62%, #e7ddce 100%);
-  }
-  /* Dark theme: an even cool charcoal, matching /research's reading-page dark. */
-  :global(html[data-theme='dark']) .projects.descent {
-    background: linear-gradient(168deg, #14171b 0%, #131619 55%, #111417 100%);
-  }
+  /* Like /research, this is a READING page — it uses the shared --reading-grad
+     token (tokens.css), which holds the luminous range top-to-bottom (light)
+     and an even charcoal (dark) so text stays legible. Shared with /research so
+     the two reading pages stay identical instead of drifting. */
+  .projects.descent { background: var(--reading-grad); }
 
   /* Centered reading column (no TOC rail — the list is short). */
   .projects-block {

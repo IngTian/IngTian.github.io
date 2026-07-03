@@ -22,6 +22,8 @@ interface Props {
    * for the light theme.
    */
   navZone?: 'scroll' | 'light';
+  /** Set on non-content routes (404): emit robots=noindex and skip canonical. */
+  noindex?: boolean;
 }
 
 const {
@@ -30,13 +32,14 @@ const {
   veilLine = 'a researcher by day',
   veilOnLoad = false,
   navZone = 'scroll',
+  noindex = false,
 } = Astro.props;
 
 // Per-page canonical + og:url. Astro.site is 'https://ingtian.github.io';
 // resolve the current path against it so each route advertises its OWN URL
 // (previously every page hardcoded the homepage — wrong for /research, /art,
 // /projects social shares + canonicalization). new URL(...).href normalizes
-// the trailing slash for us.
+// the trailing slash for us. The 404 route skips canonical (it's noindex).
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 
 // JSON-LD Person — the one structured-data type a personal portfolio benefits
@@ -101,7 +104,7 @@ const personLd = {
     <link rel="manifest" href="/site.webmanifest" />
 
     <meta name="description" content={description} />
-    <link rel="canonical" href={canonical} />
+    {noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
