@@ -16,6 +16,14 @@
 // theme toggle drops in as one more item with no restructuring.
 import { links } from '../data/profile';
 
+interface Props {
+  /** 'scroll' = flip text color by the descent fraction behind the nav (home,
+   *  /art). 'light' = pin to dark text (pages that stay pale in light theme,
+   *  e.g. /research). Only affects the LIGHT theme; dark is always light text. */
+  navZone?: 'scroll' | 'light';
+}
+const { navZone = 'scroll' } = Astro.props;
+
 // Resolve hrefs from the profile links by label — keeps URLs in one place.
 const href = (label: string) => links.find((l) => l.label === label)?.href ?? '#';
 
@@ -43,7 +51,7 @@ const items: Item[] = [
   },
 ];
 ---
-<nav class="cnav" aria-label="Contact and profiles" data-cnav>
+<nav class="cnav" aria-label="Contact and profiles" data-cnav data-nav-mode={navZone}>
   <ul>
     {items.map((it) => (
       <li>
@@ -220,6 +228,8 @@ const items: Item[] = [
 </style>
 
 <script>
+  import { prefersReducedMotion } from '../lib/motion';
+
   // Zone the nav by the gradient fraction painted directly behind it. The
   // .descent gradient spans the full content height, so the sky color at the
   // nav's fixed top position maps to (scrollY + probe) / descentHeight — the
@@ -245,27 +255,36 @@ const items: Item[] = [
     const nav = document.querySelector<HTMLElement>('[data-cnav]');
     if (!nav || !('requestAnimationFrame' in window)) return;
     const descent = document.querySelector<HTMLElement>('.descent');
-    if (!descent) return;
 
-    // document-y behind the nav's vertical center (fixed near the top edge)
-    const probe = () => (nav.getBoundingClientRect().top + nav.getBoundingClientRect().bottom) / 2;
+    // Zone = which LIGHT-theme text color the nav uses. Two modes:
+    //  - 'light': pinned dark text (pages that stay pale — /research). Set once.
+    //  - 'scroll': flip dark→paper by the descent fraction behind the nav (home,
+    //    /art, which ride the full dawn→night gradient). Needs a .descent el.
+    // (Dark theme forces light text via CSS regardless of this attribute.)
+    const mode = nav.dataset.navMode === 'light' ? 'light' : 'scroll';
 
-    function update() {
-      const h = descent.offsetHeight;
-      if (!h) return;
-      const frac = (window.scrollY + probe()) / h;
-      nav.dataset.zone = frac > DARK_FROM ? 'dark' : 'light';
+    let onScroll: (() => void) | null = null;
+    if (mode === 'light' || !descent) {
+      nav.dataset.zone = 'light';
+    } else {
+      // document-y behind the nav's vertical center (fixed near the top edge)
+      const probe = () => (nav.getBoundingClientRect().top + nav.getBoundingClientRect().bottom) / 2;
+      const update = () => {
+        const h = descent.offsetHeight;
+        if (!h) return;
+        const frac = (window.scrollY + probe()) / h;
+        nav.dataset.zone = frac > DARK_FROM ? 'dark' : 'light';
+      };
+      let ticking = false;
+      onScroll = () => {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(() => { update(); ticking = false; });
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll, { passive: true });
+      update();
     }
-
-    let ticking = false;
-    function onScroll() {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => { update(); ticking = false; });
-    }
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll, { passive: true });
-    update();
 
     // ── Theme toggle ──────────────────────────────────────────────────────
     // Flip data-theme on <html>, persist the explicit choice, and keep the
@@ -280,20 +299,40 @@ const items: Item[] = [
       toggle.setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme');
     }
     syncToggle();
-    function onToggle() {
+
+    // The actual flip: swap the attribute, persist, sync a11y, and repaint the
+    // canvas-based / page-load-driven pieces (terrain) for the new palette.
+    function flipTheme() {
       const dark = document.documentElement.dataset.theme === 'dark';
       if (dark) { delete document.documentElement.dataset.theme; }
       else { document.documentElement.dataset.theme = 'dark'; }
       try { localStorage.setItem('theme', dark ? 'light' : 'dark'); } catch (e) {}
       syncToggle();
-      // repaint canvas-based / page-load-driven pieces for the new palette
       document.dispatchEvent(new Event('astro:page-load'));
+    }
+
+    function onToggle() {
+      // Animate the change as a full-page crossfade via the View Transitions
+      // API — the whole site (gradient, text, canvas) dissolves from one theme
+      // to the other. Falls back to an instant flip where the API is missing
+      // (Firefox) or the user prefers reduced motion. The ::view-transition
+      // fade timing is themed in global.css and gated on reduced-motion there.
+      const startVT = (document as any).startViewTransition?.bind(document);
+      if (startVT && !prefersReducedMotion()) {
+        document.documentElement.classList.add('theme-vt');
+        const t = startVT(flipTheme);
+        t.finished.finally(() => document.documentElement.classList.remove('theme-vt'));
+      } else {
+        flipTheme();
+      }
     }
     toggle?.addEventListener('click', onToggle);
 
     teardown = () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
+      if (onScroll) {
+        window.removeEventListener('scroll', onScroll);
+        window.removeEventListener('resize', onScroll);
+      }
       toggle?.removeEventListener('click', onToggle);
     };
   }

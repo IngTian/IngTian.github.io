@@ -100,6 +100,24 @@ html[data-theme='dark'] .descent::after {
 .terminal-chrome { background: linear-gradient(180deg, rgba(40,36,30,0.7), rgba(20,18,15,0.92)); }
 html[data-theme='dark'] .terminal-chrome { background: linear-gradient(180deg, rgba(24,28,30,0.78), rgba(10,12,13,0.95)); }
 
+/* ── Theme-toggle crossfade (View Transitions API). The toggle wraps the
+   attribute flip in document.startViewTransition() and adds .theme-vt to <html>
+   for the duration, so ONLY the theme change animates as a full-page dissolve —
+   page navigations (also VT-driven, via ClientRouter) keep their own veil.
+   Old theme fades out over the new: a soft ~0.5s crossfade of the whole site
+   (gradient, text, canvas snapshot). Opacity only. ── */
+@media (prefers-reduced-motion: no-preference) {
+  html.theme-vt::view-transition-old(root),
+  html.theme-vt::view-transition-new(root) {
+    animation-duration: 0.5s;
+    animation-timing-function: ease;
+  }
+  html.theme-vt::view-transition-old(root) { animation-name: theme-fade-out; }
+  html.theme-vt::view-transition-new(root) { animation-name: theme-fade-in; }
+  @keyframes theme-fade-out { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes theme-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+}
+
 /* slow drift — transform/opacity only, never blur. The static state above is
    the finished composition (also the Firefox / reduced-motion fallback). */
 @media (prefers-reduced-motion: no-preference) {

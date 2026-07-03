@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import { Font } from 'astro:assets';
 import { ClientRouter } from 'astro:transitions';
+import CornerNav from '../components/CornerNav.astro';
 
 interface Props {
   title?: string;
@@ -10,6 +11,16 @@ interface Props {
   veilLine?: string;
   /** Play the veil on a FRESH load of this page? (Transitions always play it.) */
   veilOnLoad?: boolean;
+  /**
+   * How the corner nav picks its (light-theme) text color:
+   *  - 'scroll' (default): flip dark→paper by the descent fraction behind it
+   *    (home & /art ride the full dawn→night gradient).
+   *  - 'light': pin to dark text — for pages that stay pale top-to-bottom in
+   *    light theme (/research is a reading page and never sinks to dark).
+   * In DARK theme the text is always light regardless, so this only matters
+   * for the light theme.
+   */
+  navZone?: 'scroll' | 'light';
 }
 
 const {
@@ -17,6 +28,7 @@ const {
   description = 'Ing Tian (Zeying Tian) — quant researcher in portfolio optimization and incoming Operations Research PhD at the University of Toronto. Also a full-stack software and ML engineer. Toronto.',
   veilLine = 'a researcher by day',
   veilOnLoad = false,
+  navZone = 'scroll',
 } = Astro.props;
 ---
 
@@ -29,16 +41,27 @@ const {
     {/* Theme init — runs synchronously BEFORE first paint so there's no flash of
         the wrong theme. Resolves: explicit saved choice (localStorage) first,
         else the visitor's OS preference (prefers-color-scheme). Only 'dark' sets
-        the attribute; light is the default (no attribute). The toggle in the
-        corner nav writes localStorage and flips this attribute live. */}
+        the attribute; light is the default (no attribute).
+
+        Also re-applies on astro:after-swap: View Transitions replace <html> with
+        the incoming page's markup (which has NO data-theme — it's runtime-set),
+        so without this the theme would reset to light on every navigation. The
+        listener fires before the new page paints, so there's no flash. The
+        toggle in the corner nav writes localStorage and flips the attribute
+        live; this keeps it stuck across page changes. */}
     <script is:inline>
       (function () {
-        try {
-          var saved = localStorage.getItem('theme'); // 'dark' | 'light' | null
-          var dark = saved ? saved === 'dark'
-                           : matchMedia('(prefers-color-scheme: dark)').matches;
-          if (dark) document.documentElement.dataset.theme = 'dark';
-        } catch (e) {}
+        function applyTheme() {
+          try {
+            var saved = localStorage.getItem('theme'); // 'dark' | 'light' | null
+            var dark = saved ? saved === 'dark'
+                             : matchMedia('(prefers-color-scheme: dark)').matches;
+            if (dark) document.documentElement.dataset.theme = 'dark';
+            else document.documentElement.removeAttribute('data-theme');
+          } catch (e) {}
+        }
+        applyTheme();
+        document.addEventListener('astro:after-swap', applyTheme);
       })();
     </script>
     <meta name="generator" content={Astro.generator} />
@@ -71,6 +94,11 @@ const {
   </head>
   <body>
     <slot />
+    {/* Persistent top-right nav + theme toggle — global (all pages), so contact
+        actions and the light/dark switch are always reachable. Rendered here
+        (not per-page) means it survives View Transitions as part of the shell.
+        navZone tells it how to pick light-theme text color per page. */}
+    <CornerNav navZone={navZone} />
     {/* "The Descent" loader: a night veil covering the page wipes DOWNWARD off
         the bottom to reveal it. It plays on every home<->/art navigation, and on
         a fresh load only when this page opts in (veilOnLoad) — so entering the
