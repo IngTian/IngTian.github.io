@@ -2,6 +2,12 @@
 import { links } from '../data/profile';
 import SealMark from '../components/SealMark.astro';
 
+// The persistent top-right CornerNav now carries the social/contact actions
+// (GitHub · Email · CV · LinkedIn) from the first paint, so the pure social
+// links (GitHub, LinkedIn) no longer need to reappear at the foot (issue #21).
+// The footer keeps the CV closing CTA, wayfinding (Research / Art), and Email.
+const footerLinks = links.filter((l) => l.label !== 'GitHub' && l.label !== 'LinkedIn');
+
 // Auto-derived at build time so the copyright year never goes stale. Legal
 // name (matches the README license note); the seal/hero carry "Ing Tian".
 // "All rights reserved" is intentionally omitted — legally meaningless.
@@ -9,7 +15,7 @@ const year = new Date().getFullYear();
 ---
 <section id="signature" class="relative px-[7vw] py-14 text-paper flex justify-between items-end flex-wrap gap-7">
   <nav class="flex gap-3 flex-wrap">
-    {links.map((l) => (
+    {footerLinks.map((l) => (
       <a href={l.href}
          class:list={[
            'text-[12.5px] px-4 py-2 rounded-full no-underline transition-colors border',
