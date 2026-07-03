@@ -14,7 +14,7 @@ const footerLinks = links.filter((l) => l.label !== 'GitHub' && l.label !== 'Lin
 const year = new Date().getFullYear();
 ---
 <section id="signature" class="relative px-[7vw] py-14 text-paper flex justify-between items-end flex-wrap gap-7">
-  <nav class="flex gap-3 flex-wrap">
+  <nav class="flex gap-3 flex-wrap" aria-label="Links and downloads">
     {footerLinks.map((l) => (
       <a href={l.href}
          class:list={[

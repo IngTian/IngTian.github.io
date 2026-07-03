@@ -164,7 +164,14 @@ function openLB(src: string, alt: string) {
 }
 function closeLB() { lb?.close(); }
 document.querySelectorAll<HTMLElement>('[data-zoom]').forEach((el) => {
-  el.addEventListener('click', () => openLB(el.dataset.zoom || '', el.dataset.alt || ''));
+  const open = () => openLB(el.dataset.zoom || '', el.dataset.alt || '');
+  el.addEventListener('click', open);
+  // keyboard: the figures are role="button" tabindex="0", so Enter/Space must
+  // open the lightbox too (mouse-only was an a11y gap). Native <dialog>
+  // showModal() handles Esc-to-close and focus trap/return for free.
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+  });
 });
 document.getElementById('lb-close')?.addEventListener('click', closeLB);
 lb?.addEventListener('click', (e) => { if (e.target === lb) closeLB(); });

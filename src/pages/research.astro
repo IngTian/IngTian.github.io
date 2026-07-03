@@ -176,37 +176,13 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
 <style>
   .research { position: relative; z-index: 0; min-height: 100vh; }
 
-  /* /research is a READING page, so it stays in the luminous range top-to-bottom
-     — the full descent (which sinks to near-black) made ink text unreadable in
-     the lower half. This keeps the warm→cool drift (still "the descent") but
-     never dark enough to lose contrast: ink-3 holds ≥5:1 all the way down. */
-  .research.descent {
-    background: linear-gradient(
-      168deg,
-      #f4efe4 0%,
-      #f1ebe0 24%,
-      #efe6d4 48%,
-      #e7ddce 74%,
-      #dcd5cf 100%
-    );
-  }
-  /* Dark theme: /research is a reading page, so it keeps a gentle, EVEN dark
-     field (not the homepage's deep void) — cool charcoal top to bottom so the
-     light ink ramp holds contrast the whole way down, same intent as the light
-     override above (never dark enough to lose text, never bright enough to
-     glare). */
-  :global(html[data-theme='dark']) .research.descent {
-    background: linear-gradient(168deg, #14171b 0%, #131619 48%, #111417 100%);
-  }
-  /* the hairline rules use warm-grey rgba literals tuned for paper; lift them
-     to a cool light-on-dark hairline under the dark theme */
-  :global(html[data-theme='dark']) .section-label--major,
-  :global(html[data-theme='dark']) .more,
-  :global(html[data-theme='dark']) .interest,
-  :global(html[data-theme='dark']) .entry,
-  :global(html[data-theme='dark']) .math-foot,
-  :global(html[data-theme='dark']) .metrics thead th,
-  :global(html[data-theme='dark']) .metrics tbody tr { border-color: rgba(184,177,161,0.16); }
+  /* /research is a READING page — it holds the luminous range top-to-bottom
+     (never sinking to near-black) so ink text stays legible all the way down.
+     The gradient (light + dark twin) is the shared --reading-grad token in
+     tokens.css, so /research and /projects can't drift apart again. */
+  .research.descent { background: var(--reading-grad); }
+  /* (Hairlines now use var(--hairline-rgb), which flips per theme in tokens.css
+     — no hand-maintained dark-theme border override needed here anymore.) */
 
   /* left TOC rail — mirrors /art and the homepage Toc */
   .research-toc { position: fixed; left: clamp(18px, 2.4vw, 38px); top: 50%; transform: translateY(-50%); z-index: 30; }
@@ -239,13 +215,13 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
   /* section labels (mono eyebrows) — quiet wayfinding between blocks */
   .section-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em;
     text-transform: uppercase; color: var(--ink-4); scroll-margin-top: 12vh; }
-  .section-label--major { margin-top: 9vh; padding-top: 4vh; border-top: 1px solid rgba(90,84,74,0.22); }
+  .section-label--major { margin-top: 9vh; padding-top: 4vh; border-top: 1px solid rgba(var(--hairline-rgb), 0.22); }
 
   /* research interests — themed list, each a label + one-line gloss */
   .interests { margin-top: 4vh; scroll-margin-top: 12vh; }
   .interest-list { list-style: none; margin: 3vh 0 0; padding: 0;
     display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 48px; max-width: 940px; }
-  .interest { border-top: 1px solid rgba(90,84,74,0.2); padding-top: 14px; }
+  .interest { border-top: 1px solid rgba(var(--hairline-rgb), 0.2); padding-top: 14px; }
   .interest-label { display: block; font-family: var(--font-display); font-weight: 500; font-size: 18px;
     color: var(--ink-1); line-height: 1.25; font-variation-settings: 'SOFT' 40; }
   .interest-gloss { display: block; font-size: 13.5px; line-height: 1.6; color: var(--ink-3); margin-top: 8px; }
@@ -284,7 +260,7 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
   .eq-math :global(math) { font-size: 1.18em; }            /* as prominent as the prose */
   .eq figcaption { font-size: 13px; line-height: 1.6; color: var(--ink-3); margin-top: 12px; }
   .math-foot { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em; color: var(--ink-4);
-    margin-top: 6px; padding-top: 16px; border-top: 1px solid rgba(90,84,74,0.18); }
+    margin-top: 6px; padding-top: 16px; border-top: 1px solid rgba(var(--hairline-rgb), 0.18); }
 
   /* results: stat strip + full table (right column) */
   .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 18px; margin: 2vh 0 4vh; }
@@ -295,10 +271,10 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
   .metrics table { width: 100%; border-collapse: collapse; }
   .metrics th, .metrics td { text-align: right; padding: 8px 8px; font-family: var(--font-mono); font-size: 11.5px; }
   .metrics thead th { color: var(--ink-4); font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase;
-    font-size: 9.5px; border-bottom: 1px solid rgba(90,84,74,0.3); }
+    font-size: 9.5px; border-bottom: 1px solid rgba(var(--hairline-rgb), 0.3); }
   .metrics .m-name { text-align: left; color: var(--ink-3); font-weight: 400; }
   .metrics tbody th.m-name { color: var(--ink-2); }
-  .metrics tbody tr { border-bottom: 1px solid rgba(90,84,74,0.12); }
+  .metrics tbody tr { border-bottom: 1px solid rgba(var(--hairline-rgb), 0.12); }
   .metrics td { color: var(--ink-2); font-variant-numeric: tabular-nums; }
   .metrics td.m-lead { color: var(--ink-1); font-weight: 500; } /* RL-BHRP column, foregrounded */
   .metrics tr.hl td.m-lead { color: var(--seal); }              /* headline metrics in the seal accent */
@@ -309,9 +285,9 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
     color: var(--ink-1); border: 1px solid var(--ink-4); border-radius: 999px; padding: 8px 16px; transition: border-color 0.3s, color 0.3s; }
   .paper-link:hover { border-color: var(--seal); color: var(--seal); }
 
-  .more { margin-top: 8vh; border-top: 1px solid rgba(90, 84, 74, 0.25); padding-top: 4vh; scroll-margin-top: 12vh; }
+  .more { margin-top: 8vh; border-top: 1px solid rgba(var(--hairline-rgb), 0.25); padding-top: 4vh; scroll-margin-top: 12vh; }
   .more-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink-4); margin-bottom: 2vh; }
-  .entry { display: block; padding: 18px 0; border-top: 1px solid rgba(90, 84, 74, 0.16); text-decoration: none; max-width: 620px; }
+  .entry { display: block; padding: 18px 0; border-top: 1px solid rgba(var(--hairline-rgb), 0.16); text-decoration: none; max-width: 620px; }
   .entry:first-of-type { border-top: 0; }
   .entry-meta { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; color: var(--ink-4); }
   .entry-title { font-size: 15px; font-weight: 500; color: var(--ink-1); margin-top: 8px; line-height: 1.4; }

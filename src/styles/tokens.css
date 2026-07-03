@@ -19,6 +19,13 @@
   --bg: #16140f;
   --on-accent: #16140f;
 
+  /* Hairline rules (section dividers, table borders) as an R,G,B triple so each
+     use sets its own alpha: `border: 1px solid rgba(var(--hairline-rgb), .2)`.
+     Light = ink-3 (#5a544a = 90,84,74), the warm-grey the reading pages used as
+     raw literals. Redefined per theme (dark below) so hairlines re-theme with
+     the palette instead of needing a hand-maintained :global override list. */
+  --hairline-rgb: 90, 84, 74;
+
   /* The Descent gradient, tokenized so the dark theme can redefine it wholesale. */
   --descent-grad: linear-gradient(
     180deg,
@@ -34,6 +41,20 @@
     #2a2720 78%,
     #1d1b16 90%,
     #16140f 100%           /* ground: near-black ink */
+  );
+
+  /* Reading-page gradient — /research and /projects are READING pages, so they
+     hold the luminous range top-to-bottom (never sinking to the near-black
+     ground) so ink text stays legible the whole way down. Tokenized here (was
+     duplicated + DRIFTED per page: research 5-stop→#dcd5cf vs projects
+     4-stop→#e7ddce). Canonical = research's warm→cool 5-stop. Dark twin below. */
+  --reading-grad: linear-gradient(
+    168deg,
+    #f4efe4 0%,
+    #f1ebe0 24%,
+    #efe6d4 48%,
+    #e7ddce 74%,
+    #dcd5cf 100%
   );
 
   /* fonts (families resolved via astro:fonts) */
@@ -64,6 +85,7 @@ html[data-theme='dark'] {
 
   --bg: #08090b;
   --on-accent: #0b1410;  /* deep green-black for text on the phosphor accent */
+  --hairline-rgb: 184, 177, 161;  /* cool light hairline on the dark ground (was the :global override literal) */
 
   --descent-grad: linear-gradient(
     180deg,
@@ -74,4 +96,10 @@ html[data-theme='dark'] {
     #0b0d0f 80%,
     #08090b 100%
   );
+
+  /* Reading-page dark twin — a gentle EVEN charcoal (not the deep void) so the
+     light ink ramp holds contrast top-to-bottom (matches research's prior dark
+     override; /projects had the identical value, so this is byte-identical for
+     both in dark). */
+  --reading-grad: linear-gradient(168deg, #14171b 0%, #131619 48%, #111417 100%);
 }
