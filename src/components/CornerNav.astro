@@ -1,0 +1,189 @@
+---
+// Persistent top-right utility nav — surfaces the "reach me" actions
+// (GitHub · Email · CV · LinkedIn) from the very first paint, so a visitor
+// never has to scroll to the foot of the page to make contact (issue #21).
+//
+// Mirrors the Toc pattern: plain Astro + a bundled vanilla <script> (NOT a
+// React island), re-inits on astro:page-load with a teardown, and adapts its
+// color to the sky beneath it. Where the Toc sits at the viewport MIDDLE and
+// flips per-section, this nav is pinned to the TOP edge — so it flips on the
+// gradient fraction painted directly behind it, dark ink on the pale upper
+// sky → paper once the descent sinks into dusk. Ochre on hover, the site's
+// one interaction accent.
+//
+// Hrefs come from profile.ts (the single source of résumé facts); the icons
+// live here (presentation, not content). Built so the deferred light/dark
+// theme toggle drops in as one more item with no restructuring.
+import { links } from '../data/profile';
+
+// Resolve hrefs from the profile links by label — keeps URLs in one place.
+const href = (label: string) => links.find((l) => l.label === label)?.href ?? '#';
+
+type Item = { key: string; label: string; href: string; external: boolean; icon: string };
+const items: Item[] = [
+  {
+    key: 'github', label: 'GitHub', href: href('GitHub'), external: true,
+    // GitHub mark (fill, currentColor)
+    icon: '<path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>',
+  },
+  {
+    key: 'email', label: 'Email', href: href('Email'), external: false,
+    // Envelope (stroke, currentColor)
+    icon: '<path fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" d="M1.75 3.75h12.5v8.5H1.75z"/><path fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="m2.25 4.25 5.75 4.5 5.75-4.5"/>',
+  },
+  {
+    key: 'cv', label: 'CV', href: href('Download CV'), external: true,
+    // Document with a download arrow (stroke, currentColor)
+    icon: '<path fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" d="M3.75 1.75h5l3.5 3.5v9h-8.5z"/><path fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="M8 7v4m0 0L6.4 9.4M8 11l1.6-1.6"/>',
+  },
+  {
+    key: 'linkedin', label: 'LinkedIn', href: href('LinkedIn'), external: true,
+    // LinkedIn "in" mark (fill, currentColor)
+    icon: '<path fill="currentColor" d="M3.4 5.6H.9V14h2.5V5.6ZM2.15 1A1.45 1.45 0 1 0 2.15 3.9 1.45 1.45 0 0 0 2.15 1ZM14 9.28c0-2.3-1.23-3.37-2.86-3.37-1.32 0-1.91.72-2.24 1.23V5.6H6.4c.03.71 0 8.4 0 8.4h2.5V9.31c0-.22.02-.45.08-.6.18-.45.59-.91 1.28-.91.9 0 1.26.69 1.26 1.69V14H14V9.28Z"/>',
+  },
+];
+---
+<nav class="cnav" aria-label="Contact and profiles" data-cnav>
+  <ul>
+    {items.map((it) => (
+      <li>
+        <a
+          href={it.href}
+          data-key={it.key}
+          aria-label={it.label}
+          {...(it.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+        >
+          <svg class="ic" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" set:html={it.icon}></svg>
+          <span class="label">{it.label}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</nav>
+
+<style>
+  .cnav {
+    position: fixed;
+    top: clamp(14px, 2vw, 22px);
+    right: clamp(14px, 7vw, 64px);
+    z-index: 40;                 /* above Toc (30) and content */
+    pointer-events: none;        /* container ignores; links re-enable */
+  }
+  .cnav ul {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; align-items: center; gap: clamp(10px, 1.4vw, 20px);
+  }
+
+  .cnav a {
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    /* light-zone base (default at top of page). ink-1 (not ink-2) so contrast
+       holds AA against the pale→dusk sky down to the flip point; measured
+       ≥4.5:1 through frac 0.55 (see the contrast probe). The soft feel is
+       carried by opacity + a paper halo, not by a weaker ink. */
+    color: var(--ink-1);
+    opacity: 0.82;
+    /* Adaptive legibility halo — a whisper of the OPPOSITE tone. On the pale
+       upper sky a paper glow is invisible; through the mid-grey dusk "dead
+       band" (where a hard flip can hold neither ink nor paper at full 4.5:1)
+       it lifts the dark text off the grey. Static shadow (never animated). */
+    text-shadow: 0 0 9px rgba(239, 233, 221, 0.55);
+    transition: color 0.4s ease, opacity 0.3s ease, text-shadow 0.4s ease;
+  }
+  .cnav .ic { flex: none; display: block; }
+  .cnav .label { transition: color 0.4s ease; }
+
+  /* dark-zone: sky behind the nav has sunk into dusk → paper for legibility,
+     with an ink halo that lifts paper text off the mid-grey on the way down. */
+  .cnav[data-zone="dark"] a {
+    color: var(--paper);
+    text-shadow: 0 0 9px rgba(22, 20, 15, 0.6);
+  }
+
+  /* hover — the site's lone interaction accent */
+  @media (hover: hover) {
+    .cnav a:hover { opacity: 1; color: var(--ochre); }
+    .cnav[data-zone="dark"] a:hover { color: var(--ochre); }
+  }
+  .cnav a:focus-visible { opacity: 1; color: var(--ochre); outline: 1px solid var(--ochre); outline-offset: 4px; border-radius: 2px; }
+
+  /* Mobile: icons only, tighter — labels would crowd the top edge */
+  @media (max-width: 640px) {
+    .cnav { top: 12px; right: 14px; }
+    .cnav ul { gap: 16px; }
+    .cnav .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .cnav a { opacity: 0.8; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cnav a, .cnav .label { transition: none; }
+  }
+</style>
+
+<script>
+  // Zone the nav by the gradient fraction painted directly behind it. The
+  // .descent gradient spans the full content height, so the sky color at the
+  // nav's fixed top position maps to (scrollY + probe) / descentHeight — the
+  // very thing that decides whether dark ink or paper stays legible. Above the
+  // flip point the upper sky is pale (dark ink); below it the descent sinks
+  // into dusk→ink (paper). Re-inits on every astro:page-load (View Transitions)
+  // with a teardown so listeners don't leak across navigations.
+
+  // Fraction of the descent at which paper text overtakes dark ink for
+  // legibility behind the nav. Set to the measured contrast CROSSOVER: a probe
+  // of the rendered sky shows ink-1 holds AA (≥4.5:1) down to ~0.55 and paper
+  // takes over from ~0.57 upward, so flipping here keeps the higher-contrast
+  // color on each side. (The lone mid-grey dusk point right at the crossover
+  // sits just under 4.5 for both — the adaptive text-shadow halo covers it.)
+  const DARK_FROM = 0.57;
+
+  let teardown: (() => void) | null = null;
+
+  function initCornerNav() {
+    teardown?.();
+    teardown = null;
+
+    const nav = document.querySelector<HTMLElement>('[data-cnav]');
+    if (!nav || !('requestAnimationFrame' in window)) return;
+    const descent = document.querySelector<HTMLElement>('.descent');
+    if (!descent) return;
+
+    // document-y behind the nav's vertical center (fixed near the top edge)
+    const probe = () => (nav.getBoundingClientRect().top + nav.getBoundingClientRect().bottom) / 2;
+
+    function update() {
+      const h = descent.offsetHeight;
+      if (!h) return;
+      const frac = (window.scrollY + probe()) / h;
+      nav.dataset.zone = frac > DARK_FROM ? 'dark' : 'light';
+    }
+
+    let ticking = false;
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => { update(); ticking = false; });
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    update();
+
+    teardown = () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }
+
+  document.addEventListener('astro:page-load', () => {
+    teardown?.();
+    teardown = null;
+    initCornerNav();
+  });
+</script>
