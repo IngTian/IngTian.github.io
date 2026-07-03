@@ -22,7 +22,8 @@ const isFull = variant === 'full';
     <span class="pcard-year">{project.year}</span>
   </header>
 
-  <p class="pcard-tagline">{isFull ? project.blurb : project.tagline}</p>
+  <p class="pcard-tagline">{project.tagline}</p>
+  {isFull && <p class="pcard-blurb">{project.blurb}</p>}
 
   {isFull && project.highlights && project.highlights.length > 0 && (
     <ul class="pcard-highlights">
@@ -46,16 +47,48 @@ const isFull = variant === 'full';
 </article>
 
 <style>
-  /* Card surface — a quiet framed panel, like a terminal/repo tile. Border +
-     faint tint from tokens so it re-themes automatically (dark = a charcoal
-     tile on the void; light = a warm hairline card on paper). */
+  /* Two background contexts, two color schemes — this is why the card carries
+     its own text colors instead of naively using the ink ramp:
+       • TEASER lives in the homepage Mountains section, which sits on the DARK
+         part of the descent gradient in BOTH themes (its siblings use text-paper).
+         So the teaser is ALWAYS light-on-dark — using --ink-* (dark in light
+         theme) would render invisible dark text on the dark gradient.
+       • FULL lives on /projects, a reading page that flips light⇄dark. There the
+         ink ramp is correct (dark ink on the pale page, light ink on the dark),
+         and the surface must DARKEN to separate the card from the pale page.
+     Local vars set per-variant keep the rest of the rules identical. */
   .pcard {
-    border: 1px solid color-mix(in oklab, var(--ink-4) 34%, transparent);
+    /* teaser defaults: light-on-dark, tuned for the dark Mountains gradient */
+    --pc-name: var(--paper);
+    --pc-body: rgba(239, 233, 221, 0.82);
+    --pc-muted: rgba(239, 233, 221, 0.5);
+    --pc-border: rgba(239, 233, 221, 0.16);
+    --pc-fill: rgba(239, 233, 221, 0.05);
+    --pc-chip-border: rgba(239, 233, 221, 0.22);
+
+    border: 1px solid var(--pc-border);
     border-radius: 12px;
     padding: 22px 24px;
-    background: color-mix(in oklab, var(--paper) 5%, transparent);
+    background: var(--pc-fill);
     transition: border-color 0.35s ease, transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
   }
+  /* full card (/projects): use the ink ramp (flips per theme) + a surface that
+     darkens over the pale reading page so the card reads as a real tile. */
+  .pcard--full {
+    --pc-name: var(--ink-1);
+    --pc-body: var(--ink-2);
+    --pc-muted: var(--ink-4);
+    --pc-border: color-mix(in oklab, var(--ink-3) 30%, transparent);
+    --pc-fill: color-mix(in oklab, var(--ink-1) 5%, transparent);
+    --pc-chip-border: color-mix(in oklab, var(--ink-4) 40%, transparent);
+  }
+  /* on the DARK reading page the ink surface would darken into the void; flip to
+     a faint light fill + hairline so the tile still separates from the charcoal */
+  :global(html[data-theme='dark']) .pcard--full {
+    --pc-fill: rgba(255, 255, 255, 0.03);
+    --pc-border: rgba(220, 225, 220, 0.14);
+  }
+
   @media (hover: hover) {
     .pcard:hover { border-color: color-mix(in oklab, var(--ochre) 55%, transparent); transform: translateY(-2px); }
   }
@@ -64,22 +97,26 @@ const isFull = variant === 'full';
   .dot { color: var(--ochre); font-size: 10px; line-height: 1; transform: translateY(-2px); }
   .pcard-name {
     font-family: var(--font-mono); font-size: 15px; font-weight: 500; letter-spacing: 0.01em;
-    color: var(--ink-1); margin: 0;
+    color: var(--pc-name); margin: 0;
   }
   .pcard-year {
     margin-left: auto; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em;
-    color: var(--ink-4);
+    color: var(--pc-muted);
   }
 
-  .pcard-tagline {
-    font-size: 14px; line-height: 1.65; color: var(--ink-3); margin: 13px 0 0; max-width: 62ch;
+  /* tagline — the lead line on both variants */
+  .pcard-tagline { font-size: 14px; line-height: 1.65; color: var(--pc-body); margin: 13px 0 0; max-width: 62ch; }
+  .pcard--full .pcard-tagline {
+    font-family: var(--font-display); font-style: italic; font-size: clamp(16px, 2vw, 19px);
+    line-height: 1.45; color: var(--pc-name);
   }
-  .pcard--full .pcard-tagline { color: var(--ink-2); font-size: 15px; }
+  /* blurb (full only) — the prose paragraph under the tagline */
+  .pcard-blurb { font-size: 15px; line-height: 1.7; color: var(--pc-body); margin: 14px 0 0; max-width: 66ch; }
 
   /* highlights (full variant) — evidence bullets with a mono arrow mark */
   .pcard-highlights { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 11px; }
   .pcard-highlights li {
-    position: relative; padding-left: 22px; font-size: 13.5px; line-height: 1.6; color: var(--ink-3);
+    position: relative; padding-left: 22px; font-size: 13.5px; line-height: 1.6; color: var(--pc-body);
     max-width: 68ch;
   }
   .hl-mark { position: absolute; left: 0; top: 0; color: var(--ochre); font-family: var(--font-mono); }
@@ -89,8 +126,8 @@ const isFull = variant === 'full';
     list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 7px;
   }
   .pcard-stack li {
-    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.02em; color: var(--ink-4);
-    border: 1px solid color-mix(in oklab, var(--ink-4) 30%, transparent);
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.02em; color: var(--pc-muted);
+    border: 1px solid var(--pc-chip-border);
     border-radius: 6px; padding: 3px 9px;
   }
 
