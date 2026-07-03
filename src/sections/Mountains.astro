@@ -2,7 +2,8 @@
 import Timeline from '../components/Timeline.astro';
 import Publications from '../components/Publications.astro';
 import Awards from '../components/Awards.astro';
-import { researchInterests } from '../data/profile';
+import ProjectCard from '../components/ProjectCard.astro';
+import { researchInterests, projects } from '../data/profile';
 ---
 <section id="mountains" class="relative px-[7vw] py-[14vh]">
   <div class="relative z-10 max-w-[920px] mx-auto">
@@ -49,15 +50,30 @@ import { researchInterests } from '../data/profile';
     <h3 class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-14 mb-2">Experience</h3>
     <Timeline />
 
+    <!-- Projects — shipped artifacts (a teaser; full list lives on /projects).
+         Placed after Experience + writing so engineering stays a clear second
+         to the research signal. -->
+    {projects.length > 0 && (
+      <>
+        <h3 class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-14 mb-3">Projects</h3>
+        <div class="max-w-[760px]">
+          <ProjectCard project={projects[0]} variant="teaser" />
+        </div>
+        <a href="/projects" class="projects-more inline-block mt-5 font-mono text-[12px] text-ochre/90 no-underline">
+          {projects.length > 1 ? 'See all projects →' : 'More on the project →'}
+        </a>
+      </>
+    )}
+
     <!-- Awards — compact strip -->
     <Awards />
   </div>
 </section>
 
 <style>
-  .research-more { transition: color 0.3s, letter-spacing 0.3s; }
+  .research-more, .projects-more { transition: color 0.3s, letter-spacing 0.3s; }
   @media (hover: hover) {
-    .research-more:hover { color: var(--ochre); letter-spacing: 0.02em; }
+    .research-more:hover, .projects-more:hover { color: var(--ochre); letter-spacing: 0.02em; }
   }
 
   /* Research-interest pills — buttons that lift & brighten on hover, and open a

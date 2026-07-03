@@ -46,6 +46,22 @@ export interface ResearchInterest {
   gloss: string;
 }
 
+export interface ProjectLink {
+  label: string;         // e.g. 'GitHub', 'Live', 'Writeup'
+  href: string;
+}
+
+export interface Project {
+  name: string;
+  year: string;          // e.g. '2026' or '2025 —'
+  tagline: string;       // one line, shown on the card + as the homepage teaser
+  blurb: string;         // 2-3 sentences, shown on the /projects page
+  stack: string[];       // tech tags, e.g. ['Go', 'MCP', 'SQLite']
+  links: ProjectLink[];  // repo / live / writeup
+  highlights?: string[]; // a few notable points, surfaced on the /projects page
+  featured?: boolean;    // gets the full treatment on /projects
+}
+
 export const name = { first: 'Ing', last: 'Tian' } as const;
 
 export const roles = 'Quant Researcher · Portfolio Optimization';
@@ -133,9 +149,33 @@ export const awards: Award[] = [
   { year: '2020', title: 'Rio Tinto–Richards Evans Exchange Award · McGill' },
 ];
 
+// Selected projects — shipped artifacts with links (distinct from Experience
+// = roles, and Selected writing = papers). Shown as a teaser on the homepage
+// and in full on /projects. Engineering output: kept a clear second to the
+// research signal in the site's identity hierarchy.
+export const projects: Project[] = [
+  {
+    name: 'claude-witness',
+    year: '2026',
+    tagline: 'A Claude Code / OpenCode plugin that keeps a person-centric archive of how you think and grow — not what your code did.',
+    blurb:
+      'A coach-oriented (not clone-oriented) memory layer: it quietly mines each coding session for evidence-anchored observations about how you reason, get stuck, and change — then synthesizes them into evolving, bi-temporal "facets" that keep their own history, so the archive answers "how did I change," not just "who am I now." Collect-only and local-first: it captures and serves the archive over MCP but never injects anything into a session.',
+    stack: ['Go', 'MCP', 'SQLite', 'Local embeddings', 'Claude Code · OpenCode'],
+    links: [{ label: 'GitHub', href: 'https://github.com/IngTian/claude-witness' }],
+    highlights: [
+      'Four-layer archive — verbatim raw turns → mined observations → bi-temporal facets (with change history) → a regenerable narrative profile.',
+      'Single self-contained Go binary: no Python, no external services, no vector DB, no cloud key.',
+      'Pure-Go local multilingual (EN + ZH) embeddings via GoMLX (CGO_ENABLED=0) — verified to match ONNX Runtime exactly.',
+      'Pluggable "lenses" (a markdown EXTRACT/REVIEW prompt pair) let you track any domain — coding, math — through the same engine.',
+    ],
+    featured: true,
+  },
+];
+
 export const links: { label: string; href: string; primary?: boolean }[] = [
   { label: 'Download CV', href: '/cv.pdf', primary: true },
   { label: 'Research', href: '/research' },
+  { label: 'Projects', href: '/projects' },
   { label: 'Art', href: '/art' },
   { label: 'Email', href: 'mailto:zeying.tian@mail.mcgill.ca' },
   { label: 'GitHub', href: 'https://github.com/IngTian' },

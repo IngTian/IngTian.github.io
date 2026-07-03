@@ -1,0 +1,108 @@
+---
+// A repo/terminal-style project card. Two variants:
+//  - teaser (homepage Mountains): name · year, tagline, stack row, links.
+//  - full (/projects): adds the highlights list.
+// Palette-pure: the "language dot" is the site's own terminal ● motif in the
+// accent color (ochre light / phosphor-green dark), NOT GitHub's brand colors —
+// holds the palette-discipline rule and re-themes for free via var(--ochre).
+// No React island; static markup only.
+import type { Project } from '../data/profile';
+
+interface Props {
+  project: Project;
+  variant?: 'teaser' | 'full';
+}
+const { project, variant = 'teaser' } = Astro.props;
+const isFull = variant === 'full';
+---
+<article class:list={['pcard', isFull && 'pcard--full']}>
+  <header class="pcard-head">
+    <span class="dot" aria-hidden="true">●</span>
+    <h3 class="pcard-name">{project.name}</h3>
+    <span class="pcard-year">{project.year}</span>
+  </header>
+
+  <p class="pcard-tagline">{isFull ? project.blurb : project.tagline}</p>
+
+  {isFull && project.highlights && project.highlights.length > 0 && (
+    <ul class="pcard-highlights">
+      {project.highlights.map((h) => (
+        <li><span class="hl-mark" aria-hidden="true">→</span>{h}</li>
+      ))}
+    </ul>
+  )}
+
+  <ul class="pcard-stack" aria-label="Stack">
+    {project.stack.map((s) => <li>{s}</li>)}
+  </ul>
+
+  <div class="pcard-links">
+    {project.links.map((l) => (
+      <a href={l.href} target="_blank" rel="noopener noreferrer" class="pcard-link">
+        {l.label} <span aria-hidden="true">↗</span>
+      </a>
+    ))}
+  </div>
+</article>
+
+<style>
+  /* Card surface — a quiet framed panel, like a terminal/repo tile. Border +
+     faint tint from tokens so it re-themes automatically (dark = a charcoal
+     tile on the void; light = a warm hairline card on paper). */
+  .pcard {
+    border: 1px solid color-mix(in oklab, var(--ink-4) 34%, transparent);
+    border-radius: 12px;
+    padding: 22px 24px;
+    background: color-mix(in oklab, var(--paper) 5%, transparent);
+    transition: border-color 0.35s ease, transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  @media (hover: hover) {
+    .pcard:hover { border-color: color-mix(in oklab, var(--ochre) 55%, transparent); transform: translateY(-2px); }
+  }
+
+  .pcard-head { display: flex; align-items: baseline; gap: 10px; }
+  .dot { color: var(--ochre); font-size: 10px; line-height: 1; transform: translateY(-2px); }
+  .pcard-name {
+    font-family: var(--font-mono); font-size: 15px; font-weight: 500; letter-spacing: 0.01em;
+    color: var(--ink-1); margin: 0;
+  }
+  .pcard-year {
+    margin-left: auto; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em;
+    color: var(--ink-4);
+  }
+
+  .pcard-tagline {
+    font-size: 14px; line-height: 1.65; color: var(--ink-3); margin: 13px 0 0; max-width: 62ch;
+  }
+  .pcard--full .pcard-tagline { color: var(--ink-2); font-size: 15px; }
+
+  /* highlights (full variant) — evidence bullets with a mono arrow mark */
+  .pcard-highlights { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 11px; }
+  .pcard-highlights li {
+    position: relative; padding-left: 22px; font-size: 13.5px; line-height: 1.6; color: var(--ink-3);
+    max-width: 68ch;
+  }
+  .hl-mark { position: absolute; left: 0; top: 0; color: var(--ochre); font-family: var(--font-mono); }
+
+  /* stack row — mono tag chips */
+  .pcard-stack {
+    list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 7px;
+  }
+  .pcard-stack li {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.02em; color: var(--ink-4);
+    border: 1px solid color-mix(in oklab, var(--ink-4) 30%, transparent);
+    border-radius: 6px; padding: 3px 9px;
+  }
+
+  .pcard-links { margin-top: 18px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .pcard-link {
+    font-family: var(--font-mono); font-size: 12.5px; letter-spacing: 0.02em; text-decoration: none;
+    color: var(--ochre); transition: opacity 0.3s ease;
+  }
+  @media (hover: hover) { .pcard-link:hover { opacity: 0.72; } }
+  .pcard-link:focus-visible { outline: 1px solid var(--ochre); outline-offset: 3px; border-radius: 2px; }
+
+  @media (max-width: 640px) {
+    .pcard { padding: 18px 18px; }
+  }
+</style>
