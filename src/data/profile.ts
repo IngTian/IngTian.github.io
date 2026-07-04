@@ -155,13 +155,13 @@ export const awards: Award[] = [
 // research signal in the site's identity hierarchy.
 export const projects: Project[] = [
   {
-    name: 'claude-witness',
+    name: 'witness',
     year: '2026',
     tagline: 'A Claude Code / OpenCode plugin that keeps a person-centric archive of how you think and grow — not what your code did.',
     blurb:
       'A coach-oriented (not clone-oriented) memory layer: it quietly mines each coding session for evidence-anchored observations about how you reason, get stuck, and change — then synthesizes them into evolving, bi-temporal "facets" that keep their own history, so the archive answers "how did I change," not just "who am I now." Collect-only and local-first: it captures and serves the archive over MCP but never injects anything into a session.',
     stack: ['Go', 'MCP', 'SQLite', 'Local embeddings', 'Claude Code · OpenCode'],
-    links: [{ label: 'GitHub', href: 'https://github.com/IngTian/claude-witness' }],
+    links: [{ label: 'GitHub', href: 'https://github.com/IngTian/witness' }],
     highlights: [
       'Four-layer archive — verbatim raw turns → mined observations → bi-temporal facets (with change history) → a regenerable narrative profile.',
       'Single self-contained Go binary: no Python, no external services, no vector DB, no cloud key.',
