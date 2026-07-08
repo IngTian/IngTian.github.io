@@ -170,6 +170,21 @@ export const projects: Project[] = [
     ],
     featured: true,
   },
+  {
+    name: 'manifold-screensaver',
+    year: '2026',
+    tagline: "This site's hero terrain, ported to a native macOS screensaver — a mountain rendered as breathing points of light, with a clock on the golden section.",
+    blurb:
+      "A faithful Swift port of the homepage's math-generative terrain: a Gaussian-bump elevation field sampled on a 33×33 grid, projected through a fixed rotation and drawn as ~1000 elevation-colored dots that breathe, with glowing \"walker\" particles that periodically trace gradient-descent paths downhill and settle. The name is literal — the terrain is a 2-manifold — and nods to manifold optimization and to many-folded mountain ranges. A minimal clock floats over it, and the whole scene is sized as a fraction of the view, so it scales cleanly from 16:9 to 32:9 ultrawide.",
+    stack: ['Swift', 'Core Graphics', 'AppKit', 'macOS'],
+    links: [{ label: 'GitHub', href: 'https://github.com/IngTian/manifold-screensaver' }],
+    highlights: [
+      'Builds locally with swiftc into a universal (arm64 + x86_64) .saver — no Xcode, no Apple Developer account; local builds skip Gatekeeper quarantine, so install is one curl command.',
+      'Colors (sky gradient, elevation ramp, walker glow) are the exact light/dark values from the site — the screensaver and the website are one visual system.',
+      'Everything sized as a fraction of the view (no hardcoded pixels) — verified on 16:9, 21:9, 32:9 super-ultrawide, and portrait.',
+      'A headless render-frames verifier loads the real .saver bundle and renders PNGs, so the animation is checked outside System Settings.',
+    ],
+  },
 ];
 
 export const links: { label: string; href: string; primary?: boolean }[] = [
