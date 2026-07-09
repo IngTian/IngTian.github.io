@@ -83,8 +83,23 @@ import SkyWash from '../components/SkyWash.astro';
 </BaseLayout>
 
 <style>
-  /* three zones: rail · placard · works */
-  .art { position: relative; z-index: 0; min-height: 100vh; }
+  /* three zones: rail · placard · works. Each zone's left-side clearance was
+     originally an independently-tuned clamp() — they lined up fine at wide
+     viewports but, because the curves grow at different rates (2.4vw vs
+     12vw vs 34vw), crossed and OVERLAPPED in the ~1100–1350px logical-width
+     band (a 14" MacBook Pro's default scaled resolution lands right there
+     even though the panel itself is high-res). Fixed structurally: each
+     zone's position is now `max(<original clamp>, <previous zone's edge> +
+     minimum gap)` — a no-op wherever the original clamp already cleared
+     (so nothing shifts at viewports that already looked right), and a hard
+     floor everywhere else, so the three zones can never overlap at any width.
+     --toc-w is the rail's own intrinsic content width (measured ~124.6px;
+     130px is a rounded, small-buffer constant, not an actual applied width —
+     .art-toc keeps its original auto/shrink-to-fit sizing). */
+  .art { position: relative; z-index: 0; min-height: 100vh;
+    --placard-left: max(clamp(120px, 12vw, 200px), calc(clamp(18px, 2.4vw, 38px) + 130px + 16px));
+    --placard-w: clamp(240px, 20vw, 320px);
+    --content-left: max(clamp(420px, 34vw, 620px), calc(var(--placard-left) + var(--placard-w) + 24px)); }
   .art-toc { position: fixed; left: clamp(18px, 2.4vw, 38px); top: 50%; transform: translateY(-50%); z-index: 30; }
   .art-toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
   .art-toc a { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--font-mono);
@@ -95,8 +110,8 @@ import SkyWash from '../components/SkyWash.astro';
   .art-toc a.is-active .rule { width: 20px; }
   @media (hover: hover) { .art-toc a:hover { opacity: 0.85; } }
 
-  .placard { position: fixed; left: clamp(120px, 12vw, 200px); top: 50%; transform: translateY(-50%);
-    width: clamp(240px, 20vw, 320px); z-index: 20; }
+  .placard { position: fixed; left: var(--placard-left);
+    top: 50%; transform: translateY(-50%); width: var(--placard-w); z-index: 20; }
   .pl-inner { transition: opacity 0.22s ease, transform 0.22s ease; }
   .placard.fade .pl-inner { opacity: 0; transform: translateY(8px); }
   .pl-kicker { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-4); }
@@ -110,7 +125,7 @@ import SkyWash from '../components/SkyWash.astro';
   /* Works column: left edge clears the rail+placard; right edge stays anchored
      to the viewport (margin-right, no max-width) so on wide monitors the work
      fills toward the right instead of drifting left of a capped box. */
-  .art-wrap { margin-right: clamp(40px, 7vw, 180px); margin-left: clamp(420px, 34vw, 620px); }
+  .art-wrap { margin-right: clamp(40px, 7vw, 180px); margin-left: var(--content-left); }
   .art-head { padding: 13vh 0 5vh; }
   .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
   .back:hover { color: var(--seal); }
