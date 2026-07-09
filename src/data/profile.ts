@@ -171,18 +171,18 @@ export const projects: Project[] = [
     featured: true,
   },
   {
-    name: 'manifold-screensaver',
+    name: 'manifold',
     year: '2026',
-    tagline: "This site's hero terrain, ported to a native macOS screensaver — a mountain rendered as breathing points of light, with a clock on the golden section.",
+    tagline: "This site's hero terrain, ported to a native macOS screen saver and live wallpaper — a mountain rendered as breathing points of light.",
     blurb:
-      "A faithful Swift port of the homepage's math-generative terrain: a Gaussian-bump elevation field sampled on a 33×33 grid, projected through a fixed rotation and drawn as ~1000 elevation-colored dots that breathe, with glowing \"walker\" particles that periodically trace gradient-descent paths downhill and settle. The name is literal — the terrain is a 2-manifold — and nods to manifold optimization and to many-folded mountain ranges. A minimal clock floats over it, and the whole scene is sized as a fraction of the view, so it scales cleanly from 16:9 to 32:9 ultrawide.",
+      'A faithful Swift port of the homepage\'s math-generative terrain: a Gaussian-bump elevation field sampled on a 33×33 grid, projected through a fixed rotation and drawn as ~1000 elevation-colored dots that breathe, with glowing "walker" particles that periodically trace gradient-descent paths downhill and settle. The name is literal — the terrain is a 2-manifold — and nods to manifold optimization and to many-folded mountain ranges. Two builds share one renderer: a screen saver with a clock on the golden section, and a menu-bar live wallpaper with no clock — just the mountain breathing behind your icons, cross-fading between light and dark. Everything is sized as a fraction of the view, so it scales cleanly from 16:9 to 32:9 ultrawide.',
     stack: ['Swift', 'Core Graphics', 'AppKit', 'macOS'],
-    links: [{ label: 'GitHub', href: 'https://github.com/IngTian/manifold-screensaver' }],
+    links: [{ label: 'GitHub', href: 'https://github.com/IngTian/manifold' }],
     highlights: [
-      'Builds locally with swiftc into a universal (arm64 + x86_64) .saver — no Xcode, no Apple Developer account; local builds skip Gatekeeper quarantine, so install is one curl command.',
-      'Colors (sky gradient, elevation ramp, walker glow) are the exact light/dark values from the site — the screensaver and the website are one visual system.',
-      'Everything sized as a fraction of the view (no hardcoded pixels) — verified on 16:9, 21:9, 32:9 super-ultrawide, and portrait.',
-      'A headless render-frames verifier loads the real .saver bundle and renders PNGs, so the animation is checked outside System Settings.',
+      'Two builds, one shared renderer: a screen saver (.saver, in System Settings) and a "Manifold Wallpaper.app" live desktop wallpaper (menu-bar app, no clock) — pinned at the desktop level since macOS exposes no public API for animated wallpapers.',
+      'Builds locally with swiftc into universal (arm64 + x86_64) bundles — no Xcode, no Apple Developer account; local builds skip Gatekeeper quarantine, so install is one curl command.',
+      'The wallpaper is battery-aware: 30fps normally, 15fps on battery / Low Power Mode, and fully pauses whenever the desktop is covered, the display sleeps, or the screen is locked.',
+      'Colors are the exact light/dark values from the site, and switching themes cross-fades smoothly — a slow dawn/dusk transition — rather than snapping.',
     ],
   },
 ];
