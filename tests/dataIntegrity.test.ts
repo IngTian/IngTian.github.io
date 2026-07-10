@@ -20,12 +20,15 @@ describe('terminal script graph', () => {
     }
   });
 
-  it('every followup goto resolves to a real pair (no dead chips)', () => {
+  it('every pair has a non-empty slash command', () => {
     for (const pair of Object.values(script.pairs)) {
-      for (const f of pair.followups ?? []) {
-        expect(ids, `goto "${f.goto}" from pair "${pair.id}"`).toContain(f.goto);
-      }
+      expect(pair.command, `pair "${pair.id}"`).toBeTruthy();
     }
+  });
+
+  it('no two pairs share a slash command (the palette would be ambiguous)', () => {
+    const commands = Object.values(script.pairs).map((p) => p.command);
+    expect(new Set(commands).size).toBe(commands.length);
   });
 });
 

@@ -9,16 +9,22 @@ export type Line =
 
 export interface Answer { lines: Line[] }
 
-export interface Followup { label: string; goto: string }
-
 export interface QAPair {
   id: string;
   question: string;
   answer: Answer;
-  followups?: Followup[];
+  // Slash-invokable name, no leading slash (e.g. 'why-quant' for "/why-quant").
+  // The command palette lists every pair's command globally — like Claude
+  // Code's own "/" menu, not a per-answer contextual suggestion list.
+  command: string;
 }
+
+// A greeting shown before any question is asked — typed lines with no
+// "> " question prefix.
+export interface Intro { lines: Line[] }
 
 export interface Script {
   start: string;
   pairs: Record<string, QAPair>;
+  intro?: Intro;
 }
