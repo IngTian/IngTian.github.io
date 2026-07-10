@@ -1,7 +1,7 @@
 import { useEffect, useReducer } from 'react';
 import type { Script, Line } from './terminal.types';
 
-export interface RenderedLine { kind: Line['kind']; text: string; revealed: number; done: boolean; isQuestion?: boolean; href?: string }
+export interface RenderedLine { kind: Line['kind']; text: string; revealed: number; done: boolean; isQuestion?: boolean; href?: string; result?: string; ms?: number }
 
 export interface TerminalState {
   script: Script;
@@ -42,6 +42,7 @@ function createRenderedLine(line: Line, revealed: number): InternalRenderedLine 
     done,
     _full: full,
     href: line.kind === 'text' ? line.href : undefined,
+    result: line.kind === 'tool' ? line.result : undefined,
   };
 }
 
@@ -105,6 +106,7 @@ export function terminalReducer(state: TerminalState, action: TerminalAction): T
             revealed: full.length,
             done: true,
             _full: full,
+            result: line.result,
           });
         } else if (line.kind === 'text') {
           const full = line.content;
@@ -161,6 +163,7 @@ export function terminalReducer(state: TerminalState, action: TerminalAction): T
           revealed: 0,
           done: true,
           _full: '',
+          ms: line.kind === 'thinking' ? line.ms : undefined,
         };
         const status = rest.length === 0 ? 'done' : 'typing';
         return { ...state, transcript: [...transcript, rendered], queue: rest, status };
@@ -193,8 +196,14 @@ export function useTypewriter(script: Script) {
     const last = state.transcript[state.transcript.length - 1];
     // Smooth & steady cadence: text chars ~34ms with only ±6% jitter (near-even
     // rhythm reads as smooth — heavy randomness was what felt jittery before).
-    // Tool/marker lines still advance with a longer beat between them.
-    const base = last && !last.done && last.kind === 'text' ? 34 : 220;
+    // Tool/marker lines still advance with a longer beat between them; a
+    // "thinking" beat gets its own (longer, per-line-overridable) dwell so its
+    // rotating verb+spinner actually has time to register before it clears.
+    const base = last && !last.done && last.kind === 'text'
+      ? 34
+      : last?.kind === 'thinking'
+        ? last.ms ?? 900
+        : 220;
     const delay = base + (Math.random() * 0.12 - 0.06) * base;
     const t = setTimeout(() => dispatch({ type: 'TICK' }), delay);
     return () => clearTimeout(t);

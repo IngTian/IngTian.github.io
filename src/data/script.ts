@@ -8,8 +8,7 @@ export const script: Script = {
       question: 'what are you working on?',
       answer: {
         lines: [
-          { kind: 'tool', label: 'Searched memory (research-log.md)' },
-          { kind: 'tool', label: 'Read 3 notes · 412 tokens' },
+          { kind: 'tool', label: 'Searched memory (research-log.md)', result: '3 notes · 412 tokens' },
           { kind: 'text', content: 'My research thread is multi-period portfolio optimization — I co-authored RL-BHRP, a reinforcement-learning-embedded Bayesian Hierarchical Risk Parity method for adaptive allocation (arXiv:2508.11856). The pull is allocation that learns instead of assuming.' },
           { kind: 'text', content: 'By day I build large-scale recommendation systems as a software engineer at EA — retrieval and ranking that has to hold up in production, in real time.' },
         ],
