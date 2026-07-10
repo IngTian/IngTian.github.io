@@ -25,10 +25,10 @@ import { publications } from '../data/profile';
         ]}
       >
         <p class="pub-entry text-[15px] leading-[1.7] text-paper/90">
-          <span class="font-medium">{p.authors}</span>
-          {' '}({p.year}).{' '}
-          <span class="group-hover:text-ochre transition-colors">{p.title}.</span>
-          {' '}<span class="italic text-paper/70">{p.venue}.</span>
+          <span class="font-mono text-[13px] font-medium tracking-[0.01em] text-paper">{p.authors}</span>
+          {' '}<span class="font-mono text-[13px] text-paper/70">({p.year}).</span>{' '}
+          <span class="font-display group-hover:text-ochre transition-colors">{p.title}.</span>
+          {' '}<span class="font-display italic text-paper/65">{p.venue}.</span>
           {external && <span class="font-mono not-italic text-ochre"> ↗</span>}
           {internal && <span class="font-mono not-italic text-ochre"> read more →</span>}
         </p>
