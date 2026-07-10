@@ -20,7 +20,12 @@
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
-html { scroll-behavior: smooth; }
+/* overflow-x:hidden guards against the .descent::before/::after atmosphere
+   drift (transform-animated, see below) bleeding a few px past the viewport
+   edge — that drift is compositor-only (will-change:transform) so it never
+   triggers a layout recalc and won't show up in scrollWidth checks, only as
+   a real horizontal scrollbar. */
+html { scroll-behavior: smooth; overflow-x: hidden; }
 /* base behind the gradient (overscroll / loader) — a role token that stays
    dark in every theme, so it never inverts to a bright flash. */
 body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
