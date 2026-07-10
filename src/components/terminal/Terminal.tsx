@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTypewriter } from './useTypewriter';
 import { script } from '../../data/script';
-import type { Followup } from './terminal.types';
 import { prefersReducedMotion } from '../../lib/motion';
 
 // Claude Code's own thinking-verb convention — a whimsical present participle
@@ -9,17 +8,29 @@ import { prefersReducedMotion } from '../../lib/motion';
 // swapping it never touches the transcript.
 const THINKING_VERBS = ['Noodling', 'Percolating', 'Pondering', 'Mulling', 'Ruminating'];
 
+// Every pair's slash command, in script order — the palette Claude Code's own
+// "/" menu lists globally, not a per-answer contextual suggestion list.
+const COMMANDS = Object.values(script.pairs).map((p) => ({ command: p.command, pairId: p.id, question: p.question }));
+
 export default function Terminal() {
   const { state, dispatch } = useTypewriter(script);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const started = useRef(false);
   const [verbIndex, setVerbIndex] = useState(0);
+  const [input, setInput] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
 
-  // auto-ask the opening question once
+  // play the greeting once on mount (falls straight to the opening question
+  // if the script defines no intro)
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    dispatch({ type: 'ASK', pairId: script.start });
+    if (script.intro) {
+      dispatch({ type: 'INTRO' });
+    } else {
+      dispatch({ type: 'ASK', pairId: script.start });
+    }
   }, [dispatch]);
 
   // if reduced motion, instantly complete by dispatching COMPLETE
@@ -35,9 +46,6 @@ export default function Terminal() {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   }, [state.transcript]);
 
-  const currentPair = state.currentPairId ? script.pairs[state.currentPairId] : null;
-  const chips: Followup[] = state.status === 'done' && currentPair?.followups ? currentPair.followups : [];
-
   // Rotate the thinking verb only while a "thinking" beat is the active
   // (last, not-yet-superseded) transcript line — cheap to leave running
   // otherwise since it's a no-op once the line is gone.
@@ -48,6 +56,46 @@ export default function Terminal() {
     const t = setInterval(() => setVerbIndex((v) => (v + 1) % THINKING_VERBS.length), 550);
     return () => clearInterval(t);
   }, [isThinking]);
+
+  // The palette opens the instant the field starts with "/" and filters as
+  // you keep typing — Claude Code's own slash-menu behavior.
+  const showPalette = input.startsWith('/');
+  const filtered = useMemo(() => {
+    if (!showPalette) return [];
+    const q = input.slice(1).toLowerCase();
+    return COMMANDS.filter((c) => c.command.toLowerCase().includes(q));
+  }, [showPalette, input]);
+
+  // Clamp the highlighted row whenever the filtered list changes shape (e.g.
+  // typing narrows it down to fewer rows than the previous active index).
+  useEffect(() => {
+    setActiveIndex((i) => Math.min(i, Math.max(filtered.length - 1, 0)));
+  }, [filtered.length]);
+
+  const canAsk = state.status === 'done' || state.status === 'idle';
+
+  function ask(pairId: string) {
+    if (!canAsk) return;
+    dispatch({ type: 'ASK', pairId });
+    setInput('');
+    setActiveIndex(0);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!showPalette || filtered.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex((i) => (i + 1) % filtered.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((i) => (i - 1 + filtered.length) % filtered.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      ask(filtered[activeIndex].pairId);
+    } else if (e.key === 'Escape') {
+      setInput('');
+    }
+  }
 
   return (
     <div className="max-w-[680px] mx-auto">
@@ -92,10 +140,19 @@ export default function Terminal() {
               const body = l.href && l.done
                 ? <a href={l.href} target="_blank" rel="noopener noreferrer" className="text-ochre underline decoration-ochre/40 underline-offset-2 hover:decoration-ochre">{l.text}</a>
                 : l.text;
+              // The not-yet-revealed tail renders invisibly (same text flow,
+              // opacity 0) so the line wraps to its FINAL shape from the first
+              // character on — growing text never reflows anything around it.
+              const ghostTail = !l.done ? l.full.slice(l.text.length) : '';
               return (
                 <div key={i} className={isQuestion ? 'text-paper' : 'text-paper/85 mt-2'}>
                   {isQuestion && <span className="text-ochre mr-2">&gt;</span>}{body}
-                  {!l.done && <span className="inline-block w-2 h-4 align-[-2px] ml-0.5 bg-ochre animate-pulse" />}
+                  {/* Solid, not blinking: a line only ever renders !done while a
+                      character is actively landing (~34ms cadence), so the cursor
+                      IS the motion — an independent pulse animation fought that
+                      rhythm instead of tracking it. */}
+                  {!l.done && <span className="inline-block w-2 h-4 align-[-2px] ml-0.5 bg-ochre" />}
+                  {ghostTail && <span className="opacity-0">{ghostTail}</span>}
                 </div>
               );
             })}
@@ -114,16 +171,53 @@ export default function Terminal() {
             })()}
           </div>
         </div>
-      </div>
 
-      <div className="mt-4 flex gap-2 flex-wrap" style={{ opacity: chips.length ? 1 : 0.4, pointerEvents: chips.length ? 'auto' : 'none' }}>
-        {chips.map((c) => (
-          <button key={c.goto}
-            onClick={() => { dispatch({ type: 'ASK', pairId: c.goto }); }}
-            className="font-mono text-[11.5px] text-paper/80 border border-ochre/30 bg-ochre/5 px-3 py-1.5 rounded-lg hover:bg-ochre/15 hover:border-ochre hover:text-paper transition-colors">
-            <span className="text-ochre">›</span> {c.label}
-          </button>
-        ))}
+        {/* Command line — type "/" to open the palette below, ↑/↓ to move,
+            Enter to ask, Esc to clear. Disabled while a beat is running (the
+            transcript above finishes its own turn first). */}
+        <div className="relative border-t border-ochre/15">
+          {/* Standard combobox+listbox pattern: focus stays on the <input>
+              (role="combobox") the whole time — the options below are
+              pointer/aria-activedescendant targets, not separately focusable
+              buttons, since a focusable control nested inside role="option"
+              would fight the input for keyboard focus. */}
+          {showPalette && filtered.length > 0 && (
+            <ul id="ask-listbox" className="absolute bottom-full left-0 right-0 mb-1 mx-2 rounded-lg border border-ochre/25 bg-[rgba(12,11,9,0.97)] overflow-hidden"
+                role="listbox">
+              {filtered.map((c, i) => (
+                <li key={c.pairId}
+                    id={`ask-option-${c.pairId}`}
+                    role="option"
+                    aria-selected={i === activeIndex}
+                    onMouseDown={(e) => { e.preventDefault(); ask(c.pairId); }}
+                    onMouseEnter={() => setActiveIndex(i)}
+                    className={`flex items-baseline gap-3 px-3 py-2 cursor-pointer font-mono text-[12.5px] ${i === activeIndex ? 'bg-ochre/15 text-paper' : 'text-paper/70'}`}>
+                  <span className="text-ochre">/{c.command}</span>
+                  <span className="text-ink-5 truncate">{c.question}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex items-center gap-2 px-4 py-2.5">
+            <span className="text-ochre font-mono text-[13px]">&gt;</span>
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              disabled={!canAsk}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder={canAsk ? 'Type / to ask a question…' : ''}
+              aria-label="Ask a question"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={showPalette && filtered.length > 0}
+              aria-controls="ask-listbox"
+              aria-activedescendant={showPalette && filtered.length > 0 ? `ask-option-${filtered[activeIndex].pairId}` : undefined}
+              className="flex-1 bg-transparent font-mono text-[13px] text-paper placeholder:text-ink-5 outline-none disabled:opacity-40"
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

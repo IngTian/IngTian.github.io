@@ -7,11 +7,11 @@ const script: Script = {
   pairs: {
     a: {
       id: 'a',
+      command: 'a',
       question: 'hi?',
       answer: { lines: [ { kind: 'tool', label: 'Read x' }, { kind: 'text', content: 'yo' } ] },
-      followups: [{ label: 'more', goto: 'b' }],
     },
-    b: { id: 'b', question: 'more?', answer: { lines: [ { kind: 'text', content: 'ok' } ] } },
+    b: { id: 'b', command: 'b', question: 'more?', answer: { lines: [ { kind: 'text', content: 'ok' } ] } },
   },
 };
 
@@ -49,6 +49,15 @@ describe('terminalReducer', () => {
     expect(text.done).toBe(false);
     s = terminalReducer(s, { type: 'TICK' }); // "yo"
     expect(s.transcript[s.transcript.length - 1].text).toBe('yo');
+  });
+
+  it('TICK with chars reveals a multi-character burst, clamped to the line length', () => {
+    let s = terminalReducer(initialState(script), { type: 'ASK', pairId: 'a' });
+    s = terminalReducer(s, { type: 'TICK' }); // tool done
+    s = terminalReducer(s, { type: 'TICK', chars: 5 }); // "yo" is only 2 chars — clamp, don't overshoot
+    const text = s.transcript[s.transcript.length - 1];
+    expect(text.text).toBe('yo');
+    expect(text.done).toBe(true);
   });
 
   it('reaches done after all lines revealed', () => {
