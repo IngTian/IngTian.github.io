@@ -1,13 +1,19 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTypewriter } from './useTypewriter';
 import { script } from '../../data/script';
 import type { Followup } from './terminal.types';
 import { prefersReducedMotion } from '../../lib/motion';
 
+// Claude Code's own thinking-verb convention — a whimsical present participle
+// that rotates while a "thinking" beat is on screen. Purely decorative text;
+// swapping it never touches the transcript.
+const THINKING_VERBS = ['Noodling', 'Percolating', 'Pondering', 'Mulling', 'Ruminating'];
+
 export default function Terminal() {
   const { state, dispatch } = useTypewriter(script);
   const bodyRef = useRef<HTMLDivElement>(null);
   const started = useRef(false);
+  const [verbIndex, setVerbIndex] = useState(0);
 
   // auto-ask the opening question once
   useEffect(() => {
@@ -32,6 +38,17 @@ export default function Terminal() {
   const currentPair = state.currentPairId ? script.pairs[state.currentPairId] : null;
   const chips: Followup[] = state.status === 'done' && currentPair?.followups ? currentPair.followups : [];
 
+  // Rotate the thinking verb only while a "thinking" beat is the active
+  // (last, not-yet-superseded) transcript line — cheap to leave running
+  // otherwise since it's a no-op once the line is gone.
+  const lastLine = state.transcript[state.transcript.length - 1];
+  const isThinking = lastLine?.kind === 'thinking' && state.status === 'typing';
+  useEffect(() => {
+    if (!isThinking || prefersReducedMotion()) return;
+    const t = setInterval(() => setVerbIndex((v) => (v + 1) % THINKING_VERBS.length), 550);
+    return () => clearInterval(t);
+  }, [isThinking]);
+
   return (
     <div className="max-w-[680px] mx-auto">
       <p className="font-mono text-[11px] tracking-[0.18em] uppercase text-ochre">Now</p>
@@ -49,8 +66,25 @@ export default function Terminal() {
           {/* visible (animated) layer */}
           <div aria-hidden="true">
             {state.transcript.map((l, i) => {
-              if (l.kind === 'tool') return <div key={i} className="text-ink-5 mt-2"><span className="text-ochre">●</span> {l.text}</div>;
-              if (l.kind === 'thinking') return <div key={i} className="text-ink-5/70 mt-2">…</div>;
+              if (l.kind === 'tool') return (
+                <div key={i} className="mt-2">
+                  <div className="text-ink-5"><span className="text-ochre">●</span> {l.text}</div>
+                  {l.result && <div className="text-ink-5/70 pl-[18px]"><span className="text-ink-4">⎿</span> {l.result}</div>}
+                </div>
+              );
+              if (l.kind === 'thinking') {
+                const isLast = i === state.transcript.length - 1;
+                const spinning = isLast && state.status === 'typing';
+                // Once resolved this settles back to a quiet "…" (matching the
+                // prior static marker) rather than leaving a spelled-out label
+                // sitting in the scrollback, which would read as stuck.
+                return (
+                  <div key={i} className="text-ink-5/70 mt-2 flex items-center gap-2">
+                    <span className={spinning ? 'inline-block animate-spin' : 'inline-block'}>✢</span>
+                    {spinning ? `${THINKING_VERBS[verbIndex]}…` : '…'}
+                  </div>
+                );
+              }
               if (l.kind === 'divider') return <hr key={i} className="my-2 border-ochre/15" />;
               // text — use explicit isQuestion flag
               const isQuestion = l.isQuestion === true;
