@@ -68,10 +68,16 @@ function lp(a: number[], b: number[], t: number): [number, number, number] {
 // A terrain palette = three ramp stops (valley → mid → hilltop) as RGB triples.
 // The canvas is JS-painted, so it can't inherit CSS tokens; each theme passes
 // its own ramp here. Default is the shipped LIGHT ramp — keeping colormap()'s
-// zero-arg signature intact for the unit test and existing callers.
+// zero-arg signature intact for existing callers.
+//
+// The DARK ramp is a hand-tuned palette carried over from the manifold
+// screensaver (the same terrain math, dialed against the real field + EDL):
+//   • LIGHT = "Classic" — the shipped warm ochre valleys → cool indigo heights.
+//   • DARK  = "Glacier" — cool cyan-blue ice, slate valleys → bright rime peaks,
+//     on the charcoal night sky.
 export interface TerrainRamp { valley: [number, number, number]; mid: [number, number, number]; peak: [number, number, number] }
-export const TERRAIN_LIGHT: TerrainRamp = { valley: [150, 110, 58], mid: [120, 112, 96], peak: [109, 118, 137] };       // warm ochre valleys → cool indigo heights
-export const TERRAIN_TERMINAL: TerrainRamp = { valley: [70, 120, 92], mid: [78, 150, 150], peak: [95, 190, 170] };      // phosphor-green low → cyan heights (the "star field")
+export const TERRAIN_LIGHT: TerrainRamp = { valley: [150, 110, 58], mid: [120, 112, 96], peak: [109, 118, 137] };       // Classic: warm ochre valleys → cool indigo heights
+export const TERRAIN_TERMINAL: TerrainRamp = { valley: [47, 90, 110], mid: [91, 147, 168], peak: [198, 227, 237] };     // Glacier: cyan-blue ice valleys → bright rime peaks
 
 export function colormap(hn: number, ramp: TerrainRamp = TERRAIN_LIGHT): [number, number, number] {
   return hn < 0.5
@@ -82,11 +88,132 @@ export function colormap(hn: number, ramp: TerrainRamp = TERRAIN_LIGHT): [number
 // 3D projection (fixed yaw + tilt isometric). z is height (up).
 const YAW = Math.PI * 0.18, TILT = 0.92;
 const cosY = Math.cos(YAW), sinY = Math.sin(YAW), cosT = Math.cos(TILT), sinT = Math.sin(TILT);
-export function project(x: number, y: number, z: number, W: number, Hh: number): [number, number, number] {
+
+// `zoom` (default 1) pulls the camera back a touch (<1 shows more of the terrain
+// footprint) or in (>1). It's a UNIFORM scale, so it never distorts the field;
+// the same factor flows into the dot radius so the pointillist texture stays
+// consistent. The screensaver port dialed 0.85 as the "shows the whole ridge"
+// default. Kept optional so existing callers (and the unit test) are unchanged.
+export function project(x: number, y: number, z: number, W: number, Hh: number, zoom = 1): [number, number, number] {
   const rx = x * cosY - y * sinY;
   const ry = x * sinY + y * cosY;
   const sy = ry * cosT - z * sinT;
   const depth = ry * sinT + z * cosT;
-  const sc = Math.min(W, Hh) * 0.34;
+  const sc = Math.min(W, Hh) * 0.34 * zoom;
   return [W * 0.5 + rx * sc, Hh * 0.46 - sy * sc, depth];
+}
+
+// Resolution-independent projected coords (pre scale+offset): screen X-axis,
+// screen Y-axis (uy; larger = higher on screen), and depth (larger = nearer).
+// project() is just a uniform scale+translate of (rx, sy), so screen-space
+// NEIGHBOR relationships are identical at every resolution and every zoom —
+// which lets Eye-Dome Lighting be precomputed ONCE here and reused at any
+// viewport size. (Mirrors the screensaver port's `Projector.raw`.)
+export function projectRaw(x: number, y: number, z: number): { ix: number; uy: number; depth: number } {
+  const rx = x * cosY - y * sinY;
+  const ry = x * sinY + y * cosY;
+  return { ix: rx, uy: ry * cosT - z * sinT, depth: ry * sinT + z * cosT };
+}
+
+// Unit surface normal of the height field z = field(x,y): N = normalize(-fx,-fy,1)
+// in world (x, y, elevation / z-up) space. `grad` already returns d(field)/d{x,y}
+// (ZSCALE folded in), so this is the true normal of the rendered surface.
+// Precomputed per grid point so per-frame directional shading is one dot product.
+export function normal(x: number, y: number): [number, number, number] {
+  const [gx, gy] = grad(x, y);
+  const inv = 1 / Math.hypot(gx, gy, 1);
+  return [-gx * inv, -gy * inv, inv];
+}
+
+// ── Eye-Dome Lighting ──────────────────────────────────────────────────────
+// A sparse dot cloud has no silhouette or ridge edges, so it reads as a flat
+// scatter rather than a 3-D mountain. EDL manufactures those edges: for each
+// dot, gather its SCREEN-space neighbors and measure how much they RECEDE from
+// it in depth; a dot sitting behind nearer terrain gets a large response → a
+// darker/smaller shade. It's orientation-independent (works where facing-based
+// Lambert shading fails on a scatter) and — since our camera is fixed and the
+// base terrain static — the whole shade is PRECOMPUTED once, for zero per-frame
+// cost. (This is the Potree / CloudCompare technique. Ported from the manifold
+// screensaver, whose terrain math is a verbatim copy of this file.)
+export interface EDLParams { neighborRadius: number; strength: number; percentile: number }
+export const EDL_DEFAULTS: EDLParams = { neighborRadius: 0.53, strength: 2.0, percentile: 0.80 };
+
+/** Per-dot EDL shade in [0,1] (1 = unshaded, →0 = occluded/receding), aligned to
+ *  `dots` order. `dots` need only x,y (base elevation is taken from `field`). */
+export function computeEDL(dots: Array<{ x: number; y: number }>, params: EDLParams = EDL_DEFAULTS): number[] {
+  const n = dots.length;
+  const ix = new Float64Array(n), uy = new Float64Array(n), dp = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const r = projectRaw(dots[i].x, dots[i].y, field(dots[i].x, dots[i].y));
+    ix[i] = r.ix; uy[i] = r.uy; dp[i] = r.depth;
+  }
+  const r2 = params.neighborRadius * params.neighborRadius;
+  const response = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    let sum = 0, cnt = 0;
+    for (let j = 0; j < n; j++) {
+      if (j === i) continue;
+      const dx = ix[j] - ix[i], dy = uy[j] - uy[i];
+      if (dx * dx + dy * dy > r2) continue;
+      cnt++;
+      // depth larger = NEARER. A dot RECEDES (→ darken) when its neighbors are
+      // FARTHER (dp[j] < dp[i]); the opposite sign wrongly dims the ridge.
+      const recede = dp[i] - dp[j];
+      if (recede > 0) sum += recede;
+    }
+    response[i] = cnt > 0 ? sum / cnt : 0;
+  }
+  // Normalize by a high percentile: the raw response is very skewed (a few
+  // silhouette dots dominate), so a fixed strength would either barely touch the
+  // bulk or nuke the tail. Dividing by ~p80 spreads relief evenly across the field.
+  const sorted = Array.from(response).sort((a, b) => a - b);
+  const ref = Math.max(1e-6, sorted[Math.round(params.percentile * (n - 1))]);
+  const out = new Array<number>(n);
+  for (let i = 0; i < n; i++) out[i] = Math.exp(-(response[i] / ref) * params.strength);
+  return out;
+}
+
+// ── Directional relief light ────────────────────────────────────────────────
+// A single fixed, high-overhead sun shades each dot for extra form. N·L feeds a
+// half-Lambert term (soft terminator, shadow side never goes to black) that
+// drives a theme-adaptive brightness (darken shadows on the pale sky / brighten
+// highlights on the dark sky) plus a warm-lit / cool-shadow temperature swing.
+// On a sparse cloud this is a WEAKER cue than EDL, but it warms the palette and
+// adds gentle relief. Ported verbatim from the screensaver.
+export interface LightParams {
+  az: number; alt: number;          // light direction (radians): azimuth, altitude
+  ambient: number;                  // shadow-side floor (0..1); higher = flatter
+  warm: number;                     // warm-lit / cool-shadow temperature swing
+  valueLight: number;               // shadow-darkening weight, applied ∝ (1-darkness)
+  gainDark: number;                 // highlight-brightening weight, applied ∝ darkness
+}
+export const LIGHT_DEFAULTS: LightParams = { az: -0.565, alt: 1.30, ambient: 0.50, warm: 0.30, valueLight: 0.62, gainDark: 0.95 };
+
+/** Unit light direction (world x=n, y=e, z=up) from azimuth+altitude. */
+export function lightDir(p: LightParams = LIGHT_DEFAULTS): [number, number, number] {
+  const ca = Math.cos(p.alt);
+  const v: [number, number, number] = [Math.cos(p.az) * ca, Math.sin(p.az) * ca, Math.sin(p.alt)];
+  const inv = 1 / Math.hypot(v[0], v[1], v[2]);
+  return [v[0] * inv, v[1] * inv, v[2] * inv];
+}
+
+/** Shade an elevation-resolved base color by the light. `ndl` = N·L in [-1,1];
+ *  `darkness` in [0,1] (0 = light theme, 1 = dark) blends the value/gain split so
+ *  it adapts across the theme cross-fade. Returns an RGB triple in [0,255]. */
+export function litColor(
+  base: [number, number, number], ndl: number, darkness: number, p: LightParams = LIGHT_DEFAULTS,
+): [number, number, number] {
+  const h = 0.5 + 0.5 * ndl;                               // half-Lambert, [0,1]
+  const shade = p.ambient + (1 - p.ambient) * h;
+  const value = 1 - (p.valueLight * (1 - darkness)) * (1 - shade);  // ≤1: darken shadows
+  const gain = 1 + (p.gainDark * darkness) * h;                    // ≥1: brighten lit
+  const t = p.warm * (h - 0.5) * 2;                                // [-warm,+warm]
+  const cl = (v: number) => Math.max(0, Math.min(255, v));
+  return [cl(base[0] * value * gain * (1 + t)), cl(base[1] * value * gain), cl(base[2] * value * gain * (1 - t))];
+}
+
+/** Relative luminance (0..1) of an RGB[0..255] triple — used to derive a
+ *  palette's "darkness" from its top sky color for the lighting blend. */
+export function luminance01([r, g, b]: [number, number, number]): number {
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 }
