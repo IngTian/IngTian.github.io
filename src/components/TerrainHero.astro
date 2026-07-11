@@ -34,20 +34,28 @@ const bubbles = JSON.stringify([
 </style>
 
 <script>
-  import { field, runDescent, colormap, project, SPAWNS, RANGE, STEP,
+  import { field, runDescent, project, SPAWNS,
            TERRAIN_LIGHT, TERRAIN_TERMINAL, type TerrainRamp } from '../lib/terrain';
+  import { buildGrid, paintTerrain, TERRAIN_CONFIG_DEFAULTS, type GridPoint } from '../lib/terrainRender';
   import { prefersReducedMotion } from '../lib/motion';
 
   // The canvas is JS-painted, so it can't inherit CSS tokens — pick the ramp +
   // walker colors from the active theme (data-theme on <html>). Read fresh on
   // each init so a View-Transition swap or a live theme toggle repaints correctly.
-  // Dark = the "terminal galaxy": phosphor-green terrain dots read as a star
-  // field on the charcoal void, green settled-minima, cyan descending trails.
+  // Dark = the "terminal galaxy": cyan-blue "Glacier" ice dots read as a star
+  // field on the charcoal void; light = the shipped warm "Classic" ochre→indigo.
   type WalkerPalette = { glow: [number,number,number]; settled: [number,number,number]; trail: [number,number,number] };
-  function themePalette(): { ramp: TerrainRamp; walker: WalkerPalette } {
+  // `darkness` (0 = light, 1 = dark) drives the directional-light value/gain
+  // blend in the shared renderer so the relief reads on both the pale and the
+  // dark sky. `dotScale` is a per-theme radius bump — dark gets a touch more (its
+  // dots read as a fainter starfield on the void), light a little.
+  function themePalette(): { ramp: TerrainRamp; walker: WalkerPalette; darkness: number; dotScale: number } {
+    // Walker trios:
+    //   dark  = Glacier — frost glow, ice settle, recessive teal trail (screensaver)
+    //   light = Classic — the shipped paper glow, ochre settle, indigo trail
     if (document.documentElement.dataset.theme === 'dark')
-      return { ramp: TERRAIN_TERMINAL, walker: { glow: [220,225,220], settled: [102,194,140], trail: [95,178,201] } };
-    return { ramp: TERRAIN_LIGHT, walker: { glow: [244,239,228], settled: [200,163,106], trail: [92,108,140] } };
+      return { ramp: TERRAIN_TERMINAL, walker: { glow: [227,242,247], settled: [134,188,204], trail: [73,127,146] }, darkness: 1, dotScale: 1.18 };
+    return { ramp: TERRAIN_LIGHT, walker: { glow: [244,239,228], settled: [200,163,106], trail: [92,108,140] }, darkness: 0, dotScale: 1.15 };
   }
 
   // Teardown handle for the previous init — re-init runs on every page load AND
@@ -68,10 +76,18 @@ const bubbles = JSON.stringify([
     const ctx = cvs.getContext('2d')!;
     const reduce = prefersReducedMotion();
     const BUBBLES = JSON.parse(cvs.dataset.bubbles || '[]') as Array<null | { word?: string; mathml?: string }>;
-    const { ramp, walker } = themePalette();
+    const { ramp, walker, darkness, dotScale } = themePalette();
     const [gr, gg, gb] = walker.glow;      // walker head-glow
     const [sr, sg, sb] = walker.settled;   // settled-at-minimum accent
     const [tr, tg, tb] = walker.trail;      // descending trail
+
+    // The static-per-camera terrain: dot grid + precomputed normals + EDL shade,
+    // built once (EDL is O(n²); the camera is fixed so it never needs recompute).
+    // Config is the baked default (shape-reading on) plus this theme's ramp/darkness.
+    // Same code path as /terrain-lab, so a value tuned there transfers verbatim.
+    const cfg = { ...TERRAIN_CONFIG_DEFAULTS, ramp, darkness, dotScale };
+    const ZOOM = cfg.zoom;                 // walkers must use the SAME zoom to stay on the surface
+    let grid: GridPoint[] = buildGrid(cfg.edlParams);
 
     let W = 0, Hh = 0, DPR = 1;
     function resize() {
@@ -81,10 +97,6 @@ const bubbles = JSON.stringify([
       Hh = cvs!.height = Math.round(r.height * DPR);
     }
     resize();
-
-    // dot grid over the field
-    const dots: Array<{ x: number; y: number }> = [];
-    for (let x = -RANGE; x <= RANGE; x += STEP) for (let y = -RANGE; y <= RANGE; y += STEP) dots.push({ x, y });
 
     // descent walkers
     interface Walker { pts: Array<{x:number;y:number}>; born: number; done: boolean; retire: boolean; bubble: null | {word?:string;mathml?:string}; }
@@ -101,38 +113,17 @@ const bubbles = JSON.stringify([
       nextSpawnAt = ts + 4200 + (spawnIx % 3) * 900;
     }
 
-    const ZR = 1.55;
     function frame(ts: number, animate: boolean) {
       ctx.clearRect(0, 0, W, Hh);
       const tsec = ts / 1000;
       const breathAmp = animate ? 0.04 : 0;
       const breathHz = 0.4;
 
-      // terrain dots, painter-sorted by depth
-      const rd: Array<{ sx:number; sy:number; depth:number; z:number }> = [];
-      for (const d of dots) {
-        let z = field(d.x, d.y);
-        z += breathAmp * Math.sin(tsec * breathHz + d.x * 0.7 + d.y * 0.6);
-        const [sx, sy, depth] = project(d.x, d.y, z, W, Hh);
-        rd.push({ sx, sy, depth, z });
-      }
-      rd.sort((p, q) => p.depth - q.depth);
-      // Fade dots out over the bottom ~16% of the canvas so the bowl dissolves
-      // softly into the gradient instead of ending in an abrupt dot-band at the
-      // hero's lower edge. (The faint hero/interlude "divider" itself was a
-      // separate cause — a wide horizon-mist wash in global.css, now removed.)
-      const fadeStart = Hh * 0.84;
-      for (const p of rd) {
-        if (p.sx < -20 || p.sx > W + 20 || p.sy < -20 || p.sy > Hh + 20) continue;
-        const hn = Math.max(0, Math.min(1, (p.z + ZR) / (2 * ZR)));
-        const r = (2.9 - hn * 1.6) * DPR;
-        let alpha = 0.30 + (1 - hn) * 0.45;
-        if (p.sy > fadeStart) alpha *= Math.max(0, 1 - (p.sy - fadeStart) / (Hh - fadeStart));
-        if (alpha <= 0.004) continue;
-        const [cr, cg, cb] = colormap(hn, ramp);
-        ctx.beginPath(); ctx.arc(p.sx, p.sy, Math.max(0.5, r), 0, 2 * Math.PI);
-        ctx.fillStyle = `rgba(${cr|0},${cg|0},${cb|0},${alpha.toFixed(3)})`; ctx.fill();
-      }
+      // Terrain dots (shared renderer): elevation color → directional relief +
+      // warm/cool tint → Eye-Dome Lighting + elevation emphasis → bottom fade.
+      // The bottom fade dissolves the bowl softly into the gradient instead of
+      // ending in an abrupt dot-band at the hero's lower edge.
+      paintTerrain(ctx, grid, cfg, W, Hh, DPR, tsec, breathAmp);
 
       // walkers (only when animating; static frame shows terrain only)
       let anyBubble: null | { x:number; y:number; b:{word?:string;mathml?:string} } = null;
@@ -147,7 +138,7 @@ const bubbles = JSON.stringify([
           for (let i = 0; i < shown; i++) {
             const pt = wk.pts[i];
             const z = field(pt.x, pt.y) + breathAmp * Math.sin(tsec * breathHz + pt.x * 0.7 + pt.y * 0.6);
-            const [sx, sy] = project(pt.x, pt.y, z + 0.06, W, Hh);
+            const [sx, sy] = project(pt.x, pt.y, z + 0.06, W, Hh, ZOOM);
             const isLast = i === wk.pts.length - 1;
             const age = ts - (wk.born + i * STEP_MS);
             const appear = Math.min(1, age / APPEAR);

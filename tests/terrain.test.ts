@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { field, grad, runDescent, colormap, BUMPS } from '../src/lib/terrain';
+import {
+  field, grad, runDescent, colormap, BUMPS, RANGE, STEP,
+  normal, projectRaw, project, computeEDL, lightDir, litColor, luminance01,
+} from '../src/lib/terrain';
 
 describe('terrain math', () => {
   it('field is a finite number and reflects the bumps', () => {
@@ -39,5 +42,73 @@ describe('terrain math', () => {
   it('BUMPS has both valleys (negative a) and hills (positive a)', () => {
     expect(BUMPS.some(b => b.a < 0)).toBe(true);
     expect(BUMPS.some(b => b.a > 0)).toBe(true);
+  });
+});
+
+describe('terrain shape-reading (EDL + lighting)', () => {
+  // Build the same grid the renderer uses, once, for the EDL tests.
+  const grid: Array<{ x: number; y: number }> = [];
+  for (let x = -RANGE; x <= RANGE; x += STEP) for (let y = -RANGE; y <= RANGE; y += STEP) grid.push({ x, y });
+
+  it('normal is a unit vector with a positive up (z) component', () => {
+    for (const [x, y] of [[0, 0], [-1.4, -0.5], [1.0, -0.6], [2, 2]] as const) {
+      const [nx, ny, nz] = normal(x, y);
+      expect(Math.hypot(nx, ny, nz)).toBeCloseTo(1, 6);
+      expect(nz).toBeGreaterThan(0); // z = field(x,y) is a height field → normal points up
+    }
+  });
+
+  it('normal matches the surface: flatter ground → more vertical normal', () => {
+    // Far corner (2.5,2.5) is nearly flat (bumps decay); near a bump center the
+    // slope is steeper, so its normal tilts further from vertical.
+    const flatNz = normal(2.5, 2.5)[2];
+    const steepNz = normal(-0.9, 0.0)[2]; // flank between the deep valley and the hill
+    expect(flatNz).toBeGreaterThan(steepNz);
+  });
+
+  it('projectRaw is the pre-scale/pre-offset core of project (zoom & size independent)', () => {
+    const raw = projectRaw(0.7, -0.4, field(0.7, -0.4));
+    // project = W/2 + ix*sc, Hh*0.46 - uy*sc, with sc = min(W,Hh)*0.34*zoom
+    const W = 1200, Hh = 800, zoom = 0.85;
+    const sc = Math.min(W, Hh) * 0.34 * zoom;
+    const [sx, sy, depth] = project(0.7, -0.4, field(0.7, -0.4), W, Hh, zoom);
+    expect(sx).toBeCloseTo(W * 0.5 + raw.ix * sc, 6);
+    expect(sy).toBeCloseTo(Hh * 0.46 - raw.uy * sc, 6);
+    expect(depth).toBeCloseTo(raw.depth, 6); // depth is zoom-independent
+  });
+
+  it('computeEDL returns a shade in [0,1] per dot, with spread (not all unshaded)', () => {
+    const edl = computeEDL(grid);
+    expect(edl.length).toBe(grid.length);
+    for (const s of edl) { expect(s).toBeGreaterThanOrEqual(0); expect(s).toBeLessThanOrEqual(1); }
+    const min = Math.min(...edl), max = Math.max(...edl);
+    expect(max).toBeGreaterThan(0.9);  // some dots essentially unshaded
+    expect(min).toBeLessThan(0.6);     // some dots clearly shaded → real relief
+  });
+
+  it('lightDir is a unit vector aimed high overhead (large +z)', () => {
+    const [lx, ly, lz] = lightDir();
+    expect(Math.hypot(lx, ly, lz)).toBeCloseTo(1, 6);
+    expect(lz).toBeGreaterThan(0.9); // ~74° altitude → mostly straight down the +z axis
+  });
+
+  it('litColor: lit side (N·L=1) is brighter than shadow side (N·L=-1) in the light theme', () => {
+    const base: [number, number, number] = [120, 112, 96];
+    const litSum = litColor(base, 1, 0).reduce((a, b) => a + b, 0);
+    const shadowSum = litColor(base, -1, 0).reduce((a, b) => a + b, 0);
+    expect(litSum).toBeGreaterThan(shadowSum);
+  });
+
+  it('litColor: warm/cool tint pushes the lit side warmer (R−B up) than the shadow side', () => {
+    const base: [number, number, number] = [128, 128, 128];
+    const lit = litColor(base, 1, 0);
+    const shadow = litColor(base, -1, 0);
+    expect(lit[0] - lit[2]).toBeGreaterThan(shadow[0] - shadow[2]);
+  });
+
+  it('luminance01: white→1, black→0, ordered by brightness', () => {
+    expect(luminance01([255, 255, 255])).toBeCloseTo(1, 6);
+    expect(luminance01([0, 0, 0])).toBeCloseTo(0, 6);
+    expect(luminance01([200, 200, 200])).toBeGreaterThan(luminance01([40, 40, 40]));
   });
 });
