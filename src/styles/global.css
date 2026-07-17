@@ -138,6 +138,30 @@ html[data-theme='dark'] .terminal-chrome { background: linear-gradient(180deg, r
   }
 }
 
+/* ── Scroll-reveal — blocks below the hero fade + rise as they enter the
+   viewport during the descent, so content arrives to meet you rather than
+   sitting there fully-formed. Native scroll-driven animation (the same
+   `animation-timeline: view()` the Interlude's tagline already uses): pure CSS,
+   no JS, no island, no IntersectionObserver — nothing withheld from the HTML,
+   so SEO / LCP / no-JS are untouched. It is only *armed* inside this
+   no-preference query, so reduced-motion users AND browsers without
+   scroll-timeline (Firefox today) simply get the finished state — full opacity,
+   untranslated — which is the correct fallback. Tuned subtler than the tagline
+   (14px rise) so it reads as polish across many blocks, not a slideshow. ── */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    animation: reveal-rise linear both;
+    animation-timeline: view();
+    /* start just after the block's top edge clears the fold, finish while it's
+       still low in the viewport — so it's settled before it reaches center. */
+    animation-range: entry 6% cover 24%;
+  }
+  @keyframes reveal-rise {
+    from { opacity: 0; transform: translate3d(0, 14px, 0); }
+    to   { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
+}
+
 /* motion is OFF by default; opt in only when the user has no reduced-motion preference.
    Phase 3 wraps all scroll animations in this query. */
 @media (prefers-reduced-motion: reduce) {

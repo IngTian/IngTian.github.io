@@ -7,13 +7,15 @@ import { researchInterests, projects } from '../data/profile';
 ---
 <section id="mountains" class="relative px-[7vw] py-[14vh]">
   <div class="relative z-10 max-w-[920px] mx-auto">
-    <p class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/55">The story so far</p>
-    <h2 class="font-display italic text-[26px] sm:text-[30px] text-paper mt-3 leading-snug">
-      A quant who reasons in structure,<br />an engineer who makes the math run.
-    </h2>
+    <div class="reveal">
+      <p class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/55">The story so far</p>
+      <h2 class="font-display italic text-[26px] sm:text-[30px] text-paper mt-3 leading-snug">
+        A quant who reasons in structure,<br />an engineer who makes the math run.
+      </h2>
+    </div>
 
     <!-- Research interests — teaser; full themed list lives on /research -->
-    <h3 class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-14 mb-3">
+    <h3 class="reveal font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-14 mb-3">
       Research interests
     </h3>
     <ul class="flex flex-wrap gap-x-3 gap-y-2.5 max-w-[760px]" data-ri>
@@ -43,18 +45,22 @@ import { researchInterests, projects } from '../data/profile';
     </a>
 
     <!-- Publications — the distinctive research signal, given prominence -->
-    <h3 class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-14 mb-2">Selected writing</h3>
-    <Publications />
+    <div class="reveal">
+      <h3 class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-14 mb-2">Selected writing</h3>
+      <Publications />
+    </div>
 
     <!-- Experience -->
-    <h3 class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-14 mb-2">Experience</h3>
-    <Timeline />
+    <div class="reveal">
+      <h3 class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-14 mb-2">Experience</h3>
+      <Timeline />
+    </div>
 
     <!-- Projects — shipped artifacts (a teaser; full list lives on /projects).
          Placed after Experience + writing so engineering stays a clear second
          to the research signal. -->
     {projects.length > 0 && (
-      <>
+      <div class="reveal">
         <h3 class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-14 mb-3">Projects</h3>
         <div class="max-w-[760px]">
           <ProjectCard project={projects[0]} variant="teaser" />
@@ -62,11 +68,13 @@ import { researchInterests, projects } from '../data/profile';
         <a href="/projects" class="projects-more inline-block mt-5 font-mono text-[12px] text-ochre/90 no-underline">
           {projects.length > 1 ? 'See all projects →' : 'More on the project →'}
         </a>
-      </>
+      </div>
     )}
 
     <!-- Awards — compact strip -->
-    <Awards />
+    <div class="reveal">
+      <Awards />
+    </div>
   </div>
 </section>
 
