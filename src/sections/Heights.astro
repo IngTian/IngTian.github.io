@@ -25,8 +25,8 @@ for (const phrase of bio.strong) {
         style="font-variation-settings:'opsz' 144,'SOFT' 60; text-shadow: 0 1px 18px rgba(22,20,15,0.06);">
       {name.first} <em class="italic text-ink-3 font-medium">{name.last}</em>
     </h1>
-    <p class="font-display italic text-ink-3 mt-5 text-[clamp(15px,2.2vw,21px)]">{roles}</p>
-    <p class="font-mono uppercase tracking-[0.22em] text-ink-3/90 mt-2.5 text-[11px]">{phd} &nbsp;·&nbsp; {rolesSub}</p>
+    <p class="hero-roles font-display italic text-ink-3 mt-5 text-[clamp(15px,2.2vw,21px)]">{roles}</p>
+    <p class="hero-subline font-mono uppercase tracking-[0.22em] text-ink-3/90 mt-2.5 text-[11px]">{phd} &nbsp;·&nbsp; {rolesSub}</p>
   </div>
 
   <div class="scroll-cue absolute bottom-8 left-1/2 -translate-x-1/2 font-mono text-ink-4 text-[11px] tracking-[0.2em]">scroll</div>
@@ -68,6 +68,22 @@ for (const phrase of bio.strong) {
     #heights .hero-rise { order: 1; }
     #heights .hero-legibility { display: none; }
     #heights .terrain-canvas { opacity: 0.5; }
+  }
+
+  /* Large-screen type scale. Below 1536px (all mainstream laptops) NOTHING
+     changes — the existing clamps already sit at their ceilings there. Above it,
+     the hero type resumes growing so it holds presence against the full-bleed
+     terrain on a 2K/QHD monitor instead of stranding tiny type in whitespace.
+     Each formula is tuned continuous at 1536px (= the current cap, so no jump)
+     and reaches its target at 2560px, then clamps (5K/4K logical widths ≤2560
+     land on target; nothing runs away on ultrawide). The composition — name
+     bottom-left, bio top-right, the empty diagonal — is unchanged; only sizes
+     grow. Verified via CDP at 1536/1920/2560. */
+  @media (min-width: 1536px) {
+    #heights h1 { font-size: clamp(132px, calc(3.52vw + 78px), 168px); }
+    #heights .hero-roles { font-size: clamp(21px, calc(0.684vw + 10.5px), 28px); }
+    #heights .hero-subline { font-size: clamp(11px, calc(0.293vw + 6.5px), 14px); }
+    #heights .hero-bio p { font-size: clamp(15.5px, calc(0.342vw + 10.25px), 19px); }
   }
 
   @media (prefers-reduced-motion: no-preference) {

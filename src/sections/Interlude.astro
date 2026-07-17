@@ -76,6 +76,14 @@
     .research-link:hover::before, .research-link:focus-visible::before { transform: scaleX(1); }
   }
 
+  /* Large-screen type scale — matches the hero (Heights.astro): unchanged below
+     1536px, then the tagline resumes growing (40→54px by 2560px) so it holds the
+     warm-sky interlude on a 2K monitor. Continuous at 1536px (=current cap, no
+     jump), capped at 54px so ultrawide doesn't run away. */
+  @media (min-width: 1536px) {
+    .statement { font-size: clamp(40px, calc(1.367vw + 19px), 54px); }
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .statement {
       animation: statement-in linear both;
