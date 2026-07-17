@@ -86,6 +86,31 @@ for (const phrase of bio.strong) {
     #heights .hero-bio p { font-size: clamp(15.5px, calc(0.342vw + 10.25px), 19px); }
   }
 
+  /* ULTRAWIDE / 4K / 5K (> 2560px). Two things happen together above 2560px:
+     (1) the type resumes growing (it was frozen at the 2560 ceiling), and
+     (2) the name/bio anchors detach from the viewport EDGE and re-anchor to a
+     centered, bounded "composition stage" so the de-centered diagonal keeps its
+     laptop-like proportions instead of sprawling into two stranded corners.
+
+     The stage: a 2240px-wide centered band. The name pins to stage-left, the bio
+     to stage-right, via `max(7vw, (100vw - 2240px)/2)`. The max() is the load-
+     bearing seam: (100vw - 2240px)/2 only OVERTAKES 7vw at 2604px, so at 2560px
+     both anchors still resolve to 7vw — byte-for-byte the shipped composition —
+     and only above ~2604px does the stage take over. The terrain canvas stays
+     full-bleed (it's the atmospheric field, edge-to-edge is correct); only the
+     TEXT is bounded. Result: void 56%→35% (3440), 59%→32% (3840), 66%→24% (5120)
+     — the diagonal reads as one composed stage at every width. Type formulas are
+     continuous at 2560 (each = its current ceiling there, no jump) and re-cap at
+     3840 so 5K doesn't run away. Verified via CDP at 2560/3440/3840/5120. */
+  @media (min-width: 2560px) {
+    #heights .hero-rise { left: max(7vw, calc((100vw - 2240px) / 2)); }
+    #heights .hero-bio  { right: max(7vw, calc((100vw - 2240px) / 2)); }
+    #heights h1 { font-size: clamp(168px, calc(2.5vw + 104px), 200px); }
+    #heights .hero-roles { font-size: clamp(28px, calc(0.469vw + 16px), 34px); }
+    #heights .hero-subline { font-size: clamp(14px, calc(0.156vw + 10px), 16px); }
+    #heights .hero-bio p { font-size: clamp(19px, calc(0.234vw + 13px), 22px); }
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .hero-rise { animation: hero-rise 1.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
     .hero-bio  { animation: hero-rise 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both; }

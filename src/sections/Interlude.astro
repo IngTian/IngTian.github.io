@@ -83,6 +83,13 @@
   @media (min-width: 1536px) {
     .statement { font-size: clamp(40px, calc(1.367vw + 19px), 54px); }
   }
+  /* > 2560px: the tagline resumes growing past its 54px ceiling to hold the warm
+     interlude sky on 4K/5K, matched to the hero's ultrawide scale. Continuous at
+     2560 (=54px, no jump), re-caps at 66px by 3840 so 5K doesn't run away. Its
+     max-w-[20ch] measure keeps the line from stretching; only the type grows. */
+  @media (min-width: 2560px) {
+    .statement { font-size: clamp(54px, calc(0.938vw + 30px), 66px); }
+  }
 
   @media (prefers-reduced-motion: no-preference) {
     .statement {
