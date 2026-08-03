@@ -1,0 +1,97 @@
+---
+// PaperTooth (PROTOTYPE) — the paper MATERIAL, richer than Grain.astro.
+//
+// Grain.astro is one baked fractal-noise tile at opacity .09: enough to kill the
+// "flat gradient" look, not enough to read as a printed sheet. Real paper has
+// three separable frequencies, so this layers three:
+//
+//   1. TOOTH   — high-frequency fibre bite (the surface you'd feel)
+//   2. MOTTLE  — very low-frequency cloud so the sheet is NOT uniform; this is
+//                the one that actually sells "handmade stock" over "CSS noise"
+//   3. LAID    — a whisper of horizontal laid lines (the mould's wire marks),
+//                far below conscious threshold, but it breaks the isotropy that
+//                makes procedural noise read as digital
+//
+// Plus a soft edge vignette so the sheet has BODY — an infinite flat plane is
+// the tell that gives away a "textured" web page.
+//
+// Everything is a baked static data-URI SVG. Never animated (the #1 perf rule),
+// no runtime cost, no JS. In dark theme it pulls back hard: a charcoal void with
+// visible tooth just looks dusty.
+const tooth = `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='t'><feTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23t)'/></svg>`;
+const mottle = `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='m'><feTurbulence type='fractalNoise' baseFrequency='0.011' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23m)'/></svg>`;
+// Laid lines: turbulence squashed hard on one axis → directional fibre streaks.
+const laid = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='l'><feTurbulence type='fractalNoise' baseFrequency='0.004 0.5' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23l)'/></svg>`;
+
+const uri = (s: string) => `url("data:image/svg+xml,${s}")`;
+---
+<div class="paper-tooth" aria-hidden="true" style={`background-image:${uri(tooth)}`}></div>
+<div class="paper-mottle" aria-hidden="true" style={`background-image:${uri(mottle)}`}></div>
+<div class="paper-laid" aria-hidden="true" style={`background-image:${uri(laid)}`}></div>
+<div class="paper-body" aria-hidden="true"></div>
+
+<style>
+  .paper-tooth,
+  .paper-mottle,
+  .paper-laid,
+  .paper-body {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* 1 — TOOTH: the fibre bite. Multiply so it darkens into the paper rather than
+     sitting on top as grey fog. Kept near the shipped Grain value; this is the
+     layer whose opacity you feel but shouldn't see. */
+  .paper-tooth {
+    z-index: 40;
+    opacity: 0.085;
+    mix-blend-mode: multiply;
+    background-size: 180px 180px;
+  }
+
+  /* 2 — MOTTLE: the sheet is not uniform. Large tile, very low opacity; this is
+     what separates "stock" from "noise". */
+  .paper-mottle {
+    z-index: 40;
+    opacity: 0.055;
+    mix-blend-mode: multiply;
+    background-size: 560px 560px;
+  }
+
+  /* 3 — LAID lines: sub-threshold directional wire marks. If you can SEE these
+     as stripes the value is too high. */
+  .paper-laid {
+    z-index: 40;
+    opacity: 0.022;
+    mix-blend-mode: multiply;
+    background-size: 300px 300px;
+  }
+
+  /* 4 — BODY: a soft inset vignette so the sheet has edges and depth instead of
+     being an infinite plane. Baked box-shadow, never animated. */
+  .paper-body {
+    z-index: 39;
+    box-shadow:
+      inset 0 0 90px rgba(90, 84, 74, 0.09),
+      inset 0 0 220px rgba(90, 84, 74, 0.05);
+  }
+
+  /* Dark theme — the "terminal galaxy" is a void, not a sheet. Visible tooth on
+     charcoal reads as dust/dirt, so cut everything back hard and swap the
+     vignette to a pure darken (a warm-grey inset would glow brown). */
+  :global(html[data-theme='dark']) .paper-tooth  { opacity: 0.05; }
+  :global(html[data-theme='dark']) .paper-mottle { opacity: 0.03; }
+  :global(html[data-theme='dark']) .paper-laid   { opacity: 0.012; }
+  :global(html[data-theme='dark']) .paper-body {
+    box-shadow:
+      inset 0 0 110px rgba(0, 0, 0, 0.34),
+      inset 0 0 260px rgba(0, 0, 0, 0.20);
+  }
+
+  /* Layer kill-switch for A/B-ing in the prototype. */
+  :global(html[data-paper='off']) .paper-tooth,
+  :global(html[data-paper='off']) .paper-mottle,
+  :global(html[data-paper='off']) .paper-laid,
+  :global(html[data-paper='off']) .paper-body { display: none; }
+</style>

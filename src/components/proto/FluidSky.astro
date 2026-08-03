@@ -1,0 +1,255 @@
+---
+// FluidSky (PROTOTYPE) — the Monet sky, made to FLOW.
+//
+// The load-bearing decision: this does NOT replace --descent-grad. The tuned
+// gradient stays the single source of truth for the sky's colour story; this
+// canvas rides OVER it as a low-amplitude MODULATION via mix-blend-mode:
+// soft-light. The shader centres its output on mid-grey, and soft-light over
+// mid-grey is a no-op — so where the field is neutral the Monet palette shows
+// through byte-identical, and where it isn't, the sky flows lighter/darker with
+// a whisper of warm/cool temperature swing (Monet broken colour, not grey haze).
+//
+// Consequences of "combine" over "replace":
+//   · the palette can't drift — we never re-author the colours
+//   · both themes work for free (the gradient already re-themes itself)
+//   · if WebGL is missing the page is EXACTLY today's site, finished-looking
+//
+// Scroll-coupled: page position feeds a uniform so the strata slide past as you
+// descend — the descent metaphor survives.
+//
+// Perf: 0.5× internal resolution (smooth noise hides it), ~30fps, paused
+// offscreen AND on tab-hide, one static frame painted first, full GL teardown
+// on astro:page-load re-init (TerrainHero's lifecycle pattern).
+---
+<canvas id="fluid-sky" class="fluid-sky" aria-hidden="true"></canvas>
+
+<style>
+  /* position:fixed + z-index:-1 INSIDE main.descent — negative-z children paint
+     above the parent's own background (the gradient) but below all content, the
+     same slot SkyWash uses. Fixed (not absolute) keeps the canvas viewport-sized
+     instead of page-sized; scroll is carried by a uniform instead. */
+  .fluid-sky {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: block;
+    mix-blend-mode: soft-light;
+    /* Tuned DOWN from 0.75 after an A/B against the shipped page: at 0.75 the
+       warp field read as grey cloud sitting ON the sky rather than motion IN it,
+       and it visibly dulled the Monet gradient's crispness (worst in the
+       mountains zone, where the low-frequency blobs looked like smudged glass).
+       This is the "felt, not seen" value. */
+    opacity: 0.34;
+  }
+  /* Dark theme is a charcoal void — the same amplitude reads as smudge there, so
+     pull it back to a whisper. */
+  :global(html[data-theme='dark']) .fluid-sky { opacity: 0.20; }
+
+  /* Layer kill-switch for A/B-ing in the prototype. */
+  :global(html[data-fluid='off']) .fluid-sky { display: none; }
+</style>
+
+<script>
+  import { prefersReducedMotion } from '../../lib/motion';
+
+  const VERT = `
+    attribute vec2 aPos;
+    varying vec2 vUv;
+    void main() {
+      vUv = aPos * 0.5 + 0.5;
+      gl_Position = vec4(aPos, 0.0, 1.0);
+    }
+  `;
+
+  // Domain-warped fBm (Inigo Quilez's two-level warp). The output is a
+  // MODULATION centred on 0.5, not a colour — see the component comment.
+  const FRAG = `
+    precision highp float;
+    varying vec2 vUv;
+    uniform float uTime;
+    uniform float uScroll;
+    uniform float uAmp;
+
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+    float noise(vec2 p) {
+      vec2 i = floor(p), f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash(i),               hash(i + vec2(1.0, 0.0)), u.x),
+                 mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+    }
+    float fbm(vec2 p) {
+      float v = 0.0, a = 0.5;
+      for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.02; a *= 0.5; }
+      return v;
+    }
+
+    void main() {
+      // uScroll shifts the sampled window so strata slide past as you descend.
+      // Frequency raised from 1.45 after the A/B: the low-frequency version made
+      // a few big blobs that read as smudged glass over the content zone. Finer
+      // strata read as ink diffusing in water — which is the actual reference.
+      vec2 p = vec2(vUv.x * 3.1, (1.0 - vUv.y + uScroll) * 3.1);
+
+      // two-level domain warp — this is what makes it read as viscous ink
+      vec2 q = vec2(fbm(p + 0.052 * uTime),
+                    fbm(p + vec2(5.2, 1.3) - 0.040 * uTime));
+      vec2 r = vec2(fbm(p + 2.9 * q + vec2(1.7, 9.2) + 0.030 * uTime),
+                    fbm(p + 2.9 * q + vec2(8.3, 2.8) - 0.025 * uTime));
+      float f = fbm(p + 2.6 * r);
+
+      // centred on 0.5 so soft-light is a no-op at neutral
+      float m = 0.5 + (f - 0.5) * uAmp;
+      // faint warm/cool swing along the warp axis — broken colour, not haze
+      float temp = (r.x - r.y) * 0.085;
+
+      gl_FragColor = vec4(m + temp * 0.65, m, m - temp * 0.8, 1.0);
+    }
+  `;
+
+  let teardown: (() => void) | null = null;
+
+  function initFluidSky(): void {
+    teardown?.();
+    teardown = null;
+
+    const cvs = document.getElementById('fluid-sky') as HTMLCanvasElement | null;
+    if (!cvs) return;
+
+    const gl = (cvs.getContext('webgl', { antialias: false, alpha: true, depth: false })
+      || cvs.getContext('experimental-webgl', { antialias: false, alpha: true, depth: false })) as WebGLRenderingContext | null;
+    // No WebGL → hide the layer entirely. The page falls back to today's site.
+    if (!gl) { cvs.style.display = 'none'; return; }
+
+    function compile(type: number, src: string): WebGLShader | null {
+      const sh = gl!.createShader(type);
+      if (!sh) return null;
+      gl!.shaderSource(sh, src);
+      gl!.compileShader(sh);
+      if (!gl!.getShaderParameter(sh, gl!.COMPILE_STATUS)) {
+        gl!.deleteShader(sh);
+        return null;
+      }
+      return sh;
+    }
+
+    const vs = compile(gl.VERTEX_SHADER, VERT);
+    const fs = compile(gl.FRAGMENT_SHADER, FRAG);
+    if (!vs || !fs) { cvs.style.display = 'none'; return; }
+
+    const prog = gl.createProgram();
+    if (!prog) { cvs.style.display = 'none'; return; }
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { cvs.style.display = 'none'; return; }
+    gl.useProgram(prog);
+
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const aPos = gl.getAttribLocation(prog, 'aPos');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+    const uTime = gl.getUniformLocation(prog, 'uTime');
+    const uScroll = gl.getUniformLocation(prog, 'uScroll');
+    const uAmp = gl.getUniformLocation(prog, 'uAmp');
+
+    // Amplitude is the taste dial: how far the sky may deviate from the tuned
+    // gradient. Lowered from 0.62 after the A/B — combined with the opacity cut
+    // this keeps the flow as a modulation of the Monet sky instead of a haze
+    // laid over it.
+    const AMP = 0.40;
+    gl.uniform1f(uAmp, AMP);
+
+    // 0.5× internal resolution: a smooth noise field survives the upscale
+    // invisibly and this is the single biggest perf lever.
+    const SCALE = 0.5;
+    function resize(): void {
+      const w = Math.max(1, Math.round(cvs!.clientWidth * SCALE));
+      const h = Math.max(1, Math.round(cvs!.clientHeight * SCALE));
+      if (cvs!.width !== w || cvs!.height !== h) {
+        cvs!.width = w;
+        cvs!.height = h;
+        gl!.viewport(0, 0, w, h);
+      }
+    }
+
+    function scrollUnits(): number {
+      const vh = window.innerHeight || 1;
+      return window.scrollY / vh;
+    }
+
+    function draw(tSec: number): void {
+      resize();
+      gl!.uniform1f(uTime, tSec);
+      gl!.uniform1f(uScroll, scrollUnits());
+      gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
+    }
+
+    // One finished frame immediately — instant paint, and the guaranteed
+    // reduced-motion / pre-loop baseline.
+    draw(0);
+
+    const reduce = prefersReducedMotion();
+    const onResize = () => { if (reduce) draw(0); };
+    window.addEventListener('resize', onResize);
+    // Under reduced motion the strata are frozen, but the sky must still track
+    // scroll or it would look like a stuck decal.
+    const onScroll = () => { if (reduce) draw(0); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    let rafId = 0;
+    let running = false;
+    let last = 0;
+    let io: IntersectionObserver | null = null;
+    const t0 = performance.now();
+
+    function loop(now: number): void {
+      if (now - last > 33) {           // ~30fps
+        draw((now - t0) / 1000);
+        last = now;
+      }
+      rafId = requestAnimationFrame(loop);
+    }
+    function start(): void {
+      if (running || reduce || document.hidden) return;
+      running = true; last = 0;
+      rafId = requestAnimationFrame(loop);
+    }
+    function stop(): void {
+      if (!running) return;
+      running = false;
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+
+    const onVis = () => { if (document.hidden) stop(); else start(); };
+
+    if (!reduce) {
+      document.addEventListener('visibilitychange', onVis);
+      io = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) start(); else stop();
+      }, { threshold: 0 });
+      io.observe(cvs);
+    }
+
+    teardown = () => {
+      stop();
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onScroll);
+      document.removeEventListener('visibilitychange', onVis);
+      io?.disconnect();
+      // Release GL objects so a View-Transition re-init doesn't leak contexts.
+      gl.deleteBuffer(buf);
+      gl.deleteProgram(prog);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+    };
+  }
+
+  document.addEventListener('astro:page-load', initFluidSky);
+</script>

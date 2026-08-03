@@ -1,0 +1,118 @@
+---
+// PROTOTYPE ROUTE — the agreed synthesis, all layers live:
+//
+//   base   paper editorial craft  (letterpress, drop cap, folios, marginalia,
+//                                  hanging punctuation, richer paper material)
+//   accent fluid modulation OVER the Monet gradient — combined, never replacing it
+//   accent motes in the Mountains zone only, depth-gated
+//
+// The layer stack, bottom → top:
+//   --descent-grad (untouched) → FluidSky (soft-light) → SkyWash → PaperTooth → content
+//
+// Three toggles in the corner flip data-attributes on <html> so each layer can be
+// A/B'd live against the shipped look. Prototype-only chrome.
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Toc from '../components/Toc.astro';
+import SkyWash from '../components/SkyWash.astro';
+import PaperTooth from '../components/proto/PaperTooth.astro';
+import FluidSky from '../components/proto/FluidSky.astro';
+import PaperHeights from '../sections/proto/PaperHeights.astro';
+import PaperInterlude from '../sections/proto/PaperInterlude.astro';
+import PaperMountains from '../sections/proto/PaperMountains.astro';
+import Ground from '../sections/Ground.astro';
+import Signature from '../sections/Signature.astro';
+---
+
+<BaseLayout
+  title="PROTO — paper editorial + fluid sky + motes"
+  veilLine="a researcher by day"
+  veilOnLoad={false}
+  noindex={true}
+>
+  <main class="descent">
+    <FluidSky />
+    <SkyWash />
+    <PaperHeights />
+    <PaperInterlude />
+    <PaperMountains />
+    <Ground />
+    <Signature />
+  </main>
+  <Toc />
+  <PaperTooth />
+
+  <!-- Prototype-only layer switches. -->
+  <div class="proto-panel" data-proto-panel>
+    <p class="proto-title">layers</p>
+    <button type="button" data-layer="paper" class="on">paper</button>
+    <button type="button" data-layer="fluid" class="on">fluid</button>
+    <button type="button" data-layer="motes" class="on">motes</button>
+  </div>
+</BaseLayout>
+
+<style>
+  .proto-panel {
+    position: fixed;
+    left: 14px;
+    bottom: 14px;
+    z-index: 9998;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 9px 10px 10px;
+    border-radius: 9px;
+    background: rgba(22, 20, 15, 0.72);
+    -webkit-backdrop-filter: blur(12px) saturate(1.2);
+    backdrop-filter: blur(12px) saturate(1.2);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+  }
+  .proto-title {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 8.5px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(239, 233, 221, 0.5);
+    margin: 0 0 2px;
+  }
+  .proto-panel button {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    padding: 4px 11px;
+    border-radius: 20px;
+    cursor: pointer;
+    color: rgba(239, 233, 221, 0.45);
+    background: transparent;
+    border: 1px solid rgba(239, 233, 221, 0.22);
+    transition: color 0.25s, border-color 0.25s, background-color 0.25s;
+  }
+  .proto-panel button.on {
+    color: var(--on-accent);
+    background: var(--ochre);
+    border-color: var(--ochre);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .proto-panel button { transition: none; }
+  }
+</style>
+
+<script>
+  // Prototype layer toggles: flip data-<layer>="off" on <html>; each component's
+  // CSS has a matching :global(html[data-*='off']) kill-switch.
+  function initProtoPanel(): void {
+    const panel = document.querySelector<HTMLElement>('[data-proto-panel]');
+    if (!panel) return;
+    panel.addEventListener('click', (e: MouseEvent) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-layer]');
+      if (!btn) return;
+      const key = btn.dataset.layer;
+      if (!key) return;
+      const root = document.documentElement;
+      const isOn = root.dataset[key] !== 'off';
+      if (isOn) root.dataset[key] = 'off';
+      else delete root.dataset[key];
+      btn.classList.toggle('on', !isOn);
+    });
+  }
+  document.addEventListener('astro:page-load', initProtoPanel);
+</script>

@@ -1,0 +1,212 @@
+---
+// MoteField (PROTOTYPE) — the particle accent, scoped to the Mountains zone.
+//
+// Why this can exist here when a global particle layer would be wrong: Mountains
+// sits at ~62% of the descent, where the gradient is already grey ink (#3a3833)
+// carrying light paper-coloured text. Motes are LEGIBLE there. Over the pale dawn
+// heights the same motes read as dust on a scanner — so lib/proto/motes.ts gates
+// presence by page depth and they are simply absent up top.
+//
+// The motion is curl-noise advection (divergence-free → real streamlines) with a
+// downward bias, so the motes DESCEND. On a site whose hero is an optimization
+// landscape, particles that follow real math are in character; particles that
+// drift randomly are decoration.
+//
+// Deliberately NO constellation lines. Nearest-neighbour link lines are THE
+// cliché that makes a page look like a generic AI-startup landing, and they'd
+// read as a network diagram — wrong metaphor for a descent.
+//
+// Perf: capped count (scaled by area, halved on small screens), DPR ≤ 1.5,
+// ~30fps, paused offscreen + on tab-hide, static finished frame under reduced
+// motion, full teardown on re-init.
+---
+<canvas id="mote-field" class="mote-field" aria-hidden="true"></canvas>
+
+<style>
+  /* Absolute inside the Mountains <section> (which is position:relative), so the
+     field is confined to that zone rather than being a page-wide layer. z-index 0
+     keeps it under the .mtn content (z-index:10). */
+  .mote-field {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: block;
+  }
+
+  /* Layer kill-switch for A/B-ing in the prototype. */
+  :global(html[data-motes='off']) .mote-field { display: none; }
+</style>
+
+<script>
+  import { curl, depthGate } from '../../lib/proto/motes';
+  import { prefersReducedMotion } from '../../lib/motion';
+
+  interface Mote {
+    x: number;      // device px
+    y: number;      // device px
+    life: number;   // 1 → 0
+    seed: number;   // per-mote variation
+  }
+
+  let teardown: (() => void) | null = null;
+
+  function initMoteField(): void {
+    teardown?.();
+    teardown = null;
+
+    const cvs = document.getElementById('mote-field') as HTMLCanvasElement | null;
+    if (!cvs) return;
+    const ctx = cvs.getContext('2d');
+    if (!ctx) return;
+
+    // Canvas is JS-painted so it can't inherit CSS tokens — read the theme and
+    // pick palette-only colours. Light: ochre + indigo (the accent + the cool
+    // counterpoint). Dark: phosphor emerald + cyan, matching the terminal galaxy.
+    function palette(): { warm: [number, number, number]; cool: [number, number, number]; gain: number } {
+      if (document.documentElement.dataset.theme === 'dark') {
+        return { warm: [102, 194, 140], cool: [95, 178, 201], gain: 1.0 };
+      }
+      // Light theme is the hard case: Mountains is dark here, but the motes must
+      // stay a whisper so they never read as sensor noise on the printed sheet.
+      return { warm: [200, 163, 106], cool: [109, 118, 137], gain: 0.72 };
+    }
+
+    const { warm, cool, gain } = palette();
+    const DPR = Math.min(1.5, window.devicePixelRatio || 1);
+
+    let W = 0;
+    let H = 0;
+    let motes: Mote[] = [];
+
+    function seedMotes(): void {
+      const areaCss = (W / DPR) * (H / DPR);
+      // ~1 mote per 5200 css px², hard-capped; halved on narrow screens.
+      const narrow = window.innerWidth < 768;
+      const target = Math.min(narrow ? 34 : 92, Math.floor(areaCss / 5200));
+      motes = [];
+      for (let i = 0; i < target; i++) {
+        motes.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          life: Math.random(),
+          seed: Math.random(),
+        });
+      }
+    }
+
+    function resize(): void {
+      const r = cvs!.getBoundingClientRect();
+      const w = Math.max(1, Math.round(r.width * DPR));
+      const h = Math.max(1, Math.round(r.height * DPR));
+      if (w === W && h === H) return;
+      W = cvs!.width = w;
+      H = cvs!.height = h;
+      seedMotes();
+    }
+    resize();
+
+    // Page depth of a mote: where this pixel sits in the whole-document descent.
+    // Used by depthGate so presence follows the sky's darkness, not the section.
+    function pageDepth(deviceY: number): number {
+      const rect = cvs!.getBoundingClientRect();
+      const docY = rect.top + window.scrollY + deviceY / DPR;
+      const docH = Math.max(1, document.documentElement.scrollHeight);
+      return docY / docH;
+    }
+
+    function paint(animate: boolean): void {
+      ctx!.clearRect(0, 0, W, H);
+
+      for (const m of motes) {
+        const d = pageDepth(m.y);
+        const gate = depthGate(d);
+        if (gate > 0.001) {
+          // life fades in and out so motes never pop
+          const fade = Math.sin(Math.min(1, Math.max(0, m.life)) * Math.PI);
+          const alpha = gate * fade * 0.5 * gain;
+          if (alpha > 0.004) {
+            const c = m.seed > 0.72 ? cool : warm;
+            const r = (m.seed > 0.9 ? 1.5 : 1.0) * DPR;
+            ctx!.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${alpha.toFixed(3)})`;
+            ctx!.beginPath();
+            ctx!.arc(m.x, m.y, r, 0, Math.PI * 2);
+            ctx!.fill();
+          }
+        }
+
+        if (!animate) continue;
+
+        // advect along the divergence-free field, plus the descent bias
+        const [vx, vy] = curl(m.x / (W * 0.42), m.y / (H * 0.42));
+        m.x += vx * 1.5 * DPR;
+        m.y += vy * 1.5 * DPR + 0.20 * DPR;
+        m.life -= 0.0022;
+
+        if (m.life <= 0 || m.y > H + 8 || m.x < -8 || m.x > W + 8) {
+          m.x = Math.random() * W;
+          m.y = -6;
+          m.life = 1;
+          m.seed = Math.random();
+        }
+      }
+    }
+
+    // One finished static frame — the reduced-motion state and instant paint.
+    paint(false);
+
+    const reduce = prefersReducedMotion();
+    const onResize = () => { resize(); paint(false); };
+    window.addEventListener('resize', onResize);
+    // Depth is scroll-dependent, so a frozen field still needs a repaint on
+    // scroll or the gate would be stale.
+    const onScroll = () => { if (reduce) paint(false); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    let rafId = 0;
+    let running = false;
+    let last = 0;
+    let io: IntersectionObserver | null = null;
+
+    function loop(now: number): void {
+      if (now - last > 33) {          // ~30fps
+        paint(true);
+        last = now;
+      }
+      rafId = requestAnimationFrame(loop);
+    }
+    function start(): void {
+      if (running || reduce || document.hidden) return;
+      running = true; last = 0;
+      rafId = requestAnimationFrame(loop);
+    }
+    function stop(): void {
+      if (!running) return;
+      running = false;
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+
+    const onVis = () => { if (document.hidden) stop(); else start(); };
+
+    if (!reduce) {
+      document.addEventListener('visibilitychange', onVis);
+      io = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) start(); else stop();
+      }, { threshold: 0 });
+      io.observe(cvs);
+    }
+
+    teardown = () => {
+      stop();
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onScroll);
+      document.removeEventListener('visibilitychange', onVis);
+      io?.disconnect();
+    };
+  }
+
+  document.addEventListener('astro:page-load', initMoteField);
+</script>
