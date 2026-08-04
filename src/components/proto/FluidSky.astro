@@ -151,7 +151,18 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     }
 
     void main() {
-      float t = uTime;
+      // Time is scaled with the reading variant's y-stretch. The warp's drift terms
+      // are added in RAW field units, so stretching the sample coordinate 2.6x made
+      // an identical time delta a 2.6x SMALLER relative move — measured: /research
+      // changed Δ2.47/255 over 2.5s vs /art's Δ4.71, i.e. it looked STALE even though
+      // both were drawing at 26fps. Scaling time restores equal apparent motion.
+      // Time is NOT the lever for reading-page motion, established by measurement:
+      // pushing the multiplier to 4.2x made apparent motion WORSE (Δ3.00 -> 2.18),
+      // because on the reading variant the visible effect comes from a smoothstepped
+      // TINT of f and length(r), not from a ramp lookup — so a faster-scrolling fine
+      // field just averages out between frames. The real lever is response CONTRAST
+      // (below). Keeping a small boost only.
+      float t = uTime * mix(1.0, 1.35, uReading);
 
       // ANISOTROPIC sample space — more frequency DOWN than ACROSS, which is what
       // stretches the field into drifting strata instead of round blobs.
@@ -175,7 +186,12 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       // faster in y makes a short page traverse the same amount of field a long
       // page does.
       float freqK = mix(1.0, 1.9, uReading);
-      float yStretch = mix(1.0, 2.6, uReading);
+      // Reduced 2.6 -> 1.5. The stretch let a short page cover more field, but it
+      // also SHRANK every feature and diluted the apparent motion (measured: pushing
+      // time to 4.2x made motion WORSE, 3.00 -> 2.18, because a finer field averages
+      // out between frames). A gentler stretch plus a modest time boost gives both
+      // coverage and visible movement.
+      float yStretch = mix(1.0, 1.35, uReading);
       vec2 p = vec2(vUv.x * 6.2 * freqK, sy * 12.7 * freqK * yStretch);
 
       // ── two-level domain warp (Inigo Quilez) — the original gains ──
@@ -332,8 +348,8 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
         // Now: a wider response curve centred on the field's actual mean, and
         // enough magnitude to clear threshold. Still strictly subtractive, so
         // contrast against dark ink can only improve.
-        float ink = smoothstep(0.30, 0.72, f);              // centred on fbm's mean
-        float veins = smoothstep(0.38, 0.92, length(r));
+        float ink = smoothstep(0.40, 0.60, f);              // TIGHT: high slope near fbm's mean
+        float veins = smoothstep(0.50, 0.78, length(r));
         float amt = (ink * 0.62 + veins * 0.32) * uAmp;
         // Tuned DOWN by half after the first strengthened pass overshot: at
         // amt*1.25 the cool side read as saturated BLUE clouds that competed with
@@ -421,7 +437,13 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
           // Pushed LOWER on request. Tagline measures 0.259-0.293; the band now
           // starts at its lower half and extends into the upper Mountains approach,
           // so the stars sit BELOW the line rather than surrounding it.
-          float band = smoothstep(0.275, 0.335, depth) * (1.0 - smoothstep(0.40, 0.50, depth));
+          // Requested: just BELOW the mountain dots, sitting right BEHIND the
+          // tagline. Measured page depths — heights (the mountain) 0.000-0.202,
+          // interlude 0.202-0.348, TAGLINE 0.259-0.293. So the band opens right as
+          // heights ends and peaks across the tagline's own rows, then closes before
+          // the Mountains section. Narrow on purpose: a pocket of sky behind the
+          // line, not a field.
+          float band = smoothstep(0.200, 0.252, depth) * (1.0 - smoothstep(0.300, 0.348, depth));
           col += tint * (core * 1.05 + halo) * tw * band;
         }
       }

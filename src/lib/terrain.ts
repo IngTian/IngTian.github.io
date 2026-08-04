@@ -109,7 +109,13 @@ export interface TerrainRamp { valley: [number, number, number]; mid: [number, n
 //
 // Still --ochre → --indigo: the endpoints are the tokens, only the interior knot
 // moved, so the palette identity holds and no new hue is introduced.
-export const TERRAIN_LIGHT: TerrainRamp = { valley: [92, 64, 30], mid: [116, 118, 132], peak: [176, 186, 206] };
+// Widened AGAIN after the composited measurement. The pipeline compresses
+// everything: through litColor -> edlSpend -> alpha -> paper, a ramp spread of 0.46
+// arrived on screen as 0.27, and the peak still sat only 0.13 from the paper. Dots
+// therefore read as one grey mass with no ridge. Endpoints pushed apart hard —
+// near-black ochre valley, light indigo peak — so that AFTER compression there is
+// still real form. Hues unchanged: still --ochre warm low, --indigo cool high.
+export const TERRAIN_LIGHT: TerrainRamp = { valley: [58, 40, 18], mid: [104, 108, 126], peak: [154, 168, 196] };
 export const TERRAIN_TERMINAL: TerrainRamp = { valley: [47, 90, 110], mid: [91, 147, 168], peak: [198, 227, 237] };     // Glacier: cyan-blue ice valleys → bright rime peaks
 
 export function colormap(hn: number, ramp: TerrainRamp = TERRAIN_LIGHT): [number, number, number] {
