@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import FluidSky from '../components/proto/FluidSky.astro';
 import SkyWash from '../components/SkyWash.astro';
 ---
 <BaseLayout
@@ -9,7 +10,8 @@ import SkyWash from '../components/SkyWash.astro';
   veilOnLoad={false}
   noindex={true}
 >
-  <main class="notfound descent">
+  <main class="notfound descent is-fluid">
+    <FluidSky strength={4} variant="descent" />
     <SkyWash />
     <section class="nf-inner">
       <p class="nf-code">404</p>

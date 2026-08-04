@@ -66,27 +66,8 @@ import Signature from '../sections/Signature.astro';
 </BaseLayout>
 
 <style>
-  /* ── The fluid REPLACES the sky ──────────────────────────────────────────
-     .descent paints --descent-grad on itself. The fluid canvas is a negative-z
-     child, which paints ABOVE the parent's own background, so the gradient would
-     sit uselessly underneath an opaque canvas — wasted paint, and a mismatch
-     during the moment before the canvas draws.
-     So: keep the gradient as the FALLBACK (no WebGL / mobile / warp 0 → it shows
-     normally), and only suppress it once the canvas has actually painted, which
-     the script signals with .fluid-live on <main>.
-
-     At warp 0 the canvas is display:none (by design — 0 means "the plain shipped
-     gradient"), so the overrides below hand the gradient back; otherwise the page
-     would lose BOTH the canvas and the gradient and fall through to bare --bg,
-     which rendered a near-black hero with the tagline nearly invisible. */
-  .descent.is-fluid.fluid-live { background: var(--bg); }
-  :global(html[data-fluid-strength='0']) .descent.is-fluid.fluid-live,
-  :global(html[data-fluid='off']) .descent.is-fluid.fluid-live { background: var(--descent-grad); }
-
-  /* SkyWash's woven warm/cold strokes are the same broken-colour idea the shader
-     now does natively, at higher fidelity. Doubling them muddies both, so the
-     wash steps aside once the fluid is live. */
-  .descent.is-fluid.fluid-live :global(.sky-wash) { opacity: 0.35; }
+  /* NOTE: the .is-fluid / .fluid-live rules now live in global.css so every route
+     shares one definition — see "The fluid sky, shared across every route" there. */
 
   .proto-panel {
     position: fixed;

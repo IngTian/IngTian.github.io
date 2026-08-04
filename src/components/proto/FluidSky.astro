@@ -38,8 +38,22 @@ interface Props {
   /** 0 = plain gradient · 1 subtle · 2 medium · 3 strong · 4 the original demo's own strength */
   strength?: 0 | 1 | 2 | 3 | 4;
   mode?: 'background' | 'contained';
+  /**
+   * Which sky this page has.
+   *
+   * 'descent' — the homepage / /art / 404: --descent-grad, the full dawn→ground
+   *   ramp that sinks to near-black. Text over it is PAPER-coloured, so the
+   *   dangerous direction is the sky getting LIGHTER.
+   *
+   * 'reading' — /research, /projects: --reading-grad, deliberately luminous
+   *   top-to-bottom so DARK ink stays legible the whole way down. The dangerous
+   *   direction is therefore INVERTED — the sky getting DARKER. This is not a
+   *   cosmetic switch: sampling the descent ramp on a reading page would drag a
+   *   pale background down to #16140f underneath dark text.
+   */
+  variant?: 'descent' | 'reading';
 }
-const { strength = 4, mode = 'background' } = Astro.props;
+const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
 ---
 <canvas
   class:list={['fluid-sky', mode === 'contained' ? 'is-contained' : 'is-background']}
@@ -47,6 +61,7 @@ const { strength = 4, mode = 'background' } = Astro.props;
   aria-hidden="true"
   data-strength={String(strength)}
   data-mode={mode}
+  data-variant={variant}
 ></canvas>
 
 <style>
@@ -113,6 +128,7 @@ const { strength = 4, mode = 'background' } = Astro.props;
     uniform float uGateTop;   // depth where the reading zone begins
     uniform float uDark;      // 1.0 in the dark theme, 0.0 in light
     uniform vec3  uNebula;    // the cool tint dark theme lifts the ink with
+    uniform float uReading;   // 1.0 on a reading page (dark ink on pale paper)
 
     float hash(vec2 p) {
       p = fract(p * vec2(443.897, 441.423));
@@ -176,14 +192,23 @@ const { strength = 4, mode = 'background' } = Astro.props;
       // So instead of one scalar clamp, the gate is now ASYMMETRIC: over the
       // reading zone the ink may still swing generously toward the dark end while
       // its lightward excursion is limited. Full ink character, contrast intact.
-      float zone = smoothstep(uGateTop, uGateTop + 0.10, depth);
-      float gateDark  = 1.0 - 0.25 * zone;   // toward the ground: nearly free
+      // On a reading page the entire page is a reading zone (text runs top to
+      // bottom), so the gate is fully engaged everywhere rather than fading in at a
+      // content boundary.
+      float zone = mix(smoothstep(uGateTop, uGateTop + 0.10, depth), 1.0, uReading);
+      // ── The asymmetry INVERTS by page archetype ─────────────────────────
+      // Descent pages carry PAPER-coloured text, so a LIGHTER sky is what erases it
+      // and the dark direction is free. Reading pages carry DARK INK on pale paper,
+      // so the danger is exactly reversed: a DARKER sky erases the ink, and the
+      // light direction is the safe one. Copy-pasting the descent gate onto a
+      // reading page would clamp the safe direction and free the dangerous one.
+      float gateDark  = mix(1.0 - 0.25 * zone, 1.0 - 0.90 * zone, uReading);
       // Toward the dawn: 0.90, not 0.72. In LIGHT theme the content zone carries
       // paper-coloured text on grey ink, and the lightward swing was bright enough
       // that the text nearly dissolved into the sky. Only the LIGHT direction is
       // clamped harder; the dark direction stays free, so the ink keeps its
       // character (that was the point of making the gate asymmetric).
-      float gateLight = 1.0 - 0.90 * zone;
+      float gateLight = mix(1.0 - 0.90 * zone, 1.0 - 0.25 * zone, uReading);
 
       // Perturb WHERE along the descent this pixel samples → marbled strata.
       //
@@ -224,7 +249,11 @@ const { strength = 4, mode = 'background' } = Astro.props;
       // rather than a tuning — it makes "the content zone never gets brighter than
       // the shipped sky" true by construction, which is what keeps the
       // paper-coloured text readable no matter how the field swings.
-      y = mix(y, max(y, depth), zone);
+      // Hard guarantee, direction chosen per archetype:
+      //   descent → never sample LIGHTER than the gradient (protects paper text)
+      //   reading → never sample DARKER than the gradient (protects dark ink)
+      float guarded = mix(max(y, depth), min(y, depth), uReading);
+      y = mix(y, guarded, zone);
 
       vec3 col = texture2D(uRamp, vec2(0.5, y)).rgb;
 
@@ -235,7 +264,7 @@ const { strength = 4, mode = 'background' } = Astro.props;
       col *= mix(lum, 0.86 + 0.14 * f, zone);
       // Warm bloom where the warp piles up (original) — faded out over the reading
       // zone, since it lightens.
-      col += 0.045 * vec3(0.784, 0.639, 0.416) * smoothstep(0.55, 1.0, length(r)) * (1.0 - zone);
+      col += 0.045 * vec3(0.784, 0.639, 0.416) * smoothstep(0.55, 1.0, length(r)) * (1.0 - zone) * (1.0 - uReading);
 
       // ── DARK THEME needs a DIFFERENT MECHANISM, not more strength ────────
       // Measured luminance range of the two ramps:
@@ -249,7 +278,7 @@ const { strength = 4, mode = 'background' } = Astro.props;
       // phosphor/cyan nebular tint lifted by the warp, which is the same
       // vocabulary as the dark theme's existing atmosphere washes. The terrain's
       // dots still read as the star field; this becomes the nebula behind them.
-      if (uDark > 0.5) {
+      if (uDark > 0.5 && uReading < 0.5) {
         float glow = smoothstep(0.30, 0.95, f);          // where the ink piles up
         float veins = smoothstep(0.45, 1.0, length(r));  // along the warp filaments
         float lift = (glow * 0.72 + veins * 0.45) * uAmp;
@@ -323,6 +352,18 @@ const { strength = 4, mode = 'background' } = Astro.props;
     [0.30, '#ccc4b6'], [0.37, '#a6a8ad'], [0.44, '#7d7e88'], [0.52, '#565660'],
     [0.62, '#3a3833'], [0.78, '#2a2720'], [0.90, '#1d1b16'], [1.00, '#16140f'],
   ];
+  // READING pages (/research, /projects) mirror --reading-grad from tokens.css:
+  // luminous top-to-bottom, never sinking to the ground, so dark ink stays legible.
+  // Its luminance range is TINY by design (0.938 → ~0.83), which is exactly why the
+  // reading variant leans on texture and temperature rather than value swings.
+  const READING_LIGHT_STOPS: Array<[number, string]> = [
+    [0.00, '#f4efe4'], [0.24, '#f1ebe0'], [0.48, '#efe6d4'],
+    [0.74, '#e7ddce'], [1.00, '#dcd5cf'],
+  ];
+  const READING_DARK_STOPS: Array<[number, string]> = [
+    [0.00, '#14171b'], [0.48, '#131619'], [1.00, '#111417'],
+  ];
+
   const DARK_STOPS: Array<[number, string]> = [
     [0.00, '#16191d'], [0.20, '#131619'], [0.40, '#111417'],
     [0.60, '#0e1013'], [0.80, '#0b0d0f'], [1.00, '#08090b'],
@@ -343,7 +384,7 @@ const { strength = 4, mode = 'background' } = Astro.props;
     });
   }
 
-  function buildRamp(dark: boolean): HTMLCanvasElement | null {
+  function buildRamp(dark: boolean, variantOf: () => boolean): HTMLCanvasElement | null {
     const N = 512;
     const c = document.createElement('canvas');
     c.width = 1;
@@ -351,7 +392,11 @@ const { strength = 4, mode = 'background' } = Astro.props;
     const ctx = c.getContext('2d');
     if (!ctx) return null;
     const g = ctx.createLinearGradient(0, 0, 0, N);
-    for (const [pos, hex] of dark ? DARK_STOPS : LIGHT_STOPS) g.addColorStop(pos, hex);
+    const reading = variantOf();
+    const stops = reading
+      ? (dark ? READING_DARK_STOPS : READING_LIGHT_STOPS)
+      : (dark ? DARK_STOPS : LIGHT_STOPS);
+    for (const [pos, hex] of stops) g.addColorStop(pos, hex);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 1, N);
     return c;
@@ -403,6 +448,7 @@ const { strength = 4, mode = 'background' } = Astro.props;
       gate: gl.getUniformLocation(prog, 'uGateTop'),
       dark: gl.getUniformLocation(prog, 'uDark'),
       nebula: gl.getUniformLocation(prog, 'uNebula'),
+      reading: gl.getUniformLocation(prog, 'uReading'),
     };
 
     const tex = gl.createTexture();
@@ -413,12 +459,18 @@ const { strength = 4, mode = 'background' } = Astro.props;
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
+    // Declared BEFORE uploadRamp's first call: reading it from inside buildRamp
+    // while it was still declared further down threw a temporal-dead-zone
+    // ReferenceError, which aborted init — the canvas mounted but never painted
+    // (live=false on every page). A JS throw here looks identical to a shader
+    // failure from the outside, so check both.
+    const isReading = cvs.dataset.variant === 'reading';
     let rampTheme = '';
     function uploadRamp(force = false): void {
       const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
       if (!force && theme === rampTheme) return;
       rampTheme = theme;
-      const ramp = buildRamp(theme === 'dark');
+      const ramp = buildRamp(theme === 'dark', () => isReading);
       if (!ramp) return;
       gl!.activeTexture(gl!.TEXTURE0);
       gl!.bindTexture(gl!.TEXTURE_2D, tex);
@@ -438,6 +490,10 @@ const { strength = 4, mode = 'background' } = Astro.props;
     let gateTop = 0.55;
     function measureGate(): void {
       if (contained) { gateTop = 1.0; return; }
+      // Reading pages have no #mountains — they ARE text top-to-bottom, so the gate
+      // starts at the very top. (uReading also forces zone=1 in the shader; this
+      // keeps the two consistent rather than relying on one of them.)
+      if (isReading) { gateTop = 0.0; return; }
       const content = document.getElementById('mountains');
       if (!content) { gateTop = 0.55; return; }
       const top = content.getBoundingClientRect().top + window.scrollY;
@@ -509,6 +565,7 @@ const { strength = 4, mode = 'background' } = Astro.props;
       // --indigo (#5fb2c9 cyan) — the palette this theme already uses for its
       // atmosphere. Low magnitude: it is a nebula, not a light show.
       gl!.uniform3f(U.nebula, 0.055, 0.105, 0.115);
+      gl!.uniform1f(U.reading, isReading ? 1 : 0);
       gl!.uniform1f(U.gate, gateTop);
       gl!.uniform1f(U.time, (nowMs - t0) / 1000);
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);

@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import FluidSky from '../components/proto/FluidSky.astro';
 import { Image } from 'astro:assets';
 import { calligraphy, photography, photoDefault } from '../data/artworks';
 import SkyWash from '../components/SkyWash.astro';
@@ -10,7 +11,8 @@ import SkyWash from '../components/SkyWash.astro';
   veilLine="an artist by night"
   veilOnLoad={true}
 >
-  <main class="art descent">
+  <main class="art descent is-fluid">
+    <FluidSky strength={4} variant="descent" />
     <SkyWash />
     <!-- TOC rail -->
     <nav class="art-toc" id="art-toc" aria-label="Sections">

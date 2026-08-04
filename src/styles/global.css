@@ -99,6 +99,41 @@ html[data-theme='dark'] .descent::after {
     radial-gradient(90% 20% at 54% 66%, rgba(95,178,201,0.10), transparent 82%);
 }
 
+/* ── The fluid sky, shared across every route ────────────────────────────────
+   FluidSky is an OPAQUE canvas that replaces the page's CSS gradient. It is a
+   negative-z child of .descent, so it paints above the parent's own background
+   but below all content.
+
+   The gradient stays as the FALLBACK and is only suppressed once the canvas has
+   actually painted — the script adds .fluid-live after a successful draw. So no
+   WebGL, mobile (the canvas is display:none under 640px), a shader compile
+   failure, or warp 0 all fall back to the shipped sky, unchanged.
+
+   Both archetypes share this: descent pages keep --descent-grad as the fallback,
+   reading pages keep --reading-grad, because each page's own rule already sets
+   the right one and we only need to know whether to hide it. */
+.descent.is-fluid.fluid-live { background: var(--bg); }
+
+/* Reading pages must NEVER fall through to --bg (a near-black page base), not even
+   for one frame — their text is dark ink. Pin the pale reading ramp as their
+   fluid-live base instead. */
+.research.descent.is-fluid.fluid-live,
+.projects.descent.is-fluid.fluid-live { background: var(--reading-grad); }
+
+/* Explicitly restore each archetype's own gradient when the canvas is off, rather
+   than relying on revert-layer (whose cascade-layer semantics don't apply here —
+   these are all in the same layer, so it would resolve to nothing). */
+html[data-fluid-strength='0'] .descent.is-fluid.fluid-live,
+html[data-fluid='off'] .descent.is-fluid.fluid-live { background: var(--descent-grad); }
+html[data-fluid-strength='0'] .research.descent.is-fluid.fluid-live,
+html[data-fluid='off'] .research.descent.is-fluid.fluid-live,
+html[data-fluid-strength='0'] .projects.descent.is-fluid.fluid-live,
+html[data-fluid='off'] .projects.descent.is-fluid.fluid-live { background: var(--reading-grad); }
+
+/* SkyWash's woven warm/cold strokes are the same broken-colour idea the shader
+   now does natively at higher fidelity; doubling them muddies both. */
+.descent.is-fluid.fluid-live .sky-wash { opacity: 0.35; }
+
 /* Terminal chrome fill (Terminal.tsx is a React island with no <style>, so its
    panel background lives here). Light: warm ink glass. Dark: cool charcoal so
    it sits in the void rather than glowing warm. */
