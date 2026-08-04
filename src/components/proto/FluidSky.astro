@@ -165,7 +165,12 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       // enormous smear per screen, which is exactly why it read as "no difference".
       // 6.2 / 12.7 reproduce the demo's on-screen feature SIZE at viewport scale.
       float sy = uYOffset + (1.0 - vUv.y) * uYSpan;
-      vec2 p = vec2(vUv.x * 6.2, sy * 12.7);
+      // Reading pages get a FINER field. On a descent page one big marbled stratum
+      // per screen is the look; on a text page that reads as one uniform smudge
+      // (which is what the A/B showed: mean Δ 17 but max only 35.7 — nearly flat).
+      // ~2.4x finer gives structure at paragraph scale instead of page scale.
+      float freqK = mix(1.0, 1.9, uReading);
+      vec2 p = vec2(vUv.x * 6.2 * freqK, sy * 12.7 * freqK);
 
       // ── two-level domain warp (Inigo Quilez) — the original gains ──
       vec2 q = vec2(fbm(p + 0.09 * t),
@@ -308,14 +313,30 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       // (never lighter than the paper, so contrast can only improve), at low
       // magnitude — it reads as laid paper with colour in the fibre.
       if (uReading > 0.5) {
-        float ink = smoothstep(0.35, 0.95, f);        // where the warp piles up
-        float veins = smoothstep(0.45, 1.0, length(r));
-        float amt = (ink * 0.55 + veins * 0.35) * uAmp;
-        // warm ochre-side and cool indigo-side, both SUBTRACTIVE from paper so the
-        // page can only get deeper, never brighter than its own gradient
-        vec3 warmTint = vec3(0.055, 0.038, 0.016);    // toward --ochre
-        vec3 coolTint = vec3(0.022, 0.028, 0.042);    // toward --indigo
-        float pick = smoothstep(0.35, 0.65, r.x);
+        // STRENGTHENED after the first additive pass still read as "no fluid".
+        // The failure was twofold and both halves are measurable:
+        //   · magnitude: peak tint was ~0.055 of a channel = ΔL under 0.02, i.e.
+        //     below the perceptual floor on a pale page. The A/B measured a mean
+        //     Δ of 17/255 but with max only 35.7 — a nearly UNIFORM shift, which
+        //     the eye discards as "the page is slightly different" rather than
+        //     seeing structure.
+        //   · contrast shape: smoothstep(0.35,0.95) over an fbm that mostly sits
+        //     near 0.5 compressed everything into a narrow band, so the field had
+        //     no light/dark alternation to read as marbling.
+        // Now: a wider response curve centred on the field's actual mean, and
+        // enough magnitude to clear threshold. Still strictly subtractive, so
+        // contrast against dark ink can only improve.
+        float ink = smoothstep(0.30, 0.72, f);              // centred on fbm's mean
+        float veins = smoothstep(0.38, 0.92, length(r));
+        float amt = (ink * 0.62 + veins * 0.32) * uAmp;
+        // Tuned DOWN by half after the first strengthened pass overshot: at
+        // amt*1.25 the cool side read as saturated BLUE clouds that competed with
+        // the reading rather than sitting under it. The cool tint is also
+        // de-saturated (was 0.050/0.062/0.088) so it reads as cool GREY paper
+        // rather than as sky.
+        vec3 warmTint = vec3(0.095, 0.072, 0.042);          // toward --ochre
+        vec3 coolTint = vec3(0.052, 0.056, 0.066);          // cool grey, not blue
+        float pick = smoothstep(0.30, 0.70, r.x);
         col -= mix(warmTint, coolTint, pick) * amt;
       }
 
