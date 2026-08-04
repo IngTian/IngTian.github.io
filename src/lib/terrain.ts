@@ -85,7 +85,20 @@ export interface TerrainRamp { valley: [number, number, number]; mid: [number, n
 // the other ~316%. Not worth the palette risk.
 // Classic: warm ochre valleys → cool indigo heights.
 //
-// MID cooled from [120,112,96] to [104,108,124]. Measured against the fluid sky the
+// REAL VALUE RANGE, added after the light mountain still read as mush. Measured dot
+// luminance across elevation, before vs after:
+//     before  0.450 / 0.425 / 0.461  -> spread 0.036   (essentially FLAT)
+//     dark    0.323 / 0.536 / 0.869  -> spread 0.546
+// i.e. dark carried 15x more elevation→value information. Each light dot separated
+// from the SKY perfectly well (~0.45), but the dots did not separate from EACH
+// OTHER, so there was no value structure and therefore no readable mountain FORM.
+// That is why raising contrast against the background never fixed it.
+// Now: valley = deep ochre (dark), peak = pale indigo (light), so elevation reads as
+// light on the ridge the way it does in dark theme. Hues stay --ochre → --indigo.
+//
+// (Earlier note, still true: the MID knot was also hue-identical to the sky —
+// measured (r-b) sky +16..+32 vs mid +24 — so it needed cooling regardless.)
+// MID cooled. Measured against the fluid sky the
 // dots now sit on, using (r-b) as a cheap warm/cool axis:
 //     sky   dawn +16 · haze +27 · taupe +32 · warm +22
 //     dots  valley +92 · MID +24 · peak −28
@@ -96,7 +109,7 @@ export interface TerrainRamp { valley: [number, number, number]; mid: [number, n
 //
 // Still --ochre → --indigo: the endpoints are the tokens, only the interior knot
 // moved, so the palette identity holds and no new hue is introduced.
-export const TERRAIN_LIGHT: TerrainRamp = { valley: [150, 110, 58], mid: [104, 108, 124], peak: [109, 118, 137] };
+export const TERRAIN_LIGHT: TerrainRamp = { valley: [92, 64, 30], mid: [116, 118, 132], peak: [176, 186, 206] };
 export const TERRAIN_TERMINAL: TerrainRamp = { valley: [47, 90, 110], mid: [91, 147, 168], peak: [198, 227, 237] };     // Glacier: cyan-blue ice valleys → bright rime peaks
 
 export function colormap(hn: number, ramp: TerrainRamp = TERRAIN_LIGHT): [number, number, number] {

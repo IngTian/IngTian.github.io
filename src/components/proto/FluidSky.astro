@@ -293,6 +293,32 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       // phosphor/cyan nebular tint lifted by the warp, which is the same
       // vocabulary as the dark theme's existing atmosphere washes. The terrain's
       // dots still read as the star field; this becomes the nebula behind them.
+      // ── READING pages: additive texture, because displacement cannot work ──
+      // Measured luminance range of the two ramps:
+      //     descent 0.860  (0.938 -> 0.079)
+      //     reading 0.099  (0.938 -> 0.839)   <- 8.7x smaller
+      // The whole effect works by displacing WHERE along the ramp we sample, so on
+      // the reading ramp there is almost nothing to reveal no matter how far we
+      // move — exactly the problem the dark theme had, and the reason "no fluid at
+      // all" persisted even after the clamp was lifted. Raising the cap further
+      // would only risk the text.
+      //
+      // So reading pages get the same treatment dark theme got: the field ADDS a
+      // tint rather than relocating value. Warm/cool broken colour, ink-side only
+      // (never lighter than the paper, so contrast can only improve), at low
+      // magnitude — it reads as laid paper with colour in the fibre.
+      if (uReading > 0.5) {
+        float ink = smoothstep(0.35, 0.95, f);        // where the warp piles up
+        float veins = smoothstep(0.45, 1.0, length(r));
+        float amt = (ink * 0.55 + veins * 0.35) * uAmp;
+        // warm ochre-side and cool indigo-side, both SUBTRACTIVE from paper so the
+        // page can only get deeper, never brighter than its own gradient
+        vec3 warmTint = vec3(0.055, 0.038, 0.016);    // toward --ochre
+        vec3 coolTint = vec3(0.022, 0.028, 0.042);    // toward --indigo
+        float pick = smoothstep(0.35, 0.65, r.x);
+        col -= mix(warmTint, coolTint, pick) * amt;
+      }
+
       if (uDark > 0.5 && uReading < 0.5) {
         float glow = smoothstep(0.30, 0.95, f);          // where the ink piles up
         float veins = smoothstep(0.45, 1.0, length(r));  // along the warp filaments
@@ -356,7 +382,16 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
           // mathematician at heart"), which sits at roughly depth 0.16-0.22, and
           // fade out on both sides. They read as a moment at the line rather than
           // as a texture over the page.
-          float band = smoothstep(0.10, 0.17, depth) * (1.0 - smoothstep(0.24, 0.36, depth));
+          // MEASURED section depths on the real page:
+          //   heights   0.000-0.202   <- the mountain lives here
+          //   interlude 0.202-0.348
+          //   TAGLINE   0.259-0.293   <- the line itself
+          //   mountains 0.348-0.847
+          // My previous band was 0.10-0.36, which STARTED INSIDE THE HERO and so
+          // put stars in the mountain's own space — the competition that was
+          // reported. Now clamped to the tagline's own rows, fading in and out
+          // within the interlude and never touching heights or mountains.
+          float band = smoothstep(0.215, 0.262, depth) * (1.0 - smoothstep(0.292, 0.338, depth));
           col += tint * (core * 1.05 + halo) * tw * band;
         }
       }
