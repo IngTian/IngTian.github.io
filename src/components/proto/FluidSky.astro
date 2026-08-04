@@ -194,6 +194,24 @@ const { strength = 4, mode = 'background' } = Astro.props;
       float raw = (f - 0.5) * 0.34 * uAmp;
       // positive raw = deeper down the ramp (darker) → the permissive direction
       float disp = raw > 0.0 ? raw * gateDark : raw * gateLight;
+
+      // ── TOP-OF-RAMP BIAS — why the hero looked flat ─────────────────────
+      // Measured luminance of the light ramp's top stops:
+      //     0.00 #f4efe4  0.938
+      //     0.08 #f0eadf  0.920
+      //     0.15 #efe6d4  0.904
+      // A hero viewport spans depth 0.00–0.19, i.e. a luminance range of just
+      // 0.034 — versus 0.336 across 0.23–0.44. So identical displacement shows
+      // ~10x less in the hero: symmetric swings inside four near-identical creams
+      // have almost nothing to reveal, which is exactly the "no fluid in light
+      // theme" report (dusk was rich, the hero was flat).
+      //
+      // Fix: near the top, bias the excursion DOWNWARD so the ink can actually
+      // reach taupe and slate instead of oscillating within cream. Fades out by
+      // depth ~0.30, where the ramp has its own contrast and needs no help.
+      float topLift = 1.0 - smoothstep(0.02, 0.30, depth);
+      disp += 0.5 * abs(raw) * topLift;
+
       float y = clamp(depth + disp, 0.0, 1.0);
 
       vec3 col = texture2D(uRamp, vec2(0.5, y)).rgb;
@@ -227,6 +245,58 @@ const { strength = 4, mode = 'background' } = Astro.props;
         // there, since the text is light too.
         lift *= 1.0 - 0.72 * zone;
         col += uNebula * lift;
+
+        // ── STARS ────────────────────────────────────────────────────────
+        // The dark theme is already the "terminal galaxy" where the terrain's dots
+        // read as a star field; this puts real stars in the nebula BEHIND them,
+        // strongest over the content zone (the deep sky) where the nebula itself
+        // is damped — so the reading zone gains character without gaining haze.
+        //
+        // Real stars are not white: colour tracks temperature (O/B blue-white →
+        // A white → K/M amber), so each star draws its tint from its own hash. A
+        // touch of violet is included because that is what the eye reads as
+        // "deep space" even though few stars are literally violet.
+        // Star lattice in PAGE space (x across the viewport, y including scroll),
+        // so stars are pinned to the sky and scroll with it rather than sliding.
+        // NOTE: this shader has no sp vec2 — the vertical page coordinate is the
+        // float sy. Using sp here was a copy-paste from an earlier revision and
+        // failed to compile (undeclared identifier), which silently hid the canvas.
+        // (Reminder: NEVER use backticks in this file's comments — the shader is a
+        // template literal, so a backtick terminates it and breaks the build.)
+        vec2 starUv = vec2(vUv.x, sy);
+        vec2 cell = floor(starUv * 96.0);
+        vec2 sub = fract(starUv * 96.0);
+        float pick = hash(cell);
+        // ~7% of cells hold a star. The lattice is 96 (was 34): a finer grid with a
+        // lower hit rate gives POINTS at real star density, where the coarse grid
+        // made a few large orbs.
+        if (pick > 0.93) {
+          vec2 jitter = vec2(hash(cell + 3.7), hash(cell + 9.1));
+          float d = length(sub - jitter);
+          // tiny hard core + soft halo
+          // tight core + faint halo — a star is a point source with a little bloom
+          float core = smoothstep(0.055, 0.0, d);
+          float halo = smoothstep(0.20, 0.0, d) * 0.16;
+
+          // TWINKLE: two out-of-phase sines per star, so no two blink together
+          // and the field never pulses in unison.
+          float ph = hash(cell + 17.3) * 6.2831853;
+          float sp2 = 0.55 + hash(cell + 23.9) * 1.5;
+          float tw = 0.55 + 0.45 * sin(uTime * sp2 + ph)
+                          * (0.6 + 0.4 * sin(uTime * sp2 * 0.37 + ph * 2.1));
+
+          // stellar colour by "temperature"
+          float temp2 = hash(cell + 41.7);
+          vec3 tint = temp2 < 0.34
+            ? mix(vec3(0.62, 0.74, 1.00), vec3(0.86, 0.92, 1.00), temp2 / 0.34)   // blue-white
+            : (temp2 < 0.72
+              ? vec3(0.97, 0.97, 1.00)                                            // white
+              : mix(vec3(0.80, 0.72, 1.00), vec3(1.00, 0.86, 0.72), (temp2 - 0.72) / 0.28)); // violet → amber
+
+          // brighter in the deep sky, quiet in the luminous upper reaches
+          float band = smoothstep(0.18, 0.55, depth);
+          col += tint * (core * 1.05 + halo) * tw * band;
+        }
       }
 
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
