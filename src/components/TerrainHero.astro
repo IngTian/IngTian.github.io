@@ -85,7 +85,10 @@ const bubbles = JSON.stringify([
     // built once (EDL is O(n²); the camera is fixed so it never needs recompute).
     // Config is the baked default (shape-reading on) plus this theme's ramp/darkness.
     // Same code path as /terrain-lab, so a value tuned there transfers verbatim.
-    const cfg = { ...TERRAIN_CONFIG_DEFAULTS, ramp, darkness, dotScale };
+    // starfield: the dark theme's dots twinkle as temperature-tinted stars (its
+    // whole conceit is that they read as a star field); light theme keeps the
+    // shipped warm relief untouched.
+    const cfg = { ...TERRAIN_CONFIG_DEFAULTS, ramp, darkness, dotScale, starfield: darkness > 0.5 };
     const ZOOM = cfg.zoom;                 // walkers must use the SAME zoom to stay on the surface
     let grid: GridPoint[] = buildGrid(cfg.edlParams);
 

@@ -178,7 +178,12 @@ const { strength = 4, mode = 'background' } = Astro.props;
       // its lightward excursion is limited. Full ink character, contrast intact.
       float zone = smoothstep(uGateTop, uGateTop + 0.10, depth);
       float gateDark  = 1.0 - 0.25 * zone;   // toward the ground: nearly free
-      float gateLight = 1.0 - 0.72 * zone;   // toward the dawn: restrained
+      // Toward the dawn: 0.90, not 0.72. In LIGHT theme the content zone carries
+      // paper-coloured text on grey ink, and the lightward swing was bright enough
+      // that the text nearly dissolved into the sky. Only the LIGHT direction is
+      // clamped harder; the dark direction stays free, so the ink keeps its
+      // character (that was the point of making the gate asymmetric).
+      float gateLight = 1.0 - 0.90 * zone;
 
       // Perturb WHERE along the descent this pixel samples → marbled strata.
       //
@@ -213,6 +218,13 @@ const { strength = 4, mode = 'background' } = Astro.props;
       disp += 0.5 * abs(raw) * topLift;
 
       float y = clamp(depth + disp, 0.0, 1.0);
+
+      // HARD FLOOR over the reading zone: the sampled point may never sit higher
+      // (lighter) on the ramp than the gradient's own value there. A guarantee
+      // rather than a tuning — it makes "the content zone never gets brighter than
+      // the shipped sky" true by construction, which is what keeps the
+      // paper-coloured text readable no matter how the field swings.
+      y = mix(y, max(y, depth), zone);
 
       vec3 col = texture2D(uRamp, vec2(0.5, y)).rgb;
 
@@ -517,9 +529,22 @@ const { strength = 4, mode = 'background' } = Astro.props;
     let rafId = 0;
     let running = false;
     let last = 0;
+    // true while a scroll gesture is in progress → draw at full display rate
+    let scrolling = false;
 
     function loop(now: number): void {
-      if (now - last > 32) { draw(now); last = now; }   // ~30fps
+      // ── Frame pacing, and why scrolling looked laggy ────────────────────
+      // The remaining "lag" was not slowness — it was a FRAME-RATE MISMATCH. The
+      // page scrolls at the display's 60fps while this canvas redrew at 30fps, and
+      // the sky's vertical position is scroll-derived, so during a scroll the
+      // background trailed the content by up to 32ms. The eye reads that as the
+      // background stuttering against the text.
+      //
+      // Fix: while scrolling, draw EVERY frame so the sky is locked to the content.
+      // When the page is still, fall back to 30fps — the ink drift is slow enough
+      // that nobody can tell, and it halves idle cost.
+      const budget = scrolling ? 0 : 32;
+      if (now - last >= budget) { draw(now); last = now; }
       rafId = requestAnimationFrame(loop);
     }
     function start(): void {
@@ -539,10 +564,19 @@ const { strength = 4, mode = 'background' } = Astro.props;
 
     // Frozen state still needs a repaint on scroll (the depth window is
     // scroll-derived) or it would look like a stuck decal.
+    // `scrolling` stays true for a moment after the last scroll event, so the
+    // full-rate window covers the whole gesture including momentum/inertia.
     let scrollRaf = 0;
+    let scrollIdleT = 0;
     const onScroll = () => {
-      if (!reduce || scrollRaf) return;
-      scrollRaf = requestAnimationFrame(() => { scrollRaf = 0; draw(performance.now()); });
+      scrolling = true;
+      window.clearTimeout(scrollIdleT);
+      scrollIdleT = window.setTimeout(() => { scrolling = false; }, 160);
+      // Under reduced motion there is no loop, so a scroll still needs one repaint
+      // (the sky's depth window is scroll-derived and would otherwise be stale).
+      if (reduce && !scrollRaf) {
+        scrollRaf = requestAnimationFrame(() => { scrollRaf = 0; draw(performance.now()); });
+      }
     };
     window.addEventListener('scroll', onScroll, { passive: true });
 
@@ -568,6 +602,7 @@ const { strength = 4, mode = 'background' } = Astro.props;
       window.clearTimeout(resizeT);
       window.clearTimeout(settle);
       if (scrollRaf) cancelAnimationFrame(scrollRaf);
+      window.clearTimeout(scrollIdleT);
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
