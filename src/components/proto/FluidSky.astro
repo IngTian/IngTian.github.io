@@ -52,8 +52,18 @@ interface Props {
    *   pale background down to #16140f underneath dark text.
    */
   variant?: 'descent' | 'reading';
+  /**
+   * Pointer-reactive droplets. OFF by default.
+   *
+   * The implementation is complete and measured (continuous 85ms cadence, ripples
+   * interpolated along the pointer path, ~14/255 contribution against the sky's own
+   * ~135 ambient churn) but the interaction was judged a step too far for the piece —
+   * the still sky is the finished composition. Left in place, gated, so re-enabling
+   * is one prop rather than an archaeology exercise.
+   */
+  interactive?: boolean;
 }
-const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
+const { strength = 4, mode = 'background', variant = 'descent', interactive = false } = Astro.props;
 ---
 <canvas
   class:list={['fluid-sky', mode === 'contained' ? 'is-contained' : 'is-background']}
@@ -62,6 +72,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
   data-strength={String(strength)}
   data-mode={mode}
   data-variant={variant}
+  data-interactive={interactive ? "1" : "0"}
 ></canvas>
 
 <style>
@@ -640,6 +651,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     // (live=false on every page). A JS throw here looks identical to a shader
     // failure from the outside, so check both.
     const isReading = cvs.dataset.variant === 'reading';
+    const interactive = cvs.dataset.interactive === '1';
     let rampTheme = '';
     function uploadRamp(force = false): void {
       const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
@@ -726,7 +738,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     let dropClock = 0;
 
     function advancePointer(dt: number): void {
-      if (!haveRaw) return;
+      if (!interactive || !haveRaw) return;
       dropClock += dt;
       if (dropClock < DROP_INTERVAL) return;
 
@@ -927,7 +939,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       }
     };
     window.addEventListener('scroll', onScroll, { passive: true });
-    if (!contained) window.addEventListener('pointermove', onPointerMove, { passive: true });
+    if (interactive && !contained) window.addEventListener('pointermove', onPointerMove, { passive: true });
 
     let resizeT = 0;
     const onResize = () => {
