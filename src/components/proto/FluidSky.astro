@@ -1,48 +1,53 @@
 ---
-// FluidSky (PROTOTYPE) — the Monet sky, made to FLOW.
+// FluidSky (PROTOTYPE) — the Monet sky's ink diffusion, as an UPPER-SKY
+// ATMOSPHERE layer that paints ONCE.
 //
-// The load-bearing decision: this does NOT replace --descent-grad. The tuned
-// gradient stays the single source of truth for the sky's colour story; this
-// canvas rides OVER it as a low-amplitude MODULATION via mix-blend-mode:
-// soft-light. The shader centres its output on mid-grey, and soft-light over
-// mid-grey is a no-op — so where the field is neutral the Monet palette shows
-// through byte-identical, and where it isn't, the sky flows lighter/darker with
-// a whisper of warm/cool temperature swing (Monet broken colour, not grey haze).
+// ── Why this was rewritten ────────────────────────────────────────────────
+// The previous version was a full-viewport `position: fixed` canvas with
+// `mix-blend-mode`, redrawing its shader ~15-30×/sec forever. Two consequences,
+// both reported:
 //
-// Consequences of "combine" over "replace":
-//   · the palette can't drift — we never re-author the colours
-//   · both themes work for free (the gradient already re-themes itself)
-//   · if WebGL is missing the page is EXACTLY today's site, finished-looking
+//   1. COST. The noise math was only half the problem. A full-screen blended
+//      layer forces the compositor to re-read and re-blend the backdrop on every
+//      frame it changes — that defeats GPU layer caching for the whole page, and
+//      `fixed` meant it never scrolled off. A permanent tax on every pixel.
+//   2. LEGIBILITY. A whole-page layer necessarily covers the Mountains content
+//      zone, which is light paper text on grey ink. Luminance modulation there
+//      attacks text contrast directly. The effect was fighting the reading.
 //
-// Scroll-coupled: page position feeds a uniform so the strata slide past as you
-// descend — the descent metaphor survives.
+// ── The architecture now ──────────────────────────────────────────────────
+// Exactly what the shipped site already does for atmosphere (`.descent::before`
+// is a 120vh top-anchored wash that drifts via transform):
 //
-// Perf: 0.5× internal resolution (smooth noise hides it), ~30fps, paused
-// offscreen AND on tab-hide, one static frame painted first, full GL teardown
-// on astro:page-load re-init (TerrainHero's lifecycle pattern).
+//   · ABSOLUTE, not fixed — anchored to the top of the descent and ~200vh tall,
+//     so it covers Heights + Interlude and SCROLLS AWAY before Mountains. The
+//     content zone is never under it. Solves (2) structurally, not by tuning.
+//   · DRAWN ONCE. No rAF loop. The shader renders a single frame at init (and on
+//     resize / theme change). Per-frame fragment cost is zero, so (1) is solved
+//     at the root rather than optimized around.
+//   · LIFE comes from a slow CSS transform drift — compositor-only, the one kind
+//     of motion the taste rules allow, and the same technique as sky-drift-a/b.
+//     The static state is finished, so reduced-motion just gets the still.
+//   · MASKED with a vertical gradient: fades in below the hero's text band, is
+//     strongest through the dusk/interlude turn, and is fully transparent before
+//     the content starts. The ink lands where "an artist by night" lands.
 //
-// STRENGTH is a live variable (html[data-fluid-strength]) because the first tune
-// landed BELOW the perceptual threshold: measured mean Δ was 2.5/255 in the
-// content zone (≈1.5% of pixels changed by >8) — invisible. Calibrating from
-// invisible is impossible, so the levels are exposed for A/B.
+// Still combine-not-replace: the tuned --descent-grad remains the source of
+// truth; this modulates over it. No WebGL → nothing renders → today's site.
 interface Props {
   /** 0 = off · 1 subtle · 2 medium · 3 strong · 4 too-much (the ceiling) */
   strength?: 0 | 1 | 2 | 3 | 4;
   /**
-   * `fixed` (default) — one sky for the whole page, scroll carried by a uniform.
-   * `contained` — absolute inside the nearest positioned ancestor, for the
-   * ladder page where SEVERAL independent skies must coexist. Required because
-   * position:fixed took every rung's canvas out of flow: all five covered the
-   * whole viewport and only the last-painted one was visible, so the per-rung
-   * ladder measurements were meaningless (identical numbers across levels).
+   * `atmosphere` (default) — top-anchored, masked, scrolls away before content.
+   * `contained` — fills its positioned ancestor with no mask, for the /proto-ladder
+   *   comparison rungs where several independent skies must coexist.
    */
-  mode?: 'fixed' | 'contained';
+  mode?: 'atmosphere' | 'contained';
 }
-const { strength = 2, mode = 'fixed' } = Astro.props;
+const { strength = 1, mode = 'atmosphere' } = Astro.props;
 ---
 <canvas
-  class:list={['fluid-sky', mode === 'contained' && 'is-contained']}
-  id={mode === 'fixed' ? 'fluid-sky' : undefined}
+  class:list={['fluid-sky', mode === 'contained' ? 'is-contained' : 'is-atmosphere']}
   data-fluid-canvas
   aria-hidden="true"
   data-strength={String(strength)}
@@ -50,66 +55,97 @@ const { strength = 2, mode = 'fixed' } = Astro.props;
 ></canvas>
 
 <style>
-  /* position:fixed + z-index:-1 INSIDE main.descent — negative-z children paint
-     above the parent's own background (the gradient) but below all content, the
-     same slot SkyWash uses. Fixed (not absolute) keeps the canvas viewport-sized
-     instead of page-sized; scroll is carried by a uniform instead. */
   .fluid-sky {
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    width: 100%;
-    height: 100%;
+    position: absolute;
     pointer-events: none;
     display: block;
-  }
-  /* contained: stays inside its rung instead of covering the viewport */
-  .fluid-sky.is-contained {
-    position: absolute;
-    /* overlay, not soft-light — see the ladder comment below for the measurement
-       that forced this change. */
+    z-index: -1;            /* behind content, above the gradient — SkyWash's slot */
     mix-blend-mode: overlay;
-    opacity: var(--fluid-op, 0.48);
+    opacity: var(--fluid-op, 0.30);
   }
 
-  /* ── The strength ladder ────────────────────────────────────────────────
-     ALL levels now use `overlay`, not soft-light. soft-light against a
-     near-neutral source is mathematically close to an identity op, which is what
-     made levels 1–3 measure 0.3–0.5/255 (invisible) while level 4 — the only one
-     that had already been switched to overlay — measured 51. Same blend at every
-     rung is what makes the ladder monotonic instead of a cliff. */
+  /* ── ATMOSPHERE: top-anchored, ends before the content zone ─────────────
+     200vh covers Heights (108vh) + Interlude (78vh) with margin. Because it is
+     absolute inside .descent (not fixed), it scrolls off naturally and the
+     Mountains zone is never underneath it. */
+  .fluid-sky.is-atmosphere {
+    top: 0;
+    left: 0;
+    right: 0;
+    /* Height is set in JS from the ACTUAL top of #mountains — vh arithmetic can't
+       get this right (Heights carries pb-[12vh], sections use min-height, and the
+       viewport unit basis differs from layout height). Guessing gave a measured
+       200vh → 165px overlap, then 186vh → 36px. The fallback below is only for
+       the pre-script paint. */
+    height: 186vh;
+    /* Fade in under the hero's text band, peak through the dusk turn, gone well
+       before Mountains. This is also why the effect no longer costs legibility:
+       it is simply not present where the dense text is. */
+    --fluid-mask: linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(0, 0, 0, 0.35) 12%,
+      rgba(0, 0, 0, 0.85) 30%,
+      rgba(0, 0, 0, 1) 46%,
+      rgba(0, 0, 0, 0.9) 62%,
+      rgba(0, 0, 0, 0.45) 78%,
+      transparent 92%
+    );
+    -webkit-mask-image: var(--fluid-mask);
+    mask-image: var(--fluid-mask);
+  }
+
+  /* ── CONTAINED: the ladder rungs ────────────────────────────────────────── */
+  .fluid-sky.is-contained {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ── Strength ladder ────────────────────────────────────────────────────
+     Lower across the board than before: the layer is now confined to the bright
+     upper sky, where overlay bites harder than it did averaged over the whole
+     page. Level 1 is the default. */
   .fluid-sky[data-strength='0'] { display: none; }
   .fluid-sky[data-strength='1'] { --fluid-op: 0.30; }
-  .fluid-sky[data-strength='2'] { --fluid-op: 0.48; }
-  .fluid-sky[data-strength='3'] { --fluid-op: 0.68; }
-  .fluid-sky[data-strength='4'] { --fluid-op: 0.90; }
+  .fluid-sky[data-strength='2'] { --fluid-op: 0.44; }
+  .fluid-sky[data-strength='3'] { --fluid-op: 0.60; }
+  .fluid-sky[data-strength='4'] { --fluid-op: 0.82; }
 
-  /* Dark theme is a charcoal void — overlay on near-black lifts hard, so every
-     level pulls back. */
-  :global(html[data-theme='dark']) .fluid-sky[data-strength='1'] { --fluid-op: 0.18; }
-  :global(html[data-theme='dark']) .fluid-sky[data-strength='2'] { --fluid-op: 0.30; }
-  :global(html[data-theme='dark']) .fluid-sky[data-strength='3'] { --fluid-op: 0.44; }
-  :global(html[data-theme='dark']) .fluid-sky[data-strength='4'] { --fluid-op: 0.62; }
+  /* Dark theme: overlay on near-black lifts hard — pull every level back. */
+  :global(html[data-theme='dark']) .fluid-sky[data-strength='1'] { --fluid-op: 0.16; }
+  :global(html[data-theme='dark']) .fluid-sky[data-strength='2'] { --fluid-op: 0.26; }
+  :global(html[data-theme='dark']) .fluid-sky[data-strength='3'] { --fluid-op: 0.38; }
+  :global(html[data-theme='dark']) .fluid-sky[data-strength='4'] { --fluid-op: 0.54; }
 
-  /* Live override from the ladder UI, so a level can be flipped without a reload.
-     BUG FIXED HERE: these rules used to also set `display:block`, which beat the
-     [data-strength='0'] { display:none } rule on specificity — so "level 0" was
-     never actually OFF, and every ladder measurement was taken against a
-     fluid-on baseline. Only the OFF rule touches display now. */
+  /* Live override for the prototype panels. */
   :global(html[data-fluid-strength='0']) .fluid-sky { display: none !important; }
   :global(html[data-fluid-strength='1']) .fluid-sky { --fluid-op: 0.30; }
-  :global(html[data-fluid-strength='2']) .fluid-sky { --fluid-op: 0.48; }
-  :global(html[data-fluid-strength='3']) .fluid-sky { --fluid-op: 0.68; }
-  :global(html[data-fluid-strength='4']) .fluid-sky { --fluid-op: 0.90; }
+  :global(html[data-fluid-strength='2']) .fluid-sky { --fluid-op: 0.44; }
+  :global(html[data-fluid-strength='3']) .fluid-sky { --fluid-op: 0.60; }
+  :global(html[data-fluid-strength='4']) .fluid-sky { --fluid-op: 0.82; }
 
-  /* Layer kill-switch for A/B-ing in the prototype. */
+  /* Layer kill-switch. */
   :global(html[data-fluid='off']) .fluid-sky { display: none; }
 
-  /* PERF: phones pay the most for a full-screen shader and benefit least (the
-     sky is mostly hidden behind content on a narrow viewport). Skip it — the
-     shipped CSS gradient is the finished fallback. */
+  /* Phones: the sky is mostly hidden behind content on a narrow viewport, so the
+     layer pays for itself least there. The CSS gradient is the finished state. */
   @media (max-width: 640px) {
     .fluid-sky { display: none; }
+  }
+
+  /* ── The only motion: a slow compositor-only drift ───────────────────────
+     transform/opacity only, never a repaint of the shader. The still frame is
+     the finished composition, so reduced-motion loses nothing. */
+  @media (prefers-reduced-motion: no-preference) {
+    .fluid-sky.is-atmosphere {
+      will-change: transform;
+      animation: fluid-drift 68s ease-in-out infinite alternate;
+    }
+    @keyframes fluid-drift {
+      from { transform: translate3d(0, 0, 0) scale(1.04); }
+      to   { transform: translate3d(-1.2%, 1.1%, 0) scale(1.10); }
+    }
   }
 </style>
 
@@ -125,19 +161,19 @@ const { strength = 2, mode = 'fixed' } = Astro.props;
     }
   `;
 
-  // Domain-warped fBm (Inigo Quilez's two-level warp). The output is a
-  // MODULATION centred on 0.5, not a colour — see the component comment.
+  // Domain-warped fBm (Inigo Quilez's two-level warp), drawn ONCE.
+  //
+  // Because there is no per-frame budget any more, the quality knobs go back UP:
+  // 4 octaves instead of 3, and the sin()-free hash is kept. A single draw of a
+  // ~250k-pixel field is negligible, so the earlier tradeoffs (3 octaves, 0.35x
+  // scale, 15fps, adaptive throttle) are all obsolete — they existed only to make
+  // a continuous loop affordable.
   const FRAG = `
     precision highp float;
     varying vec2 vUv;
-    uniform float uTime;
-    uniform float uScroll;
     uniform float uAmp;
+    uniform float uSeed;
 
-    // PERF: sin() was the hot instruction — the old hash ran 4 sin() per noise
-    // lookup, and the two-level warp needs 5 fbm calls, so at 5 octaves that was
-    // ~100 sin() PER PIXEL (~1e9/sec at 324k px · 30fps). This hash is pure
-    // fract/dot arithmetic: same visual character, a fraction of the cost.
     float hash(vec2 p) {
       p = fract(p * vec2(443.897, 441.423));
       p += dot(p, p + 19.19);
@@ -146,55 +182,33 @@ const { strength = 2, mode = 'fixed' } = Astro.props;
     float noise(vec2 p) {
       vec2 i = floor(p), f = fract(p);
       vec2 u = f * f * (3.0 - 2.0 * f);
-      return mix(mix(hash(i),               hash(i + vec2(1.0, 0.0)), u.x),
-                 mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+      return mix(mix(hash(i),                 hash(i + vec2(1.0, 0.0)), u.x),
+                 mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
     }
-    // 3 octaves, not 5. The upper two octaves contributed detail finer than the
-    // 0.35x internal resolution can even represent — they were paid for and then
-    // thrown away by the upscale.
     float fbm(vec2 p) {
       float v = 0.0, a = 0.5;
-      for (int i = 0; i < 3; i++) { v += a * noise(p); p *= 2.02; a *= 0.5; }
+      for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.02; a *= 0.5; }
       return v;
     }
 
     void main() {
-      // uScroll shifts the sampled window so strata slide past as you descend.
-      // Frequency raised from 1.45 after the A/B: the low-frequency version made
-      // a few big blobs that read as smudged glass over the content zone. Finer
-      // strata read as ink diffusing in water — which is the actual reference.
-      vec2 p = vec2(vUv.x * 3.1, (1.0 - vUv.y + uScroll) * 3.1);
+      vec2 p = vec2(vUv.x * 3.1, (1.0 - vUv.y) * 3.1) + uSeed;
 
-      // two-level domain warp — this is what makes it read as viscous ink
-      vec2 q = vec2(fbm(p + 0.052 * uTime),
-                    fbm(p + vec2(5.2, 1.3) - 0.040 * uTime));
-      vec2 r = vec2(fbm(p + 2.9 * q + vec2(1.7, 9.2) + 0.030 * uTime),
-                    fbm(p + 2.9 * q + vec2(8.3, 2.8) - 0.025 * uTime));
+      // two-level domain warp — what makes it read as viscous ink, not blur
+      vec2 q = vec2(fbm(p), fbm(p + vec2(5.2, 1.3)));
+      vec2 r = vec2(fbm(p + 2.9 * q + vec2(1.7, 9.2)),
+                    fbm(p + 2.9 * q + vec2(8.3, 2.8)));
       float f = fbm(p + 2.6 * r);
 
-      // ── Why this is not a grey field any more ───────────────────────────
-      // The first implementation emitted 0.5 + (f-0.5)*amp and composited with
-      // soft-light. Centring on mid-grey made the blend a near-identity, so the
-      // warp field barely reached the page: measured Δ was 0.3–0.5/255 across
-      // levels 1–3 (invisible), then jumped to 51 at level 4 — a 110× cliff
-      // between adjacent levels, which is the signature of an effect that isn't
-      // actually compositing. Tuning opacity could never fix that.
-      //
-      // Now the field drives CONTRAST and TEMPERATURE with real range, and the
-      // strata come from banding the warp field rather than from luminance
-      // wobble. Output still averages ~0.5 so the Monet gradient is preserved on
-      // average, but locally it has enough amplitude to be seen.
-
-      // Stratify: fold the warp field into soft bands — this is what reads as
-      // ink diffusing in water rather than as a soft vertical blur.
+      // Stratify: fold the warp field into soft bands. This is the difference
+      // between "ink diffusing in water" and "a soft vertical blur".
       float bands = sin((f * 6.2831853) * 1.6 + length(r) * 2.4);
       float strata = smoothstep(-0.65, 0.65, bands);
 
-      // combine the raw field with the banding, then push contrast by amplitude
-      float mix1 = mix(f, strata, 0.55);
-      float m = 0.5 + (mix1 - 0.5) * (uAmp * 2.6);
+      float mixed = mix(f, strata, 0.55);
+      float m = 0.5 + (mixed - 0.5) * (uAmp * 2.6);
 
-      // warm/cool broken colour along the warp axis, scaled with amplitude
+      // warm/cool broken colour along the warp axis — Monet, not grey haze
       float temp = (r.x - r.y) * 0.42 * uAmp;
 
       gl_FragColor = vec4(
@@ -206,24 +220,23 @@ const { strength = 2, mode = 'fixed' } = Astro.props;
     }
   `;
 
-  // One teardown per canvas — the ladder page mounts several independent skies,
-  // so a single module-level handle would leak all but the last.
+  // One teardown per canvas (the ladder page mounts several).
   const teardowns: Array<() => void> = [];
 
   function initAll(): void {
     while (teardowns.length) teardowns.pop()!();
-    const all = document.querySelectorAll<HTMLCanvasElement>('[data-fluid-canvas]');
-    all.forEach((c) => {
+    document.querySelectorAll<HTMLCanvasElement>('[data-fluid-canvas]').forEach((c) => {
       const t = initOne(c);
       if (t) teardowns.push(t);
     });
   }
 
   function initOne(cvs: HTMLCanvasElement): (() => void) | null {
+    // Nothing to do if CSS has removed the layer (mobile, or strength 0).
+    if (getComputedStyle(cvs).display === 'none') return null;
 
     const gl = (cvs.getContext('webgl', { antialias: false, alpha: true, depth: false })
       || cvs.getContext('experimental-webgl', { antialias: false, alpha: true, depth: false })) as WebGLRenderingContext | null;
-    // No WebGL → hide the layer entirely. The page falls back to today's site.
     if (!gl) { cvs.style.display = 'none'; return null; }
 
     function compile(type: number, src: string): WebGLShader | null {
@@ -231,10 +244,7 @@ const { strength = 2, mode = 'fixed' } = Astro.props;
       if (!sh) return null;
       gl!.shaderSource(sh, src);
       gl!.compileShader(sh);
-      if (!gl!.getShaderParameter(sh, gl!.COMPILE_STATUS)) {
-        gl!.deleteShader(sh);
-        return null;
-      }
+      if (!gl!.getShaderParameter(sh, gl!.COMPILE_STATUS)) { gl!.deleteShader(sh); return null; }
       return sh;
     }
 
@@ -257,133 +267,77 @@ const { strength = 2, mode = 'fixed' } = Astro.props;
     gl.enableVertexAttribArray(aPos);
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
-    const uTime = gl.getUniformLocation(prog, 'uTime');
-    const uScroll = gl.getUniformLocation(prog, 'uScroll');
     const uAmp = gl.getUniformLocation(prog, 'uAmp');
+    const uSeed = gl.getUniformLocation(prog, 'uSeed');
 
-    // Amplitude — how far the sky may deviate from the tuned gradient. This is
-    // the OTHER half of strength: opacity alone can't reach the ceiling, because
-    // a low-amplitude field faded up just looks like flat grey. Amplitude is
-    // what makes the strata legible as strata.
-    const AMP_BY_LEVEL = [0, 0.30, 0.40, 0.78, 1.15];
-    function ampFor(level: number): number {
-      return AMP_BY_LEVEL[Math.max(0, Math.min(4, level))] ?? 0.40;
-    }
-    function currentLevel(): number {
+    const AMP_BY_LEVEL = [0, 0.34, 0.46, 0.72, 1.05];
+    function level(): number {
       const live = document.documentElement.dataset.fluidStrength;
       if (live !== undefined) return Number(live);
-      return Number(cvs!.dataset.strength ?? '2');
+      return Number(cvs.dataset.strength ?? '1');
     }
-    let amp = ampFor(currentLevel());
-    gl.uniform1f(uAmp, amp);
+    // Each contained rung gets its own slice of the field so the ladder panels
+    // aren't five copies of the same picture.
+    const seed = cvs.dataset.mode === 'contained' ? level() * 7.3 : 0;
+    gl.uniform1f(uSeed, seed);
 
-    // PERF: 0.35× internal resolution (was 0.5×). Cost is quadratic in this
-    // number — 0.5→0.35 removes ~51% of all fragment work — and because the field
-    // is smooth low-frequency noise the upscale is invisible. Combined with the
-    // 3-octave fbm and the sin()-free hash, fragment cost is down ~6× overall.
-    const SCALE = 0.35;
-    function resize(): void {
-      const w = Math.max(1, Math.round(cvs!.clientWidth * SCALE));
-      const h = Math.max(1, Math.round(cvs!.clientHeight * SCALE));
-      if (cvs!.width !== w || cvs!.height !== h) {
-        cvs!.width = w;
-        cvs!.height = h;
+    // 0.5× internal resolution. Higher than the old 0.35× because a ONE-TIME
+    // draw can afford quality; the smooth field still hides the upscale.
+    const SCALE = 0.5;
+
+    // Clamp the atmosphere layer to end exactly where the content zone begins.
+    // Measured, not computed from vh: 200vh overlapped #mountains by 165px and
+    // 186vh by 36px, because Heights carries pb-[12vh] and both sections use
+    // min-height. Reading the real offset is the only reliable way, and it keeps
+    // working if section heights ever change.
+    function fitToContent(): void {
+      if (cvs.dataset.mode === 'contained') return;
+      const content = document.getElementById('mountains');
+      const host = cvs.offsetParent as HTMLElement | null;
+      if (!content || !host) return;
+      const top = content.getBoundingClientRect().top + window.scrollY;
+      const hostTop = host.getBoundingClientRect().top + window.scrollY;
+      const h = Math.max(0, Math.round(top - hostTop));
+      if (h > 0) cvs.style.height = `${h}px`;
+    }
+
+    function draw(): void {
+      fitToContent();
+      const w = Math.max(1, Math.round(cvs.clientWidth * SCALE));
+      const h = Math.max(1, Math.round(cvs.clientHeight * SCALE));
+      if (cvs.width !== w || cvs.height !== h) {
+        cvs.width = w;
+        cvs.height = h;
         gl!.viewport(0, 0, w, h);
       }
-    }
-
-    // In `fixed` mode the canvas is viewport-locked, so page scroll IS the
-    // sampling window — that's what makes descending feel like descending.
-    // In `contained` mode the canvas scrolls with its own rung, so adding page
-    // scroll on top would double-count and every rung would sample nearly the
-    // same slice; a fixed per-rung offset keeps each panel's field distinct.
-    const contained = cvs.dataset.mode === 'contained';
-    function scrollUnits(): number {
-      if (contained) return 0;
-      const vh = window.innerHeight || 1;
-      return window.scrollY / vh;
-    }
-
-    function draw(tSec: number): void {
-      resize();
-      // Re-read the level each frame so the ladder UI takes effect live.
-      const want = ampFor(currentLevel());
-      if (want !== amp) { amp = want; gl!.uniform1f(uAmp, amp); }
-      gl!.uniform1f(uTime, tSec);
-      gl!.uniform1f(uScroll, scrollUnits());
+      gl!.uniform1f(uAmp, AMP_BY_LEVEL[Math.max(0, Math.min(4, level()))] ?? 0.34);
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
     }
 
-    // One finished frame immediately — instant paint, and the guaranteed
-    // reduced-motion / pre-loop baseline.
-    draw(0);
+    draw();
 
-    const reduce = prefersReducedMotion();
-    const onResize = () => { if (reduce) draw(0); };
+    // Redraw only on events that actually change the picture — never per frame.
+    let resizeTimer = 0;
+    const onResize = () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(draw, 180);
+    };
     window.addEventListener('resize', onResize);
-    // Under reduced motion the strata are frozen, but the sky must still track
-    // scroll or it would look like a stuck decal.
-    const onScroll = () => { if (reduce) draw(0); };
-    window.addEventListener('scroll', onScroll, { passive: true });
 
-    let rafId = 0;
-    let running = false;
-    let last = 0;
-    let io: IntersectionObserver | null = null;
-    const t0 = performance.now();
+    // The prototype panels flip data-fluid-strength; amplitude is baked into the
+    // single draw, so watch for it and redraw once when it changes.
+    const mo = new MutationObserver(() => draw());
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-fluid-strength', 'data-theme'] });
 
-    // PERF: ~15fps, not 30. The strata drift at ~0.05 units/sec — at that speed
-    // 15fps is indistinguishable from 30 (nothing moves far enough between
-    // frames to alias) and it halves the draw count.
-    //
-    // Plus an adaptive guard: if a draw ever costs more than ~8ms the device is
-    // struggling, so drop to ~8fps rather than degrade the whole page. This is
-    // what keeps the effect from taxing a weaker GPU.
-    let interval = 66;
-    let slowStrikes = 0;
-    function loop(now: number): void {
-      if (now - last > interval) {
-        const t1 = performance.now();
-        draw((now - t0) / 1000);
-        const cost = performance.now() - t1;
-        if (cost > 8) {
-          if (++slowStrikes >= 3) interval = 125;   // ~8fps
-        } else if (slowStrikes > 0) {
-          slowStrikes--;
-        }
-        last = now;
-      }
-      rafId = requestAnimationFrame(loop);
-    }
-    function start(): void {
-      if (running || reduce || document.hidden) return;
-      running = true; last = 0;
-      rafId = requestAnimationFrame(loop);
-    }
-    function stop(): void {
-      if (!running) return;
-      running = false;
-      cancelAnimationFrame(rafId);
-      rafId = 0;
-    }
-
-    const onVis = () => { if (document.hidden) stop(); else start(); };
-
-    if (!reduce) {
-      document.addEventListener('visibilitychange', onVis);
-      io = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting) start(); else stop();
-      }, { threshold: 0 });
-      io.observe(cvs);
-    }
+    // NOTE: no rAF loop, no IntersectionObserver, no visibilitychange handler —
+    // there is no ongoing work to pause. prefersReducedMotion() is consulted only
+    // by the CSS drift; the painted frame is identical either way.
+    void prefersReducedMotion;
 
     return () => {
-      stop();
+      window.clearTimeout(resizeTimer);
       window.removeEventListener('resize', onResize);
-      window.removeEventListener('scroll', onScroll);
-      document.removeEventListener('visibilitychange', onVis);
-      io?.disconnect();
-      // Release GL objects so a View-Transition re-init doesn't leak contexts.
+      mo.disconnect();
       gl.deleteBuffer(buf);
       gl.deleteProgram(prog);
       gl.deleteShader(vs);
