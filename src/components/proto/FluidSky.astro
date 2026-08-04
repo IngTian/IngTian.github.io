@@ -158,11 +158,25 @@ const { strength = 4, mode = 'background' } = Astro.props;
       // page depth of this pixel (0 = dawn, 1 = ground)
       float depth = clamp(uDepth0 + (1.0 - vUv.y) * uDepthSpan, 0.0, 1.0);
 
-      // LEGIBILITY GATE — the one addition the original didn't need (it was a
-      // 250px panel with no text over it). Vertical displacement is what changes
-      // luminance, so it is what can wreck contrast; damp it hard once the
-      // reading zone starts, leave the open sky untouched.
-      float gate = 1.0 - 0.86 * smoothstep(uGateTop, uGateTop + 0.06, depth);
+      // ── LEGIBILITY GATE, rewritten ──────────────────────────────────────
+      // The old gate was 1 - 0.86*smoothstep(gateTop, gateTop+0.06, depth),
+      // which pinned displacement to 14% over the whole content zone. Measured in
+      // ramp units that left 0.057 — under HALF a palette band — so Mountains got
+      // neither clean colour nor real ink, just a faint mottled mush. That is the
+      // "weird" background.
+      //
+      // The insight: what threatens text is not displacement per se, it is
+      // displacement that DARKENS the sky toward the paper-coloured text. Pulling
+      // the sample point UP the ramp (toward lighter dawn colours) is harmless
+      // here — the text is light, so a lighter background is what hurts, and a
+      // DARKER one actually helps.
+      //
+      // So instead of one scalar clamp, the gate is now ASYMMETRIC: over the
+      // reading zone the ink may still swing generously toward the dark end while
+      // its lightward excursion is limited. Full ink character, contrast intact.
+      float zone = smoothstep(uGateTop, uGateTop + 0.10, depth);
+      float gateDark  = 1.0 - 0.25 * zone;   // toward the ground: nearly free
+      float gateLight = 1.0 - 0.72 * zone;   // toward the dawn: restrained
 
       // Perturb WHERE along the descent this pixel samples → marbled strata.
       //
@@ -172,17 +186,24 @@ const { strength = 4, mode = 'background' } = Astro.props;
       // depth 0.00–0.19 — all cream — so the same 0.46 never left the cream band
       // and produced almost no visible change.
       //
-      // Fix: displace in units of the RAMP, not of the local viewport window. 0.30
-      // is ~1.6 palette bands, so the ink genuinely carries taupe and slate up into
+      // Fix: displace in units of the RAMP, not of the local viewport window. 0.34
+      // is ~1.8 palette bands, so the ink genuinely carries taupe and slate up into
       // the dawn the way it did in the panel.
-      float y = clamp(depth + (f - 0.5) * 0.30 * uAmp * gate, 0.0, 1.0);
+      float raw = (f - 0.5) * 0.34 * uAmp;
+      // positive raw = deeper down the ramp (darker) → the permissive direction
+      float disp = raw > 0.0 ? raw * gateDark : raw * gateLight;
+      float y = clamp(depth + disp, 0.0, 1.0);
 
       vec3 col = texture2D(uRamp, vec2(0.5, y)).rgb;
 
-      // viscous luminance banding straight from the warp field (original)
-      col *= 0.90 + 0.20 * f;
-      // warm bloom where the warp piles up (original)
-      col += 0.045 * vec3(0.784, 0.639, 0.416) * smoothstep(0.55, 1.0, length(r)) * gate;
+      // Viscous luminance banding straight from the warp field (original). Over
+      // the reading zone, bias it DARKWARD instead of symmetric: same viscous
+      // character, but it can only help light text.
+      float lum = 0.90 + 0.20 * f;
+      col *= mix(lum, 0.86 + 0.14 * f, zone);
+      // Warm bloom where the warp piles up (original) — faded out over the reading
+      // zone, since it lightens.
+      col += 0.045 * vec3(0.784, 0.639, 0.416) * smoothstep(0.55, 1.0, length(r)) * (1.0 - zone);
 
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
@@ -201,9 +222,10 @@ const { strength = 4, mode = 'background' } = Astro.props;
     [0.60, '#0e1013'], [0.80, '#0b0d0f'], [1.00, '#08090b'],
   ];
 
-  // Rung 4 = full displacement. Rungs raised across the board: with the scale bug
-  // fixed, the low rungs were the invisible ones.
-  const AMP_BY_LEVEL = [0, 0.55, 0.8, 1.0, 1.35];
+  // Raised again on request ("i remember the one to be more stronger"). Rung 4 is
+  // now well past the original demo's own strength — the asymmetric gate means the
+  // reading zone no longer pays for a stronger open sky.
+  const AMP_BY_LEVEL = [0, 0.7, 1.0, 1.35, 1.8];
 
   const teardowns: Array<() => void> = [];
 
