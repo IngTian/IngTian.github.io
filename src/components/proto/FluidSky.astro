@@ -564,7 +564,7 @@ const { strength = 4, mode = 'background' } = Astro.props;
 
     // Frozen state still needs a repaint on scroll (the depth window is
     // scroll-derived) or it would look like a stuck decal.
-    // `scrolling` stays true for a moment after the last scroll event, so the
+    // The scrolling flag stays true for a moment after the last scroll event, so the
     // full-rate window covers the whole gesture including momentum/inertia.
     let scrollRaf = 0;
     let scrollIdleT = 0;

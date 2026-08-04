@@ -55,7 +55,15 @@ const bubbles = JSON.stringify([
     //   light = Classic — the shipped paper glow, ochre settle, indigo trail
     if (document.documentElement.dataset.theme === 'dark')
       return { ramp: TERRAIN_TERMINAL, walker: { glow: [227,242,247], settled: [134,188,204], trail: [73,127,146] }, darkness: 1, dotScale: 1.18 };
-    return { ramp: TERRAIN_LIGHT, walker: { glow: [244,239,228], settled: [200,163,106], trail: [92,108,140] }, darkness: 0, dotScale: 1.15 };
+    // LIGHT dotScale trimmed 1.15 → 1.08. Light theme now spends its EDL shade on
+    // VALUE rather than opacity (see edlSpend in lib/terrain.ts), which by itself
+    // ADDS ink — and "heavier" is not the goal, "clearer" is. The radius trim buys
+    // most of that back: total ink (Σ alpha·r²) lands ~+5% over shipped, not at
+    // parity. True parity would be ≈1.05; 1.08 is kept because the extra 3% reads
+    // as presence on the ridge without the hero visibly darkening (measured mean
+    // luminance moves <0.001). NOTE: absolute ink figures are viewport-dependent —
+    // treat the RATIO as the reproducible quantity, not any single number.
+    return { ramp: TERRAIN_LIGHT, walker: { glow: [244,239,228], settled: [200,163,106], trail: [92,108,140] }, darkness: 0, dotScale: 1.08 };
   }
 
   // Teardown handle for the previous init — re-init runs on every page load AND

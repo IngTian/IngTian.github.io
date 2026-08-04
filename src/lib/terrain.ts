@@ -76,6 +76,13 @@ function lp(a: number[], b: number[], t: number): [number, number, number] {
 //   • DARK  = "Glacier" — cool cyan-blue ice, slate valleys → bright rime peaks,
 //     on the charcoal night sky.
 export interface TerrainRamp { valley: [number, number, number]; mid: [number, number, number]; peak: [number, number, number] }
+// LIGHT ramp — "Classic": warm ochre valleys → cool indigo heights, at the token
+// values. A deepened variant was tried and REVERTED: measured composited on screen
+// (paper backdrop, EDL shade 0.5) the ridge still landed LIGHTER than the valley
+// (L 0.680 vs 0.526), because terrainRender's base alpha ramp 0.30+(1-hn)*0.45 more
+// than cancels any value ramp. It bought ~17% of the separation win while being the
+// only part that altered the shipped hero's colour identity — edlSpend() delivers
+// the other ~316%. Not worth the palette risk.
 export const TERRAIN_LIGHT: TerrainRamp = { valley: [150, 110, 58], mid: [120, 112, 96], peak: [109, 118, 137] };       // Classic: warm ochre valleys → cool indigo heights
 export const TERRAIN_TERMINAL: TerrainRamp = { valley: [47, 90, 110], mid: [91, 147, 168], peak: [198, 227, 237] };     // Glacier: cyan-blue ice valleys → bright rime peaks
 
@@ -171,6 +178,80 @@ export function computeEDL(dots: Array<{ x: number; y: number }>, params: EDLPar
   const out = new Array<number>(n);
   for (let i = 0; i < n; i++) out[i] = Math.exp(-(response[i] / ref) * params.strength);
   return out;
+}
+
+// ── How EDL shade is SPENT: opacity, or value? ──────────────────────────────
+// computeEDL returns a shade in [0,1]; something has to turn that into pixels.
+// The shipped renderer spent it on ALPHA (`alpha *= floor + (1-floor)*shade`),
+// and on the dark theme that is exactly right: fading a dot toward a near-black
+// sky DARKENS it, which is what an eye-dome shadow looks like.
+//
+// On the LIGHT theme the same line runs BACKWARDS. Measured against the real
+// hero backdrop (mean luminance 0.875) and the mean light dot (0.445):
+//
+//     alpha  1.00 → 0.445   (the dot's own value)
+//     alpha  0.30 → 0.746   ← LIGHTER than unshaded
+//     alpha  0.08 → 0.841   ← almost exactly the sky
+//
+// So the dots EDL most wants to darken — the receding ridge, the silhouette,
+// the shape cue itself — instead BLEACH OUT into the pale sky. That is the
+// reported "the dots blend into the fluid background": not a palette problem
+// (the marbled sky just makes an existing inversion obvious), but Eye-Dome
+// Lighting subtracting contrast where it should be adding it. It also explains
+// why dark theme reads as a mountain and light theme reads as mush from the
+// SAME shade array.
+//
+// The fix is to spend the shade on VALUE in light theme — multiply the colour
+// down instead of the opacity — so a shadowed dot goes to ink rather than to
+// air. `darkness` (0 = light, 1 = dark) picks the split, so the crossover is
+// continuous and the dark theme's alpha behaviour is preserved bit-for-bit at
+// darkness = 1.
+export interface EDLSpend {
+  /** multiply the dot's RGB by this (1 = untouched) */
+  value: number;
+  /** multiply the dot's alpha by this (1 = untouched) */
+  alpha: number;
+}
+
+/** Darkest an EDL-shadowed dot's COLOUR goes on the light theme. Tuned against
+ *  the real marbled backdrop: the EDL-shadowed (ridge) dots' mean separation
+ *  from their local sky rose 0.020 → 0.135 (6.7x) at this floor. */
+export const EDL_VALUE_FLOOR = 0.32;
+/** Light theme's (gentle) EDL alpha floor — the far field still recedes, but the
+ *  shape cue is carried by value now, so opacity no longer has to crush it. */
+export const EDL_ALPHA_FLOOR_LIGHT = 0.82;
+
+/**
+ * Split an EDL shade into a value factor and an alpha factor.
+ *
+ * @param shade    per-dot EDL shade in [0,1] (1 = unshaded, →0 = occluded)
+ * @param darkness 0 = light theme, 1 = dark theme
+ * @param alphaFloor the shipped `edlFloor` — darkest an EDL-shadowed dot's
+ *                   OPACITY goes. Used unchanged when darkness = 1.
+ * @param valueFloor darkest an EDL-shadowed dot's COLOUR goes in light theme.
+ *
+ * At darkness = 1 this returns { value: 1, alpha: alphaFloor + (1-alphaFloor)*shade },
+ * i.e. precisely the shipped expression, so the dark theme cannot regress.
+ */
+export function edlSpend(
+  shade: number, darkness: number, alphaFloor: number, valueFloor = EDL_VALUE_FLOOR,
+): EDLSpend {
+  const s = Math.max(0, Math.min(1, shade));
+  const d = Math.max(0, Math.min(1, darkness));
+  // Dark theme keeps the shipped alpha ramp. Light theme leans on value, and
+  // retains a much gentler alpha ramp (floor EDL_ALPHA_FLOOR_LIGHT) so the far
+  // field still recedes into the sky instead of ending in a hard dot wall.
+  //
+  // Both blends use the `a*(1-d) + b*d` mix form rather than `a + (b-a)*d`.
+  // That is deliberate and load-bearing: the mix form is EXACT at both endpoints
+  // in floating point, so at darkness = 1 aFloor === alphaFloor and vFloor === 1
+  // bit-for-bit. `0.82 + (0.20 - 0.82) * 1` evaluates to 0.19999999999999996,
+  // which would make the dark theme's dot alphas differ in the last bits from the
+  // shipped renderer — a regression this function exists to make impossible.
+  const aFloor = EDL_ALPHA_FLOOR_LIGHT * (1 - d) + alphaFloor * d;
+  // Value shading fades out as the theme darkens; at d = 1 it is exactly 1.
+  const vFloor = valueFloor * (1 - d) + 1 * d;
+  return { value: vFloor + (1 - vFloor) * s, alpha: aFloor + (1 - aFloor) * s };
 }
 
 // ── Directional relief light ────────────────────────────────────────────────

@@ -10,7 +10,7 @@
 
 import {
   field, project, projectRaw, normal, computeEDL, litColor, luminance01,
-  colormap, RANGE, STEP,
+  colormap, RANGE, STEP, edlSpend,
   type TerrainRamp, type EDLParams, type LightParams, EDL_DEFAULTS, LIGHT_DEFAULTS, lightDir,
 } from './terrain';
 
@@ -152,11 +152,20 @@ export function paintTerrain(
     if (lit) color = litColor(color, p.ndl, cfg.darkness, cfg.light);
 
     if (cfg.edl) {
-      // Eye-Dome Lighting: a receding dot (edl→0) dims toward the floor AND
-      // shrinks; a near/high ridge dot (edl→1) stays bright and grows. Size
-      // coupling is centered on 1× (sh=0.5 ⇒ unchanged) so mean size is kept.
+      // Eye-Dome Lighting: a receding dot (edl→0) recedes AND shrinks; a
+      // near/high ridge dot (edl→1) stays present and grows. Size coupling is
+      // centered on 1× (sh=0.5 ⇒ unchanged) so mean size is kept.
+      //
+      // HOW the shade is spent is theme-dependent — see edlSpend() in terrain.ts.
+      // Dark theme spends it on ALPHA (fading toward a near-black sky darkens the
+      // dot, which is what an eye-dome shadow is). Light theme spends it mostly on
+      // VALUE, because on the pale sky fading a dot LIGHTENS it — the shipped
+      // alpha-only version ran the shape cue backwards and bleached the ridge into
+      // the sky, which is what made the mountain read as mush over the fluid.
       const sh = p.edl;
-      alpha *= cfg.edlFloor + (1 - cfg.edlFloor) * sh;
+      const spend = edlSpend(sh, cfg.darkness, cfg.edlFloor);
+      color = [color[0] * spend.value, color[1] * spend.value, color[2] * spend.value];
+      alpha *= spend.alpha;
       r *= 1 + cfg.edlSizeRange * (sh - 0.5);
       // Elevation emphasis: the mountain IS the high ground — diminish the
       // valley (hn→0) toward (1−emphasis) and shrink it so the ridge carries form.
