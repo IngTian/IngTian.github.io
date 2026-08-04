@@ -52,18 +52,8 @@ interface Props {
    *   pale background down to #16140f underneath dark text.
    */
   variant?: 'descent' | 'reading';
-  /**
-   * Pointer-reactive droplets. OFF by default.
-   *
-   * The implementation is complete and measured (continuous 85ms cadence, ripples
-   * interpolated along the pointer path, ~14/255 contribution against the sky's own
-   * ~135 ambient churn) but the interaction was judged a step too far for the piece —
-   * the still sky is the finished composition. Left in place, gated, so re-enabling
-   * is one prop rather than an archaeology exercise.
-   */
-  interactive?: boolean;
 }
-const { strength = 4, mode = 'background', variant = 'descent', interactive = false } = Astro.props;
+const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
 ---
 <canvas
   class:list={['fluid-sky', mode === 'contained' ? 'is-contained' : 'is-background']}
@@ -72,7 +62,6 @@ const { strength = 4, mode = 'background', variant = 'descent', interactive = fa
   data-strength={String(strength)}
   data-mode={mode}
   data-variant={variant}
-  data-interactive={interactive ? "1" : "0"}
 ></canvas>
 
 <style>
@@ -141,7 +130,6 @@ const { strength = 4, mode = 'background', variant = 'descent', interactive = fa
     uniform vec3  uNebula;    // the cool tint dark theme lifts the ink with
     uniform float uReading;   // 1.0 on a reading page (dark ink on pale paper)
     uniform float uReadCap;   // reading pages: max darkward ramp excursion
-    uniform vec4  uNodes[12];  // pointer trail: xy = centre, z = strength, w = angle
 
     float hash(vec2 p) {
       p = fract(p * vec2(443.897, 441.423));
@@ -195,59 +183,6 @@ const { strength = 4, mode = 'background', variant = 'descent', interactive = fa
       // 6.2 / 12.7 reproduce the demo's on-screen feature SIZE at viewport scale.
       float sy = uYOffset + (1.0 - vUv.y) * uYSpan;
 
-      // ── POINTER: DROPLETS falling into the ink ───────────────────────────
-      // Deliberately NOT the previous behaviour. That displaced the sample
-      // coordinate ALONG a stroke direction and followed the cursor continuously,
-      // which is stirring — directional, persistent, smears colour together.
-      //
-      // A droplet is a different physical event and needs different maths:
-      //   · RADIAL, not directional — it pushes outward from where it landed, so
-      //     there is no stroke and no smearing
-      //   · it EXPANDS over its own lifetime (radius grows as age grows) instead
-      //     of tracking the pointer
-      //   · it is an IMPULSE — a ring travelling outward from the impact point,
-      //     which is what a real drop on a liquid surface produces
-      //   · discrete: a few impacts, not a continuous trail
-      //
-      // Each drop is a Gaussian-enveloped radial wave: sin() across the wavefront
-      // gives the crest-and-trough of a real ripple, the envelope keeps it local,
-      // and both fade with age.
-      vec2 ptr = vec2(vUv.x, sy);
-      vec2 drag = vec2(0.0);
-      for (int i = 0; i < 12; i++) {
-        vec4 nd = uNodes[i];               // xy = impact point, z = strength, w = age (s)
-        if (nd.z > 0.001) {
-          vec2 d = ptr - nd.xy;
-          float dist = length(d) + 1e-6;
-          // wavefront travels outward at a slow, viscous speed
-          // ── SIZE, not strength — the "big drop" fix ───────────────────────
-          // Previous tuning rounds all reduced AMPLITUDE, but the complaint was that
-          // it looks like a BIG drop, which is geometry. Three numbers set the scale:
-          //   R growth   how far the wavefront travels  (0.22 -> 0.085)
-          //   ring       how WIDE the wave band is      (9 -> 26, i.e. ~3x narrower)
-          //   wave       ripple wavelength              (34 -> 78, finer rings)
-          // At the old values the band spanned ~0.11 sample units (~160px at 1440
-          // wide) and swept outward across a third of the screen — the footprint of
-          // a heavy splash. Now the disturbance is a tight ring a few tens of px
-          // across that fades quickly: a fine droplet touching the surface.
-          float R = nd.w * 0.085;
-          // ring envelope: strongest AT the wavefront, falling off both sides
-          float ring = exp(-pow((dist - R) * 26.0, 2.0));
-          // radial oscillation gives the crest/trough of an actual ripple
-          float wave = sin((dist - R) * 78.0);
-          // Amplitude dialled right down on request ("very mild"): 0.030 -> 0.012.
-          // For scale, the sky's own ambient churn measures max Δ~115/255 over 250ms
-          // while a drop at 0.030 added ~25 on top; at 0.012 a drop contributes
-          // roughly 10, i.e. a perturbation you notice only if you are watching for
-          // it. That is the intent — the sky should feel touched, not disturbed.
-          // 0.012 -> 0.0075. Continuous emission means several ripples are alive at
-          // once where the distance gate used to allow at most one or two, so
-          // per-drop amplitude comes down to keep the SUM at the same very-mild
-          // level rather than letting overlap multiply it.
-          drag += (d / dist) * ring * wave * nd.z * 0.0075;
-        }
-      }
-
       // Reading pages get a FINER field. On a descent page one big marbled stratum
       // per screen is the look; on a text page that reads as one uniform smudge
       // (which is what the A/B showed: mean Δ 17 but max only 35.7 — nearly flat).
@@ -264,7 +199,7 @@ const { strength = 4, mode = 'background', variant = 'descent', interactive = fa
       // out between frames). A gentler stretch plus a modest time boost gives both
       // coverage and visible movement.
       float yStretch = mix(1.0, 1.35, uReading);
-      vec2 p = vec2((vUv.x + drag.x) * 6.2 * freqK, (sy + drag.y) * 12.7 * freqK * yStretch);
+      vec2 p = vec2(vUv.x * 6.2 * freqK, sy * 12.7 * freqK * yStretch);
 
       // ── two-level domain warp (Inigo Quilez) — the original gains ──
       vec2 q = vec2(fbm(p + 0.09 * t),
@@ -634,7 +569,6 @@ const { strength = 4, mode = 'background', variant = 'descent', interactive = fa
       nebula: gl.getUniformLocation(prog, 'uNebula'),
       reading: gl.getUniformLocation(prog, 'uReading'),
       readCap: gl.getUniformLocation(prog, 'uReadCap'),
-      nodes: gl.getUniformLocation(prog, 'uNodes'),
     };
 
     const tex = gl.createTexture();
@@ -651,7 +585,6 @@ const { strength = 4, mode = 'background', variant = 'descent', interactive = fa
     // (live=false on every page). A JS throw here looks identical to a shader
     // failure from the outside, so check both.
     const isReading = cvs.dataset.variant === 'reading';
-    const interactive = cvs.dataset.interactive === '1';
     let rampTheme = '';
     function uploadRamp(force = false): void {
       const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
@@ -688,100 +621,6 @@ const { strength = 4, mode = 'background', variant = 'descent', interactive = fa
     }
     measureGate();
 
-
-    // ── POINTER: DROPLETS ─────────────────────────────────────────────────
-    // Rewritten from a continuous trail to discrete drops. The trail version was
-    // "stirring up a mix of colors": it emitted a node every frame the cursor moved
-    // and each node dragged the field along the stroke, so moving the mouse smeared
-    // paint. A droplet model instead waits until the cursor has travelled far enough,
-    // then drops ONE impact that expands and dies on its own.
-    //
-    // Each drop carries an AGE rather than a velocity — the shader grows its ring
-    // radius from that age, so the ripple spreads outward independently of whatever
-    // the pointer does next. That decoupling is the whole difference between a drop
-    // and a smear.
-    const NODES = 12;
-    interface Drop { x: number; y: number; age: number; str: number }
-    const nodes: Drop[] = Array.from({ length: NODES }, () => ({ x: -9, y: -9, age: 0, str: 0 }));
-    let nodeIx = 0;
-    const nodeData = new Float32Array(NODES * 4);
-
-    let rawX = -9, rawY = -9, haveRaw = false;
-    let lastDropX = -9, lastDropY = -9;
-
-    function onPointerMove(e: PointerEvent): void {
-      const vw = Math.max(1, window.innerWidth);
-      rawX = e.clientX / vw;
-      rawY = (window.scrollY + e.clientY) / vw;
-      if (!haveRaw) { haveRaw = true; lastDropX = rawX; lastDropY = rawY; }
-    }
-
-    // ── CONTINUOUS emission ────────────────────────────────────────────────
-    // Was a DISTANCE GATE: a drop landed only once the cursor had travelled 0.135
-    // sample units (~195px). That gate is exactly what made it feel discrete —
-    // between drops nothing happened at all, so the surface went dead and then
-    // popped.
-    //
-    // Now drops are emitted on a TIME cadence and INTERPOLATED along the path the
-    // pointer covered during that interval. Consequences:
-    //   · standing still or drifting slowly still produces drops, so the surface is
-    //     continuously alive under the cursor
-    //   · a fast sweep places several along the segment it crossed rather than one
-    //     at the end, so there are no gaps
-    //   · each drop is still an independent expanding ripple, so this stays a
-    //     droplet model — it is the CADENCE that became continuous, not the shape
-    //
-    // Kept mild by construction: a shorter interval means more overlapping ripples,
-    // so per-drop strength is scaled down to compensate rather than letting the sum
-    // grow. Slow movement also gets weaker drops (a gentle touch, not a plunge).
-    const DROP_INTERVAL = 0.085;   // seconds between emissions
-    let dropClock = 0;
-
-    function advancePointer(dt: number): void {
-      if (!interactive || !haveRaw) return;
-      dropClock += dt;
-      if (dropClock < DROP_INTERVAL) return;
-
-      // How many emissions are due (usually 1; more if a frame ran long).
-      const due = Math.min(3, Math.floor(dropClock / DROP_INTERVAL));
-      dropClock -= due * DROP_INTERVAL;
-
-      const dx = rawX - lastDropX;
-      const dy = rawY - lastDropY;
-      const dist = Math.hypot(dx, dy);
-
-      // Speed shapes the drop: a slow drift gives a faint touch, a quick move a
-      // slightly firmer one. Capped so a flick can't spike.
-      const speed = dist / Math.max(1e-4, DROP_INTERVAL * due);
-      const str = Math.min(1, 0.34 + speed * 0.55);
-
-      for (let i = 1; i <= due; i++) {
-        const tt = i / due;
-        const n = nodes[nodeIx % NODES];
-        nodeIx++;
-        // interpolate along the path covered since the last emission
-        n.x = lastDropX + dx * tt;
-        n.y = lastDropY + dy * tt;
-        n.age = 0;
-        n.str = str;
-      }
-      lastDropX = rawX;
-      lastDropY = rawY;
-    }
-
-    function decayNodes(dt: number): void {
-      // Age drives the shader's expanding radius; strength fades (tau 0.44s, so ~1.3s
-      // to vanish, shortened from 1.8s) — a ripple spreads, weakens and is gone. A
-      // shorter life also means fewer live drops overlapping at any moment, which is
-      // most of what "very mild" actually means in practice.
-      for (const n of nodes) {
-        if (n.str > 0.001) {
-          n.age += dt;
-          n.str *= Math.exp(-dt / 0.30);
-          if (n.str <= 0.001) n.str = 0;
-        }
-      }
-    }
 
     const SCALE = 0.5;
     // clientWidth/clientHeight are also layout reads, so they are resolved only
@@ -853,14 +692,6 @@ const { strength = 4, mode = 'background', variant = 'descent', interactive = fa
       // 6.6:1 against --ink-1 (floor is 4.5:1). Bounded on purpose: this is the one
       // number keeping body text safe on /research and /projects.
       gl!.uniform1f(U.readCap, 0.34);
-      for (let i = 0; i < NODES; i++) {
-        const n = nodes[i];
-        nodeData[i * 4] = n.x;
-        nodeData[i * 4 + 1] = n.y;
-        nodeData[i * 4 + 2] = n.str;
-        nodeData[i * 4 + 3] = n.age;   // shader grows the ring radius from this
-      }
-      gl!.uniform4fv(U.nodes, nodeData);
       gl!.uniform1f(U.gate, gateTop);
       gl!.uniform1f(U.time, (nowMs - t0) / 1000);
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
@@ -883,7 +714,6 @@ const { strength = 4, mode = 'background', variant = 'descent', interactive = fa
     let last = 0;
     // true while a scroll gesture is in progress → draw at full display rate
     let scrolling = false;
-    let lastT = 0;
 
     function loop(now: number): void {
       // ── Frame pacing, and why scrolling looked laggy ────────────────────
@@ -898,10 +728,6 @@ const { strength = 4, mode = 'background', variant = 'descent', interactive = fa
       // that nobody can tell, and it halves idle cost.
       const budget = scrolling ? 0 : 32;
       if (now - last >= budget) {
-        const dt = Math.min(0.25, (now - (lastT || now)) / 1000);
-        lastT = now;
-        advancePointer(dt);
-        decayNodes(dt);
         draw(now);
         last = now;
       }
@@ -939,7 +765,6 @@ const { strength = 4, mode = 'background', variant = 'descent', interactive = fa
       }
     };
     window.addEventListener('scroll', onScroll, { passive: true });
-    if (interactive && !contained) window.addEventListener('pointermove', onPointerMove, { passive: true });
 
     let resizeT = 0;
     const onResize = () => {
@@ -966,7 +791,6 @@ const { strength = 4, mode = 'background', variant = 'descent', interactive = fa
       window.clearTimeout(scrollIdleT);
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('resize', onResize);
       mo.disconnect();
       cvs.closest('.descent')?.classList.remove('fluid-live');
