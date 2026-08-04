@@ -67,9 +67,34 @@ const { strength = 3, mode = 'background' } = Astro.props;
        nearly an identity op, which is what made an earlier attempt measure
        0.3/255 (invisible). */
     mix-blend-mode: overlay;
-    opacity: var(--fluid-op, 0.55);
+    opacity: var(--fluid-op, 0.68);
   }
-  :global(html[data-theme='dark']) .fluid-sky { opacity: var(--fluid-op-dark, 0.34); }
+
+  /* ── Strength ladder — the OPACITY values from the approved version ──────
+     These are the numbers that produced the measured Δ 5.6 / 13.2 / 25.8 / 78.5
+     ladder. Strength drives BOTH the shader amplitude and this opacity; using
+     only one of the two is what made earlier passes read as flat. */
+  .fluid-sky[data-strength='1'] { --fluid-op: 0.30; }
+  .fluid-sky[data-strength='2'] { --fluid-op: 0.48; }
+  .fluid-sky[data-strength='3'] { --fluid-op: 0.68; }
+  .fluid-sky[data-strength='4'] { --fluid-op: 0.90; }
+  :global(html[data-fluid-strength='1']) .fluid-sky { --fluid-op: 0.30; }
+  :global(html[data-fluid-strength='2']) .fluid-sky { --fluid-op: 0.48; }
+  :global(html[data-fluid-strength='3']) .fluid-sky { --fluid-op: 0.68; }
+  :global(html[data-fluid-strength='4']) .fluid-sky { --fluid-op: 0.90; }
+
+  /* Dark theme: overlay on near-black lifts hard, so pull back — but NOT as far
+     as before. The screenshot that read as "way too weak" was dark theme at
+     0.34 combined with the 4.2x-too-small amplitude; both are corrected. */
+  :global(html[data-theme='dark']) .fluid-sky { opacity: var(--fluid-op-dark, 0.52); }
+  :global(html[data-theme='dark']) .fluid-sky[data-strength='1'] { --fluid-op-dark: 0.24; }
+  :global(html[data-theme='dark']) .fluid-sky[data-strength='2'] { --fluid-op-dark: 0.38; }
+  :global(html[data-theme='dark']) .fluid-sky[data-strength='3'] { --fluid-op-dark: 0.52; }
+  :global(html[data-theme='dark']) .fluid-sky[data-strength='4'] { --fluid-op-dark: 0.70; }
+  :global(html[data-theme='dark'][data-fluid-strength='1']) .fluid-sky { --fluid-op-dark: 0.24; }
+  :global(html[data-theme='dark'][data-fluid-strength='2']) .fluid-sky { --fluid-op-dark: 0.38; }
+  :global(html[data-theme='dark'][data-fluid-strength='3']) .fluid-sky { --fluid-op-dark: 0.52; }
+  :global(html[data-theme='dark'][data-fluid-strength='4']) .fluid-sky { --fluid-op-dark: 0.70; }
 
   /* BACKGROUND: viewport-locked. Scroll is a uniform, so we shade one screen of
      pixels no matter how tall the descent is. z-index -2 keeps it behind
@@ -166,10 +191,20 @@ const { strength = 3, mode = 'background' } = Astro.props;
           vec2 d = sp - nd.xy;
           float infl = nd.z * exp(-dot(d, d) * 30.0);
           vec2 dir = vec2(cos(nd.w), sin(nd.w));
+          vec2 perp = vec2(-dir.y, dir.x);
           // along the stroke …
           push += dir * infl * 0.16;
-          // … plus a gentler curl either side of it
-          push += vec2(-dir.y, dir.x) * infl * 0.07 * sign(dot(d, vec2(-dir.y, dir.x)));
+          // … plus a curl either side of it.
+          //
+          // BUG FIXED HERE: this used sign(dot(d, perp)), and sign() is
+          // DISCONTINUOUS at zero — so every node stamped a hard seam along its
+          // own direction of travel. Sweeping horizontally produced a visible
+          // straight line across the sky (exactly what was reported).
+          // tanh-like smoothing keeps the same "flow curls around the stroke"
+          // behaviour with a continuous transition through the centre line.
+          float across = dot(d, perp);
+          float smoothSide = across / (abs(across) + 0.035);
+          push += perp * infl * 0.09 * smoothSide;
         }
       }
       vec2 warpXY = sp + push;
@@ -204,13 +239,15 @@ const { strength = 3, mode = 'background' } = Astro.props;
       // ── BLENDED OUTPUT ─────────────────────────────────────────────────
       // We are compositing OVER --descent-grad with overlay, so this must emit
       // a modulation centred on mid-grey (overlay's neutral), not a colour.
-      // Amplitude is generous because overlay at 0.5 is a weak operator and the
-      // gate protects the text zone.
-      float m = 0.5 + field * uAmp * 0.62 * gate;
+      // RESTORED to 2.6 (I had dropped it to 0.62 — 4.2x weaker — when porting
+      // back from the palette-texture version, which is why the blend looked far
+      // weaker than the one that was approved). This is the multiplier from the
+      // version that measured Δ 5.6-78/255 across the ladder.
+      float m = 0.5 + field * uAmp * 2.6 * gate;
 
       // Warm/cool broken colour along the warp axis — Monet's temperature play,
-      // carried as a small channel split around the neutral.
-      float temp = (r.x - r.y) * 0.30 * uAmp * gate;
+      // carried as a channel split around the neutral.
+      float temp = (r.x - r.y) * 0.42 * uAmp * gate;
 
       gl_FragColor = vec4(
         clamp(m + temp,        0.0, 1.0),
