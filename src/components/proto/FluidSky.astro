@@ -111,6 +111,8 @@ const { strength = 4, mode = 'background' } = Astro.props;
     uniform float uDepth0;    // page depth at the top of the viewport
     uniform float uDepthSpan; // page depth spanned by one viewport
     uniform float uGateTop;   // depth where the reading zone begins
+    uniform float uDark;      // 1.0 in the dark theme, 0.0 in light
+    uniform vec3  uNebula;    // the cool tint dark theme lifts the ink with
 
     float hash(vec2 p) {
       p = fract(p * vec2(443.897, 441.423));
@@ -205,6 +207,28 @@ const { strength = 4, mode = 'background' } = Astro.props;
       // zone, since it lightens.
       col += 0.045 * vec3(0.784, 0.639, 0.416) * smoothstep(0.55, 1.0, length(r)) * (1.0 - zone);
 
+      // ── DARK THEME needs a DIFFERENT MECHANISM, not more strength ────────
+      // Measured luminance range of the two ramps:
+      //     light  0.938 → 0.079   range 0.860
+      //     dark   0.097 → 0.035   range 0.062   ← 13.9x smaller
+      // Displacing along six stops of near-black cannot reveal anything, which is
+      // why dark theme read as "less visible". Raising uAmp does nothing: the
+      // palette has no contrast to expose.
+      //
+      // So in dark theme the field ADDS light instead of relocating it — a cool
+      // phosphor/cyan nebular tint lifted by the warp, which is the same
+      // vocabulary as the dark theme's existing atmosphere washes. The terrain's
+      // dots still read as the star field; this becomes the nebula behind them.
+      if (uDark > 0.5) {
+        float glow = smoothstep(0.30, 0.95, f);          // where the ink piles up
+        float veins = smoothstep(0.45, 1.0, length(r));  // along the warp filaments
+        float lift = (glow * 0.72 + veins * 0.45) * uAmp;
+        // damped over the reading zone: adding light is the dangerous direction
+        // there, since the text is light too.
+        lift *= 1.0 - 0.72 * zone;
+        col += uNebula * lift;
+      }
+
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `;
@@ -295,6 +319,8 @@ const { strength = 4, mode = 'background' } = Astro.props;
       d0: gl.getUniformLocation(prog, 'uDepth0'),
       dSpan: gl.getUniformLocation(prog, 'uDepthSpan'),
       gate: gl.getUniformLocation(prog, 'uGateTop'),
+      dark: gl.getUniformLocation(prog, 'uDark'),
+      nebula: gl.getUniformLocation(prog, 'uNebula'),
     };
 
     const tex = gl.createTexture();
@@ -338,11 +364,39 @@ const { strength = 4, mode = 'background' } = Astro.props;
     measureGate();
 
     const SCALE = 0.5;
-    function sizeTo(): void {
+    // clientWidth/clientHeight are also layout reads, so they are resolved only
+    // when the size actually changes (resize / settle), not per frame.
+    let sizedW = 0;
+    let sizedH = 0;
+    function sizeTo(force = false): void {
+      if (!force && sizedW && sizedH) {
+        gl!.viewport(0, 0, sizedW, sizedH);
+        return;
+      }
       const w = Math.max(1, Math.round((cvs.clientWidth || 1) * SCALE));
       const h = Math.max(1, Math.round((cvs.clientHeight || 1) * SCALE));
       if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
-      gl!.viewport(0, 0, cvs.width, cvs.height);
+      sizedW = cvs.width;
+      sizedH = cvs.height;
+      gl!.viewport(0, 0, sizedW, sizedH);
+    }
+
+    // ── Cached layout metrics — the SCROLL-LAG fix ──────────────────────────
+    // draw() used to read document.documentElement.scrollHeight (and innerWidth /
+    // innerHeight) on EVERY frame. scrollHeight is a forced synchronous layout:
+    // the browser must flush pending style/layout work before it can answer. At
+    // ~30fps that is 30 reflows/sec, and it is worst exactly while scrolling,
+    // when layout is already dirty — the classic cause of scroll jank.
+    //
+    // These change only on resize / layout settle, never during a scroll, so they
+    // are cached and refreshed from the same places that re-measure the gate.
+    let mVw = Math.max(1, window.innerWidth);
+    let mVh = Math.max(1, window.innerHeight);
+    let mDocH = Math.max(1, document.documentElement.scrollHeight);
+    function measureLayout(): void {
+      mVw = Math.max(1, window.innerWidth);
+      mVh = Math.max(1, window.innerHeight);
+      mDocH = Math.max(1, document.documentElement.scrollHeight);
     }
 
     const t0 = performance.now();
@@ -350,9 +404,9 @@ const { strength = 4, mode = 'background' } = Astro.props;
       sizeTo();
       uploadRamp();
 
-      const vw = Math.max(1, window.innerWidth);
-      const vh = Math.max(1, window.innerHeight);
-      const docH = Math.max(1, document.documentElement.scrollHeight);
+      const vw = mVw;
+      const vh = mVh;
+      const docH = mDocH;
 
       if (contained) {
         gl!.uniform1f(U.yOff, level() * 2.0);
@@ -367,12 +421,20 @@ const { strength = 4, mode = 'background' } = Astro.props;
       }
 
       gl!.uniform1f(U.amp, AMP_BY_LEVEL[Math.max(0, Math.min(4, level()))] ?? 1.0);
+      const isDark = document.documentElement.dataset.theme === 'dark';
+      gl!.uniform1f(U.dark, isDark ? 1 : 0);
+      // Cool phosphor-cyan, between the dark theme's --ochre (#66c28c emerald) and
+      // --indigo (#5fb2c9 cyan) — the palette this theme already uses for its
+      // atmosphere. Low magnitude: it is a nebula, not a light show.
+      gl!.uniform3f(U.nebula, 0.055, 0.105, 0.115);
       gl!.uniform1f(U.gate, gateTop);
       gl!.uniform1f(U.time, (nowMs - t0) / 1000);
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
     }
 
-    // first frame — also the reduced-motion / pre-loop state
+    // first frame — also the reduced-motion / pre-loop state. Force a real
+    // measure once here; after this the cached metrics carry every frame.
+    sizeTo(true);
     draw(performance.now());
 
     // Signal a real paint so the page can drop the CSS gradient underneath this
@@ -417,7 +479,7 @@ const { strength = 4, mode = 'background' } = Astro.props;
     let resizeT = 0;
     const onResize = () => {
       window.clearTimeout(resizeT);
-      resizeT = window.setTimeout(() => { measureGate(); draw(performance.now()); }, 160);
+      resizeT = window.setTimeout(() => { sizeTo(true); measureLayout(); measureGate(); draw(performance.now()); }, 160);
     };
     window.addEventListener('resize', onResize);
 
@@ -427,7 +489,7 @@ const { strength = 4, mode = 'background' } = Astro.props;
       attributeFilter: ['data-fluid-strength', 'data-theme'],
     });
 
-    const settle = window.setTimeout(() => { measureGate(); draw(performance.now()); }, 1200);
+    const settle = window.setTimeout(() => { sizeTo(true); measureLayout(); measureGate(); draw(performance.now()); }, 1200);
 
     start();
 
