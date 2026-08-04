@@ -169,8 +169,14 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       // per screen is the look; on a text page that reads as one uniform smudge
       // (which is what the A/B showed: mean Δ 17 but max only 35.7 — nearly flat).
       // ~2.4x finer gives structure at paragraph scale instead of page scale.
+      // Reading pages are much SHORTER than /art or the homepage, so scrolling one
+      // covers far less of the field and the vivid strata never come into view —
+      // that is why they looked flat even once the magnitude was right. Sampling
+      // faster in y makes a short page traverse the same amount of field a long
+      // page does.
       float freqK = mix(1.0, 1.9, uReading);
-      vec2 p = vec2(vUv.x * 6.2 * freqK, sy * 12.7 * freqK);
+      float yStretch = mix(1.0, 2.6, uReading);
+      vec2 p = vec2(vUv.x * 6.2 * freqK, sy * 12.7 * freqK * yStretch);
 
       // ── two-level domain warp (Inigo Quilez) — the original gains ──
       vec2 q = vec2(fbm(p + 0.09 * t),
@@ -412,7 +418,10 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
           // put stars in the mountain's own space — the competition that was
           // reported. Now clamped to the tagline's own rows, fading in and out
           // within the interlude and never touching heights or mountains.
-          float band = smoothstep(0.215, 0.262, depth) * (1.0 - smoothstep(0.292, 0.338, depth));
+          // Pushed LOWER on request. Tagline measures 0.259-0.293; the band now
+          // starts at its lower half and extends into the upper Mountains approach,
+          // so the stars sit BELOW the line rather than surrounding it.
+          float band = smoothstep(0.275, 0.335, depth) * (1.0 - smoothstep(0.40, 0.50, depth));
           col += tint * (core * 1.05 + halo) * tw * band;
         }
       }

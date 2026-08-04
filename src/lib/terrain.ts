@@ -314,7 +314,18 @@ export function litColor(
   const shade = p.ambient + (1 - p.ambient) * h;
   const value = 1 - (p.valueLight * (1 - darkness)) * (1 - shade);  // ≤1: darken shadows
   const gain = 1 + (p.gainDark * darkness) * h;                    // ≥1: brighten lit
-  const t = p.warm * (h - 0.5) * 2;                                // [-warm,+warm]
+  // Warm/cool directional tint. In LIGHT theme this is scaled back hard, because
+  // it was silently CANCELLING the cooled TERRAIN_LIGHT ramp. Measured at a typical
+  // sunlit normal (ndl +0.6) with warm=0.3, using (r-b) as the warm/cool axis:
+  //     raw ramp   valley +62 · mid −16 · peak −30
+  //     after lit  valley +79 · mid +26 · peak +37   <- all pushed WARM
+  // The fluid sky sits at +16..+32, so the lit dots landed exactly on top of it and
+  // the mountain read as mush no matter what the ramp said. That is why the hue
+  // change "didn't update" on screen — it shipped, then the lighting undid it.
+  // Light theme keeps a whisper (0.08) so the relief still has warm/cool direction;
+  // dark theme is unchanged, where the tint is doing no harm.
+  const warmEff = p.warm * (0.27 + 0.73 * darkness);
+  const t = warmEff * (h - 0.5) * 2;                               // [-warm,+warm]
   const cl = (v: number) => Math.max(0, Math.min(255, v));
   return [cl(base[0] * value * gain * (1 + t)), cl(base[1] * value * gain), cl(base[2] * value * gain * (1 - t))];
 }
