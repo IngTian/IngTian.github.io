@@ -184,30 +184,40 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       // 6.2 / 12.7 reproduce the demo's on-screen feature SIZE at viewport scale.
       float sy = uYOffset + (1.0 - vUv.y) * uYSpan;
 
-      // ── POINTER: drag the ink ────────────────────────────────────────────
-      // Each trail node displaces the SAMPLE COORDINATE along the direction the
-      // cursor travelled, plus a smooth curl either side. Because the displacement
-      // happens before the warp is evaluated, the ink genuinely deforms and then
-      // relaxes — it is not a decal drawn on top.
+      // ── POINTER: DROPLETS falling into the ink ───────────────────────────
+      // Deliberately NOT the previous behaviour. That displaced the sample
+      // coordinate ALONG a stroke direction and followed the cursor continuously,
+      // which is stirring — directional, persistent, smears colour together.
       //
-      // The perpendicular term uses a tanh-like normalisation rather than sign():
-      // sign() is discontinuous at zero and stamped a hard SEAM along every node's
-      // direction of travel (a visible straight line across the sky, reported and
-      // fixed earlier). Keep it smooth.
+      // A droplet is a different physical event and needs different maths:
+      //   · RADIAL, not directional — it pushes outward from where it landed, so
+      //     there is no stroke and no smearing
+      //   · it EXPANDS over its own lifetime (radius grows as age grows) instead
+      //     of tracking the pointer
+      //   · it is an IMPULSE — a ring travelling outward from the impact point,
+      //     which is what a real drop on a liquid surface produces
+      //   · discrete: a few impacts, not a continuous trail
+      //
+      // Each drop is a Gaussian-enveloped radial wave: sin() across the wavefront
+      // gives the crest-and-trough of a real ripple, the envelope keeps it local,
+      // and both fade with age.
       vec2 ptr = vec2(vUv.x, sy);
       vec2 drag = vec2(0.0);
       for (int i = 0; i < 12; i++) {
-        vec4 nd = uNodes[i];
+        vec4 nd = uNodes[i];               // xy = impact point, z = strength, w = age (s)
         if (nd.z > 0.001) {
           vec2 d = ptr - nd.xy;
-          float infl = nd.z * exp(-dot(d, d) * 46.0);
-          vec2 dir = vec2(cos(nd.w), sin(nd.w));
-          vec2 perp = vec2(-dir.y, dir.x);
-          float across = dot(d, perp);
-          drag += dir * infl * 0.085;
-          drag += perp * infl * 0.055 * (across / (abs(across) + 0.03));
+          float dist = length(d) + 1e-6;
+          // wavefront travels outward at a slow, viscous speed
+          float R = nd.w * 0.22;
+          // ring envelope: strongest AT the wavefront, falling off both sides
+          float ring = exp(-pow((dist - R) * 9.0, 2.0));
+          // radial oscillation gives the crest/trough of an actual ripple
+          float wave = sin((dist - R) * 34.0);
+          drag += (d / dist) * ring * wave * nd.z * 0.030;
         }
       }
+
       // Reading pages get a FINER field. On a descent page one big marbled stratum
       // per screen is the look; on a text page that reads as one uniform smudge
       // (which is what the A/B showed: mean Δ 17 but max only 35.7 — nearly flat).
@@ -648,71 +658,61 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     measureGate();
 
 
-    // ── POINTER TRAIL ─────────────────────────────────────────────────────
-    // Restored from the earlier interactive build (commit c93142a), which fixed the
-    // "slippery and jigging" feel of a first attempt. Three properties matter and
-    // all three were arrived at by fixing a specific failure:
-    //   · a SMOOTHED pointer, not the raw one (raw input reads as jitter)
-    //   · nodes INTERPOLATED along the segment covered each frame, so a fast sweep
-    //     lays a continuous stroke instead of a dotted line of blobs
-    //   · emission tied to the FRAME rate, never throttled on a timer, so it cannot
-    //     be bursty; plus per-node velocity so the ink keeps drifting after the
-    //     cursor stops
+    // ── POINTER: DROPLETS ─────────────────────────────────────────────────
+    // Rewritten from a continuous trail to discrete drops. The trail version was
+    // "stirring up a mix of colors": it emitted a node every frame the cursor moved
+    // and each node dragged the field along the stroke, so moving the mouse smeared
+    // paint. A droplet model instead waits until the cursor has travelled far enough,
+    // then drops ONE impact that expands and dies on its own.
+    //
+    // Each drop carries an AGE rather than a velocity — the shader grows its ring
+    // radius from that age, so the ripple spreads outward independently of whatever
+    // the pointer does next. That decoupling is the whole difference between a drop
+    // and a smear.
     const NODES = 12;
-    interface PNode { x: number; y: number; vx: number; vy: number; str: number }
-    const nodes: PNode[] = Array.from({ length: NODES }, () => ({ x: -9, y: -9, vx: 0, vy: 0, str: 0 }));
+    interface Drop { x: number; y: number; age: number; str: number }
+    const nodes: Drop[] = Array.from({ length: NODES }, () => ({ x: -9, y: -9, age: 0, str: 0 }));
     let nodeIx = 0;
     const nodeData = new Float32Array(NODES * 4);
+
     let rawX = -9, rawY = -9, haveRaw = false;
-    let smoX = -9, smoY = -9;
-    let velX = 0, velY = 0;
+    let lastDropX = -9, lastDropY = -9;
 
     function onPointerMove(e: PointerEvent): void {
       const vw = Math.max(1, window.innerWidth);
-      // Coalesced events: one pointermove can stand for several real moves at speed.
-      // Using only the last is a second quantisation of the input.
-      const evs = (typeof e.getCoalescedEvents === 'function' && e.getCoalescedEvents().length)
-        ? e.getCoalescedEvents() as unknown as Array<{ clientX: number; clientY: number }>
-        : [e as unknown as { clientX: number; clientY: number }];
-      const last = evs[evs.length - 1];
-      rawX = last.clientX / vw;
-      rawY = (window.scrollY + last.clientY) / vw;
-      if (!haveRaw) { haveRaw = true; smoX = rawX; smoY = rawY; }
+      rawX = e.clientX / vw;
+      rawY = (window.scrollY + e.clientY) / vw;
+      if (!haveRaw) { haveRaw = true; lastDropX = rawX; lastDropY = rawY; }
     }
+
+    // Distance between drops, in sample units (~viewport widths). 0.075 is roughly
+    // every 100px at 1440 wide: frequent enough to feel responsive, sparse enough
+    // that ripples read as separate events instead of a continuous wake.
+    const DROP_SPACING = 0.075;
 
     function advancePointer(dt: number): void {
       if (!haveRaw) return;
-      const prevX = smoX, prevY = smoY;
-      // frame-rate-independent exponential smoothing; tau 0.055s reads as viscosity
-      const k = 1 - Math.exp(-dt / 0.055);
-      smoX += (rawX - smoX) * k;
-      smoY += (rawY - smoY) * k;
-      const dx = smoX - prevX, dy = smoY - prevY;
-      const dist = Math.hypot(dx, dy);
-      const inst = dt > 0 ? dist / dt : 0;
-      velX = velX * 0.86 + (dt > 0 ? dx / dt : 0) * 0.14;
-      velY = velY * 0.86 + (dt > 0 ? dy / dt : 0) * 0.14;
-      if (dist < 1e-5 && inst < 1e-4) return;
-      const steps = Math.max(1, Math.min(6, Math.ceil(dist / 0.02)));
-      const str = Math.min(1, 0.28 + inst * 0.5);
-      for (let i = 1; i <= steps; i++) {
-        const tt = i / steps;
-        const n = nodes[nodeIx % NODES];
-        nodeIx++;
-        n.x = prevX + dx * tt;
-        n.y = prevY + dy * tt;
-        n.vx = velX; n.vy = velY;
-        n.str = str / steps + 0.05;
-      }
+      const dx = rawX - lastDropX;
+      const dy = rawY - lastDropY;
+      if (Math.hypot(dx, dy) < DROP_SPACING) return;
+      lastDropX = rawX;
+      lastDropY = rawY;
+      const n = nodes[nodeIx % NODES];
+      nodeIx++;
+      n.x = rawX;
+      n.y = rawY;
+      n.age = 0;
+      n.str = 1;
+      void dt;
     }
 
     function decayNodes(dt: number): void {
-      const f = Math.exp(-dt / 0.95);   // ~2.2s to vanish: a dissipating wake
+      // Age drives the shader's expanding radius; strength fades over ~1.8s so a
+      // ripple spreads, weakens and is gone — an impulse, not a persistent mark.
       for (const n of nodes) {
         if (n.str > 0.001) {
-          n.str *= f;
-          n.x += n.vx * dt * 0.16;      // momentum
-          n.y += n.vy * dt * 0.16;
+          n.age += dt;
+          n.str *= Math.exp(-dt / 0.62);
           if (n.str <= 0.001) n.str = 0;
         }
       }
@@ -793,7 +793,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
         nodeData[i * 4] = n.x;
         nodeData[i * 4 + 1] = n.y;
         nodeData[i * 4 + 2] = n.str;
-        nodeData[i * 4 + 3] = Math.atan2(n.vy, n.vx);
+        nodeData[i * 4 + 3] = n.age;   // shader grows the ring radius from this
       }
       gl!.uniform4fv(U.nodes, nodeData);
       gl!.uniform1f(U.gate, gateTop);
