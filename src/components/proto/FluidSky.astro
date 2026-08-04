@@ -129,6 +129,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     uniform float uDark;      // 1.0 in the dark theme, 0.0 in light
     uniform vec3  uNebula;    // the cool tint dark theme lifts the ink with
     uniform float uReading;   // 1.0 on a reading page (dark ink on pale paper)
+    uniform float uReadCap;   // reading pages: max darkward ramp excursion
 
     float hash(vec2 p) {
       p = fract(p * vec2(443.897, 441.423));
@@ -202,7 +203,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       // so the danger is exactly reversed: a DARKER sky erases the ink, and the
       // light direction is the safe one. Copy-pasting the descent gate onto a
       // reading page would clamp the safe direction and free the dangerous one.
-      float gateDark  = mix(1.0 - 0.25 * zone, 1.0 - 0.90 * zone, uReading);
+      float gateDark  = mix(1.0 - 0.25 * zone, 1.0 - 0.30 * zone, uReading);
       // Toward the dawn: 0.90, not 0.72. In LIGHT theme the content zone carries
       // paper-coloured text on grey ink, and the lightward swing was bright enough
       // that the text nearly dissolved into the sky. Only the LIGHT direction is
@@ -249,10 +250,24 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       // rather than a tuning — it makes "the content zone never gets brighter than
       // the shipped sky" true by construction, which is what keeps the
       // paper-coloured text readable no matter how the field swings.
-      // Hard guarantee, direction chosen per archetype:
+      // Hard guarantee, direction chosen per archetype.
+      //
       //   descent → never sample LIGHTER than the gradient (protects paper text)
-      //   reading → never sample DARKER than the gradient (protects dark ink)
-      float guarded = mix(max(y, depth), min(y, depth), uReading);
+      //   reading → never sample MORE THAN uReadCap DEEPER than the gradient
+      //
+      // BUG FIXED HERE: the reading branch used min(y, depth), which forbade ANY
+      // darkward move. Combined with gateDark already at 0.10 that clamped the
+      // effect to exactly zero — hence "no fluid at all" on /research. And the
+      // lightward direction has nowhere to go either, because the reading ramp
+      // starts at L=0.938 (near-white). So the reading variant had no usable
+      // direction whatsoever.
+      //
+      // Measured headroom says a bounded darkward move is safe: paper L=0.938 vs
+      // --ink-1 L=0.079 is 7.7:1, and darkening the sky to L=0.80 still leaves
+      // 6.6:1 — comfortably past the 4.5:1 body-text floor. So allow the ink to
+      // sink, just not far.
+      float readGuard = min(y, depth + uReadCap);
+      float guarded = mix(max(y, depth), readGuard, uReading);
       y = mix(y, guarded, zone);
 
       vec3 col = texture2D(uRamp, vec2(0.5, y)).rgb;
@@ -334,8 +349,14 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
               ? vec3(0.97, 0.97, 1.00)                                            // white
               : mix(vec3(0.80, 0.72, 1.00), vec3(1.00, 0.86, 0.72), (temp2 - 0.72) / 0.28)); // violet → amber
 
-          // brighter in the deep sky, quiet in the luminous upper reaches
-          float band = smoothstep(0.18, 0.55, depth);
+          // ── Confined to the TAGLINE band ────────────────────────────────
+          // Previously smoothstep(0.18, 0.55, depth), which put stars across the
+          // whole lower half — too much. Stars now live in a narrow window centred
+          // on the Interlude ("A researcher by day, an artist by night, and a
+          // mathematician at heart"), which sits at roughly depth 0.16-0.22, and
+          // fade out on both sides. They read as a moment at the line rather than
+          // as a texture over the page.
+          float band = smoothstep(0.10, 0.17, depth) * (1.0 - smoothstep(0.24, 0.36, depth));
           col += tint * (core * 1.05 + halo) * tw * band;
         }
       }
@@ -449,6 +470,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       dark: gl.getUniformLocation(prog, 'uDark'),
       nebula: gl.getUniformLocation(prog, 'uNebula'),
       reading: gl.getUniformLocation(prog, 'uReading'),
+      readCap: gl.getUniformLocation(prog, 'uReadCap'),
     };
 
     const tex = gl.createTexture();
@@ -566,6 +588,11 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       // atmosphere. Low magnitude: it is a nebula, not a light show.
       gl!.uniform3f(U.nebula, 0.055, 0.105, 0.115);
       gl!.uniform1f(U.reading, isReading ? 1 : 0);
+      // How far a reading page's sky may sink below its own gradient value, in ramp
+      // units. 0.34 lands the darkest excursion near L~0.80, which still measures
+      // 6.6:1 against --ink-1 (floor is 4.5:1). Bounded on purpose: this is the one
+      // number keeping body text safe on /research and /projects.
+      gl!.uniform1f(U.readCap, 0.34);
       gl!.uniform1f(U.gate, gateTop);
       gl!.uniform1f(U.time, (nowMs - t0) / 1000);
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
