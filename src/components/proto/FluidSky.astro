@@ -104,6 +104,13 @@ const { strength = 2, mode = 'fixed' } = Astro.props;
 
   /* Layer kill-switch for A/B-ing in the prototype. */
   :global(html[data-fluid='off']) .fluid-sky { display: none; }
+
+  /* PERF: phones pay the most for a full-screen shader and benefit least (the
+     sky is mostly hidden behind content on a narrow viewport). Skip it — the
+     shipped CSS gradient is the finished fallback. */
+  @media (max-width: 640px) {
+    .fluid-sky { display: none; }
+  }
 </style>
 
 <script>
@@ -127,16 +134,27 @@ const { strength = 2, mode = 'fixed' } = Astro.props;
     uniform float uScroll;
     uniform float uAmp;
 
-    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+    // PERF: sin() was the hot instruction — the old hash ran 4 sin() per noise
+    // lookup, and the two-level warp needs 5 fbm calls, so at 5 octaves that was
+    // ~100 sin() PER PIXEL (~1e9/sec at 324k px · 30fps). This hash is pure
+    // fract/dot arithmetic: same visual character, a fraction of the cost.
+    float hash(vec2 p) {
+      p = fract(p * vec2(443.897, 441.423));
+      p += dot(p, p + 19.19);
+      return fract(p.x * p.y);
+    }
     float noise(vec2 p) {
       vec2 i = floor(p), f = fract(p);
       vec2 u = f * f * (3.0 - 2.0 * f);
       return mix(mix(hash(i),               hash(i + vec2(1.0, 0.0)), u.x),
                  mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
     }
+    // 3 octaves, not 5. The upper two octaves contributed detail finer than the
+    // 0.35x internal resolution can even represent — they were paid for and then
+    // thrown away by the upscale.
     float fbm(vec2 p) {
       float v = 0.0, a = 0.5;
-      for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.02; a *= 0.5; }
+      for (int i = 0; i < 3; i++) { v += a * noise(p); p *= 2.02; a *= 0.5; }
       return v;
     }
 
@@ -259,9 +277,11 @@ const { strength = 2, mode = 'fixed' } = Astro.props;
     let amp = ampFor(currentLevel());
     gl.uniform1f(uAmp, amp);
 
-    // 0.5× internal resolution: a smooth noise field survives the upscale
-    // invisibly and this is the single biggest perf lever.
-    const SCALE = 0.5;
+    // PERF: 0.35× internal resolution (was 0.5×). Cost is quadratic in this
+    // number — 0.5→0.35 removes ~51% of all fragment work — and because the field
+    // is smooth low-frequency noise the upscale is invisible. Combined with the
+    // 3-octave fbm and the sin()-free hash, fragment cost is down ~6× overall.
+    const SCALE = 0.35;
     function resize(): void {
       const w = Math.max(1, Math.round(cvs!.clientWidth * SCALE));
       const h = Math.max(1, Math.round(cvs!.clientHeight * SCALE));
@@ -312,9 +332,25 @@ const { strength = 2, mode = 'fixed' } = Astro.props;
     let io: IntersectionObserver | null = null;
     const t0 = performance.now();
 
+    // PERF: ~15fps, not 30. The strata drift at ~0.05 units/sec — at that speed
+    // 15fps is indistinguishable from 30 (nothing moves far enough between
+    // frames to alias) and it halves the draw count.
+    //
+    // Plus an adaptive guard: if a draw ever costs more than ~8ms the device is
+    // struggling, so drop to ~8fps rather than degrade the whole page. This is
+    // what keeps the effect from taxing a weaker GPU.
+    let interval = 66;
+    let slowStrikes = 0;
     function loop(now: number): void {
-      if (now - last > 33) {           // ~30fps
+      if (now - last > interval) {
+        const t1 = performance.now();
         draw((now - t0) / 1000);
+        const cost = performance.now() - t1;
+        if (cost > 8) {
+          if (++slowStrikes >= 3) interval = 125;   // ~8fps
+        } else if (slowStrikes > 0) {
+          slowStrikes--;
+        }
         last = now;
       }
       rafId = requestAnimationFrame(loop);

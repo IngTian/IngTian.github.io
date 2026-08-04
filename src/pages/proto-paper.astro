@@ -1,16 +1,25 @@
 ---
-// PROTOTYPE ROUTE — the agreed synthesis, all layers live:
+// PROTOTYPE ROUTE — revised after review. Two layers, not three:
 //
-//   base   paper editorial craft  (letterpress, drop cap, folios, marginalia,
-//                                  hanging punctuation, richer paper material)
-//   accent fluid modulation OVER the Monet gradient — combined, never replacing it
-//   accent motes in the Mountains zone only, depth-gated
+//   base   paper editorial craft (letterpress, raised initial, marginalia,
+//                                 hanging punctuation, richer paper material)
+//   accent fluid modulation OVER the Monet gradient — combined, never replacing
 //
 // The layer stack, bottom → top:
-//   --descent-grad (untouched) → FluidSky (soft-light) → SkyWash → PaperTooth → content
+//   --descent-grad (untouched) → FluidSky (overlay) → SkyWash → PaperTooth → content
 //
-// Three toggles in the corner flip data-attributes on <html> so each layer can be
-// A/B'd live against the shipped look. Prototype-only chrome.
+// CUT in this revision, all three for measured reasons:
+//   · MOTES — probed the live canvas: 370 lit pixels out of 3,454,560 (0.011%)
+//     at max alpha 35/255, mean 6.7/255. depthGate + the light-theme gain + the
+//     alpha multiplier stacked into nothing. The feature was running and
+//     mathematically invisible, so it went rather than getting rescued.
+//   · FOLIOS (I/II/III running heads) — the left-margin Toc already names the
+//     section AND tracks it live; the folio was a static duplicate.
+//   · PaperMountains — with motes and the folio gone the wrapper added nothing,
+//     so Mountains is imported verbatim ("the mountain is fine").
+//
+// Fluid now defaults to strength 1: measured Δ 5.6/255 — visible, but the
+// lightest rung that is. Level 2+ read as too strong.
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Toc from '../components/Toc.astro';
 import SkyWash from '../components/SkyWash.astro';
@@ -18,35 +27,41 @@ import PaperTooth from '../components/proto/PaperTooth.astro';
 import FluidSky from '../components/proto/FluidSky.astro';
 import PaperHeights from '../sections/proto/PaperHeights.astro';
 import PaperInterlude from '../sections/proto/PaperInterlude.astro';
-import PaperMountains from '../sections/proto/PaperMountains.astro';
+import Mountains from '../sections/Mountains.astro';
 import Ground from '../sections/Ground.astro';
 import Signature from '../sections/Signature.astro';
 ---
 
 <BaseLayout
-  title="PROTO — paper editorial + fluid sky + motes"
+  title="PROTO — paper editorial + fluid sky"
   veilLine="a researcher by day"
   veilOnLoad={false}
   noindex={true}
 >
   <main class="descent">
-    <FluidSky />
+    <FluidSky strength={1} />
     <SkyWash />
     <PaperHeights />
     <PaperInterlude />
-    <PaperMountains />
+    <Mountains />
     <Ground />
     <Signature />
   </main>
   <Toc />
   <PaperTooth />
 
-  <!-- Prototype-only layer switches. -->
+  <!-- Prototype-only switches: the two remaining layers, plus the fluid strength
+       rungs so the level can be judged in situ (not just on /proto-ladder). -->
   <div class="proto-panel" data-proto-panel>
     <p class="proto-title">layers</p>
     <button type="button" data-layer="paper" class="on">paper</button>
     <button type="button" data-layer="fluid" class="on">fluid</button>
-    <button type="button" data-layer="motes" class="on">motes</button>
+    <p class="proto-title mt-1">fluid level</p>
+    <div class="proto-row">
+      {[0, 1, 2, 3].map((n) => (
+        <button type="button" data-level={String(n)} class:list={[n === 1 && 'on']}>{n}</button>
+      ))}
+    </div>
   </div>
 </BaseLayout>
 
@@ -91,6 +106,9 @@ import Signature from '../sections/Signature.astro';
     background: var(--ochre);
     border-color: var(--ochre);
   }
+  .proto-row { display: flex; gap: 4px; }
+  .proto-row button { padding: 3px 8px; }
+  .mt-1 { margin-top: 5px; }
   @media (prefers-reduced-motion: reduce) {
     .proto-panel button { transition: none; }
   }
@@ -102,16 +120,32 @@ import Signature from '../sections/Signature.astro';
   function initProtoPanel(): void {
     const panel = document.querySelector<HTMLElement>('[data-proto-panel]');
     if (!panel) return;
+    const levelBtns = Array.from(panel.querySelectorAll<HTMLButtonElement>('button[data-level]'));
     panel.addEventListener('click', (e: MouseEvent) => {
-      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-layer]');
-      if (!btn) return;
-      const key = btn.dataset.layer;
-      if (!key) return;
-      const root = document.documentElement;
-      const isOn = root.dataset[key] !== 'off';
-      if (isOn) root.dataset[key] = 'off';
-      else delete root.dataset[key];
-      btn.classList.toggle('on', !isOn);
+      const target = e.target as HTMLElement;
+
+      // layer on/off
+      const layerBtn = target.closest<HTMLButtonElement>('button[data-layer]');
+      if (layerBtn) {
+        const key = layerBtn.dataset.layer;
+        if (!key) return;
+        const root = document.documentElement;
+        const isOn = root.dataset[key] !== 'off';
+        if (isOn) root.dataset[key] = 'off';
+        else delete root.dataset[key];
+        layerBtn.classList.toggle('on', !isOn);
+        return;
+      }
+
+      // fluid strength rung
+      const lvlBtn = target.closest<HTMLButtonElement>('button[data-level]');
+      if (lvlBtn) {
+        const v = lvlBtn.dataset.level;
+        if (v === undefined) return;
+        levelBtns.forEach((b) => b.classList.remove('on'));
+        lvlBtn.classList.add('on');
+        document.documentElement.dataset.fluidStrength = v;
+      }
     });
   }
   document.addEventListener('astro:page-load', initProtoPanel);

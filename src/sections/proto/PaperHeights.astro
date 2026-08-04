@@ -6,10 +6,13 @@
 //   · LETTERPRESS on the name — a light highlight below the glyph edge and a soft
 //     shadow above, so the type reads as PRESSED INTO the sheet rather than
 //     floating on it. Deliberately restrained: no glow, no colour fringing.
-//   · DROP CAP on the bio, optically aligned to the first two lines.
-//   · FOLIO / running head in the margin, set like a book's.
+//   · RAISED INITIAL on the bio (a floated drop cap can't work on right-aligned
+//     ragged text — see the note on .bio-prose::first-letter).
 //   · MARGINALIA — one real annotation beside the bio, in the outer margin.
-//   · SMALL CAPS for the role line, letterspaced (Fraunces supports them).
+//
+// CUT: the folio / running head ("I — HEIGHTS"). The left-margin Toc already
+// names the current section and tracks it live, so a folio was a second, static
+// copy of information the reader already has — decoration masquerading as craft.
 import { name, roles, rolesSub, phd, bio } from '../../data/profile';
 import TerrainHero from '../../components/TerrainHero.astro';
 
@@ -21,11 +24,6 @@ for (const phrase of bio.strong) {
 <section id="heights" class="relative min-h-[108vh] px-[7vw] pb-[12vh]">
   <TerrainHero />
   <div class="hero-legibility" aria-hidden="true"></div>
-
-  <!-- Folio / running head — the book's mark for this leaf. -->
-  <p class="folio absolute top-[7vh] left-[7vw]">
-    <span class="folio-num">I</span><span class="folio-em">—</span><span>Heights</span>
-  </p>
 
   <!-- about-me, floated top-right; the empty diagonal to the name IS the composition -->
   <div class="hero-bio absolute top-[22vh] right-[7vw] max-w-[32ch] text-right">
@@ -106,20 +104,6 @@ for (const phrase of bio.strong) {
     vertical-align: -0.06em;
   }
 
-  /* ── FOLIO / running head ─────────────────────────────────────────────── */
-  .folio {
-    z-index: 2;
-    font-family: var(--font-mono), ui-monospace, monospace;
-    font-size: 10px;
-    letter-spacing: 0.26em;
-    text-transform: uppercase;
-    color: color-mix(in oklab, var(--ink-3) 82%, transparent);
-    display: flex;
-    align-items: center;
-  }
-  .folio-num { color: var(--seal); }
-  .folio-em  { margin: 0 0.7em; opacity: 0.5; }
-
   /* ── MARGINALIA ─────────────────────────────────────────────────────────
      Set OUTSIDE the text block in the true outer margin, ruled like a scholarly
      edition's side note. Hidden below lg — there is no margin to write in. */
@@ -157,13 +141,11 @@ for (const phrase of bio.strong) {
     #heights .hero-rise { order: 1; }
     #heights .hero-legibility { display: none; }
     #heights .terrain-canvas { opacity: 0.5; }
-    .folio { display: none; }
   }
 
   @media (prefers-reduced-motion: no-preference) {
     .hero-rise { animation: hero-rise 1.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
     .hero-bio  { animation: hero-rise 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both; }
-    .folio     { animation: hero-rise 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.5s both; }
     @keyframes hero-rise {
       from { opacity: 0; transform: translate3d(0, 16px, 0); }
       to   { opacity: 1; transform: translate3d(0, 0, 0); }
