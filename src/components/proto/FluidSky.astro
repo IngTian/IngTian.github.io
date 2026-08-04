@@ -229,7 +229,11 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
           // while a drop at 0.030 added ~25 on top; at 0.012 a drop contributes
           // roughly 10, i.e. a perturbation you notice only if you are watching for
           // it. That is the intent — the sky should feel touched, not disturbed.
-          drag += (d / dist) * ring * wave * nd.z * 0.012;
+          // 0.012 -> 0.0075. Continuous emission means several ripples are alive at
+          // once where the distance gate used to allow at most one or two, so
+          // per-drop amplitude comes down to keep the SUM at the same very-mild
+          // level rather than letting overlap multiply it.
+          drag += (d / dist) * ring * wave * nd.z * 0.0075;
         }
       }
 
@@ -700,27 +704,57 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       if (!haveRaw) { haveRaw = true; lastDropX = rawX; lastDropY = rawY; }
     }
 
-    // Distance between drops, in sample units (~viewport widths). Widened 0.075 ->
-    // 0.135 (~100px -> ~195px at 1440 wide) as part of making the effect very mild:
-    // fewer simultaneous ripples means the surface is mostly at rest, and each drop
-    // reads as its own event. Ordinary mouse movement across the page now leaves a
-    // handful of quiet rings rather than a steady procession.
-    const DROP_SPACING = 0.135;
+    // ── CONTINUOUS emission ────────────────────────────────────────────────
+    // Was a DISTANCE GATE: a drop landed only once the cursor had travelled 0.135
+    // sample units (~195px). That gate is exactly what made it feel discrete —
+    // between drops nothing happened at all, so the surface went dead and then
+    // popped.
+    //
+    // Now drops are emitted on a TIME cadence and INTERPOLATED along the path the
+    // pointer covered during that interval. Consequences:
+    //   · standing still or drifting slowly still produces drops, so the surface is
+    //     continuously alive under the cursor
+    //   · a fast sweep places several along the segment it crossed rather than one
+    //     at the end, so there are no gaps
+    //   · each drop is still an independent expanding ripple, so this stays a
+    //     droplet model — it is the CADENCE that became continuous, not the shape
+    //
+    // Kept mild by construction: a shorter interval means more overlapping ripples,
+    // so per-drop strength is scaled down to compensate rather than letting the sum
+    // grow. Slow movement also gets weaker drops (a gentle touch, not a plunge).
+    const DROP_INTERVAL = 0.085;   // seconds between emissions
+    let dropClock = 0;
 
     function advancePointer(dt: number): void {
       if (!haveRaw) return;
+      dropClock += dt;
+      if (dropClock < DROP_INTERVAL) return;
+
+      // How many emissions are due (usually 1; more if a frame ran long).
+      const due = Math.min(3, Math.floor(dropClock / DROP_INTERVAL));
+      dropClock -= due * DROP_INTERVAL;
+
       const dx = rawX - lastDropX;
       const dy = rawY - lastDropY;
-      if (Math.hypot(dx, dy) < DROP_SPACING) return;
+      const dist = Math.hypot(dx, dy);
+
+      // Speed shapes the drop: a slow drift gives a faint touch, a quick move a
+      // slightly firmer one. Capped so a flick can't spike.
+      const speed = dist / Math.max(1e-4, DROP_INTERVAL * due);
+      const str = Math.min(1, 0.34 + speed * 0.55);
+
+      for (let i = 1; i <= due; i++) {
+        const tt = i / due;
+        const n = nodes[nodeIx % NODES];
+        nodeIx++;
+        // interpolate along the path covered since the last emission
+        n.x = lastDropX + dx * tt;
+        n.y = lastDropY + dy * tt;
+        n.age = 0;
+        n.str = str;
+      }
       lastDropX = rawX;
       lastDropY = rawY;
-      const n = nodes[nodeIx % NODES];
-      nodeIx++;
-      n.x = rawX;
-      n.y = rawY;
-      n.age = 0;
-      n.str = 1;
-      void dt;
     }
 
     function decayNodes(dt: number): void {
