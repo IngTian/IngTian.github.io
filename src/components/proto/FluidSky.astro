@@ -214,7 +214,12 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
           float ring = exp(-pow((dist - R) * 9.0, 2.0));
           // radial oscillation gives the crest/trough of an actual ripple
           float wave = sin((dist - R) * 34.0);
-          drag += (d / dist) * ring * wave * nd.z * 0.030;
+          // Amplitude dialled right down on request ("very mild"): 0.030 -> 0.012.
+          // For scale, the sky's own ambient churn measures max Δ~115/255 over 250ms
+          // while a drop at 0.030 added ~25 on top; at 0.012 a drop contributes
+          // roughly 10, i.e. a perturbation you notice only if you are watching for
+          // it. That is the intent — the sky should feel touched, not disturbed.
+          drag += (d / dist) * ring * wave * nd.z * 0.012;
         }
       }
 
@@ -685,10 +690,12 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       if (!haveRaw) { haveRaw = true; lastDropX = rawX; lastDropY = rawY; }
     }
 
-    // Distance between drops, in sample units (~viewport widths). 0.075 is roughly
-    // every 100px at 1440 wide: frequent enough to feel responsive, sparse enough
-    // that ripples read as separate events instead of a continuous wake.
-    const DROP_SPACING = 0.075;
+    // Distance between drops, in sample units (~viewport widths). Widened 0.075 ->
+    // 0.135 (~100px -> ~195px at 1440 wide) as part of making the effect very mild:
+    // fewer simultaneous ripples means the surface is mostly at rest, and each drop
+    // reads as its own event. Ordinary mouse movement across the page now leaves a
+    // handful of quiet rings rather than a steady procession.
+    const DROP_SPACING = 0.135;
 
     function advancePointer(dt: number): void {
       if (!haveRaw) return;
@@ -707,12 +714,14 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     }
 
     function decayNodes(dt: number): void {
-      // Age drives the shader's expanding radius; strength fades over ~1.8s so a
-      // ripple spreads, weakens and is gone — an impulse, not a persistent mark.
+      // Age drives the shader's expanding radius; strength fades (tau 0.44s, so ~1.3s
+      // to vanish, shortened from 1.8s) — a ripple spreads, weakens and is gone. A
+      // shorter life also means fewer live drops overlapping at any moment, which is
+      // most of what "very mild" actually means in practice.
       for (const n of nodes) {
         if (n.str > 0.001) {
           n.age += dt;
-          n.str *= Math.exp(-dt / 0.62);
+          n.str *= Math.exp(-dt / 0.44);
           if (n.str <= 0.001) n.str = 0;
         }
       }
