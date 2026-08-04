@@ -1,44 +1,51 @@
 ---
-// FluidSky (PROTOTYPE) — the fluid IS the sky. It REPLACES --descent-grad.
+// FluidSky (PROTOTYPE) — a LIVE, POINTER-REACTIVE fluid that IS the sky.
 //
-// ── Why replace, after two rounds of "combine" ────────────────────────────
-// Combining was the wrong call and the symptoms proved it. Modulating a tuned
-// gradient means the effect fights the thing underneath it: strong enough to see
-// meant strong enough to grey out the palette and hurt text contrast, and weak
-// enough to be safe meant invisible. Also, layering "Monet-ish ink" on top of a
-// "Monet sky" is redundant — the same idea twice, each diluting the other.
+// ── Why animating is affordable now (it wasn't before) ────────────────────
+// The version that hurt performance was a full-viewport canvas with
+// `mix-blend-mode: overlay`. The noise math was NOT the main cost: a blended
+// full-screen layer forces the compositor to re-read and re-blend the page
+// backdrop every frame it changes, which defeats layer caching for the whole
+// document. Now that the fluid REPLACES --descent-grad it is opaque, so each
+// frame is a plain blit with no backdrop read. Same animation, structurally
+// cheaper — which is why the loop can come back.
 //
-// As the background it stops fighting anything:
-//   · NO mix-blend-mode → the compositor never re-reads the page backdrop, which
-//     was the real per-frame cost (not the noise math). An opaque layer is just
-//     a blit.
-//   · It can run at FULL strength, because it isn't distorting a gradient — it is
-//     the gradient.
-//   · Contrast becomes controllable rather than accidental: the shader owns the
-//     colour, so the descent's luminance ramp is GUARANTEED (see uContrast and
-//     the legibility gate below) instead of hoped for.
+// Cost controls, all measured rather than assumed:
+//   · VIEWPORT-sized and `fixed`, not page-tall. Scroll enters as a uniform, so
+//     a 5000px descent still only ever shades ~one screen of pixels.
+//   · 0.42x internal resolution, upscaled — the field is smooth, so invisible.
+//   · ~30fps (pointer interaction needs to feel live; 15 felt like lag).
+//   · paused when the tab is hidden, and when the sky is fully covered.
+//   · sin()-free hash; 3 octaves (the finer ones were destroyed by the upscale).
+//   · skipped entirely under 640px.
 //
-// ── How the Monet colour story survives ───────────────────────────────────
-// The vertical palette is uploaded as a 1D gradient TEXTURE built from the exact
-// --descent-grad stops (mirrored from tokens.css). The shader does not invent
-// colour — the domain-warped field only displaces WHERE along that ramp each
-// pixel samples. So dawn paper → ochre → lavender → indigo dusk → grey ink →
-// near-black ground is preserved, but the boundaries marble and diffuse like ink
-// in water. That is the Seine, not a gradient with fog on it.
+// ── The Monet colour story is preserved exactly ──────────────────────────
+// The palette is uploaded as a 1D gradient TEXTURE built from the exact
+// --descent-grad stops. The shader never authors colour — the warped field only
+// displaces WHERE along that ramp each pixel samples. So dawn paper → ochre →
+// lavender → indigo dusk → grey ink → near-black ground is intact; the
+// BOUNDARIES marble and diffuse, like ink in water.
 //
-// ── Cost ──────────────────────────────────────────────────────────────────
-// Page-height absolute canvas, drawn ONCE. Scrolling moves you through it for
-// free, exactly like the CSS gradient it replaces — no scroll uniform, no rAF,
-// no blend. Redraw happens only on resize or theme change.
+// ── Pointer interaction ─────────────────────────────────────────────────
+// The cursor drags the fluid. A short trail of recent positions is uploaded as
+// ripples; each applies a SWIRL (rotating the sample coordinate about the ripple
+// centre) plus a slight outward push, falling off with a Gaussian. Strength
+// scales with pointer SPEED and decays over ~1.4s, so a slow drift barely
+// disturbs the surface while a fast sweep tears a visible wake through it. The
+// pointer is also smoothed, which reads as viscosity.
 //
-// No WebGL → canvas hides → .descent's CSS gradient shows → today's site.
+// ── Legibility ──────────────────────────────────────────────────────────
+// Vertical displacement is what changes luminance, so it is what can wreck text
+// contrast. A gate damps it hard from the content zone down (measured from
+// #mountains' real offset) and leaves the open sky unrestricted. This is what
+// makes replacing the gradient viable at all.
 interface Props {
   /** Warp strength. 0 = plain gradient · 1 subtle · 2 medium · 3 strong · 4 max */
   strength?: 0 | 1 | 2 | 3 | 4;
   /** `background` (default) — the sky itself. `contained` — a ladder rung. */
   mode?: 'background' | 'contained';
 }
-const { strength = 2, mode = 'background' } = Astro.props;
+const { strength = 3, mode = 'background' } = Astro.props;
 ---
 <canvas
   class:list={['fluid-sky', mode === 'contained' ? 'is-contained' : 'is-background']}
@@ -50,49 +57,46 @@ const { strength = 2, mode = 'background' } = Astro.props;
 
 <style>
   .fluid-sky {
-    position: absolute;
     pointer-events: none;
     display: block;
-    /* NO mix-blend-mode. This is the sky, not a wash over it — that omission is
-       the entire performance fix. */
+    /* NO mix-blend-mode — this is the sky, not a wash over it. That omission is
+       what makes a live loop affordable. */
   }
 
-  /* ── BACKGROUND: covers the whole descent, behind everything ─────────────
-     z-index:-2 (SkyWash and .descent::before/::after sit at -1) so the woven
-     broken-colour washes still ride ON TOP of the fluid, and all of it stays
-     behind content. Negative-z children paint above the parent's own background,
-     so this opaquely replaces --descent-grad while leaving it as the fallback. */
+  /* BACKGROUND: viewport-locked. Scroll is a uniform, so we shade one screen of
+     pixels no matter how tall the descent is. z-index -2 keeps it behind
+     SkyWash (-1) and all content, while still painting above .descent's own
+     background box. */
   .fluid-sky.is-background {
+    position: fixed;
     inset: 0;
     width: 100%;
     height: 100%;
     z-index: -2;
   }
 
-  /* ── CONTAINED: a /proto-ladder rung ────────────────────────────────────── */
+  /* CONTAINED: a /proto-ladder rung. */
   .fluid-sky.is-contained {
+    position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     z-index: -2;
   }
 
-  /* Strength is a SHADER uniform now, not opacity — the layer is opaque. Only
-     "off" is a CSS concern. */
+  /* Strength is a shader uniform; only "off" is a CSS concern. */
   .fluid-sky[data-strength='0'] { display: none; }
   :global(html[data-fluid-strength='0']) .fluid-sky { display: none !important; }
-
-  /* Layer kill-switch → falls back to the shipped CSS gradient. */
   :global(html[data-fluid='off']) .fluid-sky { display: none; }
 
-  /* Phones: a page-height texture is the wrong trade on a narrow viewport where
-     the sky is mostly behind content. The CSS gradient is the finished state. */
   @media (max-width: 640px) {
     .fluid-sky { display: none; }
   }
 </style>
 
 <script>
+  import { prefersReducedMotion } from '../../lib/motion';
+
   const VERT = `
     attribute vec2 aPos;
     varying vec2 vUv;
@@ -102,15 +106,21 @@ const { strength = 2, mode = 'background' } = Astro.props;
     }
   `;
 
-  // The field displaces WHERE we sample the palette ramp; it never authors colour.
+  const RIPPLES = 5;
+
   const FRAG = `
     precision highp float;
     varying vec2 vUv;
-    uniform sampler2D uRamp;   // 1D descent palette (exact --descent-grad stops)
-    uniform float uAmp;        // warp strength
-    uniform float uAspect;     // height/width, so strata aren't stretched
-    uniform float uGateTop;    // normalized depth where the content zone starts
-    uniform float uGateSoft;   // fade distance into that zone
+
+    uniform sampler2D uRamp;
+    uniform float uAmp;
+    uniform float uTime;
+    uniform float uYOffset;   // scroll, in units of viewport widths
+    uniform float uYSpan;     // viewport height, in units of viewport widths
+    uniform float uDepth0;    // page depth at the TOP of the viewport
+    uniform float uDepthSpan; // page depth covered by one viewport
+    uniform float uGateTop;
+    uniform vec3  uRipples[${RIPPLES}];  // xy = centre (sample space), z = strength
 
     float hash(vec2 p) {
       p = fract(p * vec2(443.897, 441.423));
@@ -125,48 +135,73 @@ const { strength = 2, mode = 'background' } = Astro.props;
     }
     float fbm(vec2 p) {
       float v = 0.0, a = 0.5;
-      for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.02; a *= 0.5; }
+      for (int i = 0; i < 3; i++) { v += a * noise(p); p *= 2.02; a *= 0.5; }
       return v;
     }
 
     void main() {
-      // depth: 0 at the dawn top, 1 at the near-black ground
-      float depth = 1.0 - vUv.y;
+      // Sample space measured in viewport widths, with scroll folded in — so the
+      // field is continuous through the whole descent and scrolling moves you
+      // DOWN through it exactly like the gradient it replaces.
+      vec2 sp = vec2(vUv.x, uYOffset + (1.0 - vUv.y) * uYSpan);
 
-      // Isotropic sample space. The canvas is page-tall (very non-square), so
-      // without the aspect term the strata would smear into horizontal bands.
-      vec2 p = vec2(vUv.x, (1.0 - vUv.y) * uAspect) * 2.4;
+      // ── POINTER: drag the fluid ────────────────────────────────────────
+      // Each ripple swirls the sample coordinate about its centre and pushes
+      // outward a little. Gaussian falloff, so the disturbance is local.
+      vec2 warpXY = sp;
+      for (int i = 0; i < ${RIPPLES}; i++) {
+        vec3 rp = uRipples[i];
+        if (rp.z > 0.001) {
+          vec2 d = warpXY - rp.xy;
+          float r2 = dot(d, d);
+          // Falloff 12.0 (was 26.0) → a wider disturbance. Sample space is in
+          // viewport WIDTHS, so 26.0 confined the swirl to roughly a 100px blob
+          // that was invisible at a glance. This spans ~a third of the screen,
+          // which is what makes a mouse sweep read as dragging water.
+          float infl = rp.z * exp(-r2 * 12.0);
+          // Stronger rotation + push, for the same reason.
+          float ang = infl * 4.2;
+          float s = sin(ang), c = cos(ang);
+          vec2 rot = vec2(d.x * c - d.y * s, d.x * s + d.y * c);
+          warpXY = rp.xy + rot + normalize(d + 1e-6) * infl * 0.085;
+        }
+      }
 
-      // two-level domain warp — the ink-in-water signature
-      vec2 q = vec2(fbm(p), fbm(p + vec2(5.2, 1.3)));
-      vec2 r = vec2(fbm(p + 2.9 * q + vec2(1.7, 9.2)),
-                    fbm(p + 2.9 * q + vec2(8.3, 2.8)));
+      // Frequency: 6.4, not 2.4. The canvas became VIEWPORT-sized (scroll is a
+      // uniform now) instead of page-tall, so the same number spread the field
+      // across ~900px instead of ~4800px and the strata came out ~5x too large
+      // to read as diffusion. Scaled to match the previous on-screen density.
+      vec2 p = warpXY * 6.4;
+
+      // two-level domain warp, drifting slowly in time — the ink-in-water look
+      float t = uTime * 0.035;
+      vec2 q = vec2(fbm(p + vec2(0.0, t)),
+                    fbm(p + vec2(5.2, 1.3) - vec2(t, 0.0)));
+      vec2 r = vec2(fbm(p + 2.9 * q + vec2(1.7, 9.2) + vec2(0.0, t * 0.7)),
+                    fbm(p + 2.9 * q + vec2(8.3, 2.8) - vec2(t * 0.6, 0.0)));
       float f = fbm(p + 2.6 * r);
 
-      // Stratify: banding the warp field is what reads as diffusion rather than
-      // as a soft blur.
+      // Stratify — banding the warp field is the difference between "diffusion"
+      // and "a soft blur".
       float bands = sin((f * 6.2831853) * 1.35 + length(r) * 2.2);
       float strata = smoothstep(-0.7, 0.7, bands);
-      float field = mix(f, strata, 0.5) - 0.5;   // centred, range ~[-0.5, 0.5]
+      float field = mix(f, strata, 0.5) - 0.5;
 
-      // ── LEGIBILITY GATE ────────────────────────────────────────────────
-      // Vertical displacement is what changes a pixel's luminance, so it is also
-      // what can wreck text contrast. Free rein through the open sky; damped to a
-      // fraction once we reach the content zone, where light paper text sits on
-      // grey ink. The colour story still marbles there — just not far enough to
-      // lift the background into the text's value range.
-      float gate = 1.0 - 0.82 * smoothstep(uGateTop, uGateTop + uGateSoft, depth);
+      // page depth of this pixel (0 = dawn, 1 = ground)
+      float depth = clamp(uDepth0 + (1.0 - vUv.y) * uDepthSpan, 0.0, 1.0);
 
-      // Displace where we read the ramp. 0.26 (was 0.16) — with the gate holding
-      // the reading zone safe, the open sky can afford a much larger excursion,
-      // which is what makes the strata read as ink in water rather than a haze.
-      float y = clamp(depth + field * uAmp * 0.26 * gate, 0.0, 1.0);
+      // LEGIBILITY GATE — free rein in the open sky, damped to 18% once the
+      // reading zone begins, so light text on grey ink keeps its contrast.
+      float gate = 1.0 - 0.82 * smoothstep(uGateTop, uGateTop + 0.06, depth);
+
+      // Displace where we read the ramp. Larger than the combined-mode version
+      // could ever afford, because the gate protects the text.
+      float y = clamp(depth + field * uAmp * 0.30 * gate, 0.0, 1.0);
 
       vec3 col = texture2D(uRamp, vec2(0.5, y)).rgb;
 
-      // A whisper of warm/cool broken colour along the warp axis — Monet's
-      // temperature play. Also damped by the gate.
-      float temp = (r.x - r.y) * 0.05 * uAmp * gate;
+      // warm/cool broken colour along the warp axis — Monet's temperature play
+      float temp = (r.x - r.y) * 0.06 * uAmp * gate;
       col.r += temp;
       col.b -= temp * 1.1;
 
@@ -174,9 +209,8 @@ const { strength = 2, mode = 'background' } = Astro.props;
     }
   `;
 
-  // ── The descent palette, mirroring --descent-grad in tokens.css ──────────
-  // Kept in sync by hand (a prototype); the shipped version should read these
-  // from the token so they can never drift.
+  // Mirrors --descent-grad / its dark twin in tokens.css. (A prototype: the
+  // shipped version should read these from the token so they can't drift.)
   const LIGHT_STOPS: Array<[number, string]> = [
     [0.00, '#f4efe4'], [0.08, '#f0eadf'], [0.15, '#efe6d4'], [0.23, '#e2d2c2'],
     [0.30, '#ccc4b6'], [0.37, '#a6a8ad'], [0.44, '#7d7e88'], [0.52, '#565660'],
@@ -187,7 +221,9 @@ const { strength = 2, mode = 'background' } = Astro.props;
     [0.60, '#0e1013'], [0.80, '#0b0d0f'], [1.00, '#08090b'],
   ];
 
-  const AMP_BY_LEVEL = [0, 0.55, 1.0, 1.6, 2.4];
+  const AMP_BY_LEVEL = [0, 0.6, 1.1, 1.7, 2.5];
+
+  interface Ripple { x: number; y: number; str: number }
 
   const teardowns: Array<() => void> = [];
 
@@ -199,7 +235,6 @@ const { strength = 2, mode = 'background' } = Astro.props;
     });
   }
 
-  /** Paint the descent ramp into a tall 1px-wide canvas → upload as the palette. */
   function buildRamp(dark: boolean): HTMLCanvasElement | null {
     const N = 512;
     const c = document.createElement('canvas');
@@ -249,111 +284,239 @@ const { strength = 2, mode = 'background' } = Astro.props;
     gl.enableVertexAttribArray(aPos);
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
-    const uRamp = gl.getUniformLocation(prog, 'uRamp');
-    const uAmp = gl.getUniformLocation(prog, 'uAmp');
-    const uAspect = gl.getUniformLocation(prog, 'uAspect');
-    const uGateTop = gl.getUniformLocation(prog, 'uGateTop');
-    const uGateSoft = gl.getUniformLocation(prog, 'uGateSoft');
+    const U = {
+      ramp: gl.getUniformLocation(prog, 'uRamp'),
+      amp: gl.getUniformLocation(prog, 'uAmp'),
+      time: gl.getUniformLocation(prog, 'uTime'),
+      yOff: gl.getUniformLocation(prog, 'uYOffset'),
+      ySpan: gl.getUniformLocation(prog, 'uYSpan'),
+      d0: gl.getUniformLocation(prog, 'uDepth0'),
+      dSpan: gl.getUniformLocation(prog, 'uDepthSpan'),
+      gate: gl.getUniformLocation(prog, 'uGateTop'),
+      ripples: gl.getUniformLocation(prog, 'uRipples'),
+    };
 
     const tex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-    function uploadRamp(): void {
-      const dark = document.documentElement.dataset.theme === 'dark';
-      const ramp = buildRamp(dark);
+    let rampTheme = '';
+    function uploadRamp(force = false): void {
+      const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+      if (!force && theme === rampTheme) return;
+      rampTheme = theme;
+      const ramp = buildRamp(theme === 'dark');
       if (!ramp) return;
+      gl!.activeTexture(gl!.TEXTURE0);
       gl!.bindTexture(gl!.TEXTURE_2D, tex);
       gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA, gl!.RGBA, gl!.UNSIGNED_BYTE, ramp);
-      gl!.uniform1i(uRamp, 0);
+      gl!.uniform1i(U.ramp, 0);
     }
+    uploadRamp(true);
+
+    const contained = cvs.dataset.mode === 'contained';
 
     function level(): number {
       const live = document.documentElement.dataset.fluidStrength;
       if (live !== undefined) return Number(live);
-      return Number(cvs.dataset.strength ?? '2');
+      return Number(cvs.dataset.strength ?? '3');
     }
 
-    // Where does the reading zone begin, as a fraction of the whole descent? The
-    // gate damps vertical displacement from here down so text contrast holds.
-    function gateTop(): number {
-      if (cvs.dataset.mode === 'contained') return 1.0;   // no content → no gate
+    /** Page depth where the reading zone starts (fraction of the whole descent). */
+    let gateTop = 0.55;
+    function measureGate(): void {
+      if (contained) { gateTop = 1.0; return; }
       const content = document.getElementById('mountains');
-      const host = cvs.offsetParent as HTMLElement | null;
-      if (!content || !host) return 0.55;
-      const hostTop = host.getBoundingClientRect().top + window.scrollY;
-      const hostH = host.offsetHeight || 1;
-      const cTop = content.getBoundingClientRect().top + window.scrollY;
-      return Math.min(0.95, Math.max(0.1, (cTop - hostTop) / hostH));
+      const doc = document.documentElement;
+      if (!content) { gateTop = 0.55; return; }
+      const top = content.getBoundingClientRect().top + window.scrollY;
+      gateTop = Math.min(0.95, Math.max(0.1, top / Math.max(1, doc.scrollHeight)));
+    }
+    measureGate();
+
+    // ── pointer ripples ────────────────────────────────────────────────────
+    const ripples: Ripple[] = Array.from({ length: RIPPLES }, () => ({ x: -9, y: -9, str: 0 }));
+    let rippleIx = 0;
+    let lastPx = 0, lastPy = 0, havePointer = false;
+    let lastEmit = 0;
+    const rippleData = new Float32Array(RIPPLES * 3);
+
+    function onPointerMove(e: PointerEvent | MouseEvent): void {
+      const vw = Math.max(1, window.innerWidth);
+      const x = e.clientX / vw;
+      const y = (window.scrollY + e.clientY) / vw;   // same units as sample space
+      if (!havePointer) { havePointer = true; lastPx = x; lastPy = y; return; }
+
+      const dx = x - lastPx, dy = y - lastPy;
+      const speed = Math.hypot(dx, dy);
+      lastPx = x; lastPy = y;
+
+      // Emit at most ~every 55ms, and scale with SPEED so a slow drift barely
+      // disturbs the surface while a fast sweep tears a wake through it.
+      const now = performance.now();
+      if (now - lastEmit < 55) return;
+      lastEmit = now;
+
+      const str = Math.min(1, speed * 9);
+      if (str < 0.05) return;
+      const rp = ripples[rippleIx % RIPPLES];
+      rippleIx++;
+      rp.x = x; rp.y = y; rp.str = str;
+      // any interaction should show immediately, even between throttled frames
+      wake();
     }
 
-    // Page-height canvas at reduced resolution. Clamped to the driver's
-    // renderbuffer limit — the descent can be 4000-6000px tall, and a texture
-    // request past MAX_RENDERBUFFER_SIZE fails silently to a blank frame.
-    const MAX = Math.min(4096, gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number || 4096);
+    function decayRipples(dt: number): boolean {
+      let alive = false;
+      for (const rp of ripples) {
+        if (rp.str > 0.001) {
+          rp.str *= Math.exp(-dt / 0.62);   // ~1.4s to visually vanish
+          if (rp.str <= 0.001) rp.str = 0;
+          else alive = true;
+        }
+      }
+      return alive;
+    }
 
-    function draw(): void {
-      const cssW = cvs.clientWidth || 1;
-      const cssH = cvs.clientHeight || 1;
-      let scale = 0.5;
-      // shrink further if the page is so tall that 0.5x would exceed the limit
-      if (cssH * scale > MAX) scale = MAX / cssH;
-      const w = Math.max(1, Math.min(MAX, Math.round(cssW * scale)));
-      const h = Math.max(1, Math.min(MAX, Math.round(cssH * scale)));
+    // internal resolution — the single biggest perf lever, quadratic
+    const SCALE = 0.42;
+
+    function sizeTo(): void {
+      const w = Math.max(1, Math.round((cvs.clientWidth || 1) * SCALE));
+      const h = Math.max(1, Math.round((cvs.clientHeight || 1) * SCALE));
       if (cvs.width !== w || cvs.height !== h) {
         cvs.width = w;
         cvs.height = h;
       }
-      gl!.viewport(0, 0, w, h);
+      gl!.viewport(0, 0, cvs.width, cvs.height);
+    }
 
-      gl!.activeTexture(gl!.TEXTURE0);
+    let t0 = performance.now();
+    function draw(nowMs: number): void {
+      sizeTo();
       uploadRamp();
-      gl!.uniform1f(uAmp, AMP_BY_LEVEL[Math.max(0, Math.min(4, level()))] ?? 1.0);
-      // aspect keeps the noise isotropic on a very tall canvas
-      gl!.uniform1f(uAspect, cssH / Math.max(1, cssW));
-      gl!.uniform1f(uGateTop, gateTop());
-      gl!.uniform1f(uGateSoft, 0.06);
+
+      const vw = Math.max(1, window.innerWidth);
+      const vh = Math.max(1, window.innerHeight);
+      const docH = Math.max(1, document.documentElement.scrollHeight);
+
+      if (contained) {
+        gl!.uniform1f(U.yOff, level() * 3.1);
+        gl!.uniform1f(U.ySpan, (cvs.clientHeight || vh) / (cvs.clientWidth || vw));
+        gl!.uniform1f(U.d0, 0.0);
+        gl!.uniform1f(U.dSpan, 1.0);
+      } else {
+        gl!.uniform1f(U.yOff, window.scrollY / vw);
+        gl!.uniform1f(U.ySpan, vh / vw);
+        gl!.uniform1f(U.d0, window.scrollY / docH);
+        gl!.uniform1f(U.dSpan, vh / docH);
+      }
+
+      gl!.uniform1f(U.amp, AMP_BY_LEVEL[Math.max(0, Math.min(4, level()))] ?? 1.7);
+      gl!.uniform1f(U.gate, gateTop);
+      gl!.uniform1f(U.time, (nowMs - t0) / 1000);
+
+      for (let i = 0; i < RIPPLES; i++) {
+        rippleData[i * 3] = ripples[i].x;
+        rippleData[i * 3 + 1] = ripples[i].y;
+        rippleData[i * 3 + 2] = ripples[i].str;
+      }
+      gl!.uniform3fv(U.ripples, rippleData);
+
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
     }
 
-    draw();
+    // first frame — also the reduced-motion / pre-loop state
+    draw(performance.now());
 
-    // Signal that the canvas has really painted, so the page can drop the CSS
-    // gradient underneath it. Doing this only AFTER a successful draw is what
-    // makes every failure path (no WebGL, shader compile fail, size clamp) fall
-    // back to the shipped gradient instead of a blank void.
-    if (cvs.dataset.mode !== 'contained') {
-      const host = cvs.closest('.descent');
-      host?.classList.add('fluid-live');
+    if (!contained) cvs.closest('.descent')?.classList.add('fluid-live');
+
+    const reduce = prefersReducedMotion();
+
+    let rafId = 0;
+    let running = false;
+    let last = 0;
+    let prev = performance.now();
+
+    function loop(now: number): void {
+      // ~30fps: pointer interaction needs to feel live (15 read as lag)
+      if (now - last > 32) {
+        const dt = Math.min(0.25, (now - prev) / 1000);
+        prev = now;
+        decayRipples(dt);
+        draw(now);
+        last = now;
+      }
+      rafId = requestAnimationFrame(loop);
+    }
+    function start(): void {
+      if (running || document.hidden) return;
+      running = true;
+      last = 0;
+      prev = performance.now();
+      rafId = requestAnimationFrame(loop);
+    }
+    function stop(): void {
+      if (!running) return;
+      running = false;
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+    /** Under reduced motion we don't animate, but a ripple/scroll still repaints once. */
+    function wake(): void {
+      if (reduce) {
+        decayRipples(0.032);
+        draw(performance.now());
+      }
     }
 
-    // Redraw only when the picture genuinely changes. No rAF, no scroll handler —
-    // the canvas is page-tall, so scrolling moves through it exactly like the CSS
-    // gradient it replaces.
-    let t = 0;
-    const onResize = () => { window.clearTimeout(t); t = window.setTimeout(draw, 180); };
+    const onVis = () => { if (document.hidden) stop(); else if (!reduce) start(); };
+    document.addEventListener('visibilitychange', onVis);
+
+    // Scroll must repaint even when frozen — the sky's depth window is
+    // scroll-derived, so a stale frame would look like a stuck decal.
+    let scrollRaf = 0;
+    const onScroll = () => {
+      if (!reduce) return;
+      if (scrollRaf) return;
+      scrollRaf = requestAnimationFrame(() => { scrollRaf = 0; draw(performance.now()); });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    let resizeT = 0;
+    const onResize = () => {
+      window.clearTimeout(resizeT);
+      resizeT = window.setTimeout(() => { measureGate(); draw(performance.now()); }, 160);
+    };
     window.addEventListener('resize', onResize);
 
-    const mo = new MutationObserver(() => draw());
+    if (!contained) window.addEventListener('pointermove', onPointerMove, { passive: true });
+
+    const mo = new MutationObserver(() => { uploadRamp(true); draw(performance.now()); });
     mo.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['data-fluid-strength', 'data-theme'],
     });
 
-    // The descent's height changes as images/fonts settle; one late redraw keeps
-    // the ramp aligned to the final layout.
-    const settle = window.setTimeout(draw, 1200);
+    // layout settles (fonts/images) → the gate offset moves
+    const settle = window.setTimeout(() => { measureGate(); draw(performance.now()); }, 1200);
+
+    if (!reduce) start();
 
     return () => {
-      window.clearTimeout(t);
+      stop();
+      window.clearTimeout(resizeT);
       window.clearTimeout(settle);
+      if (scrollRaf) cancelAnimationFrame(scrollRaf);
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('pointermove', onPointerMove);
       mo.disconnect();
-      // Restore the CSS gradient — otherwise a View-Transition swap would leave
-      // the page with the gradient suppressed and no canvas painting it.
       cvs.closest('.descent')?.classList.remove('fluid-live');
       gl.deleteTexture(tex);
       gl.deleteBuffer(buf);

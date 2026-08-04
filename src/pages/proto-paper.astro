@@ -39,7 +39,7 @@ import Signature from '../sections/Signature.astro';
   noindex={true}
 >
   <main class="descent is-fluid">
-    <FluidSky strength={2} />
+    <FluidSky strength={3} />
     <SkyWash />
     <PaperHeights />
     <PaperInterlude />
@@ -59,7 +59,7 @@ import Signature from '../sections/Signature.astro';
     <p class="proto-title mt-1">warp</p>
     <div class="proto-row">
       {[0, 1, 2, 3, 4].map((n) => (
-        <button type="button" data-level={String(n)} class:list={[n === 2 && 'on']}>{n}</button>
+        <button type="button" data-level={String(n)} class:list={[n === 3 && 'on']}>{n}</button>
       ))}
     </div>
   </div>
