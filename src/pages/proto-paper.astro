@@ -39,7 +39,7 @@ import Signature from '../sections/Signature.astro';
   noindex={true}
 >
   <main class="descent is-fluid">
-    <FluidSky strength={3} />
+    <FluidSky strength={4} />
     <SkyWash />
     <PaperHeights />
     <PaperInterlude />
@@ -59,7 +59,7 @@ import Signature from '../sections/Signature.astro';
     <p class="proto-title mt-1">warp</p>
     <div class="proto-row">
       {[0, 1, 2, 3, 4].map((n) => (
-        <button type="button" data-level={String(n)} class:list={[n === 3 && 'on']}>{n}</button>
+        <button type="button" data-level={String(n)} class:list={[n === 4 && 'on']}>{n}</button>
       ))}
     </div>
   </div>
@@ -73,13 +73,12 @@ import Signature from '../sections/Signature.astro';
      during the moment before the canvas draws.
      So: keep the gradient as the FALLBACK (no WebGL / mobile / warp 0 → it shows
      normally), and only suppress it once the canvas has actually painted, which
-     the script signals with .fluid-live on <main>. */
-     BUG FIXED HERE: this used to be an unconditional `background: var(--bg)`.
-     At warp 0 the canvas is display:none (by design — 0 means "plain gradient"),
-     but .fluid-live was already set, so the page lost BOTH the canvas and the
-     gradient and fell through to bare --bg: a near-black hero with the tagline
-     almost invisible. The override below restores the gradient whenever the
-     canvas is off, so "0" means the shipped sky — the point of having a 0 rung. */
+     the script signals with .fluid-live on <main>.
+
+     At warp 0 the canvas is display:none (by design — 0 means "the plain shipped
+     gradient"), so the overrides below hand the gradient back; otherwise the page
+     would lose BOTH the canvas and the gradient and fall through to bare --bg,
+     which rendered a near-black hero with the tagline nearly invisible. */
   .descent.is-fluid.fluid-live { background: var(--bg); }
   :global(html[data-fluid-strength='0']) .descent.is-fluid.fluid-live,
   :global(html[data-fluid='off']) .descent.is-fluid.fluid-live { background: var(--descent-grad); }

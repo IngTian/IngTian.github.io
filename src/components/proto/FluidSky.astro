@@ -1,51 +1,45 @@
 ---
-// FluidSky (PROTOTYPE) — a LIVE, POINTER-REACTIVE fluid that IS the sky.
+// FluidSky (PROTOTYPE) — a FAITHFUL port of the original demo shader.
 //
-// ── Why animating is affordable now (it wasn't before) ────────────────────
-// The version that hurt performance was a full-viewport canvas with
-// `mix-blend-mode: overlay`. The noise math was NOT the main cost: a blended
-// full-screen layer forces the compositor to re-read and re-blend the page
-// backdrop every frame it changes, which defeats layer caching for the whole
-// document. Now that the fluid REPLACES --descent-grad it is opaque, so each
-// frame is a plain blit with no backdrop read. Same animation, structurally
-// cheaper — which is why the loop can come back.
+// ── Why this is a rewrite back to the beginning ───────────────────────────
+// The user identified the very first thing I showed (the live WebGL panel in the
+// brainstorm synthesis screen) as the correct look, and asked to restart from it.
+// I recovered that shader verbatim from
+// .superpowers/brainstorm/9818-1785798195/content/synthesis.html and diffed it
+// against what I had drifted to. The differences that mattered:
 //
-// Cost controls, all measured rather than assumed:
-//   · VIEWPORT-sized and `fixed`, not page-tall. Scroll enters as a uniform, so
-//     a 5000px descent still only ever shades ~one screen of pixels.
-//   · 0.42x internal resolution, upscaled — the field is smooth, so invisible.
-//   · ~30fps (pointer interaction needs to feel live; 15 felt like lag).
-//   · paused when the tab is hidden, and when the sky is fully covered.
-//   · sin()-free hash; 3 octaves (the finer ones were destroyed by the upscale).
-//   · skipped entirely under 640px.
+//   original (liked)                  what I had (rejected)
+//   ────────────────────────────────  ─────────────────────────────────────
+//   frequency 1.6x / 2.2y (ANISO)     6.4 isotropic — ~4x too fine
+//   warp gains 3.4*q, 3.2*r           2.9*q, 2.6*r — weaker warp
+//   NO banding term                   a sin() "strata" fold mixed at 0.5
+//   opaque, shader owns the colour     mid-grey modulation + overlay blend
+//   5 octaves                          3 octaves
+//   displacement 0.46                  drifted
 //
-// ── The Monet colour story is preserved exactly ──────────────────────────
-// The palette is uploaded as a 1D gradient TEXTURE built from the exact
-// --descent-grad stops. The shader never authors colour — the warped field only
-// displaces WHERE along that ramp each pixel samples. So dawn paper → ochre →
-// lavender → indigo dusk → grey ink → near-black ground is intact; the
-// BOUNDARIES marble and diffuse, like ink in water.
+// The single worst offender was the sin() BANDING term — I invented it while
+// trying to make an under-powered blend visible, and it is what turned soft ink
+// diffusion into hard ribbons. It is gone.
 //
-// ── Pointer interaction ─────────────────────────────────────────────────
-// The cursor drags the fluid. A short trail of recent positions is uploaded as
-// ripples; each applies a SWIRL (rotating the sample coordinate about the ripple
-// centre) plus a slight outward push, falling off with a Gaussian. Strength
-// scales with pointer SPEED and decays over ~1.4s, so a slow drift barely
-// disturbs the surface while a fast sweep tears a visible wake through it. The
-// pointer is also smoothed, which reads as viscosity.
+// A correction to my own earlier description: that demo was NOT compositing over
+// --descent-grad. It carried the descent palette as hardcoded stops and drew
+// OPAQUELY. The reason it still felt like "the Monet background" is that those
+// stops ARE the Monet colours. So this port is opaque too, with the palette
+// uploaded as a texture built from the real --descent-grad stops (same colours,
+// one source of truth, and it re-themes for dark).
 //
-// ── Legibility ──────────────────────────────────────────────────────────
-// Vertical displacement is what changes luminance, so it is what can wreck text
-// contrast. A gate damps it hard from the content zone down (measured from
-// #mountains' real offset) and leaves the open sky unrestricted. This is what
-// makes replacing the gradient viable at all.
+// Interaction is deliberately NOT included — dropped on request so the base look
+// can be judged on its own. The pointer work is in git history if we return to it.
+//
+// Perf: viewport-sized (scroll is a uniform, so a 5000px descent still shades
+// only one screen), 0.5x internal resolution, ~30fps, paused on tab-hide,
+// static finished frame under reduced motion, skipped under 640px.
 interface Props {
-  /** Warp strength. 0 = plain gradient · 1 subtle · 2 medium · 3 strong · 4 max */
+  /** 0 = plain gradient · 1 subtle · 2 medium · 3 strong · 4 the original demo's own strength */
   strength?: 0 | 1 | 2 | 3 | 4;
-  /** `background` (default) — the sky itself. `contained` — a ladder rung. */
   mode?: 'background' | 'contained';
 }
-const { strength = 3, mode = 'background' } = Astro.props;
+const { strength = 4, mode = 'background' } = Astro.props;
 ---
 <canvas
   class:list={['fluid-sky', mode === 'contained' ? 'is-contained' : 'is-background']}
@@ -59,56 +53,20 @@ const { strength = 3, mode = 'background' } = Astro.props;
   .fluid-sky {
     pointer-events: none;
     display: block;
-    /* BLENDED over --descent-grad, not replacing it. Reverted from the
-       palette-texture "the fluid IS the sky" version: compositing over the tuned
-       Monet gradient reads better, because the gradient's colour relationships
-       stay authoritative and the fluid only disturbs them.
-       overlay, NOT soft-light — soft-light against a near-neutral source is
-       nearly an identity op, which is what made an earlier attempt measure
-       0.3/255 (invisible). */
-    mix-blend-mode: overlay;
-    opacity: var(--fluid-op, 0.68);
+    /* Opaque — the shader owns the colour, exactly as the original demo did.
+       No mix-blend-mode: that is also what keeps an animated full-screen layer
+       affordable (a blended layer forces the compositor to re-read the page
+       backdrop every frame). */
   }
 
-  /* ── Strength ladder — the OPACITY values from the approved version ──────
-     These are the numbers that produced the measured Δ 5.6 / 13.2 / 25.8 / 78.5
-     ladder. Strength drives BOTH the shader amplitude and this opacity; using
-     only one of the two is what made earlier passes read as flat. */
-  .fluid-sky[data-strength='1'] { --fluid-op: 0.30; }
-  .fluid-sky[data-strength='2'] { --fluid-op: 0.48; }
-  .fluid-sky[data-strength='3'] { --fluid-op: 0.68; }
-  .fluid-sky[data-strength='4'] { --fluid-op: 0.90; }
-  :global(html[data-fluid-strength='1']) .fluid-sky { --fluid-op: 0.30; }
-  :global(html[data-fluid-strength='2']) .fluid-sky { --fluid-op: 0.48; }
-  :global(html[data-fluid-strength='3']) .fluid-sky { --fluid-op: 0.68; }
-  :global(html[data-fluid-strength='4']) .fluid-sky { --fluid-op: 0.90; }
-
-  /* Dark theme: overlay on near-black lifts hard, so pull back — but NOT as far
-     as before. The screenshot that read as "way too weak" was dark theme at
-     0.34 combined with the 4.2x-too-small amplitude; both are corrected. */
-  :global(html[data-theme='dark']) .fluid-sky { opacity: var(--fluid-op-dark, 0.52); }
-  :global(html[data-theme='dark']) .fluid-sky[data-strength='1'] { --fluid-op-dark: 0.24; }
-  :global(html[data-theme='dark']) .fluid-sky[data-strength='2'] { --fluid-op-dark: 0.38; }
-  :global(html[data-theme='dark']) .fluid-sky[data-strength='3'] { --fluid-op-dark: 0.52; }
-  :global(html[data-theme='dark']) .fluid-sky[data-strength='4'] { --fluid-op-dark: 0.70; }
-  :global(html[data-theme='dark'][data-fluid-strength='1']) .fluid-sky { --fluid-op-dark: 0.24; }
-  :global(html[data-theme='dark'][data-fluid-strength='2']) .fluid-sky { --fluid-op-dark: 0.38; }
-  :global(html[data-theme='dark'][data-fluid-strength='3']) .fluid-sky { --fluid-op-dark: 0.52; }
-  :global(html[data-theme='dark'][data-fluid-strength='4']) .fluid-sky { --fluid-op-dark: 0.70; }
-
-  /* BACKGROUND: viewport-locked. Scroll is a uniform, so we shade one screen of
-     pixels no matter how tall the descent is. z-index -2 keeps it behind
-     SkyWash (-1) and all content, while still painting above .descent's own
-     background box. */
   .fluid-sky.is-background {
     position: fixed;
     inset: 0;
     width: 100%;
     height: 100%;
-    z-index: -2;
+    z-index: -2;   /* behind SkyWash (-1) and all content */
   }
 
-  /* CONTAINED: a /proto-ladder rung. */
   .fluid-sky.is-contained {
     position: absolute;
     inset: 0;
@@ -117,7 +75,6 @@ const { strength = 3, mode = 'background' } = Astro.props;
     z-index: -2;
   }
 
-  /* Strength is a shader uniform; only "off" is a CSS concern. */
   .fluid-sky[data-strength='0'] { display: none; }
   :global(html[data-fluid-strength='0']) .fluid-sky { display: none !important; }
   :global(html[data-fluid='off']) .fluid-sky { display: none; }
@@ -139,20 +96,21 @@ const { strength = 3, mode = 'background' } = Astro.props;
     }
   `;
 
-  const NODES = 12;   // pointer-trail length (shared by the shader + the JS trail)
-
+  // Faithful to the original demo: two-level domain warp (Inigo Quilez), the
+  // warped field displaces WHERE along the descent ramp we sample, then a viscous
+  // luminance term and a warm bloom. No banding, no strata fold.
   const FRAG = `
     precision highp float;
     varying vec2 vUv;
 
+    uniform sampler2D uRamp;
     uniform float uAmp;
     uniform float uTime;
-    uniform float uYOffset;   // scroll, in units of viewport widths
-    uniform float uYSpan;     // viewport height, in units of viewport widths
-    uniform float uDepth0;    // page depth at the TOP of the viewport
-    uniform float uDepthSpan; // page depth covered by one viewport
-    uniform float uGateTop;
-    uniform vec4  uNodes[${NODES}];  // xy = centre, z = strength, w = stroke angle
+    uniform float uYOffset;   // scroll, in viewport widths
+    uniform float uYSpan;     // viewport height, in viewport widths
+    uniform float uDepth0;    // page depth at the top of the viewport
+    uniform float uDepthSpan; // page depth spanned by one viewport
+    uniform float uGateTop;   // depth where the reading zone begins
 
     float hash(vec2 p) {
       p = fract(p * vec2(443.897, 441.423));
@@ -165,101 +123,70 @@ const { strength = 3, mode = 'background' } = Astro.props;
       return mix(mix(hash(i),                 hash(i + vec2(1.0, 0.0)), u.x),
                  mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
     }
+    // 5 octaves, as the original. (I had cut this to 3 to afford a blended loop;
+    // opaque compositing pays for the detail back.)
     float fbm(vec2 p) {
       float v = 0.0, a = 0.5;
-      for (int i = 0; i < 3; i++) { v += a * noise(p); p *= 2.02; a *= 0.5; }
+      for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.02; a *= 0.5; }
       return v;
     }
 
     void main() {
-      // Sample space measured in viewport widths, with scroll folded in — so the
-      // field is continuous through the whole descent and scrolling moves you
-      // DOWN through it exactly like the gradient it replaces.
-      vec2 sp = vec2(vUv.x, uYOffset + (1.0 - vUv.y) * uYSpan);
+      float t = uTime;
 
-      // ── POINTER: drag the fluid along the stroke ───────────────────────
-      // Each trail node DISPLACES the sample coordinate along the direction the
-      // cursor was travelling, plus a lighter perpendicular swirl. Direction is
-      // what makes it read as "pushing water" — a pure rotation (the previous
-      // version) reads as a spinning blob instead.
-      // Accumulating displacement from many overlapping nodes is also what makes
-      // the disturbance continuous rather than a row of separate dents.
-      vec2 push = vec2(0.0);
-      for (int i = 0; i < ${NODES}; i++) {
-        vec4 nd = uNodes[i];          // xy = centre, z = strength, w = direction
-        if (nd.z > 0.001) {
-          vec2 d = sp - nd.xy;
-          float infl = nd.z * exp(-dot(d, d) * 30.0);
-          vec2 dir = vec2(cos(nd.w), sin(nd.w));
-          vec2 perp = vec2(-dir.y, dir.x);
-          // along the stroke …
-          push += dir * infl * 0.16;
-          // … plus a curl either side of it.
-          //
-          // BUG FIXED HERE: this used sign(dot(d, perp)), and sign() is
-          // DISCONTINUOUS at zero — so every node stamped a hard seam along its
-          // own direction of travel. Sweeping horizontally produced a visible
-          // straight line across the sky (exactly what was reported).
-          // tanh-like smoothing keeps the same "flow curls around the stroke"
-          // behaviour with a continuous transition through the centre line.
-          float across = dot(d, perp);
-          float smoothSide = across / (abs(across) + 0.035);
-          push += perp * infl * 0.09 * smoothSide;
-        }
-      }
-      vec2 warpXY = sp + push;
+      // ANISOTROPIC sample space — 1.6 across, 2.2 down, as the original. This is
+      // a large part of the look: equal frequencies give round blobs, while more
+      // frequency down than across stretches the field into drifting STRATA.
+      // Scroll folds into the y term so descending moves through the field.
+      float sy = uYOffset + (1.0 - vUv.y) * uYSpan;
+      vec2 p = vec2(vUv.x * 1.6, sy * 2.2);
 
-      // Frequency: 6.4, not 2.4. The canvas became VIEWPORT-sized (scroll is a
-      // uniform now) instead of page-tall, so the same number spread the field
-      // across ~900px instead of ~4800px and the strata came out ~5x too large
-      // to read as diffusion. Scaled to match the previous on-screen density.
-      vec2 p = warpXY * 6.4;
-
-      // two-level domain warp, drifting slowly in time — the ink-in-water look
-      float t = uTime * 0.035;
-      vec2 q = vec2(fbm(p + vec2(0.0, t)),
-                    fbm(p + vec2(5.2, 1.3) - vec2(t, 0.0)));
-      vec2 r = vec2(fbm(p + 2.9 * q + vec2(1.7, 9.2) + vec2(0.0, t * 0.7)),
-                    fbm(p + 2.9 * q + vec2(8.3, 2.8) - vec2(t * 0.6, 0.0)));
-      float f = fbm(p + 2.6 * r);
-
-      // Stratify — banding the warp field is the difference between "diffusion"
-      // and "a soft blur".
-      float bands = sin((f * 6.2831853) * 1.35 + length(r) * 2.2);
-      float strata = smoothstep(-0.7, 0.7, bands);
-      float field = mix(f, strata, 0.5) - 0.5;
+      // ── two-level domain warp (Inigo Quilez) — the original gains ──
+      vec2 q = vec2(fbm(p + 0.09 * t),
+                    fbm(p + vec2(5.2, 1.3) - 0.07 * t));
+      vec2 r = vec2(fbm(p + 3.4 * q + vec2(1.7, 9.2) + 0.055 * t),
+                    fbm(p + 3.4 * q + vec2(8.3, 2.8) - 0.048 * t));
+      float f = fbm(p + 3.2 * r);
 
       // page depth of this pixel (0 = dawn, 1 = ground)
       float depth = clamp(uDepth0 + (1.0 - vUv.y) * uDepthSpan, 0.0, 1.0);
 
-      // LEGIBILITY GATE — free rein in the open sky, damped hard once the
-      // reading zone begins, so light text on grey ink keeps its contrast.
+      // LEGIBILITY GATE — the one addition the original didn't need (it was a
+      // 250px panel with no text over it). Vertical displacement is what changes
+      // luminance, so it is what can wreck contrast; damp it hard once the
+      // reading zone starts, leave the open sky untouched.
       float gate = 1.0 - 0.86 * smoothstep(uGateTop, uGateTop + 0.06, depth);
 
-      // ── BLENDED OUTPUT ─────────────────────────────────────────────────
-      // We are compositing OVER --descent-grad with overlay, so this must emit
-      // a modulation centred on mid-grey (overlay's neutral), not a colour.
-      // RESTORED to 2.6 (I had dropped it to 0.62 — 4.2x weaker — when porting
-      // back from the palette-texture version, which is why the blend looked far
-      // weaker than the one that was approved). This is the multiplier from the
-      // version that measured Δ 5.6-78/255 across the ladder.
-      float m = 0.5 + field * uAmp * 2.6 * gate;
+      // Perturb WHERE along the descent this pixel samples → marbled strata.
+      // 0.46 is the original displacement, scaled by the strength rung.
+      float y = clamp(depth + (f - 0.5) * 0.46 * uAmp * gate, 0.0, 1.0);
 
-      // Warm/cool broken colour along the warp axis — Monet's temperature play,
-      // carried as a channel split around the neutral.
-      float temp = (r.x - r.y) * 0.42 * uAmp * gate;
+      vec3 col = texture2D(uRamp, vec2(0.5, y)).rgb;
 
-      gl_FragColor = vec4(
-        clamp(m + temp,        0.0, 1.0),
-        clamp(m,               0.0, 1.0),
-        clamp(m - temp * 1.15, 0.0, 1.0),
-        1.0
-      );
+      // viscous luminance banding straight from the warp field (original)
+      col *= 0.90 + 0.20 * f;
+      // warm bloom where the warp piles up (original)
+      col += 0.045 * vec3(0.784, 0.639, 0.416) * smoothstep(0.55, 1.0, length(r)) * gate;
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `;
 
+  // The real --descent-grad stops (tokens.css) and its dark twin. The original
+  // demo hardcoded an abbreviated 6-stop version of the same ramp; using the full
+  // token stops keeps one source of truth and gives dark theme for free.
+  const LIGHT_STOPS: Array<[number, string]> = [
+    [0.00, '#f4efe4'], [0.08, '#f0eadf'], [0.15, '#efe6d4'], [0.23, '#e2d2c2'],
+    [0.30, '#ccc4b6'], [0.37, '#a6a8ad'], [0.44, '#7d7e88'], [0.52, '#565660'],
+    [0.62, '#3a3833'], [0.78, '#2a2720'], [0.90, '#1d1b16'], [1.00, '#16140f'],
+  ];
+  const DARK_STOPS: Array<[number, string]> = [
+    [0.00, '#16191d'], [0.20, '#131619'], [0.40, '#111417'],
+    [0.60, '#0e1013'], [0.80, '#0b0d0f'], [1.00, '#08090b'],
+  ];
 
-  const AMP_BY_LEVEL = [0, 0.6, 1.1, 1.7, 2.5];
+  // Rung 4 is the original demo's own strength (displacement 0.46 undiluted).
+  const AMP_BY_LEVEL = [0, 0.45, 0.65, 0.85, 1.0];
 
   const teardowns: Array<() => void> = [];
 
@@ -269,6 +196,20 @@ const { strength = 3, mode = 'background' } = Astro.props;
       const t = initOne(c);
       if (t) teardowns.push(t);
     });
+  }
+
+  function buildRamp(dark: boolean): HTMLCanvasElement | null {
+    const N = 512;
+    const c = document.createElement('canvas');
+    c.width = 1;
+    c.height = N;
+    const ctx = c.getContext('2d');
+    if (!ctx) return null;
+    const g = ctx.createLinearGradient(0, 0, 0, N);
+    for (const [pos, hex] of dark ? DARK_STOPS : LIGHT_STOPS) g.addColorStop(pos, hex);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 1, N);
+    return c;
   }
 
   function initOne(cvs: HTMLCanvasElement): (() => void) | null {
@@ -307,6 +248,7 @@ const { strength = 3, mode = 'background' } = Astro.props;
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
     const U = {
+      ramp: gl.getUniformLocation(prog, 'uRamp'),
       amp: gl.getUniformLocation(prog, 'uAmp'),
       time: gl.getUniformLocation(prog, 'uTime'),
       yOff: gl.getUniformLocation(prog, 'uYOffset'),
@@ -314,158 +256,67 @@ const { strength = 3, mode = 'background' } = Astro.props;
       d0: gl.getUniformLocation(prog, 'uDepth0'),
       dSpan: gl.getUniformLocation(prog, 'uDepthSpan'),
       gate: gl.getUniformLocation(prog, 'uGateTop'),
-      nodes: gl.getUniformLocation(prog, 'uNodes'),
     };
+
+    const tex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    let rampTheme = '';
+    function uploadRamp(force = false): void {
+      const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+      if (!force && theme === rampTheme) return;
+      rampTheme = theme;
+      const ramp = buildRamp(theme === 'dark');
+      if (!ramp) return;
+      gl!.activeTexture(gl!.TEXTURE0);
+      gl!.bindTexture(gl!.TEXTURE_2D, tex);
+      gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA, gl!.RGBA, gl!.UNSIGNED_BYTE, ramp);
+      gl!.uniform1i(U.ramp, 0);
+    }
+    uploadRamp(true);
 
     const contained = cvs.dataset.mode === 'contained';
 
     function level(): number {
       const live = document.documentElement.dataset.fluidStrength;
       if (live !== undefined) return Number(live);
-      return Number(cvs.dataset.strength ?? '3');
+      return Number(cvs.dataset.strength ?? '4');
     }
 
-    /** Page depth where the reading zone starts (fraction of the whole descent). */
     let gateTop = 0.55;
     function measureGate(): void {
       if (contained) { gateTop = 1.0; return; }
       const content = document.getElementById('mountains');
-      const doc = document.documentElement;
       if (!content) { gateTop = 0.55; return; }
       const top = content.getBoundingClientRect().top + window.scrollY;
-      gateTop = Math.min(0.95, Math.max(0.1, top / Math.max(1, doc.scrollHeight)));
+      gateTop = Math.min(0.95, Math.max(0.1, top / Math.max(1, document.documentElement.scrollHeight)));
     }
     measureGate();
 
-    // ── POINTER: a smoothed, continuous trail (the fix for "slippery and jigging")
-    //
-    // What was wrong before: at most ONE Gaussian ripple every 55ms, dropped into
-    // a 5-slot ring buffer, each decaying independently. Three separate sources of
-    // jitter, all structural rather than tunable:
-    //   · throttling quantised the input, so fast movement produced a dotted line
-    //     of blobs with visible GAPS instead of a stroke;
-    //   · the ring buffer meant slot N+5 abruptly overwrote a still-visible blob,
-    //     so disturbances vanished mid-life;
-    //   · nothing carried momentum — each blob was a static rotation that faded in
-    //     place, so the surface never appeared to keep moving.
-    //
-    // The standard remedy (as in Dobryakov's WebGL-Fluid-Simulation and every
-    // production variant): don't sample the raw pointer. Keep a SMOOTHED pointer
-    // that is lerped toward the raw one every frame, INTERPOLATE along the segment
-    // it travelled so there are no gaps at speed, and give each trail node its own
-    // VELOCITY so the fluid keeps flowing after the cursor stops.
-    interface Node { x: number; y: number; vx: number; vy: number; str: number }
-    const nodes: Node[] = Array.from({ length: NODES }, () => ({ x: -9, y: -9, vx: 0, vy: 0, str: 0 }));
-    let nodeIx = 0;
-    const nodeData = new Float32Array(NODES * 4);   // x, y, strength, angle
-
-    // raw (event) and smoothed (rendered) pointer, in sample-space units
-    let rawX = -9, rawY = -9, haveRaw = false;
-    let smoX = -9, smoY = -9, haveSmo = false;
-    let velX = 0, velY = 0;
-
-    function onPointerMove(e: PointerEvent): void {
-      const vw = Math.max(1, window.innerWidth);
-      // Coalesced events: a single pointermove can represent several real moves at
-      // high cursor speed. Using only the last one is a second quantisation of the
-      // input; taking them all keeps the stroke continuous.
-      const evs: Array<{ clientX: number; clientY: number }> =
-        typeof e.getCoalescedEvents === 'function' && e.getCoalescedEvents().length
-          ? e.getCoalescedEvents()
-          : [e];
-      const lastEv = evs[evs.length - 1];
-      rawX = lastEv.clientX / vw;
-      rawY = (window.scrollY + lastEv.clientY) / vw;
-      if (!haveRaw) { haveRaw = true; smoX = rawX; smoY = rawY; haveSmo = true; }
-      wake();
-    }
-
-    /**
-     * Advance the smoothed pointer and lay down trail nodes along the path it
-     * covered this frame. Called once per rendered frame, so emission rate is tied
-     * to the FRAME rate (smooth) rather than to the event rate (bursty).
-     */
-    function advancePointer(dt: number): void {
-      if (!haveRaw || !haveSmo) return;
-
-      const prevX = smoX, prevY = smoY;
-      // Exponential smoothing, frame-rate independent. tau 0.055s ≈ lerp 0.42 at
-      // 60fps — quick enough to feel attached to the cursor, slow enough to read
-      // as viscosity rather than a hard snap.
-      const k = 1 - Math.exp(-dt / 0.055);
-      smoX += (rawX - smoX) * k;
-      smoY += (rawY - smoY) * k;
-
-      const dx = smoX - prevX;
-      const dy = smoY - prevY;
-      const dist = Math.hypot(dx, dy);
-
-      // Velocity with inertia — this is what makes the fluid keep drifting after
-      // the cursor stops, instead of freezing the instant input ends.
-      const inst = dt > 0 ? dist / dt : 0;
-      velX = velX * 0.86 + (dt > 0 ? dx / dt : 0) * 0.14;
-      velY = velY * 0.86 + (dt > 0 ? dy / dt : 0) * 0.14;
-
-      if (dist < 1e-5 && inst < 1e-4) return;
-
-      // INTERPOLATE along the segment: one node roughly every 0.02 sample units,
-      // so a fast sweep lays a continuous stroke instead of isolated blobs.
-      const steps = Math.max(1, Math.min(6, Math.ceil(dist / 0.02)));
-      const str = Math.min(1, 0.30 + inst * 0.55);
-      const ang = Math.atan2(velY, velX);
-      for (let i = 1; i <= steps; i++) {
-        const t = i / steps;
-        const n = nodes[nodeIx % NODES];
-        nodeIx++;
-        n.x = prevX + dx * t;
-        n.y = prevY + dy * t;
-        n.vx = velX;
-        n.vy = velY;
-        // Split the stroke's strength across its nodes so overlapping nodes don't
-        // sum into a hard bright core.
-        n.str = str / steps + 0.06;
-        void ang;
-      }
-    }
-
-    function decayNodes(dt: number): void {
-      // Uniform exponential decay, ~2.2s to vanish — long enough that the trail
-      // reads as a dissipating wake rather than a blink.
-      const f = Math.exp(-dt / 0.95);
-      for (const n of nodes) {
-        if (n.str > 0.001) {
-          n.str *= f;
-          // nodes keep drifting along their own velocity: momentum
-          n.x += n.vx * dt * 0.16;
-          n.y += n.vy * dt * 0.16;
-          if (n.str <= 0.001) n.str = 0;
-        }
-      }
-    }
-
-    // internal resolution — the single biggest perf lever, quadratic
-    const SCALE = 0.42;
-
+    const SCALE = 0.5;
     function sizeTo(): void {
       const w = Math.max(1, Math.round((cvs.clientWidth || 1) * SCALE));
       const h = Math.max(1, Math.round((cvs.clientHeight || 1) * SCALE));
-      if (cvs.width !== w || cvs.height !== h) {
-        cvs.width = w;
-        cvs.height = h;
-      }
+      if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
       gl!.viewport(0, 0, cvs.width, cvs.height);
     }
 
-    let t0 = performance.now();
+    const t0 = performance.now();
     function draw(nowMs: number): void {
       sizeTo();
+      uploadRamp();
 
       const vw = Math.max(1, window.innerWidth);
       const vh = Math.max(1, window.innerHeight);
       const docH = Math.max(1, document.documentElement.scrollHeight);
 
       if (contained) {
-        gl!.uniform1f(U.yOff, level() * 3.1);
+        gl!.uniform1f(U.yOff, level() * 2.0);
         gl!.uniform1f(U.ySpan, (cvs.clientHeight || vh) / (cvs.clientWidth || vw));
         gl!.uniform1f(U.d0, 0.0);
         gl!.uniform1f(U.dSpan, 1.0);
@@ -476,50 +327,33 @@ const { strength = 3, mode = 'background' } = Astro.props;
         gl!.uniform1f(U.dSpan, vh / docH);
       }
 
-      gl!.uniform1f(U.amp, AMP_BY_LEVEL[Math.max(0, Math.min(4, level()))] ?? 1.7);
+      gl!.uniform1f(U.amp, AMP_BY_LEVEL[Math.max(0, Math.min(4, level()))] ?? 1.0);
       gl!.uniform1f(U.gate, gateTop);
       gl!.uniform1f(U.time, (nowMs - t0) / 1000);
-
-      for (let i = 0; i < NODES; i++) {
-        const n = nodes[i];
-        nodeData[i * 4] = n.x;
-        nodeData[i * 4 + 1] = n.y;
-        nodeData[i * 4 + 2] = n.str;
-        nodeData[i * 4 + 3] = Math.atan2(n.vy, n.vx);
-      }
-      gl!.uniform4fv(U.nodes, nodeData);
-
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
     }
 
     // first frame — also the reduced-motion / pre-loop state
     draw(performance.now());
 
+    // Signal a real paint so the page can drop the CSS gradient underneath this
+    // opaque canvas. Set only AFTER a successful draw, so every failure path (no
+    // WebGL, shader compile fail) falls back to the shipped gradient.
+    if (!contained) cvs.closest('.descent')?.classList.add('fluid-live');
 
     const reduce = prefersReducedMotion();
 
     let rafId = 0;
     let running = false;
     let last = 0;
-    let prev = performance.now();
 
     function loop(now: number): void {
-      // ~30fps: pointer interaction needs to feel live (15 read as lag)
-      if (now - last > 32) {
-        const dt = Math.min(0.25, (now - prev) / 1000);
-        prev = now;
-        advancePointer(dt);
-        decayNodes(dt);
-        draw(now);
-        last = now;
-      }
+      if (now - last > 32) { draw(now); last = now; }   // ~30fps
       rafId = requestAnimationFrame(loop);
     }
     function start(): void {
-      if (running || document.hidden) return;
-      running = true;
-      last = 0;
-      prev = performance.now();
+      if (running || reduce || document.hidden) return;
+      running = true; last = 0;
       rafId = requestAnimationFrame(loop);
     }
     function stop(): void {
@@ -528,24 +362,15 @@ const { strength = 3, mode = 'background' } = Astro.props;
       cancelAnimationFrame(rafId);
       rafId = 0;
     }
-    /** Under reduced motion we don't animate, but a ripple/scroll still repaints once. */
-    function wake(): void {
-      if (reduce) {
-        advancePointer(0.032);
-        decayNodes(0.032);
-        draw(performance.now());
-      }
-    }
 
-    const onVis = () => { if (document.hidden) stop(); else if (!reduce) start(); };
+    const onVis = () => { if (document.hidden) stop(); else start(); };
     document.addEventListener('visibilitychange', onVis);
 
-    // Scroll must repaint even when frozen — the sky's depth window is
-    // scroll-derived, so a stale frame would look like a stuck decal.
+    // Frozen state still needs a repaint on scroll (the depth window is
+    // scroll-derived) or it would look like a stuck decal.
     let scrollRaf = 0;
     const onScroll = () => {
-      if (!reduce) return;
-      if (scrollRaf) return;
+      if (!reduce || scrollRaf) return;
       scrollRaf = requestAnimationFrame(() => { scrollRaf = 0; draw(performance.now()); });
     };
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -557,18 +382,15 @@ const { strength = 3, mode = 'background' } = Astro.props;
     };
     window.addEventListener('resize', onResize);
 
-    if (!contained) window.addEventListener('pointermove', onPointerMove, { passive: true });
-
-    const mo = new MutationObserver(() => { draw(performance.now()); });
+    const mo = new MutationObserver(() => { uploadRamp(true); draw(performance.now()); });
     mo.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['data-fluid-strength', 'data-theme'],
     });
 
-    // layout settles (fonts/images) → the gate offset moves
     const settle = window.setTimeout(() => { measureGate(); draw(performance.now()); }, 1200);
 
-    if (!reduce) start();
+    start();
 
     return () => {
       stop();
@@ -578,8 +400,9 @@ const { strength = 3, mode = 'background' } = Astro.props;
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
-      window.removeEventListener('pointermove', onPointerMove);
       mo.disconnect();
+      cvs.closest('.descent')?.classList.remove('fluid-live');
+      gl.deleteTexture(tex);
       gl.deleteBuffer(buf);
       gl.deleteProgram(prog);
       gl.deleteShader(vs);
