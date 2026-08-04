@@ -134,12 +134,19 @@ const { strength = 4, mode = 'background' } = Astro.props;
     void main() {
       float t = uTime;
 
-      // ANISOTROPIC sample space — 1.6 across, 2.2 down, as the original. This is
-      // a large part of the look: equal frequencies give round blobs, while more
-      // frequency down than across stretches the field into drifting STRATA.
-      // Scroll folds into the y term so descending moves through the field.
+      // ANISOTROPIC sample space — more frequency DOWN than ACROSS, which is what
+      // stretches the field into drifting strata instead of round blobs.
+      //
+      // SCALE BUG FIXED HERE. I copied the original demo's 1.6 / 2.2 verbatim, but
+      // the demo drew into a 373x250 PANEL while this fills a ~1440x900 viewport.
+      // Measured in noise-units per on-screen pixel:
+      //     demo  0.00429 horiz / 0.00880 vert
+      //     mine  0.00111 horiz / 0.00153 vert
+      // so every feature came out 3.9x too large across and 5.8x too tall — one
+      // enormous smear per screen, which is exactly why it read as "no difference".
+      // 6.2 / 12.7 reproduce the demo's on-screen feature SIZE at viewport scale.
       float sy = uYOffset + (1.0 - vUv.y) * uYSpan;
-      vec2 p = vec2(vUv.x * 1.6, sy * 2.2);
+      vec2 p = vec2(vUv.x * 6.2, sy * 12.7);
 
       // ── two-level domain warp (Inigo Quilez) — the original gains ──
       vec2 q = vec2(fbm(p + 0.09 * t),
@@ -158,8 +165,17 @@ const { strength = 4, mode = 'background' } = Astro.props;
       float gate = 1.0 - 0.86 * smoothstep(uGateTop, uGateTop + 0.06, depth);
 
       // Perturb WHERE along the descent this pixel samples → marbled strata.
-      // 0.46 is the original displacement, scaled by the strength rung.
-      float y = clamp(depth + (f - 0.5) * 0.46 * uAmp * gate, 0.0, 1.0);
+      //
+      // The OTHER half of the "no difference" bug. The demo panel showed the
+      // ENTIRE dawn→ground ramp in 250px, so its 0.46 displacement swung across
+      // several colour bands. A real viewport at the top of the page spans only
+      // depth 0.00–0.19 — all cream — so the same 0.46 never left the cream band
+      // and produced almost no visible change.
+      //
+      // Fix: displace in units of the RAMP, not of the local viewport window. 0.30
+      // is ~1.6 palette bands, so the ink genuinely carries taupe and slate up into
+      // the dawn the way it did in the panel.
+      float y = clamp(depth + (f - 0.5) * 0.30 * uAmp * gate, 0.0, 1.0);
 
       vec3 col = texture2D(uRamp, vec2(0.5, y)).rgb;
 
@@ -185,8 +201,9 @@ const { strength = 4, mode = 'background' } = Astro.props;
     [0.60, '#0e1013'], [0.80, '#0b0d0f'], [1.00, '#08090b'],
   ];
 
-  // Rung 4 is the original demo's own strength (displacement 0.46 undiluted).
-  const AMP_BY_LEVEL = [0, 0.45, 0.65, 0.85, 1.0];
+  // Rung 4 = full displacement. Rungs raised across the board: with the scale bug
+  // fixed, the low rungs were the invisible ones.
+  const AMP_BY_LEVEL = [0, 0.55, 0.8, 1.0, 1.35];
 
   const teardowns: Array<() => void> = [];
 
