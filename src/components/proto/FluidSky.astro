@@ -59,9 +59,17 @@ const { strength = 3, mode = 'background' } = Astro.props;
   .fluid-sky {
     pointer-events: none;
     display: block;
-    /* NO mix-blend-mode — this is the sky, not a wash over it. That omission is
-       what makes a live loop affordable. */
+    /* BLENDED over --descent-grad, not replacing it. Reverted from the
+       palette-texture "the fluid IS the sky" version: compositing over the tuned
+       Monet gradient reads better, because the gradient's colour relationships
+       stay authoritative and the fluid only disturbs them.
+       overlay, NOT soft-light — soft-light against a near-neutral source is
+       nearly an identity op, which is what made an earlier attempt measure
+       0.3/255 (invisible). */
+    mix-blend-mode: overlay;
+    opacity: var(--fluid-op, 0.55);
   }
+  :global(html[data-theme='dark']) .fluid-sky { opacity: var(--fluid-op-dark, 0.34); }
 
   /* BACKGROUND: viewport-locked. Scroll is a uniform, so we shade one screen of
      pixels no matter how tall the descent is. z-index -2 keeps it behind
@@ -106,13 +114,12 @@ const { strength = 3, mode = 'background' } = Astro.props;
     }
   `;
 
-  const RIPPLES = 5;
+  const NODES = 12;   // pointer-trail length (shared by the shader + the JS trail)
 
   const FRAG = `
     precision highp float;
     varying vec2 vUv;
 
-    uniform sampler2D uRamp;
     uniform float uAmp;
     uniform float uTime;
     uniform float uYOffset;   // scroll, in units of viewport widths
@@ -120,7 +127,7 @@ const { strength = 3, mode = 'background' } = Astro.props;
     uniform float uDepth0;    // page depth at the TOP of the viewport
     uniform float uDepthSpan; // page depth covered by one viewport
     uniform float uGateTop;
-    uniform vec3  uRipples[${RIPPLES}];  // xy = centre (sample space), z = strength
+    uniform vec4  uNodes[${NODES}];  // xy = centre, z = strength, w = stroke angle
 
     float hash(vec2 p) {
       p = fract(p * vec2(443.897, 441.423));
@@ -145,27 +152,27 @@ const { strength = 3, mode = 'background' } = Astro.props;
       // DOWN through it exactly like the gradient it replaces.
       vec2 sp = vec2(vUv.x, uYOffset + (1.0 - vUv.y) * uYSpan);
 
-      // ── POINTER: drag the fluid ────────────────────────────────────────
-      // Each ripple swirls the sample coordinate about its centre and pushes
-      // outward a little. Gaussian falloff, so the disturbance is local.
-      vec2 warpXY = sp;
-      for (int i = 0; i < ${RIPPLES}; i++) {
-        vec3 rp = uRipples[i];
-        if (rp.z > 0.001) {
-          vec2 d = warpXY - rp.xy;
-          float r2 = dot(d, d);
-          // Falloff 12.0 (was 26.0) → a wider disturbance. Sample space is in
-          // viewport WIDTHS, so 26.0 confined the swirl to roughly a 100px blob
-          // that was invisible at a glance. This spans ~a third of the screen,
-          // which is what makes a mouse sweep read as dragging water.
-          float infl = rp.z * exp(-r2 * 12.0);
-          // Stronger rotation + push, for the same reason.
-          float ang = infl * 4.2;
-          float s = sin(ang), c = cos(ang);
-          vec2 rot = vec2(d.x * c - d.y * s, d.x * s + d.y * c);
-          warpXY = rp.xy + rot + normalize(d + 1e-6) * infl * 0.085;
+      // ── POINTER: drag the fluid along the stroke ───────────────────────
+      // Each trail node DISPLACES the sample coordinate along the direction the
+      // cursor was travelling, plus a lighter perpendicular swirl. Direction is
+      // what makes it read as "pushing water" — a pure rotation (the previous
+      // version) reads as a spinning blob instead.
+      // Accumulating displacement from many overlapping nodes is also what makes
+      // the disturbance continuous rather than a row of separate dents.
+      vec2 push = vec2(0.0);
+      for (int i = 0; i < ${NODES}; i++) {
+        vec4 nd = uNodes[i];          // xy = centre, z = strength, w = direction
+        if (nd.z > 0.001) {
+          vec2 d = sp - nd.xy;
+          float infl = nd.z * exp(-dot(d, d) * 30.0);
+          vec2 dir = vec2(cos(nd.w), sin(nd.w));
+          // along the stroke …
+          push += dir * infl * 0.16;
+          // … plus a gentler curl either side of it
+          push += vec2(-dir.y, dir.x) * infl * 0.07 * sign(dot(d, vec2(-dir.y, dir.x)));
         }
       }
+      vec2 warpXY = sp + push;
 
       // Frequency: 6.4, not 2.4. The canvas became VIEWPORT-sized (scroll is a
       // uniform now) instead of page-tall, so the same number spread the field
@@ -190,40 +197,32 @@ const { strength = 3, mode = 'background' } = Astro.props;
       // page depth of this pixel (0 = dawn, 1 = ground)
       float depth = clamp(uDepth0 + (1.0 - vUv.y) * uDepthSpan, 0.0, 1.0);
 
-      // LEGIBILITY GATE — free rein in the open sky, damped to 18% once the
+      // LEGIBILITY GATE — free rein in the open sky, damped hard once the
       // reading zone begins, so light text on grey ink keeps its contrast.
-      float gate = 1.0 - 0.82 * smoothstep(uGateTop, uGateTop + 0.06, depth);
+      float gate = 1.0 - 0.86 * smoothstep(uGateTop, uGateTop + 0.06, depth);
 
-      // Displace where we read the ramp. Larger than the combined-mode version
-      // could ever afford, because the gate protects the text.
-      float y = clamp(depth + field * uAmp * 0.30 * gate, 0.0, 1.0);
+      // ── BLENDED OUTPUT ─────────────────────────────────────────────────
+      // We are compositing OVER --descent-grad with overlay, so this must emit
+      // a modulation centred on mid-grey (overlay's neutral), not a colour.
+      // Amplitude is generous because overlay at 0.5 is a weak operator and the
+      // gate protects the text zone.
+      float m = 0.5 + field * uAmp * 0.62 * gate;
 
-      vec3 col = texture2D(uRamp, vec2(0.5, y)).rgb;
+      // Warm/cool broken colour along the warp axis — Monet's temperature play,
+      // carried as a small channel split around the neutral.
+      float temp = (r.x - r.y) * 0.30 * uAmp * gate;
 
-      // warm/cool broken colour along the warp axis — Monet's temperature play
-      float temp = (r.x - r.y) * 0.06 * uAmp * gate;
-      col.r += temp;
-      col.b -= temp * 1.1;
-
-      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+      gl_FragColor = vec4(
+        clamp(m + temp,        0.0, 1.0),
+        clamp(m,               0.0, 1.0),
+        clamp(m - temp * 1.15, 0.0, 1.0),
+        1.0
+      );
     }
   `;
 
-  // Mirrors --descent-grad / its dark twin in tokens.css. (A prototype: the
-  // shipped version should read these from the token so they can't drift.)
-  const LIGHT_STOPS: Array<[number, string]> = [
-    [0.00, '#f4efe4'], [0.08, '#f0eadf'], [0.15, '#efe6d4'], [0.23, '#e2d2c2'],
-    [0.30, '#ccc4b6'], [0.37, '#a6a8ad'], [0.44, '#7d7e88'], [0.52, '#565660'],
-    [0.62, '#3a3833'], [0.78, '#2a2720'], [0.90, '#1d1b16'], [1.00, '#16140f'],
-  ];
-  const DARK_STOPS: Array<[number, string]> = [
-    [0.00, '#16191d'], [0.20, '#131619'], [0.40, '#111417'],
-    [0.60, '#0e1013'], [0.80, '#0b0d0f'], [1.00, '#08090b'],
-  ];
 
   const AMP_BY_LEVEL = [0, 0.6, 1.1, 1.7, 2.5];
-
-  interface Ripple { x: number; y: number; str: number }
 
   const teardowns: Array<() => void> = [];
 
@@ -233,20 +232,6 @@ const { strength = 3, mode = 'background' } = Astro.props;
       const t = initOne(c);
       if (t) teardowns.push(t);
     });
-  }
-
-  function buildRamp(dark: boolean): HTMLCanvasElement | null {
-    const N = 512;
-    const c = document.createElement('canvas');
-    c.width = 1;
-    c.height = N;
-    const ctx = c.getContext('2d');
-    if (!ctx) return null;
-    const g = ctx.createLinearGradient(0, 0, 0, N);
-    for (const [pos, hex] of dark ? DARK_STOPS : LIGHT_STOPS) g.addColorStop(pos, hex);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 1, N);
-    return c;
   }
 
   function initOne(cvs: HTMLCanvasElement): (() => void) | null {
@@ -285,7 +270,6 @@ const { strength = 3, mode = 'background' } = Astro.props;
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
     const U = {
-      ramp: gl.getUniformLocation(prog, 'uRamp'),
       amp: gl.getUniformLocation(prog, 'uAmp'),
       time: gl.getUniformLocation(prog, 'uTime'),
       yOff: gl.getUniformLocation(prog, 'uYOffset'),
@@ -293,30 +277,8 @@ const { strength = 3, mode = 'background' } = Astro.props;
       d0: gl.getUniformLocation(prog, 'uDepth0'),
       dSpan: gl.getUniformLocation(prog, 'uDepthSpan'),
       gate: gl.getUniformLocation(prog, 'uGateTop'),
-      ripples: gl.getUniformLocation(prog, 'uRipples'),
+      nodes: gl.getUniformLocation(prog, 'uNodes'),
     };
-
-    const tex = gl.createTexture();
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-    let rampTheme = '';
-    function uploadRamp(force = false): void {
-      const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
-      if (!force && theme === rampTheme) return;
-      rampTheme = theme;
-      const ramp = buildRamp(theme === 'dark');
-      if (!ramp) return;
-      gl!.activeTexture(gl!.TEXTURE0);
-      gl!.bindTexture(gl!.TEXTURE_2D, tex);
-      gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA, gl!.RGBA, gl!.UNSIGNED_BYTE, ramp);
-      gl!.uniform1i(U.ramp, 0);
-    }
-    uploadRamp(true);
 
     const contained = cvs.dataset.mode === 'contained';
 
@@ -338,48 +300,110 @@ const { strength = 3, mode = 'background' } = Astro.props;
     }
     measureGate();
 
-    // ── pointer ripples ────────────────────────────────────────────────────
-    const ripples: Ripple[] = Array.from({ length: RIPPLES }, () => ({ x: -9, y: -9, str: 0 }));
-    let rippleIx = 0;
-    let lastPx = 0, lastPy = 0, havePointer = false;
-    let lastEmit = 0;
-    const rippleData = new Float32Array(RIPPLES * 3);
+    // ── POINTER: a smoothed, continuous trail (the fix for "slippery and jigging")
+    //
+    // What was wrong before: at most ONE Gaussian ripple every 55ms, dropped into
+    // a 5-slot ring buffer, each decaying independently. Three separate sources of
+    // jitter, all structural rather than tunable:
+    //   · throttling quantised the input, so fast movement produced a dotted line
+    //     of blobs with visible GAPS instead of a stroke;
+    //   · the ring buffer meant slot N+5 abruptly overwrote a still-visible blob,
+    //     so disturbances vanished mid-life;
+    //   · nothing carried momentum — each blob was a static rotation that faded in
+    //     place, so the surface never appeared to keep moving.
+    //
+    // The standard remedy (as in Dobryakov's WebGL-Fluid-Simulation and every
+    // production variant): don't sample the raw pointer. Keep a SMOOTHED pointer
+    // that is lerped toward the raw one every frame, INTERPOLATE along the segment
+    // it travelled so there are no gaps at speed, and give each trail node its own
+    // VELOCITY so the fluid keeps flowing after the cursor stops.
+    interface Node { x: number; y: number; vx: number; vy: number; str: number }
+    const nodes: Node[] = Array.from({ length: NODES }, () => ({ x: -9, y: -9, vx: 0, vy: 0, str: 0 }));
+    let nodeIx = 0;
+    const nodeData = new Float32Array(NODES * 4);   // x, y, strength, angle
 
-    function onPointerMove(e: PointerEvent | MouseEvent): void {
+    // raw (event) and smoothed (rendered) pointer, in sample-space units
+    let rawX = -9, rawY = -9, haveRaw = false;
+    let smoX = -9, smoY = -9, haveSmo = false;
+    let velX = 0, velY = 0;
+
+    function onPointerMove(e: PointerEvent): void {
       const vw = Math.max(1, window.innerWidth);
-      const x = e.clientX / vw;
-      const y = (window.scrollY + e.clientY) / vw;   // same units as sample space
-      if (!havePointer) { havePointer = true; lastPx = x; lastPy = y; return; }
-
-      const dx = x - lastPx, dy = y - lastPy;
-      const speed = Math.hypot(dx, dy);
-      lastPx = x; lastPy = y;
-
-      // Emit at most ~every 55ms, and scale with SPEED so a slow drift barely
-      // disturbs the surface while a fast sweep tears a wake through it.
-      const now = performance.now();
-      if (now - lastEmit < 55) return;
-      lastEmit = now;
-
-      const str = Math.min(1, speed * 9);
-      if (str < 0.05) return;
-      const rp = ripples[rippleIx % RIPPLES];
-      rippleIx++;
-      rp.x = x; rp.y = y; rp.str = str;
-      // any interaction should show immediately, even between throttled frames
+      // Coalesced events: a single pointermove can represent several real moves at
+      // high cursor speed. Using only the last one is a second quantisation of the
+      // input; taking them all keeps the stroke continuous.
+      const evs: Array<{ clientX: number; clientY: number }> =
+        typeof e.getCoalescedEvents === 'function' && e.getCoalescedEvents().length
+          ? e.getCoalescedEvents()
+          : [e];
+      const lastEv = evs[evs.length - 1];
+      rawX = lastEv.clientX / vw;
+      rawY = (window.scrollY + lastEv.clientY) / vw;
+      if (!haveRaw) { haveRaw = true; smoX = rawX; smoY = rawY; haveSmo = true; }
       wake();
     }
 
-    function decayRipples(dt: number): boolean {
-      let alive = false;
-      for (const rp of ripples) {
-        if (rp.str > 0.001) {
-          rp.str *= Math.exp(-dt / 0.62);   // ~1.4s to visually vanish
-          if (rp.str <= 0.001) rp.str = 0;
-          else alive = true;
+    /**
+     * Advance the smoothed pointer and lay down trail nodes along the path it
+     * covered this frame. Called once per rendered frame, so emission rate is tied
+     * to the FRAME rate (smooth) rather than to the event rate (bursty).
+     */
+    function advancePointer(dt: number): void {
+      if (!haveRaw || !haveSmo) return;
+
+      const prevX = smoX, prevY = smoY;
+      // Exponential smoothing, frame-rate independent. tau 0.055s ≈ lerp 0.42 at
+      // 60fps — quick enough to feel attached to the cursor, slow enough to read
+      // as viscosity rather than a hard snap.
+      const k = 1 - Math.exp(-dt / 0.055);
+      smoX += (rawX - smoX) * k;
+      smoY += (rawY - smoY) * k;
+
+      const dx = smoX - prevX;
+      const dy = smoY - prevY;
+      const dist = Math.hypot(dx, dy);
+
+      // Velocity with inertia — this is what makes the fluid keep drifting after
+      // the cursor stops, instead of freezing the instant input ends.
+      const inst = dt > 0 ? dist / dt : 0;
+      velX = velX * 0.86 + (dt > 0 ? dx / dt : 0) * 0.14;
+      velY = velY * 0.86 + (dt > 0 ? dy / dt : 0) * 0.14;
+
+      if (dist < 1e-5 && inst < 1e-4) return;
+
+      // INTERPOLATE along the segment: one node roughly every 0.02 sample units,
+      // so a fast sweep lays a continuous stroke instead of isolated blobs.
+      const steps = Math.max(1, Math.min(6, Math.ceil(dist / 0.02)));
+      const str = Math.min(1, 0.30 + inst * 0.55);
+      const ang = Math.atan2(velY, velX);
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const n = nodes[nodeIx % NODES];
+        nodeIx++;
+        n.x = prevX + dx * t;
+        n.y = prevY + dy * t;
+        n.vx = velX;
+        n.vy = velY;
+        // Split the stroke's strength across its nodes so overlapping nodes don't
+        // sum into a hard bright core.
+        n.str = str / steps + 0.06;
+        void ang;
+      }
+    }
+
+    function decayNodes(dt: number): void {
+      // Uniform exponential decay, ~2.2s to vanish — long enough that the trail
+      // reads as a dissipating wake rather than a blink.
+      const f = Math.exp(-dt / 0.95);
+      for (const n of nodes) {
+        if (n.str > 0.001) {
+          n.str *= f;
+          // nodes keep drifting along their own velocity: momentum
+          n.x += n.vx * dt * 0.16;
+          n.y += n.vy * dt * 0.16;
+          if (n.str <= 0.001) n.str = 0;
         }
       }
-      return alive;
     }
 
     // internal resolution — the single biggest perf lever, quadratic
@@ -398,7 +422,6 @@ const { strength = 3, mode = 'background' } = Astro.props;
     let t0 = performance.now();
     function draw(nowMs: number): void {
       sizeTo();
-      uploadRamp();
 
       const vw = Math.max(1, window.innerWidth);
       const vh = Math.max(1, window.innerHeight);
@@ -420,12 +443,14 @@ const { strength = 3, mode = 'background' } = Astro.props;
       gl!.uniform1f(U.gate, gateTop);
       gl!.uniform1f(U.time, (nowMs - t0) / 1000);
 
-      for (let i = 0; i < RIPPLES; i++) {
-        rippleData[i * 3] = ripples[i].x;
-        rippleData[i * 3 + 1] = ripples[i].y;
-        rippleData[i * 3 + 2] = ripples[i].str;
+      for (let i = 0; i < NODES; i++) {
+        const n = nodes[i];
+        nodeData[i * 4] = n.x;
+        nodeData[i * 4 + 1] = n.y;
+        nodeData[i * 4 + 2] = n.str;
+        nodeData[i * 4 + 3] = Math.atan2(n.vy, n.vx);
       }
-      gl!.uniform3fv(U.ripples, rippleData);
+      gl!.uniform4fv(U.nodes, nodeData);
 
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
     }
@@ -433,7 +458,6 @@ const { strength = 3, mode = 'background' } = Astro.props;
     // first frame — also the reduced-motion / pre-loop state
     draw(performance.now());
 
-    if (!contained) cvs.closest('.descent')?.classList.add('fluid-live');
 
     const reduce = prefersReducedMotion();
 
@@ -447,7 +471,8 @@ const { strength = 3, mode = 'background' } = Astro.props;
       if (now - last > 32) {
         const dt = Math.min(0.25, (now - prev) / 1000);
         prev = now;
-        decayRipples(dt);
+        advancePointer(dt);
+        decayNodes(dt);
         draw(now);
         last = now;
       }
@@ -469,7 +494,8 @@ const { strength = 3, mode = 'background' } = Astro.props;
     /** Under reduced motion we don't animate, but a ripple/scroll still repaints once. */
     function wake(): void {
       if (reduce) {
-        decayRipples(0.032);
+        advancePointer(0.032);
+        decayNodes(0.032);
         draw(performance.now());
       }
     }
@@ -496,7 +522,7 @@ const { strength = 3, mode = 'background' } = Astro.props;
 
     if (!contained) window.addEventListener('pointermove', onPointerMove, { passive: true });
 
-    const mo = new MutationObserver(() => { uploadRamp(true); draw(performance.now()); });
+    const mo = new MutationObserver(() => { draw(performance.now()); });
     mo.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['data-fluid-strength', 'data-theme'],
@@ -517,8 +543,6 @@ const { strength = 3, mode = 'background' } = Astro.props;
       window.removeEventListener('resize', onResize);
       window.removeEventListener('pointermove', onPointerMove);
       mo.disconnect();
-      cvs.closest('.descent')?.classList.remove('fluid-live');
-      gl.deleteTexture(tex);
       gl.deleteBuffer(buf);
       gl.deleteProgram(prog);
       gl.deleteShader(vs);
