@@ -209,11 +209,21 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
           vec2 d = ptr - nd.xy;
           float dist = length(d) + 1e-6;
           // wavefront travels outward at a slow, viscous speed
-          float R = nd.w * 0.22;
+          // ── SIZE, not strength — the "big drop" fix ───────────────────────
+          // Previous tuning rounds all reduced AMPLITUDE, but the complaint was that
+          // it looks like a BIG drop, which is geometry. Three numbers set the scale:
+          //   R growth   how far the wavefront travels  (0.22 -> 0.085)
+          //   ring       how WIDE the wave band is      (9 -> 26, i.e. ~3x narrower)
+          //   wave       ripple wavelength              (34 -> 78, finer rings)
+          // At the old values the band spanned ~0.11 sample units (~160px at 1440
+          // wide) and swept outward across a third of the screen — the footprint of
+          // a heavy splash. Now the disturbance is a tight ring a few tens of px
+          // across that fades quickly: a fine droplet touching the surface.
+          float R = nd.w * 0.085;
           // ring envelope: strongest AT the wavefront, falling off both sides
-          float ring = exp(-pow((dist - R) * 9.0, 2.0));
+          float ring = exp(-pow((dist - R) * 26.0, 2.0));
           // radial oscillation gives the crest/trough of an actual ripple
-          float wave = sin((dist - R) * 34.0);
+          float wave = sin((dist - R) * 78.0);
           // Amplitude dialled right down on request ("very mild"): 0.030 -> 0.012.
           // For scale, the sky's own ambient churn measures max Δ~115/255 over 250ms
           // while a drop at 0.030 added ~25 on top; at 0.012 a drop contributes
@@ -721,7 +731,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       for (const n of nodes) {
         if (n.str > 0.001) {
           n.age += dt;
-          n.str *= Math.exp(-dt / 0.44);
+          n.str *= Math.exp(-dt / 0.30);
           if (n.str <= 0.001) n.str = 0;
         }
       }
