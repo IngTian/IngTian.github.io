@@ -197,8 +197,11 @@ export function paintTerrain(
       const { phase, rate, tint } = starIdentity(p.gx, p.gy);
       // two out-of-phase sines: no two dots blink together, and the field never
       // pulses in unison the way a single shared clock would.
-      const tw = 0.62 + 0.38 * Math.sin(tsec * rate + phase)
-                      * (0.6 + 0.4 * Math.sin(tsec * rate * 0.37 + phase * 2.1));
+      // Damped 0.6x to match the calmed sky warp — the terrain's twinkle and the
+      // sky's motion should read as one tempo, not two.
+      const tw2 = tsec * 0.6;
+      const tw = 0.62 + 0.38 * Math.sin(tw2 * rate + phase)
+                      * (0.6 + 0.4 * Math.sin(tw2 * rate * 0.37 + phase * 2.1));
       // Pull each dot toward its stellar colour, then modulate brightness. High
       // ground twinkles most (hn→1): the ridge is the near sky.
       const mixK = 0.55 + 0.30 * hn;

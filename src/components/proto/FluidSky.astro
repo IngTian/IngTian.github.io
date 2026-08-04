@@ -162,7 +162,13 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       // TINT of f and length(r), not from a ramp lookup — so a faster-scrolling fine
       // field just averages out between frames. The real lever is response CONTRAST
       // (below). Keeping a small boost only.
-      float t = uTime * mix(1.0, 1.35, uReading);
+      // MOTION DIALLED BACK on request ("limit the motion, just a little bit"). One
+      // scalar governs all four drift terms below, so 0.55 slows the whole warp
+      // uniformly rather than changing its character — the strata still churn, just
+      // more slowly. Reading pages keep their small relative boost, since their
+      // effect comes from a tint response rather than a ramp lookup and needs a
+      // little more movement to register at all.
+      float t = uTime * 0.55 * mix(1.0, 1.35, uReading);
 
       // ANISOTROPIC sample space — more frequency DOWN than ACROSS, which is what
       // stretches the field into drifting strata instead of round blobs.
@@ -407,8 +413,12 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
           // and the field never pulses in unison.
           float ph = hash(cell + 17.3) * 6.2831853;
           float sp2 = 0.55 + hash(cell + 23.9) * 1.5;
-          float tw = 0.55 + 0.45 * sin(uTime * sp2 + ph)
-                          * (0.6 + 0.4 * sin(uTime * sp2 * 0.37 + ph * 2.1));
+          // Twinkle reads off RAW uTime, not the slowed warp scalar, so it needs its
+          // own damping or the stars would keep blinking at the old rate over a now
+          // much calmer sky — the mismatch is more noticeable than either alone.
+          float twT = uTime * 0.6;
+          float tw = 0.55 + 0.45 * sin(twT * sp2 + ph)
+                          * (0.6 + 0.4 * sin(twT * sp2 * 0.37 + ph * 2.1));
 
           // stellar colour by "temperature"
           float temp2 = hash(cell + 41.7);
