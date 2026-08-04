@@ -20,8 +20,34 @@
 // Perf: 0.5× internal resolution (smooth noise hides it), ~30fps, paused
 // offscreen AND on tab-hide, one static frame painted first, full GL teardown
 // on astro:page-load re-init (TerrainHero's lifecycle pattern).
+//
+// STRENGTH is a live variable (html[data-fluid-strength]) because the first tune
+// landed BELOW the perceptual threshold: measured mean Δ was 2.5/255 in the
+// content zone (≈1.5% of pixels changed by >8) — invisible. Calibrating from
+// invisible is impossible, so the levels are exposed for A/B.
+interface Props {
+  /** 0 = off · 1 subtle · 2 medium · 3 strong · 4 too-much (the ceiling) */
+  strength?: 0 | 1 | 2 | 3 | 4;
+  /**
+   * `fixed` (default) — one sky for the whole page, scroll carried by a uniform.
+   * `contained` — absolute inside the nearest positioned ancestor, for the
+   * ladder page where SEVERAL independent skies must coexist. Required because
+   * position:fixed took every rung's canvas out of flow: all five covered the
+   * whole viewport and only the last-painted one was visible, so the per-rung
+   * ladder measurements were meaningless (identical numbers across levels).
+   */
+  mode?: 'fixed' | 'contained';
+}
+const { strength = 2, mode = 'fixed' } = Astro.props;
 ---
-<canvas id="fluid-sky" class="fluid-sky" aria-hidden="true"></canvas>
+<canvas
+  class:list={['fluid-sky', mode === 'contained' && 'is-contained']}
+  id={mode === 'fixed' ? 'fluid-sky' : undefined}
+  data-fluid-canvas
+  aria-hidden="true"
+  data-strength={String(strength)}
+  data-mode={mode}
+></canvas>
 
 <style>
   /* position:fixed + z-index:-1 INSIDE main.descent — negative-z children paint
@@ -36,17 +62,45 @@
     height: 100%;
     pointer-events: none;
     display: block;
-    mix-blend-mode: soft-light;
-    /* Tuned DOWN from 0.75 after an A/B against the shipped page: at 0.75 the
-       warp field read as grey cloud sitting ON the sky rather than motion IN it,
-       and it visibly dulled the Monet gradient's crispness (worst in the
-       mountains zone, where the low-frequency blobs looked like smudged glass).
-       This is the "felt, not seen" value. */
-    opacity: 0.34;
   }
-  /* Dark theme is a charcoal void — the same amplitude reads as smudge there, so
-     pull it back to a whisper. */
-  :global(html[data-theme='dark']) .fluid-sky { opacity: 0.20; }
+  /* contained: stays inside its rung instead of covering the viewport */
+  .fluid-sky.is-contained {
+    position: absolute;
+    /* overlay, not soft-light — see the ladder comment below for the measurement
+       that forced this change. */
+    mix-blend-mode: overlay;
+    opacity: var(--fluid-op, 0.48);
+  }
+
+  /* ── The strength ladder ────────────────────────────────────────────────
+     ALL levels now use `overlay`, not soft-light. soft-light against a
+     near-neutral source is mathematically close to an identity op, which is what
+     made levels 1–3 measure 0.3–0.5/255 (invisible) while level 4 — the only one
+     that had already been switched to overlay — measured 51. Same blend at every
+     rung is what makes the ladder monotonic instead of a cliff. */
+  .fluid-sky[data-strength='0'] { display: none; }
+  .fluid-sky[data-strength='1'] { --fluid-op: 0.30; }
+  .fluid-sky[data-strength='2'] { --fluid-op: 0.48; }
+  .fluid-sky[data-strength='3'] { --fluid-op: 0.68; }
+  .fluid-sky[data-strength='4'] { --fluid-op: 0.90; }
+
+  /* Dark theme is a charcoal void — overlay on near-black lifts hard, so every
+     level pulls back. */
+  :global(html[data-theme='dark']) .fluid-sky[data-strength='1'] { --fluid-op: 0.18; }
+  :global(html[data-theme='dark']) .fluid-sky[data-strength='2'] { --fluid-op: 0.30; }
+  :global(html[data-theme='dark']) .fluid-sky[data-strength='3'] { --fluid-op: 0.44; }
+  :global(html[data-theme='dark']) .fluid-sky[data-strength='4'] { --fluid-op: 0.62; }
+
+  /* Live override from the ladder UI, so a level can be flipped without a reload.
+     BUG FIXED HERE: these rules used to also set `display:block`, which beat the
+     [data-strength='0'] { display:none } rule on specificity — so "level 0" was
+     never actually OFF, and every ladder measurement was taken against a
+     fluid-on baseline. Only the OFF rule touches display now. */
+  :global(html[data-fluid-strength='0']) .fluid-sky { display: none !important; }
+  :global(html[data-fluid-strength='1']) .fluid-sky { --fluid-op: 0.30; }
+  :global(html[data-fluid-strength='2']) .fluid-sky { --fluid-op: 0.48; }
+  :global(html[data-fluid-strength='3']) .fluid-sky { --fluid-op: 0.68; }
+  :global(html[data-fluid-strength='4']) .fluid-sky { --fluid-op: 0.90; }
 
   /* Layer kill-switch for A/B-ing in the prototype. */
   :global(html[data-fluid='off']) .fluid-sky { display: none; }
@@ -100,28 +154,59 @@
                     fbm(p + 2.9 * q + vec2(8.3, 2.8) - 0.025 * uTime));
       float f = fbm(p + 2.6 * r);
 
-      // centred on 0.5 so soft-light is a no-op at neutral
-      float m = 0.5 + (f - 0.5) * uAmp;
-      // faint warm/cool swing along the warp axis — broken colour, not haze
-      float temp = (r.x - r.y) * 0.085;
+      // ── Why this is not a grey field any more ───────────────────────────
+      // The first implementation emitted 0.5 + (f-0.5)*amp and composited with
+      // soft-light. Centring on mid-grey made the blend a near-identity, so the
+      // warp field barely reached the page: measured Δ was 0.3–0.5/255 across
+      // levels 1–3 (invisible), then jumped to 51 at level 4 — a 110× cliff
+      // between adjacent levels, which is the signature of an effect that isn't
+      // actually compositing. Tuning opacity could never fix that.
+      //
+      // Now the field drives CONTRAST and TEMPERATURE with real range, and the
+      // strata come from banding the warp field rather than from luminance
+      // wobble. Output still averages ~0.5 so the Monet gradient is preserved on
+      // average, but locally it has enough amplitude to be seen.
 
-      gl_FragColor = vec4(m + temp * 0.65, m, m - temp * 0.8, 1.0);
+      // Stratify: fold the warp field into soft bands — this is what reads as
+      // ink diffusing in water rather than as a soft vertical blur.
+      float bands = sin((f * 6.2831853) * 1.6 + length(r) * 2.4);
+      float strata = smoothstep(-0.65, 0.65, bands);
+
+      // combine the raw field with the banding, then push contrast by amplitude
+      float mix1 = mix(f, strata, 0.55);
+      float m = 0.5 + (mix1 - 0.5) * (uAmp * 2.6);
+
+      // warm/cool broken colour along the warp axis, scaled with amplitude
+      float temp = (r.x - r.y) * 0.42 * uAmp;
+
+      gl_FragColor = vec4(
+        clamp(m + temp,        0.0, 1.0),
+        clamp(m,               0.0, 1.0),
+        clamp(m - temp * 1.15, 0.0, 1.0),
+        1.0
+      );
     }
   `;
 
-  let teardown: (() => void) | null = null;
+  // One teardown per canvas — the ladder page mounts several independent skies,
+  // so a single module-level handle would leak all but the last.
+  const teardowns: Array<() => void> = [];
 
-  function initFluidSky(): void {
-    teardown?.();
-    teardown = null;
+  function initAll(): void {
+    while (teardowns.length) teardowns.pop()!();
+    const all = document.querySelectorAll<HTMLCanvasElement>('[data-fluid-canvas]');
+    all.forEach((c) => {
+      const t = initOne(c);
+      if (t) teardowns.push(t);
+    });
+  }
 
-    const cvs = document.getElementById('fluid-sky') as HTMLCanvasElement | null;
-    if (!cvs) return;
+  function initOne(cvs: HTMLCanvasElement): (() => void) | null {
 
     const gl = (cvs.getContext('webgl', { antialias: false, alpha: true, depth: false })
       || cvs.getContext('experimental-webgl', { antialias: false, alpha: true, depth: false })) as WebGLRenderingContext | null;
     // No WebGL → hide the layer entirely. The page falls back to today's site.
-    if (!gl) { cvs.style.display = 'none'; return; }
+    if (!gl) { cvs.style.display = 'none'; return null; }
 
     function compile(type: number, src: string): WebGLShader | null {
       const sh = gl!.createShader(type);
@@ -137,14 +222,14 @@
 
     const vs = compile(gl.VERTEX_SHADER, VERT);
     const fs = compile(gl.FRAGMENT_SHADER, FRAG);
-    if (!vs || !fs) { cvs.style.display = 'none'; return; }
+    if (!vs || !fs) { cvs.style.display = 'none'; return null; }
 
     const prog = gl.createProgram();
-    if (!prog) { cvs.style.display = 'none'; return; }
+    if (!prog) { cvs.style.display = 'none'; return null; }
     gl.attachShader(prog, vs);
     gl.attachShader(prog, fs);
     gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { cvs.style.display = 'none'; return; }
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { cvs.style.display = 'none'; return null; }
     gl.useProgram(prog);
 
     const buf = gl.createBuffer();
@@ -158,12 +243,21 @@
     const uScroll = gl.getUniformLocation(prog, 'uScroll');
     const uAmp = gl.getUniformLocation(prog, 'uAmp');
 
-    // Amplitude is the taste dial: how far the sky may deviate from the tuned
-    // gradient. Lowered from 0.62 after the A/B — combined with the opacity cut
-    // this keeps the flow as a modulation of the Monet sky instead of a haze
-    // laid over it.
-    const AMP = 0.40;
-    gl.uniform1f(uAmp, AMP);
+    // Amplitude — how far the sky may deviate from the tuned gradient. This is
+    // the OTHER half of strength: opacity alone can't reach the ceiling, because
+    // a low-amplitude field faded up just looks like flat grey. Amplitude is
+    // what makes the strata legible as strata.
+    const AMP_BY_LEVEL = [0, 0.30, 0.40, 0.78, 1.15];
+    function ampFor(level: number): number {
+      return AMP_BY_LEVEL[Math.max(0, Math.min(4, level))] ?? 0.40;
+    }
+    function currentLevel(): number {
+      const live = document.documentElement.dataset.fluidStrength;
+      if (live !== undefined) return Number(live);
+      return Number(cvs!.dataset.strength ?? '2');
+    }
+    let amp = ampFor(currentLevel());
+    gl.uniform1f(uAmp, amp);
 
     // 0.5× internal resolution: a smooth noise field survives the upscale
     // invisibly and this is the single biggest perf lever.
@@ -178,13 +272,23 @@
       }
     }
 
+    // In `fixed` mode the canvas is viewport-locked, so page scroll IS the
+    // sampling window — that's what makes descending feel like descending.
+    // In `contained` mode the canvas scrolls with its own rung, so adding page
+    // scroll on top would double-count and every rung would sample nearly the
+    // same slice; a fixed per-rung offset keeps each panel's field distinct.
+    const contained = cvs.dataset.mode === 'contained';
     function scrollUnits(): number {
+      if (contained) return 0;
       const vh = window.innerHeight || 1;
       return window.scrollY / vh;
     }
 
     function draw(tSec: number): void {
       resize();
+      // Re-read the level each frame so the ladder UI takes effect live.
+      const want = ampFor(currentLevel());
+      if (want !== amp) { amp = want; gl!.uniform1f(uAmp, amp); }
       gl!.uniform1f(uTime, tSec);
       gl!.uniform1f(uScroll, scrollUnits());
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
@@ -237,7 +341,7 @@
       io.observe(cvs);
     }
 
-    teardown = () => {
+    return () => {
       stop();
       window.removeEventListener('resize', onResize);
       window.removeEventListener('scroll', onScroll);
@@ -251,5 +355,5 @@
     };
   }
 
-  document.addEventListener('astro:page-load', initFluidSky);
+  document.addEventListener('astro:page-load', initAll);
 </script>
