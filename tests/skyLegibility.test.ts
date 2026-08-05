@@ -56,6 +56,15 @@ describe('gateFor — the asymmetry must INVERT by variant', () => {
       expect(gateFor(0, v)).toEqual({ dark: 1, light: 1 });
     }
   });
+
+  it('matches the shipped shader gate magnitudes', () => {
+    // Over-clamping the reading-dark direction erases the effect on the reading
+    // pages; these values are what the shader applies.
+    expect(gateFor(1, 'reading').dark).toBeCloseTo(0.70, 9);
+    expect(gateFor(1, 'reading').light).toBeCloseTo(0.75, 9);
+    expect(gateFor(1, 'descent').dark).toBeCloseTo(0.75, 9);
+    expect(gateFor(1, 'descent').light).toBeCloseTo(0.10, 9);
+  });
 });
 
 describe('maxDarkwardExcursion', () => {

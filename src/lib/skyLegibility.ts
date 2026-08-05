@@ -53,11 +53,14 @@ export function zoneAt(depth: number, gateTop: number, variant: SkyVariant): num
  * dangerous direction is clamped.
  */
 export function gateFor(zone: number, variant: SkyVariant): { dark: number; light: number } {
-  const FREE = 0.25;
-  const CLAMPED = 0.9;
+  const FREE = 0.25;              // the safe direction stays nearly free
+  const CLAMPED_LIGHT = 0.90;     // descent: paper-coloured text, so restrain LIGHTWARD hard
+  const CLAMPED_DARK = 0.30;      // reading: dark ink, so restrain DARKWARD — but only enough
+                                  // to protect contrast, since over-clamping here erases the
+                                  // effect on the reading pages entirely
   return variant === 'reading'
-    ? { dark: 1 - CLAMPED * zone, light: 1 - FREE * zone }
-    : { dark: 1 - FREE * zone, light: 1 - CLAMPED * zone };
+    ? { dark: 1 - CLAMPED_DARK * zone, light: 1 - FREE * zone }
+    : { dark: 1 - FREE * zone,          light: 1 - CLAMPED_LIGHT * zone };
 }
 
 /**
