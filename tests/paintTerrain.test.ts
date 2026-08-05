@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { buildGrid, paintTerrain, TERRAIN_CONFIG_DEFAULTS, starIdentity } from '../src/lib/terrainRender';
+import { buildGrid, paintTerrain, TERRAIN_CONFIG_DEFAULTS } from '../src/lib/terrainRender';
 import { TERRAIN_LIGHT, TERRAIN_TERMINAL } from '../src/lib/terrain';
+import { wcagLuminance } from '../src/lib/skyLegibility';
 
 /** Minimal 2D-context recorder: paintTerrain only needs arc/fill/fillStyle/clearRect. */
 function recordingCtx() {
@@ -22,29 +23,82 @@ function recordingCtx() {
 describe('paintTerrain', () => {
   const grid = buildGrid();
 
-  it('paints dots for both themes without throwing', () => {
-    for (const [ramp, darkness] of [[TERRAIN_LIGHT, 0], [TERRAIN_TERMINAL, 1]] as const) {
+  it('paints dots for both themes with theme separation and value structure', () => {
+    // Parse rgba string to [r, g, b, a]
+    const parse = (fill: string): [number, number, number, number] => {
+      const m = fill.match(/^rgba\((\d+),(\d+),(\d+),([\d.]+)\)$/);
+      if (!m) throw new Error(`bad rgba: ${fill}`);
+      return [+m[1], +m[2], +m[3], +m[4]];
+    };
+
+    const lightResult = (() => {
       const { ctx, calls } = recordingCtx();
-      paintTerrain(ctx, grid, { ...TERRAIN_CONFIG_DEFAULTS, ramp, darkness, dotScale: 1 },
+      paintTerrain(ctx, grid, { ...TERRAIN_CONFIG_DEFAULTS, ramp: TERRAIN_LIGHT, darkness: 0, dotScale: 1 },
         1440, 900, 1, 0, 0);
-      expect(calls.length).toBeGreaterThan(200);
-      for (const c of calls) {
-        expect(Number.isFinite(c.r)).toBe(true);
-        expect(c.r).toBeGreaterThan(0);
-        expect(c.fill).toMatch(/^rgba\(/);
-      }
+      return calls;
+    })();
+
+    const darkResult = (() => {
+      const { ctx, calls } = recordingCtx();
+      paintTerrain(ctx, grid, { ...TERRAIN_CONFIG_DEFAULTS, ramp: TERRAIN_TERMINAL, darkness: 1, dotScale: 1 },
+        1440, 900, 1, 0, 0);
+      return calls;
+    })();
+
+    // Basic structure
+    expect(lightResult.length).toBeGreaterThan(200);
+    expect(darkResult.length).toBeGreaterThan(200);
+    for (const c of [...lightResult, ...darkResult]) {
+      expect(Number.isFinite(c.r)).toBe(true);
+      expect(c.r).toBeGreaterThan(0);
+      expect(c.fill).toMatch(/^rgba\(/);
     }
+
+    // (a) THEME SEPARATION — light and dark must produce measurably different colour distributions
+    const lightMeans = { r: 0, g: 0, b: 0 };
+    for (const c of lightResult) {
+      const [r, g, b] = parse(c.fill);
+      lightMeans.r += r; lightMeans.g += g; lightMeans.b += b;
+    }
+    lightMeans.r /= lightResult.length;
+    lightMeans.g /= lightResult.length;
+    lightMeans.b /= lightResult.length;
+
+    const darkMeans = { r: 0, g: 0, b: 0 };
+    for (const c of darkResult) {
+      const [r, g, b] = parse(c.fill);
+      darkMeans.r += r; darkMeans.g += g; darkMeans.b += b;
+    }
+    darkMeans.r /= darkResult.length;
+    darkMeans.g /= darkResult.length;
+    darkMeans.b /= darkResult.length;
+
+    // Assert channels differ substantially (catches swapped ramps or one theme rendering with the other's palette)
+    expect(Math.abs(lightMeans.r - darkMeans.r)).toBeGreaterThan(100);
+    expect(Math.abs(lightMeans.g - darkMeans.g)).toBeGreaterThan(150);
+    expect(Math.abs(lightMeans.b - darkMeans.b)).toBeGreaterThan(140);
+
+    // (b) ELEVATION READS AS VALUE — the light ramp must carry luminance spread across elevation
+    const lightLums: number[] = [];
+    for (const c of lightResult) {
+      const [r, g, b] = parse(c.fill);
+      lightLums.push(wcagLuminance([r, g, b]));
+    }
+    const spread = Math.max(...lightLums) - Math.min(...lightLums);
+    // An iso-luminant ramp or inverted EDL would collapse this spread
+    expect(spread).toBeGreaterThan(0.10);
   });
 
-  it('applies the starfield ONLY when configured (light theme must be unaffected)', () => {
+  it('starfield flag takes effect and output is otherwise deterministic', () => {
+    // The starfield flag gates stellar tinting; when set, output must differ. When unset, output is stable.
     const paint = (starfield: boolean) => {
       const { ctx, calls } = recordingCtx();
       paintTerrain(ctx, grid, { ...TERRAIN_CONFIG_DEFAULTS, ramp: TERRAIN_LIGHT, darkness: 0, dotScale: 1, starfield },
         1440, 900, 1, 0, 0);
       return calls.map((c) => c.fill).join('|');
     };
-    expect(paint(false)).toBe(paint(false));       // deterministic
-    expect(paint(true)).not.toBe(paint(false));    // the flag must actually do something
+    expect(paint(false)).toBe(paint(false));       // deterministic when flag is off
+    expect(paint(true)).not.toBe(paint(false));    // the flag must actually change output
   });
 
   it('is deterministic for a fixed time — no hidden Math.random', () => {
