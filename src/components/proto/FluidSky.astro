@@ -310,7 +310,11 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       // the reading zone, bias it DARKWARD instead of symmetric: same viscous
       // character, but it can only help light text.
       float lum = 0.90 + 0.20 * f;
-      col *= mix(lum, 0.86 + 0.14 * f, zone);
+      // On reading pages the viscous multiply is the OTHER unbounded darkener the
+      // audit identified, so it gets a floor of its own (0.955 rather than down to
+      // 0.86) — dark ink needs the paper to stay paper.
+      float lumR = mix(lum, 0.86 + 0.14 * f, zone);
+      col *= mix(lumR, max(lumR, 0.955), uReading);
       // Warm bloom where the warp piles up (original) — faded out over the reading
       // zone, since it lightens.
       col += 0.045 * vec3(0.784, 0.639, 0.416) * smoothstep(0.55, 1.0, length(r)) * (1.0 - zone) * (1.0 - uReading);
@@ -357,17 +361,29 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
         // contrast against dark ink can only improve.
         float ink = smoothstep(0.40, 0.60, f);              // TIGHT: high slope near fbm's mean
         float veins = smoothstep(0.50, 0.78, length(r));
-        float amt = (ink * 0.62 + veins * 0.32) * uAmp;
+        // Magnitude HALVED and hard-capped. The post-hoc luminance floor I tried
+        // first did not hold in measurement (/projects stayed at 4.37:1 whether the
+        // floor was 0.62 or 0.72), so bounding the darkening at its source is the
+        // honest fix rather than correcting after the fact. Measured with the fluid
+        // off these same samples read 5.81 and 5.64:1, so the budget below is sized
+        // to give most of that headroom back.
+        float amt = min(0.55, (ink * 0.30 + veins * 0.16) * uAmp);
         // Tuned DOWN by half after the first strengthened pass overshot: at
         // amt*1.25 the cool side read as saturated BLUE clouds that competed with
         // the reading rather than sitting under it. The cool tint is also
         // de-saturated (was 0.050/0.062/0.088) so it reads as cool GREY paper
         // rather than as sky.
-        vec3 warmTint = vec3(0.095, 0.072, 0.042);          // toward --ochre
-        vec3 coolTint = vec3(0.052, 0.056, 0.066);          // cool grey, not blue
+        vec3 warmTint = vec3(0.055, 0.042, 0.024);          // toward --ochre
+        vec3 coolTint = vec3(0.030, 0.033, 0.039);          // cool grey, not blue
         float pick = smoothstep(0.30, 0.70, r.x);
         col -= mix(warmTint, coolTint, pick) * amt;
       }
+
+      // NOTE: a post-hoc luminance floor was tried here and REMOVED. It measured
+      // identically at FLOOR 0.62 and 0.72 (/projects stuck at 4.37:1 either way),
+      // i.e. it was not holding, and a guard that does not bind is worse than none
+      // because it reads like a guarantee. The darkening is now bounded at its two
+      // sources instead — see the viscous multiply and the tint magnitude above.
 
       if (uDark > 0.5 && uReading < 0.5) {
         float glow = smoothstep(0.30, 0.95, f);          // where the ink piles up
@@ -745,6 +761,25 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       rafId = 0;
     }
 
+    // ── GL context loss ────────────────────────────────────────────────────
+    // Routine in practice (driver reset, GPU switch on a laptop, Chrome reclaiming
+    // contexts at its ~16-context cap). Without handling it the canvas goes dead
+    // while .fluid-live stays set — the same invisible-hero failure as the
+    // breakpoint bug, via a trigger the CSS gate does NOT cover. Drop the class and
+    // stop the loop on loss; restore on regain.
+    const onLost = (e: Event) => {
+      e.preventDefault();                     // required for restore to be possible
+      stop();
+      if (!contained) cvs.closest('.descent')?.classList.remove('fluid-live');
+    };
+    const onRestored = () => {
+      // A restored context has no programs/buffers/textures — a full re-init is the
+      // only correct response, and initAll() disposes this instance first.
+      initAll();
+    };
+    cvs.addEventListener('webglcontextlost', onLost as EventListener);
+    cvs.addEventListener('webglcontextrestored', onRestored);
+
     const onVis = () => { if (document.hidden) stop(); else start(); };
     document.addEventListener('visibilitychange', onVis);
 
@@ -769,7 +804,16 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     let resizeT = 0;
     const onResize = () => {
       window.clearTimeout(resizeT);
-      resizeT = window.setTimeout(() => { sizeTo(true); measureLayout(); measureGate(); draw(performance.now()); }, 160);
+      resizeT = window.setTimeout(() => {
+        // Re-check visibility and SYNC the class. The CSS is breakpoint-gated so it
+        // cannot desync on its own, but keeping the class honest also stops a hidden
+        // canvas from burning frames.
+        const hidden = getComputedStyle(cvs).display === 'none';
+        if (!contained) cvs.closest('.descent')?.classList.toggle('fluid-live', !hidden);
+        if (hidden) { stop(); return; }
+        start();
+        sizeTo(true); measureLayout(); measureGate(); draw(performance.now());
+      }, 160);
     };
     window.addEventListener('resize', onResize);
 
@@ -790,6 +834,8 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       if (scrollRaf) cancelAnimationFrame(scrollRaf);
       window.clearTimeout(scrollIdleT);
       document.removeEventListener('visibilitychange', onVis);
+      cvs.removeEventListener('webglcontextlost', onLost as EventListener);
+      cvs.removeEventListener('webglcontextrestored', onRestored);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
       mo.disconnect();
