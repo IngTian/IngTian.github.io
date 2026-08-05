@@ -66,8 +66,7 @@ describe('maxDarkwardExcursion', () => {
 });
 
 describe('tintBudget — bounds the darkening at its SOURCE', () => {
-  it.fails('caps reading-page tint so composited paper cannot fall below AA against ink-3', () => {
-    // The bound needs deriving properly — current constants yield 4.33:1, below AA.
+  it('caps reading-page tint so composited paper cannot fall below AA against ink-3', () => {
     const { magnitude, cap, viscousFloor } = tintBudget('reading');
     // Worst case: start at the reading ramp's own darkest stop, apply the viscous
     // multiply and capped tint IN RGB SPACE, then take luminance. The tint is
@@ -78,7 +77,9 @@ describe('tintBudget — bounds the darkening at its SOURCE', () => {
     const tintAmount = 255 * magnitude * cap;
     const afterTint = afterViscous.map(ch => Math.max(0, ch - tintAmount)) as [number, number, number];
     const worstLuminance = wcagLuminance(afterTint);
-    expect(contrastRatio(worstLuminance, INK_3)).toBeGreaterThanOrEqual(AA_BODY);
+    expect(contrastRatio(worstLuminance, INK_3)).toBeGreaterThanOrEqual(4.5);
+    // Pin the derived headroom so drift is caught.
+    expect(contrastRatio(worstLuminance, INK_3)).toBeLessThan(6);
   });
 
   it('gives descent pages a larger budget — its danger direction is the other one', () => {

@@ -78,6 +78,9 @@ export function maxDarkwardExcursion(amp: number, displacement: number): number 
  * index cannot express what these stages do — they operate on the colour after
  * it leaves the ramp, so a colour darker than any ramp stop is reachable and no
  * cap on the index can prevent it.
+ *
+ * The reading-page constants are derived from holding WCAG AA (4.5:1) against
+ * --ink-3 at the ramp's darkest stop (#dcd5cf).
  */
 export function tintBudget(variant: SkyVariant): {
   magnitude: number;
@@ -85,6 +88,6 @@ export function tintBudget(variant: SkyVariant): {
   viscousFloor: number;
 } {
   return variant === 'reading'
-    ? { magnitude: 0.055, cap: 0.55, viscousFloor: 0.955 }
+    ? { magnitude: 0.055, cap: 0.55, viscousFloor: 0.985 }
     : { magnitude: 0.095, cap: 1.0, viscousFloor: 0.86 };
 }
