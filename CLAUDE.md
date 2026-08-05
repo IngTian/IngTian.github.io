@@ -45,7 +45,7 @@ src/
   lib/motion.ts                     # prefersReducedMotion() — the one source of truth for the motion gate
   lib/equations.ts                  # build-time KaTeX→MathML for the terrain pill (katex is a devDependency, never shipped)
   sections/{Heights,Interlude,Mountains,Ground,Signature}.astro   # scroll order, ride over the gradient
-  components/{Timeline,Publications,Awards,SealMark,Grain}.astro
+  components/{SealMark,Grain}.astro   # publication list, timeline and awards markup inlined in sections/Mountains.astro
   components/Toc.astro              # thin left-margin TOC — vanilla IntersectionObserver scrollspy, no React island
   components/TerrainHero.astro      # full-bleed hero canvas (the terrain) — vanilla <script>, no React island
   components/SkyWash.astro          # woven warm/cold broken-color wash over the gradient — pure CSS

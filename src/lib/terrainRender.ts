@@ -1,7 +1,6 @@
-// Shared terrain dot-painter — the single source of truth for how the
-// pointillist terrain is drawn, used by BOTH the hero (TerrainHero.astro) and
-// the tuning lab (/terrain-lab). Because they paint from the same code, any
-// value dialed in the lab transfers to the hero verbatim.
+// Terrain dot-painter — the single source of truth for how the pointillist
+// terrain is drawn. Hero and any future consumer stay in sync by using this
+// module's paint logic and configuration.
 //
 // Walkers/bubbles stay in the hero (they're a hero-only flourish); this module
 // owns the static-per-camera terrain: the grid, its precomputed normals + EDL,

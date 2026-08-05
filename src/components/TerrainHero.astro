@@ -92,7 +92,6 @@ const bubbles = JSON.stringify([
     // The static-per-camera terrain: dot grid + precomputed normals + EDL shade,
     // built once (EDL is O(n²); the camera is fixed so it never needs recompute).
     // Config is the baked default (shape-reading on) plus this theme's ramp/darkness.
-    // Same code path as /terrain-lab, so a value tuned there transfers verbatim.
     // starfield: the dark theme's dots twinkle as temperature-tinted stars (its
     // whole conceit is that they read as a star field); light theme keeps the
     // shipped warm relief untouched.

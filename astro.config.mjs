@@ -23,5 +23,9 @@ export default defineConfig({
     plugins: [tailwindcss()]
   },
 
-  integrations: [react(), sitemap()]
+  integrations: [react(), sitemap({
+    // Prototype routes carry noindex, but an unfiltered sitemap still advertises
+    // them to crawlers — and their rendered bodies quote internal review notes.
+    filter: (page) => !page.includes('/proto-'),
+  })]
 });
