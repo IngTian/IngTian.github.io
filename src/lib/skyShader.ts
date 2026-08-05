@@ -33,7 +33,8 @@ export function fragmentShader(): string {
     uniform vec3  uNebula;         // the cool tint dark theme lifts the ink with
     uniform float uReading;        // 1.0 on a reading page (dark ink on pale paper)
     uniform float uTintCap;        // reading-page tint hard ceiling
-    uniform float uViscousFloor;   // viscous multiply floor (bounds the darkening)
+    uniform float uViscousFloor;
+    uniform float uNebulaCeiling;   // hard bound on the dark nebula's added light
 
     float hash(vec2 p) {
       p = fract(p * vec2(443.897, 441.423));
@@ -132,7 +133,9 @@ export function fragmentShader(): string {
 
       // Dark theme: the field adds a cool phosphor/cyan nebular tint lifted by the
       // warp, damped over the reading zone since adding light is the dangerous
-      // direction there. Hard ceiling at 0.45 ensures the lightest descent-dark stop
+      // direction there. The ceiling is a uniform so the bound lives in
+      // skyLegibility.nebulaCeiling() with a test, rather than as a literal here.
+      // It exists because
       // plus full nebula clears WCAG AA (4.5:1) against ink-3 even at zone=0 (where
       // the zone-dependent damping does not apply). See tests/skyLegibility.test.ts.
       if (uDark > 0.5 && uReading < 0.5) {
@@ -140,7 +143,7 @@ export function fragmentShader(): string {
         float veins = smoothstep(0.45, 1.0, length(r));
         float lift = (glow * 0.72 + veins * 0.45) * uAmp;
         lift *= 1.0 - 0.72 * zone;
-        lift = min(lift, 0.45);
+        lift = min(lift, uNebulaCeiling);
         col += uNebula * lift;
 
         // Stars in the nebula, pinned to the page (scroll with the sky), strongest
@@ -202,5 +205,5 @@ export function fragmentShader(): string {
 export const SKY_UNIFORMS = [
   'uRamp', 'uAmp', 'uTime', 'uYOffset', 'uYSpan', 'uDepth0', 'uDepthSpan',
   'uGateTop', 'uGateDark', 'uGateLight', 'uDark', 'uNebula', 'uReading',
-  'uTintCap', 'uViscousFloor',
+  'uTintCap', 'uViscousFloor', 'uNebulaCeiling',
 ] as const;

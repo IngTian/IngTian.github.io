@@ -61,7 +61,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
 <script>
   import { prefersReducedMotion } from '../../lib/motion';
   import { VERTEX_SHADER, fragmentShader, SKY_UNIFORMS } from '../../lib/skyShader';
-  import { gateFor, tintBudget, type SkyVariant } from '../../lib/skyLegibility';
+  import { gateFor, tintBudget, nebulaCeiling, type SkyVariant } from '../../lib/skyLegibility';
   import { rampFor, type Theme } from '../../lib/skyPalette';
 
   const VERT = VERTEX_SHADER;
@@ -216,6 +216,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       const budget = tintBudget(variant);
       gl!.uniform1f(U.uTintCap, budget.cap);
       gl!.uniform1f(U.uViscousFloor, budget.viscousFloor);
+      gl!.uniform1f(U.uNebulaCeiling, nebulaCeiling());
       gl!.uniform1f(U.uTime, (nowMs - t0) / 1000);
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
     }

@@ -94,3 +94,18 @@ export function tintBudget(variant: SkyVariant): {
     ? { magnitude: 0.055, cap: 0.55, viscousFloor: 0.985 }
     : { magnitude: 0.095, cap: 1.0, viscousFloor: 0.86 };
 }
+
+/**
+ * Hard ceiling on the dark theme's nebula lift.
+ *
+ * The nebula ADDS light, so on a page whose text is light it is the dangerous
+ * direction. It is damped by `zone`, but a descent page without an identifiable
+ * content element runs its upper half at zone 0, where that damping does nothing —
+ * so the lift needs a bound that holds regardless of zone.
+ *
+ * Sized against the dark theme's --ink-3 (#8b938c), the smallest ink these pages
+ * set on the sky. tests/skyLegibility.test.ts pins the resulting contrast.
+ */
+export function nebulaCeiling(): number {
+  return 0.16;
+}

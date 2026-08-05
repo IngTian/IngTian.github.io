@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   wcagLuminance, contrastRatio, AA_BODY,
   zoneAt, gateFor, maxDarkwardExcursion, tintBudget,
+  nebulaCeiling,
 } from '../src/lib/skyLegibility';
 
 // --ink-3 #5a544a is the smallest ink actually used on the reading pages (12-14px).
@@ -123,5 +124,32 @@ describe('Dark-theme nebula ceiling — descent pages only', () => {
     expect(ratio).toBeGreaterThanOrEqual(4.5);
     // Pin that the nebula is actually visible, so a future change that neutralises it fails.
     expect(ratio).toBeLessThan(6.5);
+  });
+});
+
+describe('nebulaCeiling', () => {
+  // The dark theme's nebula ADDS light, and on a descent page with no identifiable
+  // content element the upper half runs at zone 0 where the zone-based damping does
+  // nothing. So the ceiling must hold on its own. Sized against the dark theme's
+  // --ink-3 (#8b938c), the smallest ink these pages set directly on the sky.
+  const DARK_INK_3 = wcagLuminance([0x8b, 0x93, 0x8c]);
+
+  it('keeps the darkest descent sky clear of AA even at zone 0', () => {
+    // Compose in RGB then take luminance — never subtract an RGB delta from a
+    // luminance value. The nebula tint is added per channel at the ceiling.
+    const sky: [number, number, number] = [0x16, 0x19, 0x1d];   // lightest descent-dark stop
+    const tint: [number, number, number] = [0.055, 0.105, 0.115];
+    const c = nebulaCeiling();
+    const lifted: [number, number, number] = [
+      Math.min(255, sky[0] + 255 * tint[0] * c),
+      Math.min(255, sky[1] + 255 * tint[1] * c),
+      Math.min(255, sky[2] + 255 * tint[2] * c),
+    ];
+    expect(contrastRatio(wcagLuminance(lifted), DARK_INK_3)).toBeGreaterThanOrEqual(AA_BODY);
+  });
+
+  it('is low enough that raising it would break AA — the bound binds', () => {
+    // Guards against someone "brightening the nebula" without re-deriving.
+    expect(nebulaCeiling()).toBeLessThan(0.30);
   });
 });
