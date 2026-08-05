@@ -79,20 +79,18 @@ export interface TerrainRamp { valley: [number, number, number]; mid: [number, n
 // LIGHT ramp — "Classic": warm ochre valleys → cool indigo heights, at the token
 // values. A deepened variant was tried and REVERTED: measured composited on screen
 // (paper backdrop, EDL shade 0.5) the ridge still landed LIGHTER than the valley
-// (L 0.680 vs 0.526), because terrainRender's base alpha ramp 0.30+(1-hn)*0.45 more
-// than cancels any value ramp. It bought ~17% of the separation win while being the
-// only part that altered the shipped hero's colour identity — edlSpend() delivers
-// the other ~316%. Not worth the palette risk.
+// because terrainRender's base alpha ramp 0.30+(1-hn)*0.45 more than cancels any
+// value ramp. The deepened variant was the only part that altered the shipped
+// hero's colour identity, while edlSpend() delivers the vast majority of the
+// separation win. Not worth the palette risk.
 // Classic: warm ochre valleys → cool indigo heights.
 //
-// REAL VALUE RANGE, added after the light mountain still read as mush. Measured dot
-// luminance across elevation, before vs after:
-//     before  0.450 / 0.425 / 0.461  -> spread 0.036   (essentially FLAT)
-//     dark    0.323 / 0.536 / 0.869  -> spread 0.546
-// i.e. dark carried 15x more elevation→value information. Each light dot separated
-// from the SKY perfectly well (~0.45), but the dots did not separate from EACH
-// OTHER, so there was no value structure and therefore no readable mountain FORM.
-// That is why raising contrast against the background never fixed it.
+// REAL VALUE RANGE, added after the light mountain still read as mush. Before this
+// change, light theme dots were essentially FLAT in luminance across elevation —
+// dark theme carried far more elevation→value information. Each light dot separated
+// from the sky perfectly well, but the dots did not separate from EACH OTHER, so
+// there was no value structure and therefore no readable mountain form. That is why
+// raising contrast against the background never fixed it.
 // Now: valley = deep ochre (dark), peak = pale indigo (light), so elevation reads as
 // light on the ridge the way it does in dark theme. Hues stay --ochre → --indigo.
 //
@@ -218,12 +216,12 @@ export function computeEDL(dots: Array<{ x: number; y: number }>, params: EDLPar
 // and on the dark theme that is exactly right: fading a dot toward a near-black
 // sky DARKENS it, which is what an eye-dome shadow looks like.
 //
-// On the LIGHT theme the same line runs BACKWARDS. Measured against the real
-// hero backdrop (mean luminance 0.875) and the mean light dot (0.445):
+// On the LIGHT theme the same line runs BACKWARDS. Compositing against the pale
+// paper backdrop, reducing a dot's alpha makes it LIGHTER, not darker:
 //
-//     alpha  1.00 → 0.445   (the dot's own value)
-//     alpha  0.30 → 0.746   ← LIGHTER than unshaded
-//     alpha  0.08 → 0.841   ← almost exactly the sky
+//     alpha  1.00 → the dot's own value
+//     alpha  0.30 → LIGHTER than unshaded
+//     alpha  0.08 → almost exactly the sky
 //
 // So the dots EDL most wants to darken — the receding ridge, the silhouette,
 // the shape cue itself — instead BLEACH OUT into the pale sky. That is the
@@ -246,8 +244,8 @@ export interface EDLSpend {
 }
 
 /** Darkest an EDL-shadowed dot's COLOUR goes on the light theme. Tuned against
- *  the real marbled backdrop: the EDL-shadowed (ridge) dots' mean separation
- *  from their local sky rose 0.020 → 0.135 (6.7x) at this floor. */
+ *  the real marbled backdrop to give EDL-shadowed ridge dots strong separation
+ *  from their local sky. */
 export const EDL_VALUE_FLOOR = 0.32;
 /** Light theme's (gentle) EDL alpha floor — the far field still recedes, but the
  *  shape cue is carried by value now, so opacity no longer has to crush it. */
@@ -277,9 +275,9 @@ export function edlSpend(
   // Both blends use the `a*(1-d) + b*d` mix form rather than `a + (b-a)*d`.
   // That is deliberate and load-bearing: the mix form is EXACT at both endpoints
   // in floating point, so at darkness = 1 aFloor === alphaFloor and vFloor === 1
-  // bit-for-bit. `0.82 + (0.20 - 0.82) * 1` evaluates to 0.19999999999999996,
-  // which would make the dark theme's dot alphas differ in the last bits from the
-  // shipped renderer — a regression this function exists to make impossible.
+  // bit-for-bit. The additive form would differ in the last bits due to rounding,
+  // making the dark theme's dot alphas differ from the shipped renderer — a
+  // regression this function exists to make impossible.
   const aFloor = EDL_ALPHA_FLOOR_LIGHT * (1 - d) + alphaFloor * d;
   // Value shading fades out as the theme darkens; at d = 1 it is exactly 1.
   const vFloor = valueFloor * (1 - d) + 1 * d;

@@ -146,9 +146,8 @@ export function paintTerrain(
     let r = (2.9 - hn * 1.6) * DPR * cfg.zoom * cfg.dotScale;
     // Base opacity by elevation. The shipped ramp fades the RIDGE OUT
     // (0.30+(1-hn)*0.45 → alpha 0.27 at the peak vs 0.75 in the valley), which on
-    // pale paper is fatal: measured through the full pipeline the peak dots
-    // composite to L=0.787 against paper at L=0.916 — barely 0.13 of separation, so
-    // the ridge dissolves. That is the "still blends in" report, and it is why
+    // pale paper is fatal: the peak dots composite with barely any separation from
+    // the paper backdrop, so the ridge dissolves. That is the "still blends in" report, and it is why
     // fixing hue and value alone never worked: the ridge was being made transparent.
     //
     // In LIGHT theme the ramp is flattened and lifted so high ground stays present.

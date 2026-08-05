@@ -100,8 +100,8 @@ export function fragmentShader(): string {
       float raw = (f - 0.5) * 0.34 * uAmp;
       float disp = raw > 0.0 ? raw * gateDark : raw * gateLight;
 
-      // Top-of-ramp bias: near the top the ramp is almost flat (cream stops at
-      // L=0.938, 0.920, 0.904), so symmetric swings inside them show almost nothing.
+      // Top-of-ramp bias: near the top the ramp is almost flat (pale cream stops),
+      // so symmetric swings inside them show almost nothing.
       // Bias the excursion downward so the ink can reach taupe and slate instead of
       // oscillating within cream. Fades out by depth 0.30 where the ramp has its own
       // contrast.
@@ -169,8 +169,8 @@ export function fragmentShader(): string {
               : mix(vec3(0.80, 0.72, 1.00), vec3(1.00, 0.86, 0.72), (temp2 - 0.72) / 0.28));
 
           // Confined to a narrow band behind the tagline ("A researcher by day, an
-          // artist by night..."), which measures depth 0.259-0.293. Opens as the
-          // heights section ends (0.202) and closes before Mountains (0.348).
+          // artist by night..."). Opens as the heights section ends and closes
+          // before Mountains.
           float band = smoothstep(0.200, 0.252, depth) * (1.0 - smoothstep(0.300, 0.348, depth));
           col += tint * (core * 1.05 + halo) * tw * band;
         }
