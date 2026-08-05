@@ -101,383 +101,11 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
 
 <script>
   import { prefersReducedMotion } from '../../lib/motion';
+  import { VERTEX_SHADER, fragmentShader, SKY_UNIFORMS } from '../../lib/skyShader';
+  import { gateFor, tintBudget } from '../../lib/skyLegibility';
 
-  const VERT = `
-    attribute vec2 aPos;
-    varying vec2 vUv;
-    void main() {
-      vUv = aPos * 0.5 + 0.5;
-      gl_Position = vec4(aPos, 0.0, 1.0);
-    }
-  `;
-
-  // Faithful to the original demo: two-level domain warp (Inigo Quilez), the
-  // warped field displaces WHERE along the descent ramp we sample, then a viscous
-  // luminance term and a warm bloom. No banding, no strata fold.
-  const FRAG = `
-    precision highp float;
-    varying vec2 vUv;
-
-    uniform sampler2D uRamp;
-    uniform float uAmp;
-    uniform float uTime;
-    uniform float uYOffset;   // scroll, in viewport widths
-    uniform float uYSpan;     // viewport height, in viewport widths
-    uniform float uDepth0;    // page depth at the top of the viewport
-    uniform float uDepthSpan; // page depth spanned by one viewport
-    uniform float uGateTop;   // depth where the reading zone begins
-    uniform float uDark;      // 1.0 in the dark theme, 0.0 in light
-    uniform vec3  uNebula;    // the cool tint dark theme lifts the ink with
-    uniform float uReading;   // 1.0 on a reading page (dark ink on pale paper)
-    uniform float uReadCap;   // reading pages: max darkward ramp excursion
-
-    float hash(vec2 p) {
-      p = fract(p * vec2(443.897, 441.423));
-      p += dot(p, p + 19.19);
-      return fract(p.x * p.y);
-    }
-    float noise(vec2 p) {
-      vec2 i = floor(p), f = fract(p);
-      vec2 u = f * f * (3.0 - 2.0 * f);
-      return mix(mix(hash(i),                 hash(i + vec2(1.0, 0.0)), u.x),
-                 mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
-    }
-    // 5 octaves, as the original. (I had cut this to 3 to afford a blended loop;
-    // opaque compositing pays for the detail back.)
-    float fbm(vec2 p) {
-      float v = 0.0, a = 0.5;
-      for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.02; a *= 0.5; }
-      return v;
-    }
-
-    void main() {
-      // Time is scaled with the reading variant's y-stretch. The warp's drift terms
-      // are added in RAW field units, so stretching the sample coordinate 2.6x made
-      // an identical time delta a 2.6x SMALLER relative move — measured: /research
-      // changed Δ2.47/255 over 2.5s vs /art's Δ4.71, i.e. it looked STALE even though
-      // both were drawing at 26fps. Scaling time restores equal apparent motion.
-      // Time is NOT the lever for reading-page motion, established by measurement:
-      // pushing the multiplier to 4.2x made apparent motion WORSE (Δ3.00 -> 2.18),
-      // because on the reading variant the visible effect comes from a smoothstepped
-      // TINT of f and length(r), not from a ramp lookup — so a faster-scrolling fine
-      // field just averages out between frames. The real lever is response CONTRAST
-      // (below). Keeping a small boost only.
-      // MOTION DIALLED BACK on request ("limit the motion, just a little bit"). One
-      // scalar governs all four drift terms below, so 0.55 slows the whole warp
-      // uniformly rather than changing its character — the strata still churn, just
-      // more slowly. Reading pages keep their small relative boost, since their
-      // effect comes from a tint response rather than a ramp lookup and needs a
-      // little more movement to register at all.
-      float t = uTime * 0.55 * mix(1.0, 1.35, uReading);
-
-      // ANISOTROPIC sample space — more frequency DOWN than ACROSS, which is what
-      // stretches the field into drifting strata instead of round blobs.
-      //
-      // SCALE BUG FIXED HERE. I copied the original demo's 1.6 / 2.2 verbatim, but
-      // the demo drew into a 373x250 PANEL while this fills a ~1440x900 viewport.
-      // Measured in noise-units per on-screen pixel:
-      //     demo  0.00429 horiz / 0.00880 vert
-      //     mine  0.00111 horiz / 0.00153 vert
-      // so every feature came out 3.9x too large across and 5.8x too tall — one
-      // enormous smear per screen, which is exactly why it read as "no difference".
-      // 6.2 / 12.7 reproduce the demo's on-screen feature SIZE at viewport scale.
-      float sy = uYOffset + (1.0 - vUv.y) * uYSpan;
-
-      // Reading pages get a FINER field. On a descent page one big marbled stratum
-      // per screen is the look; on a text page that reads as one uniform smudge
-      // (which is what the A/B showed: mean Δ 17 but max only 35.7 — nearly flat).
-      // ~2.4x finer gives structure at paragraph scale instead of page scale.
-      // Reading pages are much SHORTER than /art or the homepage, so scrolling one
-      // covers far less of the field and the vivid strata never come into view —
-      // that is why they looked flat even once the magnitude was right. Sampling
-      // faster in y makes a short page traverse the same amount of field a long
-      // page does.
-      float freqK = mix(1.0, 1.9, uReading);
-      // Reduced 2.6 -> 1.5. The stretch let a short page cover more field, but it
-      // also SHRANK every feature and diluted the apparent motion (measured: pushing
-      // time to 4.2x made motion WORSE, 3.00 -> 2.18, because a finer field averages
-      // out between frames). A gentler stretch plus a modest time boost gives both
-      // coverage and visible movement.
-      float yStretch = mix(1.0, 1.35, uReading);
-      vec2 p = vec2(vUv.x * 6.2 * freqK, sy * 12.7 * freqK * yStretch);
-
-      // ── two-level domain warp (Inigo Quilez) — the original gains ──
-      vec2 q = vec2(fbm(p + 0.09 * t),
-                    fbm(p + vec2(5.2, 1.3) - 0.07 * t));
-      vec2 r = vec2(fbm(p + 3.4 * q + vec2(1.7, 9.2) + 0.055 * t),
-                    fbm(p + 3.4 * q + vec2(8.3, 2.8) - 0.048 * t));
-      float f = fbm(p + 3.2 * r);
-
-      // page depth of this pixel (0 = dawn, 1 = ground)
-      float depth = clamp(uDepth0 + (1.0 - vUv.y) * uDepthSpan, 0.0, 1.0);
-
-      // ── LEGIBILITY GATE, rewritten ──────────────────────────────────────
-      // The old gate was 1 - 0.86*smoothstep(gateTop, gateTop+0.06, depth),
-      // which pinned displacement to 14% over the whole content zone. Measured in
-      // ramp units that left 0.057 — under HALF a palette band — so Mountains got
-      // neither clean colour nor real ink, just a faint mottled mush. That is the
-      // "weird" background.
-      //
-      // The insight: what threatens text is not displacement per se, it is
-      // displacement that DARKENS the sky toward the paper-coloured text. Pulling
-      // the sample point UP the ramp (toward lighter dawn colours) is harmless
-      // here — the text is light, so a lighter background is what hurts, and a
-      // DARKER one actually helps.
-      //
-      // So instead of one scalar clamp, the gate is now ASYMMETRIC: over the
-      // reading zone the ink may still swing generously toward the dark end while
-      // its lightward excursion is limited. Full ink character, contrast intact.
-      // On a reading page the entire page is a reading zone (text runs top to
-      // bottom), so the gate is fully engaged everywhere rather than fading in at a
-      // content boundary.
-      float zone = mix(smoothstep(uGateTop, uGateTop + 0.10, depth), 1.0, uReading);
-      // ── The asymmetry INVERTS by page archetype ─────────────────────────
-      // Descent pages carry PAPER-coloured text, so a LIGHTER sky is what erases it
-      // and the dark direction is free. Reading pages carry DARK INK on pale paper,
-      // so the danger is exactly reversed: a DARKER sky erases the ink, and the
-      // light direction is the safe one. Copy-pasting the descent gate onto a
-      // reading page would clamp the safe direction and free the dangerous one.
-      float gateDark  = mix(1.0 - 0.25 * zone, 1.0 - 0.30 * zone, uReading);
-      // Toward the dawn: 0.90, not 0.72. In LIGHT theme the content zone carries
-      // paper-coloured text on grey ink, and the lightward swing was bright enough
-      // that the text nearly dissolved into the sky. Only the LIGHT direction is
-      // clamped harder; the dark direction stays free, so the ink keeps its
-      // character (that was the point of making the gate asymmetric).
-      float gateLight = mix(1.0 - 0.90 * zone, 1.0 - 0.25 * zone, uReading);
-
-      // Perturb WHERE along the descent this pixel samples → marbled strata.
-      //
-      // The OTHER half of the "no difference" bug. The demo panel showed the
-      // ENTIRE dawn→ground ramp in 250px, so its 0.46 displacement swung across
-      // several colour bands. A real viewport at the top of the page spans only
-      // depth 0.00–0.19 — all cream — so the same 0.46 never left the cream band
-      // and produced almost no visible change.
-      //
-      // Fix: displace in units of the RAMP, not of the local viewport window. 0.34
-      // is ~1.8 palette bands, so the ink genuinely carries taupe and slate up into
-      // the dawn the way it did in the panel.
-      float raw = (f - 0.5) * 0.34 * uAmp;
-      // positive raw = deeper down the ramp (darker) → the permissive direction
-      float disp = raw > 0.0 ? raw * gateDark : raw * gateLight;
-
-      // ── TOP-OF-RAMP BIAS — why the hero looked flat ─────────────────────
-      // Measured luminance of the light ramp's top stops:
-      //     0.00 #f4efe4  0.938
-      //     0.08 #f0eadf  0.920
-      //     0.15 #efe6d4  0.904
-      // A hero viewport spans depth 0.00–0.19, i.e. a luminance range of just
-      // 0.034 — versus 0.336 across 0.23–0.44. So identical displacement shows
-      // ~10x less in the hero: symmetric swings inside four near-identical creams
-      // have almost nothing to reveal, which is exactly the "no fluid in light
-      // theme" report (dusk was rich, the hero was flat).
-      //
-      // Fix: near the top, bias the excursion DOWNWARD so the ink can actually
-      // reach taupe and slate instead of oscillating within cream. Fades out by
-      // depth ~0.30, where the ramp has its own contrast and needs no help.
-      float topLift = 1.0 - smoothstep(0.02, 0.30, depth);
-      disp += 0.5 * abs(raw) * topLift;
-
-      float y = clamp(depth + disp, 0.0, 1.0);
-
-      // HARD FLOOR over the reading zone: the sampled point may never sit higher
-      // (lighter) on the ramp than the gradient's own value there. A guarantee
-      // rather than a tuning — it makes "the content zone never gets brighter than
-      // the shipped sky" true by construction, which is what keeps the
-      // paper-coloured text readable no matter how the field swings.
-      // Hard guarantee, direction chosen per archetype.
-      //
-      //   descent → never sample LIGHTER than the gradient (protects paper text)
-      //   reading → never sample MORE THAN uReadCap DEEPER than the gradient
-      //
-      // BUG FIXED HERE: the reading branch used min(y, depth), which forbade ANY
-      // darkward move. Combined with gateDark already at 0.10 that clamped the
-      // effect to exactly zero — hence "no fluid at all" on /research. And the
-      // lightward direction has nowhere to go either, because the reading ramp
-      // starts at L=0.938 (near-white). So the reading variant had no usable
-      // direction whatsoever.
-      //
-      // Measured headroom says a bounded darkward move is safe: paper L=0.938 vs
-      // --ink-1 L=0.079 is 7.7:1, and darkening the sky to L=0.80 still leaves
-      // 6.6:1 — comfortably past the 4.5:1 body-text floor. So allow the ink to
-      // sink, just not far.
-      float readGuard = min(y, depth + uReadCap);
-      float guarded = mix(max(y, depth), readGuard, uReading);
-      y = mix(y, guarded, zone);
-
-      vec3 col = texture2D(uRamp, vec2(0.5, y)).rgb;
-
-      // Viscous luminance banding straight from the warp field (original). Over
-      // the reading zone, bias it DARKWARD instead of symmetric: same viscous
-      // character, but it can only help light text.
-      float lum = 0.90 + 0.20 * f;
-      // On reading pages the viscous multiply is the OTHER unbounded darkener the
-      // audit identified, so it gets a floor of its own (0.955 rather than down to
-      // 0.86) — dark ink needs the paper to stay paper.
-      float lumR = mix(lum, 0.86 + 0.14 * f, zone);
-      col *= mix(lumR, max(lumR, 0.955), uReading);
-      // Warm bloom where the warp piles up (original) — faded out over the reading
-      // zone, since it lightens.
-      col += 0.045 * vec3(0.784, 0.639, 0.416) * smoothstep(0.55, 1.0, length(r)) * (1.0 - zone) * (1.0 - uReading);
-
-      // ── DARK THEME needs a DIFFERENT MECHANISM, not more strength ────────
-      // Measured luminance range of the two ramps:
-      //     light  0.938 → 0.079   range 0.860
-      //     dark   0.097 → 0.035   range 0.062   ← 13.9x smaller
-      // Displacing along six stops of near-black cannot reveal anything, which is
-      // why dark theme read as "less visible". Raising uAmp does nothing: the
-      // palette has no contrast to expose.
-      //
-      // So in dark theme the field ADDS light instead of relocating it — a cool
-      // phosphor/cyan nebular tint lifted by the warp, which is the same
-      // vocabulary as the dark theme's existing atmosphere washes. The terrain's
-      // dots still read as the star field; this becomes the nebula behind them.
-      // ── READING pages: additive texture, because displacement cannot work ──
-      // Measured luminance range of the two ramps:
-      //     descent 0.860  (0.938 -> 0.079)
-      //     reading 0.099  (0.938 -> 0.839)   <- 8.7x smaller
-      // The whole effect works by displacing WHERE along the ramp we sample, so on
-      // the reading ramp there is almost nothing to reveal no matter how far we
-      // move — exactly the problem the dark theme had, and the reason "no fluid at
-      // all" persisted even after the clamp was lifted. Raising the cap further
-      // would only risk the text.
-      //
-      // So reading pages get the same treatment dark theme got: the field ADDS a
-      // tint rather than relocating value. Warm/cool broken colour, ink-side only
-      // (never lighter than the paper, so contrast can only improve), at low
-      // magnitude — it reads as laid paper with colour in the fibre.
-      if (uReading > 0.5) {
-        // STRENGTHENED after the first additive pass still read as "no fluid".
-        // The failure was twofold and both halves are measurable:
-        //   · magnitude: peak tint was ~0.055 of a channel = ΔL under 0.02, i.e.
-        //     below the perceptual floor on a pale page. The A/B measured a mean
-        //     Δ of 17/255 but with max only 35.7 — a nearly UNIFORM shift, which
-        //     the eye discards as "the page is slightly different" rather than
-        //     seeing structure.
-        //   · contrast shape: smoothstep(0.35,0.95) over an fbm that mostly sits
-        //     near 0.5 compressed everything into a narrow band, so the field had
-        //     no light/dark alternation to read as marbling.
-        // Now: a wider response curve centred on the field's actual mean, and
-        // enough magnitude to clear threshold. Still strictly subtractive, so
-        // contrast against dark ink can only improve.
-        float ink = smoothstep(0.40, 0.60, f);              // TIGHT: high slope near fbm's mean
-        float veins = smoothstep(0.50, 0.78, length(r));
-        // Magnitude HALVED and hard-capped. The post-hoc luminance floor I tried
-        // first did not hold in measurement (/projects stayed at 4.37:1 whether the
-        // floor was 0.62 or 0.72), so bounding the darkening at its source is the
-        // honest fix rather than correcting after the fact. Measured with the fluid
-        // off these same samples read 5.81 and 5.64:1, so the budget below is sized
-        // to give most of that headroom back.
-        float amt = min(0.55, (ink * 0.30 + veins * 0.16) * uAmp);
-        // Tuned DOWN by half after the first strengthened pass overshot: at
-        // amt*1.25 the cool side read as saturated BLUE clouds that competed with
-        // the reading rather than sitting under it. The cool tint is also
-        // de-saturated (was 0.050/0.062/0.088) so it reads as cool GREY paper
-        // rather than as sky.
-        vec3 warmTint = vec3(0.055, 0.042, 0.024);          // toward --ochre
-        vec3 coolTint = vec3(0.030, 0.033, 0.039);          // cool grey, not blue
-        float pick = smoothstep(0.30, 0.70, r.x);
-        col -= mix(warmTint, coolTint, pick) * amt;
-      }
-
-      // NOTE: a post-hoc luminance floor was tried here and REMOVED. It measured
-      // identically at FLOOR 0.62 and 0.72 (/projects stuck at 4.37:1 either way),
-      // i.e. it was not holding, and a guard that does not bind is worse than none
-      // because it reads like a guarantee. The darkening is now bounded at its two
-      // sources instead — see the viscous multiply and the tint magnitude above.
-
-      if (uDark > 0.5 && uReading < 0.5) {
-        float glow = smoothstep(0.30, 0.95, f);          // where the ink piles up
-        float veins = smoothstep(0.45, 1.0, length(r));  // along the warp filaments
-        float lift = (glow * 0.72 + veins * 0.45) * uAmp;
-        // damped over the reading zone: adding light is the dangerous direction
-        // there, since the text is light too.
-        lift *= 1.0 - 0.72 * zone;
-        col += uNebula * lift;
-
-        // ── STARS ────────────────────────────────────────────────────────
-        // The dark theme is already the "terminal galaxy" where the terrain's dots
-        // read as a star field; this puts real stars in the nebula BEHIND them,
-        // strongest over the content zone (the deep sky) where the nebula itself
-        // is damped — so the reading zone gains character without gaining haze.
-        //
-        // Real stars are not white: colour tracks temperature (O/B blue-white →
-        // A white → K/M amber), so each star draws its tint from its own hash. A
-        // touch of violet is included because that is what the eye reads as
-        // "deep space" even though few stars are literally violet.
-        // Star lattice in PAGE space (x across the viewport, y including scroll),
-        // so stars are pinned to the sky and scroll with it rather than sliding.
-        // NOTE: this shader has no sp vec2 — the vertical page coordinate is the
-        // float sy. Using sp here was a copy-paste from an earlier revision and
-        // failed to compile (undeclared identifier), which silently hid the canvas.
-        // (Reminder: NEVER use backticks in this file's comments — the shader is a
-        // template literal, so a backtick terminates it and breaks the build.)
-        vec2 starUv = vec2(vUv.x, sy);
-        vec2 cell = floor(starUv * 96.0);
-        vec2 sub = fract(starUv * 96.0);
-        float pick = hash(cell);
-        // ~7% of cells hold a star. The lattice is 96 (was 34): a finer grid with a
-        // lower hit rate gives POINTS at real star density, where the coarse grid
-        // made a few large orbs.
-        if (pick > 0.93) {
-          vec2 jitter = vec2(hash(cell + 3.7), hash(cell + 9.1));
-          float d = length(sub - jitter);
-          // tiny hard core + soft halo
-          // tight core + faint halo — a star is a point source with a little bloom
-          float core = smoothstep(0.055, 0.0, d);
-          float halo = smoothstep(0.20, 0.0, d) * 0.16;
-
-          // TWINKLE: two out-of-phase sines per star, so no two blink together
-          // and the field never pulses in unison.
-          float ph = hash(cell + 17.3) * 6.2831853;
-          float sp2 = 0.55 + hash(cell + 23.9) * 1.5;
-          // Twinkle reads off RAW uTime, not the slowed warp scalar, so it needs its
-          // own damping or the stars would keep blinking at the old rate over a now
-          // much calmer sky — the mismatch is more noticeable than either alone.
-          float twT = uTime * 0.6;
-          float tw = 0.55 + 0.45 * sin(twT * sp2 + ph)
-                          * (0.6 + 0.4 * sin(twT * sp2 * 0.37 + ph * 2.1));
-
-          // stellar colour by "temperature"
-          float temp2 = hash(cell + 41.7);
-          vec3 tint = temp2 < 0.34
-            ? mix(vec3(0.62, 0.74, 1.00), vec3(0.86, 0.92, 1.00), temp2 / 0.34)   // blue-white
-            : (temp2 < 0.72
-              ? vec3(0.97, 0.97, 1.00)                                            // white
-              : mix(vec3(0.80, 0.72, 1.00), vec3(1.00, 0.86, 0.72), (temp2 - 0.72) / 0.28)); // violet → amber
-
-          // ── Confined to the TAGLINE band ────────────────────────────────
-          // Previously smoothstep(0.18, 0.55, depth), which put stars across the
-          // whole lower half — too much. Stars now live in a narrow window centred
-          // on the Interlude ("A researcher by day, an artist by night, and a
-          // mathematician at heart"), which sits at roughly depth 0.16-0.22, and
-          // fade out on both sides. They read as a moment at the line rather than
-          // as a texture over the page.
-          // MEASURED section depths on the real page:
-          //   heights   0.000-0.202   <- the mountain lives here
-          //   interlude 0.202-0.348
-          //   TAGLINE   0.259-0.293   <- the line itself
-          //   mountains 0.348-0.847
-          // My previous band was 0.10-0.36, which STARTED INSIDE THE HERO and so
-          // put stars in the mountain's own space — the competition that was
-          // reported. Now clamped to the tagline's own rows, fading in and out
-          // within the interlude and never touching heights or mountains.
-          // Pushed LOWER on request. Tagline measures 0.259-0.293; the band now
-          // starts at its lower half and extends into the upper Mountains approach,
-          // so the stars sit BELOW the line rather than surrounding it.
-          // Requested: just BELOW the mountain dots, sitting right BEHIND the
-          // tagline. Measured page depths — heights (the mountain) 0.000-0.202,
-          // interlude 0.202-0.348, TAGLINE 0.259-0.293. So the band opens right as
-          // heights ends and peaks across the tagline's own rows, then closes before
-          // the Mountains section. Narrow on purpose: a pocket of sky behind the
-          // line, not a field.
-          float band = smoothstep(0.200, 0.252, depth) * (1.0 - smoothstep(0.300, 0.348, depth));
-          col += tint * (core * 1.05 + halo) * tw * band;
-        }
-      }
-
-      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
-    }
-  `;
+  const VERT = VERTEX_SHADER;
+  const FRAG = fragmentShader();
 
   // The real --descent-grad stops (tokens.css) and its dark twin. The original
   // demo hardcoded an abbreviated 6-stop version of the same ramp; using the full
@@ -572,20 +200,10 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     gl.enableVertexAttribArray(aPos);
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
-    const U = {
-      ramp: gl.getUniformLocation(prog, 'uRamp'),
-      amp: gl.getUniformLocation(prog, 'uAmp'),
-      time: gl.getUniformLocation(prog, 'uTime'),
-      yOff: gl.getUniformLocation(prog, 'uYOffset'),
-      ySpan: gl.getUniformLocation(prog, 'uYSpan'),
-      d0: gl.getUniformLocation(prog, 'uDepth0'),
-      dSpan: gl.getUniformLocation(prog, 'uDepthSpan'),
-      gate: gl.getUniformLocation(prog, 'uGateTop'),
-      dark: gl.getUniformLocation(prog, 'uDark'),
-      nebula: gl.getUniformLocation(prog, 'uNebula'),
-      reading: gl.getUniformLocation(prog, 'uReading'),
-      readCap: gl.getUniformLocation(prog, 'uReadCap'),
-    };
+    const U: Record<string, WebGLUniformLocation | null> = {};
+    for (const name of SKY_UNIFORMS) {
+      U[name] = gl.getUniformLocation(prog, name);
+    }
 
     const tex = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0);
@@ -611,7 +229,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       gl!.activeTexture(gl!.TEXTURE0);
       gl!.bindTexture(gl!.TEXTURE_2D, tex);
       gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA, gl!.RGBA, gl!.UNSIGNED_BYTE, ramp);
-      gl!.uniform1i(U.ramp, 0);
+      gl!.uniform1i(U.uRamp, 0);
     }
     uploadRamp(true);
 
@@ -684,32 +302,37 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       const docH = mDocH;
 
       if (contained) {
-        gl!.uniform1f(U.yOff, level() * 2.0);
-        gl!.uniform1f(U.ySpan, (cvs.clientHeight || vh) / (cvs.clientWidth || vw));
-        gl!.uniform1f(U.d0, 0.0);
-        gl!.uniform1f(U.dSpan, 1.0);
+        gl!.uniform1f(U.uYOffset, level() * 2.0);
+        gl!.uniform1f(U.uYSpan, (cvs.clientHeight || vh) / (cvs.clientWidth || vw));
+        gl!.uniform1f(U.uDepth0, 0.0);
+        gl!.uniform1f(U.uDepthSpan, 1.0);
       } else {
-        gl!.uniform1f(U.yOff, window.scrollY / vw);
-        gl!.uniform1f(U.ySpan, vh / vw);
-        gl!.uniform1f(U.d0, window.scrollY / docH);
-        gl!.uniform1f(U.dSpan, vh / docH);
+        gl!.uniform1f(U.uYOffset, window.scrollY / vw);
+        gl!.uniform1f(U.uYSpan, vh / vw);
+        gl!.uniform1f(U.uDepth0, window.scrollY / docH);
+        gl!.uniform1f(U.uDepthSpan, vh / docH);
       }
 
-      gl!.uniform1f(U.amp, AMP_BY_LEVEL[Math.max(0, Math.min(4, level()))] ?? 1.0);
+      gl!.uniform1f(U.uAmp, AMP_BY_LEVEL[Math.max(0, Math.min(4, level()))] ?? 1.0);
       const isDark = document.documentElement.dataset.theme === 'dark';
-      gl!.uniform1f(U.dark, isDark ? 1 : 0);
-      // Cool phosphor-cyan, between the dark theme's --ochre (#66c28c emerald) and
-      // --indigo (#5fb2c9 cyan) — the palette this theme already uses for its
-      // atmosphere. Low magnitude: it is a nebula, not a light show.
-      gl!.uniform3f(U.nebula, 0.055, 0.105, 0.115);
-      gl!.uniform1f(U.reading, isReading ? 1 : 0);
-      // How far a reading page's sky may sink below its own gradient value, in ramp
-      // units. 0.34 lands the darkest excursion near L~0.80, which still measures
-      // 6.6:1 against --ink-1 (floor is 4.5:1). Bounded on purpose: this is the one
-      // number keeping body text safe on /research and /projects.
-      gl!.uniform1f(U.readCap, 0.34);
-      gl!.uniform1f(U.gate, gateTop);
-      gl!.uniform1f(U.time, (nowMs - t0) / 1000);
+      gl!.uniform1f(U.uDark, isDark ? 1 : 0);
+      gl!.uniform3f(U.uNebula, 0.055, 0.105, 0.115);
+      gl!.uniform1f(U.uReading, isReading ? 1 : 0);
+      gl!.uniform1f(U.uGateTop, gateTop);
+
+      // Supply gate multipliers from the legibility policy.
+      const variant = isReading ? 'reading' : 'descent';
+      const gates = gateFor(1, variant);
+      gl!.uniform1f(U.uGateDark, gates.dark);
+      gl!.uniform1f(U.uGateLight, gates.light);
+
+      // Supply tint budget from the legibility policy.
+      const budget = tintBudget(variant);
+      gl!.uniform1f(U.uTintMagnitude, budget.magnitude);
+      gl!.uniform1f(U.uTintCap, budget.cap);
+      gl!.uniform1f(U.uViscousFloor, budget.viscousFloor);
+
+      gl!.uniform1f(U.uTime, (nowMs - t0) / 1000);
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
     }
 
