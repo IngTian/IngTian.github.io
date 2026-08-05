@@ -95,3 +95,33 @@ describe('tintBudget — bounds the darkening at its SOURCE', () => {
     expect(tintBudget('descent').magnitude).toBeGreaterThan(tintBudget('reading').magnitude);
   });
 });
+
+describe('Dark-theme nebula ceiling — descent pages only', () => {
+  // The dark theme has ink-3 = #8b938c (used for .lede on /art and .nf-sub on /404).
+  // Descent pages start at the charcoal descent-dark ramp (lightest stop #16191d).
+  // The nebula adds a cool tint vec3(0.055, 0.105, 0.115) scaled by lift, which
+  // LIGHTENS the background (dangerous on a descent page with paper-coloured text).
+  const INK_3_DARK = wcagLuminance([0x8b, 0x93, 0x8c]);
+
+  it('caps the nebula lift so descent-dark + full nebula clears AA against ink-3', () => {
+    // Worst case: start at the LIGHTEST descent-dark stop (where the nebula would
+    // make it even lighter), add the maximum nebula tint in RGB, then take luminance.
+    const descentDarkLightest: [number, number, number] = [0x16, 0x19, 0x1d];
+    const nebulaTint: [number, number, number] = [0.055, 0.105, 0.115];
+
+    // The ceiling chosen: liftCeiling = 0.45 (independent of zone, so it binds
+    // even at zone=0 where the current code applies full strength).
+    const liftCeiling = 0.45;
+    const nebulaAmount = nebulaTint.map(c => c * 255 * liftCeiling);
+    const afterNebula = descentDarkLightest.map((ch, i) =>
+      Math.min(255, ch + nebulaAmount[i])) as [number, number, number];
+
+    const worstLuminance = wcagLuminance(afterNebula);
+    const ratio = contrastRatio(worstLuminance, INK_3_DARK);
+
+    // Verify it clears AA (4.5:1) with margin.
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+    // Pin that the nebula is actually visible, so a future change that neutralises it fails.
+    expect(ratio).toBeLessThan(6.5);
+  });
+});

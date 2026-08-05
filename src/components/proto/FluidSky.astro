@@ -154,8 +154,14 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     function measureGate(): void {
       if (contained) { gateTop = 1.0; return; }
       if (variant === 'reading') { gateTop = 0.0; return; }
-      const content = document.getElementById('mountains');
-      if (!content) { gateTop = 0.55; return; }
+      // Descent pages: find where content starts. Look for #mountains (homepage),
+      // else fall back to the first element child of <main> with text content, else
+      // treat the whole page as a reading zone (gateTop = 0.0, the conservative
+      // direction — engages the legibility gate everywhere).
+      const content = document.getElementById('mountains') ||
+        Array.from(document.querySelector('main')?.children ?? [])
+          .find((el): el is HTMLElement => el instanceof HTMLElement && el.textContent?.trim().length > 0) as HTMLElement | undefined;
+      if (!content) { gateTop = 0.0; return; }
       const top = content.getBoundingClientRect().top + window.scrollY;
       gateTop = Math.min(0.95, Math.max(0.1, top / Math.max(1, document.documentElement.scrollHeight)));
     }

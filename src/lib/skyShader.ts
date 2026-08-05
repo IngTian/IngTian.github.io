@@ -132,12 +132,15 @@ export function fragmentShader(): string {
 
       // Dark theme: the field adds a cool phosphor/cyan nebular tint lifted by the
       // warp, damped over the reading zone since adding light is the dangerous
-      // direction there.
+      // direction there. Hard ceiling at 0.45 ensures the lightest descent-dark stop
+      // plus full nebula clears WCAG AA (4.5:1) against ink-3 even at zone=0 (where
+      // the zone-dependent damping does not apply). See tests/skyLegibility.test.ts.
       if (uDark > 0.5 && uReading < 0.5) {
         float glow = smoothstep(0.30, 0.95, f);
         float veins = smoothstep(0.45, 1.0, length(r));
         float lift = (glow * 0.72 + veins * 0.45) * uAmp;
         lift *= 1.0 - 0.72 * zone;
+        lift = min(lift, 0.45);
         col += uNebula * lift;
 
         // Stars in the nebula, pinned to the page (scroll with the sky), strongest
