@@ -77,8 +77,8 @@ function lp(a: number[], b: number[], t: number): [number, number, number] {
 //     on the charcoal night sky.
 export interface TerrainRamp { valley: [number, number, number]; mid: [number, number, number]; peak: [number, number, number] }
 // LIGHT ramp — "Classic": warm ochre valleys → cool indigo heights, at the token
-// values. A deepened variant was tried and REVERTED: measured composited on screen
-// (paper backdrop, EDL shade 0.5) the ridge still landed LIGHTER than the valley
+// values. A deepened variant was tried and REVERTED: composited on screen (paper
+// backdrop, EDL shade 0.5) the ridge still landed LIGHTER than the valley
 // because terrainRender's base alpha ramp 0.30+(1-hn)*0.45 more than cancels any
 // value ramp. The deepened variant was the only part that altered the shipped
 // hero's colour identity, while edlSpend() delivers the vast majority of the
@@ -94,16 +94,10 @@ export interface TerrainRamp { valley: [number, number, number]; mid: [number, n
 // Now: valley = deep ochre (dark), peak = pale indigo (light), so elevation reads as
 // light on the ridge the way it does in dark theme. Hues stay --ochre → --indigo.
 //
-// (Earlier note, still true: the MID knot was also hue-identical to the sky —
-// measured (r-b) sky +16..+32 vs mid +24 — so it needed cooling regardless.)
-// MID cooled. Measured against the fluid sky the
-// dots now sit on, using (r-b) as a cheap warm/cool axis:
-//     sky   dawn +16 · haze +27 · taupe +32 · warm +22
-//     dots  valley +92 · MID +24 · peak −28
-// The mid band was hue-IDENTICAL to the sky (+24 inside the sky's +16..+32), so
-// mid-elevation dots vanished into it while the valley and peak still read. Cooling
-// the mid to −20 puts the whole ramp on the cool side of the warm sky except the
-// valley, which separates by being much darker instead.
+// (Earlier note, still true: the MID knot was hue-identical to the sky, so mid-
+// elevation dots vanished into it while the valley and peak still read. Cooling
+// the mid stop separates them by putting the whole ramp on the cool side of the
+// warm sky except the valley, which separates by being much darker instead.)
 //
 // Still --ochre → --indigo: the endpoints are the tokens, only the interior knot
 // moved, so the palette identity holds and no new hue is introduced.
@@ -319,15 +313,12 @@ export function litColor(
   const value = 1 - (p.valueLight * (1 - darkness)) * (1 - shade);  // ≤1: darken shadows
   const gain = 1 + (p.gainDark * darkness) * h;                    // ≥1: brighten lit
   // Warm/cool directional tint. In LIGHT theme this is scaled back hard, because
-  // it was silently CANCELLING the cooled TERRAIN_LIGHT ramp. Measured at a typical
-  // sunlit normal (ndl +0.6) with warm=0.3, using (r-b) as the warm/cool axis:
-  //     raw ramp   valley +62 · mid −16 · peak −30
-  //     after lit  valley +79 · mid +26 · peak +37   <- all pushed WARM
-  // The fluid sky sits at +16..+32, so the lit dots landed exactly on top of it and
-  // the mountain read as mush no matter what the ramp said. That is why the hue
-  // change "didn't update" on screen — it shipped, then the lighting undid it.
-  // Light theme keeps a whisper (0.08) so the relief still has warm/cool direction;
-  // dark theme is unchanged, where the tint is doing no harm.
+  // it was silently CANCELLING the cooled TERRAIN_LIGHT ramp: the directional warm
+  // tint pushed every dot warm, landing them on the sky's own hue, so the mountain
+  // read as mush no matter what the ramp said. That is why the hue change "didn't
+  // update" on screen — it shipped, then the lighting undid it. Light theme keeps a
+  // whisper (0.08) so the relief still has warm/cool direction; dark theme is
+  // unchanged, where the tint is doing no harm.
   const warmEff = p.warm * (0.27 + 0.73 * darkness);
   const t = warmEff * (h - 0.5) * 2;                               // [-warm,+warm]
   const cl = (v: number) => Math.max(0, Math.min(255, v));
