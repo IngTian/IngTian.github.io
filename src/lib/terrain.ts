@@ -101,12 +101,13 @@ export interface TerrainRamp { valley: [number, number, number]; mid: [number, n
 //
 // Still --ochre → --indigo: the endpoints are the tokens, only the interior knot
 // moved, so the palette identity holds and no new hue is introduced.
-// Widened AGAIN after the composited measurement. The pipeline compresses
-// everything: through litColor -> edlSpend -> alpha -> paper, a ramp spread of 0.46
-// arrived on screen as 0.27, and the peak still sat only 0.13 from the paper. Dots
-// therefore read as one grey mass with no ridge. Endpoints pushed apart hard —
-// near-black ochre valley, light indigo peak — so that AFTER compression there is
-// still real form. Hues unchanged: still --ochre warm low, --indigo cool high.
+// The endpoints are pushed far apart because the pipeline compresses them: every
+// stage from litColor through edlSpend, alpha and the paper composite narrows the
+// range the ramp started with. A ramp that looks well separated in isolation can
+// still land on screen as one grey mass with no readable ridge, so the ramp is
+// specified wide enough that real form survives the compression. Hues unchanged:
+// --ochre warm low, --indigo cool high. tests/edlSpend.test.ts pins the spread
+// that must survive, over the elevation range the renderer actually paints.
 export const TERRAIN_LIGHT: TerrainRamp = { valley: [58, 40, 18], mid: [104, 108, 126], peak: [154, 168, 196] };
 export const TERRAIN_TERMINAL: TerrainRamp = { valley: [47, 90, 110], mid: [91, 147, 168], peak: [198, 227, 237] };     // Glacier: cyan-blue ice valleys → bright rime peaks
 
