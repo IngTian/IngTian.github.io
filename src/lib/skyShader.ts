@@ -32,7 +32,6 @@ export function fragmentShader(): string {
     uniform float uDark;           // 1.0 in the dark theme, 0.0 in light
     uniform vec3  uNebula;         // the cool tint dark theme lifts the ink with
     uniform float uReading;        // 1.0 on a reading page (dark ink on pale paper)
-    uniform float uTintMagnitude;  // reading-page tint base strength
     uniform float uTintCap;        // reading-page tint hard ceiling
     uniform float uViscousFloor;   // viscous multiply floor (bounds the darkening)
 
@@ -183,7 +182,8 @@ export function fragmentShader(): string {
       if (uReading > 0.5) {
         float ink = smoothstep(0.40, 0.60, f);
         float veins = smoothstep(0.50, 0.78, length(r));
-        // Hard-capped so the darkening is bounded at its source.
+        // The 0.30/0.16 coefficients are the tint's character (ink vs veins response
+        // shape); uTintCap and uViscousFloor are the safety bounds that vary by page.
         float amt = min(uTintCap, (ink * 0.30 + veins * 0.16) * uAmp);
         vec3 warmTint = vec3(0.055, 0.042, 0.024);
         vec3 coolTint = vec3(0.030, 0.033, 0.039);
@@ -199,5 +199,5 @@ export function fragmentShader(): string {
 export const SKY_UNIFORMS = [
   'uRamp', 'uAmp', 'uTime', 'uYOffset', 'uYSpan', 'uDepth0', 'uDepthSpan',
   'uGateTop', 'uGateDark', 'uGateLight', 'uDark', 'uNebula', 'uReading',
-  'uTintMagnitude', 'uTintCap', 'uViscousFloor',
+  'uTintCap', 'uViscousFloor',
 ] as const;

@@ -326,9 +326,8 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       gl!.uniform1f(U.uGateDark, gates.dark);
       gl!.uniform1f(U.uGateLight, gates.light);
 
-      // Supply tint budget from the legibility policy.
+      // Supply tint bounds from the legibility policy.
       const budget = tintBudget(variant);
-      gl!.uniform1f(U.uTintMagnitude, budget.magnitude);
       gl!.uniform1f(U.uTintCap, budget.cap);
       gl!.uniform1f(U.uViscousFloor, budget.viscousFloor);
 
