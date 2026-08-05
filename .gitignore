@@ -27,11 +27,9 @@ pnpm-debug.log*
 # brainstorming visual-companion artifacts (ephemeral, never committed)
 .superpowers/
 
-# local-only paper trail (spec/plan/notes — between me and Claude)
-docs/specs/
-docs/plans/
-docs/notes/
-docs/superpowers/
+# local-only paper trail (specs, plans, notes, agent scratch) — never committed
+docs/
+.superpowers/
 
 # art gallery working directories (ephemeral)
 _incoming-photos/

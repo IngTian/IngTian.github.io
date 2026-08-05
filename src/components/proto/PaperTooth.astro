@@ -1,0 +1,74 @@
+---
+// PaperTooth (PROTOTYPE) — the paper MATERIAL, as ONE composited layer.
+//
+// ── The scroll-jank fix ───────────────────────────────────────────────────
+// This used to render FOUR separate position:fixed full-viewport divs — three of
+// them mix-blend-mode:multiply, plus an inset-shadow vignette. Sitting on top of
+// an animated WebGL canvas, that meant the compositor had to re-read the page
+// backdrop and re-blend three full-screen layers on every scroll frame. That was
+// the real cause of the reported scroll lag: caching my JS layout reads (the
+// previous attempt) didn't help because the cost was never in JS.
+//
+// Now: ONE element, ONE blend pass. Multiple background-images stack inside a
+// single layer (CSS background layers composite internally, for free), and the
+// vignette rides along as a radial-gradient background instead of a second
+// element with its own box-shadow.
+//
+// The material is still three separable frequencies, which is what makes it read
+// as paper stock rather than as CSS noise:
+//   1. TOOTH   — high-frequency fibre bite (the surface you'd feel)
+//   2. MOTTLE  — very low-frequency cloud so the sheet is NOT uniform
+//   3. LAID    — a whisper of directional wire marks, below conscious threshold,
+//                which breaks the isotropy that makes procedural noise look digital
+// plus a soft edge vignette so the sheet has body instead of being an infinite plane.
+//
+// All baked static data-URI SVG. Never animated (the #1 perf rule), no JS.
+const tooth = `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='t'><feTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23t)' opacity='0.55'/></svg>`;
+const mottle = `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='m'><feTurbulence type='fractalNoise' baseFrequency='0.011' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23m)' opacity='0.34'/></svg>`;
+const laid = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='l'><feTurbulence type='fractalNoise' baseFrequency='0.004 0.5' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23l)' opacity='0.16'/></svg>`;
+
+const uri = (s: string) => `url("data:image/svg+xml,${s}")`;
+
+// One background shorthand: vignette on top, then the three noise frequencies.
+// Per-layer strength is baked into each SVG's rect opacity above, so the single
+// element needs only one overall opacity.
+const bg = [
+  // edge vignette — gives the sheet body (was a separate box-shadow element)
+  'radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(90,84,74,0.16) 100%)',
+  uri(tooth),
+  uri(mottle),
+  uri(laid),
+].join(', ');
+
+const sizes = 'cover, 180px 180px, 560px 560px, 300px 300px';
+---
+<div
+  class="paper-mat"
+  aria-hidden="true"
+  style={`background-image:${bg}; background-size:${sizes}`}
+></div>
+
+<style>
+  /* ONE fixed layer, ONE blend pass — see the header note. */
+  .paper-mat {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    pointer-events: none;
+    opacity: 0.16;
+    mix-blend-mode: multiply;
+    /* Promote to its own compositor layer and tell the browser this element's
+       painted content never changes, so scrolling can reuse the cached texture
+       instead of re-rasterising it. */
+    will-change: transform;
+    transform: translateZ(0);
+    contain: strict;
+  }
+
+  /* Dark theme — the "terminal galaxy" is a void, not a sheet. Visible tooth on
+     charcoal reads as dust, so cut it right back. */
+  :global(html[data-theme='dark']) .paper-mat { opacity: 0.085; }
+
+  /* Layer kill-switch for A/B-ing in the prototype. */
+  :global(html[data-paper='off']) .paper-mat { display: none; }
+</style>

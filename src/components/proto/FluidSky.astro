@@ -1,0 +1,307 @@
+---
+// FluidSky: WebGL lifecycle for a domain-warped, scroll-responsive sky canvas.
+//
+// Shader (skyShader.ts) displaces sampling along the gradient; contrast policy
+// (skyLegibility.ts) ensures text legibility. Two archetypes: descent (paper text,
+// dangerous: lighter) and reading (dark ink, dangerous: darker).
+//
+// INVARIANTS:
+//   1. Canvas is OPAQUE with no mix-blend-mode. A blended full-screen layer forces
+//      the compositor to re-read the page backdrop every frame, defeating layer
+//      caching for the whole document.
+//   2. .fluid-live must never outlive a visible canvas. CSS rules (display:none
+//      under 640px, reduced-motion, strength=0) gate the canvas, and the class is
+//      additionally dropped on resize-to-hidden and GL context loss.
+//
+// Perf: viewport-sized (scroll is a uniform), 0.5x internal resolution, ~30fps
+// idle / full rate while scrolling, paused on tab-hide, skipped under 640px.
+interface Props {
+  strength?: 0 | 1 | 2 | 3 | 4;
+  mode?: 'background' | 'contained';
+  /** 'descent' (paper text, dawn→ground) | 'reading' (dark ink, luminous) */
+  variant?: 'descent' | 'reading';
+}
+const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
+---
+<canvas
+  class:list={['fluid-sky', mode === 'contained' ? 'is-contained' : 'is-background']}
+  data-fluid-canvas
+  aria-hidden="true"
+  data-strength={String(strength)}
+  data-mode={mode}
+  data-variant={variant}
+></canvas>
+
+<style>
+  .fluid-sky {
+    pointer-events: none;
+    display: block;
+  }
+  .fluid-sky.is-background {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+  }
+  .fluid-sky.is-contained {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+  }
+
+  .fluid-sky[data-strength='0'] { display: none; }
+  :global(html[data-fluid-strength='0']) .fluid-sky { display: none !important; }
+  :global(html[data-fluid='off']) .fluid-sky { display: none; }
+  @media (max-width: 640px) { .fluid-sky { display: none; } }
+</style>
+
+<script>
+  import { prefersReducedMotion } from '../../lib/motion';
+  import { VERTEX_SHADER, fragmentShader, SKY_UNIFORMS } from '../../lib/skyShader';
+  import { gateFor, tintBudget, nebulaCeiling, type SkyVariant } from '../../lib/skyLegibility';
+  import { rampFor, type Theme } from '../../lib/skyPalette';
+
+  const VERT = VERTEX_SHADER;
+  const FRAG = fragmentShader();
+
+  // Strength ladder: 0 = off, 1-3 = subtle to strong, 4 = full strength.
+  const AMP_BY_LEVEL = [0, 0.7, 1.0, 1.35, 1.8];
+
+  const teardowns: Array<() => void> = [];
+
+  function initAll(): void {
+    while (teardowns.length) teardowns.pop()!();
+    document.querySelectorAll<HTMLCanvasElement>('[data-fluid-canvas]').forEach((c) => {
+      const t = initOne(c);
+      if (t) teardowns.push(t);
+    });
+  }
+
+  function buildRamp(theme: Theme, variant: SkyVariant): HTMLCanvasElement | null {
+    const N = 512;
+    const c = document.createElement('canvas');
+    c.width = 1;
+    c.height = N;
+    const ctx = c.getContext('2d');
+    if (!ctx) return null;
+    const g = ctx.createLinearGradient(0, 0, 0, N);
+    for (const [pos, hex] of rampFor(variant, theme)) g.addColorStop(pos, hex);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 1, N);
+    return c;
+  }
+  function initOne(cvs: HTMLCanvasElement): (() => void) | null {
+    if (getComputedStyle(cvs).display === 'none') return null;
+    const gl = (cvs.getContext('webgl', { antialias: false, alpha: false, depth: false })
+      || cvs.getContext('experimental-webgl', { antialias: false, alpha: false, depth: false })) as WebGLRenderingContext | null;
+    if (!gl) { cvs.style.display = 'none'; return null; }
+    function compile(type: number, src: string): WebGLShader | null {
+      const sh = gl!.createShader(type);
+      if (!sh) return null;
+      gl!.shaderSource(sh, src); gl!.compileShader(sh);
+      if (!gl!.getShaderParameter(sh, gl!.COMPILE_STATUS)) { gl!.deleteShader(sh); return null; }
+      return sh;
+    }
+    const vs = compile(gl.VERTEX_SHADER, VERT);
+    const fs = compile(gl.FRAGMENT_SHADER, FRAG);
+    if (!vs || !fs) { cvs.style.display = 'none'; return null; }
+
+    const prog = gl.createProgram();
+    if (!prog) { cvs.style.display = 'none'; return null; }
+    gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { cvs.style.display = 'none'; return null; }
+    gl.useProgram(prog);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const aPos = gl.getAttribLocation(prog, 'aPos');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+    const U: Record<string, WebGLUniformLocation | null> = {};
+    for (const name of SKY_UNIFORMS) U[name] = gl.getUniformLocation(prog, name);
+    const tex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    const variant = (cvs.dataset.variant ?? 'descent') as SkyVariant;
+    let rampTheme: Theme | '' = '';
+    function uploadRamp(force = false): void {
+      const theme: Theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+      if (!force && theme === rampTheme) return;
+      rampTheme = theme;
+      const ramp = buildRamp(theme, variant);
+      if (!ramp) return;
+      gl!.activeTexture(gl!.TEXTURE0);
+      gl!.bindTexture(gl!.TEXTURE_2D, tex);
+      gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA, gl!.RGBA, gl!.UNSIGNED_BYTE, ramp);
+      gl!.uniform1i(U.uRamp, 0);
+    }
+    uploadRamp(true);
+    const contained = cvs.dataset.mode === 'contained';
+    function level(): number {
+      const live = document.documentElement.dataset.fluidStrength;
+      if (live !== undefined) return Number(live);
+      return Number(cvs.dataset.strength ?? '4');
+    }
+    let gateTop = 0.55;
+    function measureGate(): void {
+      if (contained) { gateTop = 1.0; return; }
+      if (variant === 'reading') { gateTop = 0.0; return; }
+      // Descent pages: find where content starts. Look for #mountains (homepage),
+      // else fall back to the first element child of <main> with text content, else
+      // treat the whole page as a reading zone (gateTop = 0.0, the conservative
+      // direction — engages the legibility gate everywhere).
+      const content = document.getElementById('mountains') ||
+        Array.from(document.querySelector('main')?.children ?? [])
+          .find((el): el is HTMLElement => el instanceof HTMLElement && el.textContent?.trim().length > 0) as HTMLElement | undefined;
+      if (!content) { gateTop = 0.0; return; }
+      const top = content.getBoundingClientRect().top + window.scrollY;
+      gateTop = Math.min(0.95, Math.max(0.1, top / Math.max(1, document.documentElement.scrollHeight)));
+    }
+    measureGate();
+    const SCALE = 0.5;
+    let sizedW = 0, sizedH = 0;
+    function sizeTo(force = false): void {
+      if (!force && sizedW && sizedH) {
+        gl!.viewport(0, 0, sizedW, sizedH);
+        return;
+      }
+      const w = Math.max(1, Math.round((cvs.clientWidth || 1) * SCALE));
+      const h = Math.max(1, Math.round((cvs.clientHeight || 1) * SCALE));
+      if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
+      sizedW = cvs.width;
+      sizedH = cvs.height;
+      gl!.viewport(0, 0, sizedW, sizedH);
+    }
+    // Cached layout metrics: avoid per-frame synchronous layout reads.
+    let mVw = Math.max(1, window.innerWidth);
+    let mVh = Math.max(1, window.innerHeight);
+    let mDocH = Math.max(1, document.documentElement.scrollHeight);
+    function measureLayout(): void {
+      mVw = Math.max(1, window.innerWidth);
+      mVh = Math.max(1, window.innerHeight);
+      mDocH = Math.max(1, document.documentElement.scrollHeight);
+    }
+    const t0 = performance.now();
+    function draw(nowMs: number): void {
+      sizeTo();
+      uploadRamp();
+      const vw = mVw, vh = mVh, docH = mDocH;
+      if (contained) {
+        gl!.uniform1f(U.uYOffset, level() * 2.0);
+        gl!.uniform1f(U.uYSpan, (cvs.clientHeight || vh) / (cvs.clientWidth || vw));
+        gl!.uniform1f(U.uDepth0, 0.0);
+        gl!.uniform1f(U.uDepthSpan, 1.0);
+      } else {
+        gl!.uniform1f(U.uYOffset, window.scrollY / vw);
+        gl!.uniform1f(U.uYSpan, vh / vw);
+        gl!.uniform1f(U.uDepth0, window.scrollY / docH);
+        gl!.uniform1f(U.uDepthSpan, vh / docH);
+      }
+      gl!.uniform1f(U.uAmp, AMP_BY_LEVEL[Math.max(0, Math.min(4, level()))] ?? 1.0);
+      gl!.uniform1f(U.uDark, document.documentElement.dataset.theme === 'dark' ? 1 : 0);
+      gl!.uniform3f(U.uNebula, 0.055, 0.105, 0.115);
+      gl!.uniform1f(U.uReading, variant === 'reading' ? 1 : 0);
+      gl!.uniform1f(U.uGateTop, gateTop);
+      const gates = gateFor(1, variant);
+      gl!.uniform1f(U.uGateDark, gates.dark);
+      gl!.uniform1f(U.uGateLight, gates.light);
+      const budget = tintBudget(variant);
+      gl!.uniform1f(U.uTintCap, budget.cap);
+      gl!.uniform1f(U.uViscousFloor, budget.viscousFloor);
+      gl!.uniform1f(U.uNebulaCeiling, nebulaCeiling());
+      gl!.uniform1f(U.uTime, (nowMs - t0) / 1000);
+      gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
+    }
+
+    sizeTo(true);
+    draw(performance.now());
+    if (!contained) cvs.closest('.descent')?.classList.add('fluid-live');
+    const reduce = prefersReducedMotion();
+    let rafId = 0, running = false, last = 0, scrolling = false;
+    function loop(now: number): void {
+      const budget = scrolling ? 0 : 32;
+      if (now - last >= budget) { draw(now); last = now; }
+      rafId = requestAnimationFrame(loop);
+    }
+    function start(): void {
+      if (running || reduce || document.hidden) return;
+      running = true; last = 0; rafId = requestAnimationFrame(loop);
+    }
+    function stop(): void {
+      if (!running) return;
+      running = false; cancelAnimationFrame(rafId); rafId = 0;
+    }
+    const onLost = (e: Event) => {
+      e.preventDefault(); stop();
+      if (!contained) cvs.closest('.descent')?.classList.remove('fluid-live');
+    };
+    const onRestored = () => { initAll(); };
+    const onVis = () => { if (document.hidden) stop(); else start(); };
+    cvs.addEventListener('webglcontextlost', onLost as EventListener);
+    cvs.addEventListener('webglcontextrestored', onRestored);
+    document.addEventListener('visibilitychange', onVis);
+    let scrollRaf = 0, scrollIdleT = 0;
+    const onScroll = () => {
+      scrolling = true;
+      window.clearTimeout(scrollIdleT);
+      scrollIdleT = window.setTimeout(() => { scrolling = false; }, 160);
+      if (reduce && !scrollRaf) {
+        scrollRaf = requestAnimationFrame(() => { scrollRaf = 0; draw(performance.now()); });
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    let resizeT = 0;
+    const onResize = () => {
+      window.clearTimeout(resizeT);
+      resizeT = window.setTimeout(() => {
+        const hidden = getComputedStyle(cvs).display === 'none';
+        if (!contained) cvs.closest('.descent')?.classList.toggle('fluid-live', !hidden);
+        if (hidden) { stop(); return; }
+        start();
+        sizeTo(true); measureLayout(); measureGate(); draw(performance.now());
+      }, 160);
+    };
+    window.addEventListener('resize', onResize);
+
+    const mo = new MutationObserver(() => { uploadRamp(true); draw(performance.now()); });
+    mo.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-fluid-strength', 'data-theme'],
+    });
+
+    const settle = window.setTimeout(() => { sizeTo(true); measureLayout(); measureGate(); draw(performance.now()); }, 1200);
+
+    start();
+
+    return () => {
+      stop();
+      window.clearTimeout(resizeT);
+      window.clearTimeout(settle);
+      if (scrollRaf) cancelAnimationFrame(scrollRaf);
+      window.clearTimeout(scrollIdleT);
+      document.removeEventListener('visibilitychange', onVis);
+      cvs.removeEventListener('webglcontextlost', onLost as EventListener);
+      cvs.removeEventListener('webglcontextrestored', onRestored);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onResize);
+      mo.disconnect();
+      cvs.closest('.descent')?.classList.remove('fluid-live');
+      gl.deleteTexture(tex);
+      gl.deleteBuffer(buf);
+      gl.deleteProgram(prog);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+    };
+  }
+
+  document.addEventListener('astro:page-load', initAll);
+</script>

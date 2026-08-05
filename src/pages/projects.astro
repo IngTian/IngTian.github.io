@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import FluidSky from '../components/proto/FluidSky.astro';
 import SkyWash from '../components/SkyWash.astro';
 import ProjectCard from '../components/ProjectCard.astro';
 import { projects } from '../data/profile';
@@ -11,7 +12,8 @@ import { projects } from '../data/profile';
   veilOnLoad={true}
   navZone="light"
 >
-  <main class="projects descent">
+  <main class="projects descent is-fluid">
+    <FluidSky strength={3} variant="reading" />
     <SkyWash />
 
     <div class="projects-block">

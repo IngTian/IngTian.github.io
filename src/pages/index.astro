@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import FluidSky from '../components/proto/FluidSky.astro';
 import Grain from '../components/Grain.astro';
 import Toc from '../components/Toc.astro';
 import SkyWash from '../components/SkyWash.astro';
@@ -11,7 +12,8 @@ import Signature from '../sections/Signature.astro';
 ---
 
 <BaseLayout veilLine="a researcher by day" veilOnLoad={false}>
-  <main class="descent">
+  <main class="descent is-fluid">
+    <FluidSky strength={4} variant="descent" />
     <SkyWash />
     <Heights />
     <Interlude />

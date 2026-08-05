@@ -55,7 +55,11 @@ const bubbles = JSON.stringify([
     //   light = Classic — the shipped paper glow, ochre settle, indigo trail
     if (document.documentElement.dataset.theme === 'dark')
       return { ramp: TERRAIN_TERMINAL, walker: { glow: [227,242,247], settled: [134,188,204], trail: [73,127,146] }, darkness: 1, dotScale: 1.18 };
-    return { ramp: TERRAIN_LIGHT, walker: { glow: [244,239,228], settled: [200,163,106], trail: [92,108,140] }, darkness: 0, dotScale: 1.15 };
+    // LIGHT dotScale trimmed 1.15 → 1.08. Light theme now spends its EDL shade on
+    // VALUE rather than opacity (see edlSpend in lib/terrain.ts), which by itself
+    // adds ink — and "heavier" is not the goal, "clearer" is. The radius trim
+    // offsets that ink increase while keeping visible presence on the ridge.
+    return { ramp: TERRAIN_LIGHT, walker: { glow: [244,239,228], settled: [200,163,106], trail: [92,108,140] }, darkness: 0, dotScale: 1.08 };
   }
 
   // Teardown handle for the previous init — re-init runs on every page load AND
@@ -84,8 +88,10 @@ const bubbles = JSON.stringify([
     // The static-per-camera terrain: dot grid + precomputed normals + EDL shade,
     // built once (EDL is O(n²); the camera is fixed so it never needs recompute).
     // Config is the baked default (shape-reading on) plus this theme's ramp/darkness.
-    // Same code path as /terrain-lab, so a value tuned there transfers verbatim.
-    const cfg = { ...TERRAIN_CONFIG_DEFAULTS, ramp, darkness, dotScale };
+    // starfield: the dark theme's dots twinkle as temperature-tinted stars (its
+    // whole conceit is that they read as a star field); light theme keeps the
+    // shipped warm relief untouched.
+    const cfg = { ...TERRAIN_CONFIG_DEFAULTS, ramp, darkness, dotScale, starfield: darkness > 0.5 };
     const ZOOM = cfg.zoom;                 // walkers must use the SAME zoom to stay on the surface
     let grid: GridPoint[] = buildGrid(cfg.edlParams);
 

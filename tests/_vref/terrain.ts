@@ -76,39 +76,7 @@ function lp(a: number[], b: number[], t: number): [number, number, number] {
 //   • DARK  = "Glacier" — cool cyan-blue ice, slate valleys → bright rime peaks,
 //     on the charcoal night sky.
 export interface TerrainRamp { valley: [number, number, number]; mid: [number, number, number]; peak: [number, number, number] }
-// LIGHT ramp — "Classic": warm ochre valleys → cool indigo heights, at the token
-// values. A deepened variant was tried and REVERTED: composited on screen (paper
-// backdrop, EDL shade 0.5) the ridge still landed LIGHTER than the valley
-// because terrainRender's base alpha ramp 0.30+(1-hn)*0.45 more than cancels any
-// value ramp. The deepened variant was the only part that altered the shipped
-// hero's colour identity, while edlSpend() delivers the vast majority of the
-// separation win. Not worth the palette risk.
-// Classic: warm ochre valleys → cool indigo heights.
-//
-// REAL VALUE RANGE, added after the light mountain still read as mush. Before this
-// change, light theme dots were essentially FLAT in luminance across elevation —
-// dark theme carried far more elevation→value information. Each light dot separated
-// from the sky perfectly well, but the dots did not separate from EACH OTHER, so
-// there was no value structure and therefore no readable mountain form. That is why
-// raising contrast against the background never fixed it.
-// Now: valley = deep ochre (dark), peak = pale indigo (light), so elevation reads as
-// light on the ridge the way it does in dark theme. Hues stay --ochre → --indigo.
-//
-// (Earlier note, still true: the MID knot was hue-identical to the sky, so mid-
-// elevation dots vanished into it while the valley and peak still read. Cooling
-// the mid stop separates them by putting the whole ramp on the cool side of the
-// warm sky except the valley, which separates by being much darker instead.)
-//
-// Still --ochre → --indigo: the endpoints are the tokens, only the interior knot
-// moved, so the palette identity holds and no new hue is introduced.
-// The endpoints are pushed far apart because the pipeline compresses them: every
-// stage from litColor through edlSpend, alpha and the paper composite narrows the
-// range the ramp started with. A ramp that looks well separated in isolation can
-// still land on screen as one grey mass with no readable ridge, so the ramp is
-// specified wide enough that real form survives the compression. Hues unchanged:
-// --ochre warm low, --indigo cool high. tests/edlSpend.test.ts pins the spread
-// that must survive, over the elevation range the renderer actually paints.
-export const TERRAIN_LIGHT: TerrainRamp = { valley: [58, 40, 18], mid: [104, 108, 126], peak: [154, 168, 196] };
+export const TERRAIN_LIGHT: TerrainRamp = { valley: [150, 110, 58], mid: [120, 112, 96], peak: [109, 118, 137] };       // Classic: warm ochre valleys → cool indigo heights
 export const TERRAIN_TERMINAL: TerrainRamp = { valley: [47, 90, 110], mid: [91, 147, 168], peak: [198, 227, 237] };     // Glacier: cyan-blue ice valleys → bright rime peaks
 
 export function colormap(hn: number, ramp: TerrainRamp = TERRAIN_LIGHT): [number, number, number] {
@@ -205,80 +173,6 @@ export function computeEDL(dots: Array<{ x: number; y: number }>, params: EDLPar
   return out;
 }
 
-// ── How EDL shade is SPENT: opacity, or value? ──────────────────────────────
-// computeEDL returns a shade in [0,1]; something has to turn that into pixels.
-// The shipped renderer spent it on ALPHA (`alpha *= floor + (1-floor)*shade`),
-// and on the dark theme that is exactly right: fading a dot toward a near-black
-// sky DARKENS it, which is what an eye-dome shadow looks like.
-//
-// On the LIGHT theme the same line runs BACKWARDS. Compositing against the pale
-// paper backdrop, reducing a dot's alpha makes it LIGHTER, not darker:
-//
-//     alpha  1.00 → the dot's own value
-//     alpha  0.30 → LIGHTER than unshaded
-//     alpha  0.08 → almost exactly the sky
-//
-// So the dots EDL most wants to darken — the receding ridge, the silhouette,
-// the shape cue itself — instead BLEACH OUT into the pale sky. That is the
-// reported "the dots blend into the fluid background": not a palette problem
-// (the marbled sky just makes an existing inversion obvious), but Eye-Dome
-// Lighting subtracting contrast where it should be adding it. It also explains
-// why dark theme reads as a mountain and light theme reads as mush from the
-// SAME shade array.
-//
-// The fix is to spend the shade on VALUE in light theme — multiply the colour
-// down instead of the opacity — so a shadowed dot goes to ink rather than to
-// air. `darkness` (0 = light, 1 = dark) picks the split, so the crossover is
-// continuous and the dark theme's alpha behaviour is preserved bit-for-bit at
-// darkness = 1.
-export interface EDLSpend {
-  /** multiply the dot's RGB by this (1 = untouched) */
-  value: number;
-  /** multiply the dot's alpha by this (1 = untouched) */
-  alpha: number;
-}
-
-/** Darkest an EDL-shadowed dot's COLOUR goes on the light theme. Tuned against
- *  the real marbled backdrop to give EDL-shadowed ridge dots strong separation
- *  from their local sky. */
-export const EDL_VALUE_FLOOR = 0.32;
-/** Light theme's (gentle) EDL alpha floor — the far field still recedes, but the
- *  shape cue is carried by value now, so opacity no longer has to crush it. */
-export const EDL_ALPHA_FLOOR_LIGHT = 0.82;
-
-/**
- * Split an EDL shade into a value factor and an alpha factor.
- *
- * @param shade    per-dot EDL shade in [0,1] (1 = unshaded, →0 = occluded)
- * @param darkness 0 = light theme, 1 = dark theme
- * @param alphaFloor the shipped `edlFloor` — darkest an EDL-shadowed dot's
- *                   OPACITY goes. Used unchanged when darkness = 1.
- * @param valueFloor darkest an EDL-shadowed dot's COLOUR goes in light theme.
- *
- * At darkness = 1 this returns { value: 1, alpha: alphaFloor + (1-alphaFloor)*shade },
- * i.e. precisely the shipped expression, so the dark theme cannot regress.
- */
-export function edlSpend(
-  shade: number, darkness: number, alphaFloor: number, valueFloor = EDL_VALUE_FLOOR,
-): EDLSpend {
-  const s = Math.max(0, Math.min(1, shade));
-  const d = Math.max(0, Math.min(1, darkness));
-  // Dark theme keeps the shipped alpha ramp. Light theme leans on value, and
-  // retains a much gentler alpha ramp (floor EDL_ALPHA_FLOOR_LIGHT) so the far
-  // field still recedes into the sky instead of ending in a hard dot wall.
-  //
-  // Both blends use the `a*(1-d) + b*d` mix form rather than `a + (b-a)*d`.
-  // That is deliberate and load-bearing: the mix form is EXACT at both endpoints
-  // in floating point, so at darkness = 1 aFloor === alphaFloor and vFloor === 1
-  // bit-for-bit. The additive form would differ in the last bits due to rounding,
-  // making the dark theme's dot alphas differ from the shipped renderer — a
-  // regression this function exists to make impossible.
-  const aFloor = EDL_ALPHA_FLOOR_LIGHT * (1 - d) + alphaFloor * d;
-  // Value shading fades out as the theme darkens; at d = 1 it is exactly 1.
-  const vFloor = valueFloor * (1 - d) + 1 * d;
-  return { value: vFloor + (1 - vFloor) * s, alpha: aFloor + (1 - aFloor) * s };
-}
-
 // ── Directional relief light ────────────────────────────────────────────────
 // A single fixed, high-overhead sun shades each dot for extra form. N·L feeds a
 // half-Lambert term (soft terminator, shadow side never goes to black) that
@@ -313,15 +207,7 @@ export function litColor(
   const shade = p.ambient + (1 - p.ambient) * h;
   const value = 1 - (p.valueLight * (1 - darkness)) * (1 - shade);  // ≤1: darken shadows
   const gain = 1 + (p.gainDark * darkness) * h;                    // ≥1: brighten lit
-  // Warm/cool directional tint. In LIGHT theme this is scaled back hard, because
-  // it was silently CANCELLING the cooled TERRAIN_LIGHT ramp: the directional warm
-  // tint pushed every dot warm, landing them on the sky's own hue, so the mountain
-  // read as mush no matter what the ramp said. That is why the hue change "didn't
-  // update" on screen — it shipped, then the lighting undid it. Light theme keeps a
-  // whisper (0.08) so the relief still has warm/cool direction; dark theme is
-  // unchanged, where the tint is doing no harm.
-  const warmEff = p.warm * (0.27 + 0.73 * darkness);
-  const t = warmEff * (h - 0.5) * 2;                               // [-warm,+warm]
+  const t = p.warm * (h - 0.5) * 2;                                // [-warm,+warm]
   const cl = (v: number) => Math.max(0, Math.min(255, v));
   return [cl(base[0] * value * gain * (1 + t)), cl(base[1] * value * gain), cl(base[2] * value * gain * (1 - t))];
 }
