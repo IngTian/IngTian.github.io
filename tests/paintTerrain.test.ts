@@ -54,7 +54,7 @@ describe('paintTerrain', () => {
       expect(c.fill).toMatch(/^rgba\(/);
     }
 
-    // (a) THEME SEPARATION — light and dark must produce measurably different colour distributions
+    // (a) THEME SEPARATION — each theme must render at its own level
     const lightMeans = { r: 0, g: 0, b: 0 };
     for (const c of lightResult) {
       const [r, g, b] = parse(c.fill);
@@ -73,10 +73,15 @@ describe('paintTerrain', () => {
     darkMeans.g /= darkResult.length;
     darkMeans.b /= darkResult.length;
 
-    // Assert channels differ substantially (catches swapped ramps or one theme rendering with the other's palette)
-    expect(Math.abs(lightMeans.r - darkMeans.r)).toBeGreaterThan(100);
-    expect(Math.abs(lightMeans.g - darkMeans.g)).toBeGreaterThan(150);
-    expect(Math.abs(lightMeans.b - darkMeans.b)).toBeGreaterThan(140);
+    // The light terrain is dark ink on pale paper; the dark terrain is bright
+    // ice on a near-black sky. Pinning each theme's own level — rather than
+    // the gap between them — is what catches the two ramps being swapped.
+    expect(lightMeans.r).toBeLessThan(85);
+    expect(lightMeans.g).toBeLessThan(80);
+    expect(lightMeans.b).toBeLessThan(80);
+    expect(darkMeans.r).toBeGreaterThan(180);
+    expect(darkMeans.g).toBeGreaterThan(215);
+    expect(darkMeans.b).toBeGreaterThan(200);
 
     // (b) ELEVATION READS AS VALUE — the light ramp must carry luminance spread across elevation
     const lightLums: number[] = [];
@@ -85,7 +90,10 @@ describe('paintTerrain', () => {
       lightLums.push(wcagLuminance([r, g, b]));
     }
     const spread = Math.max(...lightLums) - Math.min(...lightLums);
-    // An iso-luminant ramp or inverted EDL would collapse this spread
+    // Catches a revert to main's iso-luminant ramp (which would collapse this
+    // spread). Does NOT catch an inverted EDL spend: the colormap alone delivers
+    // more spread (0.253) than the full pipeline with EDL (0.116), because EDL
+    // darkens receding dots and compresses the range rather than expanding it.
     expect(spread).toBeGreaterThan(0.10);
   });
 
