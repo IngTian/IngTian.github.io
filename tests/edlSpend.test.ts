@@ -3,6 +3,7 @@ import {
   edlSpend, EDL_VALUE_FLOOR, EDL_ALPHA_FLOOR_LIGHT,
   colormap, luminance01, TERRAIN_LIGHT, TERRAIN_TERMINAL,
 } from '../src/lib/terrain';
+import { wcagLuminance } from '../src/lib/skyLegibility';
 
 // Guards for the fix to "the light-theme terrain dots blend into the fluid sky".
 //
@@ -112,14 +113,21 @@ describe('edlSpend — how the EDL shade is spent per theme', () => {
   });
 });
 
-// NOTE: the two specs that used to live here guarded a DEEPENED TERRAIN_LIGHT ramp
-// which has been reverted. They are removed rather than relaxed, deliberately:
-//   · the iso-luminance guard swept hn 0..1 and required range > 0.15, but the
-//     renderer never exceeds hn ~0.80 — over the envelope actually rendered the
-//     range was 0.1477, so the guard only ever passed on values that never paint.
-//     A test that is green outside its operating range is worse than no test.
-//   · the monotonic-darkening guard asserted a screen relationship the render does
-//     not have: composited on paper at EDL shade 0.5 the ridge measures L 0.680 vs
-//     the valley's 0.526 — LIGHTER — because terrainRender's base alpha ramp
-//     0.30+(1-hn)*0.45 more than cancels any colormap value ramp. The ramp change
-//     was reverted for exactly this reason; edlSpend() carries the separation win.
+describe('TERRAIN_LIGHT carries elevation as VALUE', () => {
+  it('spans real luminance across the RENDERED elevation range', () => {
+    // hn maxes near 0.80 on screen; asserting over 0..1 would pass on values that
+    // never paint, which is how the previous guard came to be deleted as useless.
+    const ys: number[] = [];
+    for (let hn = 0; hn <= 0.80001; hn += 0.05) {
+      const rgb = colormap(hn, TERRAIN_LIGHT) as [number, number, number];
+      ys.push(wcagLuminance(rgb));
+    }
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(0.23);
+  });
+
+  it('is not iso-luminant — reverting to a flat ramp must fail this', () => {
+    const lo = wcagLuminance(colormap(0.05, TERRAIN_LIGHT) as [number, number, number]);
+    const hi = wcagLuminance(colormap(0.78, TERRAIN_LIGHT) as [number, number, number]);
+    expect(Math.abs(hi - lo)).toBeGreaterThan(0.20);
+  });
+});
