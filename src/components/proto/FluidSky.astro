@@ -1,56 +1,24 @@
 ---
-// FluidSky (PROTOTYPE) — a FAITHFUL port of the original demo shader.
+// FluidSky: WebGL lifecycle for a domain-warped, scroll-responsive sky canvas.
 //
-// ── Why this is a rewrite back to the beginning ───────────────────────────
-// The user identified the very first thing I showed (the live WebGL panel in the
-// brainstorm synthesis screen) as the correct look, and asked to restart from it.
-// I recovered that shader verbatim from
-// .superpowers/brainstorm/9818-1785798195/content/synthesis.html and diffed it
-// against what I had drifted to. The differences that mattered:
+// Shader (skyShader.ts) displaces sampling along the gradient; contrast policy
+// (skyLegibility.ts) ensures text legibility. Two archetypes: descent (paper text,
+// dangerous: lighter) and reading (dark ink, dangerous: darker).
 //
-//   original (liked)                  what I had (rejected)
-//   ────────────────────────────────  ─────────────────────────────────────
-//   frequency 1.6x / 2.2y (ANISO)     6.4 isotropic — ~4x too fine
-//   warp gains 3.4*q, 3.2*r           2.9*q, 2.6*r — weaker warp
-//   NO banding term                   a sin() "strata" fold mixed at 0.5
-//   opaque, shader owns the colour     mid-grey modulation + overlay blend
-//   5 octaves                          3 octaves
-//   displacement 0.46                  drifted
+// INVARIANTS:
+//   1. Canvas is OPAQUE with no mix-blend-mode. A blended full-screen layer forces
+//      the compositor to re-read the page backdrop every frame, defeating layer
+//      caching for the whole document.
+//   2. .fluid-live must never outlive a visible canvas. CSS rules (display:none
+//      under 640px, reduced-motion, strength=0) gate the canvas, and the class is
+//      additionally dropped on resize-to-hidden and GL context loss.
 //
-// The single worst offender was the sin() BANDING term — I invented it while
-// trying to make an under-powered blend visible, and it is what turned soft ink
-// diffusion into hard ribbons. It is gone.
-//
-// A correction to my own earlier description: that demo was NOT compositing over
-// --descent-grad. It carried the descent palette as hardcoded stops and drew
-// OPAQUELY. The reason it still felt like "the Monet background" is that those
-// stops ARE the Monet colours. So this port is opaque too, with the palette
-// uploaded as a texture built from the real --descent-grad stops (same colours,
-// one source of truth, and it re-themes for dark).
-//
-// Interaction is deliberately NOT included — dropped on request so the base look
-// can be judged on its own. The pointer work is in git history if we return to it.
-//
-// Perf: viewport-sized (scroll is a uniform, so a 5000px descent still shades
-// only one screen), 0.5x internal resolution, ~30fps, paused on tab-hide,
-// static finished frame under reduced motion, skipped under 640px.
+// Perf: viewport-sized (scroll is a uniform), 0.5x internal resolution, ~30fps
+// idle / full rate while scrolling, paused on tab-hide, skipped under 640px.
 interface Props {
-  /** 0 = plain gradient · 1 subtle · 2 medium · 3 strong · 4 the original demo's own strength */
   strength?: 0 | 1 | 2 | 3 | 4;
   mode?: 'background' | 'contained';
-  /**
-   * Which sky this page has.
-   *
-   * 'descent' — the homepage / /art / 404: --descent-grad, the full dawn→ground
-   *   ramp that sinks to near-black. Text over it is PAPER-coloured, so the
-   *   dangerous direction is the sky getting LIGHTER.
-   *
-   * 'reading' — /research, /projects: --reading-grad, deliberately luminous
-   *   top-to-bottom so DARK ink stays legible the whole way down. The dangerous
-   *   direction is therefore INVERTED — the sky getting DARKER. This is not a
-   *   cosmetic switch: sampling the descent ramp on a reading page would drag a
-   *   pale background down to #16140f underneath dark text.
-   */
+  /** 'descent' (paper text, dawn→ground) | 'reading' (dark ink, luminous) */
   variant?: 'descent' | 'reading';
 }
 const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
@@ -68,20 +36,14 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
   .fluid-sky {
     pointer-events: none;
     display: block;
-    /* Opaque — the shader owns the colour, exactly as the original demo did.
-       No mix-blend-mode: that is also what keeps an animated full-screen layer
-       affordable (a blended layer forces the compositor to re-read the page
-       backdrop every frame). */
   }
-
   .fluid-sky.is-background {
     position: fixed;
     inset: 0;
     width: 100%;
     height: 100%;
-    z-index: -2;   /* behind SkyWash (-1) and all content */
+    z-index: -2;
   }
-
   .fluid-sky.is-contained {
     position: absolute;
     inset: 0;
@@ -93,48 +55,19 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
   .fluid-sky[data-strength='0'] { display: none; }
   :global(html[data-fluid-strength='0']) .fluid-sky { display: none !important; }
   :global(html[data-fluid='off']) .fluid-sky { display: none; }
-
-  @media (max-width: 640px) {
-    .fluid-sky { display: none; }
-  }
+  @media (max-width: 640px) { .fluid-sky { display: none; } }
 </style>
 
 <script>
   import { prefersReducedMotion } from '../../lib/motion';
   import { VERTEX_SHADER, fragmentShader, SKY_UNIFORMS } from '../../lib/skyShader';
-  import { gateFor, tintBudget } from '../../lib/skyLegibility';
+  import { gateFor, tintBudget, type SkyVariant } from '../../lib/skyLegibility';
+  import { rampFor, type Theme } from '../../lib/skyPalette';
 
   const VERT = VERTEX_SHADER;
   const FRAG = fragmentShader();
 
-  // The real --descent-grad stops (tokens.css) and its dark twin. The original
-  // demo hardcoded an abbreviated 6-stop version of the same ramp; using the full
-  // token stops keeps one source of truth and gives dark theme for free.
-  const LIGHT_STOPS: Array<[number, string]> = [
-    [0.00, '#f4efe4'], [0.08, '#f0eadf'], [0.15, '#efe6d4'], [0.23, '#e2d2c2'],
-    [0.30, '#ccc4b6'], [0.37, '#a6a8ad'], [0.44, '#7d7e88'], [0.52, '#565660'],
-    [0.62, '#3a3833'], [0.78, '#2a2720'], [0.90, '#1d1b16'], [1.00, '#16140f'],
-  ];
-  // READING pages (/research, /projects) mirror --reading-grad from tokens.css:
-  // luminous top-to-bottom, never sinking to the ground, so dark ink stays legible.
-  // Its luminance range is TINY by design (0.938 → ~0.83), which is exactly why the
-  // reading variant leans on texture and temperature rather than value swings.
-  const READING_LIGHT_STOPS: Array<[number, string]> = [
-    [0.00, '#f4efe4'], [0.24, '#f1ebe0'], [0.48, '#efe6d4'],
-    [0.74, '#e7ddce'], [1.00, '#dcd5cf'],
-  ];
-  const READING_DARK_STOPS: Array<[number, string]> = [
-    [0.00, '#14171b'], [0.48, '#131619'], [1.00, '#111417'],
-  ];
-
-  const DARK_STOPS: Array<[number, string]> = [
-    [0.00, '#16191d'], [0.20, '#131619'], [0.40, '#111417'],
-    [0.60, '#0e1013'], [0.80, '#0b0d0f'], [1.00, '#08090b'],
-  ];
-
-  // Raised again on request ("i remember the one to be more stronger"). Rung 4 is
-  // now well past the original demo's own strength — the asymmetric gate means the
-  // reading zone no longer pays for a stronger open sky.
+  // Strength ladder: 0 = off, 1-3 = subtle to strong, 4 = full strength.
   const AMP_BY_LEVEL = [0, 0.7, 1.0, 1.35, 1.8];
 
   const teardowns: Array<() => void> = [];
@@ -147,7 +80,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     });
   }
 
-  function buildRamp(dark: boolean, variantOf: () => boolean): HTMLCanvasElement | null {
+  function buildRamp(theme: Theme, variant: SkyVariant): HTMLCanvasElement | null {
     const N = 512;
     const c = document.createElement('canvas');
     c.width = 1;
@@ -155,56 +88,40 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     const ctx = c.getContext('2d');
     if (!ctx) return null;
     const g = ctx.createLinearGradient(0, 0, 0, N);
-    const reading = variantOf();
-    const stops = reading
-      ? (dark ? READING_DARK_STOPS : READING_LIGHT_STOPS)
-      : (dark ? DARK_STOPS : LIGHT_STOPS);
-    for (const [pos, hex] of stops) g.addColorStop(pos, hex);
+    for (const [pos, hex] of rampFor(variant, theme)) g.addColorStop(pos, hex);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 1, N);
     return c;
   }
-
   function initOne(cvs: HTMLCanvasElement): (() => void) | null {
     if (getComputedStyle(cvs).display === 'none') return null;
-
     const gl = (cvs.getContext('webgl', { antialias: false, alpha: false, depth: false })
       || cvs.getContext('experimental-webgl', { antialias: false, alpha: false, depth: false })) as WebGLRenderingContext | null;
     if (!gl) { cvs.style.display = 'none'; return null; }
-
     function compile(type: number, src: string): WebGLShader | null {
       const sh = gl!.createShader(type);
       if (!sh) return null;
-      gl!.shaderSource(sh, src);
-      gl!.compileShader(sh);
+      gl!.shaderSource(sh, src); gl!.compileShader(sh);
       if (!gl!.getShaderParameter(sh, gl!.COMPILE_STATUS)) { gl!.deleteShader(sh); return null; }
       return sh;
     }
-
     const vs = compile(gl.VERTEX_SHADER, VERT);
     const fs = compile(gl.FRAGMENT_SHADER, FRAG);
     if (!vs || !fs) { cvs.style.display = 'none'; return null; }
 
     const prog = gl.createProgram();
     if (!prog) { cvs.style.display = 'none'; return null; }
-    gl.attachShader(prog, vs);
-    gl.attachShader(prog, fs);
-    gl.linkProgram(prog);
+    gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { cvs.style.display = 'none'; return null; }
     gl.useProgram(prog);
-
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
     const aPos = gl.getAttribLocation(prog, 'aPos');
     gl.enableVertexAttribArray(aPos);
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
-
     const U: Record<string, WebGLUniformLocation | null> = {};
-    for (const name of SKY_UNIFORMS) {
-      U[name] = gl.getUniformLocation(prog, name);
-    }
-
+    for (const name of SKY_UNIFORMS) U[name] = gl.getUniformLocation(prog, name);
     const tex = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -213,18 +130,13 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-    // Declared BEFORE uploadRamp's first call: reading it from inside buildRamp
-    // while it was still declared further down threw a temporal-dead-zone
-    // ReferenceError, which aborted init — the canvas mounted but never painted
-    // (live=false on every page). A JS throw here looks identical to a shader
-    // failure from the outside, so check both.
-    const isReading = cvs.dataset.variant === 'reading';
-    let rampTheme = '';
+    const variant = (cvs.dataset.variant ?? 'descent') as SkyVariant;
+    let rampTheme: Theme | '' = '';
     function uploadRamp(force = false): void {
-      const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+      const theme: Theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
       if (!force && theme === rampTheme) return;
       rampTheme = theme;
-      const ramp = buildRamp(theme === 'dark', () => isReading);
+      const ramp = buildRamp(theme, variant);
       if (!ramp) return;
       gl!.activeTexture(gl!.TEXTURE0);
       gl!.bindTexture(gl!.TEXTURE_2D, tex);
@@ -232,35 +144,24 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       gl!.uniform1i(U.uRamp, 0);
     }
     uploadRamp(true);
-
     const contained = cvs.dataset.mode === 'contained';
-
     function level(): number {
       const live = document.documentElement.dataset.fluidStrength;
       if (live !== undefined) return Number(live);
       return Number(cvs.dataset.strength ?? '4');
     }
-
     let gateTop = 0.55;
     function measureGate(): void {
       if (contained) { gateTop = 1.0; return; }
-      // Reading pages have no #mountains — they ARE text top-to-bottom, so the gate
-      // starts at the very top. (uReading also forces zone=1 in the shader; this
-      // keeps the two consistent rather than relying on one of them.)
-      if (isReading) { gateTop = 0.0; return; }
+      if (variant === 'reading') { gateTop = 0.0; return; }
       const content = document.getElementById('mountains');
       if (!content) { gateTop = 0.55; return; }
       const top = content.getBoundingClientRect().top + window.scrollY;
       gateTop = Math.min(0.95, Math.max(0.1, top / Math.max(1, document.documentElement.scrollHeight)));
     }
     measureGate();
-
-
     const SCALE = 0.5;
-    // clientWidth/clientHeight are also layout reads, so they are resolved only
-    // when the size actually changes (resize / settle), not per frame.
-    let sizedW = 0;
-    let sizedH = 0;
+    let sizedW = 0, sizedH = 0;
     function sizeTo(force = false): void {
       if (!force && sizedW && sizedH) {
         gl!.viewport(0, 0, sizedW, sizedH);
@@ -273,16 +174,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       sizedH = cvs.height;
       gl!.viewport(0, 0, sizedW, sizedH);
     }
-
-    // ── Cached layout metrics — the SCROLL-LAG fix ──────────────────────────
-    // draw() used to read document.documentElement.scrollHeight (and innerWidth /
-    // innerHeight) on EVERY frame. scrollHeight is a forced synchronous layout:
-    // the browser must flush pending style/layout work before it can answer. At
-    // ~30fps that is 30 reflows/sec, and it is worst exactly while scrolling,
-    // when layout is already dirty — the classic cause of scroll jank.
-    //
-    // These change only on resize / layout settle, never during a scroll, so they
-    // are cached and refreshed from the same places that re-measure the gate.
+    // Cached layout metrics: avoid per-frame synchronous layout reads.
     let mVw = Math.max(1, window.innerWidth);
     let mVh = Math.max(1, window.innerHeight);
     let mDocH = Math.max(1, document.documentElement.scrollHeight);
@@ -291,16 +183,11 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       mVh = Math.max(1, window.innerHeight);
       mDocH = Math.max(1, document.documentElement.scrollHeight);
     }
-
     const t0 = performance.now();
     function draw(nowMs: number): void {
       sizeTo();
       uploadRamp();
-
-      const vw = mVw;
-      const vh = mVh;
-      const docH = mDocH;
-
+      const vw = mVw, vh = mVh, docH = mDocH;
       if (contained) {
         gl!.uniform1f(U.uYOffset, level() * 2.0);
         gl!.uniform1f(U.uYSpan, (cvs.clientHeight || vh) / (cvs.clientWidth || vw));
@@ -312,111 +199,53 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
         gl!.uniform1f(U.uDepth0, window.scrollY / docH);
         gl!.uniform1f(U.uDepthSpan, vh / docH);
       }
-
       gl!.uniform1f(U.uAmp, AMP_BY_LEVEL[Math.max(0, Math.min(4, level()))] ?? 1.0);
-      const isDark = document.documentElement.dataset.theme === 'dark';
-      gl!.uniform1f(U.uDark, isDark ? 1 : 0);
+      gl!.uniform1f(U.uDark, document.documentElement.dataset.theme === 'dark' ? 1 : 0);
       gl!.uniform3f(U.uNebula, 0.055, 0.105, 0.115);
-      gl!.uniform1f(U.uReading, isReading ? 1 : 0);
+      gl!.uniform1f(U.uReading, variant === 'reading' ? 1 : 0);
       gl!.uniform1f(U.uGateTop, gateTop);
-
-      // Supply gate multipliers from the legibility policy.
-      const variant = isReading ? 'reading' : 'descent';
       const gates = gateFor(1, variant);
       gl!.uniform1f(U.uGateDark, gates.dark);
       gl!.uniform1f(U.uGateLight, gates.light);
-
-      // Supply tint bounds from the legibility policy.
       const budget = tintBudget(variant);
       gl!.uniform1f(U.uTintCap, budget.cap);
       gl!.uniform1f(U.uViscousFloor, budget.viscousFloor);
-
       gl!.uniform1f(U.uTime, (nowMs - t0) / 1000);
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
     }
 
-    // first frame — also the reduced-motion / pre-loop state. Force a real
-    // measure once here; after this the cached metrics carry every frame.
     sizeTo(true);
     draw(performance.now());
-
-    // Signal a real paint so the page can drop the CSS gradient underneath this
-    // opaque canvas. Set only AFTER a successful draw, so every failure path (no
-    // WebGL, shader compile fail) falls back to the shipped gradient.
     if (!contained) cvs.closest('.descent')?.classList.add('fluid-live');
-
     const reduce = prefersReducedMotion();
-
-    let rafId = 0;
-    let running = false;
-    let last = 0;
-    // true while a scroll gesture is in progress → draw at full display rate
-    let scrolling = false;
-
+    let rafId = 0, running = false, last = 0, scrolling = false;
     function loop(now: number): void {
-      // ── Frame pacing, and why scrolling looked laggy ────────────────────
-      // The remaining "lag" was not slowness — it was a FRAME-RATE MISMATCH. The
-      // page scrolls at the display's 60fps while this canvas redrew at 30fps, and
-      // the sky's vertical position is scroll-derived, so during a scroll the
-      // background trailed the content by up to 32ms. The eye reads that as the
-      // background stuttering against the text.
-      //
-      // Fix: while scrolling, draw EVERY frame so the sky is locked to the content.
-      // When the page is still, fall back to 30fps — the ink drift is slow enough
-      // that nobody can tell, and it halves idle cost.
       const budget = scrolling ? 0 : 32;
-      if (now - last >= budget) {
-        draw(now);
-        last = now;
-      }
+      if (now - last >= budget) { draw(now); last = now; }
       rafId = requestAnimationFrame(loop);
     }
     function start(): void {
       if (running || reduce || document.hidden) return;
-      running = true; last = 0;
-      rafId = requestAnimationFrame(loop);
+      running = true; last = 0; rafId = requestAnimationFrame(loop);
     }
     function stop(): void {
       if (!running) return;
-      running = false;
-      cancelAnimationFrame(rafId);
-      rafId = 0;
+      running = false; cancelAnimationFrame(rafId); rafId = 0;
     }
-
-    // ── GL context loss ────────────────────────────────────────────────────
-    // Routine in practice (driver reset, GPU switch on a laptop, Chrome reclaiming
-    // contexts at its ~16-context cap). Without handling it the canvas goes dead
-    // while .fluid-live stays set — the same invisible-hero failure as the
-    // breakpoint bug, via a trigger the CSS gate does NOT cover. Drop the class and
-    // stop the loop on loss; restore on regain.
     const onLost = (e: Event) => {
-      e.preventDefault();                     // required for restore to be possible
-      stop();
+      e.preventDefault(); stop();
       if (!contained) cvs.closest('.descent')?.classList.remove('fluid-live');
     };
-    const onRestored = () => {
-      // A restored context has no programs/buffers/textures — a full re-init is the
-      // only correct response, and initAll() disposes this instance first.
-      initAll();
-    };
+    const onRestored = () => { initAll(); };
+    const onVis = () => { if (document.hidden) stop(); else start(); };
     cvs.addEventListener('webglcontextlost', onLost as EventListener);
     cvs.addEventListener('webglcontextrestored', onRestored);
-
-    const onVis = () => { if (document.hidden) stop(); else start(); };
     document.addEventListener('visibilitychange', onVis);
-
-    // Frozen state still needs a repaint on scroll (the depth window is
-    // scroll-derived) or it would look like a stuck decal.
-    // The scrolling flag stays true for a moment after the last scroll event, so the
-    // full-rate window covers the whole gesture including momentum/inertia.
-    let scrollRaf = 0;
-    let scrollIdleT = 0;
+    let scrollRaf = 0, scrollIdleT = 0;
     const onScroll = () => {
       scrolling = true;
       window.clearTimeout(scrollIdleT);
       scrollIdleT = window.setTimeout(() => { scrolling = false; }, 160);
-      // Under reduced motion there is no loop, so a scroll still needs one repaint
-      // (the sky's depth window is scroll-derived and would otherwise be stale).
       if (reduce && !scrollRaf) {
         scrollRaf = requestAnimationFrame(() => { scrollRaf = 0; draw(performance.now()); });
       }
@@ -427,9 +256,6 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     const onResize = () => {
       window.clearTimeout(resizeT);
       resizeT = window.setTimeout(() => {
-        // Re-check visibility and SYNC the class. The CSS is breakpoint-gated so it
-        // cannot desync on its own, but keeping the class honest also stops a hidden
-        // canvas from burning frames.
         const hidden = getComputedStyle(cvs).display === 'none';
         if (!contained) cvs.closest('.descent')?.classList.toggle('fluid-live', !hidden);
         if (hidden) { stop(); return; }
