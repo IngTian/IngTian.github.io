@@ -78,8 +78,8 @@ describe('tintBudget — bounds the darkening at its SOURCE', () => {
     const afterTint = afterViscous.map(ch => Math.max(0, ch - tintAmount)) as [number, number, number];
     const worstLuminance = wcagLuminance(afterTint);
     expect(contrastRatio(worstLuminance, INK_3)).toBeGreaterThanOrEqual(4.5);
-    // Pin the derived headroom so drift is caught.
-    expect(contrastRatio(worstLuminance, INK_3)).toBeLessThan(6);
+    // Pin that the tint is actually doing something, so a future change that neutralises it fails loudly.
+    expect(contrastRatio(worstLuminance, INK_3)).toBeLessThan(4.9);
   });
 
   it('gives descent pages a larger budget — its danger direction is the other one', () => {
