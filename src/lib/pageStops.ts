@@ -14,12 +14,14 @@
 // spells it.
 
 import type { Publication, Project } from '../data/profile';
+import { mathFor } from './paperMath';
 
 export interface Stop {
   label: string;
   /** DOM id this stop scrolls to (no '#'). */
   target: string;
-  /** Nested stops. Absent/empty = a leaf; the rail renders flat if NO stop nests. */
+  /** Nested stops. Absent/empty = a leaf. SideRail renders one indent level per
+   *  level present, so the rail's depth follows this tree. */
   children?: Stop[];
 }
 
@@ -40,9 +42,12 @@ export function paperAnchorId(index: number): string {
 function hasIdea(p: Publication): boolean {
   return !!p.idea;
 }
-/** Does this paper own a set of typeset equations? */
+/** Does this paper own a set of typeset equations that the page can actually
+ *  RENDER? Asks lib/paperMath, the same table research.astro renders from —
+ *  testing `!!p.mathKey` instead would emit a Method stop for a key the table
+ *  doesn't know, pointing at an id the page never emits. */
 function hasMath(p: Publication): boolean {
-  return !!p.mathKey;
+  return !!mathFor(p);
 }
 /** Does this paper have headline numbers or a metrics table? */
 function hasResults(p: Publication): boolean {
@@ -69,8 +74,9 @@ function paperChildren(p: Publication, index: number): Stop[] {
  * honest label: "Method" alone is ambiguous the moment the page can hold more
  * than one paper, and the page can.
  *
- * Two levels under "Selected research", not three: at 11px mono in a ~38px left
- * margin, a third indent level is unreadable.
+ * Depth is three: "Selected research" → paper name → its sections. The two nested
+ * tiers are separated by WEIGHT (size, tracking, opacity) rather than by more
+ * indent, because a ~38px left margin can't afford a third indent step.
  */
 export function researchStops(
   publications: readonly Publication[],
@@ -89,7 +95,9 @@ export function researchStops(
     .map((p, i) => ({ p, i, children: paperChildren(p, i) }))
     .filter(({ children }) => children.length > 0)
     .map(({ p, i, children }) => ({
-      label: p.shortTitle ?? p.title,
+      // `||` not `??`: an empty-string shortTitle must fall back to the title, or
+      // the rail renders a row with no text at all.
+      label: p.shortTitle?.trim() || p.title,
       target: paperAnchorId(i),
       children,
     }));
@@ -118,7 +126,12 @@ export function projectStops(projects: readonly Project[]): Stop[] {
   return projects.map((p, i) => ({ label: p.name, target: projectSectionId(i) }));
 }
 
-/** Flatten a stop tree into document order — what the scrollspy walks. */
+/** Flatten a stop tree depth-first (parent before its children).
+ *  NOTE this is TREE order, which is NOT the same as top-to-bottom VISUAL order —
+ *  /research puts "Results" in a right-hand grid column beside "The idea", so it
+ *  sits higher on screen than its tree position implies. SideRail therefore sorts
+ *  by measured position before running the scrollspy; do not assume this order is
+ *  geometrically monotonic. */
 export function flattenStops(stops: readonly Stop[]): Stop[] {
   const out: Stop[] = [];
   for (const s of stops) {
@@ -128,7 +141,3 @@ export function flattenStops(stops: readonly Stop[]): Stop[] {
   return out;
 }
 
-/** True when any stop in the tree nests — the rail renders two-level if so. */
-export function isNested(stops: readonly Stop[]): boolean {
-  return stops.some((s) => !!s.children?.length);
-}

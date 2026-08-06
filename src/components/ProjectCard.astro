@@ -80,8 +80,14 @@ const Heading = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
     --pc-edge: rgba(255, 255, 255, 0.14);       /* inset top edge-highlight */
     --pc-shadow: rgba(0, 0, 0, 0.28);
     --pc-sheen: rgba(255, 255, 255, 0.10);       /* diagonal specular streak */
-    /* How much the backdrop is LIFTED behind the pane — see the note below. */
-    --pc-lift: 1.10;
+    /* How much the backdrop is LIFTED behind the pane — see the note below.
+       The TEASER default is 1.0 (no lift). Lifting only helps when the pane must
+       separate UPWARD from its backdrop while holding dark text; the teaser is the
+       opposite case — light paper text on the near-black descent — so brightening
+       its backdrop moves the surface TOWARD the text and shrinks every text
+       contrast on the card. Measured: 3.090:1 without the lift vs 2.931:1 with it.
+       The /projects (full) variant sets its own lift below, per theme. */
+    --pc-lift: 1;
 
     position: relative;
     overflow: hidden;                            /* clip the sheen to the radius */

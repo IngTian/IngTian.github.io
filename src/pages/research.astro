@@ -4,34 +4,15 @@ import FluidSky from '../components/proto/FluidSky.astro';
 import SkyWash from '../components/SkyWash.astro';
 import SideRail from '../components/SideRail.astro';
 import { publications, researchInterests } from '../data/profile';
-import { PAPER_EQUATIONS } from '../lib/equations';
 import { researchStops, paperSectionId, paperAnchorId } from '../lib/pageStops';
+import { mathFor } from '../lib/paperMath';
 
 const featured = publications.filter((p) => p.featured);
 const others = publications.filter((p) => !p.featured);
 
-// Equations keyed by the paper that OWNS them. Previously this was a page-level
-// constant rendered inside the per-paper loop, so a second featured paper would
-// have shown RL-BHRP's equations under its own title, captioned with RL-BHRP's
-// arXiv id. MathML is baked at build time (no KaTeX shipped to the client).
-interface MathShowcase {
-  source: string;                              // shown in the block's footnote
-  equations: { html: string; gloss: string }[];
-}
-const MATH_BY_KEY: Record<string, MathShowcase> = {
-  rlbhrp: {
-    source: 'arXiv:2508.11856',
-    equations: [
-      { html: PAPER_EQUATIONS.weightMap, gloss: 'Two-level weights — each holding is its sector’s share times its share within that sector.' },
-      { html: PAPER_EQUATIONS.reward, gloss: 'The learning signal: gross return, minus turnover cost, minus a risk-dispersion penalty.' },
-      { html: PAPER_EQUATIONS.riskConservation, gloss: 'Risk contributions sum exactly to portfolio variance — the basis for parity.' },
-      { html: PAPER_EQUATIONS.sectorCov, gloss: 'Within-sector weights aggregate asset covariance up to the sector level.' },
-    ],
-  },
-};
-
-// The rail's shape follows the data: flat for one featured paper (identical to
-// what shipped), nested per-paper for two or more. See lib/pageStops.ts.
+// The rail nests each paper under its own name at any paper count — see
+// lib/pageStops.ts. Equations come from lib/paperMath, the SAME module the rail
+// consults, so a Method stop and a Method block can never disagree.
 const stops = researchStops(publications, researchInterests);
 ---
 <BaseLayout
@@ -71,7 +52,7 @@ const stops = researchStops(publications, researchInterests);
       <h2 class="section-label section-label--major" id="r-selected">Selected research</h2>
 
       {featured.map((p, i) => {
-        const math = p.mathKey ? MATH_BY_KEY[p.mathKey] : undefined;
+        const math = mathFor(p);
         return (
         <article class="paper">
           <!-- title + byline span both columns, like a paper masthead -->
@@ -252,7 +233,12 @@ const stops = researchStops(publications, researchInterests);
   .eq-math { color: var(--ink-1); overflow-x: auto; overflow-y: hidden; }
   .eq-math :global(math) { font-size: 1.18em; }            /* as prominent as the prose */
   .eq figcaption { font-size: 13px; line-height: 1.6; color: var(--ink-3); margin-top: 12px; }
-  .math-foot { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em; color: var(--ink-4);
+  /* `.block > p` (specificity 0,4,2 once Astro adds its scope attributes) beats a
+     bare `.math-foot` (0,2,1), so this footnote was rendering at the body size of
+     16px instead of 10px — a caption set larger than the prose it annotates.
+     Pre-existing (it is live on main today); scoped the same way as its sibling
+     rules so it actually wins. */
+  .block > .math-foot { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em; color: var(--ink-4);
     margin-top: 6px; padding-top: 16px; border-top: 1px solid rgba(var(--hairline-rgb), 0.18); }
 
   /* results: stat strip + full table (right column) */
@@ -261,8 +247,14 @@ const stops = researchStops(publications, researchInterests);
      balances rather than overflowing its cell, so a long value degrades to two
      lines instead of getting cut off. */
   .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 18px; margin: 2vh 0 4vh; }
+  /* NO overflow-wrap: break-word here. It was added to stop "comparable" being
+     clipped, but at 26px display type it splits the word itself ("comparabl" /
+     "e") at most desktop widths — worse than the problem. The widened minmax is
+     the actual fix; a value longer than its cell now overhangs into the 18px grid
+     gap, which nothing clips. text-wrap: balance still evens out multi-WORD
+     values across lines without ever breaking inside a word. */
   .result dt { font-family: var(--font-display); font-weight: 600; font-size: 26px; color: var(--ink-1); font-variation-settings: 'SOFT' 30;
-    overflow-wrap: break-word; text-wrap: balance; }
+    text-wrap: balance; }
   .result dd { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--ink-3); }
 
   .metrics { margin: 0; }

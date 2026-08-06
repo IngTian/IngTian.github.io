@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   researchStops, projectStops, paperSectionId, paperAnchorId, projectSectionId,
-  flattenStops, isNested, type Stop,
+  flattenStops, type Stop,
 } from '../src/lib/pageStops';
 import type { Publication, Project } from '../src/data/profile';
 import { publications, researchInterests, projects } from '../src/data/profile';
@@ -15,7 +15,7 @@ function paper(over: Partial<Publication> = {}): Publication {
     year: '2026',
     featured: true,
     idea: 'the idea',
-    mathKey: 'k',
+    mathKey: 'rlbhrp',
     results: [{ value: '1%', label: 'l' }],
     ...over,
   };
@@ -32,7 +32,7 @@ describe('researchStops — always names the paper', () => {
     // rail identical to the buggy flat one until a 2nd paper existed, and made
     // the rail's shape change the day a paper was added.
     const stops = researchStops([paper({ shortTitle: 'One' })], ['i']);
-    expect(isNested(stops)).toBe(true);
+    expect(stops.some((s) => !!s.children?.length)).toBe(true);
     expect(stops.map((s) => s.label)).toEqual(['Interests', 'Selected research']);
     const sel = stops[1];
     expect(sel.children?.map((c) => c.label)).toEqual(['One']);
@@ -41,7 +41,7 @@ describe('researchStops — always names the paper', () => {
 
   it('NESTS once there are two featured papers', () => {
     const stops = researchStops([paper({ shortTitle: 'One' }), paper({ shortTitle: 'Two' })], ['i']);
-    expect(isNested(stops)).toBe(true);
+    expect(stops.some((s) => !!s.children?.length)).toBe(true);
     const selected = stops.find((s) => s.label === 'Selected research');
     expect(selected?.children?.map((c) => c.label)).toEqual(['One', 'Two']);
   });
@@ -69,6 +69,25 @@ describe('researchStops — always names the paper', () => {
     const p = paper();
     const stops = researchStops([p, paper({ shortTitle: 'Two' })], []);
     expect(stops[0].children?.[0].label).toBe(p.title);
+  });
+
+  it('falls back to the title for a BLANK shortTitle, not an empty rail row', () => {
+    // `??` would accept '' as a real label and render a row with no text.
+    for (const blank of ['', '   ']) {
+      const p = paper({ shortTitle: blank });
+      const stops = researchStops([p], []);
+      expect(stops[0].children?.[0].label).toBe(p.title);
+    }
+  });
+
+  it('omits Method when mathKey is set but UNRESOLVABLE', () => {
+    // The rail must agree with what the page can actually render: research.astro
+    // only emits a Method block when lib/paperMath resolves the key, so a stop for
+    // an unknown key would point at an id that never exists in the DOM.
+    const stops = researchStops([paper({ shortTitle: 'One', mathKey: 'no-such-key' })], []);
+    const sections = stops[0].children?.[0].children?.map((c) => c.label);
+    expect(sections).toEqual(['The idea', 'Results']);
+    expect(targets(stops)).not.toContain(paperSectionId(0, 'math'));
   });
 
   it('emits no stops at all for an empty page', () => {
@@ -105,7 +124,7 @@ describe('projectStops', () => {
   it('is one flat stop per project, labelled by name', () => {
     const ps = [{ name: 'a' }, { name: 'b' }] as Project[];
     const stops = projectStops(ps);
-    expect(isNested(stops)).toBe(false);
+    expect(stops.some((s) => !!s.children?.length)).toBe(false);
     expect(stops).toEqual([
       { label: 'a', target: projectSectionId(0) },
       { label: 'b', target: projectSectionId(1) },
@@ -131,7 +150,7 @@ describe('flattenStops', () => {
 describe('the REAL site data', () => {
   it('nests today, naming the real paper, with unique targets', () => {
     const stops = researchStops(publications, researchInterests);
-    expect(isNested(stops)).toBe(true);
+    expect(stops.some((s) => !!s.children?.length)).toBe(true);
     // the rail must name the paper, not show a bare "Method"
     expect(flattenStops(stops).map((s) => s.label)).toContain('RL-BHRP');
     const all = targets(stops);
@@ -141,7 +160,7 @@ describe('the REAL site data', () => {
   it('would nest — with unique ids — if a second paper were featured', () => {
     const twice = [...publications, { ...publications.find((p) => p.featured)!, shortTitle: 'Next' }];
     const stops = researchStops(twice, researchInterests);
-    expect(isNested(stops)).toBe(true);
+    expect(stops.some((s) => !!s.children?.length)).toBe(true);
     const all = targets(stops);
     expect(new Set(all).size).toBe(all.length);
   });
