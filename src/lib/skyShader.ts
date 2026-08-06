@@ -35,6 +35,7 @@ export function fragmentShader(): string {
     uniform float uTintCap;        // reading-page tint hard ceiling
     uniform float uViscousFloor;
     uniform float uNebulaCeiling;   // hard bound on the dark nebula's added light
+    uniform float uMotion;          // global speed multiplier for the warp drift
 
     float hash(vec2 p) {
       p = fract(p * vec2(443.897, 441.423));
@@ -55,10 +56,18 @@ export function fragmentShader(): string {
 
     void main() {
       // Time is scaled with the reading variant's y-stretch so scrolling the warp
-      // produces equal apparent motion on both page types. Motion dialled back
-      // uniformly by 0.55; reading pages keep a small relative boost since their
-      // effect comes from a tint response rather than a ramp lookup.
-      float t = uTime * 0.55 * mix(1.0, 1.35, uReading);
+      // produces equal apparent motion on both page types. Reading pages keep a small
+      // relative boost since their effect comes from a tint response rather than a
+      // ramp lookup.
+      //
+      // uMotion is the global speed multiplier (was a hardcoded 0.55). SPEED is the
+      // right lever for "more alive", not amplitude: the ramp displacement is already
+      // +/-0.306 of the whole dawn-to-ground span at full strength — nearly two
+      // palette bands — and over text it is the legibility gate, not that constant,
+      // that reins it in. So raising amplitude changes little where text lives while
+      // risking the un-gated open sky, whereas a faster drift reads as more alive
+      // without swinging further in tone.
+      float t = uTime * uMotion * mix(1.0, 1.35, uReading);
 
       // Anisotropic sample space: more frequency DOWN than ACROSS, which stretches
       // the field into drifting strata instead of round blobs. Scaled so one
@@ -205,5 +214,5 @@ export function fragmentShader(): string {
 export const SKY_UNIFORMS = [
   'uRamp', 'uAmp', 'uTime', 'uYOffset', 'uYSpan', 'uDepth0', 'uDepthSpan',
   'uGateTop', 'uGateDark', 'uGateLight', 'uDark', 'uNebula', 'uReading',
-  'uTintCap', 'uViscousFloor', 'uNebulaCeiling',
+  'uTintCap', 'uViscousFloor', 'uNebulaCeiling', 'uMotion',
 ] as const;

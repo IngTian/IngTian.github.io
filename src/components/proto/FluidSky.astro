@@ -70,6 +70,28 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
   // Strength ladder: 0 = off, 1-3 = subtle to strong, 4 = full strength.
   const AMP_BY_LEVEL = [0, 0.7, 1.0, 1.35, 1.8];
 
+  // How FAST the warp drifts, independent of how far it swings in tone. 0.55 is the
+  // shipped value (motion was damped to 55% in an earlier round when the sky felt too
+  // busy). Speed is the lever for "more alive": amplitude is already ~1.6 palette
+  // bands and is held back over text by the legibility gate rather than by its own
+  // constant, so raising it changes little where text lives.
+  //
+  // Live-overridable via html[data-sky-motion] so the ladder can be compared on the
+  // real page — a drift rate cannot be judged from a screenshot.
+  const MOTION_BY_LEVEL = [0.55, 0.8, 1.1, 1.5, 2.0];
+  const MOTION_DEFAULT = 0.55;
+
+  function motion(): number {
+    const live = document.documentElement.dataset.skyMotion;
+    if (live === undefined) return MOTION_DEFAULT;
+    const n = Number(live);
+    if (Number.isFinite(n) && n >= 0 && n <= 4 && Number.isInteger(n)) {
+      return MOTION_BY_LEVEL[n] ?? MOTION_DEFAULT;
+    }
+    // also accept a raw multiplier, for fine tuning without editing the ladder
+    return Number.isFinite(n) && n > 0 && n <= 6 ? n : MOTION_DEFAULT;
+  }
+
   const teardowns: Array<() => void> = [];
 
   function initAll(): void {
@@ -217,6 +239,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       gl!.uniform1f(U.uTintCap, budget.cap);
       gl!.uniform1f(U.uViscousFloor, budget.viscousFloor);
       gl!.uniform1f(U.uNebulaCeiling, nebulaCeiling());
+      gl!.uniform1f(U.uMotion, motion());
       gl!.uniform1f(U.uTime, (nowMs - t0) / 1000);
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
     }
@@ -275,7 +298,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     const mo = new MutationObserver(() => { uploadRamp(true); draw(performance.now()); });
     mo.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['data-fluid-strength', 'data-theme'],
+      attributeFilter: ['data-fluid-strength', 'data-theme', 'data-sky-motion'],
     });
 
     const settle = window.setTimeout(() => { sizeTo(true); measureLayout(); measureGate(); draw(performance.now()); }, 1200);

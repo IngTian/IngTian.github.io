@@ -1,0 +1,109 @@
+---
+// ── TEMPORARY REVIEW SCAFFOLDING — delete once a motion level is chosen. ──
+// Switches the fluid sky's DRIFT SPEED live on the real page.
+//
+// A drift rate is the one property a screenshot cannot show at all, and the previous
+// round established that diffing frames does not work here either: the sky moves
+// ~75/255 between two consecutive frames, so every measurement drowns. Watching it is
+// the only instrument.
+//
+// Writes html[data-sky-motion] (0-4, or a raw multiplier); FluidSky reads it per frame
+// and its MutationObserver repaints on change. Choice persists in localStorage.
+const LEVELS = [
+  { id: 0, label: '0.55x', hint: 'shipped — calm' },
+  { id: 1, label: '0.80x', hint: 'a touch more alive' },
+  { id: 2, label: '1.10x', hint: 'clearly moving' },
+  { id: 3, label: '1.50x', hint: 'strong drift' },
+  { id: 4, label: '2.00x', hint: 'busy — probably too much' },
+];
+---
+<div class="motionlab" id="motionlab">
+  <p class="motionlab-title">Sky drift speed</p>
+  <div class="motionlab-rows">
+    {LEVELS.map((l) => (
+      <button type="button" class="motionlab-btn" data-motion={String(l.id)}>
+        <span class="motionlab-key">{l.id}</span>
+        <span class="motionlab-body">
+          <span class="motionlab-label">{l.label}</span>
+          <span class="motionlab-hint">{l.hint}</span>
+        </span>
+      </button>
+    ))}
+  </div>
+  <p class="motionlab-note">Keys 0–4 · watch the sky, not the panel</p>
+</div>
+
+<style>
+  .motionlab {
+    position: fixed; right: 16px; bottom: 16px; z-index: 90;
+    width: 232px; padding: 12px 13px 10px;
+    border-radius: 12px;
+    background: rgba(18, 20, 24, 0.9);
+    border: 1px solid rgba(239, 233, 221, 0.16);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 14px 34px -12px rgba(0, 0, 0, 0.6);
+    font-family: var(--font-mono);
+  }
+  .motionlab-title {
+    font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: rgba(239, 233, 221, 0.5); margin: 0 0 8px;
+  }
+  .motionlab-rows { display: flex; flex-direction: column; gap: 2px; }
+  .motionlab-btn {
+    display: flex; align-items: flex-start; gap: 9px;
+    width: 100%; padding: 6px; border: 0; border-radius: 6px;
+    background: transparent; cursor: pointer; text-align: left;
+    color: rgba(239, 233, 221, 0.62); font-family: inherit;
+    transition: background-color 0.2s, color 0.2s;
+  }
+  .motionlab-btn:hover { background: rgba(239, 233, 221, 0.07); color: rgba(239, 233, 221, 0.92); }
+  .motionlab-btn[aria-pressed='true'] { background: rgba(239, 233, 221, 0.13); color: #efe9dd; }
+  .motionlab-key { width: 9px; flex: none; font-size: 10px; opacity: 0.6; padding-top: 1px; }
+  .motionlab-body { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .motionlab-label { font-size: 11px; letter-spacing: 0.04em; }
+  .motionlab-hint { font-size: 9.5px; line-height: 1.35; opacity: 0.55; }
+  .motionlab-note {
+    margin: 9px 0 0; padding-top: 8px; font-size: 9px; letter-spacing: 0.03em;
+    color: rgba(239, 233, 221, 0.34); border-top: 1px solid rgba(239, 233, 221, 0.12);
+  }
+  /* the canvas is skipped under 641px, so the control has nothing to drive there */
+  @media (max-width: 640px) { .motionlab { display: none; } }
+</style>
+
+<script>
+  const KEY = 'skyMotionLevel';
+
+  function apply(v: string): void {
+    document.documentElement.dataset.skyMotion = v;
+    document.querySelectorAll<HTMLButtonElement>('[data-motion]').forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.motion === v));
+    });
+  }
+
+  function initMotionLab(): void {
+    let current = '0';
+    try { current = localStorage.getItem(KEY) || '0'; } catch { /* ignore */ }
+    apply(current);
+    document.querySelectorAll<HTMLButtonElement>('[data-motion]').forEach((b) => {
+      b.addEventListener('click', () => {
+        const v = b.dataset.motion || '0';
+        try { localStorage.setItem(KEY, v); } catch { /* ignore */ }
+        apply(v);
+      });
+    });
+    // Number keys, so the sky can be watched while switching — reaching for the
+    // panel pulls the eye off the thing being judged.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!/^[0-4]$/.test(e.key)) return;
+      const t = e.target as HTMLElement | null;
+      if (t && /^(INPUT|TEXTAREA)$/.test(t.tagName)) return;
+      try { localStorage.setItem(KEY, e.key); } catch { /* ignore */ }
+      apply(e.key);
+    };
+    document.addEventListener('keydown', onKey);
+  }
+
+  document.addEventListener('astro:page-load', initMotionLab);
+</script>
