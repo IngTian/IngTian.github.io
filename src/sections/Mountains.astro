@@ -227,24 +227,30 @@ const elsewhere = timeline.filter((e) => !flagTitles.has(e.title));
     position: absolute; left: 1px; top: 7px; width: 9px; height: 9px; border-radius: 50%;
     background: var(--bg); border: 1px solid rgba(239,233,221,0.3);
   }
-  /* Flagship node: a HOLLOW seal ring, a touch more air below.
-     Was a solid seal disc inside a 3px seal-tinted halo — four of those stacked
-     vertically is ~5x the saturated pixel area the mark needs, and it spent the
-     light theme's ONE saturated colour on résumé furniture. The ring keeps the
-     seal's hue and meaning at a fraction of the area, and makes the spine a
-     single vocabulary: seal ring (flagship) → dim ring (tail).
+  /* Flagship node: a HOLLOW INDIGO ring, a touch more air below.
+     Was a solid seal disc inside a 3px seal-tinted halo. Two problems, not one:
+       • AREA — four of those stacked vertically is ~5x the saturated pixel area
+         the mark needs; and
+       • HUE — the seal is the brand mark (the signature seal, the favicon), so
+         spending it on four résumé rows spends the mark on furniture. It was also
+         the only element on the page carrying that hue, which pulled the eye to
+         the dates instead of the roles.
+     --indigo is the cool palette token (the terrain's peak colour), so the mark
+     stays inside the palette while leaving the seal reserved. Chosen live on the
+     page against both themes, not from a swatch.
 
-     Sized 10px with a 2px ring, MEASURED not guessed: at the 9px base a 1.5px
-     border rounds to 1px, leaving the seal at only ~40% of the disc and the dark
-     fill dominant — the mark read as a near-black dot with a red rim, i.e. the
-     seal had stopped registering. 2px of 10px puts the ring at ~64%, so seal is
-     the mark's colour again while total saturated area stays far under the old
-     solid-disc-plus-halo. The fill is a seal-tinted ink rather than raw --bg, so
-     the centre reads as part of the mark instead of a hole punched in it. */
+     Sized 10px with a 2px ring, MEASURED not guessed: at the previous 9px base a
+     1.5px border rounds down to 1px, leaving the ring at only ~40% of the disc
+     with the dark fill dominant — the mark read as a near-black dot with a
+     coloured rim, i.e. the hue had stopped registering at all. 2px of 10px puts
+     the ring at ~64%, so the ring IS the mark's colour while total saturated area
+     stays far under the old solid-disc-plus-halo. The fill is an indigo-tinted
+     ink rather than raw --bg, so the centre reads as part of the mark instead of
+     a hole punched in it. */
   .node-flag .dot {
     width: 10px; height: 10px; left: 0.5px;
-    background: color-mix(in oklab, var(--seal) 26%, var(--bg));
-    border: 2px solid var(--seal);
+    background: color-mix(in oklab, var(--indigo) 26%, var(--bg));
+    border: 2px solid var(--indigo);
   }
   .node-flag { padding-bottom: 34px; }
 

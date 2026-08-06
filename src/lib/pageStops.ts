@@ -61,15 +61,16 @@ function paperChildren(p: Publication, index: number): Stop[] {
 /**
  * The /research rail.
  *
- * SHAPE FOLLOWS THE DATA, deliberately:
- *   • ONE featured paper  → the paper's sections are hoisted to the top level, so
- *     the rail is exactly the flat "Interests / The idea / Method / Results /
- *     Earlier" that shipped. Today's page is visually unchanged.
- *   • TWO OR MORE         → a "Selected research" parent holds one child per
- *     paper (labelled by shortTitle), each holding its own sections.
+ * ALWAYS nests each paper under its own name, at any paper count. An earlier
+ * version hoisted a lone paper's sections to the top level so the rail matched
+ * the flat one that shipped — but that made the fix invisible on the real page
+ * (identical to the buggy rail until a second paper exists) and, worse, meant the
+ * rail's shape changed the day a paper was added. Naming the paper is also the
+ * honest label: "Method" alone is ambiguous the moment the page can hold more
+ * than one paper, and the page can.
  *
- * Nesting appears only when it earns its place. Two levels, not three: at 11px
- * mono in a ~38px left margin, a third indent level is unreadable.
+ * Two levels under "Selected research", not three: at 11px mono in a ~38px left
+ * margin, a third indent level is unreadable.
  */
 export function researchStops(
   publications: readonly Publication[],
@@ -81,19 +82,20 @@ export function researchStops(
   const stops: Stop[] = [];
   if (interests.length) stops.push({ label: 'Interests', target: 'r-interests' });
 
-  if (featured.length === 1) {
-    // Hoist: the single paper's sections ARE the page's sections.
-    stops.push(...paperChildren(featured[0], 0));
-  } else if (featured.length > 1) {
-    stops.push({
-      label: 'Selected research',
-      target: 'r-selected',
-      children: featured.map((p, i) => ({
-        label: p.shortTitle ?? p.title,
-        target: paperAnchorId(i),
-        children: paperChildren(p, i),
-      })),
-    });
+  // Only papers that actually render a section get a rail entry: a paper stop
+  // whose child list is empty would be a rail row pointing at nothing, and a
+  // "Selected research" parent with no such papers would be a heading over air.
+  const paperStops = featured
+    .map((p, i) => ({ p, i, children: paperChildren(p, i) }))
+    .filter(({ children }) => children.length > 0)
+    .map(({ p, i, children }) => ({
+      label: p.shortTitle ?? p.title,
+      target: paperAnchorId(i),
+      children,
+    }));
+
+  if (paperStops.length) {
+    stops.push({ label: 'Selected research', target: 'r-selected', children: paperStops });
   }
 
   if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });

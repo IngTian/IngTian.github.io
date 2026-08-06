@@ -26,11 +26,17 @@ function targets(stops: Stop[]): string[] {
   return flattenStops(stops).map((s) => s.target);
 }
 
-describe('researchStops — shape follows the data', () => {
-  it('is FLAT for a single featured paper (the shipped rail is unchanged)', () => {
-    const stops = researchStops([paper()], ['i']);
-    expect(isNested(stops)).toBe(false);
-    expect(stops.map((s) => s.label)).toEqual(['Interests', 'The idea', 'Method', 'Results']);
+describe('researchStops — always names the paper', () => {
+  it('NESTS even for a single featured paper', () => {
+    // Deliberate: hoisting a lone paper's sections to the top level made the
+    // rail identical to the buggy flat one until a 2nd paper existed, and made
+    // the rail's shape change the day a paper was added.
+    const stops = researchStops([paper({ shortTitle: 'One' })], ['i']);
+    expect(isNested(stops)).toBe(true);
+    expect(stops.map((s) => s.label)).toEqual(['Interests', 'Selected research']);
+    const sel = stops[1];
+    expect(sel.children?.map((c) => c.label)).toEqual(['One']);
+    expect(sel.children?.[0].children?.map((c) => c.label)).toEqual(['The idea', 'Method', 'Results']);
   });
 
   it('NESTS once there are two featured papers', () => {
@@ -49,8 +55,8 @@ describe('researchStops — shape follows the data', () => {
   });
 
   it('omits Method for a paper with no mathKey — it owns no equations', () => {
-    const flat = researchStops([paper({ mathKey: undefined })], []);
-    expect(flat.map((s) => s.label)).toEqual(['The idea', 'Results']);
+    const one = researchStops([paper({ shortTitle: 'One', mathKey: undefined })], []);
+    expect(one[0].children?.[0].children?.map((c) => c.label)).toEqual(['The idea', 'Results']);
 
     const nested = researchStops(
       [paper({ shortTitle: 'One' }), paper({ shortTitle: 'Two', mathKey: undefined })], [],
@@ -69,14 +75,18 @@ describe('researchStops — shape follows the data', () => {
     expect(researchStops([], [])).toEqual([]);
   });
 
-  it('drops sections a paper does not carry, and Earlier only when non-featured exist', () => {
+  it('emits no empty parents for a paper carrying no sections at all', () => {
+    // A featured paper with nothing to point at must not leave a childless
+    // "Selected research" stop, nor a paper stop with an empty child list —
+    // either would render a rail row that goes nowhere.
     const bare = researchStops([paper({ idea: undefined, mathKey: undefined, results: undefined })], []);
     expect(bare).toEqual([]);
+  });
 
-    const withOthers = researchStops(
-      [paper(), paper({ featured: false, title: 'old' })], [],
-    );
+  it('adds Earlier only when non-featured publications exist', () => {
+    const withOthers = researchStops([paper(), paper({ featured: false, title: 'old' })], []);
     expect(withOthers.at(-1)?.label).toBe('Earlier');
+    expect(researchStops([paper()], []).some((s) => s.label === 'Earlier')).toBe(false);
   });
 
   it("a paper's own stop points at its MASTHEAD, distinct from its sections", () => {
@@ -119,9 +129,11 @@ describe('flattenStops', () => {
 });
 
 describe('the REAL site data', () => {
-  it('renders a flat rail today (one featured paper) with unique targets', () => {
+  it('nests today, naming the real paper, with unique targets', () => {
     const stops = researchStops(publications, researchInterests);
-    expect(isNested(stops)).toBe(false);
+    expect(isNested(stops)).toBe(true);
+    // the rail must name the paper, not show a bare "Method"
+    expect(flattenStops(stops).map((s) => s.label)).toContain('RL-BHRP');
     const all = targets(stops);
     expect(new Set(all).size).toBe(all.length);
   });

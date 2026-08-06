@@ -52,16 +52,15 @@ const stops = projectStops(projects);
      the two reading pages stay identical instead of drifting. */
   .projects.descent { background: var(--reading-grad); }
 
-  /* Held RIGHT-of-center: the rail owns the left margin, the cards hug the right.
-     The measure caps at 860px — narrower than /research's 1180px on purpose,
-     because these cards hold prose and a 1180px card reads as stretched.
-     margin-left is AUTO rather than a 34% push, so the column's right edge lands
-     on the same line as the corner nav (and /research's content) instead of
-     stopping 200px short of it — that misalignment is what made the leftover
-     space read as an accident rather than as negative space. */
+  /* Same composition as /research — identical left margin and right gutter, so
+     the two reading pages read as one system instead of two guesses. The measure
+     caps at 860px rather than /research's 1180px because these cards hold prose
+     and a 1180px card reads as stretched; the paper page needs the extra width
+     for its two-column body. A percentage left margin (not a clamp, which caps
+     out and drifts left on wide monitors) keeps ~34% as the rail's margin. */
   .projects-block {
     width: min(64%, 860px);
-    margin-left: auto;
+    margin-left: 34%;
     margin-right: clamp(24px, 4vw, 90px);
     box-sizing: border-box;
   }
