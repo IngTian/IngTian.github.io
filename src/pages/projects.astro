@@ -3,7 +3,12 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import FluidSky from '../components/proto/FluidSky.astro';
 import SkyWash from '../components/SkyWash.astro';
 import ProjectCard from '../components/ProjectCard.astro';
+import SideRail from '../components/SideRail.astro';
 import { projects } from '../data/profile';
+import { projectStops, projectSectionId } from '../lib/pageStops';
+
+// One rail stop per project — flat and literal. See lib/pageStops.ts.
+const stops = projectStops(projects);
 ---
 <BaseLayout
   title="Projects — Ing Tian"
@@ -16,6 +21,8 @@ import { projects } from '../data/profile';
     <FluidSky strength={3} variant="reading" />
     <SkyWash />
 
+    <SideRail stops={stops} id="projects-toc" />
+
     <div class="projects-block">
       <header class="projects-head">
         <a class="back" href="/">← back</a>
@@ -24,7 +31,11 @@ import { projects } from '../data/profile';
       </header>
 
       <div class="project-list">
-        {projects.map((p) => <ProjectCard project={p} variant="full" />)}
+        {projects.map((p, i) => (
+          <div class="project-slot" id={projectSectionId(i)}>
+            <ProjectCard project={p} variant="full" headingLevel={2} />
+          </div>
+        ))}
       </div>
 
       <footer class="projects-foot"><a class="back" href="/">← back to the descent</a></footer>
@@ -41,11 +52,16 @@ import { projects } from '../data/profile';
      the two reading pages stay identical instead of drifting. */
   .projects.descent { background: var(--reading-grad); }
 
-  /* Centered reading column (no TOC rail — the list is short). */
+  /* Same composition as /research — identical left margin and right gutter, so
+     the two reading pages read as one system instead of two guesses. The measure
+     caps at 860px rather than /research's 1180px because these cards hold prose
+     and a 1180px card reads as stretched; the paper page needs the extra width
+     for its two-column body. A percentage left margin (not a clamp, which caps
+     out and drifts left on wide monitors) keeps ~34% as the rail's margin. */
   .projects-block {
-    width: min(760px, 100%);
-    margin: 0 auto;
-    padding: 0 clamp(24px, 6vw, 40px);
+    width: min(64%, 860px);
+    margin-left: 34%;
+    margin-right: clamp(24px, 4vw, 90px);
     box-sizing: border-box;
   }
 
@@ -59,11 +75,22 @@ import { projects } from '../data/profile';
   .lede { font-size: 14px; color: var(--ink-3); margin-top: 16px; line-height: 1.7; max-width: 54ch; }
 
   .project-list { display: grid; gap: 22px; }
+  /* Anchor wrapper for the rail, offset so a jumped-to card isn't glued to the
+     viewport's top edge. A REAL box, not display:contents — a contents element
+     generates no box, so getBoundingClientRect() returns zeros and every rail
+     stop would report top:0, pinning the scrollspy to the last stop forever. */
+  .project-slot { scroll-margin-top: 12vh; }
 
   .projects-foot { padding: 10vh 0 16vh; }
 
+  /* Narrow / tablet: the rail hides itself (same 1100px breakpoint as SideRail);
+     the column re-centers at the reading measure. */
+  @media (max-width: 1100px) {
+    .projects-block { width: auto; margin: 0 auto; padding: 0 24px; max-width: 760px; }
+  }
+
   @media (prefers-reduced-motion: no-preference) {
-    .project-list > :global(.pcard) { animation: projects-in 0.7s ease both; }
+    .project-list :global(.pcard) { animation: projects-in 0.7s ease both; }
     @keyframes projects-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
   }
 </style>

@@ -152,7 +152,7 @@ const elsewhere = timeline.filter((e) => !flagTitles.has(e.title));
       <>
         <h3 class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-16 mb-3">Projects</h3>
         <div class="max-w-[760px]">
-          <ProjectCard project={projects[0]} variant="teaser" />
+          <ProjectCard project={projects[0]} variant="teaser" headingLevel={4} />
         </div>
         <a href="/projects" class="projects-more inline-block mt-5 font-mono text-[12px] text-ochre/90 no-underline">
           {projects.length > 1 ? 'See all projects →' : 'More on the project →'}
@@ -227,8 +227,31 @@ const elsewhere = timeline.filter((e) => !flagTitles.has(e.title));
     position: absolute; left: 1px; top: 7px; width: 9px; height: 9px; border-radius: 50%;
     background: var(--bg); border: 1px solid rgba(239,233,221,0.3);
   }
-  /* Flagship node: seal dot + halo, a touch more air below. */
-  .node-flag .dot { background: var(--seal); border-color: var(--seal); box-shadow: 0 0 0 3px color-mix(in oklab, var(--seal) 22%, transparent); }
+  /* Flagship node: a HOLLOW INDIGO ring, a touch more air below.
+     Was a solid seal disc inside a 3px seal-tinted halo. Two problems, not one:
+       • AREA — four of those stacked vertically is ~5x the saturated pixel area
+         the mark needs; and
+       • HUE — the seal is the brand mark (the signature seal, the favicon), so
+         spending it on four résumé rows spends the mark on furniture. It was also
+         the only element on the page carrying that hue, which pulled the eye to
+         the dates instead of the roles.
+     --indigo is the cool palette token (the terrain's peak colour), so the mark
+     stays inside the palette while leaving the seal reserved. Chosen live on the
+     page against both themes, not from a swatch.
+
+     Sized 10px with a 2px ring, MEASURED not guessed: at the previous 9px base a
+     1.5px border rounds down to 1px, leaving the ring at only ~40% of the disc
+     with the dark fill dominant — the mark read as a near-black dot with a
+     coloured rim, i.e. the hue had stopped registering at all. 2px of 10px puts
+     the ring at ~64%, so the ring IS the mark's colour while total saturated area
+     stays far under the old solid-disc-plus-halo. The fill is an indigo-tinted
+     ink rather than raw --bg, so the centre reads as part of the mark instead of
+     a hole punched in it. */
+  .node-flag .dot {
+    width: 10px; height: 10px; left: 0.5px;
+    background: color-mix(in oklab, var(--indigo) 26%, var(--bg));
+    border: 2px solid var(--indigo);
+  }
   .node-flag { padding-bottom: 34px; }
 
   /* Nested same-employer stint (the 2021 TikTok intern under Senior): a hair-line

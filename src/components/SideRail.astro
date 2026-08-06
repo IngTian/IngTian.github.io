@@ -1,0 +1,248 @@
+---
+// A thin marginal table-of-contents rail, driven by a Stop tree from lib/pageStops.
+//
+// Renders one level per level of the Stop tree (up to three), so the rail's depth
+// follows the data rather than being hardcoded per page.
+//
+// Not a React island (the site's one island is the terminal). Vanilla <script>,
+// re-inits on astro:page-load with teardown so it survives View Transitions.
+//
+// Scope note: the site has two OTHER rails — Toc.astro (post-hero fade-in) and the
+// /art rail (coupled to gallery formation). Both carry behavior this component
+// deliberately does not model, so they are left alone rather than half-migrated.
+import { type Stop } from '../lib/pageStops';
+
+interface Props {
+  stops: Stop[];
+  /** DOM id on the <nav> — a stable handle for tests and for #-linking to the rail.
+   *  (The script finds rails by the .side-rail CLASS, so it can drive several.) */
+  id: string;
+  label?: string;
+}
+const { stops, id, label = 'On this page' } = Astro.props;
+---
+{stops.length > 0 && (
+  <nav class="side-rail" id={id} aria-label={label}>
+    <ul>
+      {stops.map((s) => (
+        <li>
+          <a href={`#${s.target}`} data-target={s.target}>
+            <span class="rule" aria-hidden="true"></span><span class="label">{s.label}</span>
+          </a>
+          {s.children && s.children.length > 0 && (
+            <ul class="sub">
+              {s.children.map((c) => (
+                <li>
+                  <a href={`#${c.target}`} data-target={c.target}>
+                    <span class="rule" aria-hidden="true"></span><span class="label">{c.label}</span>
+                  </a>
+                  {c.children && c.children.length > 0 && (
+                    <ul class="sub sub-2">
+                      {c.children.map((g) => (
+                        <li>
+                          <a href={`#${g.target}`} data-target={g.target}>
+                            <span class="rule" aria-hidden="true"></span><span class="label">{g.label}</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ul>
+  </nav>
+)}
+
+<style>
+  /* Vertically centred in the left margin — same position as the /research rail
+     it replaces, so the page's composition is unchanged. */
+  .side-rail {
+    position: fixed;
+    left: clamp(18px, 2.4vw, 38px);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 30;
+    max-width: 190px;
+  }
+  .side-rail ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+  /* Nested lists breathe less than top-level ones, so a group reads as a group. */
+  .side-rail .sub { gap: 9px; margin-top: 9px; padding-left: 12px; }
+  .side-rail .sub-2 { gap: 7px; margin-top: 7px; }
+
+  .side-rail a {
+    display: flex; align-items: center; gap: 10px; text-decoration: none;
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em;
+    text-transform: uppercase; line-height: 1.25; color: var(--ink-3); opacity: 0.45;
+    transition: opacity 0.3s, color 0.3s;
+  }
+  /* Child stops are quieter and less tracked-out than their parent — hierarchy by
+     weight, not by adding indent depth (which a narrow margin can't afford).
+     Opacity 0.45 (matching the top tier) not 0.34: at 0.34 the child text measured
+     ~1.6:1 against the reading-page sky, the least legible text on either reading
+     page. Size and tracking already carry the tier difference, so the extra fade
+     bought hierarchy that was already there at the cost of readability. */
+  .side-rail .sub a { font-size: 10px; letter-spacing: 0.12em; opacity: 0.45; }
+  .side-rail .rule { width: 0; height: 1px; background: currentColor; opacity: 0.55; transition: width 0.4s ease; flex: none; }
+  .side-rail .label { min-width: 0; }
+
+  /* ── STATE beats TIER, and state beats hover. ──
+     These are written with :where() on the tier part so the STATE selectors win
+     regardless of nesting depth. Plainly-written `.side-rail a.is-active`
+     (specificity 0,4,1) LOSES to `.side-rail .sub a` (0,5,1), which meant a
+     nested active stop stayed at the child tier's opacity 0.34 — the active
+     indicator never appeared on any child row, which is every section stop on
+     /research. Verified in the browser: the active leaf computed to 0.34.
+     :where() contributes ZERO specificity, so `.side-rail :where(.sub, .sub-2) a`
+     still targets the nested tiers but cannot outrank a state class. */
+  .side-rail a.is-active,
+  .side-rail :where(.sub, .sub-2) a.is-active { opacity: 1; color: var(--ink-1); }
+  .side-rail a.is-active .rule,
+  .side-rail :where(.sub, .sub-2) a.is-active .rule { width: 20px; }
+  /* Ancestor of the active leaf: lit, but not as loud as the leaf itself, so you
+     can see WHICH paper you're inside without it competing with the section. */
+  .side-rail a.is-ancestor,
+  .side-rail :where(.sub, .sub-2) a.is-ancestor { opacity: 0.78; color: var(--ink-2); }
+  .side-rail a.is-ancestor .rule,
+  .side-rail :where(.sub, .sub-2) a.is-ancestor .rule { width: 12px; }
+
+  /* Hover must not DIM the active row. The hover rules come later in the sheet at
+     equal-or-higher specificity than the state rules, so without the :not() guard
+     pointing at the active stop dropped it from 1.0 to 0.85 — dimming exactly the
+     row the pointer is most likely resting on. */
+  @media (hover: hover) {
+    .side-rail a:not(.is-active):not(.is-ancestor):hover { opacity: 0.85; }
+    .side-rail :where(.sub, .sub-2) a:not(.is-active):not(.is-ancestor):hover { opacity: 0.7; }
+  }
+
+  /* Keyboard focus must be visible. The inherited element `opacity` fades a UA
+     focus ring, so the rail draws its own and lifts the row to full strength. */
+  .side-rail a:focus-visible {
+    opacity: 1;
+    outline: 1px solid var(--ochre);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* The rail is a wide-viewport affordance; below this the page re-centers. */
+  @media (max-width: 1100px) { .side-rail { display: none; } }
+</style>
+
+<script>
+  import { activeStopIndex } from '../lib/scrollspy';
+
+  const teardowns: Array<() => void> = [];
+
+  function initRails(): void {
+    while (teardowns.length) teardowns.pop()!();
+    document.querySelectorAll<HTMLElement>('.side-rail').forEach((rail) => {
+      const t = initRail(rail);
+      if (t) teardowns.push(t);
+    });
+  }
+
+  function initRail(rail: HTMLElement): (() => void) | null {
+    const links = Array.from(rail.querySelectorAll<HTMLAnchorElement>('a'));
+    const stops = links
+      .map((a) => ({ a, el: document.getElementById(a.dataset.target || '') }))
+      .filter((s): s is { a: HTMLAnchorElement; el: HTMLElement } => !!s.el);
+    if (!stops.length) return null;
+
+    // Each link's ancestor links, so activating a leaf can also light its parents.
+    const ancestorsOf = new Map<HTMLAnchorElement, HTMLAnchorElement[]>();
+    for (const { a } of stops) {
+      const chain: HTMLAnchorElement[] = [];
+      let li = a.closest('li')?.parentElement?.closest('li') ?? null;
+      while (li) {
+        const parentLink = li.querySelector<HTMLAnchorElement>(':scope > a');
+        if (parentLink) chain.push(parentLink);
+        li = li.parentElement?.closest('li') ?? null;
+      }
+      ancestorsOf.set(a, chain);
+    }
+
+    // WHICH STOP IS "CURRENT" — and why more than one can be.
+    //
+    // The obvious rule (last stop whose top crossed a line near the viewport top,
+    // which lib/scrollspy implements) assumes tree order equals top-to-bottom
+    // order. On /research it does not: the paper body is a two-column grid with
+    // "The idea" and "Method" stacked in the LEFT column and "Results" filling the
+    // RIGHT. Measured on the real page, Results spans document 1044-1817 while the
+    // left sections span 1044-1307 and 1367-1849 — so Results is on screen at the
+    // same time as a left section at EVERY scroll position, and no position-based
+    // rule can name a single current section. Feeding tree order to the shared rule
+    // left only 1 of 7 stops ever active; sorting by measured top left 5 of 7.
+    //
+    // So the rail marks every stop the reader is actually looking at: each stop
+    // whose box overlaps a reading band below the viewport top is CURRENT. That is
+    // honest about a two-column layout instead of picking a winner by coin flip.
+    // The band is deliberately shallow so a tall section does not stay lit forever.
+    //
+    // Ancestors of any current stop are marked separately (dimmer), so you can see
+    // which paper you are inside without it competing with its sections.
+    function update(): void {
+      const vh = window.innerHeight;
+      const bandTop = vh * 0.10;
+      const bandBottom = vh * 0.62;
+      const measured = stops.map((s, treeIndex) => {
+        const r = s.el.getBoundingClientRect();
+        return {
+          ...s, treeIndex, top: r.top,
+          overlap: Math.max(0, Math.min(r.bottom, bandBottom) - Math.max(r.top, bandTop)),
+        };
+      });
+
+      let current = measured.filter((s) => s.overlap > 0);
+
+      if (!current.length) {
+        // Nothing in the band: above the first section, or (at the page bottom)
+        // below the last one — content past max scroll can never reach the band.
+        // Fall back to the shared "last top past the line" rule, on positionally
+        // sorted tops so its monotonic-order precondition actually holds.
+        const sorted = [...measured].sort((p, q) => (p.top - q.top) || (p.treeIndex - q.treeIndex));
+        const idx = activeStopIndex(
+          sorted.map((s) => s.top), vh, window.scrollY, document.documentElement.scrollHeight,
+        );
+        if (idx >= 0) current = [sorted[idx]];
+      }
+
+      const activeSet = new Set(current.map((s) => s.a));
+      const litAncestors = new Set<HTMLAnchorElement>();
+      for (const s of current) for (const anc of ancestorsOf.get(s.a) ?? []) litAncestors.add(anc);
+
+      for (const { a } of stops) {
+        const isActive = activeSet.has(a);
+        a.classList.toggle('is-active', isActive);
+        a.classList.toggle('is-ancestor', !isActive && litAncestors.has(a));
+        // aria-current mirrors the visual state for assistive tech, the way the
+        // sibling Toc.astro rail does. 'true' is valid on more than one link when
+        // more than one section is genuinely in view.
+        if (isActive) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      }
+    }
+
+    let ticking = false;
+    function onScroll(): void {
+      if (ticking) return;
+      // Below 1100px the rail is display:none, so measuring every stop's rect on
+      // each scroll buys nothing the user can see. Skip the work instead.
+      if (getComputedStyle(rail).display === 'none') return;
+      ticking = true;
+      requestAnimationFrame(() => { update(); ticking = false; });
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    update();
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }
+
+  document.addEventListener('astro:page-load', initRails);
+</script>

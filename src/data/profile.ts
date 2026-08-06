@@ -34,6 +34,15 @@ export interface Publication {
   metrics?: MetricsTable; // full results table (verbatim from the paper)
   abstract?: string;      // verbatim abstract
   featured?: boolean;     // gets the full treatment on /research
+  // Short label for the /research rail. Real titles run 100+ chars, which is
+  // unusable at 11px mono in a narrow margin. Falls back to `title`.
+  shortTitle?: string;
+  // Which set of typeset equations this paper OWNS, keyed into research.astro's
+  // showcase table. Load-bearing for honesty: the showcase used to be a
+  // page-level constant rendered inside the per-paper loop, so a second featured
+  // paper would have displayed RL-BHRP's equations under its own title. A paper
+  // without a mathKey renders no Method block and gets no Method stop.
+  mathKey?: string;
 }
 
 export interface Award {
@@ -109,6 +118,8 @@ export const publications: Publication[] = [
     pdfHref: 'https://arxiv.org/pdf/2508.11856',
     subject: 'q-fin.PM · Portfolio Management',
     featured: true,
+    shortTitle: 'RL-BHRP',
+    mathKey: 'rlbhrp',
     idea: 'Most portfolios either assume a fixed model of risk or chase returns directly. RL-BHRP does neither: it spreads risk hierarchically across sectors and the stocks within them, then uses reinforcement learning to adapt those exposures as market conditions shift — learning how to allocate, rather than assuming.',
     takeaway: 'Allocation that learns instead of assuming — diversified and investable, not a backtest curiosity.',
     results: [
