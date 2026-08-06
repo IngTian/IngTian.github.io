@@ -169,17 +169,20 @@ export const INTERACTION_GLSL = `
         // of features under the lens.
         float R = 0.085 * mix(1.0, 0.62, uReading);
         float A = 0.16 * mix(1.0, 0.85, uReading);
-        // Strongest at REST, quieter as the pointer moves: a bead of water sits, it
-        // does not smear. This is also the structural guard against becoming the
-        // rejected trail — a fast flick leaves little strung out behind the pointer.
+        // Slightly quieter while moving, but only slightly. Two rounds of tuning
+        // walked this down: 0.85 deep made the lens drop to ~15% during any ordinary
+        // move, so following it felt like the effect cutting out and reappearing when
+        // you stopped; 0.45 still cost ~43% at a flick, which COMPOUNDED with position
+        // lag — the lens was both weaker AND behind the cursor exactly when moving
+        // fast, which is the "works slowly, poorly when quick" failure.
         //
-        // The fade is 0.45 deep, not 0.85. At 0.85 the lens dropped to ~15% strength
-        // during any ordinary move, so following it felt like the effect cutting out
-        // and then reappearing when you stopped — which reads as unsmooth even though
-        // each individual frame is correct. Retaining 55% while moving keeps it
-        // continuously present, and the saturation point is raised to 1.6 so a normal
-        // gesture sits mid-fade instead of at the floor. A genuine flick still fades.
-        A *= presence * (1.0 - 0.45 * min(1.0, uPtr.w / 1.6));
+        // Now 0.18 deep: a fast move keeps ~82% strength, so what you see at speed is
+        // a lens that stays under the cursor rather than a faint smear left behind.
+        // The rest-vs-moving distinction is preserved (a bead of water settles when you
+        // stop) but it is no longer the dominant term. The guard against becoming the
+        // rejected directional trail is now the SHRINKING position lag in the JS, which
+        // is the honest place for it — a trail is a lag artefact, not an amplitude one.
+        A *= presence * (1.0 - 0.18 * min(1.0, uPtr.w / 1.6));
         float u = dist / R;
         if (u < 1.0) {
           float s = 1.0 - u * u;

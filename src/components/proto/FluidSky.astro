@@ -284,23 +284,45 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
         const want = havePointer && idleFor < 6 ? 1 : 0;
         ptr.presence += (want - ptr.presence) * smoothingAlpha(dt, want ? 0.30 : 0.55);
 
-        // Position lag is what makes this feel like a material responding rather
-        // than a cursor-following spotlight — but too much lag turns the effect INTO
-        // the rejected directional trail. Steady-state lag is v * tau, so at
-        // tau = 0.085 a 2200px/s sweep leaves the effect ~187px behind the pointer,
-        // which is 1.5x the lens radius: the disturbance sits entirely OUTSIDE its
-        // own footprint and reads as a lagging blob dragged along. At 0.055 the same
-        // sweep lags ~110px (0.9 R) and an ordinary 430px/s move lags ~22px — inertia
-        // without a tail. The localised models use the shorter constant; ripple keeps
-        // the longer one because its nodes detach from the pointer on emission.
+        // ── Position lag, and why it must SHRINK as the pointer speeds up ──────
+        // A little lag makes the effect feel like a material responding instead of a
+        // spotlight glued to the cursor. But a FIXED time constant gives lag that
+        // grows without bound with speed, because steady-state lag is v * tau:
+        //
+        //   at tau = 0.055 and R = 122px (the lens radius at 1440 wide)
+        //      430 px/s ->  24px = 0.19 R   under the cursor, correct
+        //     1500 px/s ->  82px = 0.67 R   trailing
+        //     2200 px/s -> 121px = 0.99 R   DETACHED — a blob behind the cursor
+        //     3500 px/s -> 192px = 1.57 R   entirely outside its own footprint
+        //
+        // That is the "works when I move slowly, poorly when I move fast" failure: a
+        // flick easily reaches 2000-3000px/s, where the lens is no longer where you
+        // are pointing. Physically it is also wrong — a bead of water under your
+        // finger does not fall further behind the faster you drag it.
+        //
+        // So tau is scaled down with speed, holding lag at roughly a FIXED FRACTION
+        // of the radius instead of a fixed time. Slow moves keep the full 0.055s of
+        // inertia; a fast flick converges toward tau_min and stays under the cursor.
+        // Ripple is excluded: its nodes detach from the pointer by design on emission.
         const m2 = mode();
         const localised = m2 === 1 || m2 === 2 || m2 === 3;
-        const aPos = smoothingAlpha(dt, localised ? 0.055 : 0.085);
+        // speed is in viewport widths/sec; 0.30 vw/s ~ 430px/s at 1440 wide.
+        const fastness = Math.min(1, ptr.speed / 1.2);
+        const tauPos = localised ? 0.055 - 0.038 * fastness : 0.085;
+        const aPos = smoothingAlpha(dt, tauPos);
         const nx = ptr.x + (rawX - ptr.x) * aPos;
         const ny = ptr.y + (rawY - ptr.y) * aPos;
         if (dt > 0) {
           const ivx = (nx - ptr.x) / dt, ivy = (ny - ptr.y) / dt;
-          const aVel = smoothingAlpha(dt, 0.12);
+          // Velocity RISES fast and falls slow. It now feeds the position time
+          // constant above, so a slow rise would mean the lag shrinks only after the
+          // flick is already underway — the effect would detach for the first ~100ms
+          // of every fast move, which is precisely the part that reads as broken.
+          // Asymmetric smoothing (0.03s up, 0.12s down) reacts immediately to
+          // acceleration while still decaying gently, so the vortex's turning rate and
+          // the fade do not flicker when the pointer stops.
+          const speeding = Math.hypot(ivx, ivy) > Math.hypot(ptr.vx, ptr.vy);
+          const aVel = smoothingAlpha(dt, speeding ? 0.03 : 0.12);
           ptr.vx += (ivx - ptr.vx) * aVel;
           ptr.vy += (ivy - ptr.vy) * aVel;
         }
