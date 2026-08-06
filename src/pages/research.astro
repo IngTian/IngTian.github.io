@@ -2,29 +2,37 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import FluidSky from '../components/proto/FluidSky.astro';
 import SkyWash from '../components/SkyWash.astro';
+import SideRail from '../components/SideRail.astro';
 import { publications, researchInterests } from '../data/profile';
 import { PAPER_EQUATIONS } from '../lib/equations';
+import { researchStops, paperSectionId, paperAnchorId } from '../lib/pageStops';
 
 const featured = publications.filter((p) => p.featured);
 const others = publications.filter((p) => !p.featured);
-const hasMath = featured.length > 0;
 
-// The formal-method equations — verified from arXiv:2508.11856, each with a
-// plain gloss. MathML is baked at build time (no KaTeX shipped to the client).
-const showcase: { html: string; gloss: string }[] = [
-  { html: PAPER_EQUATIONS.weightMap, gloss: 'Two-level weights — each holding is its sector’s share times its share within that sector.' },
-  { html: PAPER_EQUATIONS.reward, gloss: 'The learning signal: gross return, minus turnover cost, minus a risk-dispersion penalty.' },
-  { html: PAPER_EQUATIONS.riskConservation, gloss: 'Risk contributions sum exactly to portfolio variance — the basis for parity.' },
-  { html: PAPER_EQUATIONS.sectorCov, gloss: 'Within-sector weights aggregate asset covariance up to the sector level.' },
-];
+// Equations keyed by the paper that OWNS them. Previously this was a page-level
+// constant rendered inside the per-paper loop, so a second featured paper would
+// have shown RL-BHRP's equations under its own title, captioned with RL-BHRP's
+// arXiv id. MathML is baked at build time (no KaTeX shipped to the client).
+interface MathShowcase {
+  source: string;                              // shown in the block's footnote
+  equations: { html: string; gloss: string }[];
+}
+const MATH_BY_KEY: Record<string, MathShowcase> = {
+  rlbhrp: {
+    source: 'arXiv:2508.11856',
+    equations: [
+      { html: PAPER_EQUATIONS.weightMap, gloss: 'Two-level weights — each holding is its sector’s share times its share within that sector.' },
+      { html: PAPER_EQUATIONS.reward, gloss: 'The learning signal: gross return, minus turnover cost, minus a risk-dispersion penalty.' },
+      { html: PAPER_EQUATIONS.riskConservation, gloss: 'Risk contributions sum exactly to portfolio variance — the basis for parity.' },
+      { html: PAPER_EQUATIONS.sectorCov, gloss: 'Within-sector weights aggregate asset covariance up to the sector level.' },
+    ],
+  },
+};
 
-// TOC stops, built from what the page actually carries.
-const stops: { label: string; target: string }[] = [];
-if (researchInterests.length) stops.push({ label: 'Interests', target: 'r-interests' });
-if (featured.some((p) => p.idea)) stops.push({ label: 'The idea', target: 'r-idea' });
-if (hasMath) stops.push({ label: 'Method', target: 'r-math' });
-if (featured.some((p) => p.results?.length || p.metrics)) stops.push({ label: 'Results', target: 'r-results' });
-if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
+// The rail's shape follows the data: flat for one featured paper (identical to
+// what shipped), nested per-paper for two or more. See lib/pageStops.ts.
+const stops = researchStops(publications, researchInterests);
 ---
 <BaseLayout
   title="Research — Ing Tian"
@@ -37,19 +45,7 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
     <FluidSky strength={3} variant="reading" />
     <SkyWash />
 
-    {stops.length > 0 && (
-      <nav class="research-toc" id="research-toc" aria-label="On this page">
-        <ul>
-          {stops.map((s) => (
-            <li>
-              <a href={`#${s.target}`} data-target={s.target}>
-                <span class="rule" aria-hidden="true"></span><span>{s.label}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
-    )}
+    <SideRail stops={stops} id="research-toc" />
 
     <div class="research-block">
       <header class="research-head">
@@ -74,10 +70,12 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
 
       <h2 class="section-label section-label--major" id="r-selected">Selected research</h2>
 
-      {featured.map((p) => (
+      {featured.map((p, i) => {
+        const math = p.mathKey ? MATH_BY_KEY[p.mathKey] : undefined;
+        return (
         <article class="paper">
           <!-- title + byline span both columns, like a paper masthead -->
-          <div class="paper-head">
+          <div class="paper-head" id={paperAnchorId(i)}>
             <p class="kicker">{p.subject ?? 'Research'}</p>
             <h2>{p.title}</h2>
             <p class="byline">{p.authors} · {p.venue}{p.arxivId && <> · arXiv:{p.arxivId}</>} · {p.year}</p>
@@ -87,30 +85,30 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
           <div class="paper-body">
             <div class="paper-left">
               {p.idea && (
-                <section class="block" id="r-idea">
+                <section class="block" id={paperSectionId(i, 'idea')}>
                   <h3>The idea</h3>
                   <p>{p.idea}</p>
                   {p.takeaway && <p class="takeaway">{p.takeaway}</p>}
                 </section>
               )}
 
-              {hasMath && (
-                <section class="block math" id="r-math">
+              {math && (
+                <section class="block math" id={paperSectionId(i, 'math')}>
                   <h3>The method, formally</h3>
-                  {showcase.map((eq) => (
+                  {math.equations.map((eq) => (
                     <figure class="eq">
                       <div class="eq-math" set:html={eq.html}></div>
                       <figcaption>{eq.gloss}</figcaption>
                     </figure>
                   ))}
-                  <p class="math-foot">Equations from arXiv:2508.11856.</p>
+                  <p class="math-foot">Equations from {math.source}.</p>
                 </section>
               )}
             </div>
 
             <div class="paper-right">
               {(p.results?.length || p.metrics) && (
-                <section class="block" id="r-results">
+                <section class="block" id={paperSectionId(i, 'results')}>
                   <h3>Results · out-of-sample</h3>
                   {p.results && p.results.length > 0 && (
                     <dl class="results">
@@ -152,7 +150,8 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
             </div>
           </div>
         </article>
-      ))}
+        );
+      })}
 
       {others.length > 0 && (
         <section class="more" id="r-earlier">
@@ -186,16 +185,8 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
   /* (Hairlines now use var(--hairline-rgb), which flips per theme in tokens.css
      — no hand-maintained dark-theme border override needed here anymore.) */
 
-  /* left TOC rail — mirrors /art and the homepage Toc */
-  .research-toc { position: fixed; left: clamp(18px, 2.4vw, 38px); top: 50%; transform: translateY(-50%); z-index: 30; }
-  .research-toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
-  .research-toc a { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--font-mono);
-    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; line-height: 1; color: var(--ink-3); opacity: 0.45;
-    transition: opacity 0.3s, color 0.3s; }
-  .research-toc .rule { width: 0; height: 1px; background: currentColor; opacity: 0.55; transition: width 0.4s ease; }
-  .research-toc a.is-active { opacity: 1; color: var(--ink-1); }
-  .research-toc a.is-active .rule { width: 20px; }
-  @media (hover: hover) { .research-toc a:hover { opacity: 0.85; } }
+  /* The left rail is now the shared <SideRail> component (styles + scrollspy
+     live there, so /research and /projects can't drift apart). */
 
   /* The paper block — held RIGHT-of-center at any width. A percentage left
      margin (NOT a clamp that caps out and drifts left on wide monitors) keeps
@@ -228,8 +219,8 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
     color: var(--ink-1); line-height: 1.25; font-variation-settings: 'SOFT' 40; }
   .interest-gloss { display: block; font-size: 13.5px; line-height: 1.6; color: var(--ink-3); margin-top: 8px; }
 
-  /* paper masthead — spans both columns */
-  .paper-head { padding-bottom: 1vh; }
+  /* paper masthead — spans both columns; also the paper's own rail anchor */
+  .paper-head { padding-bottom: 1vh; scroll-margin-top: 12vh; }
   .kicker { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-4); }
   .paper-head h2 { font-family: var(--font-display); font-weight: 500; font-size: clamp(24px, 3vw, 34px);
     line-height: 1.18; color: var(--ink-1); margin: 14px 0 0; font-variation-settings: 'SOFT' 40; max-width: 40ch; }
@@ -265,8 +256,13 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
     margin-top: 6px; padding-top: 16px; border-top: 1px solid rgba(var(--hairline-rgb), 0.18); }
 
   /* results: stat strip + full table (right column) */
-  .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 18px; margin: 2vh 0 4vh; }
-  .result dt { font-family: var(--font-display); font-weight: 600; font-size: 26px; color: var(--ink-1); font-variation-settings: 'SOFT' 30; }
+  /* Stat strip. minmax(140px…) not 120px: a word-value like "comparable" needs
+     ~159px at 26px display type and was being clipped at 120. dt also wraps and
+     balances rather than overflowing its cell, so a long value degrades to two
+     lines instead of getting cut off. */
+  .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 18px; margin: 2vh 0 4vh; }
+  .result dt { font-family: var(--font-display); font-weight: 600; font-size: 26px; color: var(--ink-1); font-variation-settings: 'SOFT' 30;
+    overflow-wrap: break-word; text-wrap: balance; }
   .result dd { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--ink-3); }
 
   .metrics { margin: 0; }
@@ -302,7 +298,7 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
   /* narrow / tablet: drop the rail; collapse to one column (idea → method →
      results, in reading order). */
   @media (max-width: 1100px) {
-    .research-toc { display: none; }
+    /* (SideRail hides itself at this same breakpoint.) */
     .research-block { width: auto; margin: 0 auto; padding: 0 24px; max-width: 760px; }
     .paper-body { grid-template-columns: 1fr; gap: 0; }
     .paper-right { margin-top: 6vh; }
@@ -316,52 +312,3 @@ if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
     @keyframes research-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
   }
 </style>
-
-<script>
-  import { activeStopIndex } from '../lib/scrollspy';
-
-  // TOC scrollspy — same shared rule as the homepage TOC and the /art rail.
-  // Re-inits on astro:page-load (View Transitions) with teardown so listeners
-  // don't leak or point at a swapped-out rail.
-  let teardown: (() => void) | null = null;
-
-  function initResearchToc() {
-    teardown?.();
-    teardown = null;
-
-    const toc = document.getElementById('research-toc');
-    if (!toc) return;
-    const links = Array.from(toc.querySelectorAll<HTMLAnchorElement>('a'));
-    const stops = links
-      .map((a) => ({ a, el: document.getElementById(a.dataset.target || '') }))
-      .filter((s): s is { a: HTMLAnchorElement; el: HTMLElement } => !!s.el);
-    if (!stops.length) return;
-
-    function update() {
-      const idx = activeStopIndex(
-        stops.map((s) => s.el.getBoundingClientRect().top),
-        window.innerHeight,
-        window.scrollY,
-        document.documentElement.scrollHeight,
-      );
-      stops.forEach((s, i) => s.a.classList.toggle('is-active', i === idx));
-    }
-
-    let ticking = false;
-    function onScroll() {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => { update(); ticking = false; });
-    }
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll, { passive: true });
-    update();
-
-    teardown = () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
-    };
-  }
-
-  document.addEventListener('astro:page-load', initResearchToc);
-</script>

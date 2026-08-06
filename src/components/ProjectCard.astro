@@ -11,14 +11,20 @@ import type { Project } from '../data/profile';
 interface Props {
   project: Project;
   variant?: 'teaser' | 'full';
+  /** Heading level for the card's name, so the page's outline stays sequential.
+   *  The homepage nests these under an <h3> section label (→ h4); /projects has
+   *  only the page <h1> above them (→ h2). Hardcoding h3 broke heading-order on
+   *  /projects, which Lighthouse flags as an a11y failure. */
+  headingLevel?: 2 | 3 | 4;
 }
-const { project, variant = 'teaser' } = Astro.props;
+const { project, variant = 'teaser', headingLevel = 3 } = Astro.props;
 const isFull = variant === 'full';
+const Heading = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
 ---
 <article class:list={['pcard', isFull && 'pcard--full']}>
   <header class="pcard-head">
     <span class="dot" aria-hidden="true">●</span>
-    <h3 class="pcard-name">{project.name}</h3>
+    <Heading class="pcard-name">{project.name}</Heading>
     <span class="pcard-year">{project.year}</span>
   </header>
 
@@ -74,6 +80,8 @@ const isFull = variant === 'full';
     --pc-edge: rgba(255, 255, 255, 0.14);       /* inset top edge-highlight */
     --pc-shadow: rgba(0, 0, 0, 0.28);
     --pc-sheen: rgba(255, 255, 255, 0.10);       /* diagonal specular streak */
+    /* How much the backdrop is LIFTED behind the pane — see the note below. */
+    --pc-lift: 1.10;
 
     position: relative;
     overflow: hidden;                            /* clip the sheen to the radius */
@@ -82,8 +90,15 @@ const isFull = variant === 'full';
     border-radius: 14px;
     padding: 22px 24px;
     background: var(--pc-fill);
-    -webkit-backdrop-filter: blur(16px) saturate(1.4);
-    backdrop-filter: blur(16px) saturate(1.4);
+    /* The blur/saturate pair was tuned against a SMOOTH css gradient. The sky is
+       now marbled (the WebGL fluid), so a translucent fill carries the sky's own
+       structure into the pane and the boundary reads as mush. `brightness()` is
+       the structural half of the fix: the pane is lifted relative to ITS OWN
+       LOCAL BACKDROP, so lucidity tracks whatever the fluid is doing there
+       instead of being pinned to a hardcoded rgba that can desync from it.
+       Static — never animated (taste rule: never animate filter). */
+    -webkit-backdrop-filter: blur(20px) saturate(1.25) brightness(var(--pc-lift));
+    backdrop-filter: blur(20px) saturate(1.25) brightness(var(--pc-lift));
     box-shadow: 0 10px 30px -12px var(--pc-shadow), inset 0 1px 0 var(--pc-edge);
     transition: border-color 0.35s ease, transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1),
                 box-shadow 0.35s ease;
@@ -114,13 +129,26 @@ const isFull = variant === 'full';
   .pcard--full {
     --pc-name: var(--ink-1);
     --pc-body: var(--ink-2);
-    --pc-muted: var(--ink-4);
-    --pc-border: rgba(255, 255, 255, 0.7);
-    --pc-fill: rgba(255, 253, 248, 0.55);        /* warm frosted white, lifts off cream */
+    /* Muted text (the year + the stack chips) is pulled toward ink-3 instead of
+       sitting on raw ink-4. Measured on the card's own composited surface, not
+       derived: raw ink-4 gives 3.5:1 here, which FAILS WCAG AA for body text
+       (4.5:1) — and it already failed before this change (3.2:1 on the old fill).
+       The mix clears AA with headroom rather than landing near 4.5, where the
+       marbled sky's own variation could push it back under.
+       NOTE the direction is per-theme: on light, legible = DARKER (this rule); on
+       dark the ink ramp inverts, so the dark block below re-mixes toward ink-2. */
+    --pc-muted: color-mix(in oklab, var(--ink-3) 62%, var(--ink-4));
+    /* TWO-TONE edge: a warm DARK outer hairline plus the bright inset rim below.
+       The old edge was white-on-cream, which carries almost no separation — the
+       reason the card's boundary read as mush against the marbled sky. Glass on a
+       light field is defined by a dark outer line and a bright inner one. */
+    --pc-border: rgba(120, 105, 80, 0.22);
+    --pc-fill: rgba(255, 253, 248, 0.74);        /* warm frosted white, lifts off cream */
     --pc-chip-border: color-mix(in oklab, var(--ink-4) 34%, transparent);
     --pc-edge: rgba(255, 255, 255, 0.85);        /* crisp bright top rim */
-    --pc-shadow: rgba(70, 60, 42, 0.13);         /* soft WARM lift shadow */
+    --pc-shadow: rgba(70, 60, 42, 0.16);         /* soft WARM lift shadow */
     --pc-sheen: transparent;                     /* no glossy streak on light */
+    --pc-lift: 1.06;                             /* gentle on a already-pale field */
   }
   /* on the DARK reading page the ink surface would sink into the void; flip to a
      faint light glass + hairline so the tile still separates from the charcoal */
@@ -130,6 +158,12 @@ const isFull = variant === 'full';
     --pc-edge: rgba(255, 255, 255, 0.12);
     --pc-shadow: rgba(0, 0, 0, 0.5);
     --pc-sheen: rgba(255, 255, 255, 0.08);
+    --pc-lift: 1.14;                             /* more headroom against charcoal */
+    /* The ink ramp inverts here, so legibility runs the OTHER way: muted text is
+       mixed toward ink-2 (lighter) rather than ink-3 (darker). Inheriting the
+       light rule would push it further INTO the charcoal — measured at 4.2:1,
+       still under AA (and 3.0:1 before this change). */
+    --pc-muted: color-mix(in oklab, var(--ink-2) 58%, var(--ink-4));
   }
 
   @media (hover: hover) {
