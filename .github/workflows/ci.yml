@@ -4,10 +4,18 @@ name: CI
 # be green before it is merged (enable "Require status checks to pass" on the
 # main branch protection rule to enforce it). Deploy lives in deploy.yml and
 # runs only after a merge to main.
+#
+# workflow_dispatch exists so the gate can be run BY HAND. During the 2026-08-06
+# Actions incident GitHub throttled webhook delivery to ~15%, so pushes and
+# pull_request events silently produced no runs at all — and with only event
+# triggers there was no way to ask for one. A PR then cannot be merged on a green
+# check through no fault of the branch. This makes the gate recoverable:
+#   gh workflow run ci.yml --ref <branch>
 on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 # A newer push to the same branch/PR cancels the in-flight run.
 concurrency:
