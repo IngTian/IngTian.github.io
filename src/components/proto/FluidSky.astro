@@ -306,9 +306,17 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
         // Ripple is excluded: its nodes detach from the pointer by design on emission.
         const m2 = mode();
         const localised = m2 === 1 || m2 === 2 || m2 === 3;
-        // speed is in viewport widths/sec; 0.30 vw/s ~ 430px/s at 1440 wide.
+        // speed is in viewport widths/sec; 0.30 vw/s ~ 480px/s at 1600 wide.
+        //
+        // The slow end is 0.095s, not 0.055s: the lens radius grew to ~208px, and lag
+        // only reads as wrong relative to the FOOTPRINT, so a bigger lens can afford
+        // more absolute inertia at the same fraction of R (38px = 0.18R at 480px/s).
+        // That extra inertia is what makes a slow drift feel like glass gliding rather
+        // than a disc snapped to the cursor — the "smoother" half of the request.
+        // The fast end still converges to 0.017s so the lens stays under the cursor
+        // during a flick; the whole point is that these two ends want opposite things.
         const fastness = Math.min(1, ptr.speed / 1.2);
-        const tauPos = localised ? 0.055 - 0.038 * fastness : 0.085;
+        const tauPos = localised ? 0.095 - 0.078 * fastness : 0.085;
         const aPos = smoothingAlpha(dt, tauPos);
         const nx = ptr.x + (rawX - ptr.x) * aPos;
         const ny = ptr.y + (rawY - ptr.y) * aPos;

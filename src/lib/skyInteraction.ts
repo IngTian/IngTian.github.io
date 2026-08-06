@@ -159,16 +159,26 @@ export const INTERACTION_GLSL = `
       // with a radial Jacobian that stays strictly positive, so the field can never
       // fold over itself (that would need A > 1).
       if (uMode < 1.5) {
-        // R: 0.085 viewport widths ~ 122px radius at 1440. The field's own feature
-        // scale is ~58px across, so the disc spans about four features and structure
-        // visibly BENDS; at half this it covers one feature and merely translates it,
-        // which reads as nothing. Much larger and the footprint reaches parity with
-        // the sky's own churn, which is the "way too big drop of water" scale — a
-        // GEOMETRY limit, so it cannot be bought back with a smaller amplitude.
-        // Reading pages run a 1.9x finer field, so R shrinks to keep the same number
-        // of features under the lens.
-        float R = 0.085 * mix(1.0, 0.62, uReading);
-        float A = 0.16 * mix(1.0, 0.85, uReading);
+        // R: 0.13 viewport widths ~ 208px radius, a 416px lens (26% of viewport
+        // width) at 1600. Up from 0.085 on request for a bigger lens, and it also
+        // buys SMOOTHNESS for free: position lag is set by the time constant in px,
+        // so a larger radius makes the same lag a smaller fraction of the footprint
+        // (0.30R -> 0.20R at 2400px/s). The field's own feature scale is ~58px
+        // across, so the disc now spans ~7 features and structure clearly BENDS.
+        //
+        // Not larger than this: at ~0.18 the lens spans over a third of the screen,
+        // where the footprint approaches parity with the sky's own churn and reads as
+        // the "way too big drop of water" scale. That is a GEOMETRY ceiling and
+        // cannot be bought back by lowering the amplitude.
+        //
+        // Reading pages run a 1.9x finer field, so R shrinks there to keep roughly the
+        // same number of features under the lens.
+        float R = 0.13 * mix(1.0, 0.62, uReading);
+        // A trimmed 0.16 -> 0.14 because peak displacement scales with R*A: at the
+        // larger radius the old A gave ~7.9px of pull (1.5x the previous 5.2px), which
+        // overshoots "mild". 0.14 lands at ~6.9px — a little more present than before,
+        // since the ask was for more presence, but not a different order of effect.
+        float A = 0.14 * mix(1.0, 0.85, uReading);
         // Slightly quieter while moving, but only slightly. Two rounds of tuning
         // walked this down: 0.85 deep made the lens drop to ~15% during any ordinary
         // move, so following it felt like the effect cutting out and reappearing when
