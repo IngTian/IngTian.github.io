@@ -4,6 +4,14 @@
 // viscous luminance banding and a warm bloom. The reading variant adds a
 // subtractive broken-color tint (ink-side only, never lightens). Dark theme
 // becomes a phosphor nebula with stars behind the line.
+//
+// Pointer interaction (lib/skyInteraction.ts) is composed in here rather than
+// bolted on afterwards, and deliberately lands BEFORE the warp: it perturbs the
+// sample coordinate and/or the field, both of which flow into the displacement and so
+// through the asymmetric legibility gate. That is what makes an interaction
+// incapable of pushing text contrast the wrong way on either archetype.
+
+import { INTERACTION_UNIFORM_DECLS, INTERACTION_GLSL, INTERACTION_UNIFORMS } from './skyInteraction';
 
 export const VERTEX_SHADER = `
   attribute vec2 aPos;
@@ -35,7 +43,7 @@ export function fragmentShader(): string {
     uniform float uTintCap;        // reading-page tint hard ceiling
     uniform float uViscousFloor;
     uniform float uNebulaCeiling;   // hard bound on the dark nebula's added light
-
+` + INTERACTION_UNIFORM_DECLS + `
     float hash(vec2 p) {
       p = fract(p * vec2(443.897, 441.423));
       p += dot(p, p + 19.19);
@@ -52,7 +60,7 @@ export function fragmentShader(): string {
       for (int i = 0; i < 5; i++) { v += a * noise(p); p *= 2.02; a *= 0.5; }
       return v;
     }
-
+` + INTERACTION_GLSL + `
     void main() {
       // Time is scaled with the reading variant's y-stretch so scrolling the warp
       // produces equal apparent motion on both page types. Motion dialled back
@@ -73,12 +81,19 @@ export function fragmentShader(): string {
       float yStretch = mix(1.0, 1.35, uReading);
       vec2 p = vec2(vUv.x * 6.2 * freqK, sy * 12.7 * freqK * yStretch);
 
+      // Pointer interaction. Both outputs are applied to the FIELD's inputs, never
+      // to colour, so everything below (including the legibility gate) governs them.
+      // pOffset is in sample-space units, so it is scaled into p's frequency space.
+      vec2 pOffset; float fAdd;
+      skyInteract(vUv, sy, pOffset, fAdd);
+      p += vec2(pOffset.x * 6.2 * freqK, pOffset.y * 12.7 * freqK * yStretch);
+
       // Two-level domain warp: the original demo's drift terms.
       vec2 q = vec2(fbm(p + 0.09 * t),
                     fbm(p + vec2(5.2, 1.3) - 0.07 * t));
       vec2 r = vec2(fbm(p + 3.4 * q + vec2(1.7, 9.2) + 0.055 * t),
                     fbm(p + 3.4 * q + vec2(8.3, 2.8) - 0.048 * t));
-      float f = fbm(p + 3.2 * r);
+      float f = fbm(p + 3.2 * r) + fAdd;
 
       // Page depth of this pixel (0 = dawn, 1 = ground).
       float depth = clamp(uDepth0 + (1.0 - vUv.y) * uDepthSpan, 0.0, 1.0);
@@ -206,4 +221,6 @@ export const SKY_UNIFORMS = [
   'uRamp', 'uAmp', 'uTime', 'uYOffset', 'uYSpan', 'uDepth0', 'uDepthSpan',
   'uGateTop', 'uGateDark', 'uGateLight', 'uDark', 'uNebula', 'uReading',
   'uTintCap', 'uViscousFloor', 'uNebulaCeiling',
+  // pointer interaction — see lib/skyInteraction.ts
+  ...INTERACTION_UNIFORMS,
 ] as const;

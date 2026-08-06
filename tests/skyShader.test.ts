@@ -12,7 +12,10 @@ describe('SKY_UNIFORMS completeness', () => {
     const source = fragmentShader();
 
     // Extract uniform declarations from the shader source.
-    const declaredRaw = [...source.matchAll(/^\s*uniform\s+\S+\s+(\w+);/gm)].map(m => m[1]);
+    // `(\w+)` then an OPTIONAL array suffix: the interaction's ripple nodes are
+    // declared as `uniform vec4 uNodes[8];`, and without the suffix the name reads
+    // as undeclared — which made this guard fail on a correctly-wired uniform.
+    const declaredRaw = [...source.matchAll(/^\s*uniform\s+\S+\s+(\w+)\s*(?:\[\s*\d+\s*\])?\s*;/gm)].map(m => m[1]);
     const declared = new Set(declaredRaw);
     const listed = new Set(SKY_UNIFORMS);
 

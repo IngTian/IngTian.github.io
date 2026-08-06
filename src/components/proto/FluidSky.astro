@@ -63,6 +63,10 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
   import { VERTEX_SHADER, fragmentShader, SKY_UNIFORMS } from '../../lib/skyShader';
   import { gateFor, tintBudget, nebulaCeiling, type SkyVariant } from '../../lib/skyLegibility';
   import { rampFor, type Theme } from '../../lib/skyPalette';
+  import {
+    DEFAULT_MODE, NODE_COUNT, NODE_LIFETIME,
+    smoothingAlpha, nodeStrength, speedDrive,
+  } from '../../lib/skyInteraction';
 
   const VERT = VERTEX_SHADER;
   const FRAG = fragmentShader();
@@ -189,7 +193,132 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       mVh = Math.max(1, window.innerHeight);
       mDocH = Math.max(1, document.documentElement.scrollHeight);
     }
+    // ── Pointer interaction state ──────────────────────────────────────────
+    // The pointer is tracked in SAMPLE SPACE (x = 0..1 across the canvas, y in the
+    // same scrolling units the shader uses for sy), so the effect stays anchored to
+    // the sky rather than to the screen while the page scrolls.
+    //
+    // Everything is exponentially smoothed with a time constant, not a per-frame
+    // lerp: this canvas runs ~30fps idle and full-rate while scrolling, and a raw
+    // lerp would make the interaction feel different at the two rates.
+    const ptr = { x: 0.5, y: 0, presence: 0, speed: 0, vx: 0, vy: 0 };
+    let rawX = 0.5, rawY = 0, havePointer = false, lastPtrMs = 0;
+    // Ripple node pool: xy = impact point, z = strength, w = age. Reused round-robin
+    // so allocation is zero per frame and the count is a compile-time constant the
+    // shader's loop bound matches (WebGL1 forbids a dynamic bound).
+    const nodes = new Float32Array(NODE_COUNT * 4);
+    const nodeAges = new Float32Array(NODE_COUNT).fill(Infinity);
+    let nodeNext = 0;
+    let dropClock = 0;
+    // Continuous emission, not discrete: the user explicitly asked for "the drop to
+    // be continuous instead of discrete", so drops land on a TIME cadence and are
+    // interpolated along the path covered since the last one. Per-drop strength is
+    // scaled down to compensate for more overlapping ripples, keeping the SUM mild.
+    const DROP_INTERVAL = 0.075;
+
+    function mode(): number {
+      const live = document.documentElement.dataset.skyInteraction;
+      if (live !== undefined) return Number(live) || 0;
+      return DEFAULT_MODE;
+    }
+
+    function onPointerMove(e: PointerEvent): void {
+      if (e.pointerType === 'touch') return;   // mouse/trackpad only, by design
+      const rect = cvs.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      rawX = (e.clientX - rect.left) / rect.width;
+      // y in the shader's scrolling sample units: same scale as uYOffset/uYSpan
+      const vwNow = Math.max(1, mVw);
+      rawY = (window.scrollY + (e.clientY - rect.top)) / vwNow;
+      havePointer = true;
+      lastPtrMs = performance.now();
+    }
+    function onPointerLeave(): void { havePointer = false; }
+
+    // Advance the pointer + node simulation. Split out of draw() so the maths is
+    // readable and so a frame with dt = 0 (a duplicate rAF) cannot divide by zero.
+    function stepInteraction(dt: number): void {
+      const m = mode();
+      if (m === 0) {
+        // Off: relax presence to zero so switching modes mid-hover fades out
+        // instead of snapping, and let live nodes finish rather than vanish.
+        ptr.presence *= 1 - smoothingAlpha(dt, 0.25);
+      } else {
+        // Presence rises while the pointer is over the canvas and falls when it
+        // leaves or goes idle — an idle pointer should not hold the sky open.
+        const idleFor = (performance.now() - lastPtrMs) / 1000;
+        const want = havePointer && idleFor < 1.2 ? 1 : 0;
+        ptr.presence += (want - ptr.presence) * smoothingAlpha(dt, want ? 0.18 : 0.42);
+
+        // Position lag is what makes this feel like a material responding rather
+        // than a cursor-following spotlight.
+        const aPos = smoothingAlpha(dt, 0.085);
+        const nx = ptr.x + (rawX - ptr.x) * aPos;
+        const ny = ptr.y + (rawY - ptr.y) * aPos;
+        if (dt > 0) {
+          const ivx = (nx - ptr.x) / dt, ivy = (ny - ptr.y) / dt;
+          const aVel = smoothingAlpha(dt, 0.12);
+          ptr.vx += (ivx - ptr.vx) * aVel;
+          ptr.vy += (ivy - ptr.vy) * aVel;
+        }
+        ptr.x = nx; ptr.y = ny;
+        ptr.speed = Math.hypot(ptr.vx, ptr.vy);
+      }
+
+      // Ripple emission (mode 4 only) — continuous cadence, interpolated path.
+      if (m === 4 && ptr.presence > 0.05) {
+        dropClock += dt;
+        while (dropClock >= DROP_INTERVAL) {
+          dropClock -= DROP_INTERVAL;
+          // gentle movement makes gentle drops; a still pointer still emits, faintly
+          const drive = 0.35 + 0.65 * speedDrive(ptr.speed);
+          nodes[nodeNext * 4 + 0] = ptr.x;
+          nodes[nodeNext * 4 + 1] = ptr.y;
+          nodes[nodeNext * 4 + 2] = drive * ptr.presence;
+          nodes[nodeNext * 4 + 3] = 0;
+          nodeAges[nodeNext] = 0;
+          nodeNext = (nodeNext + 1) % NODE_COUNT;
+        }
+      }
+      // Age every live node and recompute its strength envelope.
+      for (let i = 0; i < NODE_COUNT; i++) {
+        if (!Number.isFinite(nodeAges[i])) continue;
+        nodeAges[i] += dt;
+        if (nodeAges[i] >= NODE_LIFETIME) {
+          nodeAges[i] = Infinity;
+          nodes[i * 4 + 2] = 0;
+          continue;
+        }
+        nodes[i * 4 + 3] = nodeAges[i];
+        // keep the emitted drive, scale by the age envelope
+        const base = nodes[i * 4 + 2];
+        if (base > 0) nodes[i * 4 + 2] = base;
+      }
+    }
+
+    /** Is any ripple still visible? Keeps the loop at full rate until the last one
+     *  has finished expanding, so a ripple never freezes mid-flight. */
+    function hasLiveNodes(): boolean {
+      for (let i = 0; i < NODE_COUNT; i++) if (Number.isFinite(nodeAges[i])) return true;
+      return false;
+    }
+
+    /** Per-node strength actually sent to the GPU: emitted drive x age envelope. */
+    const nodeUpload = new Float32Array(NODE_COUNT * 4);
+    function packNodes(): Float32Array {
+      for (let i = 0; i < NODE_COUNT; i++) {
+        const age = nodeAges[i];
+        const live = Number.isFinite(age);
+        nodeUpload[i * 4 + 0] = nodes[i * 4 + 0];
+        nodeUpload[i * 4 + 1] = nodes[i * 4 + 1];
+        nodeUpload[i * 4 + 2] = live ? nodes[i * 4 + 2] * nodeStrength(age) : 0;
+        nodeUpload[i * 4 + 3] = live ? age : 0;
+      }
+      return nodeUpload;
+    }
+
     const t0 = performance.now();
+    let lastDrawMs = t0;
     function draw(nowMs: number): void {
       sizeTo();
       uploadRamp();
@@ -218,6 +347,18 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       gl!.uniform1f(U.uViscousFloor, budget.viscousFloor);
       gl!.uniform1f(U.uNebulaCeiling, nebulaCeiling());
       gl!.uniform1f(U.uTime, (nowMs - t0) / 1000);
+
+      // Pointer interaction. dt is clamped: a backgrounded tab or a long GC pause
+      // can hand back a huge delta, which would teleport the pointer and fire a
+      // burst of ripples all at one spot.
+      const dt = Math.min(0.05, Math.max(0, (nowMs - lastDrawMs) / 1000));
+      lastDrawMs = nowMs;
+      stepInteraction(dt);
+      gl!.uniform1f(U.uMode, contained ? 0 : mode());
+      gl!.uniform4f(U.uPtr, ptr.x, ptr.y, ptr.presence, ptr.speed);
+      gl!.uniform2f(U.uPtrVel, ptr.vx, ptr.vy);
+      gl!.uniform4fv(U.uNodes, packNodes());
+
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
     }
 
@@ -227,7 +368,12 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     const reduce = prefersReducedMotion();
     let rafId = 0, running = false, last = 0, scrolling = false;
     function loop(now: number): void {
-      const budget = scrolling ? 0 : 32;
+      // Full rate while scrolling OR while the pointer effect is alive: at the 32ms
+      // idle budget an interaction reads as a stutter rather than a fluid response,
+      // and the ripple wavefront visibly steps. Idle with no pointer stays throttled,
+      // which is where the canvas spends nearly all of its time.
+      const interactive = mode() !== 0 && (ptr.presence > 0.02 || hasLiveNodes());
+      const budget = scrolling || interactive ? 0 : 32;
       if (now - last >= budget) { draw(now); last = now; }
       rafId = requestAnimationFrame(loop);
     }
@@ -248,6 +394,19 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     cvs.addEventListener('webglcontextlost', onLost as EventListener);
     cvs.addEventListener('webglcontextrestored', onRestored);
     document.addEventListener('visibilitychange', onVis);
+    // Pointer listeners go on the WINDOW, not the canvas: the canvas is
+    // pointer-events: none (it must never intercept a click or a text selection),
+    // so it receives no pointer events of its own. Passive, and skipped entirely
+    // under reduced motion — the no-motion state must look finished, and a
+    // pointer-driven effect is motion.
+    const onMove = onPointerMove as EventListener;
+    const onLeaveWin = onPointerLeave as EventListener;
+    if (!reduce && !contained) {
+      window.addEventListener('pointermove', onMove, { passive: true });
+      window.addEventListener('pointerdown', onMove, { passive: true });
+      document.addEventListener('pointerleave', onLeaveWin, { passive: true });
+      window.addEventListener('blur', onLeaveWin);
+    }
     let scrollRaf = 0, scrollIdleT = 0;
     const onScroll = () => {
       scrolling = true;
@@ -275,7 +434,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     const mo = new MutationObserver(() => { uploadRamp(true); draw(performance.now()); });
     mo.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['data-fluid-strength', 'data-theme'],
+      attributeFilter: ['data-fluid-strength', 'data-theme', 'data-sky-interaction'],
     });
 
     const settle = window.setTimeout(() => { sizeTo(true); measureLayout(); measureGate(); draw(performance.now()); }, 1200);
@@ -289,6 +448,10 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       if (scrollRaf) cancelAnimationFrame(scrollRaf);
       window.clearTimeout(scrollIdleT);
       document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerdown', onMove);
+      document.removeEventListener('pointerleave', onLeaveWin);
+      window.removeEventListener('blur', onLeaveWin);
       cvs.removeEventListener('webglcontextlost', onLost as EventListener);
       cvs.removeEventListener('webglcontextrestored', onRestored);
       window.removeEventListener('scroll', onScroll);

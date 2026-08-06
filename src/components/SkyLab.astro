@@ -1,0 +1,106 @@
+---
+// ── TEMPORARY REVIEW SCAFFOLDING — delete once an interaction model is chosen. ──
+// A picker that switches the sky's pointer-interaction model live on the real page.
+//
+// This exists because the effect CANNOT be judged any other way. Screenshot diffs
+// were tried and are not decisive: the sky's own ambient churn moves pixels by up to
+// ~100/255 between any two frames, which swamps a deliberately mild effect, and the
+// measured "lift" for a given model moved by 15/255 between identical runs purely
+// from sampling phase. Motion is the signal, and only a human watching it can rank
+// these. So: switch models with the pointer still moving, no reload.
+//
+// Writes html[data-sky-interaction]; FluidSky reads it per frame and its
+// MutationObserver repaints on change. Choice persists in localStorage.
+import { INTERACTION_MODES } from '../lib/skyInteraction';
+---
+<div class="skylab" id="skylab">
+  <p class="skylab-title">Sky interaction</p>
+  <div class="skylab-rows">
+    {INTERACTION_MODES.map((m) => (
+      <button type="button" class="skylab-btn" data-sky-mode={String(m.id)}>
+        <span class="skylab-key">{m.id}</span>
+        <span class="skylab-body">
+          <span class="skylab-label">{m.label}</span>
+          <span class="skylab-hint">{m.hint}</span>
+        </span>
+      </button>
+    ))}
+  </div>
+  <p class="skylab-note">Move the pointer over the sky · try both themes</p>
+</div>
+
+<style>
+  .skylab {
+    position: fixed; right: 16px; bottom: 16px; z-index: 90;
+    width: 256px; padding: 12px 13px 10px;
+    border-radius: 12px;
+    background: rgba(18, 20, 24, 0.9);
+    border: 1px solid rgba(239, 233, 221, 0.16);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 14px 34px -12px rgba(0, 0, 0, 0.6);
+    font-family: var(--font-mono);
+  }
+  .skylab-title {
+    font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: rgba(239, 233, 221, 0.5); margin: 0 0 8px;
+  }
+  .skylab-rows { display: flex; flex-direction: column; gap: 2px; }
+  .skylab-btn {
+    display: flex; align-items: flex-start; gap: 9px;
+    width: 100%; padding: 6px; border: 0; border-radius: 6px;
+    background: transparent; cursor: pointer; text-align: left;
+    color: rgba(239, 233, 221, 0.62); font-family: inherit;
+    transition: background-color 0.2s, color 0.2s;
+  }
+  .skylab-btn:hover { background: rgba(239, 233, 221, 0.07); color: rgba(239, 233, 221, 0.92); }
+  .skylab-btn[aria-pressed='true'] { background: rgba(239, 233, 221, 0.13); color: #efe9dd; }
+  .skylab-key { width: 9px; flex: none; font-size: 10px; opacity: 0.6; padding-top: 1px; }
+  .skylab-body { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .skylab-label { font-size: 11px; letter-spacing: 0.04em; }
+  .skylab-hint { font-size: 9.5px; line-height: 1.35; opacity: 0.55; }
+  .skylab-note {
+    margin: 9px 0 0; padding-top: 8px; font-size: 9px; letter-spacing: 0.03em;
+    color: rgba(239, 233, 221, 0.34); border-top: 1px solid rgba(239, 233, 221, 0.12);
+  }
+  /* The interaction itself is desktop-only (the canvas is skipped under 641px). */
+  @media (max-width: 640px) { .skylab { display: none; } }
+</style>
+
+<script>
+  const KEY = 'skyInteractionMode';
+
+  function apply(v: string): void {
+    document.documentElement.dataset.skyInteraction = v;
+    document.querySelectorAll<HTMLButtonElement>('[data-sky-mode]').forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.skyMode === v));
+    });
+  }
+
+  function initSkyLab(): void {
+    let current = '0';
+    try { current = localStorage.getItem(KEY) || '0'; } catch { /* ignore */ }
+    apply(current);
+    document.querySelectorAll<HTMLButtonElement>('[data-sky-mode]').forEach((b) => {
+      b.addEventListener('click', () => {
+        const v = b.dataset.skyMode || '0';
+        try { localStorage.setItem(KEY, v); } catch { /* ignore */ }
+        apply(v);
+      });
+    });
+    // Number keys 0-5 switch models without moving the pointer off the sky, which
+    // matters: the effect fades when the pointer leaves, so reaching for the picker
+    // hides the very thing being compared.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!/^[0-5]$/.test(e.key)) return;
+      const t = e.target as HTMLElement | null;
+      if (t && /^(INPUT|TEXTAREA)$/.test(t.tagName)) return;
+      try { localStorage.setItem(KEY, e.key); } catch { /* ignore */ }
+      apply(e.key);
+    };
+    document.addEventListener('keydown', onKey);
+  }
+
+  document.addEventListener('astro:page-load', initSkyLab);
+</script>
