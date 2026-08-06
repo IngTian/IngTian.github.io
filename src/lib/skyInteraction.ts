@@ -111,10 +111,14 @@ export const INTERACTION_UNIFORM_DECLS = `
  * Both outputs feed the field, so both are gated downstream — see the module note.
  */
 export const INTERACTION_GLSL = `
-    // Aspect-correct distance to the pointer. The sample space is anisotropic
-    // (x spans one viewport width, y is in the same units but scrolls), so a
-    // circular footprint on screen needs the x term scaled by the viewport ratio.
-    // Without this the effect is a vertical ellipse on a wide monitor.
+    // Distance to the pointer, and it needs NO aspect correction — an earlier
+    // version of this comment claimed it did, which reads like a bug and is not one.
+    // Both axes are already in the same units: the JS side divides pointer x by the
+    // canvas WIDTH and pointer y by the viewport WIDTH too (not the height), so the
+    // sample space is isotropic in screen terms and the footprint is a true circle.
+    // The field's own 6.2-vs-12.7 anisotropy is applied by skyShader.ts to pOffset
+    // exactly as it is to the coordinate itself, which is what preserves that.
+    // Do not "fix" this by scaling x — that would make the footprint an ellipse.
     vec2 ptrDelta(vec2 uv, float syNow) {
       return vec2(uv.x - uPtr.x, (syNow - uPtr.y));
     }
@@ -135,17 +139,54 @@ export const INTERACTION_GLSL = `
       // added, so the pixel histogram is unchanged; only WHERE values come from
       // moves. The envelope is a smoothstep to zero, so there is no circular rim.
       //
-      // MEASURED, then retuned: at R = 0.055 / strength 0.55 a screenshot diff put
-      // this at +5/255 above the still-pointer control, i.e. below the measurement
-      // noise floor (+6 was observed with the effect OFF). The fBm is locally
-      // smooth, so a small coordinate nudge samples an almost identical value —
-      // visibility needs the offset to cross a feature, which is GEOMETRY. Radius
-      // and strength up; amplitude was never the lever.
+      // MAGNIFY, NOT PINCH, and measured rather than chosen by taste: at the 0.5x
+      // internal resolution, magnifying LOWERS high-frequency energy inside the disc
+      // (it enlarges features already there) while pinching RAISES it by a similar
+      // amount — on marbled strata at half resolution a pinch shimmers under the
+      // cursor and a magnify reads as glass. It also matches the metaphor, since a
+      // water bead is convex.
+      //
+      // THE RIM is this model's classic failure — a faint visible circle at the
+      // envelope edge. The envelope is the compact cubic bump w(u) = (1-u^2)^3 on
+      // u = dist/R, and the offset is dist * A * w. That form has w, w' AND w''
+      // all vanishing at u = 1, so the disc is C2 at its own edge and a rim is
+      // impossible by construction rather than merely faint. A
+      // (1 - smoothstep(0,R,dist))^2 envelope — the obvious choice, and what this
+      // first shipped with — is only C1 there and additionally kinks partway in.
+      //
+      // The peak displacement is at u = 1/sqrt(7) ~ 0.378, NOT at the centre, where
+      // it is zero by construction. A = 0.16 gives ~1.19x magnification centrally
+      // with a radial Jacobian that stays strictly positive, so the field can never
+      // fold over itself (that would need A > 1).
       if (uMode < 1.5) {
-        float R = 0.115;                       // ~166px at 1440 wide
-        float k = 1.0 - smoothstep(0.0, R, dist);
-        // pull samples inward => magnify. squared falloff keeps the centre gentle
-        pOffset = -dir * dist * k * k * 1.45 * presence;
+        // R: 0.085 viewport widths ~ 122px radius at 1440. The field's own feature
+        // scale is ~58px across, so the disc spans about four features and structure
+        // visibly BENDS; at half this it covers one feature and merely translates it,
+        // which reads as nothing. Much larger and the footprint reaches parity with
+        // the sky's own churn, which is the "way too big drop of water" scale — a
+        // GEOMETRY limit, so it cannot be bought back with a smaller amplitude.
+        // Reading pages run a 1.9x finer field, so R shrinks to keep the same number
+        // of features under the lens.
+        float R = 0.085 * mix(1.0, 0.62, uReading);
+        float A = 0.16 * mix(1.0, 0.85, uReading);
+        // Strongest at REST, quieter as the pointer moves: a bead of water sits, it
+        // does not smear. This is also the structural guard against becoming the
+        // rejected trail — a fast flick leaves little strung out behind the pointer.
+        //
+        // The fade is 0.45 deep, not 0.85. At 0.85 the lens dropped to ~15% strength
+        // during any ordinary move, so following it felt like the effect cutting out
+        // and then reappearing when you stopped — which reads as unsmooth even though
+        // each individual frame is correct. Retaining 55% while moving keeps it
+        // continuously present, and the saturation point is raised to 1.6 so a normal
+        // gesture sits mid-fade instead of at the floor. A genuine flick still fades.
+        A *= presence * (1.0 - 0.45 * min(1.0, uPtr.w / 1.6));
+        float u = dist / R;
+        if (u < 1.0) {
+          float s = 1.0 - u * u;
+          float w = s * s * s;                 // C2 compact bump
+          // d is already dir * dist, so this needs no normalize and no divide.
+          pOffset = -d * (A * w);
+        }
       }
 
       // ── 2. BLOOM — tone, via the field ──────────────────────────────────
@@ -166,19 +207,33 @@ export const INTERACTION_GLSL = `
         fAdd = k * k * k * 0.14 * presence;
       }
 
-      // ── 3. VORTEX — angular, sample-coordinate ──────────────────────────
-      // Rotational shear, NOT displacement along the stroke: the offset is
-      // TANGENTIAL, so it curls the strata instead of smearing them along the
-      // cursor path (which is the model the user rejected as stirring). Rotation
-      // is differential (falls off with radius) because rigid rotation of a noise
-      // field is nearly invisible.
+      // ── 3. VORTEX — angular, sample-coordinate, driven by TURNING ───────
+      // Rotational shear, and the drive is the pointer's signed TURNING RATE, not
+      // its speed. That distinction is the whole model.
+      //
+      // A vortex driven by SPEED is the rejected "stirring up a mix of colors" model
+      // wearing a different hat: sustained rotational displacement following a moving
+      // cursor reads as stirring whether the offset is tangential or axial. Driving it
+      // from turning rate separates them CATEGORICALLY rather than by tuning — a
+      // straight stroke has zero curvature, so it produces a bit-identical image to
+      // Off. You have to actually turn the pointer to disturb the sky, which is what
+      // "a spoon turned once in ink" means physically.
+      //
+      // Differential rotation (falling off with radius) rather than rigid, because
+      // rigidly rotating a noise field is almost invisible — nothing shears.
       else if (uMode < 3.5) {
-        float R = 0.075;
-        float k = 1.0 - smoothstep(0.0, R, dist);
-        vec2 tangent = vec2(-dir.y, dir.x);
-        // spin scales with pointer speed, so a still pointer leaves no permanent twist
-        float spin = 0.045 * k * k * presence * (0.35 + 0.65 * min(1.0, uPtr.w / 1.6));
-        pOffset = tangent * spin;
+        float R = 0.085;
+        float u = dist / R;
+        if (u < 1.0) {
+          float s = 1.0 - u * u;
+          float w = s * s * s;                 // same C2 bump as the lens: no rim
+          vec2 tangent = vec2(-dir.y, dir.x);
+          // uPtrVel.x carries the signed turning rate for this model (see the JS).
+          // Signed, so turning back the other way unwinds the twist instead of
+          // accumulating it — that is what makes it relax rather than smear.
+          float spin = clamp(uPtrVel.x, -1.0, 1.0) * 0.075 * w * presence;
+          pOffset = tangent * spin;
+        }
       }
 
       // ── 4. RIPPLE — expanding rings, via the field ──────────────────────

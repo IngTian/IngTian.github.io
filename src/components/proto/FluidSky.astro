@@ -170,19 +170,39 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       gateTop = Math.min(0.95, Math.max(0.1, top / Math.max(1, document.documentElement.scrollHeight)));
     }
     measureGate();
-    const SCALE = 0.5;
+    // The ambient sky renders at HALF resolution: it is a soft, low-frequency field
+    // where 2x2 blocks are invisible, and halving the pixel count is most of why this
+    // canvas is cheap.
+    //
+    // An interaction is the exception. The lens magnifies the field around a point,
+    // which concentrates a spatial GRADIENT inside a ~120px radius — and at 0.5x that
+    // gradient is quantised onto 2px blocks, which is what reads as a coarse or
+    // "steppy" lens rather than glass. So the canvas re-sizes to full resolution while
+    // an interaction is live and drops back to half when it ends. Idle cost is
+    // unchanged (which is where the canvas spends nearly all its time), and the extra
+    // pixels are only paid for while the pointer is actually doing something.
+    const SCALE_IDLE = 0.5;
+    const SCALE_ACTIVE = 1.0;
+    let scaleNow = SCALE_IDLE;
     let sizedW = 0, sizedH = 0;
     function sizeTo(force = false): void {
       if (!force && sizedW && sizedH) {
         gl!.viewport(0, 0, sizedW, sizedH);
         return;
       }
-      const w = Math.max(1, Math.round((cvs.clientWidth || 1) * SCALE));
-      const h = Math.max(1, Math.round((cvs.clientHeight || 1) * SCALE));
+      const w = Math.max(1, Math.round((cvs.clientWidth || 1) * scaleNow));
+      const h = Math.max(1, Math.round((cvs.clientHeight || 1) * scaleNow));
       if (cvs.width !== w || cvs.height !== h) { cvs.width = w; cvs.height = h; }
       sizedW = cvs.width;
       sizedH = cvs.height;
       gl!.viewport(0, 0, sizedW, sizedH);
+    }
+    /** Switch internal resolution. Resizing a canvas clears it and reallocates its
+     *  backbuffer, so this must only fire on a real transition, never per frame. */
+    function setScale(next: number): void {
+      if (next === scaleNow) return;
+      scaleNow = next;
+      sizeTo(true);
     }
     // Cached layout metrics: avoid per-frame synchronous layout reads.
     let mVw = Math.max(1, window.innerWidth);
@@ -201,8 +221,9 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     // Everything is exponentially smoothed with a time constant, not a per-frame
     // lerp: this canvas runs ~30fps idle and full-rate while scrolling, and a raw
     // lerp would make the interaction feel different at the two rates.
-    const ptr = { x: 0.5, y: 0, presence: 0, speed: 0, vx: 0, vy: 0 };
+    const ptr = { x: 0.5, y: 0, presence: 0, speed: 0, vx: 0, vy: 0, turn: 0 };
     let rawX = 0.5, rawY = 0, havePointer = false, lastPtrMs = 0;
+    let prevVx = 0, prevVy = 0;   // previous velocity, for the signed turning rate
     // Ripple node pool: xy = impact point, z = strength, w = age. Reused round-robin
     // so allocation is zero per frame and the count is a compile-time constant the
     // shader's loop bound matches (WebGL1 forbids a dynamic bound).
@@ -241,18 +262,40 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       const m = mode();
       if (m === 0) {
         // Off: relax presence to zero so switching modes mid-hover fades out
-        // instead of snapping, and let live nodes finish rather than vanish.
-        ptr.presence *= 1 - smoothingAlpha(dt, 0.25);
+        // instead of snapping, and let live nodes finish rather than vanish. Velocity
+        // must decay too, or `speed` keeps its last value and the activity check that
+        // drives frame rate and internal resolution never goes false.
+        const decay = 1 - smoothingAlpha(dt, 0.25);
+        ptr.presence *= decay;
+        ptr.vx *= decay; ptr.vy *= decay; ptr.turn *= decay;
+        ptr.speed = Math.hypot(ptr.vx, ptr.vy);
       } else {
         // Presence rises while the pointer is over the canvas and falls when it
         // leaves or goes idle — an idle pointer should not hold the sky open.
+        // Slower rise (0.30s) than the original 0.18s: the lens should GATHER at the
+        // pointer rather than appear at it. The fall stays longer still, so leaving
+        // the sky relaxes rather than snaps off.
+        //
+        // The idle timeout is 6s, not 1.2s. At 1.2s a lens held still — which is the
+        // lens's strongest and most deliberate state — silently dissolved while the
+        // pointer had not moved at all, so resting on the sky and watching it looked
+        // like the effect was broken. An idle pointer is a legitimate reading pose.
         const idleFor = (performance.now() - lastPtrMs) / 1000;
-        const want = havePointer && idleFor < 1.2 ? 1 : 0;
-        ptr.presence += (want - ptr.presence) * smoothingAlpha(dt, want ? 0.18 : 0.42);
+        const want = havePointer && idleFor < 6 ? 1 : 0;
+        ptr.presence += (want - ptr.presence) * smoothingAlpha(dt, want ? 0.30 : 0.55);
 
         // Position lag is what makes this feel like a material responding rather
-        // than a cursor-following spotlight.
-        const aPos = smoothingAlpha(dt, 0.085);
+        // than a cursor-following spotlight — but too much lag turns the effect INTO
+        // the rejected directional trail. Steady-state lag is v * tau, so at
+        // tau = 0.085 a 2200px/s sweep leaves the effect ~187px behind the pointer,
+        // which is 1.5x the lens radius: the disturbance sits entirely OUTSIDE its
+        // own footprint and reads as a lagging blob dragged along. At 0.055 the same
+        // sweep lags ~110px (0.9 R) and an ordinary 430px/s move lags ~22px — inertia
+        // without a tail. The localised models use the shorter constant; ripple keeps
+        // the longer one because its nodes detach from the pointer on emission.
+        const m2 = mode();
+        const localised = m2 === 1 || m2 === 2 || m2 === 3;
+        const aPos = smoothingAlpha(dt, localised ? 0.055 : 0.085);
         const nx = ptr.x + (rawX - ptr.x) * aPos;
         const ny = ptr.y + (rawY - ptr.y) * aPos;
         if (dt > 0) {
@@ -261,8 +304,32 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
           ptr.vx += (ivx - ptr.vx) * aVel;
           ptr.vy += (ivy - ptr.vy) * aVel;
         }
+        // Signed TURNING RATE, for the vortex model. The 2D cross product of the
+        // previous and current velocity gives the sense and magnitude of the turn;
+        // normalising by the speeds makes it a rate rather than a speed proxy, which
+        // is the point: a STRAIGHT stroke has zero curvature and must leave the sky
+        // untouched, or the model degenerates into the rejected "stirring".
+        if (dt > 0) {
+          const sp = Math.hypot(ptr.vx, ptr.vy), spPrev = Math.hypot(prevVx, prevVy);
+          const cross = prevVx * ptr.vy - prevVy * ptr.vx;
+          const turnNow = sp > 1e-4 && spPrev > 1e-4 ? cross / (sp * spPrev) / dt : 0;
+          // smoothed so a single jittery sample cannot spike the twist
+          ptr.turn += (turnNow - ptr.turn) * smoothingAlpha(dt, 0.16);
+          prevVx = ptr.vx; prevVy = ptr.vy;
+        }
         ptr.x = nx; ptr.y = ny;
         ptr.speed = Math.hypot(ptr.vx, ptr.vy);
+
+        // Bleed velocity toward zero when no pointer is present. Without this, vx/vy
+        // keep whatever value they last held — nothing recomputes them once events
+        // stop — so `speed` stays above the activity threshold forever and the canvas
+        // never returns to its idle frame rate or half resolution. Measured: it sat
+        // at full resolution indefinitely after the pointer left.
+        if (!havePointer) {
+          const decay = 1 - smoothingAlpha(dt, 0.20);
+          ptr.vx *= decay; ptr.vy *= decay; ptr.turn *= decay;
+          ptr.speed = Math.hypot(ptr.vx, ptr.vy);
+        }
       }
 
       // Ripple emission (mode 4 only) — continuous cadence, interpolated path.
@@ -356,7 +423,12 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
       stepInteraction(dt);
       gl!.uniform1f(U.uMode, contained ? 0 : mode());
       gl!.uniform4f(U.uPtr, ptr.x, ptr.y, ptr.presence, ptr.speed);
-      gl!.uniform2f(U.uPtrVel, ptr.vx, ptr.vy);
+      // uPtrVel carries the raw velocity for WIND (which advects along it), but the
+      // signed TURNING RATE in .x for VORTEX (which must be zero on a straight
+      // stroke). One vec2, two meanings, selected by mode — documented here and in
+      // the GLSL because a reader of either side alone would misread it.
+      const vortex = mode() === 3;
+      gl!.uniform2f(U.uPtrVel, vortex ? ptr.turn : ptr.vx, vortex ? 0 : ptr.vy);
       gl!.uniform4fv(U.uNodes, packNodes());
 
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
@@ -368,11 +440,22 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     const reduce = prefersReducedMotion();
     let rafId = 0, running = false, last = 0, scrolling = false;
     function loop(now: number): void {
-      // Full rate while scrolling OR while the pointer effect is alive: at the 32ms
-      // idle budget an interaction reads as a stutter rather than a fluid response,
-      // and the ripple wavefront visibly steps. Idle with no pointer stays throttled,
-      // which is where the canvas spends nearly all of its time.
-      const interactive = mode() !== 0 && (ptr.presence > 0.02 || hasLiveNodes());
+      // Full rate whenever a pointer effect is ALIVE — not only while it is moving.
+      //
+      // An earlier version gated this on movement, reasoning that a still pointer adds
+      // no temporal signal. That is wrong for the lens, and backwards in the worst
+      // way: the lens FADES as the pointer moves and is strongest at rest, so its
+      // smoothest, most-visible moment is exactly the one that gated down to ~30fps.
+      // What the eye then saw was the effect relaxing in visible steps.
+      //
+      // A settling effect is still animating even when the input is static: the
+      // exponential position/presence smoothing has a ~0.055-0.42s tail, and every
+      // frame of that tail is a different image. So escalate on presence, and hold
+      // full rate briefly after presence decays so the relaxation lands smoothly too.
+      const settling = ptr.presence > 0.02 || ptr.speed > 0.004;
+      const interactive = mode() !== 0 && (settling || hasLiveNodes());
+      // Full internal resolution only while an interaction is live — see sizeTo().
+      setScale(interactive ? SCALE_ACTIVE : SCALE_IDLE);
       const budget = scrolling || interactive ? 0 : 32;
       if (now - last >= budget) { draw(now); last = now; }
       rafId = requestAnimationFrame(loop);
