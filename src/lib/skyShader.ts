@@ -55,10 +55,23 @@ export function fragmentShader(): string {
 
     void main() {
       // Time is scaled with the reading variant's y-stretch so scrolling the warp
-      // produces equal apparent motion on both page types. Motion dialled back
-      // uniformly by 0.55; reading pages keep a small relative boost since their
-      // effect comes from a tint response rather than a ramp lookup.
-      float t = uTime * 0.55 * mix(1.0, 1.35, uReading);
+      // produces equal apparent motion on both page types. Reading pages keep a small
+      // relative boost since their effect comes from a tint response rather than a
+      // ramp lookup.
+      //
+      // 0.80 is the global drift speed, chosen on the real page from a live ladder
+      // (0.55 / 0.80 / 1.10 / 1.50 / 2.00). It replaces an earlier 0.55, which had
+      // damped the motion when the sky felt too busy — 0.80 is the point where the sky
+      // reads as alive without becoming distracting.
+      //
+      // SPEED is the lever here, not amplitude. The ramp displacement is already
+      // +/-0.306 of the whole dawn-to-ground span at full strength — nearly two
+      // palette bands — and over text it is the asymmetric legibility gate, not that
+      // constant, that reins it in. So raising amplitude changes little exactly where
+      // text lives while spending the headroom on the un-gated open sky, whereas a
+      // faster drift reads as more alive without swinging further in tone. Verified:
+      // contrast is FLAT across the whole speed ladder on both archetypes.
+      float t = uTime * 0.80 * mix(1.0, 1.35, uReading);
 
       // Anisotropic sample space: more frequency DOWN than ACROSS, which stretches
       // the field into drifting strata instead of round blobs. Scaled so one
