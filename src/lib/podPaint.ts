@@ -39,6 +39,15 @@ function palette(theme: 'light' | 'dark') {
   };
 }
 
+/** Deterministic per-dot jitter in [0,1), hashed from the dot's lattice position.
+ *  NOT Math.random(): the pod repaints on hover, theme change and resize, and a
+ *  fresh random per repaint makes the whole scene shimmer when the pointer merely
+ *  crosses a monitor — and it would stop screenshots reproducing. */
+function dotJitter(x: number, y: number): number {
+  const h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return h - Math.floor(h);
+}
+
 const path = (ctx: CanvasRenderingContext2D, q: PodQuad, o: PaintOpts) => {
   ctx.beginPath();
   q.corners.forEach((c, i) => {
@@ -92,7 +101,7 @@ function paintWall(ctx: CanvasRenderingContext2D, q: PodQuad, o: PaintOpts, c: P
         // tiny jitter so the grid doesn't alias
         const jx = ((Math.sin(x * 0.7 + y * 1.1) * 0.5 + 0.5) - 0.5) * spacing * 0.4;
         const jy = ((Math.sin(x * 1.3 + y * 0.9) * 0.5 + 0.5) - 0.5) * spacing * 0.4;
-        const alpha = baseAlpha * (0.7 + Math.random() * 0.3);
+        const alpha = baseAlpha * (0.7 + dotJitter(x, y) * 0.3);
         const radius = 0.9 * o.dpr;
 
         ctx.beginPath();
@@ -127,7 +136,7 @@ function paintBench(ctx: CanvasRenderingContext2D, q: PodQuad, o: PaintOpts, c: 
 
         // Screen spill: brighter at the top (back of the bench)
         const spillT = 1 - (y - yTop) / (yBot - yTop);
-        const alpha = (0.12 + spillT * 0.22) * (0.7 + Math.random() * 0.3);
+        const alpha = (0.12 + spillT * 0.22) * (0.7 + dotJitter(x, y) * 0.3);
         const radius = 1.0 * o.dpr;
 
         ctx.beginPath();
@@ -242,13 +251,15 @@ function paintGantt(ctx: CanvasRenderingContext2D, r: { x: number; y: number; w:
   if (!bars.length) return;
   const lo = Math.min(...bars.map((b) => b.start));
   const hi = Math.max(...bars.map((b) => b.end));
+  const span = Math.max(1, hi - lo);   // never divide by zero: a single-year Gantt
+                                       // would otherwise NaN out and blank the screen
   const rowH = r.h / bars.length;
   const fs = Math.max(3.5, rowH * 0.42);
   mono(ctx, fs);
   bars.forEach((b, i) => {
     const y = r.y + i * rowH + rowH * 0.22;
-    const x0 = r.x + ((b.start - lo) / (hi - lo)) * r.w;
-    const x1 = r.x + ((b.end - lo) / (hi - lo)) * r.w;
+    const x0 = r.x + ((b.start - lo) / span) * r.w;
+    const x1 = r.x + ((b.end - lo) / span) * r.w;
     ctx.fillStyle = b.kind === 'education' ? c.indigo : c.accent;
     ctx.globalAlpha = 0.85;
     ctx.fillRect(x0, y, Math.max(2, x1 - x0), rowH * 0.34);
@@ -320,7 +331,7 @@ function paintDeskObject(ctx: CanvasRenderingContext2D, q: PodQuad, o: PaintOpts
       for (let x = x0; x < x1; x += spacing) {
         const jx = ((Math.sin(x * 0.7 + y * 1.1) * 0.5 + 0.5) - 0.5) * spacing * 0.4;
         const jy = ((Math.sin(x * 1.3 + y * 0.9) * 0.5 + 0.5) - 0.5) * spacing * 0.4;
-        const alpha = fill.alpha * (0.7 + Math.random() * 0.3);
+        const alpha = fill.alpha * (0.7 + dotJitter(x, y) * 0.3);
         const radius = 0.85 * o.dpr;
 
         ctx.beginPath();
