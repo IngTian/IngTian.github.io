@@ -138,8 +138,14 @@ function blitQuad(ctx: Ctx, src: HTMLCanvasElement, q: Quad) {
     const bot = bl[1] + (br[1] - bl[1]) * t;
     const h = bot - top;
     if (h <= 0) continue;
+    // Source column advances in exact step with the destination column, and both the
+    // top and the height are rounded CONSISTENTLY (round the edges, not the span) —
+    // rounding the height independently accumulates a per-column error that reads as the
+    // content sagging in the middle of the screen.
     const sx = Math.min(src.width - 1, Math.floor(t * src.width));
-    ctx.drawImage(src, sx, 0, 1, src.height, x, Math.round(top), 1, Math.round(h));
+    const yTop = Math.round(top);
+    const yBot = Math.round(bot);
+    ctx.drawImage(src, sx, 0, 1, src.height, x, yTop, 1, Math.max(1, yBot - yTop));
   }
 }
 
@@ -483,8 +489,16 @@ function drawMonitor(ctx: Ctx, p: RoomPal, m: MonitorPlace, o: RoomOpts) {
 
   // Screen: content renders rectangular into an offscreen buffer, then maps into the
   // tilted quad. See blitQuad — this is why content code stays readable.
+  //
+  // The source is sized to the trapezoid's UNWRAPPED dimensions — its width, and the
+  // MEAN of its two vertical edge heights — not to its bounding box. The bounding box is
+  // taller than any single column, so sizing to it squashes every column by a different
+  // amount and the content visibly bows in the middle.
   const sb = quadBounds(sq);
-  const src = renderScreen(p, m, Math.max(8, Math.round(sb.w)), Math.max(8, Math.round(sb.h)), o);
+  const edgeL = Math.abs(sq[3][1] - sq[0][1]);
+  const edgeR = Math.abs(sq[2][1] - sq[1][1]);
+  const srcH = Math.max(8, Math.round((edgeL + edgeR) / 2));
+  const src = renderScreen(p, m, Math.max(8, Math.round(sb.w)), srcH, o);
   if (src) blitQuad(ctx, src, sq);
   strokeQuad(ctx, sq, p.void);
 
