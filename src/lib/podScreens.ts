@@ -57,19 +57,44 @@ function shortLabel(title: string): string {
 }
 
 /**
- * Bars for the Gantt screen: longest-running first, capped at 6 so the screen
- * stays readable at monitor scale.
+ * Bars for the Gantt screen: the PhD first (identity headline), then longest-
+ * running, capped at 6 so the screen stays readable. No duplicate labels.
  */
 export function ganttBars(entries: readonly TimelineEntry[], nowYear: number): GanttBar[] {
   const bars: GanttBar[] = [];
+  const seen = new Set<string>();
+
   for (const e of entries) {
     const span = parsePeriod(e.period);
     if (!span) continue;
-    bars.push({ label: shortLabel(e.title), start: span.start, end: span.end, kind: e.kind });
+    const label = shortLabel(e.title);
+
+    // When an institution appears twice, keep only the longer-running entry
+    if (seen.has(label)) {
+      const existing = bars.find(b => b.label === label);
+      if (existing && (span.end - span.start) > (existing.end - existing.start)) {
+        // Replace with the longer run
+        bars.splice(bars.indexOf(existing), 1);
+      } else {
+        // Keep the existing one, skip this
+        continue;
+      }
+    }
+
+    seen.add(label);
+    bars.push({ label, start: span.start, end: span.end, kind: e.kind });
   }
-  return bars
-    .sort((a, b) => (b.end - b.start) - (a.end - a.start) || b.start - a.start)
-    .slice(0, 6);
+
+  // Sort: PhD first, then by duration descending
+  bars.sort((a, b) => {
+    const aIsPhd = /phd/i.test(a.label);
+    const bIsPhd = /phd/i.test(b.label);
+    if (aIsPhd && !bIsPhd) return -1;
+    if (!aIsPhd && bIsPhd) return 1;
+    return (b.end - b.start) - (a.end - a.start) || b.start - a.start;
+  });
+
+  return bars.slice(0, 6);
 }
 
 // ── Monitor 1: an IDE ───────────────────────────────────────────────────────
@@ -147,14 +172,14 @@ export function latexLines(): { indent: number; text: string; kind: 'head' | 'bo
 
 export function bloombergRows(): { ticker: string; last: string; chg: string; up: boolean }[] {
   return [
-    { ticker: 'SPX', last: '5,412.18', chg: '+0.42%', up: true },
-    { ticker: 'NDX', last: '19,204.7', chg: '+0.71%', up: true },
-    { ticker: 'RTY', last: '2,088.34', chg: '-0.19%', up: false },
+    { ticker: 'SPX', last: '5,410', chg: '+0.42%', up: true },
+    { ticker: 'NDX', last: '19,205', chg: '+0.71%', up: true },
+    { ticker: 'RTY', last: '2,088', chg: '-0.19%', up: false },
     { ticker: 'VIX', last: '13.62', chg: '-2.10%', up: false },
-    { ticker: 'UST10', last: '4.213', chg: '+1.8bp', up: true },
-    { ticker: 'DXY', last: '104.88', chg: '-0.08%', up: false },
-    { ticker: 'XAU', last: '2,391.4', chg: '+0.55%', up: true },
-    { ticker: 'CL1', last: '78.21', chg: '-1.24%', up: false },
+    { ticker: 'UST10', last: '4.21', chg: '+1.8bp', up: true },
+    { ticker: 'DXY', last: '104.9', chg: '-0.08%', up: false },
+    { ticker: 'XAU', last: '2,391', chg: '+0.55%', up: true },
+    { ticker: 'CL1', last: '78.2', chg: '-1.24%', up: false },
   ];
 }
 

@@ -56,6 +56,19 @@ describe('ganttBars — against the REAL timeline', () => {
     const labels = ganttBars(timeline, 2026).map((b) => b.label.toLowerCase());
     expect(labels.some((l) => l.includes('phd'))).toBe(true);
   });
+
+  it('has NO duplicate institution labels (keep longer-running when duplicated)', () => {
+    const bars = ganttBars(timeline, 2026);
+    const labels = bars.map(b => b.label);
+    const uniq = new Set(labels);
+    expect(uniq.size).toBe(labels.length);
+  });
+
+  it('puts the PhD FIRST (quant-first identity hierarchy)', () => {
+    const bars = ganttBars(timeline, 2026);
+    expect(bars.length).toBeGreaterThan(0);
+    expect(bars[0].label.toLowerCase()).toMatch(/phd/);
+  });
 });
 
 describe('screen content generators are deterministic', () => {

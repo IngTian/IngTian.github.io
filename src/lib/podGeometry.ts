@@ -22,9 +22,9 @@ const T = (POD_TILT_DEG * Math.PI) / 180;
 const cosT = Math.cos(T);
 const sinT = Math.sin(T);
 
-/** Horizon line as a fraction of frame height. 0.62 leaves room for the bench
- *  below and the monitor wall above. */
-const HORIZON = 0.62;
+/** Horizon line as a fraction of frame height. 0.68 pushes the bench down so its
+ *  front edge lands near the canvas bottom, using the full height. */
+const HORIZON = 0.68;
 
 /**
  * Project a pod-space point to screen space.
@@ -98,8 +98,8 @@ function upright(id: PodQuadId, x0: number, x1: number, y: number, z0: number, z
 export const POD_LAYOUT: PodQuad[] = [
   // the wall plane behind the monitors (dark, so screens read as lit)
   { id: 'wall', corners: [[-2.4, WALL_Y + 0.02, 1.9], [2.4, WALL_Y + 0.02, 1.9], [2.4, WALL_Y + 0.02, 0], [-2.4, WALL_Y + 0.02, 0]] },
-  // the bench surface
-  { id: 'bench', corners: [[-2.2, -1.05, 0], [2.2, -1.05, 0], [2.0, WALL_Y, 0], [-2.0, WALL_Y, 0]] },
+  // the bench surface — front edge extended toward viewer so it fills the frame
+  { id: 'bench', corners: [[-2.2, -1.35, 0], [2.2, -1.35, 0], [2.0, WALL_Y, 0], [-2.0, WALL_Y, 0]] },
   ...Array.from({ length: MONITOR_SLOTS }, (_, i) => monitorQuad(i)),
   // desk objects, front to back. Keyboard/mouse nearest — they are what make the
   // scene read as FROM THE SEAT rather than a view of a desk.

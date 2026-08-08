@@ -71,7 +71,12 @@ const gantt = ganttBars(timeline, 2026);
     position: relative; width: min(1180px, 92vw); margin: 0 auto;
     aspect-ratio: 16 / 9;
   }
-  .pod-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .pod-canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+    /* Dissolve top and bottom into the page */
+    mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%);
+  }
 
   .pod-hits { position: absolute; inset: 0; list-style: none; margin: 0; padding: 0; }
   .pod-hit-wrap { position: absolute; }
