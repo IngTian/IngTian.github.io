@@ -90,7 +90,7 @@ const C = (text: string) => ({ text, kind: 'comment' as const });
 
 export function ideLines(): CodeLine[] {
   return [
-    { indent: 0, tokens: [K('from'), P(' risk '), K('import'), P(' hrp, sector_cov')] },
+    { indent: 0, tokens: [K('from'), P(' risk '), K('import'), P(' hrp, sector_cov, within, dispersion')] },
     { indent: 0, tokens: [C('# two-level weights: sector share x within-sector share')] },
     { indent: 0, tokens: [K('def'), P(' '), F('allocate'), P('(returns, sectors):')] },
     { indent: 1, tokens: [P('cov = '), F('sector_cov'), P('(returns, sectors)')] },
@@ -99,7 +99,7 @@ export function ideLines(): CodeLine[] {
     { indent: 1, tokens: [K('return'), P(' w / w.'), F('sum'), P('()')] },
     { indent: 0, tokens: [C('# reward: return - turnover cost - dispersion penalty')] },
     { indent: 0, tokens: [K('def'), P(' '), F('reward'), P('(w, w_prev, r, lam='), N('0.35'), P('):')] },
-    { indent: 1, tokens: [P('turn = c * np.'), F('abs'), P('(w - w_prev).'), F('sum'), P('()')] },
+    { indent: 1, tokens: [P('turn = '), N('12e-4'), P(' * np.'), F('abs'), P('(w - w_prev).'), F('sum'), P('()'), C('  # 12 bps')] },
     { indent: 1, tokens: [K('return'), P(' w @ r - turn - lam * '), F('dispersion'), P('(w)')] },
   ];
 }
