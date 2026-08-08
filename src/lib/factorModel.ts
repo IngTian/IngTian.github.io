@@ -224,6 +224,8 @@ export interface Beam {
   elevation: number;
   /** Tip position in world space. */
   tip: Vec3;
+  /** Unit direction of the beam axis, independent of its length. */
+  dir: Vec3;
   /** Half-width of the wedge at the tip; proportional to beta. */
   halfWidth: number;
   /** Length from origin to tip. */
@@ -243,13 +245,21 @@ export const FAN = {
    *  An earlier 232° put two beams behind the camera where their labels could never be
    *  read. 150° leaves a real margin without collapsing the fan to a narrow cone. */
   spreadDeg: 150,
-  /** Beams tilt up as they fan out, so the object is a shallow dome rather than a flat star —
-   *  that is what makes it read as 3D from a single still frame.
+  /** A single CONSTANT tilt for every beam, so the fan is a shallow cone rather than a flat
+   *  star — enough to read as 3D, and identical across beams.
    *
-   *  Raised 26 → 52 after rendering: at 26° the six beams were nearly coplanar, so they
-   *  overlapped on screen and their tip labels stacked. The lift is what separates the tips
-   *  VERTICALLY, which is the only axis available once azimuth is spent on the spread. */
-  liftDeg: 52,
+   *  WHY CONSTANT, and this is the fix for the beams visibly interleaving:
+   *  elevation used to RISE with azimuth (26°, later 52°, scaled by distance from centre).
+   *  Horizontal reach goes as cos(elevation), so a short, steeply-lifted outer beam reached
+   *  LESS far across the screen than a long, flat inner one — and the on-screen order stopped
+   *  matching the azimuth order. Measured at the time:
+   *      craft   az −45°  →  screen x 515
+   *      writing az −75°  →  screen x 595   ← outermost beam, but drawn INSIDE craft
+   *      exp     az −15°  →  screen x 624
+   *  Three coupled variables (β → length, β → width, azimuth → elevation) guaranteed
+   *  crossings. Now decoupled: azimuth alone sets angular position, elevation is the same for
+   *  all, and β drives length and width only. Screen order then always follows azimuth. */
+  liftDeg: 16,
   /** Length of a beam at beta = 0, and the extra length per unit beta. A zero-loading
    *  factor still gets a visible stub, because "no signal yet" is information. */
   minLength: 0.55,
@@ -303,9 +313,9 @@ export function fanBeams(): Beam[] {
     const slot = slotOrder[i];
     const t = n === 1 ? 0.5 : slot / (n - 1);          // 0..1 across the fan
     const azimuth = -spread / 2 + t * spread;
-    // Beams further from centre lift more, so the fan is a dome and the outer beams do not
-    // collide with the inner ones on screen.
-    const elevation = lift * Math.abs((t - 0.5) * 2) ** 1.4;
+    // ONE elevation for every beam — see FAN.liftDeg for why a varying lift made the beams
+    // cross on screen.
+    const elevation = lift;
     const length = FAN.minLength + l.beta * FAN.lengthGain;
     const halfWidth = FAN.minHalfWidth + l.beta * FAN.widthGain;
 
@@ -316,10 +326,23 @@ export function fanBeams(): Beam[] {
       elevation,
       length,
       halfWidth,
+      // The tip's ANGULAR position is fixed by azimuth, and beta sets how far along that
+      // ray the beam reaches. Note this still leaves tip.x proportional to length, so a long
+      // inner beam can out-reach a short outer one in raw x — that is honest 3D and is why
+      // the fan must ROTATE to be read properly. What must never happen is two beams sharing
+      // angular space, which even spacing plus one shared elevation guarantees.
       tip: {
         x: Math.sin(azimuth) * Math.cos(elevation) * length,
         y: Math.sin(elevation) * length,
         z: Math.cos(azimuth) * Math.cos(elevation) * length,
+      },
+      /** Unit direction of the beam's axis — the thing that is strictly ordered by azimuth,
+       *  independent of beta. Used by tests and by label placement, so "which beam is further
+       *  left" never depends on how strong it is. */
+      dir: {
+        x: Math.sin(azimuth) * Math.cos(elevation),
+        y: Math.sin(elevation),
+        z: Math.cos(azimuth) * Math.cos(elevation),
       },
     };
   });

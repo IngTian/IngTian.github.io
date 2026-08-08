@@ -159,10 +159,40 @@ describe('fanBeams — the equation laid out in space', () => {
     }
   });
 
-  it('lifts outer beams above inner ones, so the fan is a dome not a flat star', () => {
-    const sorted = [...beams].sort((a, b) => Math.abs(a.azimuth) - Math.abs(b.azimuth));
-    expect(sorted[0].elevation).toBeLessThan(sorted[sorted.length - 1].elevation);
-    for (const b of beams) expect(b.elevation).toBeGreaterThanOrEqual(0);
+  it('gives every beam the SAME elevation, so none can cross another', () => {
+    // The interleaving bug: elevation used to rise with azimuth, and horizontal reach goes as
+    // cos(elevation), so a short steeply-lifted outer beam reached less far across the screen
+    // than a long flat inner one and got drawn INSIDE it. One shared elevation makes that
+    // impossible by construction.
+    const els = new Set(beams.map((b) => b.elevation.toFixed(9)));
+    expect(els.size).toBe(1);
+    for (const b of beams) expect(b.elevation).toBeGreaterThan(0);
+  });
+
+  it('orders beams in ANGLE independently of how strong they are — no shared angular space', () => {
+    // The invariant that actually prevents interleaving. tip.x is still proportional to
+    // length (honest 3D — a long inner beam does reach further in raw x), so the test is on
+    // the beam's DIRECTION, which depends only on azimuth. Two beams may overlap visually at
+    // one camera angle; they must never occupy the same angular slot.
+    const byAz = [...beams].sort((a, b) => a.azimuth - b.azimuth).map((b) => b.factor.key);
+    const byDirX = [...beams].sort((a, b) => a.dir.x - b.dir.x).map((b) => b.factor.key);
+    expect(byDirX).toEqual(byAz);
+  });
+
+  it('gives every beam a unit-length direction', () => {
+    for (const b of beams) {
+      expect(Math.hypot(b.dir.x, b.dir.y, b.dir.z), b.factor.key).toBeCloseTo(1, 9);
+    }
+  });
+
+  it('spaces the beams evenly in azimuth', () => {
+    // Even spacing is what makes it read as a FAN rather than as two dominant wedges with
+    // stragglers behind them. With a shared elevation, equal azimuth steps are the only
+    // remaining lever on angular rhythm.
+    const az = [...beams].map((b) => b.azimuth).sort((a, b) => a - b);
+    const gaps = az.slice(1).map((v, i) => v - az[i]);
+    const first = gaps[0];
+    for (const g of gaps) expect(g).toBeCloseTo(first, 9);
   });
 
   it('gives a zero-loading factor a visible stub, not nothing', () => {
