@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { parsePeriod, ganttBars } from '../src/lib/podScreens';
+import {
+  parsePeriod, ganttBars,
+  ideLines, backtestCurve, latexLines, bloombergRows, SCREEN_CONTENT,
+} from '../src/lib/podScreens';
 import { timeline } from '../src/data/profile';
 
 describe('parsePeriod', () => {
@@ -52,5 +55,74 @@ describe('ganttBars — against the REAL timeline', () => {
   it('includes the incoming PhD — the identity headline', () => {
     const labels = ganttBars(timeline, 2026).map((b) => b.label.toLowerCase());
     expect(labels.some((l) => l.includes('phd'))).toBe(true);
+  });
+});
+
+describe('screen content generators are deterministic', () => {
+  it('backtestCurve returns identical output on repeat calls', () => {
+    expect(backtestCurve(64)).toEqual(backtestCurve(64));
+  });
+
+  it('backtestCurve stays inside 0..1 and rises overall', () => {
+    const c = backtestCurve(64);
+    expect(c).toHaveLength(64);
+    for (const p of c) {
+      expect(p.x).toBeGreaterThanOrEqual(0); expect(p.x).toBeLessThanOrEqual(1);
+      expect(p.y).toBeGreaterThanOrEqual(0); expect(p.y).toBeLessThanOrEqual(1);
+    }
+    expect(c[c.length - 1].y).toBeGreaterThan(c[0].y);
+  });
+
+  it('backtestCurve has at least one drawdown — a monotone line is not a backtest', () => {
+    const c = backtestCurve(64);
+    expect(c.some((p, i) => i > 0 && p.y < c[i - 1].y)).toBe(true);
+  });
+
+  it('ideLines produces indented, tokenised code', () => {
+    const lines = ideLines();
+    expect(lines.length).toBeGreaterThanOrEqual(8);
+    expect(lines.some((l) => l.indent > 0)).toBe(true);
+    expect(lines.every((l) => l.tokens.length > 0)).toBe(true);
+    expect(lines.some((l) => l.tokens.some((t) => t.kind === 'kw'))).toBe(true);
+  });
+
+  it('latexLines and bloombergRows are non-empty and plain data', () => {
+    expect(latexLines().length).toBeGreaterThanOrEqual(5);
+    const rows = bloombergRows();
+    expect(rows.length).toBeGreaterThanOrEqual(6);
+    expect(rows.some((r) => r.up)).toBe(true);
+    expect(rows.some((r) => !r.up)).toBe(true);
+  });
+
+  it('contains no CJK anywhere (English-only rule)', () => {
+    const all = JSON.stringify([ideLines(), latexLines(), bloombergRows(), SCREEN_CONTENT]);
+    expect(/[一-鿿]/.test(all)).toBe(false);
+  });
+});
+
+describe('SCREEN_CONTENT — the slot binding', () => {
+  it('covers all 5 slots exactly once', () => {
+    expect(SCREEN_CONTENT.map((s) => s.slot).sort()).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it('three slots navigate and two announce', () => {
+    const links = SCREEN_CONTENT.filter((s) => s.href);
+    const announces = SCREEN_CONTENT.filter((s) => s.announce);
+    expect(links).toHaveLength(3);
+    expect(announces).toHaveLength(2);
+    // never both — a control either goes somewhere or says it is coming
+    for (const s of SCREEN_CONTENT) expect(Boolean(s.href) && Boolean(s.announce)).toBe(false);
+  });
+
+  it('links point at real routes', () => {
+    const hrefs = SCREEN_CONTENT.filter((s) => s.href).map((s) => s.href);
+    expect(hrefs.sort()).toEqual(['/experience', '/projects', '/research']);
+  });
+
+  it('every slot has a short label for the overlay control', () => {
+    for (const s of SCREEN_CONTENT) {
+      expect(s.label.length).toBeGreaterThan(0);
+      expect(s.label.length).toBeLessThanOrEqual(24);
+    }
   });
 });

@@ -71,3 +71,107 @@ export function ganttBars(entries: readonly TimelineEntry[], nowYear: number): G
     .sort((a, b) => (b.end - b.start) - (a.end - a.start) || b.start - a.start)
     .slice(0, 6);
 }
+
+// ── Monitor 1: an IDE ───────────────────────────────────────────────────────
+// Plausible portfolio-optimization Python. Hand-written rather than generated:
+// a quant reads this screen, so the code has to be sane.
+
+export interface CodeLine {
+  indent: number;
+  tokens: { text: string; kind: 'kw' | 'fn' | 'str' | 'num' | 'plain' | 'comment' }[];
+}
+
+const K = (text: string) => ({ text, kind: 'kw' as const });
+const F = (text: string) => ({ text, kind: 'fn' as const });
+const S = (text: string) => ({ text, kind: 'str' as const });
+const N = (text: string) => ({ text, kind: 'num' as const });
+const P = (text: string) => ({ text, kind: 'plain' as const });
+const C = (text: string) => ({ text, kind: 'comment' as const });
+
+export function ideLines(): CodeLine[] {
+  return [
+    { indent: 0, tokens: [K('from'), P(' risk '), K('import'), P(' hrp, sector_cov')] },
+    { indent: 0, tokens: [C('# two-level weights: sector share x within-sector share')] },
+    { indent: 0, tokens: [K('def'), P(' '), F('allocate'), P('(returns, sectors):')] },
+    { indent: 1, tokens: [P('cov = '), F('sector_cov'), P('(returns, sectors)')] },
+    { indent: 1, tokens: [P('w_sector = '), F('hrp'), P('(cov, method='), S("'ward'"), P(')')] },
+    { indent: 1, tokens: [P('w = w_sector[sectors] * '), F('within'), P('(returns)')] },
+    { indent: 1, tokens: [K('return'), P(' w / w.'), F('sum'), P('()')] },
+    { indent: 0, tokens: [C('# reward: return - turnover cost - dispersion penalty')] },
+    { indent: 0, tokens: [K('def'), P(' '), F('reward'), P('(w, w_prev, r, lam='), N('0.35'), P('):')] },
+    { indent: 1, tokens: [P('turn = c * np.'), F('abs'), P('(w - w_prev).'), F('sum'), P('()')] },
+    { indent: 1, tokens: [K('return'), P(' w @ r - turn - lam * '), F('dispersion'), P('(w)')] },
+  ];
+}
+
+// ── Monitor 2: a backtest equity curve ─────────────────────────────────────
+// Deterministic: a seeded hash, never Math.random(), so the static first frame
+// matches the animated one and screenshots are reproducible.
+
+function seeded(i: number): number {
+  const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+export function backtestCurve(n: number): { x: number; y: number }[] {
+  const out: { x: number; y: number }[] = [];
+  let v = 0.18;
+  for (let i = 0; i < n; i++) {
+    // upward drift plus mean-reverting noise, with two engineered drawdowns so it
+    // reads as a real equity curve rather than a rising line
+    const shock = (i > n * 0.32 && i < n * 0.40) || (i > n * 0.66 && i < n * 0.71) ? -0.035 : 0;
+    v += 0.011 + (seeded(i) - 0.5) * 0.022 + shock;
+    v = Math.max(0.02, Math.min(0.98, v));
+    out.push({ x: i / (n - 1), y: v });
+  }
+  return out;
+}
+
+// ── Monitor 4: a LaTeX page mid-typeset ────────────────────────────────────
+
+export function latexLines(): { indent: number; text: string; kind: 'head' | 'body' | 'math' }[] {
+  return [
+    { indent: 0, text: 'Hierarchical Risk Parity, revisited', kind: 'head' },
+    { indent: 0, text: 'Notes on allocation under regime change.', kind: 'body' },
+    { indent: 0, text: 'w = W g(i) eta i | g(i)', kind: 'math' },
+    { indent: 0, text: 'The two-level map keeps sector risk', kind: 'body' },
+    { indent: 0, text: 'separable from within-sector dispersion,', kind: 'body' },
+    { indent: 0, text: 'which is what makes the parity claim hold.', kind: 'body' },
+    { indent: 0, text: 'sum RC i (w) = sigma^2 p (w)', kind: 'math' },
+  ];
+}
+
+// ── Monitor 5: a Bloomberg-style panel ─────────────────────────────────────
+// Rendered in --ochre, NOT amber: CLAUDE.md permits only the seal as a saturated
+// colour in light theme, and ochre is already the accent and reads amber-adjacent.
+
+export function bloombergRows(): { ticker: string; last: string; chg: string; up: boolean }[] {
+  return [
+    { ticker: 'SPX', last: '5,412.18', chg: '+0.42%', up: true },
+    { ticker: 'NDX', last: '19,204.7', chg: '+0.71%', up: true },
+    { ticker: 'RTY', last: '2,088.34', chg: '-0.19%', up: false },
+    { ticker: 'VIX', last: '13.62', chg: '-2.10%', up: false },
+    { ticker: 'UST10', last: '4.213', chg: '+1.8bp', up: true },
+    { ticker: 'DXY', last: '104.88', chg: '-0.08%', up: false },
+    { ticker: 'XAU', last: '2,391.4', chg: '+0.55%', up: true },
+    { ticker: 'CL1', last: '78.21', chg: '-1.24%', up: false },
+  ];
+}
+
+// ── The slot binding: content, label, destination ───────────────────────────
+// Single source of truth. The component reads this to build the overlay controls,
+// so a screen's picture and its link can never disagree.
+
+export const SCREEN_CONTENT: {
+  slot: number;
+  kind: 'ide' | 'backtest' | 'gantt' | 'latex' | 'bloomberg';
+  label: string;
+  href?: string;
+  announce?: string;
+}[] = [
+  { slot: 0, kind: 'ide', label: 'Projects', href: '/projects' },
+  { slot: 1, kind: 'backtest', label: 'Research', href: '/research' },
+  { slot: 2, kind: 'gantt', label: 'Experience', href: '/experience' },
+  { slot: 3, kind: 'latex', label: 'Writing', announce: 'Writing · coming' },
+  { slot: 4, kind: 'bloomberg', label: 'Market reports', announce: 'Market reports · coming' },
+];
