@@ -1,0 +1,202 @@
+---
+// PROTO SHOWPIECE — a kill gate, not a design proposal.
+//
+// WHY THIS ROUTE EXISTS: three attempts at the homepage's bottom section were built and
+// rejected, and each one was only judgeable AFTER it was finished. That is the expensive
+// order. These are the three surviving candidate concepts as static build-time SVG — the
+// same geometry that would go to the GPU, so the composition is representative — shown
+// side by side so one look kills or keeps each for the price of one function.
+//
+// Deliberately honest about what a still frame CANNOT show, per frame, in the notes below.
+// A frame that flatters its concept is worse than no frame.
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { protoFrame } from '../lib/protoFrames';
+
+const FRAMES = [
+  {
+    id: 'seriation' as const,
+    n: 1,
+    title: 'Seriation',
+    score: 'ranked #1 — mean 21.6 / buildability 8.0',
+    pitch: 'A linkage tree standing on a correlation floor. The tiles are your real portfolio items; because rows are ordered by similarity, related work collapses into blocks down the diagonal. The six stems rising out of the tree are the six destinations.',
+    quant: 'Highest — it is the signature figure of the RL-BHRP paper you actually wrote. A quant reads it in one second.',
+    missing: 'A real build adds a cast shadow from one low light, which is the only thing that welds the tree to the floor as ONE object. SVG cannot cast it, so this frame under-sells the join — the one place it is pessimistic rather than flattering.',
+    risk: 'It lands as a journal plate: correct, cold, a chart at the foot of an atmospheric page.',
+  },
+  {
+    id: 'stepwell' as const,
+    n: 2,
+    title: 'Stepwell',
+    score: 'ranked #2 — mean 20.7 / buildability 8.7 (highest)',
+    pitch: 'The ground opens into a stepped shaft. Six terraces descend inward, each rotated slightly so the corners spiral, with one destination per terrace — so tab order IS descent order, and the site’s own title becomes literal.',
+    quant: 'Near zero. It says architecture, not portfolio optimization. For a slot whose job is to be memorable to a quant audience, that is a real price, not a rounding error.',
+    missing: 'Real matte concrete under one shadow-casting light is the most forgiving image in rendering; flat SVG fills cannot show that softness, so this frame is harsher and more diagrammatic than the build would be.',
+    risk: 'It reads as a swimming pool or a stack of empty picture frames — not theoretical, since an earlier desk already read as a bathtub.',
+  },
+  {
+    id: 'simplex' as const,
+    n: 3,
+    title: 'The Simplex Cage',
+    score: 'ranked #3 — mean 18.6 / buildability 7.3',
+    pitch: 'The space of portfolio weights as a wireframe solid. Its six vertices are six pure allocations and six destinations; a live long-only min-variance solution drifts inside and sticks to faces and edges when it goes sparse.',
+    quant: 'Highest content of the three — the visual IS your PhD subject, and six vertices is the only honest reason for exactly six panels anywhere in the set.',
+    missing: 'The interior veils and the solver are the whole appeal and neither survives a still: on the page the solution re-solves when you hover a corner, which is mathematics answering rather than a tween.',
+    risk: 'A slowly rotating translucent polyhedron with glowing labelled nodes is THE WebGL landing-page object of the last four years. It will look dated fast, and it tells the hero terrain’s story twice.',
+  },
+];
+---
+<BaseLayout
+  title="Proto — showpiece candidates"
+  description="Diagnostic route: three candidate concepts for the homepage showpiece, as static frames."
+  veilLine="three candidates"
+  veilOnLoad={false}
+  navZone="light"
+>
+  <main class="proto">
+    <header class="proto-head">
+      <a class="back" href="/">← back</a>
+      <h1>Showpiece candidates</h1>
+      <p class="lede">
+        Three concepts as static frames, before any 3D is built. Same geometry that would go
+        to the GPU. Each note says what a still frame <em>cannot</em> show, so nothing here
+        is flattering itself.
+      </p>
+      <p class="lede dim">
+        Flip the theme with the corner nav — both must work. If none of these survives being
+        looked at, the concept dies here rather than after five sessions.
+      </p>
+    </header>
+
+    {FRAMES.map((f) => (
+      <section class="frame-block">
+        <div class="frame-meta">
+          <p class="frame-n">{String(f.n).padStart(2, '0')}</p>
+          <h2>{f.title}</h2>
+          <p class="frame-score">{f.score}</p>
+          <p class="frame-pitch">{f.pitch}</p>
+          <dl>
+            <dt>Quant signal</dt><dd>{f.quant}</dd>
+            <dt>What this frame can’t show</dt><dd>{f.missing}</dd>
+            <dt>Biggest risk</dt><dd>{f.risk}</dd>
+          </dl>
+        </div>
+        <div class={`frame-art frame-${f.id}`} set:html={protoFrame(f.id)} />
+      </section>
+    ))}
+
+    <footer class="proto-foot">
+      <a class="back" href="/">← back to the descent</a>
+    </footer>
+  </main>
+</BaseLayout>
+
+<style>
+  .proto {
+    background: var(--reading-grad);
+    min-height: 100vh;
+    padding: 12vh 6vw 16vh;
+  }
+  .back {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--ink-4); text-decoration: none;
+  }
+  .back:hover { color: var(--ink-2); }
+  .proto-head h1 {
+    font-family: var(--font-display); font-size: clamp(32px, 4.6vw, 50px);
+    font-weight: 300; color: var(--ink-1); margin: 18px 0 0;
+  }
+  .lede { font-size: 15.5px; line-height: 1.7; color: var(--ink-3); max-width: 62ch; margin: 14px 0 0; }
+  .lede.dim { color: var(--ink-4); font-size: 14px; }
+
+  .frame-block { margin-top: 12vh; }
+  .frame-meta { max-width: 74ch; }
+  .frame-n {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.2em;
+    color: var(--ink-5); margin: 0;
+  }
+  .frame-meta h2 {
+    font-family: var(--font-display); font-size: 28px; font-weight: 400;
+    color: var(--ink-1); margin: 6px 0 0;
+  }
+  .frame-score {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em;
+    color: var(--ochre); margin: 6px 0 0;
+  }
+  .frame-pitch { font-size: 15px; line-height: 1.7; color: var(--ink-2); margin: 12px 0 0; }
+  dl { margin: 14px 0 0; display: grid; grid-template-columns: 15rem 1fr; gap: 6px 20px; }
+  dt {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--ink-4);
+  }
+  dd { margin: 0; font-size: 14px; line-height: 1.66; color: var(--ink-3); }
+  @media (max-width: 780px) { dl { grid-template-columns: 1fr; gap: 2px 0; } dd { margin-bottom: 10px; } }
+
+  /* The art sits on the site's near-black ground, which is where it would really live —
+     judging it on a light reading background would be judging the wrong thing. */
+  .frame-art {
+    margin: 26px 0 0;
+    background: var(--bg);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .frame-art :global(svg) { display: block; width: 100%; height: auto; }
+
+  /* ── Per-frame palettes. Every colour is a token, so both themes are covered and the
+     palette rule (seal reserved as the brand mark) is not quietly broken. ── */
+
+  /* Seriation: a diverging ramp, indigo (low) -> paper (zero) -> ochre (high). In DARK the
+     midpoint must be the void, not --paper, because --paper is near-white there and would
+     blow out the zero band. */
+  .frame-seriation {
+    --ser-c0: color-mix(in oklab, var(--indigo) 88%, #000);
+    --ser-c1: color-mix(in oklab, var(--indigo) 70%, #000);
+    --ser-c2: color-mix(in oklab, var(--indigo) 52%, #000);
+    --ser-c3: color-mix(in oklab, var(--indigo) 34%, #000);
+    --ser-c4: color-mix(in oklab, var(--indigo) 18%, #000);
+    --ser-c5: #14120f;
+    --ser-c6: color-mix(in oklab, var(--ochre) 20%, #000);
+    --ser-c7: color-mix(in oklab, var(--ochre) 38%, #000);
+    --ser-c8: color-mix(in oklab, var(--ochre) 56%, #000);
+    --ser-c9: color-mix(in oklab, var(--ochre) 74%, #000);
+    --ser-c10: var(--ochre);
+    --ser-line: var(--ink-5);
+    --ser-cut: color-mix(in oklab, var(--ink-4) 70%, transparent);
+    --ser-node: var(--ochre);
+  }
+  :global(html[data-theme='dark']) .frame-seriation { --ser-c5: #0e1013; }
+
+  /* Stepwell: concrete lit from low left. Kept mostly in the ink range with only the lips
+     catching light, so a large bright plane never arrives at the darkest point of the page. */
+  .frame-stepwell {
+    --sw-ground: color-mix(in oklab, var(--ink-1) 92%, var(--bg));
+    --sw-tread0: color-mix(in oklab, var(--ink-3) 34%, var(--bg));
+    --sw-tread1: color-mix(in oklab, var(--ink-3) 26%, var(--bg));
+    --sw-lit: color-mix(in oklab, var(--ink-5) 52%, var(--bg));
+    --sw-shade: color-mix(in oklab, var(--ink-1) 78%, var(--bg));
+    --sw-lip: color-mix(in oklab, var(--paper) 42%, transparent);
+    --sw-core: var(--bg);
+  }
+
+  /* Simplex: hairline cage, ochre nodes, the solution point in seal — the ONE saturated
+     mark, which is exactly what the brand colour is for. */
+  .frame-simplex {
+    --sx-edge: color-mix(in oklab, var(--ink-5) 78%, transparent);
+    --sx-veil: var(--indigo);
+    --sx-node: var(--ochre);
+    --sx-w: var(--seal);
+    --sx-shadow: color-mix(in oklab, var(--ink-1) 60%, transparent);
+  }
+
+  .frame-art :global(.ser-label),
+  .frame-art :global(.sw-label),
+  .frame-art :global(.sx-label) {
+    font-family: var(--font-mono); font-size: 15px; letter-spacing: 0.1em;
+    text-transform: uppercase; fill: var(--paper);
+  }
+  .frame-art :global(.ser-caption) {
+    font-family: var(--font-mono); font-size: 14px; letter-spacing: 0.06em;
+    fill: var(--ink-4);
+  }
+
+  .proto-foot { margin-top: 14vh; }
+</style>
