@@ -44,6 +44,14 @@ const gantt = ganttBars(timeline, 2026);
       aria-hidden="true"
     ></canvas>
 
+    <!-- Style lab: TEMPORARY scaffolding so the two art directions can be judged live,
+         because small-detail screenshots are unjudgeable. One of these gets baked in and
+         this block is deleted. -->
+    <div class="pod-lab" role="group" aria-label="Room art style">
+      <button type="button" class="pod-lab-btn" data-pod-style-btn="retro">1 · retrofuture</button>
+      <button type="button" class="pod-lab-btn" data-pod-style-btn="pixel">2 · pixel art</button>
+    </div>
+
     <!-- The real interface, over the painted screens. -->
     <ul class="pod-hits">
       {slots.map((s) => (
@@ -83,13 +91,33 @@ const gantt = ganttBars(timeline, 2026);
   .pod-frame { position: relative; width: 100%; aspect-ratio: 1600 / 880; }
   .pod-canvas {
     position: absolute; inset: 0; width: 100%; height: 100%; display: block;
-    /* THE pixel-art line: scale the small buffer up with hard pixels, no blur. */
-    image-rendering: pixelated;
+    /* Smooth by default — the retrofuturist style wants its curved glass and chrome
+       gradients interpolated. The pixel style adds .is-pixel to get hard pixels instead;
+       image-rendering is that style's entire look and this one's enemy. */
+    image-rendering: auto;
     /* Only the TOP needs dissolving — the room's own dark floor carries the bottom
        into the page, and the links sit on it. */
     mask-image: linear-gradient(to bottom, transparent 0, black 7%);
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 7%);
   }
+
+  .pod-canvas.is-pixel { image-rendering: pixelated; }
+
+  /* Style lab — temporary scaffolding, deleted when a style is chosen. */
+  .pod-lab {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    z-index: 3; display: flex; gap: 6px;
+    padding: 5px; border-radius: 999px;
+    background: rgb(0 0 0 / 0.55); backdrop-filter: blur(8px);
+    border: 1px solid rgb(255 255 255 / 0.12);
+  }
+  .pod-lab-btn {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em;
+    padding: 5px 12px; border-radius: 999px; cursor: pointer;
+    background: transparent; border: 0; color: var(--ink-3);
+  }
+  .pod-lab-btn[aria-pressed='true'] { background: var(--ochre); color: var(--on-accent); }
+  .pod-lab-btn:focus-visible { outline: 1px solid var(--ochre); outline-offset: 2px; }
 
   .pod-hits { position: absolute; inset: 0; list-style: none; margin: 0; padding: 0; }
   .pod-hit-wrap { position: absolute; }
@@ -140,6 +168,15 @@ const gantt = ganttBars(timeline, 2026);
 <script>
   import { ROOM_W, ROOM_H } from '../lib/podRoom';
   import { paintRoom } from '../lib/podRoomPaint';
+  import { paintRetroRoom } from '../lib/podRoomRetro';
+
+  type PodStyle = 'retro' | 'pixel';
+  const STYLE_KEY = 'podStyle';
+
+  /** Two painters over ONE geometry module, so the DOM overlay's click targets are
+   *  identical in both. Retro is the default while it is being evaluated. */
+  const currentStyle = (): PodStyle =>
+    (document.documentElement.dataset.podStyle as PodStyle) || 'retro';
 
   const teardowns: Array<() => void> = [];
 
@@ -159,13 +196,20 @@ const gantt = ganttBars(timeline, 2026);
     const theme = (): 'light' | 'dark' =>
       document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
 
-    // The buffer is FIXED — no DPR, no resize sizing. That is the whole point of a
-    // low-res pixel buffer: paint cost is constant and CSS does the scaling.
+    // The buffer is FIXED — no DPR, no resize sizing. Paint cost is constant and CSS does
+    // the scaling, which is what keeps a 1600x880 room cheap to repaint on hover.
     cvs.width = ROOM_W;
     cvs.height = ROOM_H;
 
     let hoverSlot: number | null = null;
-    const draw = () => paintRoom(ctx, { theme: theme(), hoverSlot, gantt });
+    const draw = () => {
+      const opts = { theme: theme(), hoverSlot, gantt };
+      const style = currentStyle();
+      // image-rendering is the pixel style's whole look and the retro style's enemy.
+      cvs.classList.toggle('is-pixel', style === 'pixel');
+      if (style === 'pixel') paintRoom(ctx, opts);
+      else paintRetroRoom(ctx, opts);
+    };
 
     const frame = cvs.parentElement!;
     const hits = Array.from(frame.querySelectorAll<HTMLElement>('.pod-hit'));
@@ -183,16 +227,46 @@ const gantt = ganttBars(timeline, 2026);
       if (h.tagName === 'BUTTON') h.addEventListener('click', (ev) => ev.preventDefault());
     }
 
+    // Style lab wiring — temporary, removed with the lab itself.
+    const labBtns = Array.from(frame.querySelectorAll<HTMLButtonElement>('[data-pod-style-btn]'));
+    const syncLab = () => {
+      const s = currentStyle();
+      for (const b of labBtns) b.setAttribute('aria-pressed', String(b.dataset.podStyleBtn === s));
+    };
+    const onLab = (e: Event) => {
+      const s = (e.currentTarget as HTMLElement).dataset.podStyleBtn as PodStyle;
+      document.documentElement.dataset.podStyle = s;
+      try { localStorage.setItem(STYLE_KEY, s); } catch { /* private mode */ }
+      syncLab();
+      draw();
+    };
+    for (const b of labBtns) b.addEventListener('click', onLab);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const s: PodStyle | null = e.key === '1' ? 'retro' : e.key === '2' ? 'pixel' : null;
+      if (!s) return;
+      document.documentElement.dataset.podStyle = s;
+      try { localStorage.setItem(STYLE_KEY, s); } catch { /* private mode */ }
+      syncLab();
+      draw();
+    };
+    window.addEventListener('keydown', onKey);
+    syncLab();
+
     draw();   // static first frame immediately — this is the LCP paint
 
-    // Repaint only on hover and theme change. Nothing animates: a dark room lit by
-    // screens is alive without motion, so there is no rAF loop at all and the
+    // Repaint only on hover, theme change and style change. Nothing animates: a dark room
+    // lit by screens is alive without motion, so there is no rAF loop at all and the
     // reduced-motion state is the same finished picture.
-    const mo = new MutationObserver(draw);
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    const mo = new MutationObserver(() => { syncLab(); draw(); });
+    mo.observe(document.documentElement, {
+      attributes: true, attributeFilter: ['data-theme', 'data-pod-style'],
+    });
 
     return () => {
       mo.disconnect();
+      window.removeEventListener('keydown', onKey);
+      for (const b of labBtns) b.removeEventListener('click', onLab);
       for (const h of hits) {
         h.removeEventListener('pointerenter', onEnter);
         h.removeEventListener('focus', onEnter);
@@ -202,5 +276,14 @@ const gantt = ganttBars(timeline, 2026);
     };
   }
 
+  // Restore the chosen style before the first paint, so switching does not flash.
+  function restoreStyle(): void {
+    try {
+      const s = localStorage.getItem(STYLE_KEY);
+      if (s === 'pixel' || s === 'retro') document.documentElement.dataset.podStyle = s;
+    } catch { /* private mode */ }
+  }
+
+  restoreStyle();
   document.addEventListener('astro:page-load', initPods);
 </script>
