@@ -48,8 +48,9 @@ const gantt = ganttBars(timeline, 2026);
          because small-detail screenshots are unjudgeable. One of these gets baked in and
          this block is deleted. -->
     <div class="pod-lab" role="group" aria-label="Room art style">
-      <button type="button" class="pod-lab-btn" data-pod-style-btn="retro">1 · retrofuture</button>
-      <button type="button" class="pod-lab-btn" data-pod-style-btn="pixel">2 · pixel art</button>
+      <button type="button" class="pod-lab-btn" data-pod-style-btn="scene">1 · modernist</button>
+      <button type="button" class="pod-lab-btn" data-pod-style-btn="retro">2 · console</button>
+      <button type="button" class="pod-lab-btn" data-pod-style-btn="pixel">3 · pixel art</button>
     </div>
 
     <!-- The real interface, over the painted screens. -->
@@ -57,6 +58,7 @@ const gantt = ganttBars(timeline, 2026);
       {slots.map((s) => (
         <li
           class="pod-hit-wrap"
+          data-base-rect={`${s.rect.left},${s.rect.top},${s.rect.width},${s.rect.height}`}
           style={`left:${s.rect.left}%;top:${s.rect.top}%;width:${s.rect.width}%;height:${s.rect.height}%`}
         >
           {s.href ? (
@@ -169,14 +171,17 @@ const gantt = ganttBars(timeline, 2026);
   import { ROOM_W, ROOM_H } from '../lib/podRoom';
   import { paintRoom } from '../lib/podRoomPaint';
   import { paintRetroRoom } from '../lib/podRoomRetro';
+  import { paintScene, sceneScreens } from '../lib/podScene';
+  import { prefersReducedMotion } from '../lib/motion';
 
-  type PodStyle = 'retro' | 'pixel';
+  type PodStyle = 'scene' | 'retro' | 'pixel';
   const STYLE_KEY = 'podStyle';
 
-  /** Two painters over ONE geometry module, so the DOM overlay's click targets are
-   *  identical in both. Retro is the default while it is being evaluated. */
+  /** Three painters over shared geometry. 'scene' is flat modernist architecture on the
+   *  one-true-camera (podCamera); 'retro' is the 1960s console; 'pixel' is the pixel-art
+   *  room. Modernist is the default while it is being evaluated. */
   const currentStyle = (): PodStyle =>
-    (document.documentElement.dataset.podStyle as PodStyle) || 'retro';
+    (document.documentElement.dataset.podStyle as PodStyle) || 'scene';
 
   const teardowns: Array<() => void> = [];
 
@@ -202,22 +207,56 @@ const gantt = ganttBars(timeline, 2026);
     cvs.height = ROOM_H;
 
     let hoverSlot: number | null = null;
-    const draw = () => {
-      const opts = { theme: theme(), hoverSlot, gantt };
-      const style = currentStyle();
-      // image-rendering is the pixel style's whole look and the retro style's enemy.
-      cvs.classList.toggle('is-pixel', style === 'pixel');
-      if (style === 'pixel') paintRoom(ctx, opts);
-      else paintRetroRoom(ctx, opts);
+    let t0 = 0;
+
+    // The modernist scene lays its screens out in world space, so its hit areas differ
+    // from the other two styles'. The overlay follows the ACTIVE style — if it did not,
+    // the click targets would silently drift off the painted screens.
+    const wraps = Array.from(
+      (cvs.parentElement as HTMLElement).querySelectorAll<HTMLElement>('.pod-hit-wrap'),
+    );
+    const applyRects = (style: PodStyle) => {
+      const rects = style === 'scene' ? sceneScreens(ROOM_W, ROOM_H) : null;
+      for (const wrap of wraps) {
+        const slot = Number(wrap.querySelector<HTMLElement>('.pod-hit')?.dataset.slot);
+        if (rects) {
+          const r = rects.find((x) => x.slot === slot);
+          if (!r) continue;
+          wrap.style.left = `${r.left}%`; wrap.style.top = `${r.top}%`;
+          wrap.style.width = `${r.width}%`; wrap.style.height = `${r.height}%`;
+        } else if (wrap.dataset.baseRect) {
+          const [l, tp, w, h] = wrap.dataset.baseRect.split(',');
+          wrap.style.left = `${l}%`; wrap.style.top = `${tp}%`;
+          wrap.style.width = `${w}%`; wrap.style.height = `${h}%`;
+        }
+      }
     };
+
+    // Last animation timestamp, so a hover repaint while the loop is running does not
+    // rewind the sun and the water to t=0 (a bare draw() would). `function` rather than
+    // `const` so redraw() can reference it above its own definition without a TDZ error.
+    let lastNow = 0;
+    function redraw() { draw(lastNow); }
+
+    function draw(nowMs = lastNow) {
+      lastNow = nowMs;
+      const style = currentStyle();
+      // image-rendering is the pixel style's whole look and the other two styles' enemy.
+      cvs.classList.toggle('is-pixel', style === 'pixel');
+      cvs.classList.toggle('is-scene', style === 'scene');
+      const t = t0 ? (nowMs - t0) / 1000 : 0;
+      if (style === 'pixel') paintRoom(ctx, { theme: theme(), hoverSlot, gantt });
+      else if (style === 'retro') paintRetroRoom(ctx, { theme: theme(), hoverSlot, gantt });
+      else paintScene(ctx, ROOM_W, ROOM_H, { theme: theme(), hoverSlot, gantt, t });
+    }
 
     const frame = cvs.parentElement!;
     const hits = Array.from(frame.querySelectorAll<HTMLElement>('.pod-hit'));
     const onEnter = (e: Event) => {
       hoverSlot = Number((e.currentTarget as HTMLElement).dataset.slot);
-      draw();
+      redraw();
     };
-    const onLeave = () => { hoverSlot = null; draw(); };
+    const onLeave = () => { hoverSlot = null; redraw(); };
     for (const h of hits) {
       h.addEventListener('pointerenter', onEnter);
       h.addEventListener('focus', onEnter);
@@ -233,37 +272,64 @@ const gantt = ganttBars(timeline, 2026);
       const s = currentStyle();
       for (const b of labBtns) b.setAttribute('aria-pressed', String(b.dataset.podStyleBtn === s));
     };
-    const onLab = (e: Event) => {
-      const s = (e.currentTarget as HTMLElement).dataset.podStyleBtn as PodStyle;
+    const setStyle = (s: PodStyle) => {
       document.documentElement.dataset.podStyle = s;
       try { localStorage.setItem(STYLE_KEY, s); } catch { /* private mode */ }
       syncLab();
-      draw();
+      applyRects(s);
+      restartLoop();
+    };
+    const onLab = (e: Event) => {
+      setStyle((e.currentTarget as HTMLElement).dataset.podStyleBtn as PodStyle);
     };
     for (const b of labBtns) b.addEventListener('click', onLab);
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      const s: PodStyle | null = e.key === '1' ? 'retro' : e.key === '2' ? 'pixel' : null;
-      if (!s) return;
-      document.documentElement.dataset.podStyle = s;
-      try { localStorage.setItem(STYLE_KEY, s); } catch { /* private mode */ }
-      syncLab();
-      draw();
+      const s: PodStyle | null =
+        e.key === '1' ? 'scene' : e.key === '2' ? 'retro' : e.key === '3' ? 'pixel' : null;
+      if (s) setStyle(s);
     };
     window.addEventListener('keydown', onKey);
     syncLab();
 
-    draw();   // static first frame immediately — this is the LCP paint
+    // ── Ambient life. ONLY the modernist scene moves, and only slowly: the sun drifts, the
+    // pool's highlights slide, the birds shift. Gated three ways — the style must be
+    // 'scene', the section must be on screen (IntersectionObserver), and the visitor must
+    // not have asked for reduced motion. Under reduced motion the static first frame is
+    // the finished picture, which is also the no-JS state.
+    let raf = 0;
+    let onScreen = true;
+    const reduce = prefersReducedMotion();
 
-    // Repaint only on hover, theme change and style change. Nothing animates: a dark room
-    // lit by screens is alive without motion, so there is no rAF loop at all and the
-    // reduced-motion state is the same finished picture.
-    const mo = new MutationObserver(() => { syncLab(); draw(); });
+    const frameLoop = (now: number) => {
+      if (!t0) t0 = now;
+      draw(now);
+      raf = requestAnimationFrame(frameLoop);
+    };
+    const stopLoop = () => { if (raf) { cancelAnimationFrame(raf); raf = 0; } };
+    const restartLoop = () => {
+      stopLoop();
+      if (currentStyle() === 'scene' && onScreen && !reduce) raf = requestAnimationFrame(frameLoop);
+      else draw();
+    };
+
+    const io = new IntersectionObserver((entries) => {
+      onScreen = entries.some((e) => e.isIntersecting);
+      restartLoop();
+    }, { rootMargin: '120px' });
+    io.observe(cvs.parentElement as HTMLElement);
+
+    applyRects(currentStyle());
+    restartLoop();   // paints a static first frame immediately — this is the LCP paint
+
+    const mo = new MutationObserver(() => { syncLab(); applyRects(currentStyle()); restartLoop(); });
     mo.observe(document.documentElement, {
       attributes: true, attributeFilter: ['data-theme', 'data-pod-style'],
     });
 
     return () => {
+      stopLoop();
+      io.disconnect();
       mo.disconnect();
       window.removeEventListener('keydown', onKey);
       for (const b of labBtns) b.removeEventListener('click', onLab);

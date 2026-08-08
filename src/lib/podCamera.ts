@@ -50,11 +50,17 @@ export const DESK_Z_FAR = 2.35;      // where it meets the console
 export const DESK_THICK = 0.06;
 
 /** Focal length in "screen widths". Larger = longer lens = less dramatic convergence.
- *  1.5 is roughly a 50 mm-equivalent view: natural, not fisheye. */
-const FOCAL = 1.5;
-/** Downward pitch of the camera, radians. Small — you are looking level-ish, just able to
- *  see the desk surface. */
-const PITCH = 0.085;
+ *
+ *  0.62 is a wide-ish view that fits the whole terrace in frame. It was 1.5 (a ~50 mm
+ *  equivalent), which is right for standing INSIDE a room but put the camera so close that
+ *  one monitor filled the entire canvas — the scene is viewed, not inhabited. */
+const FOCAL = 0.62;
+/** Downward pitch of the camera, radians. Small — looking level-ish, just enough to read
+ *  the desk surface from a seated height. */
+const PITCH = 0.055;
+/** How far BACK the camera sits from the origin of the world, in metres. Pulling it back
+ *  (rather than shrinking the world) keeps every dimension in honest human units. */
+const CAM_Z = -3.4;
 
 // ── Projection ──────────────────────────────────────────────────────────────
 
@@ -82,8 +88,9 @@ export function makeCamera(W: number, H: number): CameraView {
   const project = (p: Vec3): Projected => {
     // Camera space: translate so the eye is the origin, then pitch down about x.
     const yc = p.y - EYE_Y;
-    const y1 = yc * cosP + p.z * sinP;      // rotated up-axis
-    const z1 = p.z * cosP - yc * sinP;      // rotated depth (always > 0 in this room)
+    const zc = p.z - CAM_Z;                 // the camera stands back from the world origin
+    const y1 = yc * cosP + zc * sinP;       // rotated up-axis
+    const z1 = zc * cosP - yc * sinP;       // rotated depth (always > 0 in this scene)
     const z = Math.max(0.05, z1);           // never divide by ~0
     const scale = f / z;
     return { sx: W * 0.5 + p.x * scale, sy: H * 0.5 - y1 * scale, depth: z, scale };

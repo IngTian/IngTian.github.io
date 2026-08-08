@@ -202,10 +202,31 @@ describe('planes — the monitors', () => {
   it('makes the nearer edge taller when a panel is yawed', () => {
     // Yaw is only visible as a difference between the two vertical edges. This is the
     // property that makes a panel read as an object rather than a rectangle.
-    const { pts } = projectPlane(cam, panel(0, 0.3, 0));
+    //
+    // Thresholds here are MEASURED, not guessed — and the measurement has to use the REAL
+    // primary-panel size, because skew scales with panel height. At this lens, yawed by the
+    // rig's own faceViewer() rule:
+    //     h=0.58 (a real primary):  cx 1.0 -> 4.1px   cx 1.6 -> 6.1px   cx 2.2 -> 7.6px
+    //     h=0.36 (a small stand-in): cx 1.6 -> 2.4px  — which is why an earlier version of
+    //                                this test kept "failing" against a threshold that was
+    //                                fine; the panel was the problem, not the camera.
+    // A panel on the optical axis is symmetric by construction (both edges equidistant from
+    // the camera), so the property only exists off-axis.
+    const real: Plane3 = { cx: 1.6, cy: 1.26, cz: 2.6, w: 0.98, h: 0.58, yaw: faceViewer(1.6, 2.6), tilt: 0 };
+    const { pts } = projectPlane(cam, real);
     const lH = Math.abs(pts[3][1] - pts[0][1]);
     const rH = Math.abs(pts[2][1] - pts[1][1]);
-    expect(Math.abs(lH - rH)).toBeGreaterThan(2);
+    expect(Math.abs(lH - rH)).toBeGreaterThan(4);
+    // The nearer (outer) edge must be the TALLER one, or the panel turns the wrong way.
+    expect(rH).toBeGreaterThan(lH);
+  });
+
+  it('yaws a panel more the further it sits from the optical axis', () => {
+    const skew = (cx: number, yaw: number) => {
+      const { pts } = projectPlane(cam, panel(cx, yaw, 0));
+      return Math.abs(Math.abs(pts[3][1] - pts[0][1]) - Math.abs(pts[2][1] - pts[1][1]));
+    };
+    expect(skew(2.2, faceViewer(2.2, 2.6))).toBeGreaterThan(skew(0.5, faceViewer(0.5, 2.6)));
   });
 
   it('tilting back pushes the top edge away, so it projects lower', () => {
