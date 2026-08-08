@@ -169,14 +169,15 @@ describe('fanBeams — the equation laid out in space', () => {
     for (const b of beams) expect(b.elevation).toBeGreaterThan(0);
   });
 
-  it('orders beams in ANGLE independently of how strong they are — no shared angular space', () => {
-    // The invariant that actually prevents interleaving. tip.x is still proportional to
-    // length (honest 3D — a long inner beam does reach further in raw x), so the test is on
-    // the beam's DIRECTION, which depends only on azimuth. Two beams may overlap visually at
-    // one camera angle; they must never occupy the same angular slot.
-    const byAz = [...beams].sort((a, b) => a.azimuth - b.azimuth).map((b) => b.factor.key);
-    const byDirX = [...beams].sort((a, b) => a.dir.x - b.dir.x).map((b) => b.factor.key);
-    expect(byDirX).toEqual(byAz);
+  it('gives every beam its own angular slot, evenly pitched', () => {
+    // The invariant that prevents interleaving, restated for a full circle. Sorting by dir.x no
+    // longer matches azimuth order once the fan wraps past 90 degrees (sin is not monotone over
+    // 360), so the honest test is that the azimuths are distinct and equally spaced — no two
+    // beams can ever occupy the same slot, whatever the betas are.
+    const az = [...beams].map((b) => b.azimuth).sort((a, b) => a - b);
+    expect(new Set(az.map((a) => a.toFixed(9))).size).toBe(beams.length);
+    const gaps = az.slice(1).map((v, i) => v - az[i]);
+    for (const g of gaps) expect(g).toBeCloseTo(gaps[0], 9);
   });
 
   it('gives every beam a unit-length direction', () => {
@@ -214,10 +215,25 @@ describe('fanBeams — the equation laid out in space', () => {
     }
   });
 
-  it('places every tip in front of the viewer (positive z)', () => {
-    // The fan opens away from the camera; a negative z would put a beam behind the origin
-    // where its label could never be read.
-    for (const b of beams) expect(b.tip.z, b.factor.key).toBeGreaterThan(0);
+  it('spreads beams all the way around the circle', () => {
+    // NOT "every tip has positive z" any more. That was right when the fan was a flat SVG still
+    // and every label had to face one fixed camera; the object now rotates, so a beam pointing
+    // away is the REASON to turn it rather than a defect. What matters on a full circle is that
+    // the beams genuinely surround the origin instead of bunching in one hemisphere — which is
+    // what a 150 degree spread looked like, and the complaint that prompted the change.
+    const behind = beams.filter((b) => b.tip.z < 0);
+    const infront = beams.filter((b) => b.tip.z >= 0);
+    expect(behind.length, 'some beams point away').toBeGreaterThan(0);
+    expect(infront.length, 'some beams point toward').toBeGreaterThan(0);
+  });
+
+  it('covers the full circle without two beams sharing a slot', () => {
+    const az = [...beams].map((b) => b.azimuth).sort((a, b) => a - b);
+    const span = az[az.length - 1] - az[0];
+    // Six beams at a 60 degree pitch span 300 degrees between first and last; the wrap-around
+    // gap closes the circle.
+    expect(span).toBeGreaterThan(Math.PI * 1.5);
+    for (let i = 1; i < az.length; i++) expect(az[i]).toBeGreaterThan(az[i - 1]);
   });
 
   it('keeps tip magnitude equal to the beam length', () => {

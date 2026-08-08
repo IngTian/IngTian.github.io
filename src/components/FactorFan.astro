@@ -14,11 +14,10 @@
 // prefers-reduced-motion the import never fires at all and the baked SVG still frame — which
 // is also the no-JS state and the LCP paint — stays on screen.
 //
-// PIXEL-ART SHADING is deliberate and cheap: the scene renders into a LOW-RESOLUTION buffer
-// (see PIXEL_SCALE) which CSS scales back up with image-rendering: pixelated, and materials
-// are flat-shaded with a quantised toon ramp. That is one renderer setting plus one gradient
-// texture, not hand-drawn art — which matters, because hand-authored illustration is exactly
-// what failed three times in this section.
+// RENDERED AS AN INSTRUMENT, not as pixel art. A first pass rendered into a low-resolution
+// buffer with image-rendering: pixelated; it read as a retro-game artefact against a
+// Swiss-minimal page and was dropped. Full resolution, flat metal-free shading, hairline
+// structure: the object should look measured, because it is showing a measurement.
 import { fanFrame } from '../lib/fanFrame';
 import { loadings, fanBeams, FACTORS } from '../lib/factorModel';
 import { SIGNAL_WEIGHTS } from '../data/signalWeights';
@@ -136,8 +135,9 @@ const signalsByFactor = Object.fromEntries(
   .fan-still :global(svg) { display: block; width: 100%; height: auto; }
   .fan-canvas {
     display: block; opacity: 0; transition: opacity .5s ease;
-    /* THE pixel-art line: the low-res render buffer is scaled up with hard pixels. */
-    image-rendering: pixelated;
+    /* No image-rendering: pixelated. The pixel-art treatment was dropped — it read as a
+       retro-game artefact against a Swiss-minimal page, and this object's job is to look like
+       a precise instrument, which wants clean antialiased edges. */
     cursor: grab;
   }
   .fan-canvas.is-live { opacity: 1; }
@@ -146,8 +146,17 @@ const signalsByFactor = Object.fromEntries(
      a failed init can bring it straight back. */
   .fan-still.is-hidden { opacity: 0; pointer-events: none; }
 
-  .fan-hits { position: absolute; inset: 0; list-style: none; margin: 0; padding: 0; }
-  .fan-hit-wrap { position: absolute; transform: translate(-50%, -50%); }
+  /* THE OVERLAY MUST NOT EAT THE DRAG. This <ul> covers the whole stage, so with the default
+     pointer-events it swallowed every pointerdown and the canvas never saw one — drag-to-rotate
+     was completely dead. Verified with elementFromPoint at five points across the stage: all
+     five returned .fan-hits, never the canvas. The container is now transparent to the pointer
+     and only the labels themselves are targets. */
+  .fan-hits {
+    position: absolute; inset: 0; list-style: none; margin: 0; padding: 0;
+    pointer-events: none;
+  }
+  .fan-hit-wrap { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
+  .fan-hit { pointer-events: auto; }
   .fan-hit {
     display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
     padding: 5px 9px; border: 0; cursor: pointer;

@@ -235,16 +235,15 @@ export interface Beam {
 /** Fan geometry constants. Kept here (not in the painter) so the layout is testable and so
  *  the DOM overlay and the renderer read the same numbers. */
 export const FAN = {
-  /** Beams spread across this arc, centred on straight-ahead. Not a full circle: a full ring
-   *  reads as a pie chart and hides half the beams behind the origin.
+  /** Beams spread across a FULL circle.
    *
-   *  150 is MEASURED, not chosen. A forward-facing fan needs every tip at z > 0, and
-   *  z ∝ cos(azimuth), so |azimuth| must stay under 90°. Sweeping the value:
-   *      120° → min z 0.449   150° → 0.233   160° → 0.156
-   *      170° → 0.078 (edge-on)            232° → −0.394 (beams behind the viewer)
-   *  An earlier 232° put two beams behind the camera where their labels could never be
-   *  read. 150° leaves a real margin without collapsing the fan to a narrow cone. */
-  spreadDeg: 150,
+   *  Was 150°, chosen back when the fan was a flat SVG still and every tip had to face the
+   *  camera to be labelled. That constraint died with the still frame: the object now rotates,
+   *  so a beam pointing away is not a problem — it is the reason to turn the thing. And 150°
+   *  left the object reading as a spray of wedges in one hemisphere with dead space around it.
+   *  360° makes it a DIAL: six exposures around a full compass, which is both a fuller
+   *  composition and the honest shape for a factor decomposition. */
+  spreadDeg: 360,
   /** A single CONSTANT tilt for every beam, so the fan is a shallow cone rather than a flat
    *  star — enough to read as 3D, and identical across beams.
    *
@@ -286,6 +285,9 @@ export function fanBeams(): Beam[] {
   const n = ls.length;
   const spread = (FAN.spreadDeg * Math.PI) / 180;
   const lift = (FAN.liftDeg * Math.PI) / 180;
+  // A full circle wraps, so the last beam must not land on top of the first: divide by n, not
+  // by (n - 1). At 360° with n = 6 that is a clean 60° pitch.
+  const full = FAN.spreadDeg >= 359.5;
 
   // Assign the sorted betas to slots alternating outward from the middle, so the largest
   // exposure lands centrally and the smallest at the edges.
@@ -311,7 +313,7 @@ export function fanBeams(): Beam[] {
 
   return ls.map((l, i) => {
     const slot = slotOrder[i];
-    const t = n === 1 ? 0.5 : slot / (n - 1);          // 0..1 across the fan
+    const t = n === 1 ? 0.5 : slot / (full ? n : n - 1);   // 0..1 across the fan
     const azimuth = -spread / 2 + t * spread;
     // ONE elevation for every beam — see FAN.liftDeg for why a varying lift made the beams
     // cross on screen.

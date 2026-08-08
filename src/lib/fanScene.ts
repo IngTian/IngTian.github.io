@@ -3,15 +3,11 @@
 // IntersectionObserver (see FactorFan.astro), so three.js is never fetched on first paint,
 // never during a Lighthouse audit, and never under prefers-reduced-motion.
 //
-// PIXEL ART, WITHOUT DRAWING ANY:
-//   1. the renderer targets a LOW-RESOLUTION buffer (PIXEL_H tall) that CSS scales back up
-//      with image-rendering: pixelated — so every edge is a hard, chunky pixel;
-//   2. materials are MeshToonMaterial against a 4-step gradient texture, so lighting
-//      quantises into flat bands instead of smooth shading;
-//   3. geometry is flat-shaded, so each facet is one solid colour.
-// All three are renderer settings, not artwork. That distinction matters: hand-authored
-// illustration is exactly what failed three times in this section, and none of this asks for
-// a taste call about where to put a shape.
+// AN INSTRUMENT, NOT PIXEL ART. A first pass rendered into a low-res buffer upscaled with
+// image-rendering: pixelated; against a Swiss-minimal page that read as a retro-game artefact
+// and was dropped. Now: full resolution, antialiased, flat-shaded wedges over a hairline
+// measuring frame — beta rings, radial spokes and tick marks — so the object looks measured,
+// which is what it is.
 //
 // EVERY NUMBER COMES FROM THE MODEL. Beam length and width are the betas computed in
 // factorModel.ts; nothing here invents geometry. The scene is the equation, rotatable.
@@ -45,9 +41,9 @@ export interface FanSceneOpts {
   placeLabel: (key: string, x: number, y: number) => void;
 }
 
-/** Vertical resolution of the render buffer. 320 gives visibly chunky pixels at any viewport
- *  while keeping the fan's own edges readable; the CSS upscale does the rest. */
-const PIXEL_H = 320;
+/** Device-pixel cap. 2 is the usual ceiling for this site's canvases: beyond it the GPU cost
+ *  doubles for no visible gain on the hairlines this scene is made of. */
+const MAX_DPR = 2;
 
 export function mountFanScene(opts: FanSceneOpts): () => void {
   const { canvas, beams, onActive, placeLabel } = opts;
@@ -59,12 +55,11 @@ export function mountFanScene(opts: FanSceneOpts): () => void {
   function start(): () => void {
     const cleanups: Array<() => void> = [];
 
-    const dpr = 1;   // deliberately 1: the point is a low-res buffer, not a crisp one
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(38, 1600 / 880, 0.1, 100);
 
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false });
-    renderer.setPixelRatio(dpr);
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(MAX_DPR, window.devicePixelRatio || 1));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.NoToneMapping;   // the colours ARE the palette tokens
 
@@ -78,8 +73,9 @@ export function mountFanScene(opts: FanSceneOpts): () => void {
     const paper = tok('--paper', '#efe9dd');
     const ink5 = tok('--ink-5', '#b8b1a1');
 
-    // ── The toon ramp: 4 hard steps, which is what quantises the shading into flat bands.
-    const rampData = new Uint8Array([70, 130, 200, 255]);
+    // ── A soft ramp. Still banded (flat facets read as planes, which is what a diagram wants)
+    // but with enough steps that it no longer looks like a cel-shaded game.
+    const rampData = new Uint8Array([96, 140, 178, 210, 236, 255]);
     const ramp = new THREE.DataTexture(rampData, rampData.length, 1, THREE.RedFormat);
     ramp.needsUpdate = true;
     ramp.minFilter = THREE.NearestFilter;
@@ -90,14 +86,19 @@ export function mountFanScene(opts: FanSceneOpts): () => void {
 
     // ── Beams. Each is an extruded wedge: a flat quad given thickness, so it reads as a solid
     // under the toon ramp rather than as a piece of paper.
-    const meshes: { key: string; mesh: any; base: any; tip: any }[] = [];
+    const meshes: {
+      key: string; mesh: any; base: any; tip: any;
+      /** 0..1 eased hover weight, so the response is animated rather than switched. */
+      hover: number; zero: boolean; edge: any;
+    }[] = [];
+    let gaugeGlow = 0;
     for (const b of beams) {
       const zero = b.beta === 0;
       const geom = beamGeometry(b);
       const mat = new THREE.MeshToonMaterial({
         color: zero ? indigo : ochre,
         gradientMap: ramp,
-        transparent: zero,
+        transparent: true,
         opacity: zero ? 0.42 : 1,
       });
       const mesh = new THREE.Mesh(geom, mat);
@@ -107,7 +108,11 @@ export function mountFanScene(opts: FanSceneOpts): () => void {
       // wedge instead of sitting on top of it. 1.18 is enough at every loading, including the
       // short zero stubs.
       const anchor = new THREE.Vector3(b.tip.x, b.tip.y, b.tip.z).multiplyScalar(1.18);
-      meshes.push({ key: b.key, mesh, base: mat.color.clone(), tip: anchor });
+      const record = {
+        key: b.key, mesh, base: mat.color.clone(), tip: anchor,
+        hover: 0, zero, edge: null as any,
+      };
+      meshes.push(record);
 
       // A bright leading edge along the beam's top — the single strongest cue that a flat
       // shape is a solid one.
@@ -116,6 +121,7 @@ export function mountFanScene(opts: FanSceneOpts): () => void {
         new THREE.MeshBasicMaterial({ color: paper, transparent: true, opacity: zero ? 0.3 : 0.85 }),
       );
       root.add(edge);
+      record.edge = edge;
     }
 
     // ── The asset at the origin: one seal-red mark every beam loads onto.
@@ -125,12 +131,74 @@ export function mountFanScene(opts: FanSceneOpts): () => void {
     );
     root.add(asset);
 
-    // ── A ground grid, so the fan sits on a plane instead of floating in a void.
-    const grid = new THREE.PolarGridHelper(2.4, 6, 4, 48, ink5, ink5);
-    (grid.material as any).transparent = true;
-    (grid.material as any).opacity = 0.16;
-    grid.position.y = -0.002;
-    root.add(grid);
+    // ── THE MEASURING FRAME. This is what fills the scene: without it six wedges float in a
+    // void and the whole thing reads as empty, which was the complaint. Everything here is
+    // derived from the model — no invented furniture.
+    //
+    //   · concentric rings at beta = 0.1 … 0.5, so a beam's LENGTH is readable as a value
+    //     rather than as a relative size;
+    //   · one radial spoke per factor, running the full radius, so the six angular slots are
+    //     visible even where a beam is short (the two zero factors especially);
+    //   · tick marks along each spoke at the ring radii.
+    // `gauge`, not `frame`: `frame` is the rAF callback further down and esbuild rejected the
+    // duplicate binding.
+    const gauge = new THREE.Group();
+    root.add(gauge);
+
+    const RING_BETAS = [0.1, 0.2, 0.3, 0.4, 0.5];
+    const betaToRadius = (b: number) => 0.55 + b * 2.6;   // matches FAN.minLength/lengthGain
+
+    const ringMat = new THREE.LineBasicMaterial({ color: ink5, transparent: true, opacity: 0.22 });
+    ringMat.userData.baseOpacity = 0.22;
+    for (const rb of RING_BETAS) {
+      const rad = betaToRadius(rb);
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i <= 96; i++) {
+        const a = (i / 96) * Math.PI * 2;
+        pts.push(new THREE.Vector3(Math.cos(a) * rad, 0, Math.sin(a) * rad));
+      }
+      gauge.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), ringMat));
+    }
+
+    // Spokes + ticks, one per factor, at that factor's own azimuth.
+    const spokeMat = new THREE.LineBasicMaterial({ color: ink5, transparent: true, opacity: 0.16 });
+    spokeMat.userData.baseOpacity = 0.16;
+    const tickMat = new THREE.LineBasicMaterial({ color: ink5, transparent: true, opacity: 0.34 });
+    tickMat.userData.baseOpacity = 0.34;
+    const outer = betaToRadius(0.5);
+    for (const b of beams) {
+      const dx = Math.sin(b.azimuth);
+      const dz = Math.cos(b.azimuth);
+      gauge.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(dx * outer, 0, dz * outer),
+        ]),
+        spokeMat,
+      ));
+      // ticks across the spoke at each ring
+      for (const rb of RING_BETAS) {
+        const rad = betaToRadius(rb);
+        const px = Math.cos(b.azimuth) * 0.035;
+        const pz = -Math.sin(b.azimuth) * 0.035;
+        gauge.add(new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(dx * rad - px, 0, dz * rad - pz),
+            new THREE.Vector3(dx * rad + px, 0, dz * rad + pz),
+          ]),
+          tickMat,
+        ));
+      }
+    }
+
+    // A vertical axis through the origin — the asset's own line, and it stops the object
+    // reading as flat when seen from a low angle.
+    gauge.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, -0.02, 0), new THREE.Vector3(0, 1.05, 0),
+      ]),
+      new THREE.LineBasicMaterial({ color: ink5, transparent: true, opacity: 0.2 }),
+    ));
 
     // ── Light: one key, one fill. Flat and directional, which is what the toon ramp wants.
     const key = new THREE.DirectionalLight(0xffffff, 2.1);
@@ -191,24 +259,19 @@ export function mountFanScene(opts: FanSceneOpts): () => void {
       const k = hit ? (hit.object.userData.key as string) : null;
       if (k !== hovered) {
         hovered = k;
-        for (const m of meshes) {
-          const active = m.key === k;
-          (m.mesh.material as any).color.copy(active ? paper : m.base);
-        }
         onActive(k);
       }
     };
     canvas.addEventListener('pointermove', onHover);
     cleanups.push(() => canvas.removeEventListener('pointermove', onHover));
 
-    // ── Size the buffer LOW and let CSS scale it up. This is the pixel-art step.
+    // ── Render at the element's real size; the pixel-art downscale is gone.
     const resize = () => {
       const r = canvas.getBoundingClientRect();
       if (r.width < 2) return;
-      const h = PIXEL_H;
-      const w = Math.round((r.width / r.height) * h);
-      renderer.setSize(w, h, false);
-      camera.aspect = w / h;
+      renderer.setPixelRatio(Math.min(MAX_DPR, window.devicePixelRatio || 1));
+      renderer.setSize(r.width, r.height, false);
+      camera.aspect = r.width / r.height;
       camera.updateProjectionMatrix();
     };
     resize();
@@ -236,6 +299,29 @@ export function mountFanScene(opts: FanSceneOpts): () => void {
       if (!dragging) yaw += spin * dt;
       root.rotation.y = yaw;
       root.rotation.x = pitch;
+
+      // HOVER RESPONSE, eased rather than switched. Three things move together, which is what
+      // makes it feel like an instrument answering instead of a colour swap:
+      //   · the hovered beam LIFTS off the ground plane and scales out slightly;
+      //   · it brightens toward paper while the others dim toward the base colour;
+      //   · the whole gauge fades up, so the measuring frame is legible while you read a value.
+      for (const m of meshes) {
+        const active = m.key === hovered;
+        m.hover += ((active ? 1 : 0) - m.hover) * Math.min(1, dt * 9);
+        m.mesh.position.y = m.hover * 0.12;
+        const sc = 1 + m.hover * 0.05;
+        m.mesh.scale.setScalar(sc);
+        (m.mesh.material as any).color.copy(m.base).lerp(paper, m.hover * 0.55);
+        (m.mesh.material as any).opacity = m.zero ? 0.42 + m.hover * 0.4 : 1;
+        if (m.edge) m.edge.position.y = m.hover * 0.12;
+      }
+      gaugeGlow += ((hovered ? 1 : 0) - gaugeGlow) * Math.min(1, dt * 6);
+      for (const child of gauge.children) {
+        const mat = (child as any).material;
+        if (mat && typeof mat.opacity === 'number') {
+          mat.opacity = (mat.userData.baseOpacity ?? mat.opacity) * (1 + gaugeGlow * 0.9);
+        }
+      }
 
       // Labels ride the geometry: project each tip and hand normalised coords to the page.
       for (const m of meshes) {
