@@ -295,19 +295,22 @@ function drawColonnade(ctx: Ctx, cam: CameraView, p: ScenePal) {
 
   // Openings cut as dark arches on the wall's front face. Drawn in screen space against
   // the projected wall, so they follow the perspective exactly.
-  const yBase = 0.42, yTop = CEIL_Y + 0.42;
-  const count = 9;
+  const yBase = 0.42, yTop = CEIL_Y + 0.30;
+  const count = 7;
   for (let i = 0; i < count; i++) {
-    const cx = -ROOM_HALF_W - 0.5 + (i + 0.5) * ((ROOM_HALF_W + 0.5) * 2 / count);
-    const halfW = 0.20;
+    const cx = -ROOM_HALF_W - 0.4 + (i + 0.5) * ((ROOM_HALF_W + 0.4) * 2 / count);
+    const halfW = 0.29;
     const [lx, ly] = cam.xy({ x: cx - halfW, y: yBase, z: WALL_Z });
     const [rx] = cam.xy({ x: cx + halfW, y: yBase, z: WALL_Z });
-    const [, ty] = cam.xy({ x: cx, y: yTop, z: WALL_Z });
-    const [, springY] = cam.xy({ x: cx, y: yTop - halfW * 2.1, z: WALL_Z });
+    const [, springY] = cam.xy({ x: cx, y: yTop - halfW * 1.05, z: WALL_Z });
+    // A SEMICIRCULAR head (a true arc springing from the jambs), not a quadratic curve to
+    // an apex — that produced a pointed gothic arch, which is the wrong century for this
+    // style. Modernist arcades are round-headed.
+    const r = (rx - lx) / 2;
     ctx.beginPath();
     ctx.moveTo(lx, ly);
     ctx.lineTo(lx, springY);
-    ctx.quadraticCurveTo((lx + rx) / 2, ty, rx, springY);
+    ctx.arc((lx + rx) / 2, springY, r, Math.PI, 0);
     ctx.lineTo(rx, ly);
     ctx.closePath();
     ctx.fillStyle = p.deepShadow;
@@ -432,11 +435,22 @@ function drawPlants(ctx: Ctx, cam: CameraView, p: ScenePal) {
 }
 
 function drawDesk(ctx: Ctx, cam: CameraView, p: ScenePal) {
-  // The desk slab, plus a stepped mustard plinth under its centre.
-  mass(ctx, cam, p, DESK, 'cream');
+  // The plinth FIRST, so the slab's front edge overhangs it and casts the shadow line that
+  // makes the desk sit on the ground rather than hover. It runs the full depth from the
+  // pool's edge to the wall: a shorter plinth left a visible gap under the desk and the
+  // whole thing read as floating.
   mass(ctx, cam, p, {
-    x: -1.5, y: 0, z: DESK_Z_NEAR + 0.25, w: 3.0, h: DESK_Y - DESK_THICK, d: 1.0,
+    x: -1.62, y: 0, z: DESK_Z_NEAR + 0.02, w: 3.24, h: DESK_Y - DESK_THICK,
+    d: (DESK_Z_FAR - DESK_Z_NEAR) - 0.10,
   }, 'mustard');
+  // Two side returns, so the desk is supported across its whole width.
+  for (const x of [-2.52, 1.66]) {
+    mass(ctx, cam, p, {
+      x, y: 0, z: DESK_Z_NEAR + 0.30, w: 0.86, h: DESK_Y - DESK_THICK, d: 1.10,
+    }, 'cream');
+  }
+  // The slab.
+  mass(ctx, cam, p, DESK, 'cream');
   // A coral riser the screens sit on, so the rig reads as built into the terrace.
   mass(ctx, cam, p, {
     x: -2.45, y: DESK_Y, z: DESK_Z_FAR - 0.34, w: 4.9, h: 0.42, d: 0.34,
@@ -631,37 +645,49 @@ function drawDeskObjects(ctx: Ctx, cam: CameraView, p: ScenePal) {
  *  reference's figures. This is the element that makes the scene a place with a person in
  *  it rather than an empty render, and it replaces the old near-black chair blob. */
 function drawFigure(ctx: Ctx, cam: CameraView, p: ScenePal) {
-  const seatZ = DESK_Z_NEAR - 0.30;
-  const [hx, hy] = cam.xy({ x: 0.30, y: 1.44, z: seatZ });     // head
-  const [sx, sy] = cam.xy({ x: 0.30, y: 1.18, z: seatZ });     // shoulders
-  const [wx, wy] = cam.xy({ x: 0.30, y: 0.80, z: seatZ });     // waist
-  const headR = Math.abs(sy - hy) * 0.46;
+  // Seated OFF the centre line and to the side, so the figure never masks the middle
+  // monitor. A centred figure at this camera height became a black slab across the whole
+  // composition — the reference's figures always sit to one side of the architecture.
+  const seatZ = DESK_Z_NEAR - 0.34;
+  const fx = 1.62;
+  const [hx, hy] = cam.xy({ x: fx, y: 1.34, z: seatZ });        // head
+  const [sx, sy] = cam.xy({ x: fx, y: 1.10, z: seatZ });        // shoulders
+  const [wx, wy] = cam.xy({ x: fx, y: 0.74, z: seatZ });        // waist
+  const headR = Math.abs(sy - hy) * 0.40;
+
+  // The chair: a low flat mass BEHIND the figure, in shade rather than ink, so it reads as
+  // furniture instead of a hole in the picture.
+  mass(ctx, cam, p, {
+    x: fx - 0.34, y: 0.20, z: seatZ + 0.16, w: 0.68, h: 0.62, d: 0.42,
+  }, 'shadow');
 
   ctx.fillStyle = p.ink;
-  // Head.
+  // Head, with a suggestion of hair as one offset arc — enough to read as a person.
   ctx.beginPath();
   ctx.arc(hx, hy, headR, 0, Math.PI * 2);
   ctx.fill();
-  // Torso: a tapered block from shoulders to waist, wider at the shoulders.
-  const shW = headR * 2.5, wsW = headR * 2.0;
-  poly(ctx, [
-    [sx - shW, sy], [sx + shW, sy], [wx + wsW, wy], [wx - wsW, wy],
-  ]);
+  // Neck.
+  ctx.fillRect(hx - headR * 0.32, hy, headR * 0.64, Math.abs(sy - hy) * 0.5);
+  // Torso: shoulders down to waist, a clean tapered silhouette.
+  const shW = headR * 2.0, wsW = headR * 1.55;
+  poly(ctx, [[sx - shW, sy], [sx + shW, sy], [wx + wsW, wy], [wx - wsW, wy]]);
   ctx.fill();
-  // One arm reaching forward to the keyboard — the gesture that says "working".
-  const [ex, ey] = cam.xy({ x: 0.02, y: DESK_Y + 0.06, z: DESK_Z_NEAR + 0.34 });
-  ctx.lineWidth = headR * 0.72;
+  // Rounded shoulder line, so the torso is not a hard-cornered box.
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, shW, headR * 0.7, 0, Math.PI, 0);
+  ctx.fill();
+  // One forearm resting on the desk in front of the figure — NOT reaching across to the
+  // keyboard. Aiming at the centred keyboard from an off-centre seat drew a long black bar
+  // straight across the whole desk, which read as a girder rather than an arm.
+  const [ex, ey] = cam.xy({ x: fx - 0.46, y: DESK_Y + 0.04, z: DESK_Z_NEAR + 0.22 });
+  ctx.lineWidth = headR * 0.58;
   ctx.lineCap = 'round';
   ctx.strokeStyle = p.ink;
   ctx.beginPath();
-  ctx.moveTo(sx - shW * 0.55, sy + headR * 0.5);
-  ctx.lineTo(ex, ey);
+  ctx.moveTo(sx - shW * 0.72, sy + headR * 0.7);
+  ctx.quadraticCurveTo(sx - shW * 1.1, (sy + ey) / 2, ex, ey);
   ctx.stroke();
   ctx.lineCap = 'butt';
-  // The chair back, one flat mass behind the figure.
-  mass(ctx, cam, p, {
-    x: -0.05, y: 0.42, z: seatZ + 0.12, w: 0.72, h: 0.78, d: 0.10,
-  }, 'ink');
 }
 
 /** A whisper of grain over everything. The reference is a print, and a perfectly clean

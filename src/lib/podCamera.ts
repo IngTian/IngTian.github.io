@@ -45,7 +45,7 @@ export const ROOM_HALF_W = 3.6;
 export const CEIL_Y = 2.7;
 /** The desk: a slab the viewer is sitting at. */
 export const DESK_Y = 0.74;          // standing surface height
-export const DESK_Z_NEAR = 0.62;     // nearest edge, just in front of the viewer
+export const DESK_Z_NEAR = 1.35;     // nearest edge; the pool fills the space in front
 export const DESK_Z_FAR = 2.35;      // where it meets the console
 export const DESK_THICK = 0.06;
 
