@@ -130,6 +130,47 @@ export function signals(): Signal[] {
   return out;
 }
 
+/** The same signal list with stable ids, for matching against committed LLM scores. The id
+ *  is '<collection>:<index>' and the label is carried alongside, so an edited item is
+ *  DETECTED (label mismatch) rather than silently keeping a stale score. */
+export function identifiedSignals(): { id: string; label: string; factor: string }[] {
+  const out: { id: string; label: string; factor: string }[] = [];
+  timeline.forEach((t, i) => out.push({ id: `timeline:${i}`, label: t.title, factor: 'experience' }));
+  publications.forEach((p, i) => out.push({ id: `publications:${i}`, label: p.title, factor: 'research' }));
+  researchInterests.forEach((r, i) => out.push({ id: `interests:${i}`, label: r.label, factor: 'research' }));
+  projects.forEach((p, i) => out.push({ id: `projects:${i}`, label: p.name, factor: 'projects' }));
+  awards.forEach((a, i) => out.push({ id: `awards:${i}`, label: a.title, factor: 'craft' }));
+  return out;
+}
+
+/** How the loadings were computed, for the on-screen caption. The page states which of these
+ *  is live, so the reader always knows whether a beta is a count or a judgement. */
+export type WeightBasis = 'count' | 'evidence';
+
+/**
+ * Weight per signal id, from committed LLM scores when they are present AND current.
+ *
+ * Falls back to counting whenever the artefact is absent or stale. That fallback is not a
+ * convenience — it is what keeps the site honest without a working scorer: a missing or
+ * outdated score file degrades the model to verifiable arithmetic rather than to a wrong
+ * number. Staleness is also asserted by a test, so it surfaces as a red build.
+ */
+export function evidenceWeights(
+  scored: readonly { id: string; label: string; score: number }[] | null,
+): { basis: WeightBasis; weightFor: (id: string) => number } {
+  const live = identifiedSignals();
+  if (!scored || scored.length === 0) {
+    return { basis: 'count', weightFor: () => 1 };
+  }
+  const byId = new Map(scored.map((s) => [s.id, s]));
+  const allCurrent = live.every((l) => byId.get(l.id)?.label === l.label);
+  if (!allCurrent) return { basis: 'count', weightFor: () => 1 };
+  return {
+    basis: 'evidence',
+    weightFor: (id) => byId.get(id)?.score ?? 1,
+  };
+}
+
 export interface Loading {
   factor: Factor;
   /** Raw summed weight of the factor's signals. */
@@ -138,6 +179,9 @@ export interface Loading {
   beta: number;
   /** How many signals load on this factor. */
   count: number;
+  /** Whether these weights are artefact counts or LLM-scored evidence strength. The page
+   *  MUST state this, so the reader always knows if a beta is arithmetic or judgement. */
+  basis: WeightBasis;
 }
 
 /**
@@ -149,13 +193,16 @@ export interface Loading {
  * Betas are shares, so they are non-negative and sum to 1 — which is also why the fan can
  * use beam area to encode them without misleading anyone.
  */
-export function loadings(): Loading[] {
-  const sig = signals();
-  const total = sig.reduce((s, x) => s + x.weight, 0) || 1;
+export function loadings(
+  scored: readonly { id: string; label: string; score: number }[] | null = null,
+): Loading[] {
+  const { basis, weightFor } = evidenceWeights(scored);
+  const live = identifiedSignals();
+  const total = live.reduce((s, l) => s + weightFor(l.id), 0) || 1;
   return FACTORS.map((factor) => {
-    const mine = sig.filter((s) => s.factor === factor.key);
-    const raw = mine.reduce((s, x) => s + x.weight, 0);
-    return { factor, raw, beta: raw / total, count: mine.length };
+    const mine = live.filter((l) => l.factor === factor.key);
+    const raw = mine.reduce((s, l) => s + weightFor(l.id), 0);
+    return { factor, raw, beta: raw / total, count: mine.length, basis };
   });
 }
 

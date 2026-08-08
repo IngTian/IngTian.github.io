@@ -9,9 +9,23 @@
 
 import { it, expect } from 'vitest';
 import { loadings, fanBeams, signals, expressionTerms } from '../src/lib/factorModel';
+import { SIGNAL_WEIGHTS } from '../src/data/signalWeights';
 
 it('prints the model the page would render', () => {
-  const ls = loadings();
+  // Print BOTH bases side by side: counting is the fallback, evidence is what ships. Seeing
+  // them together is how the weighting bug (years vs counts) was caught.
+  const byCount = loadings(null);
+  const ls = loadings(SIGNAL_WEIGHTS.signals);
+  const cmp: string[] = ['=== COUNT vs EVIDENCE ==='];
+  for (const l of ls) {
+    const c = byCount.find((x) => x.factor.key === l.factor.key)!;
+    cmp.push(
+      `  ${l.factor.label.padEnd(16)} count ${c.beta.toFixed(3)}  ->  evidence ${l.beta.toFixed(3)}` +
+      `  (${l.beta > c.beta ? '+' : ''}${((l.beta - c.beta) * 100).toFixed(1)}pp)`,
+    );
+  }
+  // eslint-disable-next-line no-console
+  console.log('\n' + cmp.join('\n'));
   const lines: string[] = [];
 
   lines.push('=== LOADINGS (beta = factor weight / total weight) ===');
