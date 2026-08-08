@@ -50,9 +50,10 @@ const roles = indexed.filter(({ entry }) => entry.kind === 'work');
 
       <section class="xp-group" aria-labelledby="x-education">
         <h2 class="xp-group-title" id="x-education">Education</h2>
-        <ol class="xp-list">
-          {education.map(({ entry, id }) => (
-            <li class="xp-entry" id={id}>
+        <ol class="spine">
+          {education.map(({ entry, id }, i) => (
+            <li class={`node${i === 0 ? ' node-flag' : ''}`} id={id}>
+              <span class="dot" aria-hidden="true"></span>
               <p class="xp-period">{entry.period}</p>
               <div class="xp-body">
                 <h3 class="xp-title">{entry.title}</h3>
@@ -66,9 +67,10 @@ const roles = indexed.filter(({ entry }) => entry.kind === 'work');
 
       <section class="xp-group" aria-labelledby="x-roles">
         <h2 class="xp-group-title" id="x-roles">Roles</h2>
-        <ol class="xp-list">
+        <ol class="spine">
           {roles.map(({ entry, id }) => (
-            <li class="xp-entry" id={id}>
+            <li class="node" id={id}>
+              <span class="dot" aria-hidden="true"></span>
               <p class="xp-period">{entry.period}</p>
               <div class="xp-body">
                 <h3 class="xp-title">{entry.title}</h3>
@@ -98,7 +100,11 @@ const roles = indexed.filter(({ entry }) => entry.kind === 'work');
 </BaseLayout>
 
 <style>
-  .experience { position: relative; z-index: 0; min-height: 100vh; }
+  /* The spine dots sit ON the page ground, so they need its tone as a flat colour (a
+     gradient cannot fill a 9px circle convincingly). Sampled from --reading-grad's mid stop
+     per theme, declared here rather than invented as a global token. */
+  .experience { --dot-fill: #efe9e0; position: relative; z-index: 0; min-height: 100vh; }
+  :global(html[data-theme='dark']) .experience { --dot-fill: #131619; }
 
   /* A READING page, so it uses the shared --reading-grad token (tokens.css) rather than the
      descent's sky: dark ink on a luminous ground in light theme, an even charcoal in dark.
@@ -140,17 +146,48 @@ const roles = indexed.filter(({ entry }) => entry.kind === 'work');
     margin: 0 0 8px;
   }
 
-  .xp-list { list-style: none; margin: 0; padding: 0; }
-
-  /* Two columns: the period sits in its own narrow column so the titles align on a single
-     spine down the page — the same left-edge discipline the rest of the site holds. */
-  .xp-entry {
-    display: grid; grid-template-columns: 8.5rem 1fr; gap: 0 24px;
-    padding: 26px 0; border-bottom: 1px solid var(--rule);
+  /* ── The descent spine, carried over from the homepage's Selected experience.
+     A single vertical thread with one node per entry; the first education node gets the
+     indigo hollow ring that marks a flagship. The homepage version is tuned for the dark
+     descent (paper at 0.22 alpha over --bg); this is a READING page with dark ink on a
+     luminous ground, so the thread and the dot fills use --rule / --reading-bg instead of
+     hardcoded paper alphas. Same mark, correct contrast — a copy-paste would have drawn a
+     near-white thread on cream and vanished. ── */
+  .spine { position: relative; margin-left: 6px; list-style: none; padding: 0; }
+  .spine::before {
+    content: ""; position: absolute; left: 5px; top: 8px; bottom: 8px; width: 1px;
+    background: linear-gradient(
+      180deg, transparent,
+      rgba(var(--hairline-rgb), 0.32) 8%, rgba(var(--hairline-rgb), 0.32) 92%, transparent
+    );
   }
-  .xp-entry:last-child { border-bottom: 0; }
+  .node {
+    position: relative; display: grid; grid-template-columns: 8.5rem 1fr; gap: 0 24px;
+    padding: 0 0 30px 26px;
+  }
+  .node:last-child { padding-bottom: 6px; }
+  /* The dot's fill must match the page GROUND, not --paper: on a reading page --paper is the
+     near-white text colour in dark theme, so filling with it would punch a bright hole in
+     the thread. --ink-1 inverts correctly per theme, and the page ground is --reading-grad,
+     so the fill samples the gradient's mid instead. */
+  .node .dot {
+    position: absolute; left: 1px; top: 9px; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--dot-fill);
+    border: 1px solid rgba(var(--hairline-rgb), 0.45);
+  }
+  /* Flagship node — the incoming PhD. A HOLLOW INDIGO RING at 10px with a 2px border, the
+     same MEASURED proportions as the homepage: at 9px a 1.5px border rounds down to 1px,
+     leaving the ring at ~40% of the disc so the hue stops registering at all. The seal stays
+     reserved for the brand mark. */
+  .node-flag .dot {
+    width: 10px; height: 10px; left: 0.5px; top: 8px;
+    background: color-mix(in oklab, var(--indigo) 22%, var(--dot-fill));
+    border: 2px solid var(--indigo);
+  }
+  .node-flag { padding-bottom: 38px; }
+
   @media (max-width: 640px) {
-    .xp-entry { grid-template-columns: 1fr; gap: 6px; }
+    .node { grid-template-columns: 1fr; gap: 6px; }
   }
 
   .xp-period {
