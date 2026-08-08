@@ -13,7 +13,7 @@
 // point at an id the page didn't emit, because there is only one place that
 // spells it.
 
-import type { Publication, Project } from '../data/profile';
+import type { Publication, Project, TimelineEntry } from '../data/profile';
 import { mathFor } from './paperMath';
 
 export interface Stop {
@@ -124,6 +124,43 @@ export function projectSectionId(index: number): string {
  */
 export function projectStops(projects: readonly Project[]): Stop[] {
   return projects.map((p, i) => ({ label: p.name, target: projectSectionId(i) }));
+}
+
+/** Experience section id — one speller, same reason as paperSectionId. */
+export function experienceSectionId(index: number): string {
+  return `x-${index}`;
+}
+
+/**
+ * The /experience rail: two groups, roles and education, each with its entries nested.
+ *
+ * Grouped rather than flat (unlike /projects) because the timeline mixes two KINDS and the
+ * site's identity hierarchy is load-bearing — education carries the incoming PhD, which
+ * must not be buried among nine jobs. The rail's two parents point at their group headings;
+ * the leaves point at individual entries.
+ */
+export function experienceStops(timeline: readonly TimelineEntry[]): Stop[] {
+  const group = (kind: TimelineEntry['kind']) =>
+    timeline
+      .map((t, i) => ({ t, i }))
+      .filter(({ t }) => t.kind === kind)
+      .map(({ t, i }) => ({ label: railLabel(t), target: experienceSectionId(i) }));
+
+  const stops: Stop[] = [];
+  const education = group('education');
+  const work = group('work');
+  // Education first, so the incoming PhD is the first thing the rail offers.
+  if (education.length) stops.push({ label: 'Education', target: 'x-education', children: education });
+  if (work.length) stops.push({ label: 'Roles', target: 'x-roles', children: work });
+  return stops;
+}
+
+/** A rail label short enough to fit a thin margin: the institution, not the whole title.
+ *  Titles read "Senior Software Engineer · TikTok"; the rail wants "TikTok". */
+export function railLabel(entry: TimelineEntry): string {
+  const parts = entry.title.split('·').map((s) => s.trim());
+  const tail = parts.length > 1 ? parts[parts.length - 1] : parts[0];
+  return tail.length > 24 ? `${tail.slice(0, 23)}…` : tail;
 }
 
 /** Flatten a stop tree depth-first (parent before its children).
