@@ -80,7 +80,7 @@ const gantt = ganttBars(timeline, 2026);
     overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }
   /* The buffer's own aspect, so the percentage overlay always lines up. */
-  .pod-frame { position: relative; width: 100%; aspect-ratio: 480 / 280; }
+  .pod-frame { position: relative; width: 100%; aspect-ratio: 800 / 440; }
   .pod-canvas {
     position: absolute; inset: 0; width: 100%; height: 100%; display: block;
     /* THE pixel-art line: scale the small buffer up with hard pixels, no blur. */
@@ -138,7 +138,8 @@ const gantt = ganttBars(timeline, 2026);
 </style>
 
 <script>
-  import { paintRoom, ROOM_W, ROOM_H } from '../lib/podRoom';
+  import { ROOM_W, ROOM_H } from '../lib/podRoom';
+  import { paintRoom } from '../lib/podRoomPaint';
 
   const teardowns: Array<() => void> = [];
 
