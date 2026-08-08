@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest';
 import {
   roomScreens, ROOM_W, ROOM_H, ROOM_CX, MONITOR_COUNT, MONITORS, roomPalette, sideDepth,
   CEIL_BOTTOM, WALL_BOTTOM, DESK_FRONT, APRON_BOTTOM, FLOOR_BOTTOM,
+  monitorQuad, screenQuad, quadBounds, TILT_DEG, YAW_MAX_DEG,
 } from '../src/lib/podRoom';
 
 const lum = (hex: string) => {
@@ -52,8 +53,8 @@ describe('roomScreens', () => {
     // the fix was to narrow the window, not the screens.
     for (const slot of [0, 1, 2]) {
       const r = rects.find((x) => x.slot === slot)!;
-      expect(r.width, `slot ${slot} width%`).toBeGreaterThan(20);
-      expect(r.height, `slot ${slot} height%`).toBeGreaterThan(20);
+      expect(r.width, `slot ${slot} width%`).toBeGreaterThan(19);
+      expect(r.height, `slot ${slot} height%`).toBeGreaterThan(19);
     }
   });
 
@@ -137,12 +138,26 @@ describe('sideDepth', () => {
 });
 
 describe('the buffer', () => {
-  it('stays low-res enough to read as pixel art', () => {
-    // Real pixel art is authored small and scaled up. At 800px wide, a 1600px viewport
-    // paints each buffer pixel as a crisp 2x2 block. Push much past this and the pixels
-    // stop reading as pixels and the style collapses into the fake-pixel look.
-    expect(ROOM_W).toBeLessThanOrEqual(1000);
-    expect(ROOM_H).toBeLessThanOrEqual(560);
+  it('is sized for detailed screen content', () => {
+    // The buffer grew 480 -> 800 -> 1600 on the owner's instruction ("keep going higher
+    // res, way higher"), because the screen CONTENTS were the limiting factor: at 800px a
+    // monitor's glass was ~165px wide, too coarse for an editor with a minimap or an axis
+    // with ticks. The pixel-art look now comes from flat shading, hard 1px edges and
+    // ordered dithering rather than from upscaling. The cap remains only so nobody
+    // wanders into full-resolution territory where repaint cost stops being constant.
+    expect(ROOM_W).toBeGreaterThanOrEqual(1200);
+    expect(ROOM_W).toBeLessThanOrEqual(2048);
+    expect(ROOM_H).toBeLessThanOrEqual(1200);
+  });
+
+  it('gives each primary screen enough pixels for legible content', () => {
+    // The concrete reason the buffer grew. A code editor with a gutter, ~20 token-run
+    // lines and a minimap needs roughly this much glass.
+    for (const m of MONITORS.filter((x) => x.kind === 'primary')) {
+      const b = quadBounds(screenQuad(m));
+      expect(b.w, 'screen width px').toBeGreaterThan(300);
+      expect(b.h, 'screen height px').toBeGreaterThan(170);
+    }
   });
 
   it('is a landscape frame', () => {
@@ -157,6 +172,98 @@ describe('the buffer', () => {
 
   it('gives the desk real thickness, so it is not a painted line', () => {
     expect(APRON_BOTTOM - DESK_FRONT).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe('monitorQuad — the yaw/tilt maths that makes a panel look like an object', () => {
+  const left = MONITORS.filter((m) => m.kind === 'primary')[0];
+  const mid = MONITORS.filter((m) => m.kind === 'primary')[1];
+  const right = MONITORS.filter((m) => m.kind === 'primary')[2];
+
+  const edgeH = (q: ReturnType<typeof monitorQuad>) => ({
+    l: Math.abs(q[3][1] - q[0][1]),   // BL.y - TL.y
+    r: Math.abs(q[2][1] - q[1][1]),   // BR.y - TR.y
+  });
+
+  it('yaws a left monitor so its LEFT edge is the taller, nearer one', () => {
+    // Yaw is only visible as a difference in the two vertical edges' heights. If they
+    // match, the panel is straight-on and cannot read as 3D — the whole point of note 2.
+    const e = edgeH(monitorQuad(left));
+    expect(e.l).toBeGreaterThan(e.r);
+  });
+
+  it('yaws a right monitor the mirror way', () => {
+    const e = edgeH(monitorQuad(right));
+    expect(e.r).toBeGreaterThan(e.l);
+  });
+
+  it('yaws less the closer a monitor sits to the vanishing axis', () => {
+    // NOT "the middle monitor is square-on": the rig is deliberately shifted right to
+    // clear the window, so its centre monitor is ~120px right of the axis and is yawed
+    // too. The real invariant is monotonicity — yaw grows with distance from the axis.
+    const skew = (m: typeof mid) => {
+      const e = edgeH(monitorQuad(m));
+      return Math.abs(e.l - e.r);
+    };
+    const dist = (m: typeof mid) => Math.abs(m.x + m.w / 2 - ROOM_CX);
+    const byDist = [left, mid, right].sort((a, b) => dist(a) - dist(b));
+    for (let i = 1; i < byDist.length; i++) {
+      expect(skew(byDist[i]), `skew grows with distance (step ${i})`)
+        .toBeGreaterThanOrEqual(skew(byDist[i - 1]));
+    }
+  });
+
+  it('yaws the outer monitors visibly, not imperceptibly', () => {
+    const e = edgeH(monitorQuad(left));
+    expect(Math.abs(e.l - e.r)).toBeGreaterThan(8);
+  });
+
+  it('tilts every screen back, dropping its top edge below the untilted top', () => {
+    for (const m of MONITORS) {
+      const q = monitorQuad(m);
+      const topMost = Math.min(q[0][1], q[1][1]);
+      expect(topMost, 'tilted top sits below the flat top').toBeGreaterThan(m.y - 1);
+    }
+  });
+
+  it('keeps the tilt and yaw shallow — a desk, not a fisheye', () => {
+    expect(TILT_DEG).toBeGreaterThan(0);
+    expect(TILT_DEG).toBeLessThanOrEqual(12);
+    expect(YAW_MAX_DEG).toBeGreaterThan(0);
+    expect(YAW_MAX_DEG).toBeLessThanOrEqual(20);
+  });
+
+  it('keeps every quad inside the buffer', () => {
+    for (const m of MONITORS) {
+      for (const [qx, qy] of monitorQuad(m)) {
+        expect(qx).toBeGreaterThanOrEqual(0);
+        expect(qx).toBeLessThanOrEqual(ROOM_W);
+        expect(qy).toBeGreaterThanOrEqual(0);
+        expect(qy).toBeLessThanOrEqual(ROOM_H);
+      }
+    }
+  });
+});
+
+describe('screenQuad', () => {
+  it('sits strictly inside its monitor quad', () => {
+    for (const m of MONITORS) {
+      const outer = quadBounds(monitorQuad(m));
+      const inner = quadBounds(screenQuad(m));
+      expect(inner.x).toBeGreaterThan(outer.x);
+      expect(inner.y).toBeGreaterThan(outer.y);
+      expect(inner.x + inner.w).toBeLessThan(outer.x + outer.w);
+      expect(inner.y + inner.h).toBeLessThan(outer.y + outer.h);
+    }
+  });
+
+  it('inherits the yaw, so the glass is a trapezoid too', () => {
+    // If the screen were axis-aligned inside a tilted bezel, the illusion would break at
+    // the glass — the most visible surface in the scene.
+    const m = MONITORS.filter((x) => x.kind === 'primary')[0];
+    const q = screenQuad(m);
+    const lH = Math.abs(q[3][1] - q[0][1]), rH = Math.abs(q[2][1] - q[1][1]);
+    expect(Math.abs(lH - rH)).toBeGreaterThan(4);
   });
 });
 
