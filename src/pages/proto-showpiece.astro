@@ -11,6 +11,14 @@
 // A frame that flatters its concept is worse than no frame.
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { protoFrame } from '../lib/protoFrames';
+import { fanFrame } from '../lib/fanFrame';
+import { loadings } from '../lib/factorModel';
+import { SIGNAL_WEIGHTS } from '../data/signalWeights';
+import { RUBRIC_PROMPT } from '../lib/signalRubric';
+
+// The live model, so the page states the real numbers rather than a description of them.
+const ls = loadings(SIGNAL_WEIGHTS.signals);
+const fanSvg = fanFrame(SIGNAL_WEIGHTS.signals);
 
 const FRAMES = [
   {
@@ -66,6 +74,62 @@ const FRAMES = [
         looked at, the concept dies here rather than after five sessions.
       </p>
     </header>
+
+    <!-- ── THE FACTOR FAN — the current direction, ahead of the three earlier candidates.
+         Shown first because it is the one that survived the concept correction: seriation
+         needs n comparable assets, and this site is ONE asset with many signals. ── -->
+    <section class="frame-block">
+      <div class="frame-meta">
+        <p class="frame-n">00</p>
+        <h2>Factor exposure fan</h2>
+        <p class="frame-score">current direction · one asset, many signals</p>
+        <p class="frame-pitch">
+          You as a single ticker. The portfolio items are signals that load onto it, so the
+          object is a factor model — <em>r</em> = α + Σ β<sub>k</sub> f<sub>k</sub> + ε — with
+          each term expanded into one beam. Beam area is that factor’s loading.
+        </p>
+        <dl>
+          <dt>Where the numbers come from</dt>
+          <dd>
+            β = summed evidence score of a factor’s signals ÷ total. Every signal is scored
+            1–5 against a fixed rubric by three independent raters; the median ships. 20
+            items, 14 exact agreement, 20 within one point, 0 disputes.
+          </dd>
+          <dt>Live loadings</dt>
+          <dd>
+            <ul class="beta-list">
+              {ls.map((l) => (
+                <li>
+                  <span class="beta-label">{l.factor.label}</span>
+                  <span class="beta-bar" style={`--w:${(l.beta * 100).toFixed(1)}%`}></span>
+                  <span class="beta-num">{l.beta.toFixed(3)}</span>
+                </li>
+              ))}
+            </ul>
+          </dd>
+          <dt>What this frame can’t show</dt>
+          <dd>
+            In 3D the fan would be draggable, hovering a beam would isolate its factor and
+            list the signals loading on it, and the expression would expand into the beams on
+            scroll. This is one fixed camera.
+          </dd>
+          <dt>The honest finding</dt>
+          <dd>
+            Experience still leads (β {ls.find((l) => l.factor.key === 'experience')!.beta.toFixed(3)})
+            because nine items scoring 2 outweigh two research artefacts scoring 4. Writing and
+            Market reports sit at exactly zero — those pages don’t exist yet, and the model says
+            so rather than inventing a loading.
+          </dd>
+        </dl>
+      </div>
+      <div class="frame-art frame-fan" set:html={fanSvg} />
+      <details class="rubric">
+        <summary>The rubric the scores were made against</summary>
+        <pre>{RUBRIC_PROMPT}</pre>
+      </details>
+    </section>
+
+    <h2 class="earlier">Earlier candidates</h2>
 
     {FRAMES.map((f) => (
       <section class="frame-block">
@@ -196,6 +260,63 @@ const FRAMES = [
   .frame-art :global(.ser-caption) {
     font-family: var(--font-mono); font-size: 14px; letter-spacing: 0.06em;
     fill: var(--ink-4);
+  }
+
+  /* ── The factor fan. Ochre carries the loadings, indigo the zero stubs, seal the asset
+     mark at the origin — the one saturated colour, which is what the brand mark is for. ── */
+  .frame-fan {
+    --fan-beam: var(--ochre);
+    --fan-edge: color-mix(in oklab, var(--paper) 70%, var(--ochre));
+    --fan-tip: var(--paper);
+    --fan-zero: var(--indigo);
+    --fan-shadow: color-mix(in oklab, var(--ink-1) 72%, transparent);
+    --fan-rule: color-mix(in oklab, var(--ink-5) 60%, transparent);
+    --fan-asset: var(--seal);
+  }
+  .frame-art :global(.fan-label) {
+    font-family: var(--font-mono); font-size: 19px; letter-spacing: 0.1em;
+    text-transform: uppercase; fill: var(--paper);
+  }
+  .frame-art :global(.fan-beta) {
+    font-family: var(--font-mono); font-size: 16px; fill: var(--ochre);
+  }
+  .frame-art :global(.fan-expr) {
+    font-family: var(--font-mono); font-size: 26px; fill: var(--paper); letter-spacing: 0.02em;
+  }
+  .frame-art :global(.fan-caption) {
+    font-family: var(--font-mono); font-size: 15px; fill: var(--ink-4);
+  }
+
+  /* Live loadings, as a bar list beside the art — the numbers legible as numbers, not only
+     as beam widths. */
+  .beta-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 5px; }
+  .beta-list li {
+    display: grid; grid-template-columns: 9rem 1fr 3.4rem; align-items: center; gap: 10px;
+  }
+  .beta-label { font-size: 13px; color: var(--ink-2); }
+  .beta-bar {
+    height: 7px; border-radius: 1px;
+    background: linear-gradient(90deg, var(--ochre) var(--w), transparent var(--w));
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ink-5) 40%, transparent);
+  }
+  .beta-num { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-align: right; }
+
+  .rubric { margin-top: 18px; }
+  .rubric summary {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--ink-4); cursor: pointer;
+  }
+  .rubric pre {
+    margin: 12px 0 0; padding: 16px 18px; overflow-x: auto;
+    font-family: var(--font-mono); font-size: 12px; line-height: 1.6;
+    color: var(--ink-3); background: color-mix(in oklab, var(--ink-1) 6%, transparent);
+    border-left: 2px solid var(--ochre); white-space: pre-wrap;
+  }
+
+  .earlier {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em;
+    text-transform: uppercase; color: var(--ink-4);
+    margin: 16vh 0 0; padding-bottom: 10px; border-bottom: 1px solid rgba(var(--hairline-rgb), 0.3);
   }
 
   .proto-foot { margin-top: 14vh; }

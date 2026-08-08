@@ -243,9 +243,13 @@ export const FAN = {
    *  An earlier 232° put two beams behind the camera where their labels could never be
    *  read. 150° leaves a real margin without collapsing the fan to a narrow cone. */
   spreadDeg: 150,
-  /** Beams tilt up as they fan out, so the object is a shallow dome rather than a flat
-   *  star — that is what makes it read as 3D from a single still frame. */
-  liftDeg: 26,
+  /** Beams tilt up as they fan out, so the object is a shallow dome rather than a flat star —
+   *  that is what makes it read as 3D from a single still frame.
+   *
+   *  Raised 26 → 52 after rendering: at 26° the six beams were nearly coplanar, so they
+   *  overlapped on screen and their tip labels stacked. The lift is what separates the tips
+   *  VERTICALLY, which is the only axis available once azimuth is spent on the spread. */
+  liftDeg: 52,
   /** Length of a beam at beta = 0, and the extra length per unit beta. A zero-loading
    *  factor still gets a visible stub, because "no signal yet" is information. */
   minLength: 0.55,
