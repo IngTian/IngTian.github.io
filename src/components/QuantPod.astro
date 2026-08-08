@@ -1,0 +1,214 @@
+---
+// src/components/QuantPod.astro
+// A quant pod seen FROM THE SEAT: a lit monitor wall over a bench. Replaces the
+// resume-like Experience/Projects/Recognition blocks.
+//
+// WHY THIS EXISTS: with all text hidden and only the sky sampled, motion in this
+// stretch of the page measured 11/255 against the hero's 133 — the living sky that
+// carries the site was effectively frozen across 48% of the homepage. A lit monitor
+// wall puts a light source and real content where the sky gave up.
+//
+// STRUCTURE, and the accessibility contract:
+//   - ONE canvas, aria-hidden, pure decoration.
+//   - Every destination is a REAL focusable element positioned by PERCENTAGE over
+//     its monitor: <a> for the three that navigate, <button> for the two that
+//     announce "coming". So keyboard, screen readers and JS-off all work, with no
+//     separate accessible path to maintain.
+//   - No React island. Vanilla script, re-inits on astro:page-load with teardown,
+//     matching TerrainHero / Toc / artGallery.
+import { screenRects } from '../lib/podGeometry';
+import { SCREEN_CONTENT, ganttBars } from '../lib/podScreens';
+import { timeline } from '../data/profile';
+
+// Percentages are resolution independent, so the overlay needs no JS on resize.
+const rects = screenRects(1600, 900);
+const slots = SCREEN_CONTENT.map((s) => ({ ...s, rect: rects.find((r) => r.slot === s.slot)! }));
+// Built at BUILD time and serialised, so the first paint needs no data work.
+const gantt = ganttBars(timeline, 2026);
+---
+<section id="pod" class="pod" aria-labelledby="pod-heading">
+  <h2 id="pod-heading" class="sr-only">The desk — where to find my work</h2>
+
+  <div class="pod-frame">
+    <canvas
+      class="pod-canvas"
+      data-pod-canvas
+      data-gantt={JSON.stringify(gantt)}
+      aria-hidden="true"
+    ></canvas>
+
+    <!-- The real interface. Positioned over the painted screens. -->
+    <ul class="pod-hits">
+      {slots.map((s) => (
+        <li
+          class="pod-hit-wrap"
+          style={`left:${s.rect.left}%;top:${s.rect.top}%;width:${s.rect.width}%;height:${s.rect.height}%`}
+        >
+          {s.href ? (
+            <a class="pod-hit" data-slot={String(s.slot)} href={s.href}>
+              <span class="pod-hit-label">{s.label}</span>
+            </a>
+          ) : (
+            <button class="pod-hit" data-slot={String(s.slot)} type="button" aria-live="polite">
+              <span class="pod-hit-label">{s.label}</span>
+              <span class="pod-hit-soon">{s.announce}</span>
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  </div>
+</section>
+
+<style>
+  .pod { position: relative; padding: 8vh 0 10vh; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  /* Fixed aspect so the percentage overlay always lines up with the painting. */
+  .pod-frame {
+    position: relative; width: min(1180px, 92vw); margin: 0 auto;
+    aspect-ratio: 16 / 9;
+  }
+  .pod-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  .pod-hits { position: absolute; inset: 0; list-style: none; margin: 0; padding: 0; }
+  .pod-hit-wrap { position: absolute; }
+  .pod-hit {
+    display: flex; flex-direction: column; justify-content: flex-end;
+    width: 100%; height: 100%; padding: 6px;
+    background: transparent; border: 0; cursor: pointer;
+    text-decoration: none; text-align: left; font-family: var(--font-mono);
+    color: var(--paper);
+  }
+  .pod-hit-label {
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    opacity: 0; transition: opacity 0.25s ease;
+  }
+  .pod-hit-soon {
+    font-size: 9px; letter-spacing: 0.06em; opacity: 0;
+    color: rgba(239, 233, 221, 0.6); transition: opacity 0.25s ease;
+  }
+  .pod-hit:hover .pod-hit-label,
+  .pod-hit:focus-visible .pod-hit-label,
+  .pod-hit:hover .pod-hit-soon,
+  .pod-hit:focus-visible .pod-hit-soon { opacity: 1; }
+  .pod-hit:focus-visible {
+    outline: 1px solid var(--ochre); outline-offset: 2px; border-radius: 2px;
+  }
+
+  /* No-canvas / small screens: the scene is skipped and the destinations become a
+     plain labelled list. Same content, no scene — a finished state, not a broken one. */
+  @media (max-width: 640px) {
+    .pod-frame { aspect-ratio: auto; }
+    .pod-canvas { display: none; }
+    .pod-hits { position: static; display: grid; gap: 10px; }
+    .pod-hit-wrap { position: static !important; width: auto !important; height: auto !important; }
+    .pod-hit {
+      border: 1px solid rgba(239, 233, 221, 0.18); border-radius: 10px; padding: 14px;
+    }
+    .pod-hit-label, .pod-hit-soon { opacity: 1; }
+  }
+</style>
+
+<script>
+  import { paintPod, type PodStyle } from '../lib/podPaint';
+  import { prefersReducedMotion } from '../lib/motion';
+
+  const teardowns: Array<() => void> = [];
+
+  function initPods(): void {
+    while (teardowns.length) teardowns.pop()!();
+    document.querySelectorAll<HTMLCanvasElement>('[data-pod-canvas]').forEach((cvs) => {
+      const t = initPod(cvs);
+      if (t) teardowns.push(t);
+    });
+  }
+
+  function initPod(cvs: HTMLCanvasElement): (() => void) | null {
+    if (getComputedStyle(cvs).display === 'none') return null;
+    const ctx = cvs.getContext('2d');
+    if (!ctx) return null;
+
+    const gantt = JSON.parse(cvs.dataset.gantt || '[]');
+    const style = (): PodStyle =>
+      (document.documentElement.dataset.podStyle as PodStyle) || 'dots';
+    const theme = (): 'light' | 'dark' =>
+      document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+
+    let hoverSlot: number | null = null;
+    const frame = cvs.parentElement!;
+    const hits = Array.from(frame.querySelectorAll<HTMLElement>('.pod-hit'));
+    const onEnter = (e: Event) => {
+      hoverSlot = Number((e.currentTarget as HTMLElement).dataset.slot);
+      draw(0);
+    };
+    const onLeave = () => { hoverSlot = null; draw(0); };
+    for (const h of hits) {
+      h.addEventListener('pointerenter', onEnter);
+      h.addEventListener('focus', onEnter);
+      h.addEventListener('pointerleave', onLeave);
+      h.addEventListener('blur', onLeave);
+      // The two announcing controls must not navigate.
+      if (h.tagName === 'BUTTON') {
+        h.addEventListener('click', (ev) => ev.preventDefault());
+      }
+    }
+
+    let W = 0, H = 0, dpr = 1;
+    function size(): void {
+      const r = cvs.getBoundingClientRect();
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      W = Math.max(1, Math.round(r.width));
+      H = Math.max(1, Math.round(r.height));
+      cvs.width = Math.round(W * dpr);
+      cvs.height = Math.round(H * dpr);
+    }
+
+    const t0 = performance.now();
+    function draw(nowMs: number): void {
+      paintPod(ctx!, {
+        W, H, dpr, style: style(), theme: theme(),
+        tSec: (nowMs ? nowMs - t0 : 0) / 1000,
+        hoverSlot, gantt,
+      });
+    }
+
+    size();
+    draw(0);   // static first frame immediately — this is the LCP paint
+
+    // Only repaint when something actually changes: hover, theme, style, resize.
+    // Nothing animates by default, so there is no rAF loop at all — a dark room lit
+    // by screens is alive without motion, which is also why the reduced-motion state
+    // looks finished rather than degraded.
+    const reduce = prefersReducedMotion();
+    void reduce; // no animation yet; Task 8 adds the optional glow breath
+
+    let resizeT = 0;
+    const onResize = () => {
+      window.clearTimeout(resizeT);
+      resizeT = window.setTimeout(() => { size(); draw(0); }, 150);
+    };
+    window.addEventListener('resize', onResize);
+
+    const mo = new MutationObserver(() => draw(0));
+    mo.observe(document.documentElement, {
+      attributes: true, attributeFilter: ['data-theme', 'data-pod-style'],
+    });
+
+    return () => {
+      window.clearTimeout(resizeT);
+      window.removeEventListener('resize', onResize);
+      mo.disconnect();
+      for (const h of hits) {
+        h.removeEventListener('pointerenter', onEnter);
+        h.removeEventListener('focus', onEnter);
+        h.removeEventListener('pointerleave', onLeave);
+        h.removeEventListener('blur', onLeave);
+      }
+    };
+  }
+
+  document.addEventListener('astro:page-load', initPods);
+</script>
