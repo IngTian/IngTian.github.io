@@ -86,23 +86,24 @@ function paintWall(ctx: CanvasRenderingContext2D, q: PodQuad, o: PaintOpts, c: P
   // The wall is deliberately near-black: DARK surroundings are what make the lit
   // screens read as lit. It is not a background, it is the lighting design.
   if (o.style === 'dots') {
-    // Very sparse, very dim dot field — must read as near-black.
+    // Dot field — must be visible but subdued.
     const pts = q.corners.map((corner) => podProject(corner[0], corner[1], corner[2], o.W, o.H));
     const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
     const x0 = Math.min(...xs), x1 = Math.max(...xs);
     const y0 = Math.min(...ys), y1 = Math.max(...ys);
 
-    const spacing = 18 * o.dpr; // coarse: cheap at 2x DPR
-    const baseAlpha = 0.08;     // very dim
-    const [r, g, b] = [0x0a, 0x0c, 0x0f];
+    const spacing = 14 * o.dpr; // denser so it's perceivable
+    const baseAlpha = 0.18;     // visible against the page
+    // Parse the palette wall color instead of hardcoding
+    const [r, g, b] = c.wall.match(/[\da-f]{2}/gi)!.map(h => parseInt(h, 16));
 
-    for (let y = y0; y < y1; y += spacing) {
-      for (let x = x0; x < x1; x += spacing) {
+    for (let y = Math.max(0, y0); y < Math.min(o.H, y1); y += spacing) {
+      for (let x = Math.max(0, x0); x < Math.min(o.W, x1); x += spacing) {
         // tiny jitter so the grid doesn't alias
         const jx = ((Math.sin(x * 0.7 + y * 1.1) * 0.5 + 0.5) - 0.5) * spacing * 0.4;
         const jy = ((Math.sin(x * 1.3 + y * 0.9) * 0.5 + 0.5) - 0.5) * spacing * 0.4;
         const alpha = baseAlpha * (0.7 + dotJitter(x, y) * 0.3);
-        const radius = 0.9 * o.dpr;
+        const radius = 1.1 * o.dpr;
 
         ctx.beginPath();
         ctx.arc(x + jx, y + jy, radius, 0, 2 * Math.PI);
@@ -125,19 +126,20 @@ function paintBench(ctx: CanvasRenderingContext2D, q: PodQuad, o: PaintOpts, c: 
     const x0 = Math.min(...xs), x1 = Math.max(...xs);
     const y0 = Math.min(...ys), y1 = Math.max(...ys);
 
-    const spacing = 9 * o.dpr; // denser than the wall
+    const spacing = 8 * o.dpr; // denser than the wall, clearly visible
     const yTop = y0, yBot = y1;
-    const [r, g, b] = [0x24, 0x1f, 0x19];
+    // Parse bench color from palette
+    const [r, g, b] = c.bench.match(/[\da-f]{2}/gi)!.map(h => parseInt(h, 16));
 
-    for (let y = y0; y < y1; y += spacing) {
-      for (let x = x0; x < x1; x += spacing) {
+    for (let y = Math.max(0, y0); y < Math.min(o.H, y1); y += spacing) {
+      for (let x = Math.max(0, x0); x < Math.min(o.W, x1); x += spacing) {
         const jx = ((Math.sin(x * 0.7 + y * 1.1) * 0.5 + 0.5) - 0.5) * spacing * 0.4;
         const jy = ((Math.sin(x * 1.3 + y * 0.9) * 0.5 + 0.5) - 0.5) * spacing * 0.4;
 
         // Screen spill: brighter at the top (back of the bench)
         const spillT = 1 - (y - yTop) / (yBot - yTop);
-        const alpha = (0.12 + spillT * 0.22) * (0.7 + dotJitter(x, y) * 0.3);
-        const radius = 1.0 * o.dpr;
+        const alpha = (0.24 + spillT * 0.32) * (0.7 + dotJitter(x, y) * 0.3);
+        const radius = 1.2 * o.dpr;
 
         ctx.beginPath();
         ctx.arc(x + jx, y + jy, radius, 0, 2 * Math.PI);
@@ -164,9 +166,13 @@ function paintMonitor(ctx: CanvasRenderingContext2D, q: PodQuad, o: PaintOpts, c
   const meta = SCREEN_CONTENT.find((s) => s.slot === q.slot)!;
   const hot = o.hoverSlot === q.slot;
 
-  // bezel
+  // bezel with depth: darker base + lighter top edge
+  const bezelW = 3;
   ctx.fillStyle = c.bezel;
-  ctx.fillRect(b.x - 3, b.y - 3, b.w + 6, b.h + 6);
+  ctx.fillRect(b.x - bezelW, b.y - bezelW, b.w + bezelW * 2, b.h + bezelW * 2);
+  // top edge lighter to read as a ridge
+  ctx.fillStyle = c.benchEdge;
+  ctx.fillRect(b.x - bezelW, b.y - bezelW, b.w + bezelW * 2, 1.5);
   // screen
   ctx.fillStyle = c.screenBg;
   ctx.fillRect(b.x, b.y, b.w, b.h);
@@ -284,7 +290,16 @@ function paintLatex(ctx: CanvasRenderingContext2D, r: { x: number; y: number; w:
       ctx.font = `${ln.kind === 'head' ? 'bold ' : ''}${fs}px "Fraunces", Georgia, serif`;
       ctx.textBaseline = 'top';
       ctx.fillStyle = ln.kind === 'head' ? c.ink : o.theme === 'dark' ? 'rgba(220,225,220,0.66)' : 'rgba(239,233,221,0.66)';
-      ctx.fillText(ln.text, r.x, y);
+      // Truncate if too wide
+      const maxW = r.w - 4;
+      let text = ln.text;
+      let measured = ctx.measureText(text).width;
+      if (measured > maxW && ln.kind === 'head') {
+        // Scale down the heading to fit
+        const scale = maxW / measured;
+        ctx.font = `${ln.kind === 'head' ? 'bold ' : ''}${fs * scale}px "Fraunces", Georgia, serif`;
+      }
+      ctx.fillText(text, r.x + 2, y);
     }
   });
 }
@@ -303,36 +318,38 @@ function paintBloomberg(ctx: CanvasRenderingContext2D, r: { x: number; y: number
     ctx.fillStyle = c.accent;
     ctx.fillText(row.ticker, r.x + 2, y);
     ctx.fillStyle = o.theme === 'dark' ? 'rgba(220,225,220,0.72)' : 'rgba(239,233,221,0.72)';
-    ctx.fillText(row.last, r.x + r.w * 0.42, y);
+    ctx.fillText(row.last, r.x + r.w * 0.36, y);
     ctx.fillStyle = row.up ? c.accent : c.seal;
-    ctx.fillText(row.chg, r.x + r.w * 0.74, y);
+    ctx.fillText(row.chg, r.x + r.w * 0.64, y);
   });
 }
 
 function paintDeskObject(ctx: CanvasRenderingContext2D, q: PodQuad, o: PaintOpts, c: Pal) {
   if (o.style === 'dots') {
-    // Desk objects as dot fields at low density.
+    // Desk objects as dot fields — visible texture on the bench.
     const pts = q.corners.map((corner) => podProject(corner[0], corner[1], corner[2], o.W, o.H));
     const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
     const x0 = Math.min(...xs), x1 = Math.max(...xs);
     const y0 = Math.min(...ys), y1 = Math.max(...ys);
 
-    const spacing = 7 * o.dpr;
+    const spacing = 6 * o.dpr;
+    // Parse paper color from palette for theme consistency
+    const [pr, pg, pb] = c.paper.match(/[\da-f]{2}/gi)!.map(h => parseInt(h, 16));
     const fills: Record<string, { r: number; g: number; b: number; alpha: number }> = {
-      keyboard: { r: 0xef, g: 0xe9, b: 0xdd, alpha: 0.13 },
-      mouse: { r: 0xef, g: 0xe9, b: 0xdd, alpha: 0.15 },
-      coffee: { r: 0xef, g: 0xe9, b: 0xdd, alpha: 0.20 },
-      papers: { r: 0xef, g: 0xe9, b: 0xdd, alpha: 0.30 },
-      cow: { r: 0xef, g: 0xe9, b: 0xdd, alpha: 0.26 },
+      keyboard: { r: pr, g: pg, b: pb, alpha: 0.22 },
+      mouse: { r: pr, g: pg, b: pb, alpha: 0.24 },
+      coffee: { r: pr, g: pg, b: pb, alpha: 0.30 },
+      papers: { r: pr, g: pg, b: pb, alpha: 0.42 },
+      cow: { r: pr, g: pg, b: pb, alpha: 0.36 },
     };
-    const fill = fills[q.id] ?? { r: 0xef, g: 0xe9, b: 0xdd, alpha: 0.15 };
+    const fill = fills[q.id] ?? { r: pr, g: pg, b: pb, alpha: 0.22 };
 
-    for (let y = y0; y < y1; y += spacing) {
-      for (let x = x0; x < x1; x += spacing) {
+    for (let y = Math.max(0, y0); y < Math.min(o.H, y1); y += spacing) {
+      for (let x = Math.max(0, x0); x < Math.min(o.W, x1); x += spacing) {
         const jx = ((Math.sin(x * 0.7 + y * 1.1) * 0.5 + 0.5) - 0.5) * spacing * 0.4;
         const jy = ((Math.sin(x * 1.3 + y * 0.9) * 0.5 + 0.5) - 0.5) * spacing * 0.4;
         const alpha = fill.alpha * (0.7 + dotJitter(x, y) * 0.3);
-        const radius = 0.85 * o.dpr;
+        const radius = 1.0 * o.dpr;
 
         ctx.beginPath();
         ctx.arc(x + jx, y + jy, radius, 0, 2 * Math.PI);
