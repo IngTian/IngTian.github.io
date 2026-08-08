@@ -15,10 +15,19 @@ import { fanFrame } from '../lib/fanFrame';
 import { loadings } from '../lib/factorModel';
 import { SIGNAL_WEIGHTS } from '../data/signalWeights';
 import { RUBRIC_PROMPT } from '../lib/signalRubric';
+import { FACTOR_EQUATIONS, factorExpansion } from '../lib/equations';
+import { expressionTerms } from '../lib/factorModel';
 
 // The live model, so the page states the real numbers rather than a description of them.
 const ls = loadings(SIGNAL_WEIGHTS.signals);
 const fanSvg = fanFrame(SIGNAL_WEIGHTS.signals);
+// Both equations go through the site's existing KaTeX -> MathML build step. The terms carry
+// the SAME betas the fan draws, from one source, so the two cannot disagree.
+const betaByKey = new Map(ls.map((l) => [l.factor.key, l.beta]));
+const fittedTerms = expressionTerms().map((t) => ({ ...t, beta: betaByKey.get(
+  ls.find((l) => l.factor.symbol === t.symbol)!.factor.key,
+) ?? t.beta }));
+const expansionHtml = factorExpansion(fittedTerms);
 
 const FRAMES = [
   {
@@ -122,7 +131,38 @@ const FRAMES = [
           </dd>
         </dl>
       </div>
-      <div class="frame-art frame-fan" set:html={fanSvg} />
+      <!-- The maths, typeset. Real KaTeX -> MathML through the site's existing build step —
+           the general form, then the same form with the fitted loadings substituted in. -->
+      <div class="eqs">
+        <div class="eq" set:html={FACTOR_EQUATIONS.general} />
+        <p class="eq-note">one asset, six signals</p>
+        <div class="eq" set:html={expansionHtml} />
+        <p class="eq-note">fitted — grey terms are exactly zero, and say so</p>
+        <div class="eq eq-small" set:html={FACTOR_EQUATIONS.betaDef} />
+        <p class="eq-note">
+          s<sub>i</sub> is one signal’s evidence score, 1–5, against the rubric below
+        </p>
+      </div>
+
+      <!-- The fan's palette is set INLINE, not in the scoped <style>. Astro tree-shook the
+           .frame-fan rule because the class is only ever referenced from a set:html string,
+           which left every var(--fan-*) resolving to nothing and the beams invisible. Inline
+           custom properties cannot be shaken, and they still resolve against the theme tokens,
+           so both themes keep working. -->
+      <div
+        class="frame-art frame-fan"
+        style="
+          --fan-beam: var(--ochre);
+          --fan-edge: color-mix(in oklab, var(--paper) 70%, var(--ochre));
+          --fan-tip: var(--paper);
+          --fan-zero: var(--indigo);
+          --fan-shadow: color-mix(in oklab, var(--ink-1) 72%, transparent);
+          --fan-rule: color-mix(in oklab, var(--ink-5) 60%, transparent);
+          --fan-asset: var(--seal);
+          --fan-leader: color-mix(in oklab, var(--ink-5) 85%, transparent);
+        "
+        set:html={fanSvg}
+      />
       <details class="rubric">
         <summary>The rubric the scores were made against</summary>
         <pre>{RUBRIC_PROMPT}</pre>
@@ -263,8 +303,14 @@ const FRAMES = [
   }
 
   /* ── The factor fan. Ochre carries the loadings, indigo the zero stubs, seal the asset
-     mark at the origin — the one saturated colour, which is what the brand mark is for. ── */
-  .frame-fan {
+     mark at the origin — the one saturated colour, which is what the brand mark is for.
+
+     :global() IS LOAD-BEARING HERE. The fan's paths live inside a set:html string, so Astro's
+     scoped-style analyser never sees .frame-fan referenced by a static class attribute and
+     TREE-SHOOK THE WHOLE RULE — every var(--fan-*) then resolved to nothing and the beams and
+     labels rendered invisible while the SVG itself was perfectly well-formed. Verified by
+     grepping the emitted CSS for .frame-fan and finding no match. ── */
+  :global(.frame-fan) {
     --fan-beam: var(--ochre);
     --fan-edge: color-mix(in oklab, var(--paper) 70%, var(--ochre));
     --fan-tip: var(--paper);
@@ -272,6 +318,7 @@ const FRAMES = [
     --fan-shadow: color-mix(in oklab, var(--ink-1) 72%, transparent);
     --fan-rule: color-mix(in oklab, var(--ink-5) 60%, transparent);
     --fan-asset: var(--seal);
+    --fan-leader: color-mix(in oklab, var(--ink-5) 85%, transparent);
   }
   .frame-art :global(.fan-label) {
     font-family: var(--font-mono); font-size: 19px; letter-spacing: 0.1em;
@@ -280,11 +327,17 @@ const FRAMES = [
   .frame-art :global(.fan-beta) {
     font-family: var(--font-mono); font-size: 16px; fill: var(--ochre);
   }
-  .frame-art :global(.fan-expr) {
-    font-family: var(--font-mono); font-size: 26px; fill: var(--paper); letter-spacing: 0.02em;
+  /* Typeset maths. MathML inherits the page's font, so the display face is set here rather
+     than left to the browser's default serif. */
+  .eqs { margin: 26px 0 0; display: grid; gap: 4px; justify-items: center; }
+  .eq :global(math) {
+    font-family: var(--font-display), Georgia, serif;
+    font-size: 25px; color: var(--ink-1);
   }
-  .frame-art :global(.fan-caption) {
-    font-family: var(--font-mono); font-size: 15px; fill: var(--ink-4);
+  .eq.eq-small :global(math) { font-size: 19px; color: var(--ink-2); }
+  .eq-note {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--ink-4); margin: 0 0 14px;
   }
 
   /* Live loadings, as a bar list beside the art — the numbers legible as numbers, not only

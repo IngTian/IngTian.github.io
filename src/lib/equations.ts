@@ -33,3 +33,46 @@ export const PAPER_EQUATIONS = {
   // Sector-level composite covariance from within-sector weights.
   sectorCov: katex.renderToString('\\tilde{\\Sigma}_{gh} = (\\eta^{(g)})^{\\top}\\Sigma_{gh}\\,\\eta^{(h)}', display),
 };
+
+// ── The factor model, for the exposure fan ──────────────────────────────────
+// Baked through the SAME KaTeX -> MathML path as everything else, which is the point: a first
+// pass hand-built this from SVG <tspan> elements and it read as monospace text pretending to
+// be maths — wrong subscript sizing, wrong italic/upright distinction, no proper spacing
+// around operators. Real typesetting is not optional for the one element whose whole job is
+// to say "this is a model".
+
+/** The general form: one asset, many signals. */
+export const FACTOR_EQUATIONS = {
+  general: katex.renderToString(
+    'r_{\\mathrm{TIAN}} = \\alpha + \\sum_{k=1}^{6} \\beta_k f_k + \\varepsilon',
+    display,
+  ),
+  /** How beta is defined — the caption's claim, typeset rather than described in prose. */
+  betaDef: katex.renderToString(
+    '\\beta_k = \\frac{\\sum_{i \\in k} s_i}{\\sum_{j} s_j}',
+    display,
+  ),
+};
+
+/**
+ * The expanded form, with each term's fitted loading substituted in.
+ *
+ * Built from the live loadings so the displayed equation and the drawn fan can never
+ * disagree — the numbers come from one source. Zero-loading terms are rendered in a muted
+ * colour via \\textcolor so an honest absence reads as deliberate rather than as a typo.
+ */
+export function factorExpansion(
+  terms: readonly { symbol: string; beta: number }[],
+): string {
+  const body = terms
+    .map(({ symbol, beta }) => {
+      const coef = beta.toFixed(2);
+      const term = `${coef}\\,f_{\\mathrm{${symbol}}}`;
+      return beta === 0 ? `\\textcolor{#8c8576}{${term}}` : term;
+    })
+    .join(' + ');
+  return katex.renderToString(
+    `r_{\\mathrm{TIAN}} = \\alpha + ${body} + \\varepsilon`,
+    { ...display, trust: true },
+  );
+}
