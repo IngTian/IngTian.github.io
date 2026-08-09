@@ -187,7 +187,21 @@ const { stops, id, label = 'On this page' } = Astro.props;
       const vh = window.innerHeight;
       const bandTop = vh * 0.10;
       const bandBottom = vh * 0.62;
-      const measured = stops.map((s, treeIndex) => {
+
+      // COLLAPSED CONTENT: a stop whose target is not rendered must not appear in the rail.
+      // /research collapses each paper behind a card, so "The idea / Method / Results" point at
+      // elements inside a `hidden` panel. getBoundingClientRect() on those returns an all-zero box,
+      // which is not merely inert — it sorts to the top and can win the fallback rule, lighting a
+      // section the reader cannot see. Hiding the row is also the honest UI: the rail should offer
+      // what the page is currently showing.
+      for (const s of stops) {
+        const live = s.el.getClientRects().length > 0;
+        s.a.closest('li')?.toggleAttribute('hidden', !live);
+      }
+      const visible = stops.filter((s) => s.el.getClientRects().length > 0);
+      if (!visible.length) return;
+
+      const measured = visible.map((s, treeIndex) => {
         const r = s.el.getBoundingClientRect();
         return {
           ...s, treeIndex, top: r.top,

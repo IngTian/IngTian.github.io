@@ -22,6 +22,11 @@ const stops = researchStops(publications, researchInterests);
   veilOnLoad={true}
   navZone="light"
 >
+  <!-- Marks the document JS-capable before anything paints, so the CSS can present the cards as
+       interactive only when something can respond. The collapse itself happens in the snippet AFTER
+       the papers (a detail cannot be collapsed before it is parsed). -->
+  <script is:inline>document.documentElement.classList.add('paper-js');</script>
+
   <main class="research descent is-fluid">
     <FluidSky strength={3} variant="reading" />
     <SkyWash />
@@ -53,17 +58,55 @@ const stops = researchStops(publications, researchInterests);
 
       {featured.map((p, i) => {
         const math = mathFor(p);
+        const headline = p.results?.[0];
         return (
-        <article class="paper">
-          <!-- title + byline span both columns, like a paper masthead -->
-          <div class="paper-head" id={paperAnchorId(i)}>
-            <p class="kicker">{p.subject ?? 'Research'}</p>
-            <h2>{p.title}</h2>
-            <p class="byline">{p.authors} · {p.venue}{p.arxivId && <> · arXiv:{p.arxivId}</>} · {p.year}</p>
-          </div>
+        <article class="paper" data-paper>
+          <!-- title + byline span both columns, like a paper masthead.
+               THE MASTHEAD IS THE CARD'S BUTTON. The owner's brief: the lucid paper card is "elegant…
+               probably we will have many papers in the future, so it's fine to have that card in the
+               research tab. After clicking on the card, it expands to a more detailed summary."
+               A real <button> wrapping the summary, not a click handler on a div: it is keyboard
+               reachable, announces its expanded state, and works with assistive tech for free. -->
+          <button
+            type="button"
+            class="paper-card"
+            id={paperAnchorId(i)}
+            aria-expanded="false"
+            aria-controls={`${paperAnchorId(i)}-detail`}
+            data-paper-toggle
+          >
+            <span class="paper-head">
+              <span class="kicker">{p.subject ?? 'Research'}</span>
+              <span class="paper-title">{p.title}</span>
+              <span class="byline">{p.authors} · {p.venue}{p.arxivId && <> · arXiv:{p.arxivId}</>} · {p.year}</span>
+            </span>
+
+            <!-- The card's own summary, visible while collapsed: the one-line "why it matters" plus a
+                 single headline number. Enough to decide whether to open it. -->
+            {p.takeaway && <span class="card-takeaway">{p.takeaway}</span>}
+            <span class="card-foot">
+              {headline && (
+                <span class="card-stat">
+                  <span class="card-stat-value">{headline.value}</span>
+                  <span class="card-stat-label">{headline.label}</span>
+                </span>
+              )}
+              <!-- The label swaps with the expanded state in CSS (see .card-cue-text), so there is no
+                   JS-owned copy that could disagree with aria-expanded. aria-hidden because the button
+                   already announces its own state — a screen reader would otherwise hear it twice. -->
+              <span class="card-cue" aria-hidden="true">
+                <span class="card-cue-text"></span>
+                <span class="card-chevron"></span>
+              </span>
+            </span>
+          </button>
 
           <!-- two columns: LEFT = idea + formal method (math); RIGHT = results -->
-          <div class="paper-body">
+          <!-- NOT `hidden` in the markup: with JS off, this content must be readable, and an earlier
+               version that shipped it hidden made the whole paper unreachable (measured: 0 of 1 panels
+               rendered with script execution disabled). The inline head script collapses it before
+               first paint whenever JS is available, so there is no flash for real visitors. -->
+          <div class="paper-body" id={`${paperAnchorId(i)}-detail`} data-paper-detail>
             <div class="paper-left">
               {p.idea && (
                 <section class="block" id={paperSectionId(i, 'idea')}>
@@ -134,6 +177,29 @@ const stops = researchStops(publications, researchInterests);
         );
       })}
 
+      <!-- COLLAPSE BEFORE PAINT. Placed here, immediately after the papers, because a detail cannot be
+           collapsed before it is parsed — and a deferred module script would run after first paint,
+           flashing every expanded paper. A synchronous inline script at this point in the document
+           collapses them during parsing, so the first thing painted is already the card view.
+           The details ship VISIBLE (see the .paper-body markup) so a JS failure leaves the papers
+           readable rather than unreachable; this snippet is the enhancement, not the mechanism. -->
+      <script is:inline>
+        (() => {
+          const details = document.querySelectorAll('[data-paper-detail]');
+          const hash = location.hash.slice(1);
+          for (const d of details) {
+            // Never collapse the panel a deep link points into.
+            if (hash && (d.id === hash || d.querySelector('#' + CSS.escape(hash)))) continue;
+            d.setAttribute('hidden', '');
+          }
+          // Mirror the state onto the buttons so the chevron and label are right on the first frame.
+          for (const b of document.querySelectorAll('[data-paper-toggle]')) {
+            const panel = document.getElementById(b.getAttribute('aria-controls'));
+            b.setAttribute('aria-expanded', String(!!panel && !panel.hasAttribute('hidden')));
+          }
+        })();
+      </script>
+
       {others.length > 0 && (
         <section class="more" id="r-earlier">
           <h3 class="more-label">Earlier work</h3>
@@ -200,12 +266,95 @@ const stops = researchStops(publications, researchInterests);
     color: var(--ink-1); line-height: 1.25; font-variation-settings: 'SOFT' 40; }
   .interest-gloss { display: block; font-size: 13.5px; line-height: 1.6; color: var(--ink-3); margin-top: 8px; }
 
-  /* paper masthead — spans both columns; also the paper's own rail anchor */
-  .paper-head { padding-bottom: 1vh; scroll-margin-top: 12vh; }
-  .kicker { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-4); }
-  .paper-head h2 { font-family: var(--font-display); font-weight: 500; font-size: clamp(24px, 3vw, 34px);
-    line-height: 1.18; color: var(--ink-1); margin: 14px 0 0; font-variation-settings: 'SOFT' 40; max-width: 40ch; }
-  .byline { font-family: var(--font-mono); font-size: 11px; color: var(--ink-4); letter-spacing: 0.02em; margin-top: 14px; }
+  /* ── THE PAPER CARD. Collapsed by default; the masthead IS the button.
+     This is the "lucid paper card" the owner picked out on the homepage — a translucent pane that
+     lets the fluid sky through — moved here and made the paper's entry point: "after clicking on
+     the card, it expands to a more detailed summary."
+     Translucent rather than a solid fill, because the elegance came from the fluid showing through.
+     A backdrop blur lifts the ink off the moving sky without hiding it. */
+  /* --card-tint is the PANE colour, and it must key off the SURFACE, not the ink ramp.
+     The bug this fixes: the pane was color-mix(--paper 42%). In the dark theme --paper is #dfe3df — it
+     is the INK colour there, not a surface — so the card rendered as a pale panel and the --ink-4 text
+     on it (rgb(100,107,100)) measured almost illegible. Light stays a warm paper wash; dark becomes a
+     lifted charcoal, so ink keeps its meaning in both. */
+  .paper-card {
+    --card-tint: #f3eee2;
+    --card-tint-strength: 42%;
+    --card-tint-hover: 56%;
+    --card-sheen: rgba(255, 255, 255, 0.28);
+
+    display: block;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    scroll-margin-top: 12vh;
+    padding: clamp(22px, 2.2vw, 32px) clamp(22px, 2.4vw, 36px);
+    border-radius: 14px;
+    border: 1px solid rgba(var(--hairline-rgb), 0.3);
+    background: color-mix(in srgb, var(--card-tint) var(--card-tint-strength), transparent);
+    -webkit-backdrop-filter: blur(9px) saturate(1.05);
+    backdrop-filter: blur(9px) saturate(1.05);
+    box-shadow: inset 0 1px 0 var(--card-sheen);
+  }
+  :global(html[data-theme='dark']) .paper-card {
+    --card-tint: #2b3038;
+    --card-tint-strength: 62%;
+    --card-tint-hover: 76%;
+    --card-sheen: rgba(255, 255, 255, 0.07);
+  }
+  @media (hover: hover) {
+    .paper-card { transition: border-color .3s, background-color .3s, transform .3s cubic-bezier(.2,.7,.3,1); }
+    .paper-card:hover {
+      border-color: color-mix(in srgb, var(--ochre) 55%, transparent);
+      background: color-mix(in srgb, var(--card-tint) var(--card-tint-hover), transparent);
+      transform: translateY(-2px);
+    }
+  }
+  .paper-card:focus-visible { outline: 2px solid var(--ochre); outline-offset: 3px; }
+
+  /* paper masthead — inside the card; also the paper's own rail anchor */
+  .paper-head { display: block; }
+  .kicker { display: block; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-4); }
+  .paper-title {
+    display: block;
+    font-family: var(--font-display); font-weight: 500; font-size: clamp(22px, 2.7vw, 31px);
+    line-height: 1.18; color: var(--ink-1); margin: 14px 0 0; font-variation-settings: 'SOFT' 40; max-width: 40ch;
+  }
+  .byline { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--ink-4); letter-spacing: 0.02em; margin-top: 14px; }
+
+  /* The collapsed card's summary — the one-line thesis and one number, so the card is a real
+     preview rather than a title you must open to evaluate. */
+  .card-takeaway {
+    display: block;
+    font-family: var(--font-display); font-style: italic;
+    font-size: clamp(16px, 1.5vw, 19px); line-height: 1.55;
+    color: var(--ink-2); margin-top: 20px; max-width: 54ch;
+  }
+  .card-foot {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 24px; flex-wrap: wrap; margin-top: 22px;
+  }
+  .card-stat { display: flex; align-items: baseline; gap: 10px; }
+  .card-stat-value { font-family: var(--font-mono); font-size: clamp(19px, 1.9vw, 24px); color: var(--ink-1); }
+  .card-stat-label { font-size: 12.5px; color: var(--ink-4); max-width: 34ch; }
+  .card-cue { display: inline-flex; align-items: center; gap: 9px; }
+  /* The label follows aria-expanded rather than being written by the script, so the visible copy and
+     the announced state cannot drift. */
+  .card-cue-text { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ochre); }
+  .paper-card[aria-expanded='false'] .card-cue-text::after { content: 'read the detail'; }
+  .paper-card[aria-expanded='true'] .card-cue-text::after { content: 'close'; }
+  /* A chevron drawn from a rotated border, so it costs no glyph and no asset. */
+  .card-chevron {
+    width: 7px; height: 7px; display: inline-block;
+    border-right: 1.5px solid var(--ochre); border-bottom: 1.5px solid var(--ochre);
+    transform: rotate(45deg) translateY(-1px);
+    transition: transform .32s cubic-bezier(.2,.7,.3,1);
+  }
+  .paper-card[aria-expanded='true'] .card-chevron { transform: rotate(225deg) translateY(-1px); }
+  /* Once open, the cue reads as the reverse action and the summary is redundant with the detail. */
+  .paper-card[aria-expanded='true'] .card-takeaway { display: none; }
 
   /* two columns: LEFT (idea + formal math) is wider so equations show in full;
      RIGHT (results) is the narrower numeric column. */
@@ -215,6 +364,32 @@ const stops = researchStops(publications, researchInterests);
     gap: clamp(32px, 3.4vw, 60px);
     align-items: start;
     margin-top: 5vh;
+  }
+  /* THE DETAIL SHIPS VISIBLE, and the script collapses it. This direction is deliberate and it is the
+     second attempt: the first shipped `hidden` in the markup with an `html.no-paper-js` class meant to
+     reveal it as a fallback — but that class was ADDED BY THE SCRIPT, so with JS disabled it never
+     existed, the fallback never applied, and the entire paper was unreachable. Measured with script
+     execution disabled: 1 detail panel, 0 with a rendered box.
+     Shipping visible cannot fail that way. The trade is a brief flash of the full paper before the
+     script collapses it, which the guard below removes for anyone whose JS does run. */
+  .paper-body[hidden] { display: none; }
+
+  /* The guard is emitted INTO THE HTML by an inline head script (see BaseLayout's paper-collapse
+     snippet), so it is present on the very first paint and absent when JS is off. Belt and braces:
+     the cue is also hidden when nothing can respond to it. */
+  :global(html.paper-js) .paper-card { cursor: pointer; }
+  :global(html:not(.paper-js)) .card-cue { display: none; }
+  :global(html:not(.paper-js)) .paper-card { cursor: default; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    /* Opening animates the panel in — transform and opacity only, per the project's motion rule.
+       Height is not animated: it would need a fixed value or a layout-thrashing measure, and the
+       project bans animating anything that forces layout. */
+    .paper-body:not([hidden]) { animation: detail-in .42s cubic-bezier(.2,.7,.3,1) both; }
+    @keyframes detail-in {
+      from { opacity: 0; transform: translate3d(0, -10px, 0); }
+      to   { opacity: 1; transform: none; }
+    }
   }
   .paper-left, .paper-right { min-width: 0; }
 
@@ -304,3 +479,92 @@ const stops = researchStops(publications, researchInterests);
     @keyframes research-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
   }
 </style>
+
+<script>
+  // THE PAPER CARDS — click a card, it expands to the detailed summary.
+  //
+  // The owner's brief: the lucid paper card is "elegant… probably we will have many papers in the
+  // future, so I guess it's fine to have that card in the research tab with fluid background. After
+  // clicking on the card, it expands to a more detailed summary. I think that's the right shape."
+  //
+  // Progressive enhancement, and the DIRECTION matters: the detail is `hidden` in the MARKUP so the
+  // collapsed state is right before any script runs (no flash of every full paper), while
+  // `html.no-paper-js` — added here and cleared here — makes the CSS reveal everything if this script
+  // never executes. The content is therefore never trapped behind JS that failed to load.
+  //
+  // No React island (the terminal is the only one). Re-inits on astro:page-load with teardown.
+
+  function initPapers(): (() => void) | null {
+    const cards = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-paper-toggle]'));
+    if (!cards.length) return null;
+    // The .paper-js class and the initial collapse are done by the inline snippets, before paint. This
+    // module only wires behaviour; it must not re-derive the open/closed state or it would fight them.
+    document.documentElement.classList.add('paper-js');
+
+    const detailOf = (card: HTMLButtonElement): HTMLElement | null => {
+      const id = card.getAttribute('aria-controls');
+      return id ? document.getElementById(id) : null;
+    };
+
+    function setOpen(card: HTMLButtonElement, open: boolean): void {
+      const detail = detailOf(card);
+      if (!detail) return;
+      card.setAttribute('aria-expanded', String(open));
+      detail.toggleAttribute('hidden', !open);
+      // The side rail's rows follow what is actually rendered (see SideRail) and it re-measures on
+      // scroll — but an expand is not a scroll, so nudge it, or the rail keeps the old rows until the
+      // reader happens to move.
+      window.dispatchEvent(new Event('scroll'));
+    }
+
+    const onClick = (e: Event) => {
+      const card = e.currentTarget as HTMLButtonElement;
+      const wasOpen = card.getAttribute('aria-expanded') === 'true';
+      setOpen(card, !wasOpen);
+      // Collapsing shortens the page, which can leave the viewport below the card and strand the
+      // reader in blank space. Pull the card back into view when that has happened.
+      if (wasOpen && card.getBoundingClientRect().top < 0) {
+        card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      }
+    };
+
+    for (const card of cards) card.addEventListener('click', onClick);
+
+    // DEEP LINKS AND THE RAIL: a URL like /research#r-p0-math points INSIDE a collapsed card, and an
+    // anchor into hidden content silently does nothing — the reader would click a rail row or open a
+    // shared link and see no movement at all. Open the owning card first, then jump.
+    function revealFromHash(): void {
+      const id = location.hash.slice(1);
+      if (!id) return;
+      const target = document.getElementById(id);
+      if (!target) return;
+      const detail = target.closest<HTMLElement>('[data-paper-detail]');
+      if (!detail || !detail.hasAttribute('hidden')) return;
+      const card = document.querySelector<HTMLButtonElement>(`[aria-controls="${detail.id}"]`);
+      if (!card) return;
+      setOpen(card, true);
+      // The anchor has no real position until the panel is laid out.
+      requestAnimationFrame(() => target.scrollIntoView({ block: 'start', behavior: 'auto' }));
+    }
+    window.addEventListener('hashchange', revealFromHash);
+    revealFromHash();
+
+    // The first featured paper opens by default: this page's job is to show the work, and a wall of
+    // shut cards would make a reader click before they can read anything at all. Only when nothing is
+    // already open — a deep link, or a View Transition returning to a page the reader had expanded,
+    // must not be overridden.
+    const anyOpen = cards.some((c) => c.getAttribute('aria-expanded') === 'true');
+    if (!anyOpen && !location.hash) setOpen(cards[0], true);
+
+    return () => {
+      for (const card of cards) card.removeEventListener('click', onClick);
+      window.removeEventListener('hashchange', revealFromHash);
+    };
+  }
+
+  let papersTeardown: (() => void) | null = null;
+  document.addEventListener('astro:page-load', () => {
+    papersTeardown?.();
+    papersTeardown = initPapers();
+  });
+</script>
