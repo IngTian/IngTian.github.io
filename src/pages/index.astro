@@ -8,6 +8,8 @@ import Heights from '../sections/Heights.astro';
 import Interlude from '../sections/Interlude.astro';
 import DescentPath from '../components/DescentPath.astro';
 import Story from '../sections/Story.astro';
+import Inquiry from '../sections/Inquiry.astro';
+import Making from '../sections/Making.astro';
 import Signature from '../sections/Signature.astro';
 import Deck from '../components/Deck.astro';
 ---
@@ -28,6 +30,12 @@ import Deck from '../components/Deck.astro';
     <Story>
       <DescentPath />
     </Story>
+    <!-- After the career story: WHAT the work actually is. An open question with one concrete example
+         (Inquiry), then the quieter slide of writing and software (Making). Neither is a list of roles —
+         the question leads and the artifacts arrive as its answer, which is the whole point of not
+         going back to a résumé. -->
+    <Inquiry />
+    <Making />
     <!-- MOUNTAINS IS GONE from the homepage, on the owner's instruction: "you may delete everything
          from below. The record, the experience, everything." It was the résumé — research interests,
          selected writing, selected experience, projects, recognition — and it is the thing the graph

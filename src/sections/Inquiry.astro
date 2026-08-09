@@ -1,0 +1,179 @@
+---
+// src/sections/Inquiry.astro
+// THE RESEARCH SLIDE — an open question, one concrete example, then the door to the papers.
+//
+// The owner's brief: "start with an open question, we promote the curiosity with one example, let the
+// reader understand what I'm working on, and then say read my papers here." And the constraint behind
+// it, stated twice now: "I don't want to go into resume again."
+//
+// So the shape is deliberately NOT a list. There is no inventory of interests, no publication count, no
+// venue names in the headline position. The question is the largest thing on the slide; the paper
+// arrives at the end as the answer to it. A reader who knows nothing about portfolio theory should
+// still follow the example, and a reader who knows a lot should recognise the seam being described.
+//
+// Content lives in data/inquiry.ts, like every other fact on this site.
+import { INQUIRY, INQUIRY_QUESTION, INQUIRY_SCOPE, INQUIRY_INVITATION } from '../data/inquiry';
+---
+<section id="inquiry" class="inq" aria-labelledby="inq-heading">
+  <div class="inq-paper">
+    <div class="inq-inner">
+      <p class="inq-kicker">The research</p>
+
+      <!-- THE QUESTION IS THE HEADLINE. It is the one thing on the slide set at display size, because
+           it is the thing the section exists to ask. Marked up as the heading so the document outline
+           and the visual hierarchy agree. -->
+      <h2 id="inq-heading" class="inq-question">{INQUIRY_QUESTION}</h2>
+
+      <p class="inq-scope">{INQUIRY_SCOPE}</p>
+
+      <div class="inq-cols">
+        {INQUIRY.map((block) => (
+          <div class="inq-col">
+            <p class="inq-block-kicker">{block.kicker}</p>
+            {block.body.map((para) => <p class="inq-body">{para}</p>)}
+          </div>
+        ))}
+      </div>
+
+      <!-- The door, last: the reader now knows what they would be reading and why. -->
+      <div class="inq-invite">
+        <p class="inq-invite-lead">{INQUIRY_INVITATION.lead}</p>
+        <a class="inq-link" href={INQUIRY_INVITATION.href}>
+          {INQUIRY_INVITATION.linkLabel}
+          <span class="inq-arrow" aria-hidden="true">→</span>
+        </a>
+        <p class="inq-invite-note">{INQUIRY_INVITATION.note}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* Same full-bleed paper surface as the career section — this is the second stop in the same
+     editorial register, so it shares the ground rather than inventing a new one. The tokens are
+     re-declared here rather than imported because Astro scopes styles per component; they are the
+     same measured values (see Story.astro for why the light tone is this dark). */
+  .inq {
+    position: relative;
+    z-index: 1;
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    --deck-lead: 0px;      /* the panel is opaque and full-bleed; a lead would show sky above it */
+  }
+
+  .inq-paper {
+    --inq-bg: #c4b7a1;
+    --inq-edge: rgba(74, 66, 54, 0.26);
+    --inq-ink: #1f1b14;
+    --inq-ink-soft: #423b30;
+    --inq-ink-faint: #6a6153;
+    --inq-accent: #7c5522;
+
+    background: var(--inq-bg);
+    border-top: 1px solid var(--inq-edge);
+    border-bottom: 1px solid var(--inq-edge);
+    /* Slightly tighter than the career panel's 9vh: this slide carries more text, and it has to fit ONE
+       screen or the deck pages through it and the composition is never seen whole. Measured at
+       1700x1050 it lands just inside the viewport. */
+    padding: clamp(52px, 7.4vh, 104px) 0;
+  }
+  :global(html[data-theme='dark']) .inq-paper {
+    --inq-bg: #14161a;
+    --inq-edge: rgba(184, 177, 161, 0.14);
+    --inq-ink: #dce1dc;
+    --inq-ink-soft: #a8b0a9;
+    --inq-ink-faint: #6d746e;
+    --inq-accent: #7fc9a0;
+  }
+
+  /* Shares the career section's left edge, so the paper slides read as one spread.
+     The inset MUST clear the fixed Toc rail: measured, the rail spans x=34..129 at 1700px, and the
+     previous clamp resolved to 128px — a 9px overlap, with the rail's labels sitting on the text. The
+     minimum is 150px because the rail is still shown down to 1100px wide. */
+  .inq-inner {
+    padding-left: clamp(150px, 9.5vw, 190px);
+    padding-right: clamp(20px, 2.4vw, 52px);
+    box-sizing: border-box;
+  }
+  /* Below the rail's breakpoint it is display:none, so the page reclaims the margin. */
+  @media (max-width: 1099px) {
+    .inq-inner { padding-left: clamp(28px, 6vw, 80px); }
+  }
+
+  .inq-kicker {
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.24em;
+    text-transform: uppercase; color: var(--inq-accent); margin: 0 0 clamp(20px, 2.6vh, 34px);
+  }
+
+  /* THE QUESTION, at display size. Capped by measure (ch) rather than by viewport, so it stays a
+     readable line length on a wide monitor instead of running to 140 characters.
+     Slightly smaller and tighter than the first pass: at 40px/1.3 the question ran to five lines and
+     pushed the slide 80px past one screen, which in a deck means the composition is never seen whole. */
+  .inq-question {
+    font-family: var(--font-display); font-weight: 300;
+    font-size: clamp(23px, 2.1vw, 35px);
+    line-height: 1.26; letter-spacing: -0.005em;
+    color: var(--inq-ink); margin: 0; max-width: 52ch;
+    text-wrap: pretty;
+  }
+
+  .inq-scope {
+    font-family: var(--font-mono); font-size: 12.5px; line-height: 1.65;
+    color: var(--inq-ink-faint); margin: clamp(18px, 2.4vh, 30px) 0 0; max-width: 62ch;
+  }
+
+  /* Two columns: the example, then what the research does with it. Reading order is left to right,
+     which is also the argument's order. */
+  .inq-cols {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 0 clamp(32px, 4vw, 80px);
+    margin: clamp(38px, 5vh, 64px) 0 0;
+  }
+  .inq-col + .inq-col {
+    border-left: 1px solid var(--inq-edge);
+    padding-left: clamp(32px, 4vw, 80px);
+  }
+  @media (max-width: 900px) {
+    .inq-cols { grid-template-columns: 1fr; gap: 5vh 0; }
+    .inq-col + .inq-col { border-left: 0; padding-left: 0; padding-top: 5vh; border-top: 1px solid var(--inq-edge); }
+  }
+
+  .inq-block-kicker {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--inq-accent); margin: 0 0 16px;
+  }
+  .inq-body {
+    font-size: clamp(15px, 1.05vw, 17px); line-height: 1.75; color: var(--inq-ink-soft);
+    margin: 0 0 16px; max-width: 52ch;
+  }
+  .inq-body:last-child { margin-bottom: 0; }
+
+  /* The invitation. A rule above it so it reads as a turn in the page rather than another paragraph. */
+  .inq-invite {
+    margin: clamp(38px, 5vh, 64px) 0 0;
+    padding-top: clamp(24px, 3vh, 40px);
+    border-top: 1px solid var(--inq-edge);
+  }
+  .inq-invite-lead {
+    font-family: var(--font-display); font-style: italic;
+    font-size: clamp(17px, 1.5vw, 22px); line-height: 1.5;
+    color: var(--inq-ink); margin: 0;
+  }
+  .inq-link {
+    display: inline-flex; align-items: baseline; gap: 10px;
+    margin: clamp(14px, 1.8vh, 22px) 0 0;
+    font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.12em;
+    text-transform: uppercase; text-decoration: none;
+    color: var(--inq-accent);
+    border-bottom: 1px solid currentColor; padding-bottom: 3px;
+  }
+  .inq-arrow { transition: transform .28s cubic-bezier(.2,.7,.3,1); }
+  @media (hover: hover) {
+    .inq-link:hover .inq-arrow { transform: translateX(5px); }
+  }
+  .inq-link:focus-visible { outline: 2px solid var(--inq-accent); outline-offset: 4px; }
+  .inq-invite-note {
+    font-size: 13.5px; line-height: 1.6; color: var(--inq-ink-faint);
+    margin: clamp(14px, 1.8vh, 20px) 0 0; max-width: 58ch;
+  }
+</style>

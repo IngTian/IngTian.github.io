@@ -19,9 +19,11 @@
 // pointed at #mountains, also deleted. Both are removed rather than repointed: a rail stop whose target
 // is missing still renders as a clickable link that goes nowhere.
 const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
-  { label: 'About', href: '#heights',   zone: 'light' },
-  { label: 'Story', href: '#story',     zone: 'light' },
-  { label: 'Links', href: '#signature', zone: 'dark'  },
+  { label: 'About',    href: '#heights',   zone: 'light' },
+  { label: 'Story',    href: '#story',     zone: 'light' },
+  { label: 'Research', href: '#inquiry',   zone: 'light' },
+  { label: 'Making',   href: '#making',    zone: 'light' },
+  { label: 'Links',    href: '#signature', zone: 'dark'  },
 ];
 ---
 <nav class="toc" aria-label="Sections" data-toc>
@@ -150,9 +152,13 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
       .map((a) => ({ a, el: document.getElementById(a.getAttribute('href')?.slice(1) ?? '') }))
       .filter((s): s is { a: HTMLAnchorElement; el: HTMLElement } => !!s.el);
     const hero = document.getElementById('heights');
-    // The opaque paper slide. The rail is fixed, so its ink has to follow whatever is actually behind
+    // The opaque paper slides. The rail is fixed, so its ink has to follow whatever is actually behind
     // it rather than the stop's own position in the page.
-    const paperPanel = document.getElementById('story');
+    //
+    // ALL of them, not just the first: the page now has three paper panels in a row (the career story,
+    // the research question, the writing/projects slide). Testing only #story meant the rail reverted to
+    // light sky ink over the other two, where it is nearly invisible against the panel.
+    const paperPanels = Array.from(document.querySelectorAll<HTMLElement>('.story-paper, .inq-paper, .mk-paper'));
 
     function update() {
       const vh = window.innerHeight;
@@ -160,12 +166,15 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
       const heroPast = !hero || hero.getBoundingClientRect().bottom < vh * 0.5;
       toc.classList.toggle('toc--visible', heroPast);
 
-      // Is the paper panel behind the rail right now? Compare the rail's own vertical box against the
+      // Is ANY paper panel behind the rail right now? Compare the rail's own vertical box against each
       // panel's, so this stays correct at any viewport height and with the rail centred on 50%.
-      if (paperPanel) {
+      if (paperPanels.length) {
         const r = toc.getBoundingClientRect();
-        const p = paperPanel.getBoundingClientRect();
-        toc.classList.toggle('over-paper', p.top < r.bottom && p.bottom > r.top);
+        const onPaper = paperPanels.some((el) => {
+          const p = el.getBoundingClientRect();
+          return p.top < r.bottom && p.bottom > r.top;
+        });
+        toc.classList.toggle('over-paper', onPaper);
       }
 
       // scrollspy: shared pure rule (see lib/scrollspy.ts) — active = the last

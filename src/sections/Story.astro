@@ -141,9 +141,14 @@ import { STORY, STORY_CODA } from '../data/story';
     grid-template-columns: 64fr 36fr;
     gap: 0 clamp(28px, 3vw, 64px);
     align-items: start;
-    padding-left: clamp(96px, 7.5vw, 150px);
+    /* Clears the fixed Toc rail, which spans x=34..129 at 1700px — the previous clamp resolved to 128px
+       and the rail's labels sat on the graph's own header. Shared with the other paper slides. */
+    padding-left: clamp(150px, 9.5vw, 190px);
     padding-right: clamp(20px, 2.4vw, 52px);
     box-sizing: border-box;
+  }
+  @media (max-width: 1099px) {
+    .story-split { padding-left: clamp(28px, 6vw, 80px); }
   }
 
   .story-inner { width: 100%; margin: 0; max-width: none; }
