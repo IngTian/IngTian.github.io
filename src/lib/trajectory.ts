@@ -76,12 +76,12 @@ export const WAYPOINTS: Waypoint[] = [
     learned: 'A comfortable minimum: 50k QPS, real scale, and still not the question I wanted.',
   },
   {
-    period: '2023 —', label: 'Independent quant', x: 0.95, y: 0.42, phase: 'escape',
-    learned: 'Built the trading system to test whether the interest was real. It was.',
+    period: '2026 —', label: 'Electronic Arts', x: 0.95, y: 0.42, phase: 'escape',
+    learned: 'A bridge, chosen deliberately: enough room to keep the research moving.',
   },
   {
-    period: '2026 —', label: 'Electronic Arts', x: 0.15, y: -0.05, phase: 'escape',
-    learned: 'A bridge, chosen deliberately: enough room to keep the research moving.',
+    period: '2023 —', label: 'Independent quant', x: 0.15, y: -0.05, phase: 'escape',
+    learned: 'Built the trading system to test whether the interest was real. It was.',
   },
   {
     period: 'Fall 2027 —', label: 'PhD · Operations Research', x: -0.92, y: -0.44, phase: 'descent',
@@ -91,6 +91,10 @@ export const WAYPOINTS: Waypoint[] = [
 
 /** Where the path stops today. Everything past this is unknown, and the picture says so. */
 export const PATH_END = WAYPOINTS[WAYPOINTS.length - 1];
+
+/** What lies on the deeper side. NOT a claim of arrival — the label names the DIRECTION the descent
+ *  is running in, which is the honest version of "I have no idea where the global min is". */
+export const DEEP_SIDE_LABEL = 'Quantitative Researcher';
 
 /**
  * The global minimum is NOT a waypoint, and that is the point.

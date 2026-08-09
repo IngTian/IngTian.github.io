@@ -53,13 +53,14 @@ const facts = trajectoryFacts();
     </p>
   </div>
 
-  <!-- The real content. Ordered, focusable, and complete without the canvas. -->
-  <ol class="dp-stops">
-    {WAYPOINTS.map((w, i) => (
-      <li class={`dp-stop dp-${w.phase}`} data-stop={String(i)}>
-        <p class="dp-period">{w.period}</p>
-        <h3 class="dp-label">{w.label}</h3>
-        <p class="dp-learned">{w.learned}</p>
+  <!-- The accessible path. Visually hidden because the graph's own labels already name every stop —
+       a repeated list on screen said the same thing twice and pulled the section back toward the
+       resume format this whole piece exists to avoid. Screen readers and no-JS still get everything,
+       in order. -->
+  <ol class="dp-stops sr-only">
+    {WAYPOINTS.map((w) => (
+      <li>
+        <span>{w.period}</span> — <strong>{w.label}</strong>. {w.learned}
       </li>
     ))}
   </ol>
@@ -113,38 +114,23 @@ const facts = trajectoryFacts();
   }
   .dp-stage.is-live .dp-fallback { display: none; }
 
-  /* The stops: a horizontal band under the graph, so path order reads left to right and matches
-     the drawn trail's direction. */
-  .dp-stops {
-    list-style: none; margin: 4vh 0 0; padding: 0;
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0;
-    border-top: 1px solid rgba(var(--hairline-rgb), 0.22);
-  }
-  .dp-stop {
-    padding: 16px 18px 20px 0; border-right: 1px solid rgba(var(--hairline-rgb), 0.12);
-  }
-  .dp-stop:last-child { border-right: 0; }
-  .dp-period {
-    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.1em;
-    color: var(--ink-5); margin: 0;
-  }
-  .dp-label {
-    font-family: var(--font-display); font-size: 15px; font-weight: 400;
-    color: var(--paper); margin: 6px 0 0; line-height: 1.3;
-  }
-  .dp-learned { font-size: 12.5px; line-height: 1.6; color: var(--ink-4); margin: 8px 0 0; }
-  /* The two basin stops and the climb are tinted, so the band echoes the graph's own colour code. */
-  .dp-basin .dp-label { color: var(--ochre); }
-  .dp-escape .dp-label { color: var(--seal); }
 
   .dp-foot {
     margin: 4vh 0 0; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.04em;
     color: var(--ink-5); max-width: 64ch;
   }
 
+  /* Narrow screens: the graph's in-frame labels collide below ~720px, so the canvas gives way to the
+     ordered list, which stops being visually hidden and becomes the content. */
   @media (max-width: 720px) {
-    .dp-stage { aspect-ratio: 4 / 3; }
-    .dp-stops { grid-template-columns: 1fr 1fr; }
+    .dp-stage { display: none; }
+    .dp-stops.sr-only {
+      position: static; width: auto; height: auto; margin: 3vh 0 0; padding: 0;
+      overflow: visible; clip: auto; white-space: normal;
+      list-style: none; display: grid; gap: 14px;
+    }
+    .dp-stops li { font-size: 13.5px; line-height: 1.6; color: var(--ink-3); }
+    .dp-stops strong { color: var(--paper); font-weight: 400; }
   }
 </style>
 
@@ -153,7 +139,7 @@ const facts = trajectoryFacts();
     project, contours, contourLevels, trail, climbSpan, unknownAttractor,
     type Projection, type View,
   } from '../lib/descentPath';
-  import { WAYPOINTS, trajectoryFacts } from '../lib/trajectory';
+  import { WAYPOINTS, trajectoryFacts, DEEP_SIDE_LABEL } from '../lib/trajectory';
   import { knownnessFn, knowledgeRadius } from '../lib/knowledge';
   import { prefersReducedMotion } from '../lib/motion';
 
@@ -173,7 +159,6 @@ const facts = trajectoryFacts();
     if (!canvas || !ctx) return null;
     const section = stage.closest('#descent-path') as HTMLElement;
     const replay = section.querySelector<HTMLButtonElement>('[data-replay]');
-    const stops = Array.from(section.querySelectorAll<HTMLElement>('[data-stop]'));
     const readout = section.querySelector<HTMLElement>('[data-readout]');
 
     const projection: Projection = '2d';   // plan only; see the note in the markup above
@@ -273,31 +258,30 @@ const facts = trajectoryFacts();
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
 
-      // ── Contours. Continuous polylines, and deeper levels drawn stronger so the basins read as
-      // basins rather than as uniform hatching. The first attempt drew 1px stubs and was invisible.
+      // ── Contours as DOTS, not polylines. This is the style from the original sketch, copied
+      // rather than re-invented: each grid crossing is drawn as a 1px stub with a round linecap, so
+      // it renders as a dot. It reads as a survey plot and it is kin to the hero's dot field without
+      // repeating the hero's object.
+      ctx.lineCap = 'round';
       levels.forEach((lv, i) => {
         const runs = contoursFor(lv);
         const deep = 1 - i / (levels.length - 1);          // 1 at the deepest level
-        // Alpha and weight both measured up: at 0.10-0.40 on near-black the contours read as
-        // nothing (2.06% total ink, the same band as the four rejected frames).
         ctx.strokeStyle = ink5;
-        ctx.globalAlpha = 0.26 + deep * 0.44;
-        ctx.lineWidth = 1.1 + deep * 1.5;
-        // Draw a run only where it is KNOWN. Break the polyline wherever knowledge drops out, so
-        // the contour ends softly at the edge of experience instead of ending on a hard circle.
+        ctx.lineWidth = 1.7 + deep * 1.3;
         for (const run of runs) {
-          let open = false;
-          run.forEach((p) => {
+          // Sample along the run so the dots have air between them; a dot per point would fuse back
+          // into a line at this contour resolution.
+          for (let k = 0; k < run.length; k += 2) {
+            const p = run[k];
             const kn = known(p[0], p[1]);
+            if (kn <= 0.02) continue;
             const [sx, sy] = project(p[0], p[1], v);
-            if (kn <= 0.02) {
-              if (open) { ctx.stroke(); open = false; }
-              return;
-            }
-            if (!open) { ctx.beginPath(); ctx.moveTo(sx, sy); open = true; }
-            else ctx.lineTo(sx, sy);
-          });
-          if (open) ctx.stroke();
+            ctx.globalAlpha = (0.30 + deep * 0.50) * Math.min(1, kn * 1.6);
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx + 0.5, sy);
+            ctx.stroke();
+          }
         }
       });
       ctx.globalAlpha = 1;
@@ -364,7 +348,9 @@ const facts = trajectoryFacts();
       ctx.lineWidth = 1.1;
       ctx.stroke();
       ctx.setLineDash([]);
-      label(ctx, ax + 16, ay + 4, 'deeper — found late', 11, ochre);
+      // The deeper side, NAMED. Not "the global minimum" — the direction the descent runs in.
+      label(ctx, ax + 22, ay + 30, DEEP_SIDE_LABEL, 15, ochre);
+      label(ctx, ax + 22, ay + 51, 'deeper still — unknown', 12, ink5);
       }
 
       // ── The local basin, named, because being stuck there is the point.
@@ -413,7 +399,11 @@ const facts = trajectoryFacts();
         ctx.arc(px, py, isBasin ? 6 : 4, 0, Math.PI * 2);
         ctx.fillStyle = isBasin ? ochre : paper;
         ctx.fill();
-        label(ctx, px + 13, py + 4, wp.label, 12.5, ink3);
+        // The final waypoint sits near the attractor, so its label collided with the deep-side name.
+        // Put the last one above its dot and leave the rest to the right.
+        const isLast = i === WAYPOINTS.length - 1;
+        if (isLast) label(ctx, px - 6, py - 14, wp.label, 15, paper);
+        else label(ctx, px + 14, py + 5, wp.label, 15, ink3);
       });
 
       // ── The climb, called out once, where it happens.
@@ -427,21 +417,29 @@ const facts = trajectoryFacts();
         ctx.lineTo(mx - 54, my - 38);
         ctx.stroke();
         ctx.globalAlpha = 1;
-        label(ctx, mx - 58, my - 44, `climb +${facts.climbRequired.toFixed(2)}`, 12, seal, 'end');
+        label(ctx, mx - 58, my - 44, `climb +${facts.climbRequired.toFixed(2)}`, 13, seal, 'end');
       }
 
       ctx.restore();
     }
 
+    /** Labels in the sketch's own idiom: 15px mono with real letter-spacing. Canvas has no
+     *  letter-spacing property everywhere, so the glyphs are spaced by hand — that tracking is most
+     *  of why the sketch's type reads better than plain fillText at 12.5px. */
     function label(
       c: CanvasRenderingContext2D, x: number, y: number, text: string,
-      size: number, fill: string, align: CanvasTextAlign = 'left',
+      size = 15, fill: string, align: CanvasTextAlign = 'left', track = 0.9,
     ): void {
       c.font = `${size}px "JetBrains Mono", ui-monospace, monospace`;
-      c.textAlign = align;
       c.fillStyle = fill;
-      c.fillText(text, x, y);
-      c.textAlign = 'left';
+      const chars = [...text];
+      const widths = chars.map((ch) => c.measureText(ch).width + track);
+      const total = widths.reduce((a, b) => a + b, 0) - track;
+      let cx = align === 'end' ? x - total : align === 'center' ? x - total / 2 : x;
+      for (let i = 0; i < chars.length; i++) {
+        c.fillText(chars[i], cx, y);
+        cx += widths[i];
+      }
     }
 
     // ── Reveal animation. Slow enough to read, and it is the only motion here.
@@ -478,10 +476,7 @@ const facts = trajectoryFacts();
 
     /** Light up the stop cards as the trail reaches them, so the graph and the list are one thing. */
     function markStops(): void {
-      stops.forEach((el, i) => {
-        const arrival = i / (WAYPOINTS.length - 1);
-        el.style.opacity = arrival <= reveal + 1e-6 ? '1' : '0.32';
-      });
+      // The visible stop cards are gone (the graph labels them), so this only drives the readout now.
       if (!readout) return;
       // Experience is continuous now, so the READOUT has to round it — an earlier build printed
       // "stop 1.0000000994998548/8" straight from the float.
