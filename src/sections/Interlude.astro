@@ -3,20 +3,31 @@
 // editorial statement set in the warming Monet sky. Swiss restraint: one line,
 // generous space, no ornament. Replaces the old (weak) painted-cloud section.
 //
-// THE QUANT LINE SITS HERE, under the tagline, per the owner: "you can put the quant reasons in
-// structure just below the tag line." It used to open Mountains, but once the descent graph and the
-// story panel moved above Mountains it was buried three screens down — present in the HTML and
-// effectively gone from the read. The tagline names the three hats; this line says which one leads
-// and what the other is for, so the identity claim lands before any evidence is offered.
+// THE FIELD IS NOW THE HEADLINE, on the owner: "for what I'm doing, maybe we should start right with what
+// am I doing: Multi-period Portfolio Optimization. That's the tag line."
+//
+// It used to open with "a researcher by day, an artist by night" — a charming line that names three hats and
+// no subject, so a reader arrived at the explainer without knowing what field it explains. Naming the work
+// first is also what the reordering downstream is about: what I do, then how I got here.
+//
+// The identity line survives BENEATH it, smaller. It still carries the two doorways (/research and /art) and
+// the site's stated hierarchy — quant first, engineer second — but it now qualifies a subject instead of
+// standing in for one.
 ---
 <section id="interlude" class="relative min-h-[78vh] flex flex-col items-center justify-center px-[8vw]">
-  <p class="statement max-w-[20ch] text-center font-display italic text-ink-2 leading-[1.35] text-[clamp(24px,3.6vw,40px)]">
+  <p class="field text-center font-display text-ink-1 leading-[1.06] text-[clamp(30px,5.2vw,68px)]">
+    Multi-period portfolio optimization
+  </p>
+  <p class="field-sub text-center font-mono uppercase text-ink-3 tracking-[0.2em] text-[clamp(10px,1.1vw,12.5px)]">
+    deciding, and deciding again, under constraints
+  </p>
+
+  <p class="statement max-w-[26ch] text-center font-display italic text-ink-2 leading-[1.35] text-[clamp(17px,2.1vw,26px)]">
     <a class="research-link" href="/research">A researcher by day</a>, <a class="art-link" href="/art">an artist by night</a>, and a mathematician at heart.
   </p>
 
-  <!-- The hierarchy, stated once. Smaller and quieter than the tagline: it explains the line above
-       rather than competing with it. -->
-  <p class="reasons text-center font-display italic text-ink-3 max-w-[34ch] leading-[1.45] text-[clamp(15px,1.7vw,20px)]">
+  <!-- The hierarchy, stated once. Quieter than the lines above: it qualifies them rather than competing. -->
+  <p class="reasons text-center font-display italic text-ink-3 max-w-[34ch] leading-[1.45] text-[clamp(13px,1.4vw,17px)]">
     A quant who reasons in structure,<br />an engineer who makes the math run.
   </p>
 </section>
@@ -121,20 +132,44 @@
 
   /* The quant line: same voice as the tagline, a step down in size and weight. Generous space above
      so it reads as a second beat rather than a subtitle glued to the line. */
-  .reasons { margin: clamp(26px, 4vh, 46px) 0 0; }
+  /* THE FIELD, as the headline. Display weight rather than italic: this is a subject being named, not an
+     aside. Tight leading because it wraps to two lines at most widths and the two lines should read as one
+     object. */
+  .field {
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    max-width: 22ch;
+    text-wrap: balance;
+    margin: 0;
+  }
+  .field-sub { margin: clamp(14px, 2vh, 24px) 0 0; }
+  /* Generous gap: the identity line is a separate thought, and running it close under the field would read as
+     a subtitle of it. */
+  .statement { margin: clamp(34px, 5.5vh, 68px) 0 0; }
+  .reasons { margin: clamp(16px, 2.4vh, 28px) 0 0; }
 
+  /* Four lines, arriving in reading order on staggered scroll ranges — the field first, because it is the
+     subject. Same keyframes throughout, so there is only one animation to keep in sync. */
   @media (prefers-reduced-motion: no-preference) {
+    .field {
+      animation: statement-in linear both;
+      animation-timeline: view();
+      animation-range: entry 2% cover 30%;
+    }
+    .field-sub {
+      animation: statement-in linear both;
+      animation-timeline: view();
+      animation-range: entry 8% cover 36%;
+    }
     .statement {
       animation: statement-in linear both;
       animation-timeline: view();
-      animation-range: entry 5% cover 38%;
+      animation-range: entry 16% cover 44%;
     }
-    /* Arrives on a LATER range than the tagline, so the two land in reading order rather than
-       together. Same keyframes — no second animation to keep in sync. */
     .reasons {
       animation: statement-in linear both;
       animation-timeline: view();
-      animation-range: entry 18% cover 50%;
+      animation-range: entry 24% cover 52%;
     }
     @keyframes statement-in {
       from { opacity: 0.15; transform: translate3d(0, 28px, 0); }

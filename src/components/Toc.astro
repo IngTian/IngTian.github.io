@@ -18,12 +18,15 @@
 // 'Ask' pointed at #ground — the terminal — which is deleted (see index.astro), and 'Work' before it
 // pointed at #mountains, also deleted. Both are removed rather than repointed: a rail stop whose target
 // is missing still renders as a clickable link that goes nowhere.
+// ORDER FOLLOWS THE PAGE, and the page now answers "what do I do" before "how I got here" — so Story moved
+// below the explainer. A rail whose order disagrees with the document is worse than no rail: the scrollspy
+// sorts by measured position, so a mismatched list would light stops out of sequence.
 const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
   { label: 'About',    href: '#heights',   zone: 'light' },
-  { label: 'Story',    href: '#story',     zone: 'light' },
   { label: 'Choice',   href: '#choice',    zone: 'light' },
   { label: 'Rules',    href: '#rules',     zone: 'light' },
   { label: 'Solve',    href: '#solve',     zone: 'dark'  },
+  { label: 'Path',     href: '#story',     zone: 'light' },
   { label: 'Work',     href: '#work',      zone: 'light' },
   { label: 'Links',    href: '#signature', zone: 'dark'  },
 ];

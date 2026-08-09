@@ -26,16 +26,10 @@ import Deck from '../components/Deck.astro';
     <SkyWash />
     <Heights />
     <Interlude />
-    <!-- The story so far: the graph, then the editorial that explains it. ONE SLIDE, so one surface —
-         the graph renders INSIDE the Story panel, on the same paper ground, with the fluid sky fully
-         hidden behind it. The descent piece is settled (see notes/showpiece.md). -->
-    <Story>
-      <DescentPath />
-    </Story>
-    <!-- THREE SLIDES, ONE ARGUMENT, on the owner's plan: "3 slides, thousands of tickers, thousands of
-         constraints, and the last slide animate a 3D route in a Bellman propagation of many that we highlight
-         as our goal." Audience, in his words: non-finance first, finance second — a QR/PM goes straight to the
-         papers anyway, so this exists to give a curious outsider a clue.
+    <!-- WHAT I DO COMES BEFORE HOW I GOT HERE, on the owner's observation: "the descent answered my
+         trajectory, but didn't answer what I do. Normally people think about what do I do first, then my
+         trajectory." Correct, and it was backwards — a reader met a career-shaped gradient descent before
+         knowing what field it descended into.
            1. Choice — what the decision IS, and how much of it there is. Six names you recognise, thousands you
               do not, and the fan of forty-eight people reading the same six headlines to 0.85x-1.34x.
            2. Rules — what you are not allowed to do, as the feasible set collapsing. Real convex geometry:
@@ -43,15 +37,17 @@ import Deck from '../components/Deck.astro';
            3. Solve — the method, as the algorithm running: a real Bellman lattice filling in backward from the
               horizon, then the optimal route traced forward past 29 candidates.
 
-         THIS REPLACES FOUR SLIDES (Lesson, Moment, Method) and the reason is rhythm, not content. All four used
-         the same toned ground, the same inset, the same two-column split — four walls of the same wall — and
-         three of them sat at 1040 of 1050px, which is cramming rather than restraint. Two of them (the fan and
-         the Monday briefing) were also both answering "how hard is this decision", so the second re-established
-         what the first had earned. Solve breaks the register deliberately: it is the one dark panel, because it
-         is the arrival. -->
+         Solve breaks the register deliberately: it is the one dark panel, because it is the arrival of the
+         explainer. -->
     <Choice />
     <Rules />
     <Solve />
+    <!-- THEN the trajectory, which now reads as "and this is how I came to be doing it" rather than as a
+         riddle about an unnamed field. The graph renders INSIDE the Story panel so the picture and the words
+         that read it are one surface. Settled piece — see notes/showpiece.md. -->
+    <Story>
+      <DescentPath />
+    </Story>
     <Work />
     <!-- MOUNTAINS IS GONE from the homepage, on the owner's instruction: "you may delete everything
          from below. The record, the experience, everything." It was the résumé — research interests,
