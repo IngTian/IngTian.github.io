@@ -33,6 +33,15 @@ export interface DeckSlide {
   top: number;
   /** Slide height in px. */
   height: number;
+  /**
+   * Breathing air above the slide when the deck rests on it, in px. The stop is placed this far ABOVE
+   * the slide's top edge, so the content opens with space rather than flush against the browser chrome.
+   *
+   * This lives here rather than in CSS because `scroll-margin-top` is only honoured by
+   * scrollIntoView(), and the deck moves with window.scrollTo() — so a CSS rule looked correct, did
+   * nothing, and the panel title came to rest hard against the top of the window.
+   */
+  lead?: number;
 }
 
 /**
@@ -67,10 +76,15 @@ export function deckStops(
   const out: number[] = [];
 
   for (const s of slides) {
-    out.push(s.top);
+    // The stop sits `lead` px above the slide's top, so the slide opens with air. The interior paging
+    // below is measured from this same lifted origin, which keeps the last stop's bottom-alignment
+    // honest — otherwise the lead would eat a strip of the final screen.
+    const lead = s.lead ?? 0;
+    const origin = s.top - lead;
+    out.push(origin);
     // Slightly-too-tall slides are left as a single stop: the sliver below the fold costs less than a
-    // stop that advances by a sliver.
-    if (s.height <= vh + minAdvance) continue;
+    // stop that advances by a sliver. The lead counts toward the height, since it occupies screen too.
+    if (s.height + lead <= vh + minAdvance) continue;
     // Interior stops, a (slightly overlapped) viewport apart. The overlap keeps a couple of lines of
     // the previous screen visible, so a paragraph broken across two stops stays readable.
     //
@@ -79,10 +93,10 @@ export function deckStops(
     // stop. A fixed stride broke the coverage guarantee: for a 3000px slide in a 1000px viewport it
     // produced 0, 920, 2000 — a 1080px jump across which 80px of content is visible at no stop at all.
     const lastUseful = s.top + s.height - vh;
-    const span = lastUseful - s.top;
+    const span = lastUseful - origin;
     const legs = Math.max(1, Math.ceil(span / step));
     const stride = span / legs;
-    for (let k = 1; k < legs; k++) out.push(s.top + stride * k);
+    for (let k = 1; k < legs; k++) out.push(origin + stride * k);
     // Align the slide's bottom edge to the viewport bottom.
     out.push(lastUseful);
   }

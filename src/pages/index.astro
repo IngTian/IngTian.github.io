@@ -6,7 +6,6 @@ import Toc from '../components/Toc.astro';
 import SkyWash from '../components/SkyWash.astro';
 import Heights from '../sections/Heights.astro';
 import Interlude from '../sections/Interlude.astro';
-import Mountains from '../sections/Mountains.astro';
 import DescentPath from '../components/DescentPath.astro';
 import Story from '../sections/Story.astro';
 import Ground from '../sections/Ground.astro';
@@ -30,7 +29,12 @@ import Deck from '../components/Deck.astro';
     <Story>
       <DescentPath />
     </Story>
-    <Mountains />
+    <!-- MOUNTAINS IS GONE from the homepage, on the owner's instruction: "you may delete everything
+         from below. The record, the experience, everything." It was the résumé — research interests,
+         selected writing, selected experience, projects, recognition — and it is the thing the graph
+         and the editorial exist to replace. Nothing was lost: every block already has its own route
+         (/research, /experience, /projects), and the footer + corner nav carry the doorways. The
+         section file is kept, unreferenced, so the markup can be recovered from git or re-used. -->
     <Ground />
     <Signature />
   </main>

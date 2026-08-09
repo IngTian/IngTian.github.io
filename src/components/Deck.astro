@@ -49,12 +49,21 @@
 
     let stops: number[] = [];
     function measure(): void {
+      const vh = window.innerHeight;
       const slides: DeckSlide[] = slideEls().map((el) => {
         const r = el.getBoundingClientRect();
-        return { top: r.top + window.scrollY, height: r.height };
+        // BREATHING AIR above each stop. Read from the element's own --deck-lead (in px) when it sets
+        // one, so a slide decides its own opening space in CSS; otherwise a small default.
+        //
+        // This cannot be scroll-margin-top: that property is only honoured by scrollIntoView(), and the
+        // deck moves with window.scrollTo(). The CSS rule read correctly and did nothing, which is why
+        // the paper panel's title came to rest hard against the browser chrome.
+        const declared = parseFloat(getComputedStyle(el).getPropertyValue('--deck-lead'));
+        const lead = Number.isFinite(declared) ? declared : vh * 0.04;
+        return { top: r.top + window.scrollY, height: r.height, lead };
       });
-      const maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-      stops = deckStops(slides, window.innerHeight, maxY);
+      const maxY = Math.max(0, document.documentElement.scrollHeight - vh);
+      stops = deckStops(slides, vh, maxY);
     }
     measure();
 

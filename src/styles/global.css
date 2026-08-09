@@ -70,18 +70,18 @@ body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body)
    gestures of 640px+ ever advanced.
 
    The deck is therefore driven explicitly — see lib/deck.ts (pure,
-   unit-tested: where the stops are) and the controller in
-   BaseLayout (one gesture = one stop). The only CSS the deck needs
-   is the scroll-margin below.
-   ============================================================ */
+   unit-tested: where the stops are) and Deck.astro (one gesture =
+   one stop).
 
-/* Slide tops sit flush against the viewport top when the deck scrolls to them,
-   which crops the panel padding and makes a slide look cut off. scroll-margin is
-   read by scrollIntoView(), so the deck inherits this without hard-coding an
-   offset in the script. */
-.is-slides > section,
-.is-slides .story-figure-slot,
-.is-slides .story-inner { scroll-margin-top: 6vh; }
+   BREATHING AIR above each stop is a --deck-lead custom property on
+   the slide, read by the controller. It was `scroll-margin-top`
+   here, which was WRONG and silently did nothing: scroll-margin is
+   only honoured by scrollIntoView(), and the deck moves with
+   window.scrollTo(). The rule read correctly, applied never, and
+   the paper panel's title came to rest hard against the browser
+   chrome. A CSS property that only some scroll APIs respect is a
+   trap; the offset now lives where the scrolling happens.
+   ============================================================ */
 
 /* ── Atmosphere, upper sky (heights → interlude). Normal blend: these are warm
    LIGHT washes + a soft horizon haze that read on the pale paper. Localized to

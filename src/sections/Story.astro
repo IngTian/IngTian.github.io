@@ -121,12 +121,28 @@ const figures = STORY_FIGURES.map((f) => {
     --story-line-soft: rgba(160, 168, 161, 0.5);
   }
 
-  /* One shared measure for the graph and the prose, so the slide has a single left edge. The inset
-     clears the fixed ToC rail (left: clamp(14px,2.4vw,34px) plus its labels) — the graph section had
-     no horizontal padding of its own and its title ran straight under the rail. */
-  .story-inner,
-  .story-figure-slot { width: min(1180px, 84vw); margin: 0 auto; }
-  .story-figure-slot { margin-bottom: 7vh; }
+  /* The PROSE keeps a measure — long lines are unreadable, and this is a journal spread. */
+  .story-inner { width: min(1180px, 84vw); margin: 0 auto; }
+
+  /* The GRAPH does not. It is the showpiece and it was too small inside the text measure, so it spans
+     the panel edge to edge; only enough side padding to keep the outermost labels off the edge. The
+     header text inside it keeps the prose measure (see DescentPath), so the widening moves the DRAWING,
+     not the reading.
+     --deck-lead is read by the deck controller: the air above this slide's resting position. It is a
+     custom property rather than scroll-margin-top because the deck scrolls with window.scrollTo(),
+     which ignores scroll-margin — the title was coming to rest against the browser chrome. */
+  .story-figure-slot {
+    --deck-lead: 60px;
+    width: 100%;
+    padding: 0 clamp(16px, 2.5vw, 44px);
+    box-sizing: border-box;
+    /* The gap below must EXCEED the lead, or the next slide bleeds into this one's resting screen: the
+       stop sits 60px above the slot's top, so the viewport reaches 60px further down than the slot
+       does. Measured: with a 7vh gap the editorial's heading appeared 35px inside the graph slide. */
+    margin: 0 0 max(12vh, 120px);
+  }
+  /* The editorial gets the same air when the deck rests on it. */
+  .story-inner { --deck-lead: 60px; }
 
   .story-title {
     font-family: var(--font-display); font-weight: 300;

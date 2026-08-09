@@ -119,6 +119,43 @@ const facts = trajectoryFacts();
     position: relative; margin: 3vh 0 0; width: 100%; aspect-ratio: 16 / 9;
     transition: opacity .18s ease;
   }
+  /* ── ON THE PAPER PANEL: the graph owns the whole slide, and the header OVERLAYS it.
+     The measurement that forced this layout. The drawing must keep the field's true aspect or the
+     contour rings render as flattened ovals — the world box is 4.61 x 3.64, aspect 1.27, and the field
+     is only 5.2 units wide so it cannot be widened to suit a letterbox frame. With the header stacked
+     ABOVE the stage, the stage got 62vh; at aspect 1.27 that allowed a drawing just 674px wide inside a
+     1612px panel — 658px of width thrown away, and the picture came out SMALLER than before. Height is
+     the binding constraint, so the fix is to stop spending height on stacked text.
+     The header now sits over the drawing's empty upper-left (the field's content runs lower-right, so
+     nothing is covered), and the stage takes the full slide: ~1043px of drawing, close to double. */
+  :global(.story-paper) .dp { display: grid; }
+  :global(.story-paper) .dp-stage {
+    aspect-ratio: auto;
+    height: min(84vh, 96vw);
+    margin: 0;
+  }
+  :global(.story-paper) .dp-head {
+    position: absolute;
+    top: 0; left: 0;
+    max-width: min(48ch, 42%);
+    z-index: 2;
+    pointer-events: none;      /* the drawing is not interactive, but never block it either */
+  }
+  :global(.story-paper) .dp-head .dp-btn { pointer-events: auto; }
+  /* The footnote tucks into the bottom-left corner, over the same empty region. */
+  :global(.story-paper) .dp-foot {
+    position: absolute;
+    bottom: 0; left: 0;
+    margin: 0;
+    max-width: 52ch;
+  }
+  /* Narrow screens keep the stacked flow: there is no empty corner to overlay into. */
+  @media (max-width: 1000px) {
+    :global(.story-paper) .dp-head,
+    :global(.story-paper) .dp-foot { position: static; max-width: 70ch; }
+    :global(.story-paper) .dp-stage { height: min(56vh, 90vw); margin: 3vh 0 0; }
+    :global(.story-paper) .dp-foot { margin: 3vh 0 0; }
+  }
   .dp-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   /* The fallback text sits under the canvas and is revealed only when the canvas cannot draw, so
      the no-JS state is informative rather than an empty box. */
@@ -150,7 +187,10 @@ const facts = trajectoryFacts();
   /* ON THE PAPER PANEL: dark ink, and no top padding — the panel already opens with 9vh, and the
      section's own 12vh on top of it left the title floating. */
   :global(.story-paper) .dp {
-    padding: 0 0 2vh;
+    /* No vertical padding here: the panel already opens with its own, and the stage is sized to the
+       viewport. `position: relative` makes this the containing block for the overlaid header/footnote. */
+    position: relative;
+    padding: 0;
     --dp-strong: var(--story-ink);
     --dp-body: var(--story-ink-soft);
     --dp-quiet: var(--story-ink-faint);
@@ -165,7 +205,7 @@ const facts = trajectoryFacts();
 
 <script>
   import {
-    project, contours, contourLevels, trail, climbSpan, unknownAttractor,
+    project, contours, contourLevels, trail, climbSpan, unknownAttractor, storyBounds,
     type Projection, type View,
   } from '../lib/descentPath';
   import { WAYPOINTS, trajectoryFacts, DEEP_SIDE_LABEL } from '../lib/trajectory';
@@ -248,9 +288,44 @@ const facts = trajectoryFacts();
     }
 
     function view(): View {
-      // Generous right and bottom padding: labels sit to the right of their points, and the
-      // original render clipped them off the frame.
-      return { w: W, h: H, projection, pad: { l: 70, r: 210, t: 50, b: 70 } };
+      // Generous right padding: labels sit to the RIGHT of their points, and the original render
+      // clipped them off the frame. The other three are small — every px of padding is px the drawing
+      // does not get, and at the paper panel's size the drawing is the point. Scaled to the frame so a
+      // small canvas is not swallowed by a fixed gutter.
+      const gutter = Math.max(120, Math.min(230, W * 0.135));
+      const pad = { l: 34, r: gutter, t: 30, b: 40 };
+
+      // KEEP THE FIELD'S ASPECT. project() maps the world box onto the padded inner box
+      // independently in x and y, so a wide frame stretches the surface horizontally: the world is
+      // 4.61 x 3.64 (aspect 1.27), and at full panel width the inner box is aspect ~2.35 — the
+      // contour rings would be drawn as flattened ovals and the two basins would read as smears.
+      // Widen the padding on whichever axis has surplus so the DRAWN box matches the world's ratio.
+      // The surplus goes mostly to the right, where the labels live.
+      //
+      // Derived from the real bounds (memoised, so this is free) rather than hardcoded: the bounds come
+      // from the waypoints, and a future edit to the career path would silently re-introduce the
+      // stretch if this were a literal.
+      const wb = storyBounds();
+      const worldAspect = (wb.x1 - wb.x0) / (wb.y1 - wb.y0);
+      const iw = W - pad.l - pad.r;
+      const ih = H - pad.t - pad.b;
+      if (iw > 0 && ih > 0) {
+        const boxAspect = iw / ih;
+        if (boxAspect > worldAspect) {
+          // Too wide: give the extra width back as padding.
+          const want = ih * worldAspect;
+          const extra = iw - want;
+          pad.l += extra * 0.34;
+          pad.r += extra * 0.66;
+        } else {
+          // Too tall: give the extra height back, biased to the bottom where the footnote sits.
+          const want = iw / worldAspect;
+          const extra = ih - want;
+          pad.t += extra * 0.42;
+          pad.b += extra * 0.58;
+        }
+      }
+      return { w: W, h: H, projection, pad };
     }
 
     /** How much experience the walker has at the current reveal, as a CONTINUOUS quantity.

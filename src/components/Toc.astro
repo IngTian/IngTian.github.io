@@ -12,10 +12,12 @@
 // also sets an .over-paper class on the rail by testing the panel's box against the rail's own box,
 // which flips all the labels to dark ink for as long as the panel is behind them. Without it the
 // three dark-sky labels rendered light-on-light and effectively vanished.
+// 'Work' pointed at #mountains, which no longer exists on the homepage — the résumé section was
+// deleted (see index.astro). A rail stop whose target is missing is dead: the scrollspy silently drops
+// it, but it still renders as a clickable link that goes nowhere. Removed rather than repointed.
 const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
   { label: 'About', href: '#heights',   zone: 'light' },
   { label: 'Story', href: '#story',     zone: 'light' },
-  { label: 'Work',  href: '#mountains', zone: 'light' },
   { label: 'Ask',   href: '#ground',    zone: 'dark'  },
   { label: 'Links', href: '#signature', zone: 'dark'  },
 ];
@@ -56,6 +58,22 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
   .toc.toc--visible { opacity: 1; visibility: visible; transition: opacity 0.6s ease, visibility 0s; }
 
   .toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+
+  /* ── FROST BEHIND THE RAIL, over the paper slide only.
+     The descent graph now spans the panel's full width, so its contour dots and the leftmost labels
+     pass under the fixed rail. A frosted pad lifts the labels off that texture without hiding the
+     drawing: it is the panel's own colour at partial opacity plus a blur, so it reads as the paper
+     coming forward rather than as a card. Only on the paper slide — over the open sky the rail is a
+     whisper and a pad would be an object. */
+  .toc.over-paper ul {
+    padding: 14px 16px 14px 12px;
+    margin: -14px 0 -14px -12px;              /* keep the labels' optical position unchanged */
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--toc-frost, #efe7d8) 78%, transparent);
+    -webkit-backdrop-filter: blur(7px);
+    backdrop-filter: blur(7px);
+  }
+  :global(html[data-theme='dark']) .toc.over-paper ul { --toc-frost: #14161a; }
 
   .toc a {
     pointer-events: auto;
