@@ -7,6 +7,8 @@ import SkyWash from '../components/SkyWash.astro';
 import Heights from '../sections/Heights.astro';
 import Interlude from '../sections/Interlude.astro';
 import Mountains from '../sections/Mountains.astro';
+import DescentPath from '../components/DescentPath.astro';
+import Story from '../sections/Story.astro';
 import Ground from '../sections/Ground.astro';
 import Signature from '../sections/Signature.astro';
 ---
@@ -17,6 +19,11 @@ import Signature from '../sections/Signature.astro';
     <SkyWash />
     <Heights />
     <Interlude />
+    <!-- The story so far: the graph, then the editorial that explains it. The descent piece is
+         settled (see notes/showpiece.md); the Story panel is the one place the page stops and
+         talks, so it gets a paper ground instead of the sky. -->
+    <DescentPath />
+    <Story />
     <Mountains />
     <Ground />
     <Signature />

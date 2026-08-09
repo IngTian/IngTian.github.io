@@ -1,0 +1,168 @@
+---
+// src/sections/Story.astro
+// THE EDITORIAL that explains the descent graph, in two columns on a paper ground.
+//
+// The owner's brief: "after the descent line, a section explaining ourselves, incl. why we transition
+// into quants… the section explains the graph literally. You maybe even can get creative, try 2
+// columns etc." And the register: the earlier "forty-two sentences" sketch read like a good journal
+// spread, but its CONTENT was photograph notes — "after all we are not an artist". So this keeps that
+// typographic register and puts the actual subject in it.
+//
+// WHY A PAPER GROUND. The rest of the homepage is a sky you descend through. This section is the one
+// place that stops and talks, so it gets a different surface: an editorial paper panel, full-bleed,
+// with the sky visible above and below it. That is also the elegant thing the owner picked out about
+// the light theme, and the panel colour is chosen per theme rather than shared.
+//
+// Every number here is COMPUTED at build time from the same field the graph draws, so the prose and
+// the picture cannot drift apart. Nothing is hand-typed.
+import { STORY, STORY_CODA, STORY_FIGURES } from '../data/story';
+import { trajectoryFacts, WAYPOINTS } from '../lib/trajectory';
+import { curvature } from '../lib/sensitivity';
+import { discoveryOf } from '../lib/knowledge';
+
+const facts = trajectoryFacts();
+const swe = WAYPOINTS.find((w) => w.label.includes('Senior SWE'))!;
+const phd = WAYPOINTS.find((w) => w.label.includes('PhD'))!;
+const inBasin = curvature(swe.x, swe.y).signal;
+const onDescent = curvature(phd.x, phd.y).signal;
+const discovery = discoveryOf(facts.globalBasin.x, facts.globalBasin.y);
+
+// Fill the figures from the real measurements.
+const figures = STORY_FIGURES.map((f) => {
+  if (f.label === 'feedback ratio') return { ...f, value: `${Math.round(onDescent / inBasin)}×` };
+  if (f.label === 'climb to leave') return { ...f, value: `+${facts.climbRequired.toFixed(2)}` };
+  return { ...f, value: String(discovery?.blindStops ?? 0) };
+});
+---
+<section id="story" class="story" aria-labelledby="story-heading">
+  <div class="story-paper">
+    <div class="story-inner">
+      <h2 id="story-heading" class="story-title">Why the climb</h2>
+
+      <div class="story-cols">
+        {STORY.map((col) => (
+          <div class="story-col">
+            <p class="story-kicker">{col.kicker}</p>
+            <p class="story-lead">{col.lead}</p>
+            {col.body.map((para) => <p class="story-body">{para}</p>)}
+          </div>
+        ))}
+      </div>
+
+      <!-- The numbers the prose leans on, so a reader can check them against the graph above. -->
+      <dl class="story-figures">
+        {figures.map((f) => (
+          <div class="story-figure">
+            <dt>{f.value}</dt>
+            <dd><span class="story-figure-label">{f.label}</span>{f.note}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <p class="story-coda">{STORY_CODA}</p>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* Full-bleed, so the paper panel is a surface the page passes through rather than a card sitting
+     on the sky. */
+  .story {
+    position: relative;
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    padding: 8vh 0 10vh;
+  }
+
+  /* THE PAPER GROUND. Two different colours by theme rather than one shared value:
+     - light: a warm bone/oat that reads as printed stock against the luminous sky, NOT the same
+       --paper as the text colour (which would vanish);
+     - dark: a cool near-black slate a shade above --bg, so the panel is felt rather than seen. */
+  .story-paper {
+    --story-bg: #efe7d8;
+    --story-edge: rgba(90, 84, 74, 0.16);
+    --story-ink: #1f1b14;
+    --story-ink-soft: #4a4438;
+    --story-ink-faint: #7d7566;
+    --story-accent: #9a6f34;
+
+    background: var(--story-bg);
+    border-top: 1px solid var(--story-edge);
+    border-bottom: 1px solid var(--story-edge);
+    padding: 9vh 0;
+  }
+  :global(html[data-theme='dark']) .story-paper {
+    --story-bg: #14161a;
+    --story-edge: rgba(184, 177, 161, 0.14);
+    --story-ink: #dce1dc;
+    --story-ink-soft: #a8b0a9;
+    --story-ink-faint: #6d746e;
+    --story-accent: #7fc9a0;
+  }
+
+  .story-inner { width: min(1180px, 88vw); margin: 0 auto; }
+
+  .story-title {
+    font-family: var(--font-display); font-weight: 300;
+    font-size: clamp(28px, 3.4vw, 46px);
+    color: var(--story-ink); margin: 0 0 5vh;
+    letter-spacing: -0.01em;
+  }
+
+  /* Two columns, because the piece IS a comparison: where I was, against where the signal was. A
+     single measure makes the reader reconstruct that pairing themselves. */
+  .story-cols {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0 clamp(32px, 5vw, 88px);
+  }
+  .story-col + .story-col {
+    border-left: 1px solid var(--story-edge);
+    padding-left: clamp(32px, 5vw, 88px);
+  }
+  @media (max-width: 860px) {
+    .story-cols { grid-template-columns: 1fr; gap: 6vh 0; }
+    .story-col + .story-col { border-left: 0; padding-left: 0; }
+  }
+
+  .story-kicker {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.24em;
+    text-transform: uppercase; color: var(--story-accent); margin: 0 0 14px;
+  }
+  /* The lead is display-size: it is the sentence a skimmer reads, and the one that has to carry the
+     whole column on its own. */
+  .story-lead {
+    font-family: var(--font-display); font-size: clamp(19px, 1.9vw, 26px);
+    line-height: 1.38; color: var(--story-ink); margin: 0 0 20px;
+    text-wrap: balance;
+  }
+  .story-body {
+    font-size: 15px; line-height: 1.78; color: var(--story-ink-soft);
+    margin: 0 0 15px; max-width: 46ch;
+  }
+  .story-body:last-child { margin-bottom: 0; }
+
+  /* The figures: a measured row, mono, so they read as readings rather than as pull-quotes. */
+  .story-figures {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 clamp(24px, 4vw, 64px);
+    margin: 7vh 0 0; padding-top: 4vh; border-top: 1px solid var(--story-edge);
+  }
+  .story-figure dt {
+    font-family: var(--font-mono); font-size: clamp(24px, 2.6vw, 34px);
+    color: var(--story-accent); line-height: 1;
+  }
+  .story-figure dd {
+    margin: 12px 0 0; font-size: 13px; line-height: 1.6; color: var(--story-ink-faint);
+  }
+  .story-figure-label {
+    display: block; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--story-ink-soft); margin-bottom: 6px;
+  }
+  @media (max-width: 700px) {
+    .story-figures { grid-template-columns: 1fr; gap: 4vh 0; }
+  }
+
+  .story-coda {
+    margin: 7vh 0 0; max-width: 62ch;
+    font-family: var(--font-display); font-style: italic;
+    font-size: clamp(17px, 1.6vw, 21px); line-height: 1.6; color: var(--story-ink);
+  }
+</style>

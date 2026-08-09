@@ -76,6 +76,37 @@
     .research-link:hover::before, .research-link:focus-visible::before { transform: scaleX(1); }
   }
 
+  /* ── A ONE-TIME HINT that the two phrases are doors.
+     Both already have hover affordances — an ochre marker wash on "day", an underline draw on
+     "night" — but neither ANNOUNCES itself, so a visitor who never hovers never learns they are
+     links. This plays each affordance once, in sequence, shortly after the line scrolls in, and then
+     leaves them alone: an invitation rather than an animation. Transform-only, and it never runs
+     under reduced motion (where both affordances are already shown statically). */
+  @media (prefers-reduced-motion: no-preference) {
+    .research-link::before {
+      animation: hint-wash 3.2s cubic-bezier(0.2, 0.7, 0.2, 1) 1.1s 1 both;
+    }
+    .art-link::after {
+      animation: hint-underline 3.2s cubic-bezier(0.2, 0.7, 0.2, 1) 2.0s 1 both;
+    }
+    /* Hover must win over the hint at any point, including mid-play. */
+    .research-link:hover::before, .research-link:focus-visible::before,
+    .art-link:hover::after, .art-link:focus-visible::after { animation: none; }
+
+    @keyframes hint-wash {
+      0%   { transform: scaleX(0); }
+      22%  { transform: scaleX(1); }
+      62%  { transform: scaleX(1); }
+      100% { transform: scaleX(0); }
+    }
+    @keyframes hint-underline {
+      0%   { transform: scaleX(0); }
+      22%  { transform: scaleX(1); }
+      62%  { transform: scaleX(1); }
+      100% { transform: scaleX(0); }
+    }
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .statement {
       animation: statement-in linear both;
