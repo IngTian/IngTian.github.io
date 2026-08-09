@@ -92,6 +92,10 @@ const facts = trajectoryFacts();
     font-family: var(--font-display); font-size: clamp(26px, 3vw, 38px); font-weight: 300;
     color: var(--dp-strong); margin: 0;
   }
+  /* On the paper panel the graph shares the section with the writing, so its title is scaled to sit
+     BESIDE "Why the climb" as a peer rather than out-shouting it, and kept to one line. */
+  :global(.story-paper) .dp-head h2 { font-size: clamp(25px, 2.2vw, 40px); text-wrap: balance; }
+  :global(.story-paper) .dp-lede { max-width: 44ch; }
   .dp-lede {
     font-size: 15.5px; line-height: 1.75; color: var(--dp-body); margin: 14px 0 0;
   }
@@ -131,15 +135,20 @@ const facts = trajectoryFacts();
   :global(.story-paper) .dp { display: grid; }
   :global(.story-paper) .dp-stage {
     aspect-ratio: auto;
-    /* Slightly short of the full slide, leaving a clear strip at the foot for the "why the climb" cue —
-       the drawing spans the whole width now, so without this the cue sits on top of contour ink. */
-    height: min(78vh, 92vw);
+    /* Sized to the viewport, not a ratio: the graph is sticky in a column beside the writing, so it must
+       fit one screen with its overlaid header. The strip that used to be reserved for the "why the
+       climb" cue is reclaimed — that cue is gone, since the writing is now beside the graph rather
+       than on a slide below it. */
+    height: min(80vh, 88vw);
     margin: 0;
   }
   :global(.story-paper) .dp-head {
     position: absolute;
     top: 0; left: 0;
-    max-width: min(48ch, 42%);
+    /* Wide enough to keep "A descent, with one climb" on one line — at 42% it wrapped after "one",
+       which reads as a broken heading rather than a deliberate two-line title. The overlay sits on the
+       drawing's empty upper-left, so a wider box costs nothing. */
+    max-width: min(52ch, 58%);
     z-index: 2;
     pointer-events: none;      /* the drawing is not interactive, but never block it either */
   }

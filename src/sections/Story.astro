@@ -43,46 +43,45 @@ const figures = STORY_FIGURES.map((f) => {
 ---
 <section id="story" class="story" aria-labelledby="story-heading">
   <div class="story-paper">
-    <!-- The graph, on the same paper. Passed in as a slot so this component owns the surface and the
-         ink tokens, and DescentPath stays a self-contained piece that inherits them. -->
-    <div class="story-figure-slot">
-      <slot />
+    <!-- ONE SECTION, TWO COLUMNS. The owner: "I'm thinking about if it's more natural to merge A
+         descent with one climb with Why the climb. After all they are all describing my career path.
+         There is also a huge right panel unused here."
+         Both are right. They were two stacked slides describing one subject, and at a wide viewport the
+         graph left 586px — 29.3% of the window — genuinely empty on the right, because the field's
+         aspect (1.27) cannot stretch to fill a letterbox frame and the surplus became padding.
+         So the prose moves INTO that space: graph left, writing right, one section. The graph is
+         STICKY, so it stays visible while its explanation scrolls past — the whole point of merging is
+         that you can read the claim and check the picture at the same time. -->
+    <div class="story-split">
+      <!-- The graph, on the same paper. Passed in as a slot so this component owns the surface and the
+           ink tokens, and DescentPath stays a self-contained piece that inherits them. -->
+      <div class="story-figure-slot"><slot /></div>
 
-      <!-- WHAT IS BELOW, NAMED. The hero carries a "scroll" cue and the tagline slide reveals the
-           descent beneath it, but the graph slide ended with nothing — in a deck, where each slide
-           fills the screen, an unmarked bottom edge reads as the end of the page. This names the next
-           slide rather than just gesturing down: the reader learns the graph HAS an explanation.
-           A real link, so it works without the deck (and for keyboard). -->
-      <a class="story-next" href="#story-heading">
-        <span class="story-next-label">Why the climb</span>
-        <span class="story-next-arrow" aria-hidden="true"></span>
-      </a>
-    </div>
+      <div class="story-inner">
+        <h2 id="story-heading" class="story-title">Why the climb</h2>
 
-    <div class="story-inner">
-      <h2 id="story-heading" class="story-title">Why the climb</h2>
+        <div class="story-cols">
+          {STORY.map((col) => (
+            <div class="story-col">
+              <p class="story-kicker">{col.kicker}</p>
+              <p class="story-lead">{col.lead}</p>
+              {col.body.map((para) => <p class="story-body">{para}</p>)}
+            </div>
+          ))}
+        </div>
 
-      <div class="story-cols">
-        {STORY.map((col) => (
-          <div class="story-col">
-            <p class="story-kicker">{col.kicker}</p>
-            <p class="story-lead">{col.lead}</p>
-            {col.body.map((para) => <p class="story-body">{para}</p>)}
-          </div>
-        ))}
+        <!-- The numbers the prose leans on, so a reader can check them against the graph beside it. -->
+        <dl class="story-figures">
+          {figures.map((f) => (
+            <div class="story-figure">
+              <dt>{f.value}</dt>
+              <dd><span class="story-figure-label">{f.label}</span>{f.note}</dd>
+            </div>
+          ))}
+        </dl>
+
+        <p class="story-coda">{STORY_CODA}</p>
       </div>
-
-      <!-- The numbers the prose leans on, so a reader can check them against the graph above. -->
-      <dl class="story-figures">
-        {figures.map((f) => (
-          <div class="story-figure">
-            <dt>{f.value}</dt>
-            <dd><span class="story-figure-label">{f.label}</span>{f.note}</dd>
-          </div>
-        ))}
-      </dl>
-
-      <p class="story-coda">{STORY_CODA}</p>
     </div>
   </div>
 </section>
@@ -98,6 +97,12 @@ const figures = STORY_FIGURES.map((f) => {
     z-index: 1;
     width: 100vw;
     margin-left: calc(50% - 50vw);
+    /* NO LEAD ON THIS SECTION. The lead lifts the deck's resting position ABOVE the element, which for a
+       full-bleed opaque panel means a strip of sky shows above the paper — measured: paper starts at
+       1953, the deck rested at 1893, so 60px of the descent sky sat above the panel edge and the slide
+       read as a card that had slipped down.
+       The air the title needs is the panel's own padding-top instead, which is inside the paper. */
+    --deck-lead: 0px;
   }
 
   /* THE PAPER GROUND. Two different colours by theme rather than one shared value:
@@ -143,137 +148,106 @@ const figures = STORY_FIGURES.map((f) => {
     --story-line-soft: rgba(160, 168, 161, 0.5);
   }
 
-  /* The PROSE keeps a measure — long lines are unreadable, and this is a journal spread. It shares the
-     graph's LEFT EDGE rather than being centred: the two are one slide, and a centred text block under
-     a left-aligned drawing reads as two unrelated pieces. Centring also put the prose at x=260 while
-     the graph began at x=43, which is what made the graph look pushed against the boundary. */
-  .story-inner {
-    width: 100%;
-    margin: 0;
-    padding-left: clamp(96px, 8.5vw, 168px);
-    padding-right: clamp(16px, 2vw, 40px);
+  /* ── THE SPLIT: graph left, writing right, in one section.
+     64% to the graph, measured rather than guessed: at 2000px that gives the drawing 1091px, slightly
+     WIDER than the 1004px it occupied when it had the whole slide (the surplus was padding the aspect
+     guard could not use), while leaving the prose a real 720px panel. */
+  .story-split {
+    display: grid;
+    grid-template-columns: 64fr 36fr;
+    gap: 0 clamp(28px, 3vw, 64px);
+    align-items: start;
+    padding-left: clamp(96px, 7.5vw, 150px);
+    padding-right: clamp(20px, 2.4vw, 52px);
     box-sizing: border-box;
-    max-width: none;
   }
-  /* The prose itself keeps a comfortable measure inside that full-width box. */
-  .story-cols, .story-figures, .story-coda, .story-title { max-width: 1300px; }
 
-  /* The GRAPH does not. It is the showpiece and it was too small inside the text measure, so it spans
-     the panel edge to edge; only enough side padding to keep the outermost labels off the edge. The
-     header text inside it keeps the prose measure (see DescentPath), so the widening moves the DRAWING,
-     not the reading.
-     --deck-lead is read by the deck controller: the air above this slide's resting position. It is a
-     custom property rather than scroll-margin-top because the deck scrolls with window.scrollTo(),
-     which ignores scroll-margin — the title was coming to rest against the browser chrome. */
+  .story-inner { width: 100%; margin: 0; max-width: none; }
+
+  /* Below the split's comfortable width the two columns stack: a 36% prose column becomes unreadable
+     long before the graph stops being legible, and the graph's in-frame labels need room. */
+  @media (max-width: 1180px) {
+    .story-split { grid-template-columns: 1fr; gap: 8vh 0; }
+  }
+
+  /* STICKY, so the drawing stays beside its explanation while the prose scrolls. That is the argument
+     for merging in the first place: the reader can check each claim against the picture without
+     scrolling back to it. Sticky is bounded by its parent, so the graph releases by itself at the end
+     of the writing — no JS, no scroll listener.
+     No --deck-lead here: the slot is no longer a deck stop (the deck's slides are top-level sections),
+     and leaving one would inherit down and re-open the sky gap above the panel. */
   .story-figure-slot {
-    --deck-lead: 60px;
+    position: sticky;
+    top: clamp(40px, 6vh, 80px);
     width: 100%;
-    /* INDENTED PAST THE RAIL, not merely padded off the viewport edge. Measured before this: the
-       drawing began at x=43 while the fixed Toc occupies x=34..86 — they overlapped, which is why the
-       graph read as jammed against the left boundary. The left inset now clears the rail with room to
-       breathe; the right stays tight so the extra space goes to the DRAWING rather than to margin. */
-    padding-left: clamp(96px, 8.5vw, 168px);
-    padding-right: clamp(16px, 2vw, 40px);
     box-sizing: border-box;
-    /* The gap below must exceed the LEAD PLUS whatever the slot is short of a full screen, or the next
-       slide bleeds into this one's resting view. The stop sits 60px above the slot's top, so the
-       viewport reaches 60px further down than the slot does; the stage is also deliberately shorter
-       than the slide (leaving room for the cue), which adds to the shortfall.
-       Measured at 1700x1050: slot 819px, rest at 1989, viewport reaches 3039 — and the editorial began
-       at 2994, i.e. 45px inside the graph slide. Sized to clear both terms with room to spare. */
-    margin: 0 0 max(22vh, 230px);
   }
-  /* The editorial gets the same air when the deck rests on it. */
-  .story-inner { --deck-lead: 60px; }
+  /* The horizontal insets live on .story-split now, so both columns share one left edge and the rail is
+     cleared once rather than per-column. */
 
-  /* ── THE "MORE BELOW" CUE, at the foot of the graph slide.
-     Centred on the slide rather than the drawing, and low enough to read as an edge marker instead of a
-     caption. Quiet by default; the arrow bobs under no-preference exactly like the hero's cue. */
-  .story-next {
-    position: absolute;
-    left: 50%; bottom: 1.4vh;
-    transform: translateX(-50%);
-    display: inline-flex; flex-direction: column; align-items: center; gap: 7px;
-    text-decoration: none;
-    color: var(--story-ink-soft);
-    z-index: 3;
-    /* Its own ground. The drawing now spans the full slide, so the cue sits ON the contour dots and was
-       unreadable against them — measured by eye against the settled frame, where "WHY THE CLIMB" ran
-       straight through a band of ink. A soft pad of the panel colour clears just enough room without
-       reading as a button. */
-    padding: 10px 18px 8px;
-    border-radius: 3px;
-    background: radial-gradient(60% 60% at 50% 50%,
-      color-mix(in srgb, var(--story-bg) 96%, transparent) 40%,
-      color-mix(in srgb, var(--story-bg) 0%, transparent) 100%);
-  }
-  .story-next-label {
-    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
-  }
-  /* A chevron from two borders — no glyph, no asset, and it inherits the ink. */
-  .story-next-arrow {
-    width: 8px; height: 8px;
-    border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
-    transform: rotate(45deg);
-  }
-  .story-next:hover { color: var(--story-ink); }
-  .story-next:focus-visible { outline: 2px solid var(--story-accent); outline-offset: 6px; border-radius: 2px; }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .story-next-arrow { animation: story-next-bob 2.6s ease-in-out 1s infinite; }
-    @keyframes story-next-bob {
-      0%, 100% { opacity: 0.55; transform: rotate(45deg) translate(0, 0); }
-      50%      { opacity: 1;    transform: rotate(45deg) translate(3px, 3px); }
-    }
-  }
-  /* The slot is the positioning context for the cue. */
-  .story-figure-slot { position: relative; }
+  /* The "why the climb" cue is GONE — it existed because the writing was a separate slide below the
+     graph, and an unmarked bottom edge read as the end of the page. The writing is now beside the graph
+     in the same section, so there is nothing below to announce. */
 
   .story-title {
     font-family: var(--font-display); font-weight: 300;
-    font-size: clamp(30px, 3.8vw, 54px);
-    color: var(--story-ink); margin: 0 0 5vh;
+    font-size: clamp(28px, 2.4vw, 42px);
+    color: var(--story-ink); margin: 0 0 clamp(24px, 3.4vh, 46px);
     letter-spacing: -0.01em;
+    text-wrap: balance;
   }
 
-  /* Two columns, because the piece IS a comparison: where I was, against where the signal was. A
-     single measure makes the reader reconstruct that pairing themselves. */
-  .story-cols {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 0 clamp(32px, 5vw, 88px);
-  }
+  /* ONE COLUMN NOW, not two. The piece is still a comparison — where I was against where the signal
+     was — but in a 36%-wide panel two sub-columns would be ~330px each, far under a readable measure.
+     The pairing is carried by the two kickers and a rule between the blocks instead of by side-by-side
+     geometry: same contrast, read top-to-bottom. */
+  .story-cols { display: grid; grid-template-columns: 1fr; gap: 0; }
   .story-col + .story-col {
-    border-left: 1px solid var(--story-edge);
-    padding-left: clamp(32px, 5vw, 88px);
+    border-top: 1px solid var(--story-edge);
+    margin-top: clamp(24px, 3vh, 40px);
+    padding-top: clamp(24px, 3vh, 40px);
   }
-  @media (max-width: 860px) {
-    .story-cols { grid-template-columns: 1fr; gap: 6vh 0; }
-    .story-col + .story-col { border-left: 0; padding-left: 0; }
+  /* Stacked (narrow) layout: the prose has the full width back, so the two blocks can sit side by side
+     again — which is where the comparison reads best. */
+  @media (max-width: 1180px) and (min-width: 861px) {
+    .story-cols { grid-template-columns: 1fr 1fr; gap: 0 clamp(32px, 5vw, 88px); }
+    .story-col + .story-col {
+      border-top: 0; margin-top: 0; padding-top: 0;
+      border-left: 1px solid var(--story-edge);
+      padding-left: clamp(32px, 5vw, 88px);
+    }
   }
 
   .story-kicker {
     font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.24em;
     text-transform: uppercase; color: var(--story-accent); margin: 0 0 18px;
   }
-  /* ── TYPE SCALED UP to the proto-sketches register, which is the style the owner preferred.
-     That sketch pulled its two focal sentences out at 34px on a 44px line (see lib/sketches/batch1.ts
-     — the "forty-two sentences" frame, the only one that measured as not reading empty). The lead was
-     26px here, which is a subtitle rather than a focal sentence. Now it tops out at 34px on a 1.32
-     line, and the body follows to 17px: a journal spread's body is not a UI label. */
+  /* ── TYPE in the proto-sketches register, which is the style the owner preferred: that sketch pulled
+     its focal sentences out at 34px on a 44px line (lib/sketches/batch1.ts — the "forty-two sentences"
+     frame, the only one that measured as not reading empty).
+     Sized in ch/rem terms against the PROSE COLUMN rather than the viewport, because the column is now
+     36% of the window: a 2.3vw lead measured 46px at 2000px wide and would have been ~4 words per line
+     in a 720px panel. cqw units would be ideal but container queries would need a container declared on
+     an element the deck also measures, so this stays on a viewport clamp with a tighter cap. */
   .story-lead {
-    font-family: var(--font-display); font-size: clamp(21px, 2.3vw, 34px);
-    line-height: 1.32; color: var(--story-ink); margin: 0 0 26px;
+    font-family: var(--font-display); font-size: clamp(21px, 1.7vw, 30px);
+    line-height: 1.34; color: var(--story-ink); margin: 0 0 22px;
     text-wrap: balance;
   }
   .story-body {
-    font-size: clamp(15px, 1.15vw, 17px); line-height: 1.75; color: var(--story-ink-soft);
-    margin: 0 0 18px; max-width: 52ch;
+    font-size: clamp(15px, 0.95vw, 17px); line-height: 1.74; color: var(--story-ink-soft);
+    margin: 0 0 16px; max-width: 46ch;
   }
   .story-body:last-child { margin-bottom: 0; }
 
-  /* The figures: a measured row, mono, so they read as readings rather than as pull-quotes. */
+  /* The figures: measured readings, mono, so they read as instrument output rather than pull-quotes.
+     Three across needed ~1300px; in the 720px prose panel they wrap to a responsive grid instead of
+     being crushed to 220px each. */
   .story-figures {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 clamp(24px, 4vw, 64px);
-    margin: 7vh 0 0; padding-top: 4vh; border-top: 1px solid var(--story-edge);
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: clamp(20px, 2.4vh, 32px) clamp(20px, 2vw, 40px);
+    margin: clamp(28px, 4vh, 52px) 0 0; padding-top: clamp(22px, 3vh, 40px);
+    border-top: 1px solid var(--story-edge);
   }
   .story-figure dt {
     font-family: var(--font-mono); font-size: clamp(26px, 3vw, 40px);

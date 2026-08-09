@@ -34,17 +34,18 @@
     // reader who asked for less motion gets the plain scroll.
     if (prefersReducedMotion()) return null;
 
-    // Slide elements: the top-level sections, but with the story panel replaced by its two beats (the
-    // graph and the editorial) since that one panel is 2.17 viewports of two distinct things.
+    // Slide elements: the top-level sections, full stop.
+    //
+    // This used to split the story panel into its two beats (graph, then editorial), because they were
+    // stacked and the panel was 2.17 viewports of two distinct things. They are now ONE section — the
+    // graph sticky in a column beside the writing — so splitting it would be wrong twice over: the two
+    // beats overlap vertically, and a stop on the sticky column measures the STUCK position rather than
+    // a place in the document. The section is taller than a screen, which deckStops already handles by
+    // paging through it.
     function slideEls(): HTMLElement[] {
-      const out: HTMLElement[] = [];
-      for (const el of Array.from(main!.children)) {
-        if (!(el instanceof HTMLElement) || el.tagName !== 'SECTION') continue;
-        const beats = el.querySelectorAll<HTMLElement>('.story-figure-slot, .story-inner');
-        if (beats.length) out.push(...Array.from(beats));
-        else out.push(el);
-      }
-      return out;
+      return Array.from(main!.children).filter(
+        (el): el is HTMLElement => el instanceof HTMLElement && el.tagName === 'SECTION',
+      );
     }
 
     let stops: number[] = [];
