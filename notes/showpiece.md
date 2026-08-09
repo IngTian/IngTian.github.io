@@ -180,6 +180,24 @@ Not rhetorical — these are the actual forks, and none of them has been settled
    curvature changes as the walker learns is the literal reading; whether that is legible in five
    seconds is untested.
 
+## Round-one sketch verdicts, from judges who MEASURED the rendered frames
+
+The five candidates in `src/lib/sketches/batch1.ts`, rendered at `/proto-sketches` and scored by a
+curious stranger, an art director and a graphics engineer (curiosity and buildability double
+weighted). Full report in `notes/sediment-spec.md`.
+
+**Ink coverage is now a number, not an opinion.** The four rejected showpieces measured
+**1.2–2.6%** ink. The sentences sketch measured **6.1%** — the only one that did not read empty.
+Proposed bar for any future candidate: ≥8% ink, no quadrant under 3%.
+
+| sketch | mean | verdict |
+|---|---|---|
+| B · forty-two sentences | 48–52 | **the only frame that produced curiosity rather than assessment.** Weakness: it is a text page, not an object in the descent's world, and has no geometry for the six links — "ship it as the CONTENT of something, not as the something" |
+| D · mostly still hidden | 42–46 | sharpest MECHANISM (withholding), but drawn as noise: tick angles come from `rnd()`, so 180 marks mean nothing and exploration is a lottery. 1.17% ink |
+| E · below the ground | 45 | best continuity argument of the five; as drawn it is "a résumé with rock texture" — label overflow, an empty 2024 band, role names repeated across layers |
+| A · the path that went uphill | 35–37 | **fatal, and my mistake:** it re-renders `terrain.ts`'s own `field()`. Same mixture, same two basins. Contours instead of dots is a change of hatching, not of object — the one concept already rejected. Also "answers its own riddle in the caption", and the labels collide because the `wp.x < 0.4` anchor test pushes nearly all of them left into the line |
+| C · everything counted | 34 | *"'nothing here is a claim' sits under a headline that says 173 ARTEFACTS, which is the claim."* Two identical 42-dot rows carry the same information twice |
+
 ## The lesson from five failures, stated plainly
 
 Every rejection came from building before deciding. The pod was built, then diagnosed as wrong in
