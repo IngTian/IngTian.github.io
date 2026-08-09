@@ -31,16 +31,17 @@ import Deck from '../components/Deck.astro';
     <Story>
       <DescentPath />
     </Story>
-    <!-- THE FIELD, IN THREE SLIDES, on the owner's structure: teach it, then show how the decision gets
-         made, then say plainly where the work is.
-           1. Lesson — what portfolio optimization IS, with a drafted illustrative asset table, several
-              candidate portfolios, the constraints, and the cow as the naive teaching voice.
-           2. Method — "systematically, with maths, ML as a tool" plus the chart: three strategies from the
-              paper's PUBLISHED out-of-sample results, the owner's method highlighted. Real numbers only —
-              see data/track.ts for why an invented equity curve was not an option.
+    <!-- THE FIELD, IN THREE SLIDES, on the owner's own framing of the goal: "our job is to illustrate
+         1. what this topic is 2. why is it important and hard 3. what's my job."
+           1. Lesson — the topic. Assets with pixel marks, then "How would you invest?", then four RULES
+              (not fixed mixes) with the multi-period paths they actually produce. The honest punchline is
+              that the tallest curve is not the answer: the naive rule ends highest and falls 22%.
+           2. Method — why it is hard, in arithmetic a non-specialist can check (48 decisions vs 72,000,
+              and more corner portfolios than atoms in the universe), then what the job is.
            3. Work — publications, writings, projects, stated plainly.
-         The single-question Inquiry slide this replaces was the earlier draft of the same idea; it taught
-         nothing before asking, which is what the lesson slide now fixes. -->
+         Two earlier drafts are gone: the single-question Inquiry slide (it asked before teaching) and the
+         published-results chart (it framed the work as "this is mine" rather than "this is what we are
+         trying to find" — the owner's correction, and the right one). -->
     <Lesson />
     <Method />
     <Work />

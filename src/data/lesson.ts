@@ -9,8 +9,7 @@
 // THE NUMBERS HERE ARE ILLUSTRATIVE AND SAY SO. This is the one place on the site where invented figures
 // are legitimate, and the distinction matters: these are textbook-style asset-class characteristics used
 // to TEACH a method, not results attributed to the owner. The table is captioned as illustrative, the
-// figures are deliberately round, and no portfolio below is presented as anything he ran. Contrast
-// data/track.ts, where every number is a published result and nothing is invented.
+// figures are deliberately round, and no portfolio is presented as anything he ran.
 //
 // THE COW IS A VOICE, NOT A DRAWING. It reuses the existing easter-egg idiom (TerrainHero's "Moo!" pill):
 // a marginal voice that asks the naive question the reader is already thinking. The project notes are

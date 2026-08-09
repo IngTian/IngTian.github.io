@@ -1,55 +1,109 @@
 ---
 // src/sections/Lesson.astro
-// SLIDE 1 — teaches what portfolio optimization IS, with the cow as the naive voice.
+// SLIDE 1 — WHAT THE TOPIC IS. Assets with pixel marks, one big question, then candidate strategies with
+// their actual multi-period paths.
 //
-// The owner's brief: one slide, a drafted asset table with historic-style performance, named constraints,
-// several example portfolios, and a cow easter egg acting as a teacher.
+// The owner's layout, verbatim: "the slide opens with a handful of assets, each with pixel art images, then
+// followed by a Big question, 'How would you invest?' then these moves on to the left, on the right you can
+// show a few strategies and their prospective return curve etc."
 //
-// WHY THE COW IS A PILL AND NOT A PICTURE. The site already has this idiom — TerrainHero drops a rare
-// "Moo!" pill at a settled optimum — and the project notes record three failed attempts at hand-authored
-// illustration. So the cow is a VOICE: it asks the question the reader is already thinking, in the margin,
-// and it costs no drawing. It cycles on click and on a slow timer, so it reads as a companion rather than
-// as a decoration that fired once.
+// And the correction that reshaped the content: "seems like we didnt bake in multi period at all for the
+// examples." Right — the previous version offered four FIXED MIXES, which is a one-shot choice, the exact
+// thing multi-period optimisation is not. Each candidate here is a RULE that decides again every period and
+// pays for changing its mind, and the curves are what those rules actually produce (lib/multiperiod.ts,
+// 28 tests).
 //
-// The numbers in the table are ILLUSTRATIVE and captioned as such — see data/lesson.ts for why that is
-// legitimate here and not elsewhere on the site.
-import { ASSETS, ASSETS_CAPTION, LESSON_QUESTION, CANDIDATES, CONSTRAINTS, COW_LINES, LESSON_CLOSE } from '../data/lesson';
+// WHAT THE CURVES SHOW, and why it is not a flattering result. Measured in this declared world: buying only
+// equities ends HIGHEST at 1.35x — and pays a 22% drawdown to get there, while the optimised rule ends at
+// 1.26x with 0.5%. The honest lesson is that the highest curve is not automatically the one you want, and
+// the copy says exactly that. A test asserts the naive rule wins on raw return, so this cannot quietly drift
+// into "mine is best".
+//
+// The cow is a VOICE in a pill (the existing easter-egg idiom), never a drawn animal — three attempts at
+// hand-authored illustration have been rejected on this project.
+import { ASSET_GLYPHS, type AssetGlyphKey } from '../data/assetGlyphs';
+import { TOY_ASSETS, PERIOD_RETURNS, runRule, finalValue, realisedVol, maxDrawdown } from '../lib/multiperiod';
+import { RULES, COST_PER_TURNOVER } from '../data/rules';
+import { COW_LINES } from '../data/lesson';
+
+// Everything is computed at BUILD time — the return table is declared, so the paths are deterministic and
+// the client ships numbers rather than a solver.
+const paths = RULES.map((r) => {
+  const path = runRule(r, PERIOD_RETURNS, COST_PER_TURNOVER);
+  return {
+    key: r.key,
+    label: r.label,
+    gloss: r.gloss,
+    isTarget: !!r.isTarget,
+    final: finalValue(path),
+    vol: realisedVol(path),
+    dd: maxDrawdown(path),
+    // Screen-space polyline for an inline SVG sparkline, computed here so the client draws nothing.
+    points: path,
+  };
+});
+
+// One shared scale across all four sparklines, or they cannot be compared.
+const lo = Math.min(1, ...paths.flatMap((p) => p.points.map((q) => q.value)));
+const hi = Math.max(...paths.flatMap((p) => p.points.map((q) => q.value)));
+const SW = 100, SH = 30;
+const spark = (pts: { t: number; value: number }[]) => {
+  const tMax = pts[pts.length - 1].t || 1;
+  return pts
+    .map((q) => {
+      const x = (q.t / tMax) * SW;
+      const y = SH - ((q.value - lo) / (hi - lo || 1)) * SH;
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(' ');
+};
+
+const CELL = 3;   // px per pixel-art cell
 ---
 <section id="lesson" class="ls" aria-labelledby="ls-heading">
   <div class="ls-paper">
     <div class="ls-inner">
-      <p class="ls-kicker">The problem</p>
-      <h2 id="ls-heading" class="ls-question">{LESSON_QUESTION}</h2>
+      <div class="ls-split">
+        <!-- LEFT: the assets, then the question. This is the reading order the owner asked for — you meet
+             the ingredients before you are asked what to do with them. -->
+        <div class="ls-ask">
+          <p class="ls-kicker">The topic</p>
 
-      <div class="ls-grid">
-        <!-- LEFT: the assets, as a set table rather than a spreadsheet — hairline rules, mono figures,
-             right-aligned numerals so the columns read down. -->
-        <div class="ls-col ls-col--table">
-          <table class="ls-table">
-            <caption class="sr-only">Illustrative long-run characteristics of four asset classes</caption>
-            <thead>
-              <tr>
-                <th scope="col">Asset</th>
-                <th scope="col" class="num">Return</th>
-                <th scope="col" class="num">Vol</th>
-                <th scope="col">Its job</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ASSETS.map((a) => (
-                <tr>
-                  <th scope="row">{a.label}</th>
-                  <td class="num">{a.ret}</td>
-                  <td class="num">{a.vol}</td>
-                  <td class="role">{a.role}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p class="ls-caption">{ASSETS_CAPTION}</p>
+          <ul class="ls-assets">
+            {TOY_ASSETS.map((a) => {
+              const g = ASSET_GLYPHS[a.key as AssetGlyphKey];
+              return (
+                <li class="ls-asset">
+                  <!-- The pixel mark: a matrix of cells compiled from data (lib/pixels.ts), rendered as
+                       rects. Not a drawing — a diagram of what the asset does. -->
+                  <svg
+                    class="ls-glyph"
+                    viewBox={`0 0 ${g.w * CELL} ${g.h * CELL}`}
+                    width={g.w * CELL}
+                    height={g.h * CELL}
+                    aria-hidden="true"
+                    shape-rendering="crispEdges"
+                  >
+                    {g.cells.map((c) => (
+                      <rect x={c.x * CELL} y={c.y * CELL} width={CELL} height={CELL} />
+                    ))}
+                  </svg>
+                  <span class="ls-asset-name">{a.label}</span>
+                  <span class="ls-asset-num">{Math.round(a.mu * 100)}% <span class="ls-dim">return</span></span>
+                  <span class="ls-asset-num">{Math.round(a.sigma * 100)}% <span class="ls-dim">swing</span></span>
+                </li>
+              );
+            })}
+          </ul>
+          <p class="ls-illus">Illustrative long-run figures, rounded — the shape of the problem, not anyone’s results.</p>
 
-          <!-- THE COW, in the margin under the table: a real button, so it is keyboard reachable and
-               announces its own content to a screen reader. -->
+          <!-- THE BIG QUESTION. -->
+          <h2 id="ls-heading" class="ls-question">How would you invest?</h2>
+          <p class="ls-lede">
+            And then — because the year does not end — how would you change it next period, knowing every
+            change costs you {(COST_PER_TURNOVER * 10000).toFixed(0)}bp of whatever you move?
+          </p>
+
           <div class="ls-cow">
             <button
               type="button"
@@ -65,27 +119,35 @@ import { ASSETS, ASSETS_CAPTION, LESSON_QUESTION, CANDIDATES, CONSTRAINTS, COW_L
           </div>
         </div>
 
-        <!-- RIGHT: several candidate answers, then the constraints that make it hard. -->
-        <div class="ls-col">
-          <p class="ls-sub">Four defensible answers</p>
-          <ul class="ls-cands">
-            {CANDIDATES.map((c) => (
-              <li class="ls-cand">
-                <span class="ls-cand-name">{c.name}</span>
-                <span class="ls-cand-mix">{c.mix}</span>
-                <span class="ls-cand-body">{c.goal} — <em>{c.cost}</em></span>
+        <!-- RIGHT: four rules, each with the path it actually produces. -->
+        <div class="ls-answers">
+          <p class="ls-kicker">Four rules, twelve periods, same world</p>
+          <ul class="ls-rules">
+            {paths.map((p) => (
+              <li class:list={['ls-rule', p.isTarget && 'is-target']}>
+                <div class="ls-rule-head">
+                  <span class="ls-rule-name">{p.label}</span>
+                  <svg class="ls-spark" viewBox={`0 0 ${SW} ${SH}`} preserveAspectRatio="none" aria-hidden="true">
+                    <polyline points={spark(p.points)} />
+                  </svg>
+                  <span class="ls-rule-final">{p.final.toFixed(2)}×</span>
+                </div>
+                <p class="ls-rule-gloss">{p.gloss}</p>
+                <p class="ls-rule-stats">
+                  <span>worst fall <strong>{(p.dd * 100).toFixed(1)}%</strong></span>
+                  <span>swing <strong>{(p.vol * 100).toFixed(1)}%</strong></span>
+                </p>
               </li>
             ))}
           </ul>
-
-          <p class="ls-sub ls-sub--rule">And the rules you must respect</p>
-          <ul class="ls-cons">
-            {CONSTRAINTS.map((c) => <li>{c}</li>)}
-          </ul>
+          <p class="ls-punch">
+            The tallest curve is not the answer. Buying only equities ends highest and falls
+            {' '}{(Math.abs(paths[0].dd) * 100).toFixed(0)}% on the way; the optimised rule gives up a little
+            to fall {(Math.abs(paths[3].dd) * 100).toFixed(1)}%. Which one is right depends on what you can
+            survive — and that is a question with a mathematical answer.
+          </p>
         </div>
       </div>
-
-      <p class="ls-close">{LESSON_CLOSE}</p>
     </div>
   </div>
 </section>
@@ -106,9 +168,6 @@ import { ASSETS, ASSETS_CAPTION, LESSON_QUESTION, CANDIDATES, CONSTRAINTS, COW_L
     background: var(--ls-bg);
     border-top: 1px solid var(--ls-edge);
     border-bottom: 1px solid var(--ls-edge);
-    /* This is the densest slide on the page — a table, four candidates, five constraints and the cow — and
-       it has to fit ONE screen or the deck pages through it and the composition is never seen whole.
-       Measured at 1700x1050 it overflowed by 10px at 6.2vh; this lands it inside. */
     padding: clamp(38px, 5.4vh, 80px) 0;
   }
   :global(html[data-theme='dark']) .ls-paper {
@@ -126,59 +185,58 @@ import { ASSETS, ASSETS_CAPTION, LESSON_QUESTION, CANDIDATES, CONSTRAINTS, COW_L
   }
   @media (max-width: 1099px) { .ls-inner { padding-left: clamp(28px, 6vw, 80px); } }
 
-  .ls-kicker {
-    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em;
-    text-transform: uppercase; color: var(--ls-accent); margin: 0 0 14px;
+  .ls-split {
+    display: grid; grid-template-columns: 44fr 56fr;
+    gap: 0 clamp(28px, 3.4vw, 68px);
+    align-items: start;
   }
+  .ls-answers { border-left: 1px solid var(--ls-edge); padding-left: clamp(28px, 3.4vw, 68px); }
+  @media (max-width: 1040px) {
+    .ls-split { grid-template-columns: 1fr; gap: 4vh 0; }
+    .ls-answers { border-left: 0; padding-left: 0; padding-top: 4vh; border-top: 1px solid var(--ls-edge); }
+  }
+
+  .ls-kicker {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--ls-accent); margin: 0 0 16px;
+  }
+
+  /* THE ASSETS: pixel mark, name, and its two numbers, in a four-column grid so the figures align down. */
+  .ls-assets { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .ls-asset {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: 0 clamp(10px, 1.2vw, 20px);
+  }
+  .ls-glyph { display: block; }
+  .ls-glyph rect { fill: var(--ls-accent); }
+  .ls-asset-name {
+    font-family: var(--font-display); font-weight: 500; font-size: 16px; color: var(--ls-ink);
+  }
+  .ls-asset-num {
+    font-family: var(--font-mono); font-size: 13px; color: var(--ls-ink-soft);
+    font-variant-numeric: tabular-nums; text-align: right; min-width: 8ch;
+  }
+  .ls-dim { color: var(--ls-ink-faint); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .ls-illus {
+    font-size: 11.5px; line-height: 1.5; color: var(--ls-ink-faint);
+    margin: 12px 0 0; max-width: 46ch; font-style: italic;
+  }
+
+  /* THE BIG QUESTION — the largest thing on the slide, because it is the thing being asked. */
   .ls-question {
     font-family: var(--font-display); font-weight: 300;
-    font-size: clamp(21px, 1.8vw, 30px); line-height: 1.28;
-    color: var(--ls-ink); margin: 0; max-width: 60ch;
-    text-wrap: pretty; letter-spacing: -0.005em;
+    font-size: clamp(30px, 3.2vw, 52px); line-height: 1.1;
+    color: var(--ls-ink); margin: clamp(22px, 3vh, 40px) 0 0;
+    letter-spacing: -0.015em;
+  }
+  .ls-lede {
+    font-size: clamp(14px, 1.05vw, 16px); line-height: 1.68; color: var(--ls-ink-soft);
+    margin: 14px 0 0; max-width: 44ch;
   }
 
-  .ls-grid {
-    display: grid; grid-template-columns: 1fr 1fr;
-    gap: 0 clamp(30px, 3.6vw, 72px);
-    margin: clamp(24px, 3.2vh, 44px) 0 0;
-  }
-  .ls-col + .ls-col { border-left: 1px solid var(--ls-edge); padding-left: clamp(30px, 3.6vw, 72px); }
-  @media (max-width: 980px) {
-    .ls-grid { grid-template-columns: 1fr; gap: 4vh 0; }
-    .ls-col + .ls-col { border-left: 0; padding-left: 0; padding-top: 4vh; border-top: 1px solid var(--ls-edge); }
-  }
-
-  /* THE TABLE, set rather than dumped: hairline rules only, no fills, no borders around cells, mono
-     tabular figures so the columns align down the page. This is the difference between a set table and a
-     spreadsheet, and the project's taste rules care about it. */
-  .ls-table { width: 100%; border-collapse: collapse; }
-  .ls-table th, .ls-table td {
-    text-align: left; padding: 8px 12px 8px 0; vertical-align: baseline;
-  }
-  .ls-table thead th {
-    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase;
-    color: var(--ls-ink-faint); font-weight: 400;
-    border-bottom: 1px solid var(--ls-edge); padding-bottom: 7px;
-  }
-  .ls-table tbody th {
-    font-family: var(--font-display); font-weight: 500; font-size: 15.5px; color: var(--ls-ink);
-  }
-  .ls-table tbody tr + tr th, .ls-table tbody tr + tr td {
-    border-top: 1px solid color-mix(in srgb, var(--ls-edge) 55%, transparent);
-  }
-  .ls-table .num {
-    font-family: var(--font-mono); font-size: 13.5px; color: var(--ls-ink-soft);
-    font-variant-numeric: tabular-nums; text-align: right; padding-right: clamp(10px, 1.4vw, 22px);
-  }
-  .ls-table .role { font-size: 13px; line-height: 1.5; color: var(--ls-ink-faint); }
-  .ls-caption {
-    font-size: 11.5px; line-height: 1.55; color: var(--ls-ink-faint);
-    margin: 10px 0 0; max-width: 44ch; font-style: italic;
-  }
-
-  /* THE COW. A pill in the same idiom as the hero's easter egg, but here it is the teaching voice, so it
-     is always present rather than rare. */
-  .ls-cow { display: flex; align-items: center; gap: 10px; margin: clamp(18px, 2.4vh, 30px) 0 0; flex-wrap: wrap; }
+  .ls-cow { display: flex; align-items: center; gap: 10px; margin: clamp(16px, 2.2vh, 26px) 0 0; flex-wrap: wrap; }
   .ls-cow-btn {
     display: inline-flex; align-items: baseline; gap: 9px;
     font: inherit; cursor: pointer; text-align: left;
@@ -199,46 +257,50 @@ import { ASSETS, ASSETS_CAPTION, LESSON_QUESTION, CANDIDATES, CONSTRAINTS, COW_L
     color: var(--ls-ink-faint);
   }
 
-  .ls-sub {
-    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
-    color: var(--ls-accent); margin: 0 0 12px;
+  /* THE RULES, each with the path it produces. */
+  .ls-rules { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(12px, 1.6vh, 18px); }
+  .ls-rule { padding-bottom: clamp(12px, 1.6vh, 18px); border-bottom: 1px solid color-mix(in srgb, var(--ls-edge) 60%, transparent); }
+  .ls-rule:last-of-type { border-bottom: 0; padding-bottom: 0; }
+  .ls-rule-head {
+    display: grid; grid-template-columns: 1fr auto auto;
+    align-items: center; gap: 0 clamp(12px, 1.4vw, 22px);
   }
-  .ls-sub--rule { margin-top: clamp(20px, 2.6vh, 32px); }
+  .ls-rule-name {
+    font-family: var(--font-display); font-weight: 500; font-size: 15.5px; color: var(--ls-ink);
+  }
+  /* The sparkline: one shared scale across all four, or they could not be compared. */
+  .ls-spark { width: clamp(90px, 11vw, 150px); height: 30px; display: block; }
+  .ls-spark polyline {
+    fill: none; stroke: var(--ls-ink-faint); stroke-width: 1.4;
+    vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round;
+  }
+  .is-target .ls-spark polyline { stroke: var(--ls-accent); stroke-width: 2.2; }
+  .ls-rule-final {
+    font-family: var(--font-mono); font-size: 15px; color: var(--ls-ink-soft);
+    font-variant-numeric: tabular-nums; min-width: 5ch; text-align: right;
+  }
+  .is-target .ls-rule-final { color: var(--ls-accent); }
+  .is-target .ls-rule-name { color: var(--ls-ink); }
+  .ls-rule-gloss {
+    font-size: 13px; line-height: 1.55; color: var(--ls-ink-soft); margin: 5px 0 0; max-width: 56ch;
+  }
+  .ls-rule-stats {
+    display: flex; gap: 0 clamp(14px, 1.6vw, 26px); margin: 5px 0 0;
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; color: var(--ls-ink-faint);
+  }
+  .ls-rule-stats strong { color: var(--ls-ink-soft); font-weight: 400; }
 
-  .ls-cands { list-style: none; margin: 0; padding: 0; display: grid; gap: 11px; }
-  .ls-cand { display: grid; gap: 2px; }
-  .ls-cand-name {
-    font-family: var(--font-display); font-weight: 500; font-size: 15px; color: var(--ls-ink);
-  }
-  .ls-cand-mix {
-    font-family: var(--font-mono); font-size: 11.5px; color: var(--ls-accent);
-  }
-  .ls-cand-body { font-size: 13px; line-height: 1.55; color: var(--ls-ink-soft); max-width: 52ch; }
-  .ls-cand-body em { font-style: italic; color: var(--ls-ink-faint); }
-
-  .ls-cons { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
-  .ls-cons li {
-    font-size: 12.5px; line-height: 1.5; color: var(--ls-ink-soft);
-    padding-left: 15px; position: relative; max-width: 54ch;
-  }
-  .ls-cons li::before {
-    content: ""; position: absolute; left: 0; top: 0.62em;
-    width: 7px; height: 1px; background: var(--ls-accent); opacity: 0.7;
-  }
-
-  .ls-close {
-    font-family: var(--font-display); font-style: italic;
-    font-size: clamp(16px, 1.4vw, 21px); line-height: 1.5;
-    color: var(--ls-ink); margin: clamp(22px, 3vh, 40px) 0 0; max-width: 66ch;
-    padding-top: clamp(18px, 2.4vh, 30px); border-top: 1px solid var(--ls-edge);
+  .ls-punch {
+    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.65; color: var(--ls-ink-soft);
+    margin: clamp(16px, 2.2vh, 26px) 0 0; max-width: 62ch;
+    padding-top: clamp(12px, 1.6vh, 18px); border-top: 1px solid var(--ls-edge);
   }
 </style>
 
 <script>
-  // THE COW CYCLES. Its questions are the naive ones a reader is already asking, so it should be able to
-  // ask the next one — a single fixed line would read as decoration. Clicking advances it; it also
-  // advances slowly on its own so the affordance announces itself, and that timer stops for good on the
-  // first interaction (the reader has taken over) and never runs under reduced motion.
+  // The cow cycles: its lines are the naive questions a reader is already asking, so it should be able to
+  // ask the next one. Clicking advances it; it also advances slowly while on screen so the affordance
+  // announces itself, and that timer stops for good on the first click and never runs under reduced motion.
   function initCow(): (() => void) | null {
     const btn = document.querySelector<HTMLButtonElement>('[data-cow]');
     const say = document.querySelector<HTMLElement>('[data-cow-say]');
@@ -251,23 +313,25 @@ import { ASSETS, ASSETS_CAPTION, LESSON_QUESTION, CANDIDATES, CONSTRAINTS, COW_L
     let i = 0;
     let timer = 0;
     const advance = () => { i = (i + 1) % lines.length; say.textContent = lines[i]; };
-
     const onClick = () => { window.clearInterval(timer); timer = 0; advance(); };
     btn.addEventListener('click', onClick);
 
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!reduced) {
-      // Only while the slide is actually on screen — a timer mutating text in an unseen section is waste,
-      // and an aria-live region changing off-screen is noise for a screen reader.
-      const io = new IntersectionObserver((entries) => {
-        const visible = entries.some((e) => e.isIntersecting);
-        if (visible && !timer) timer = window.setInterval(advance, 6200);
-        else if (!visible && timer) { window.clearInterval(timer); timer = 0; }
-      }, { threshold: 0.4 });
-      io.observe(btn.closest('#lesson')!);
-      return () => { btn.removeEventListener('click', onClick); window.clearInterval(timer); io.disconnect(); };
-    }
-    return () => { btn.removeEventListener('click', onClick); window.clearInterval(timer); };
+    if (reduced) return () => { btn.removeEventListener('click', onClick); };
+
+    const section = btn.closest('#lesson');
+    const io = new IntersectionObserver((entries) => {
+      const visible = entries.some((e) => e.isIntersecting);
+      if (visible && !timer) timer = window.setInterval(advance, 6200);
+      else if (!visible && timer) { window.clearInterval(timer); timer = 0; }
+    }, { threshold: 0.4 });
+    if (section) io.observe(section);
+
+    return () => {
+      btn.removeEventListener('click', onClick);
+      window.clearInterval(timer);
+      io.disconnect();
+    };
   }
 
   let cowTeardown: (() => void) | null = null;

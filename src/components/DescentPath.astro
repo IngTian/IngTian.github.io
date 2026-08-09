@@ -51,6 +51,19 @@ import { WAYPOINTS } from '../lib/trajectory';
 
   <div class="dp-stage" data-dp-stage>
     <canvas class="dp-canvas" data-dp-canvas aria-hidden="true"></canvas>
+
+    <!-- THE CODA, MOVED HERE, and this is a reachability fix rather than a layout preference.
+         It used to close the editorial column, where the deck made it unreadable: the story section is
+         taller than one screen, so the gesture that would scroll to the coda advanced to the next slide
+         instead. The owner: "totally unreacheable with normal scroll… a simple strategy is to put this
+         phrase here [the graph's empty lower-right], after the Quantitative Researcher is shown, animated."
+         So it lives in the drawing's empty quadrant and fades in once the walk has actually discovered the
+         deeper basin — the line only makes sense after that. HTML rather than canvas text, so the display
+         italic renders properly and a screen reader can read it. -->
+    <p class="dp-coda" data-dp-coda>
+      The deepest point on that surface is not marked, because I do not know where it is. What I know is the
+      direction, and that the descent is still running.
+    </p>
     <p class="dp-fallback" data-dp-fallback>
       A contour map of a non-convex loss surface with a career path crossing a ridge between two
       basins. The list below carries the same information.
@@ -172,6 +185,39 @@ import { WAYPOINTS } from '../lib/trajectory';
     :global(.story-paper) .dp-foot { margin: 3vh 0 0; }
   }
   .dp-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* THE CODA, in the drawing's empty lower-right. Positioned as a fraction of the stage so it tracks the
+     canvas at any size, and capped by measure so it stays a readable block rather than a wide banner.
+     Hidden until the walk discovers the deeper basin — the script adds .is-shown. */
+  .dp-coda {
+    position: absolute;
+    right: 3%;
+    bottom: 6%;
+    max-width: min(46ch, 42%);
+    margin: 0;
+    font-family: var(--font-display); font-style: italic;
+    font-size: clamp(14px, 1.15vw, 18px); line-height: 1.55;
+    color: var(--dp-body);
+    text-align: right;
+    opacity: 0;
+    z-index: 2;
+  }
+  /* Motion is opacity/transform only, per the project's rule. The no-motion state is simply the finished
+     one: visible, because a coda that never appears is worse than one that appears without a fade. */
+  @media (prefers-reduced-motion: no-preference) {
+    .dp-coda { transform: translate3d(0, 8px, 0); transition: opacity .9s ease, transform .9s cubic-bezier(.2,.7,.3,1); }
+  }
+  .dp-coda.is-shown { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .dp-coda { opacity: 1; }
+  }
+  /* Narrow screens: the drawing gives way to the ordered list, so the coda returns to normal flow. */
+  @media (max-width: 1000px) {
+    .dp-coda {
+      position: static; max-width: 60ch; text-align: left; opacity: 1; transform: none;
+      margin: 3vh 0 0;
+    }
+  }
   /* The fallback text sits under the canvas and is revealed only when the canvas cannot draw, so
      the no-JS state is informative rather than an empty box. */
   .dp-fallback {
@@ -244,6 +290,7 @@ import { WAYPOINTS } from '../lib/trajectory';
     const section = stage.closest('#descent-path') as HTMLElement;
     const replay = section.querySelector<HTMLButtonElement>('[data-replay]');
     const readout = section.querySelector<HTMLElement>('[data-readout]');
+    const coda = section.querySelector<HTMLElement>('[data-dp-coda]');
 
     const projection: Projection = '2d';   // plan only; see the note in the markup above
     let reveal = 0;                 // 0..1, how much of the trail is drawn
@@ -618,6 +665,11 @@ import { WAYPOINTS } from '../lib/trajectory';
         ? `stop <b>${kShown}/${WAYPOINTS.length}</b> · ` +
           `<i>a deeper basin is now visible</i> — it was there the whole time`
         : `stop <b>${kShown}/${WAYPOINTS.length}</b> · nothing deeper is visible from here`;
+
+      // THE CODA APPEARS ON DISCOVERY, not on a timer: the line is about not knowing where the deepest
+      // point is, so it only means anything once the walk can see there IS a deeper side. Toggled rather
+      // than set once, so a replay resets it honestly.
+      coda?.classList.toggle('is-shown', found);
     }
 
     const onReplay = () => animate();

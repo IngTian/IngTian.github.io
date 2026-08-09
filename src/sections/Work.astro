@@ -104,11 +104,14 @@ const shownProjects = projects.slice(0, 2);
   }
   @media (max-width: 1099px) { .wk-inner { padding-left: clamp(28px, 6vw, 80px); } }
 
-  /* Smaller than the two slides before it: this one points, it does not argue. */
+  /* BIGGER THROUGHOUT, on the owner's note ("the work is okay. fonts can be bigger"). The slide had the
+     most vertical room of the three — it measured 501px of a 1050px screen — so the type was small for no
+     reason. It still stays under the two slides before it in hierarchy, because this one points rather
+     than argues. */
   .wk-title {
     font-family: var(--font-display); font-weight: 300;
-    font-size: clamp(24px, 2vw, 32px); line-height: 1.24;
-    color: var(--wk-ink); margin: 0; letter-spacing: -0.005em;
+    font-size: clamp(28px, 2.6vw, 42px); line-height: 1.22;
+    color: var(--wk-ink); margin: 0; letter-spacing: -0.008em;
   }
 
   .wk-cols {
@@ -124,34 +127,35 @@ const shownProjects = projects.slice(0, 2);
 
   .wk-col-head { display: flex; align-items: baseline; gap: 10px; }
   .wk-col-kicker {
-    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
-    text-transform: uppercase; color: var(--wk-accent); margin: 0 0 16px;
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--wk-accent); margin: 0 0 20px;
   }
-  .wk-col-head .wk-col-kicker { margin-bottom: 16px; }
+  .wk-col-head .wk-col-kicker { margin-bottom: 20px; }
   .wk-tag {
-    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
     color: var(--wk-ink-faint);
-    border: 1px solid var(--wk-edge); border-radius: 2px; padding: 2px 6px;
+    border: 1px solid var(--wk-edge); border-radius: 2px; padding: 3px 7px;
   }
 
-  .wk-item { margin: 0 0 clamp(14px, 1.8vh, 20px); }
+  .wk-item { margin: 0 0 clamp(18px, 2.2vh, 26px); }
   .wk-item-name {
-    font-family: var(--font-display); font-weight: 500; font-size: 15px; line-height: 1.3;
-    color: var(--wk-ink); margin: 0;
+    font-family: var(--font-display); font-weight: 500; font-size: clamp(17px, 1.35vw, 20px);
+    line-height: 1.28; color: var(--wk-ink); margin: 0;
   }
   .wk-item-line {
-    font-size: 12.5px; line-height: 1.55; color: var(--wk-ink-faint); margin: 4px 0 0; max-width: 40ch;
+    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.58; color: var(--wk-ink-faint);
+    margin: 6px 0 0; max-width: 40ch;
   }
 
   .wk-promise {
     font-family: var(--font-display); font-style: italic;
-    font-size: clamp(15px, 1.15vw, 17.5px); line-height: 1.48;
-    color: var(--wk-ink); margin: 0; max-width: 36ch;
+    font-size: clamp(17px, 1.4vw, 21px); line-height: 1.45;
+    color: var(--wk-ink); margin: 0; max-width: 34ch;
   }
-  .wk-topics { list-style: none; margin: clamp(13px, 1.7vh, 18px) 0 0; padding: 0; display: grid; gap: 7px; }
+  .wk-topics { list-style: none; margin: clamp(16px, 2vh, 22px) 0 0; padding: 0; display: grid; gap: 9px; }
   .wk-topics li {
-    font-size: 12.5px; line-height: 1.5; color: var(--wk-ink-soft);
-    padding-left: 14px; position: relative; max-width: 40ch;
+    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.55; color: var(--wk-ink-soft);
+    padding-left: 16px; position: relative; max-width: 40ch;
   }
   .wk-topics li::before {
     content: ""; position: absolute; left: 0; top: 0.62em;
@@ -160,8 +164,8 @@ const shownProjects = projects.slice(0, 2);
 
   .wk-link {
     display: inline-flex; align-items: baseline; gap: 8px;
-    margin: clamp(6px, 1vh, 12px) 0 0;
-    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.12em;
+    margin: clamp(8px, 1.2vh, 14px) 0 0;
+    font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.12em;
     text-transform: uppercase; text-decoration: none;
     color: var(--wk-accent);
     border-bottom: 1px solid currentColor; padding-bottom: 3px;

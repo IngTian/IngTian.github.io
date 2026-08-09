@@ -54,10 +54,20 @@ export const STORY: StoryColumn[] = [
 ];
 
 /** A single line under the two columns, in the same voice — the thesis, compressed.
- *  Deliberately not a conclusion about how good he is: a statement about what the object shows. */
+ *  Deliberately not a conclusion about how good he is: a statement about what the object shows.
+ *
+ *  STILL EXPORTED because the graph renders it: it moved from this column into the drawing's empty
+ *  lower-right, where it fades in as the walk discovers the deeper basin. The reason was mechanical, not
+ *  editorial — this column is taller than one screen, so in the deck the gesture that should have scrolled
+ *  down to the coda advanced to the next slide instead, and the line could not be read at all. */
 export const STORY_CODA =
   'The deepest point on that surface is not marked, because I do not know where it is. ' +
   'What I know is the direction, and that the descent is still running.';
+
+/** The column's own last line, now that the coda lives in the graph. Shorter, and it hands off to the
+ *  drawing rather than concluding — the coda is the conclusion, and it is over there. */
+export const STORY_TAIL =
+  'The picture beside this is that decision, drawn on the surface it was made on.';
 
 // STORY_FIGURES is deleted. It held three "measured facts" — feedback ratio, climb to leave, blind stops
 // — computed at build time from the hero's field. The computation was real; the field is invented. So the

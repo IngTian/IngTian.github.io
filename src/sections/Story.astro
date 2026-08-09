@@ -26,7 +26,7 @@
 // discoveryOf() and trajectoryFacts() were only ever called here to fill those three numbers. The
 // modules stay: lib/sensitivity and lib/knowledge are what the GRAPH is drawn from, and they keep their
 // own specs.
-import { STORY, STORY_CODA } from '../data/story';
+import { STORY, STORY_TAIL } from '../data/story';
 ---
 <section id="story" class="story" aria-labelledby="story-heading">
   <div class="story-paper">
@@ -59,12 +59,15 @@ import { STORY, STORY_CODA } from '../data/story';
 
         <!-- THE FIGURES ARE GONE. They were computed at build time rather than typed, but computed from
              the HERO'S INVENTED FIELD — so "260x feedback ratio" was an exact measurement of a fiction,
-             printed where a reader would take it as a fact about a career. The owner: "drop the figures,
-             they are made up." A true number about a made-up surface is worse than no number, because it
-             borrows the authority of measurement for something unmeasured.
-             The coda stays (explicitly kept): it makes the same point as a statement, in the writing's
-             own voice, claiming nothing quantitative. -->
-        <p class="story-coda">{STORY_CODA}</p>
+             printed where a reader would take it as a fact about a career. A true number about a made-up
+             surface is worse than no number, because it borrows the authority of measurement.
+
+             THE CODA MOVED INTO THE GRAPH (see DescentPath), and that was a reachability bug rather than a
+             taste call: this column is taller than one screen, so the deck gesture that should have
+             scrolled down to the coda advanced to the next slide instead — the line was unreadable by
+             normal scrolling. It now sits in the drawing's empty lower-right and fades in when the walk
+             discovers the deeper basin, which is also the moment it starts to mean something. -->
+        <p class="story-tail">{STORY_TAIL}</p>
       </div>
     </div>
   </div>
@@ -253,9 +256,11 @@ import { STORY, STORY_CODA } from '../data/story';
     .story-figures { grid-template-columns: 1fr; gap: 4vh 0; }
   }
 
-  .story-coda {
-    margin: 7vh 0 0; max-width: 62ch;
+  /* The column's closing line. Smaller than the old coda was, because it hands off to the drawing rather
+     than concluding — the conclusion is the coda, and that now lives in the graph. */
+  .story-tail {
+    margin: clamp(26px, 4vh, 56px) 0 0; max-width: 46ch;
     font-family: var(--font-display); font-style: italic;
-    font-size: clamp(19px, 1.9vw, 26px); line-height: 1.55; color: var(--story-ink);
+    font-size: clamp(16px, 1.4vw, 20px); line-height: 1.5; color: var(--story-ink-soft);
   }
 </style>
