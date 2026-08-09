@@ -6,8 +6,15 @@
 //
 // Each stop carries a `zone` (light|dark) so the label color adapts to the
 // gradient sky beneath it — dark ink on the pale top, paper on the dark bottom.
+//
+// The rail is FIXED, so a per-stop zone is only half the story: when the opaque story panel fills the
+// viewport, EVERY visible label sits over paper, not just the story's own. The script below therefore
+// also sets an .over-paper class on the rail by testing the panel's box against the rail's own box,
+// which flips all the labels to dark ink for as long as the panel is behind them. Without it the
+// three dark-sky labels rendered light-on-light and effectively vanished.
 const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
   { label: 'About', href: '#heights',   zone: 'light' },
+  { label: 'Story', href: '#story',     zone: 'light' },
   { label: 'Work',  href: '#mountains', zone: 'light' },
   { label: 'Ask',   href: '#ground',    zone: 'dark'  },
   { label: 'Links', href: '#signature', zone: 'dark'  },
@@ -85,6 +92,15 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
     .toc a:hover { opacity: 0.85; }
   }
 
+  /* ── OVER THE PAPER SLIDE. Set by the script whenever the story panel is behind the rail. The
+     panel is opaque and inverts between themes — light paper in light, near-black slate in dark — so
+     the rail's ink inverts with it. This overrides the per-stop zone for every label at once, which
+     is the point: a fixed rail cannot use its stops' page positions to know what is behind it. */
+  .toc.over-paper a { color: #2a251c; }
+  .toc.over-paper a.is-active { color: #12100b; }
+  :global(html[data-theme='dark']) .toc.over-paper a { color: #b9c0b9; }
+  :global(html[data-theme='dark']) .toc.over-paper a.is-active { color: #eef2ee; }
+
   /* Mobile: dots only, no labels, tighter — a minimal progress cue */
   @media (max-width: 640px) {
     .toc { left: 12px; }
@@ -124,12 +140,23 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
       .map((a) => ({ a, el: document.getElementById(a.getAttribute('href')?.slice(1) ?? '') }))
       .filter((s): s is { a: HTMLAnchorElement; el: HTMLElement } => !!s.el);
     const hero = document.getElementById('heights');
+    // The opaque paper slide. The rail is fixed, so its ink has to follow whatever is actually behind
+    // it rather than the stop's own position in the page.
+    const paperPanel = document.getElementById('story');
 
     function update() {
       const vh = window.innerHeight;
       // show the rail only after we've scrolled past most of the hero
       const heroPast = !hero || hero.getBoundingClientRect().bottom < vh * 0.5;
       toc.classList.toggle('toc--visible', heroPast);
+
+      // Is the paper panel behind the rail right now? Compare the rail's own vertical box against the
+      // panel's, so this stays correct at any viewport height and with the rail centred on 50%.
+      if (paperPanel) {
+        const r = toc.getBoundingClientRect();
+        const p = paperPanel.getBoundingClientRect();
+        toc.classList.toggle('over-paper', p.top < r.bottom && p.bottom > r.top);
+      }
 
       // scrollspy: shared pure rule (see lib/scrollspy.ts) — active = the last
       // stop whose top crossed the reference line, with a page-bottom guard so

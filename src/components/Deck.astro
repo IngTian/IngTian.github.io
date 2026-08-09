@@ -1,0 +1,229 @@
+---
+// src/components/Deck.astro
+// THE DECK CONTROLLER — "like a PPT, one scroll guides you to the next slide. It's not a free scroll."
+//
+// One wheel gesture, one arrow key, or one swipe advances exactly one stop. The stops themselves come
+// from lib/deck.ts (pure and unit-tested); this file is only the event plumbing.
+//
+// WHY JS AT ALL, when CSS scroll-snap exists. Snap was built first and measured; it cannot do this at
+// the page's real proportions. Slide gaps are 819-2346px while one wheel gesture is ~320px, so
+// `scroll-snap-type: y mandatory` re-snapped to the slide it started from and the page froze at y=84
+// through eight consecutive gestures. `proximity`, `scroll-snap-stop: always`, and a hero shrunk to
+// exactly 100vh all measured identically stuck. The full numbers are in global.css and lib/deck.ts.
+//
+// WHAT THIS DELIBERATELY DOES NOT BREAK, because hijacking the wheel is the easiest way to ruin a page:
+//   · keyboard — Home/End/PageUp/PageDown/space/arrows keep working, and Tab focus is never fought
+//   · find-in-page and #anchor links — the deck ignores programmatic scrolls, so browser-driven jumps
+//     land where the browser intends
+//   · zoom and small viewports — recomputed on resize; disabled when a slide barely exceeds the screen
+//   · REDUCED MOTION — the deck does not engage at all; the page is an ordinary free scroll, which is
+//     a finished state, not a degraded one
+//   · trackpad momentum — a gesture is coalesced, so one flick is one slide rather than five
+//
+// No React island (the terminal is the only one). Vanilla script, re-inits on astro:page-load with a
+// teardown, matching TerrainHero / Toc / DescentPath.
+---
+<script>
+  import { deckStops, nextStop, type DeckSlide } from '../lib/deck';
+  import { prefersReducedMotion } from '../lib/motion';
+
+  function initDeck(): (() => void) | null {
+    const main = document.querySelector<HTMLElement>('main.is-slides');
+    if (!main) return null;
+    // The motion gate is the project's single source of truth. A deck is involuntary movement; a
+    // reader who asked for less motion gets the plain scroll.
+    if (prefersReducedMotion()) return null;
+
+    // Slide elements: the top-level sections, but with the story panel replaced by its two beats (the
+    // graph and the editorial) since that one panel is 2.17 viewports of two distinct things.
+    function slideEls(): HTMLElement[] {
+      const out: HTMLElement[] = [];
+      for (const el of Array.from(main!.children)) {
+        if (!(el instanceof HTMLElement) || el.tagName !== 'SECTION') continue;
+        const beats = el.querySelectorAll<HTMLElement>('.story-figure-slot, .story-inner');
+        if (beats.length) out.push(...Array.from(beats));
+        else out.push(el);
+      }
+      return out;
+    }
+
+    let stops: number[] = [];
+    function measure(): void {
+      const slides: DeckSlide[] = slideEls().map((el) => {
+        const r = el.getBoundingClientRect();
+        return { top: r.top + window.scrollY, height: r.height };
+      });
+      const maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      stops = deckStops(slides, window.innerHeight, maxY);
+    }
+    measure();
+
+    // ── Gesture coalescing.
+    // A trackpad flick is dozens of wheel events; a mouse notch is one. Without coalescing, a flick
+    // would advance a dozen slides. After a gesture is honoured, further wheel events are swallowed
+    // until the stream goes quiet — which is also what stops momentum from queueing up jumps.
+    // THE LOCK IS HELD UNTIL THE SLIDE ANIMATION FINISHES, not until the wheel stream goes quiet.
+    // An earlier version cleared it after 140ms of silence, which measured as a bug: a 14-event
+    // trackpad flick jumped from the top of the page to the bottom (0 → 6302, every slide at once),
+    // because events still arriving during the ~500ms smooth scroll each triggered another advance.
+    // Two conditions must BOTH hold before another gesture is honoured — the animation has settled at
+    // its target, AND the wheel stream has gone quiet, so leftover momentum cannot advance a slide the
+    // reader did not ask for.
+    let animating = false;
+    let target: number | null = null;
+    let quietTimer = 0;
+    let animTimer = 0;
+    let streamLive = false;
+    const QUIET_MS = 160;      // stream considered ended after this much silence
+    const ANIM_MAX_MS = 900;   // hard release, in case a smooth scroll is interrupted and never lands
+    const THRESHOLD = 18;      // ignore sub-pixel/accidental deltas
+
+    /** Programmatic scrolls (anchors, find-in-page, replay buttons) must not be treated as gestures. */
+    let ignoreUntil = 0;
+
+    function release(): void {
+      animating = false;
+      target = null;
+    }
+
+    function go(dir: 1 | -1): boolean {
+      const dest = nextStop(stops, Math.round(window.scrollY), dir);
+      if (dest === null) return false;      // at an end — let the browser scroll normally
+      animating = true;
+      target = dest;
+      ignoreUntil = Date.now() + ANIM_MAX_MS;
+      window.clearTimeout(animTimer);
+      animTimer = window.setTimeout(release, ANIM_MAX_MS);
+      window.scrollTo({ top: dest, behavior: 'smooth' });
+      return true;
+    }
+
+    function onWheel(e: WheelEvent): void {
+      if (e.ctrlKey) return;                          // pinch-zoom, not a scroll
+      if (Math.abs(e.deltaY) < THRESHOLD) return;
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;  // horizontal gesture
+
+      // Let anything scrollable in its own right (the terminal's log, a code block) scroll itself.
+      if (isInnerScrollable(e.target, e.deltaY)) return;
+
+      // Was a gesture ALREADY in flight before this event? Captured before the flag is re-armed below,
+      // because the test that matters is "is this event a continuation" — re-arming first would make
+      // every event look like a continuation of itself.
+      const continuing = streamLive;
+
+      // Track the stream: a new gesture is only possible once this goes quiet.
+      streamLive = true;
+      window.clearTimeout(quietTimer);
+      quietTimer = window.setTimeout(() => { streamLive = false; }, QUIET_MS);
+
+      // Mid-animation OR mid-gesture: swallow. This is what makes one flick equal one slide.
+      if (animating || continuing) { e.preventDefault(); return; }
+
+      const dir: 1 | -1 = e.deltaY > 0 ? 1 : -1;
+      if (go(dir)) e.preventDefault();
+      else streamLive = false;   // at an end and not intercepting — don't hold the gesture open
+    }
+
+    /** True when the event started inside an element that can still scroll in this direction. */
+    function isInnerScrollable(target: EventTarget | null, deltaY: number): boolean {
+      let el = target instanceof Element ? target : null;
+      while (el && el !== document.body) {
+        const st = getComputedStyle(el);
+        const scrolls = /(auto|scroll|overlay)/.test(st.overflowY);
+        if (scrolls && el.scrollHeight > el.clientHeight + 1) {
+          const atTop = el.scrollTop <= 0;
+          const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+          if (!((deltaY < 0 && atTop) || (deltaY > 0 && atBottom))) return true;
+        }
+        el = el.parentElement;
+      }
+      return false;
+    }
+
+    // ── Keyboard. Arrows/space/PageUp/PageDown move a slide; Home/End and Tab are left alone so the
+    // page stays navigable in the ways people expect.
+    function onKey(e: KeyboardEvent): void {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      // Never intercept typing, or a control that uses arrows itself.
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+
+      let dir: 1 | -1 | 0 = 0;
+      if (e.key === 'ArrowDown' || e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) dir = 1;
+      else if (e.key === 'ArrowUp' || e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) dir = -1;
+      if (!dir) return;
+      // Space on a button/link is an activation, not a scroll.
+      if (e.key === ' ' && t && /^(BUTTON|A|SUMMARY)$/.test(t.tagName)) return;
+      if (go(dir)) e.preventDefault();
+    }
+
+    // ── Touch. One swipe, one slide. Threshold in px so a tap or a tiny drag does nothing.
+    let touchY: number | null = null;
+    const SWIPE = 44;
+    function onTouchStart(e: TouchEvent): void {
+      touchY = e.touches.length === 1 ? e.touches[0].clientY : null;
+    }
+    function onTouchEnd(e: TouchEvent): void {
+      if (touchY === null) return;
+      const endY = e.changedTouches[0]?.clientY ?? touchY;
+      const dy = touchY - endY;
+      touchY = null;
+      if (Math.abs(dy) < SWIPE) return;
+      if (isInnerScrollable(e.target, dy)) return;
+      go(dy > 0 ? 1 : -1);
+    }
+
+    // Recompute on resize (zoom, rotation, devtools) — stop positions are geometry, and stale geometry
+    // is worse than no deck. Also recompute when the document height changes: images and the terrain
+    // canvas settle after first paint, and the /art-style lazy content can grow the page.
+    let resizeTimer = 0;
+    function onResize(): void {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(measure, 160);
+    }
+    const ro = new ResizeObserver(onResize);
+    ro.observe(document.documentElement);
+
+    // Release the lock as soon as the animation actually LANDS, so a deliberate second gesture is not
+    // made to wait out the full ANIM_MAX_MS. The timer stays as the fallback for a smooth scroll that
+    // never reaches its target (interrupted by an anchor jump, or clamped at the page end).
+    function onScroll(): void {
+      if (animating && target !== null) {
+        if (Math.abs(window.scrollY - target) <= 2) release();
+        return;
+      }
+      // A scroll the deck did not initiate (anchor link, find-in-page, restored position) is left
+      // alone; the deck simply picks up from wherever the browser put us.
+      if (Date.now() > ignoreUntil) release();
+    }
+
+    window.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchend', onTouchEnd, { passive: true });
+    window.addEventListener('resize', onResize, { passive: true });
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('wheel', onWheel);
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchend', onTouchEnd);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onScroll);
+      window.clearTimeout(quietTimer);
+      window.clearTimeout(resizeTimer);
+      window.clearTimeout(animTimer);
+      ro.disconnect();
+    };
+  }
+
+  // Re-init on first load AND after every View Transition swap, with teardown — the project's pattern
+  // for vanilla scripts (see TerrainHero / Toc). Without the teardown the listeners would stack up and
+  // one gesture would advance several slides after a couple of navigations.
+  let deckTeardown: (() => void) | null = null;
+  document.addEventListener('astro:page-load', () => {
+    deckTeardown?.();
+    deckTeardown = initDeck();
+  });
+</script>

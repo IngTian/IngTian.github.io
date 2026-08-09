@@ -15,6 +15,13 @@
 //
 // Every number here is COMPUTED at build time from the same field the graph draws, so the prose and
 // the picture cannot drift apart. Nothing is hand-typed.
+//
+// THE PANEL NOW WRAPS THE GRAPH TOO. The owner: "in the descent one climb section, you might want to
+// completely turn off the fluid background and use the paper editorial background." That is one
+// slide — the picture and the words that read it — so it is one surface, and DescentPath renders as
+// a <slot> inside this panel rather than as a sibling floating on the sky. Turning the fluid off
+// behind it is done by the panel being opaque, not by touching the fluid layer: the sky keeps
+// running above and below, and this slide simply sits on paper.
 import { STORY, STORY_CODA, STORY_FIGURES } from '../data/story';
 import { trajectoryFacts, WAYPOINTS } from '../lib/trajectory';
 import { curvature } from '../lib/sensitivity';
@@ -36,6 +43,10 @@ const figures = STORY_FIGURES.map((f) => {
 ---
 <section id="story" class="story" aria-labelledby="story-heading">
   <div class="story-paper">
+    <!-- The graph, on the same paper. Passed in as a slot so this component owns the surface and the
+         ink tokens, and DescentPath stays a self-contained piece that inherits them. -->
+    <div class="story-figure-slot"><slot /></div>
+
     <div class="story-inner">
       <h2 id="story-heading" class="story-title">Why the climb</h2>
 
@@ -66,12 +77,15 @@ const figures = STORY_FIGURES.map((f) => {
 
 <style>
   /* Full-bleed, so the paper panel is a surface the page passes through rather than a card sitting
-     on the sky. */
+     on the sky. No vertical padding: the panel itself must reach the section's edges, or a band of
+     sky shows above and below it and the "turn the fluid off here" reads as a floating card.
+     z-index lifts it over the SkyWash and .descent::after washes (both z-index:-1), so the fluid is
+     completely hidden behind this slide rather than tinting the paper. */
   .story {
     position: relative;
+    z-index: 1;
     width: 100vw;
     margin-left: calc(50% - 50vw);
-    padding: 8vh 0 10vh;
   }
 
   /* THE PAPER GROUND. Two different colours by theme rather than one shared value:
@@ -85,6 +99,11 @@ const figures = STORY_FIGURES.map((f) => {
     --story-ink-soft: #4a4438;
     --story-ink-faint: #7d7566;
     --story-accent: #9a6f34;
+    /* The graph's own ink, dark-on-paper. The canvas reads these (see DescentPath) because its
+       default tokens — --paper, --ink-3..5 — are LIGHT inks chosen for the dark sky, and on a light
+       paper ground they render invisible. Same reason the panel can't reuse --paper as a background. */
+    --story-line: rgba(60, 54, 44, 0.72);
+    --story-line-soft: rgba(96, 88, 74, 0.6);
 
     background: var(--story-bg);
     border-top: 1px solid var(--story-edge);
@@ -98,9 +117,16 @@ const figures = STORY_FIGURES.map((f) => {
     --story-ink-soft: #a8b0a9;
     --story-ink-faint: #6d746e;
     --story-accent: #7fc9a0;
+    --story-line: rgba(214, 220, 214, 0.66);
+    --story-line-soft: rgba(160, 168, 161, 0.5);
   }
 
-  .story-inner { width: min(1180px, 88vw); margin: 0 auto; }
+  /* One shared measure for the graph and the prose, so the slide has a single left edge. The inset
+     clears the fixed ToC rail (left: clamp(14px,2.4vw,34px) plus its labels) — the graph section had
+     no horizontal padding of its own and its title ran straight under the rail. */
+  .story-inner,
+  .story-figure-slot { width: min(1180px, 84vw); margin: 0 auto; }
+  .story-figure-slot { margin-bottom: 7vh; }
 
   .story-title {
     font-family: var(--font-display); font-weight: 300;

@@ -72,33 +72,47 @@ const facts = trajectoryFacts();
 </section>
 
 <style>
-  .dp { position: relative; padding: 12vh 0 8vh; }
+  /* ── INK IS CONTEXTUAL, and this is what makes the piece portable onto the paper panel.
+     Both the CSS and the CANVAS read these --dp-* tokens instead of the global ink ramp. The
+     defaults below are the sky values (light ink on a dark descent); when this section renders
+     inside .story-paper, that panel redefines them to dark-on-paper. Without the indirection the
+     labels drew in --paper — a near-white — directly onto light paper, i.e. invisible. */
+  .dp {
+    position: relative; padding: 12vh 0 8vh;
+    --dp-strong: var(--paper);
+    --dp-body: var(--ink-3);
+    --dp-quiet: var(--ink-4);
+    --dp-line: var(--ink-5);
+    --dp-line-soft: var(--ink-4);
+    --dp-accent: var(--ochre);
+    --dp-alert: var(--seal);
+  }
   .dp-head { max-width: 70ch; }
   .dp-head h2 {
     font-family: var(--font-display); font-size: clamp(26px, 3vw, 38px); font-weight: 300;
-    color: var(--paper); margin: 0;
+    color: var(--dp-strong); margin: 0;
   }
   .dp-lede {
-    font-size: 15.5px; line-height: 1.75; color: var(--ink-3); margin: 14px 0 0;
+    font-size: 15.5px; line-height: 1.75; color: var(--dp-body); margin: 14px 0 0;
   }
-  .dp-lede strong { color: var(--ochre); font-weight: 400; }
+  .dp-lede strong { color: var(--dp-accent); font-weight: 400; }
 
   .dp-readout {
     margin: 14px 0 0; min-height: 1.5em;
-    font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; color: var(--ink-4);
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; color: var(--dp-quiet);
   }
-  .dp-readout b { color: var(--ochre); font-weight: 400; }
-  .dp-readout i { color: var(--seal); font-style: normal; }
+  .dp-readout b { color: var(--dp-accent); font-weight: 400; }
+  .dp-readout i { color: var(--dp-alert); font-style: normal; }
 
   .dp-controls { display: flex; gap: 8px; margin: 22px 0 0; }
   .dp-btn {
     font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em;
     text-transform: uppercase; padding: 7px 14px; cursor: pointer;
-    background: transparent; color: var(--ink-4);
-    border: 1px solid rgba(var(--hairline-rgb), 0.3); border-radius: 2px;
+    background: transparent; color: var(--dp-quiet);
+    border: 1px solid currentColor; border-radius: 2px; opacity: 0.75;
   }
-  .dp-btn:hover { color: var(--paper); border-color: rgba(var(--hairline-rgb), 0.55); }
-  .dp-btn:focus-visible { outline: 1px solid var(--ochre); outline-offset: 2px; }
+  .dp-btn:hover { color: var(--dp-strong); opacity: 1; }
+  .dp-btn:focus-visible { outline: 1px solid var(--dp-accent); outline-offset: 2px; }
 
 
   .dp-stage {
@@ -110,14 +124,14 @@ const facts = trajectoryFacts();
      the no-JS state is informative rather than an empty box. */
   .dp-fallback {
     position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
-    margin: 0; padding: 0 12%; font-size: 14px; line-height: 1.7; color: var(--ink-4);
+    margin: 0; padding: 0 12%; font-size: 14px; line-height: 1.7; color: var(--dp-quiet);
   }
   .dp-stage.is-live .dp-fallback { display: none; }
 
 
   .dp-foot {
     margin: 4vh 0 0; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.04em;
-    color: var(--ink-5); max-width: 64ch;
+    color: var(--dp-line); max-width: 64ch;
   }
 
   /* Narrow screens: the graph's in-frame labels collide below ~720px, so the canvas gives way to the
@@ -129,8 +143,23 @@ const facts = trajectoryFacts();
       overflow: visible; clip: auto; white-space: normal;
       list-style: none; display: grid; gap: 14px;
     }
-    .dp-stops li { font-size: 13.5px; line-height: 1.6; color: var(--ink-3); }
-    .dp-stops strong { color: var(--paper); font-weight: 400; }
+    .dp-stops li { font-size: 13.5px; line-height: 1.6; color: var(--dp-body); }
+    .dp-stops strong { color: var(--dp-strong); font-weight: 400; }
+  }
+
+  /* ON THE PAPER PANEL: dark ink, and no top padding — the panel already opens with 9vh, and the
+     section's own 12vh on top of it left the title floating. */
+  :global(.story-paper) .dp {
+    padding: 0 0 2vh;
+    --dp-strong: var(--story-ink);
+    --dp-body: var(--story-ink-soft);
+    --dp-quiet: var(--story-ink-faint);
+    --dp-line: var(--story-line);
+    --dp-line-soft: var(--story-line-soft);
+    --dp-accent: var(--story-accent);
+    /* The seal red is the brand mark in both themes and reads correctly on paper, so the climb keeps
+       it rather than being recoloured. */
+    --dp-alert: var(--seal);
   }
 </style>
 
@@ -189,18 +218,22 @@ const facts = trajectoryFacts();
     // frame, which is precisely the "step function, like a powerpoint" symptom. The canvas work
     // itself was never the problem: only ~270 draw calls per frame, and the pure maths costs 10ms.
     // Read the tokens once and invalidate only when the theme attribute changes.
+    // Read from the SECTION, not the document root, and read the --dp-* tokens rather than the global
+    // ink ramp. The section inherits sky ink by default and dark-on-paper ink when it renders inside
+    // .story-paper, so the same canvas code draws correctly on either ground. Reading the root would
+    // always return the light sky inks — invisible on light paper.
     type Pal = Record<string, string>;
     let palCache: Pal | null = null;
     const readPalette = (): Pal => {
-      const cs = getComputedStyle(document.documentElement);
+      const cs = getComputedStyle(section);
       const get = (n: string, fb: string) => cs.getPropertyValue(n).trim() || fb;
       return {
-        ink5: get('--ink-5', '#b8b1a1'),
-        ink4: get('--ink-4', '#8c8576'),
-        ink3: get('--ink-3', '#5a544a'),
-        paper: get('--paper', '#efe9dd'),
-        ochre: get('--ochre', '#c8a36a'),
-        seal: get('--seal', '#b23a2e'),
+        ink5: get('--dp-line', '#b8b1a1'),
+        ink4: get('--dp-line-soft', '#8c8576'),
+        ink3: get('--dp-body', '#5a544a'),
+        paper: get('--dp-strong', '#efe9dd'),
+        ochre: get('--dp-accent', '#c8a36a'),
+        seal: get('--dp-alert', '#b23a2e'),
       };
     };
     const palette = (): Pal => (palCache ??= readPalette());
@@ -512,16 +545,24 @@ const facts = trajectoryFacts();
     // ever crossing that shrunken boundary, so the observer never fires and the trail sits frozen
     // one leg in. Measured: 7 of 8 stops stayed dimmed. Now: no negative margin, plus a direct
     // visibility check at init for the case where it is ALREADY on screen before the observer runs.
+    // THRESHOLD 0.55, not 0.25, because the deck arrives here deliberately. At 0.25 the walk began
+    // while the smooth scroll was still travelling, so roughly the first quarter of the 6.4s reveal
+    // played off-screen and the slide came to rest showing "stop 1/8" — the reader lands on a graph
+    // that looks half-drawn instead of watching it draw. Requiring most of the stage to be on screen
+    // means the walk starts once the slide has actually arrived. Free scrolling still triggers it
+    // comfortably before the graph is centred.
     let started = false;
     const begin = () => { if (!started) { started = true; animate(); } };
     const io = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting)) begin();
-    }, { threshold: 0.25 });
+    }, { threshold: 0.55 });
     io.observe(stage);
     // Already visible on load? The observer would fire, but not until the next frame — and if the
-    // page was restored mid-scroll it may not fire at all. Check directly.
+    // page was restored mid-scroll it may not fire at all. Check directly, using the same "mostly on
+    // screen" test as the observer so a reload does not start the walk from a half-visible stage.
     const r0 = stage.getBoundingClientRect();
-    if (r0.top < window.innerHeight * 0.9 && r0.bottom > 0) begin();
+    const shown = Math.min(r0.bottom, window.innerHeight) - Math.max(r0.top, 0);
+    if (r0.height > 0 && shown / r0.height >= 0.55) begin();
 
     size();
     stage.classList.add('is-live');

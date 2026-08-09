@@ -11,23 +11,32 @@ import DescentPath from '../components/DescentPath.astro';
 import Story from '../sections/Story.astro';
 import Ground from '../sections/Ground.astro';
 import Signature from '../sections/Signature.astro';
+import Deck from '../components/Deck.astro';
 ---
 
 <BaseLayout veilLine="a researcher by day" veilOnLoad={false}>
-  <main class="descent is-fluid">
+  <!-- is-slides turns the homepage into the deck: the scroll rests at slide edges instead of
+       anywhere. The mechanism is CSS scroll-snap (see global.css) — no scroll-hijacking JS, so
+       keyboard, trackpad momentum, and find-in-page all keep working. Only the homepage opts in;
+       /research and /projects share .descent and must stay free-scrolling reading pages. -->
+  <main class="descent is-fluid is-slides">
     <FluidSky strength={4} variant="descent" />
     <SkyWash />
     <Heights />
     <Interlude />
-    <!-- The story so far: the graph, then the editorial that explains it. The descent piece is
-         settled (see notes/showpiece.md); the Story panel is the one place the page stops and
-         talks, so it gets a paper ground instead of the sky. -->
-    <DescentPath />
-    <Story />
+    <!-- The story so far: the graph, then the editorial that explains it. ONE SLIDE, so one surface —
+         the graph renders INSIDE the Story panel, on the same paper ground, with the fluid sky fully
+         hidden behind it. The descent piece is settled (see notes/showpiece.md). -->
+    <Story>
+      <DescentPath />
+    </Story>
     <Mountains />
     <Ground />
     <Signature />
   </main>
   <Toc />
   <Grain />
+  <!-- One gesture = one slide. Behaviour lives in lib/deck.ts (pure, tested); this only attaches the
+       listeners, and only on the homepage — the reading pages stay free-scrolling. -->
+  <Deck />
 </BaseLayout>

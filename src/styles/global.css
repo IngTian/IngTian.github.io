@@ -45,6 +45,44 @@ body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body)
   background: var(--descent-grad);
 }
 
+/* ============================================================
+   THE SCROLLABLE DECK — "like a PPT, one scroll guides you to the
+   next slide; it's not a free scroll."
+
+   The descent stays one continuous sky; what changes is that the
+   scroll now RESTS at slide boundaries instead of anywhere.
+
+   CSS scroll-snap was tried FIRST and MEASURED, because it is the
+   cheap answer with no JS. It does not work at this page's
+   proportions, and the numbers are worth keeping so nobody
+   "simplifies" the deck back into it:
+
+     slide gaps at 1700x1050:  1134px, 819px, 2279px, 2346px, 581px
+     one wheel gesture:        ~320px
+
+   Every gap is 1.8x-7.3x a single scroll, so with `y mandatory` one
+   gesture proposes a destination ~320px away and the nearest snap
+   position to it is the slide it just left — the browser snaps back
+   and the page does not move. Measured: stuck at y=84 through eight
+   gestures, and through a 12-event burst shaped like a trackpad
+   flick. `proximity`, `scroll-snap-stop: always`, and shrinking the
+   hero to exactly 100vh all produced identical stuck walks; only
+   gestures of 640px+ ever advanced.
+
+   The deck is therefore driven explicitly — see lib/deck.ts (pure,
+   unit-tested: where the stops are) and the controller in
+   BaseLayout (one gesture = one stop). The only CSS the deck needs
+   is the scroll-margin below.
+   ============================================================ */
+
+/* Slide tops sit flush against the viewport top when the deck scrolls to them,
+   which crops the panel padding and makes a slide look cut off. scroll-margin is
+   read by scrollIntoView(), so the deck inherits this without hard-coding an
+   offset in the script. */
+.is-slides > section,
+.is-slides .story-figure-slot,
+.is-slides .story-inner { scroll-margin-top: 6vh; }
+
 /* ── Atmosphere, upper sky (heights → interlude). Normal blend: these are warm
    LIGHT washes + a soft horizon haze that read on the pale paper. Localized to
    the top, they scroll away naturally. ── */

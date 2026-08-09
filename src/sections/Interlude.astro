@@ -2,10 +2,22 @@
 // A short, quiet transition between the hero and the experience — a single
 // editorial statement set in the warming Monet sky. Swiss restraint: one line,
 // generous space, no ornament. Replaces the old (weak) painted-cloud section.
+//
+// THE QUANT LINE SITS HERE, under the tagline, per the owner: "you can put the quant reasons in
+// structure just below the tag line." It used to open Mountains, but once the descent graph and the
+// story panel moved above Mountains it was buried three screens down — present in the HTML and
+// effectively gone from the read. The tagline names the three hats; this line says which one leads
+// and what the other is for, so the identity claim lands before any evidence is offered.
 ---
-<section id="interlude" class="relative min-h-[78vh] flex items-center justify-center px-[8vw]">
+<section id="interlude" class="relative min-h-[78vh] flex flex-col items-center justify-center px-[8vw]">
   <p class="statement max-w-[20ch] text-center font-display italic text-ink-2 leading-[1.35] text-[clamp(24px,3.6vw,40px)]">
     <a class="research-link" href="/research">A researcher by day</a>, <a class="art-link" href="/art">an artist by night</a>, and a mathematician at heart.
+  </p>
+
+  <!-- The hierarchy, stated once. Smaller and quieter than the tagline: it explains the line above
+       rather than competing with it. -->
+  <p class="reasons text-center font-display italic text-ink-3 max-w-[34ch] leading-[1.45] text-[clamp(15px,1.7vw,20px)]">
+    A quant who reasons in structure,<br />an engineer who makes the math run.
   </p>
 </section>
 
@@ -107,11 +119,22 @@
     }
   }
 
+  /* The quant line: same voice as the tagline, a step down in size and weight. Generous space above
+     so it reads as a second beat rather than a subtitle glued to the line. */
+  .reasons { margin: clamp(26px, 4vh, 46px) 0 0; }
+
   @media (prefers-reduced-motion: no-preference) {
     .statement {
       animation: statement-in linear both;
       animation-timeline: view();
       animation-range: entry 5% cover 38%;
+    }
+    /* Arrives on a LATER range than the tagline, so the two land in reading order rather than
+       together. Same keyframes — no second animation to keep in sync. */
+    .reasons {
+      animation: statement-in linear both;
+      animation-timeline: view();
+      animation-range: entry 18% cover 50%;
     }
     @keyframes statement-in {
       from { opacity: 0.15; transform: translate3d(0, 28px, 0); }
