@@ -80,6 +80,49 @@ export function knownAfter(k: number): KnownDisc[] {
   return out;
 }
 
+/**
+ * Knowledge as a function of WHERE THE WALKER IS, not of how many stops it has ticked past.
+ *
+ * `u` is the continuous trail parameter in [0, 1]. The walker carries its own reading radius, so the
+ * frontier advances with the curve itself — smoothly, one pixel at a time — instead of waiting for a
+ * waypoint to be reached. This is what makes the left half of the field come into view GRADUALLY as
+ * the descent proceeds, which is the effect the owner asked for; keying it to stop count made the
+ * reveal arrive in visible instalments however smooth the easing was.
+ *
+ * The radius still grows with experience, because that part of the claim is real: you get better at
+ * reading the field as you cover more of it.
+ */
+export function walkerKnowledge(
+  u: number, pathAt: (t: number) => { x: number; y: number },
+  trailSamples = 96,
+): KnownDisc[] {
+  const uu = Math.max(0, Math.min(1, u));
+  const out: KnownDisc[] = [];
+  const upTo = Math.max(1, Math.round(uu * trailSamples));
+  for (let i = 0; i <= upTo; i++) {
+    const t = (i / trailSamples);
+    if (t > uu + 1e-9) break;
+    const p = pathAt(t);
+    // Experience at this point of the walk, expressed in stop-equivalents so the radius law is the
+    // same one the tests already lock.
+    const exp = t * (WAYPOINTS.length - 1);
+    out.push({ x: p.x, y: p.y, r: knowledgeRadius(exp), index: i, label: '' });
+  }
+  return out;
+}
+
+/** knownness against a walker-derived frontier. Same soft edge as the stop-based version. */
+export function walkerKnownness(
+  x: number, y: number, u: number, pathAt: (t: number) => { x: number; y: number },
+): number {
+  let best = 0;
+  for (const d of walkerKnowledge(u, pathAt)) {
+    const t = 1 - Math.hypot(x - d.x, y - d.y) / d.r;
+    if (t > best) best = t;
+  }
+  return Math.max(0, Math.min(1, best));
+}
+
 /** Is a world point inside anything you have learned after `k` stops? */
 export function isKnown(x: number, y: number, k: number): boolean {
   return knownAfter(k).some((d) => Math.hypot(x - d.x, y - d.y) <= d.r);

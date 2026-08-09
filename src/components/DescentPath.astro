@@ -154,7 +154,7 @@ const facts = trajectoryFacts();
     type Projection, type View,
   } from '../lib/descentPath';
   import { WAYPOINTS, trajectoryFacts } from '../lib/trajectory';
-  import { knownAfter, knownness, discoveryOf, knowledgeRadius } from '../lib/knowledge';
+  import { walkerKnownness, knowledgeRadius } from '../lib/knowledge';
   import { prefersReducedMotion } from '../lib/motion';
 
   const teardowns: Array<() => void> = [];
@@ -223,6 +223,20 @@ const facts = trajectoryFacts();
       return reveal * (WAYPOINTS.length - 1) + 1;
     }
 
+    /** Position on the spline at parameter t — the walker's own location, used to advance the
+     *  knowledge frontier continuously rather than in per-stop instalments. */
+    function pathAt(t: number): { x: number; y: number } {
+      const idx = Math.min(pts.length - 1, Math.max(0, Math.round(t * (pts.length - 1))));
+      const p = pts[idx];
+      return { x: p.x, y: p.y };
+    }
+
+    /** How well a world point is understood right now. Driven by where the walker HAS BEEN along the
+     *  curve, so the left half of the field fades in smoothly as the descent proceeds. */
+    function known(x: number, y: number): number {
+      return walkerKnownness(x, y, reveal, pathAt);
+    }
+
     function draw(): void {
       const v = view();
       const ink5 = tok('--ink-5', '#b8b1a1');
@@ -253,7 +267,7 @@ const facts = trajectoryFacts();
         for (const run of runs) {
           let open = false;
           run.forEach((p) => {
-            const kn = knownness(p[0], p[1], experience());
+            const kn = known(p[0], p[1]);
             const [sx, sy] = project(p[0], p[1], v);
             if (kn <= 0.02) {
               if (open) { ctx.stroke(); open = false; }
@@ -267,19 +281,26 @@ const facts = trajectoryFacts();
       });
       ctx.globalAlpha = 1;
 
-      // ── Basin wash: fill below a mid level so the bowls read as VOLUME rather than as rings.
-      // Contours alone gave 2% ink; the eye needs a filled region to see a basin at a glance.
+      // ── Basin wash. Fills only CLOSED contour loops, which is the fix for the rectangular
+      // patches that appeared around both minima: a contour run clipped by the frame edge is an open
+      // polyline, and closePath() on it draws a chord straight across the frame, filling a slab. A
+      // real bowl is a loop whose last point returns to its first.
       const washLevels = levels.slice(0, 5);
       washLevels.forEach((lv, i) => {
         const runs = contoursFor(lv);
         ctx.fillStyle = ochre;
-        ctx.globalAlpha = 0.030 - i * 0.004;
+        ctx.globalAlpha = 0.034 - i * 0.005;
         for (const run of runs) {
-          if (run.length < 8) continue;
-          // Only wash a bowl once its centre is known, or the deep basin would glow before it has
-          // been discovered — which would give the ending away.
+          if (run.length < 12) continue;
+          const a = run[0], z = run[run.length - 1];
+          const closed = Math.hypot(a[0] - z[0], a[1] - z[1]) < 0.08;
+          if (!closed) continue;
           const mid = run[Math.floor(run.length / 2)];
-          if (knownness(mid[0], mid[1], experience()) <= 0.05) continue;
+          const kn = known(mid[0], mid[1]);
+          if (kn <= 0.05) continue;
+          // Fade the wash in with knowledge too, so a basin does not appear at full strength the
+          // instant its centre is learned.
+          ctx.globalAlpha = (0.034 - i * 0.005) * Math.min(1, kn * 1.6);
           ctx.beginPath();
           run.forEach((p, k) => {
             const [sx, sy] = project(p[0], p[1], v);
@@ -291,31 +312,17 @@ const facts = trajectoryFacts();
       });
       ctx.globalAlpha = 1;
 
-      // ── THE EDGE OF KNOWLEDGE, drawn as a hairline rather than as a wash.
-      //
-      // The first version filled each disc with a radial gradient. Additive fills over eight
-      // overlapping discs took ink coverage from 3.4% to 57.6% — the frame flooded and the contours
-      // drowned. Knowledge should REVEAL the field, not paint light on top of it, so the discs now
-      // contribute only a faint boundary and the actual masking happens in the contour pass.
-      const discs = knownAfter(experience());
-      ctx.globalAlpha = 0.13;
-      ctx.strokeStyle = ink5;
-      ctx.lineWidth = 1;
-      for (const d of discs) {
-        if (d.r < 0.02) continue;
-        const [cx0, cy0] = project(d.x, d.y, v);
-        const [ex] = project(d.x + d.r, d.y, v);
-        ctx.beginPath();
-        ctx.arc(cx0, cy0, Math.abs(ex - cx0), 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
+      // ── NO KNOWLEDGE CIRCLES. Two earlier versions drew the horizon explicitly: first as radial
+      // gradient fills (which flooded the frame, 3.4% -> 57.6% ink) and then as boundary hairlines
+      // (which drew circles straight across both basins and fought the shapes they were meant to
+      // reveal). The horizon does not need its own marks: masking the contours by knowledge already
+      // shows exactly how far understanding reaches, and it shows it in the field's own language.
 
       // ── The deeper basin. HELD BACK until experience actually reaches it: measured, it is
       // invisible for seven of eight stops and discovered at the last, missing by 0.01 at the stop
       // before. Drawing it earlier would give away an ending the walker had not yet earned.
       const att = unknownAttractor();
-      const discovered = knownness(att.x, att.y, experience()) > 0.02;
+      const discovered = known(att.x, att.y) > 0.02;
       const [ax, ay] = project(att.x, att.y, v);
       if (!discovered) {
         // Not yet known: nothing is drawn here at all. The absence IS the point.
@@ -460,7 +467,7 @@ const facts = trajectoryFacts();
       const k = experience();
       const kShown = Math.min(WAYPOINTS.length, Math.round(k));
       const att = unknownAttractor();
-      const found = knownness(att.x, att.y, k) > 0.02;
+      const found = known(att.x, att.y) > 0.02;
       const r = knowledgeRadius(k - 1).toFixed(2);
       readout.innerHTML = found
         ? `stop <b>${kShown}/${WAYPOINTS.length}</b> · reach <b>${r}</b> · ` +

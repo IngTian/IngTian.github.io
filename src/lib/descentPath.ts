@@ -170,39 +170,51 @@ export interface TrailPoint {
 }
 
 /**
- * The trail: waypoints joined by short interpolated runs, each sample carrying its height.
+ * The trail, as a CATMULL-ROM SPLINE through the waypoints.
  *
- * Between consecutive waypoints the path bends toward the local downhill direction, so the trail
- * looks like something that was WALKED under a gradient rather than a ruler line between dots —
- * except where it must climb, where it goes straight over the barrier because that is precisely
- * what a gradient method cannot do for you.
+ * The previous version interpolated each pair of waypoints LINEARLY and bent the middle downhill.
+ * That produces a path whose direction changes discontinuously at every stop, and the eye reads
+ * those corners as discrete steps — the owner's "the curve is like going one step at a time, HARD".
+ *
+ * A Catmull-Rom spline is C1 continuous by construction: position and velocity both carry through
+ * each waypoint, so the walk CURVES rather than turning. Catmull-Rom specifically (rather than a
+ * Bezier) because it passes THROUGH its control points — the waypoints are real declared positions
+ * and the curve has to actually visit them, not merely be influenced by them.
  */
-export function trail(perLeg = 26): TrailPoint[] {
+export function trail(samples = 360): TrailPoint[] {
+  const pts = WAYPOINTS.map((w) => [w.x, w.y] as [number, number]);
+  const n = pts.length;
+  const at = (i: number) => pts[Math.max(0, Math.min(n - 1, i))];
+
   const out: TrailPoint[] = [];
-  const total = (WAYPOINTS.length - 1) * perLeg;
-  let n = 0;
-  for (let i = 0; i < WAYPOINTS.length - 1; i++) {
-    const a = WAYPOINTS[i], c = WAYPOINTS[i + 1];
-    const climbing = field(c.x, c.y) > field(a.x, a.y);
-    for (let k = 0; k < perLeg; k++) {
-      const s = k / perLeg;
-      let x = a.x + (c.x - a.x) * s;
-      let y = a.y + (c.y - a.y) * s;
-      if (!climbing) {
-        // Bend downhill: sample the gradient and nudge across, strongest mid-leg so the ends still
-        // meet their waypoints exactly.
-        const [gx, gy] = grad(x, y);
-        const bend = Math.sin(s * Math.PI) * 0.16;
-        x -= gx * bend;
-        y -= gy * bend;
-      }
-      out.push({ x, y, z: field(x, y), t: n / total, climbing, toward: i + 1 });
-      n++;
-    }
+  for (let s = 0; s <= samples; s++) {
+    const u = (s / samples) * (n - 1);          // 0 .. n-1 across the whole path
+    const i = Math.min(n - 2, Math.floor(u));
+    const t = u - i;
+    const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2);
+    const t2 = t * t, t3 = t2 * t;
+    const x = 0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t +
+      (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 +
+      (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3);
+    const y = 0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t +
+      (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 +
+      (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
+
+    const z = field(x, y);
+    const prev = out[out.length - 1];
+    // Climbing is decided against the PREVIOUS SAMPLE, not against a leg's endpoints, so the red
+    // stretch marks exactly where the path actually rises — a shorter and truer span than "the whole
+    // leg between two jobs".
+    const climbing = prev ? z > prev.z + 1e-6 : false;
+    out.push({ x, y, z, t: s / samples, climbing, toward: Math.min(n - 1, i + 1) });
   }
-  const last = WAYPOINTS[WAYPOINTS.length - 1];
-  out.push({ x: last.x, y: last.y, z: field(last.x, last.y), t: 1, climbing: false, toward: WAYPOINTS.length - 1 });
   return out;
+}
+
+/** The trail parameter at which the walk reaches waypoint `i`. Waypoints are evenly spaced in the
+ *  spline's parameter, so this is exact rather than a search. */
+export function waypointT(i: number): number {
+  return i / (WAYPOINTS.length - 1);
 }
 
 /** Where the trail turns upward, as a t-range — for calling out the escape. */
