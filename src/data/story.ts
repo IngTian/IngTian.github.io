@@ -64,10 +64,11 @@ export const STORY_CODA =
   'The deepest point on that surface is not marked, because I do not know where it is. ' +
   'What I know is the direction, and that the descent is still running.';
 
-/** The column's own last line, now that the coda lives in the graph. Shorter, and it hands off to the
- *  drawing rather than concluding — the coda is the conclusion, and it is over there. */
-export const STORY_TAIL =
-  'The picture beside this is that decision, drawn on the surface it was made on.';
+// STORY_TAIL is deleted. It was a replacement closing line for this column, and it inherited the exact bug
+// it was meant to work around: the column is taller than one screen, so its last line sits below the deck's
+// resting fold and the next gesture jumps the whole slide. Anything at the foot of that column is
+// unreachable by normal scrolling — so the column now simply ends with its last body paragraph, and the
+// coda above is the closing line, over in the drawing where it can actually be read.
 
 // STORY_FIGURES is deleted. It held three "measured facts" — feedback ratio, climb to leave, blind stops
 // — computed at build time from the hero's field. The computation was real; the field is invented. So the

@@ -26,7 +26,7 @@
 // discoveryOf() and trajectoryFacts() were only ever called here to fill those three numbers. The
 // modules stay: lib/sensitivity and lib/knowledge are what the GRAPH is drawn from, and they keep their
 // own specs.
-import { STORY, STORY_TAIL } from '../data/story';
+import { STORY } from '../data/story';
 ---
 <section id="story" class="story" aria-labelledby="story-heading">
   <div class="story-paper">
@@ -62,12 +62,14 @@ import { STORY, STORY_TAIL } from '../data/story';
              printed where a reader would take it as a fact about a career. A true number about a made-up
              surface is worse than no number, because it borrows the authority of measurement.
 
-             THE CODA MOVED INTO THE GRAPH (see DescentPath), and that was a reachability bug rather than a
-             taste call: this column is taller than one screen, so the deck gesture that should have
-             scrolled down to the coda advanced to the next slide instead — the line was unreadable by
-             normal scrolling. It now sits in the drawing's empty lower-right and fades in when the walk
-             discovers the deeper basin, which is also the moment it starts to mean something. -->
-        <p class="story-tail">{STORY_TAIL}</p>
+             THE CODA MOVED INTO THE GRAPH (see DescentPath), because this column is taller than one screen:
+             the deck gesture that should scroll down to its last line advances to the next slide instead, so
+             anything at the foot of this column is unreadable by normal scrolling.
+
+             The replacement tail line I put here had EXACTLY THE SAME BUG — same column, same fold, same
+             unreachable position — so it is deleted rather than restyled. The section now ends with its last
+             body paragraph, and the coda in the drawing is the closing line. Nothing goes at the bottom of
+             this column again. -->
       </div>
     </div>
   </div>
@@ -256,11 +258,6 @@ import { STORY, STORY_TAIL } from '../data/story';
     .story-figures { grid-template-columns: 1fr; gap: 4vh 0; }
   }
 
-  /* The column's closing line. Smaller than the old coda was, because it hands off to the drawing rather
-     than concluding — the conclusion is the coda, and that now lives in the graph. */
-  .story-tail {
-    margin: clamp(26px, 4vh, 56px) 0 0; max-width: 46ch;
-    font-family: var(--font-display); font-style: italic;
-    font-size: clamp(16px, 1.4vw, 20px); line-height: 1.5; color: var(--story-ink-soft);
-  }
+  /* (.story-tail is gone with the element — see the markup comment. Anything placed at the foot of this
+     column is unreachable in the deck, so the rule is deleted rather than left for someone to reuse.) */
 </style>

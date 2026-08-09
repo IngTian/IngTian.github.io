@@ -19,6 +19,10 @@
 import { CONSTRAINTS, FUND, JOB_STATEMENT, JOB_NOTE, TOOLKIT, INSTRUMENTS } from '../data/desk';
 import { multiPeriodVars, humanCount } from '../lib/problemSize';
 
+// The two problem sizes the scale row compares. The decision TREE that used to sit on this slide moved to
+// the Moment slide: it is the same decision one step further on, and this slide measured 1307px against a
+// 1050px viewport with both on it — 257px past a single screen, which in a deck means the composition is
+// never seen whole.
 const smallVars = multiPeriodVars(INSTRUMENTS.length, 52);
 const bigVars = multiPeriodVars(FUND.tickers, FUND.periods);
 
