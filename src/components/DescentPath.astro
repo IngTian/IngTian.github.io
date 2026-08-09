@@ -1,0 +1,442 @@
+---
+// src/components/DescentPath.astro
+// THE CAREER AS A DESCENT — one named trajectory on the site's own loss field, in 2D or 3D, with
+// the trail drawn as it was walked.
+//
+// The owner's framing: "I'm almost running a gradient descent on my own while finding that we are
+// at a LOCAL MIN in the SDE — that's why we adapted and intended to find the GLOBAL MIN." And the
+// correction that matters most: "I have no idea where the global min is. Maybe a future quant
+// researcher." So the deepest point is drawn as an UNKNOWN and the trail stops short of it.
+//
+// WHY THIS IS NOT THE HERO AGAIN. A reviewer flagged that contouring terrain.ts's field() is the
+// hero's object with different hatching, and that is a fair charge against a REPLACEMENT for the
+// hero. Here the field is deliberately the same field, because the point is that this is the same
+// landscape the whole site is about — but the hero shows an anonymous surface with anonymous
+// walkers, and this shows ONE trajectory, named, with its barrier called out. Same field,
+// different subject. The caption says so rather than pretending the surface is new.
+//
+// No React island (the terminal is the only one). Vanilla script, re-inits on astro:page-load with
+// teardown, matching TerrainHero / Toc. Canvas is decoration; the waypoints are a real <ol> so the
+// content works with JS off and for a screen reader.
+import { WAYPOINTS, trajectoryFacts } from '../lib/trajectory';
+
+const facts = trajectoryFacts();
+---
+<section id="descent-path" class="dp" aria-labelledby="dp-heading">
+  <header class="dp-head">
+    <h2 id="dp-heading">A descent, with one climb</h2>
+    <p class="dp-lede">
+      The same loss surface the page opens with — but one named path across it. The engineering
+      years sit in a real local minimum. Leaving it costs a
+      <strong>{facts.climbRequired.toFixed(2)} climb</strong>, because a gradient method cannot
+      walk out of a basin. That climb is the whole story.
+    </p>
+
+    <div class="dp-controls" role="group" aria-label="Projection">
+      <button type="button" class="dp-btn" data-proj="2d" aria-pressed="true">plan · 2D</button>
+      <button type="button" class="dp-btn" data-proj="3d" aria-pressed="false">relief · 3D</button>
+      <button type="button" class="dp-btn dp-replay" data-replay>replay</button>
+    </div>
+  </header>
+
+  <div class="dp-stage" data-dp-stage>
+    <canvas class="dp-canvas" data-dp-canvas aria-hidden="true"></canvas>
+    <p class="dp-fallback" data-dp-fallback>
+      A contour map of a non-convex loss surface with a career path crossing a ridge between two
+      basins. The list below carries the same information.
+    </p>
+  </div>
+
+  <!-- The real content. Ordered, focusable, and complete without the canvas. -->
+  <ol class="dp-stops">
+    {WAYPOINTS.map((w, i) => (
+      <li class={`dp-stop dp-${w.phase}`} data-stop={String(i)}>
+        <p class="dp-period">{w.period}</p>
+        <h3 class="dp-label">{w.label}</h3>
+        <p class="dp-learned">{w.learned}</p>
+      </li>
+    ))}
+  </ol>
+
+  <p class="dp-foot">
+    The deepest point is not marked. Where the global minimum actually is remains unknown — the
+    descent is still running.
+  </p>
+</section>
+
+<style>
+  .dp { position: relative; padding: 12vh 0 8vh; }
+  .dp-head { max-width: 70ch; }
+  .dp-head h2 {
+    font-family: var(--font-display); font-size: clamp(26px, 3vw, 38px); font-weight: 300;
+    color: var(--paper); margin: 0;
+  }
+  .dp-lede {
+    font-size: 15.5px; line-height: 1.75; color: var(--ink-3); margin: 14px 0 0;
+  }
+  .dp-lede strong { color: var(--ochre); font-weight: 400; }
+
+  .dp-controls { display: flex; gap: 8px; margin: 22px 0 0; }
+  .dp-btn {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; padding: 7px 14px; cursor: pointer;
+    background: transparent; color: var(--ink-4);
+    border: 1px solid rgba(var(--hairline-rgb), 0.3); border-radius: 2px;
+  }
+  .dp-btn[aria-pressed='true'] { color: var(--on-accent); background: var(--ochre); border-color: var(--ochre); }
+  .dp-btn:hover { color: var(--paper); }
+  .dp-btn[aria-pressed='true']:hover { color: var(--on-accent); }
+  .dp-btn:focus-visible { outline: 1px solid var(--ochre); outline-offset: 2px; }
+  .dp-replay { margin-left: auto; }
+
+  .dp-stage { position: relative; margin: 3vh 0 0; width: 100%; aspect-ratio: 16 / 9; }
+  .dp-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  /* The fallback text sits under the canvas and is revealed only when the canvas cannot draw, so
+     the no-JS state is informative rather than an empty box. */
+  .dp-fallback {
+    position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+    margin: 0; padding: 0 12%; font-size: 14px; line-height: 1.7; color: var(--ink-4);
+  }
+  .dp-stage.is-live .dp-fallback { display: none; }
+
+  /* The stops: a horizontal band under the graph, so path order reads left to right and matches
+     the drawn trail's direction. */
+  .dp-stops {
+    list-style: none; margin: 4vh 0 0; padding: 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0;
+    border-top: 1px solid rgba(var(--hairline-rgb), 0.22);
+  }
+  .dp-stop {
+    padding: 16px 18px 20px 0; border-right: 1px solid rgba(var(--hairline-rgb), 0.12);
+  }
+  .dp-stop:last-child { border-right: 0; }
+  .dp-period {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.1em;
+    color: var(--ink-5); margin: 0;
+  }
+  .dp-label {
+    font-family: var(--font-display); font-size: 15px; font-weight: 400;
+    color: var(--paper); margin: 6px 0 0; line-height: 1.3;
+  }
+  .dp-learned { font-size: 12.5px; line-height: 1.6; color: var(--ink-4); margin: 8px 0 0; }
+  /* The two basin stops and the climb are tinted, so the band echoes the graph's own colour code. */
+  .dp-basin .dp-label { color: var(--ochre); }
+  .dp-escape .dp-label { color: var(--seal); }
+
+  .dp-foot {
+    margin: 4vh 0 0; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.04em;
+    color: var(--ink-5); max-width: 64ch;
+  }
+
+  @media (max-width: 720px) {
+    .dp-stage { aspect-ratio: 4 / 3; }
+    .dp-stops { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+
+<script>
+  import {
+    project, contours, contourLevels, trail, climbSpan, unknownAttractor,
+    type Projection, type View,
+  } from '../lib/descentPath';
+  import { WAYPOINTS, trajectoryFacts } from '../lib/trajectory';
+  import { prefersReducedMotion } from '../lib/motion';
+
+  const teardowns: Array<() => void> = [];
+
+  function initAll(): void {
+    while (teardowns.length) teardowns.pop()!();
+    document.querySelectorAll<HTMLElement>('[data-dp-stage]').forEach((stage) => {
+      const t = init(stage);
+      if (t) teardowns.push(t);
+    });
+  }
+
+  function init(stage: HTMLElement): (() => void) | null {
+    const canvas = stage.querySelector<HTMLCanvasElement>('[data-dp-canvas]');
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return null;
+    const section = stage.closest('#descent-path') as HTMLElement;
+    const buttons = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-proj]'));
+    const replay = section.querySelector<HTMLButtonElement>('[data-replay]');
+    const stops = Array.from(section.querySelectorAll<HTMLElement>('[data-stop]'));
+
+    let projection: Projection = '2d';
+    let reveal = 0;                 // 0..1, how much of the trail is drawn
+    let raf = 0;
+    let W = 0, H = 0, dpr = 1;
+
+    // Geometry is computed ONCE per projection, not per frame: contours are the expensive part and
+    // they do not change as the trail animates.
+    const pts = trail();
+    const span = climbSpan(pts);
+    const facts = trajectoryFacts();
+    const levels = contourLevels(11);
+    const contourCache = new Map<string, [number, number][][]>();
+    const contoursFor = (lv: number) => {
+      const key = lv.toFixed(4);
+      let c = contourCache.get(key);
+      if (!c) { c = contours(lv, 150); contourCache.set(key, c); }
+      return c;
+    };
+
+    const tok = (name: string, fb: string) =>
+      getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fb;
+
+    function size(): void {
+      const r = canvas.getBoundingClientRect();
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      W = Math.max(1, Math.round(r.width));
+      H = Math.max(1, Math.round(r.height));
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+    }
+
+    function view(): View {
+      // Generous right and bottom padding: labels sit to the right of their points, and the
+      // original render clipped them off the frame.
+      return { w: W, h: H, projection, pad: { l: 70, r: 210, t: 50, b: 70 } };
+    }
+
+    function draw(): void {
+      const v = view();
+      const ink5 = tok('--ink-5', '#b8b1a1');
+      const ink4 = tok('--ink-4', '#8c8576');
+      const ink3 = tok('--ink-3', '#5a544a');
+      const paper = tok('--paper', '#efe9dd');
+      const ochre = tok('--ochre', '#c8a36a');
+      const seal = tok('--seal', '#b23a2e');
+
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, W, H);
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+
+      // ── Contours. Continuous polylines, and deeper levels drawn stronger so the basins read as
+      // basins rather than as uniform hatching. The first attempt drew 1px stubs and was invisible.
+      levels.forEach((lv, i) => {
+        const runs = contoursFor(lv);
+        const deep = 1 - i / (levels.length - 1);          // 1 at the deepest level
+        // Alpha and weight both measured up: at 0.10-0.40 on near-black the contours read as
+        // nothing (2.06% total ink, the same band as the four rejected frames).
+        ctx.strokeStyle = ink5;
+        ctx.globalAlpha = 0.26 + deep * 0.44;
+        ctx.lineWidth = 1.1 + deep * 1.5;
+        for (const run of runs) {
+          ctx.beginPath();
+          run.forEach((p, k) => {
+            const [sx, sy] = project(p[0], p[1], v);
+            if (k === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+          });
+          ctx.stroke();
+        }
+      });
+      ctx.globalAlpha = 1;
+
+      // ── Basin wash: fill below a mid level so the bowls read as VOLUME rather than as rings.
+      // Contours alone gave 2% ink; the eye needs a filled region to see a basin at a glance.
+      const washLevels = levels.slice(0, 5);
+      washLevels.forEach((lv, i) => {
+        const runs = contoursFor(lv);
+        ctx.fillStyle = ochre;
+        ctx.globalAlpha = 0.030 - i * 0.004;
+        for (const run of runs) {
+          if (run.length < 8) continue;
+          ctx.beginPath();
+          run.forEach((p, k) => {
+            const [sx, sy] = project(p[0], p[1], v);
+            if (k === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+          });
+          ctx.closePath();
+          ctx.fill();
+        }
+      });
+      ctx.globalAlpha = 1;
+
+      // ── The unknown attractor. Drawn as a soft target with NO label: the trail is heading here,
+      // and where the true optimum sits is not a claim this page makes.
+      const att = unknownAttractor();
+      const [ax, ay] = project(att.x, att.y, v);
+      for (let r = 34; r > 0; r -= 8) {
+        ctx.beginPath();
+        ctx.arc(ax, ay, r, 0, Math.PI * 2);
+        ctx.strokeStyle = ink4;
+        ctx.globalAlpha = 0.06 + (34 - r) / 34 * 0.10;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.setLineDash([2, 5]);
+      ctx.beginPath();
+      ctx.arc(ax, ay, 9, 0, Math.PI * 2);
+      ctx.strokeStyle = ink4;
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      label(ctx, ax + 16, ay + 4, 'deeper — unknown', 11, ink5);
+
+      // ── The local basin, named, because being stuck there is the point.
+      const [lx, ly] = project(facts.localBasin.x, facts.localBasin.y, v);
+      ctx.beginPath();
+      ctx.arc(lx, ly, 5, 0, Math.PI * 2);
+      ctx.fillStyle = ochre;
+      ctx.globalAlpha = 0.55;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // ── The trail, revealed to `reveal`. Ochre descending, SEAL climbing — the one saturated
+      // colour on the site, spent on the one moment that matters.
+      const shown = pts.filter((p) => p.t <= reveal);
+      if (shown.length > 1) {
+        for (let i = 1; i < shown.length; i++) {
+          const a = shown[i - 1], b = shown[i];
+          const [x1, y1] = project(a.x, a.y, v);
+          const [x2, y2] = project(b.x, b.y, v);
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.strokeStyle = b.climbing ? seal : ochre;
+          ctx.lineWidth = b.climbing ? 3.4 : 2.1;
+          ctx.globalAlpha = b.climbing ? 1 : 0.9;
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        // The walker's head: a small mark at the leading edge, so an in-progress reveal reads as
+        // something moving rather than a line being wiped in.
+        const head = shown[shown.length - 1];
+        const [hx, hy] = project(head.x, head.y, v);
+        ctx.beginPath();
+        ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = paper;
+        ctx.fill();
+      }
+
+      // ── Waypoints, only those the trail has reached.
+      WAYPOINTS.forEach((wp, i) => {
+        const arrival = i / (WAYPOINTS.length - 1);
+        if (arrival > reveal + 1e-6) return;
+        const [px, py] = project(wp.x, wp.y, v);
+        const isBasin = wp.phase === 'basin';
+        ctx.beginPath();
+        ctx.arc(px, py, isBasin ? 6 : 4, 0, Math.PI * 2);
+        ctx.fillStyle = isBasin ? ochre : paper;
+        ctx.fill();
+        label(ctx, px + 13, py + 4, wp.label, 12.5, ink3);
+      });
+
+      // ── The climb, called out once, where it happens.
+      if (span && reveal >= span.t1) {
+        const mid = pts.find((p) => p.t >= (span.t0 + span.t1) / 2)!;
+        const [mx, my] = project(mid.x, mid.y, v);
+        ctx.strokeStyle = seal;
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(mx, my);
+        ctx.lineTo(mx - 54, my - 38);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        label(ctx, mx - 58, my - 44, `climb +${facts.climbRequired.toFixed(2)}`, 12, seal, 'end');
+      }
+
+      ctx.restore();
+    }
+
+    function label(
+      c: CanvasRenderingContext2D, x: number, y: number, text: string,
+      size: number, fill: string, align: CanvasTextAlign = 'left',
+    ): void {
+      c.font = `${size}px "JetBrains Mono", ui-monospace, monospace`;
+      c.textAlign = align;
+      c.fillStyle = fill;
+      c.fillText(text, x, y);
+      c.textAlign = 'left';
+    }
+
+    // ── Reveal animation. Slow enough to read, and it is the only motion here.
+    const reduce = prefersReducedMotion();
+    function animate(): void {
+      cancelAnimationFrame(raf);
+      if (reduce) { reveal = 1; draw(); return; }
+      // Drive the reveal from ELAPSED TIME, not from an accumulated per-frame delta.
+      //
+      // The accumulator version ran ~5x too slow and looked frozen. Measured: 3 of 8 stops after
+      // 4s, i.e. ~11s for the whole path against an intended 2s. The cause is that dt was clamped
+      // to 0.05 as a safety rail, but the clamp was BINDING on most frames, so each frame
+      // contributed at most 0.05 * rate regardless of real time. Elapsed time cannot drift.
+      const DURATION_MS = 1150;   // brisk: the reveal is a beat, not a performance
+      const t0 = performance.now();
+      reveal = 0;
+      const step = (now: number) => {
+        reveal = Math.min(1, (now - t0) / DURATION_MS);
+        markStops();
+        draw();
+        if (reveal < 1) raf = requestAnimationFrame(step);
+      };
+      raf = requestAnimationFrame(step);
+    }
+
+    /** Light up the stop cards as the trail reaches them, so the graph and the list are one thing. */
+    function markStops(): void {
+      stops.forEach((el, i) => {
+        const arrival = i / (WAYPOINTS.length - 1);
+        el.style.opacity = arrival <= reveal + 1e-6 ? '1' : '0.32';
+      });
+    }
+
+    const onProj = (e: Event) => {
+      const b = e.currentTarget as HTMLButtonElement;
+      projection = (b.dataset.proj as Projection) ?? '2d';
+      for (const btn of buttons) btn.setAttribute('aria-pressed', String(btn === b));
+      draw();
+    };
+    for (const b of buttons) b.addEventListener('click', onProj);
+    const onReplay = () => animate();
+    replay?.addEventListener('click', onReplay);
+
+    let resizeT = 0;
+    const onResize = () => {
+      window.clearTimeout(resizeT);
+      resizeT = window.setTimeout(() => { size(); draw(); }, 140);
+    };
+    window.addEventListener('resize', onResize);
+
+    const mo = new MutationObserver(() => draw());
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+    // Start when it is on screen, so the reveal is seen rather than missed.
+    //
+    // rootMargin was '-15% 0px', which shrinks the trigger box — and an INSTANT scroll (or a deep
+    // link, or a reload already scrolled down) can land the element inside the viewport without
+    // ever crossing that shrunken boundary, so the observer never fires and the trail sits frozen
+    // one leg in. Measured: 7 of 8 stops stayed dimmed. Now: no negative margin, plus a direct
+    // visibility check at init for the case where it is ALREADY on screen before the observer runs.
+    let started = false;
+    const begin = () => { if (!started) { started = true; animate(); } };
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) begin();
+    }, { threshold: 0.25 });
+    io.observe(stage);
+    // Already visible on load? The observer would fire, but not until the next frame — and if the
+    // page was restored mid-scroll it may not fire at all. Check directly.
+    const r0 = stage.getBoundingClientRect();
+    if (r0.top < window.innerHeight * 0.9 && r0.bottom > 0) begin();
+
+    size();
+    stage.classList.add('is-live');
+    markStops();
+    draw();                       // a finished static frame immediately
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(resizeT);
+      window.removeEventListener('resize', onResize);
+      io.disconnect();
+      mo.disconnect();
+      for (const b of buttons) b.removeEventListener('click', onProj);
+      replay?.removeEventListener('click', onReplay);
+    };
+  }
+
+  document.addEventListener('astro:page-load', initAll);
+</script>

@@ -84,10 +84,27 @@ export const WAYPOINTS: Waypoint[] = [
     learned: 'A bridge, chosen deliberately: enough room to keep the research moving.',
   },
   {
-    period: 'Fall 2027 —', label: 'PhD · Operations Research', x: -1.46, y: -0.64, phase: 'descent',
-    learned: 'Portfolio optimization under Kwon — the objective I was actually looking for.',
+    period: 'Fall 2027 —', label: 'PhD · Operations Research', x: -0.92, y: -0.44, phase: 'descent',
+    learned: 'Portfolio optimization under Kwon — the first step down the side I actually want.',
   },
 ];
+
+/** Where the path stops today. Everything past this is unknown, and the picture says so. */
+export const PATH_END = WAYPOINTS[WAYPOINTS.length - 1];
+
+/**
+ * The global minimum is NOT a waypoint, and that is the point.
+ *
+ * An earlier version put the PhD exactly at (-1.46, -0.64) — the field's true global minimum —
+ * which claims he has arrived at the optimum. He has not, and saying so was the self-flattery a
+ * reviewer caught: "escaping costs a 1.26 climb" reads as a brag when the destination is also
+ * declared to be the best possible one.
+ *
+ * His own correction: "I have no idea where the global min is. Maybe a future quant researcher."
+ * So the deepest point stays UNLABELLED and the path stops short of it. The honest claim is
+ * direction, not arrival: the descent is still running.
+ */
+export const GLOBAL_MIN_IS_KNOWN = false;
 
 /** The two basins the story turns on, found by descent rather than declared. */
 export interface Basin { x: number; y: number; depth: number }

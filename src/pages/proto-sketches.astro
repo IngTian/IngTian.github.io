@@ -15,6 +15,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { BATCH1 } from '../lib/sketches/batch1';
 import { sketchData, FRAME, PAL } from '../lib/sketches/kit';
+import DescentPath from '../components/DescentPath.astro';
 
 const data = sketchData();
 const ctx = { w: FRAME.w, h: FRAME.h, pal: PAL, data };
@@ -42,6 +43,22 @@ const sketches = BATCH1.map((s) => ({ meta: s, html: s.draw(ctx) }));
         are recorded in <code>notes/showpiece.md</code>.
       </p>
     </header>
+
+    <!-- The part-1 graph, now interactive: 2D plan / 3D relief, animated trail, and the global
+         minimum left deliberately unknown. Shown above the static sketches because it is the one
+         candidate that has moved past the still-frame gate. -->
+    <section class="sk-block">
+      <div class="sk-meta">
+        <p class="sk-n">live · descent path</p>
+        <h2>A descent, with one climb</h2>
+        <p class="sk-pitch">
+          The career as a trajectory on the site's own loss field. Toggle plan/relief to compare
+          projections; press replay to watch the trail walk itself. The deepest point is drawn but
+          not named — where the global minimum actually sits is not a claim this page makes.
+        </p>
+      </div>
+      <DescentPath />
+    </section>
 
     {sketches.map(({ meta, html }, i) => (
       <section class="sk-block">
