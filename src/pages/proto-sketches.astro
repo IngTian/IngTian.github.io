@@ -1,0 +1,115 @@
+---
+// PROTO SKETCHES — the kill gate, industrialised.
+//
+// Five showpiece attempts have been rejected, and each cost a hand-built component before it could
+// be judged. This route makes a candidate cost ONE FUNCTION: write a draw() in
+// src/lib/sketches/, add it to the batch, and it appears here at real width against the real
+// corpus and the real palette.
+//
+// The rule this formalises (see notes/showpiece.md): A STILL FRAME FIRST. Judge it in one look.
+// three.js only after a frame survives. Four of the five rejections were only judgeable once
+// finished; the one cheap gate that ever worked was a static SVG page.
+//
+// Each sketch declares what a still frame CANNOT show, so nothing is judged for a quality it was
+// never able to convey — and its verdict is recorded next to it once it has been looked at.
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { BATCH1 } from '../lib/sketches/batch1';
+import { sketchData, FRAME, PAL } from '../lib/sketches/kit';
+
+const data = sketchData();
+const ctx = { w: FRAME.w, h: FRAME.h, pal: PAL, data };
+const sketches = BATCH1.map((s) => ({ meta: s, html: s.draw(ctx) }));
+---
+<BaseLayout
+  title="Proto — showpiece sketches"
+  description="Diagnostic route: candidate showpiece frames, judged cheaply before anything is built."
+  veilLine="sketches, not decisions"
+  veilOnLoad={false}
+  navZone="dark"
+>
+  <main class="sk">
+    <header class="sk-head">
+      <a class="back" href="/">← back</a>
+      <h1>Showpiece sketches</h1>
+      <p class="lede">
+        Candidate frames for the bottom of the homepage. Still SVG, real corpus, real palette, real
+        width — cheap enough that most of these should die. Each says what it
+        <em>cannot</em> show, so nothing is judged for something a still frame was never going to
+        convey.
+      </p>
+      <p class="lede dim">
+        Flip the theme with the corner nav; both must work. Five earlier attempts and their reasons
+        are recorded in <code>notes/showpiece.md</code>.
+      </p>
+    </header>
+
+    {sketches.map(({ meta, html }, i) => (
+      <section class="sk-block">
+        <div class="sk-meta">
+          <p class="sk-n">{String(i + 1).padStart(2, '0')} · {meta.id}</p>
+          <h2>{meta.title}</h2>
+          <p class="sk-pitch">{meta.pitch}</p>
+          <dl>
+            <dt>The hook</dt><dd>{meta.hook}</dd>
+            {meta.cannotShow && (<><dt>A still can’t show</dt><dd>{meta.cannotShow}</dd></>)}
+            {meta.verdict && (<><dt>Verdict</dt><dd class={`v-${meta.verdict.call}`}>
+              {meta.verdict.call} — {meta.verdict.why}
+            </dd></>)}
+          </dl>
+        </div>
+        <div class="sk-art" set:html={html} />
+      </section>
+    ))}
+
+    <footer class="sk-foot"><a class="back" href="/">← back to the descent</a></footer>
+  </main>
+</BaseLayout>
+
+<style>
+  /* The sketches must be judged on the ground they would really sit on — the descent's near-black
+     bottom — not on a light reading page. */
+  .sk { background: var(--bg); min-height: 100vh; padding: 10vh 5vw 14vh; }
+  .back {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--ink-4); text-decoration: none;
+  }
+  .back:hover { color: var(--ink-2); }
+  .sk-head h1 {
+    font-family: var(--font-display); font-size: clamp(32px, 4.4vw, 52px);
+    font-weight: 300; color: var(--ink-1); margin: 18px 0 0;
+  }
+  .lede { font-size: 15.5px; line-height: 1.7; color: var(--ink-3); max-width: 66ch; margin: 14px 0 0; }
+  .lede.dim { color: var(--ink-4); font-size: 14px; }
+  code { font-family: var(--font-mono); font-size: 0.92em; color: var(--ochre); }
+
+  .sk-block { margin-top: 12vh; }
+  .sk-meta { max-width: 76ch; }
+  .sk-n {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--ink-5); margin: 0;
+  }
+  .sk-meta h2 {
+    font-family: var(--font-display); font-size: 28px; font-weight: 400;
+    color: var(--ink-1); margin: 6px 0 0;
+  }
+  .sk-pitch { font-size: 15px; line-height: 1.7; color: var(--ink-2); margin: 10px 0 0; }
+  dl { margin: 14px 0 0; display: grid; grid-template-columns: 13rem 1fr; gap: 6px 20px; }
+  dt {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--ink-4);
+  }
+  dd { margin: 0; font-size: 14px; line-height: 1.66; color: var(--ink-3); }
+  dd.v-kill { color: var(--seal); }
+  dd.v-keep { color: var(--ochre); }
+  @media (max-width: 820px) { dl { grid-template-columns: 1fr; gap: 2px 0; } dd { margin-bottom: 10px; } }
+
+  /* Full width, real aspect. A candidate that only works small is not a candidate. */
+  .sk-art {
+    margin: 26px 0 0; width: 100%;
+    border-top: 1px solid rgba(var(--hairline-rgb), 0.16);
+    border-bottom: 1px solid rgba(var(--hairline-rgb), 0.16);
+  }
+  .sk-art :global(svg) { display: block; width: 100%; height: auto; }
+
+  .sk-foot { margin-top: 14vh; }
+</style>
