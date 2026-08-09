@@ -1,0 +1,377 @@
+---
+// src/sections/Solve.astro
+// SLIDE 3 OF 3 — THE METHOD, as the algorithm actually running.
+//
+// The owner's brief: "the last slide animate a 3D route in a Bellman propagation of many that we highlight as
+// our goal."
+//
+// So this is the Bellman lattice: states of the book across time, values propagating BACKWARD (which is
+// literally what dynamic programming does — you cannot know today's best move until you know what tomorrow is
+// worth), then the optimal route lighting FORWARD through the candidates it beat.
+//
+// WHY THIS IS NOT THE SIXTH REJECTED SHOWPIECE. Every one of the five failures was a drawing that looked like
+// it meant something without meaning anything, and three of them were hand-drawn props. This is neither: the
+// surface is a real finite-horizon dynamic program solved by backward induction, and lib/bellman.ts's tests
+// assert the Bellman optimality condition at EVERY node, that the traced route achieves exactly the value the
+// DP promises, and that it beats all 29 enumerated candidate policies. If the maths is real, the animation
+// teaches the method rather than decorating it.
+//
+// Hand-rolled oblique projection rather than three.js — ships no bytes, and a parallel projection keeps
+// heights comparable across the lattice, which matters when the height IS the value being compared.
+import {
+  LEVELS, PERIODS, WORLD, solve, route, candidates, utilityOf, bestConstant,
+  exposureOf, project3, valueBounds,
+} from '../lib/bellman';
+import { TOOLKIT, JOB_STATEMENT } from '../data/desk';
+
+const sol = solve();
+const optimal = route(sol, 0);
+const cands = candidates();
+const bounds = valueBounds(sol);
+const optUtility = utilityOf(optimal.map((s) => s.level));
+const constant = bestConstant();
+
+const VW = 760, VH = 380;
+const view = { w: VW, h: VH, shear: 0.30, lift: 0.46, pad: { l: 30, r: 30, t: 18, b: 46 } };
+const norm = (v: number) => (bounds.hi - bounds.lo > 0 ? (v - bounds.lo) / (bounds.hi - bounds.lo) : 0);
+const at = (t: number, level: number, v: number) => project3(t, level, norm(v), PERIODS, LEVELS, view);
+
+// The lattice as lines of constant state (running through time) and lines of constant time (across states).
+// Both are needed for the surface to read as a surface rather than as scattered dots.
+const stateLines = Array.from({ length: LEVELS }, (_, s) =>
+  Array.from({ length: PERIODS + 1 }, (_, t) => at(t, s, sol.value[t][s])),
+);
+const timeLines = Array.from({ length: PERIODS + 1 }, (_, t) =>
+  Array.from({ length: LEVELS }, (_, s) => at(t, s, sol.value[t][s])),
+);
+
+// Candidate routes, drawn at the value the DP assigns to the state each one occupies.
+const candLines = cands.map((c) =>
+  c.map((level, t) => at(t, level, sol.value[t][level])),
+);
+const optLine = optimal.map((s) => at(s.t, s.level, sol.value[s.t][s.level]));
+const path = (pt: [number, number][]) => pt.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+
+// Which periods the model expects to punish risk — the reason the route moves at all.
+const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0).map(({ i }) => i);
+---
+<section id="solve" class="so" aria-labelledby="so-heading">
+  <div class="so-paper">
+    <div class="so-inner">
+      <p class="so-kicker">3 / 3 · the method</p>
+
+      <div class="so-split">
+        <div class="so-say">
+          <h2 id="so-heading" class="so-head">{JOB_STATEMENT}</h2>
+
+          <p class="so-body">
+            The way to solve a sequence is to work it <em>backwards</em>. What is the last decision worth? Given
+            that, what is the one before it worth? Keep going and every state at every date carries a value —
+            and the best move today is simply the one that leads to the highest of them.
+          </p>
+          <p class="so-body">
+            That is dynamic programming, and it is why the surface fills in from the right. Once it exists, the
+            optimal route is not searched for. It is read off.
+          </p>
+
+          <dl class="so-figs">
+            <div>
+              <dt>{cands.length}</dt>
+              <dd>candidate policies drawn behind it</dd>
+            </div>
+            <div>
+              <dt>{optUtility.toFixed(3)}</dt>
+              <dd>the optimum's utility</dd>
+            </div>
+            <div>
+              <dt>+{(optUtility - constant.utility).toFixed(3)}</dt>
+              <dd>its margin over the best fixed allocation</dd>
+            </div>
+          </dl>
+
+          <ul class="so-tools">
+            {TOOLKIT.slice(0, 4).map((t) => (
+              <li><span class="so-tool-name">{t.name}</span><span class="so-tool-role">{t.role}</span></li>
+            ))}
+          </ul>
+        </div>
+
+        <figure class="so-fig">
+          <svg class="so-chart" viewBox={`0 0 ${VW} ${VH}`} role="img"
+               aria-label={`A lattice of portfolio states across twelve decision points. Values are computed backward from the horizon, then the optimal route is traced forward, beating ${cands.length} candidate policies.`}>
+            <!-- THE SURFACE. Drawn as a wireframe from both directions; the script reveals it right-to-left,
+                 which is the direction the algorithm actually runs. -->
+            <g class="so-mesh">
+              {timeLines.map((line, t) => (
+                <polyline class="so-rib" data-t={t} points={path(line)} />
+              ))}
+              {stateLines.map((line, s) => (
+                <polyline class="so-spine" data-s={s} points={path(line)} />
+              ))}
+            </g>
+
+            <!-- THE MANY: every candidate policy, at the value of the states it passes through. -->
+            <g class="so-cands" data-cands>
+              {candLines.map((line) => <polyline class="so-cand" points={path(line)} />)}
+            </g>
+
+            <!-- THE ONE. Revealed last, forward through time. -->
+            <polyline class="so-opt" data-opt points={path(optLine)} />
+            {optLine.map(([x, y], i) => (
+              <circle class="so-opt-node" data-opt-node={i} cx={x} cy={y} r="3" />
+            ))}
+          </svg>
+
+          <div class="so-legend">
+            <span class="so-key so-key--mesh">value surface</span>
+            <span class="so-key so-key--cand">{cands.length} candidate policies</span>
+            <span class="so-key so-key--opt">the optimum</span>
+          </div>
+
+          <p class="so-read" data-read aria-live="polite">Solving backward from the horizon…</p>
+
+          <figcaption class="so-cap">
+            A real dynamic program: {LEVELS} exposure states, {PERIODS} decisions, solved by backward induction.
+            The route cuts risk into the periods the model expects to punish it
+            ({badPeriods.map((i) => `t${i}`).join(', ')}) and carries it otherwise — illustrative world,
+            real algorithm.
+          </figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .so { position: relative; z-index: 1; width: 100vw; margin-left: calc(50% - 50vw); --deck-lead: 0px; }
+  /* THE ONE DARK SLIDE, deliberately. Four consecutive paper panels read as four walls of the same wall, and
+     this is the payoff of the sequence — a lattice of light is what it wants to be, and the register break
+     marks it as the arrival rather than another exposition. The dark theme leaves it nearly unchanged, which is
+     correct: it is already the night end of the descent. */
+  .so-paper {
+    --s-bg: #1b1a17; --s-edge: rgba(214,206,190,0.16); --s-ink: #ece6da;
+    /* Ochre, which is the palette's accent — on this dark ground it reads as the lit route without needing a
+       new colour. The tokens are hardcoded rather than inherited because this panel is the one surface that
+       does NOT flip with the theme: it is dark in both. */
+    --s-soft: #b9b2a4; --s-faint: #8a8377; --s-accent: #c8a36a;
+    background: var(--s-bg);
+    border-top: 1px solid var(--s-edge); border-bottom: 1px solid var(--s-edge);
+    padding: clamp(30px, 4vh, 62px) 0;
+  }
+  :global(html[data-theme='dark']) .so-paper {
+    --s-bg: #101215; --s-edge: rgba(184,177,161,0.14); --s-ink: #dce1dc;
+    --s-soft: #a8b0a9; --s-faint: #6d746e; --s-accent: #7fc9a0;
+  }
+  .so-inner {
+    padding-left: clamp(150px, 9.5vw, 190px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
+  }
+  @media (max-width: 1099px) { .so-inner { padding-left: clamp(28px, 6vw, 80px); } }
+
+  .so-kicker {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--s-accent); margin: 0 0 14px;
+  }
+  .so-split {
+    display: grid; grid-template-columns: 42fr 58fr; gap: 0 clamp(26px, 3.2vw, 62px); align-items: start;
+  }
+  .so-fig { border-left: 1px solid var(--s-edge); padding-left: clamp(26px, 3.2vw, 62px); margin: 0; }
+  @media (max-width: 1080px) {
+    .so-split { grid-template-columns: 1fr; gap: 4vh 0; }
+    .so-fig { border-left: 0; padding-left: 0; padding-top: 4vh; border-top: 1px solid var(--s-edge); }
+  }
+
+  .so-head {
+    font-family: var(--font-display); font-weight: 300;
+    font-size: clamp(20px, 1.8vw, 30px); line-height: 1.24;
+    color: var(--s-ink); margin: 0 0 clamp(14px, 2vh, 22px); max-width: 32ch; letter-spacing: -0.008em;
+  }
+  .so-body {
+    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.68; color: var(--s-soft);
+    margin: 0 0 12px; max-width: 46ch;
+  }
+  .so-body em { font-style: italic; color: var(--s-ink); }
+
+  .so-figs {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: clamp(10px, 1.6vh, 18px) clamp(16px, 2vw, 32px);
+    margin: clamp(14px, 2vh, 22px) 0 0;
+    padding: clamp(12px, 1.6vh, 18px) 0;
+    border-top: 1px solid var(--s-edge); border-bottom: 1px solid var(--s-edge);
+  }
+  .so-figs dt {
+    font-family: var(--font-mono); font-size: clamp(16px, 1.4vw, 21px);
+    color: var(--s-accent); line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .so-figs dd { margin: 6px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--s-faint); max-width: 24ch; }
+
+  .so-tools { list-style: none; margin: clamp(14px, 2vh, 20px) 0 0; padding: 0; display: grid; gap: 7px; }
+  .so-tools li { display: grid; gap: 1px; }
+  .so-tool-name {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--s-accent);
+  }
+  .so-tool-role { font-size: 12px; line-height: 1.45; color: var(--s-soft); max-width: 46ch; }
+
+  .so-chart { width: 100%; height: clamp(220px, 32vh, 340px); display: block; }
+
+  /* The wireframe surface: hairlines, so it reads as structure rather than as a filled object. */
+  .so-rib, .so-spine {
+    fill: none; stroke: var(--s-faint); stroke-width: 1;
+    vector-effect: non-scaling-stroke; opacity: 0;
+  }
+  .so-rib.is-in, .so-spine.is-in { opacity: 0.42; }
+  /* THE MANY had to be raised: at 0.26 opacity on hairlines over a dark ground the candidate policies were
+     invisible in the shot, which loses the whole "one route out of many" contrast the slide is built on. 0.55
+     on a slightly thicker stroke reads as a crowd without competing with the optimum. */
+  .so-cand {
+    fill: none; stroke: var(--s-soft); stroke-width: 1.2;
+    vector-effect: non-scaling-stroke; stroke-linejoin: round; opacity: 0;
+  }
+  .so-cands.is-in .so-cand { opacity: 0.55; }
+  .so-opt {
+    fill: none; stroke: var(--s-accent); stroke-width: 2.6;
+    vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round;
+    opacity: 0;
+  }
+  .so-opt.is-in { opacity: 1; }
+  .so-opt-node { fill: var(--s-accent); opacity: 0; }
+  .so-opt-node.is-in { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    .so-rib, .so-spine, .so-cand, .so-opt, .so-opt-node { transition: opacity .5s ease; }
+  }
+  /* No JS / reduced motion: the whole solved picture, which is the finished state. */
+  :global(html.no-lattice-js) .so-rib,
+  :global(html.no-lattice-js) .so-spine { opacity: 0.5; }
+  :global(html.no-lattice-js) .so-cand { opacity: 0.26; }
+  :global(html.no-lattice-js) .so-opt,
+  :global(html.no-lattice-js) .so-opt-node { opacity: 1; }
+
+  .so-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 0; }
+  .so-key {
+    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--s-faint); display: inline-flex; align-items: center; gap: 6px;
+  }
+  .so-key::before {
+    content: ""; width: 14px; height: 0; border-top: 1px solid currentColor;
+  }
+  .so-key--opt { color: var(--s-accent); }
+  .so-key--opt::before { border-top-width: 2.5px; }
+  .so-key--cand { color: var(--s-soft); }
+
+  .so-read {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--s-soft);
+    margin: 10px 0 0; min-height: 2.6em;
+  }
+  .so-cap {
+    font-size: 10.5px; line-height: 1.5; color: var(--s-faint);
+    margin: 8px 0 0; max-width: 62ch;
+  }
+</style>
+
+<script>
+  // THE ALGORITHM, ANIMATED IN ITS OWN DIRECTION.
+  //
+  // Backward induction fills the value surface from the horizon toward today, so the mesh reveals right to
+  // left — that direction IS the teaching point, and animating it left to right would misrepresent the method.
+  // Then the candidates appear, then the optimal route traces forward, because that is the order the maths
+  // happens in: solve backward, act forward.
+  //
+  // Safe direction for progressive enhancement: html.no-lattice-js (added here, cleared once this runs) makes
+  // the CSS show the fully solved picture, so a JS failure leaves the finished diagram rather than a blank box.
+  document.documentElement.classList.add('no-lattice-js');
+
+  function initLattice(): (() => void) | null {
+    const section = document.querySelector<HTMLElement>('#solve');
+    if (!section) return null;
+    const ribs = Array.from(section.querySelectorAll<SVGPolylineElement>('[data-t]'));
+    const spines = Array.from(section.querySelectorAll<SVGPolylineElement>('[data-s]'));
+    const cands = section.querySelector<SVGGElement>('[data-cands]');
+    const opt = section.querySelector<SVGPolylineElement>('[data-opt]');
+    const nodes = Array.from(section.querySelectorAll<SVGCircleElement>('[data-opt-node]'));
+    const read = section.querySelector<HTMLElement>('[data-read]');
+    if (!ribs.length || !cands || !opt || !read) return null;
+    document.documentElement.classList.remove('no-lattice-js');
+
+    // Ribs are lines of constant time; sort descending so the reveal runs from the horizon backward.
+    const byTime = [...ribs].sort((a, b) => Number(b.dataset.t) - Number(a.dataset.t));
+    const periods = byTime.length - 1;
+
+    const showAll = () => {
+      for (const el of [...ribs, ...spines]) el.classList.add('is-in');
+      cands.classList.add('is-in');
+      opt.classList.add('is-in');
+      for (const n of nodes) n.classList.add('is-in');
+      read.textContent = 'Solved. The optimum is read off the surface, not searched for.';
+    };
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      showAll();
+      return null;
+    }
+
+    let raf = 0;
+    let timers: number[] = [];
+    const clearAll = () => {
+      for (const t of timers) window.clearTimeout(t);
+      timers = [];
+      cancelAnimationFrame(raf);
+    };
+
+    const reset = () => {
+      for (const el of [...ribs, ...spines]) el.classList.remove('is-in');
+      cands.classList.remove('is-in');
+      opt.classList.remove('is-in');
+      for (const n of nodes) n.classList.remove('is-in');
+      read.textContent = 'Solving backward from the horizon…';
+    };
+
+    const run = () => {
+      reset();
+      const STEP = 130;
+      // 1. The surface fills in backward, one time-slice at a time.
+      byTime.forEach((rib, k) => {
+        timers.push(window.setTimeout(() => {
+          rib.classList.add('is-in');
+          const t = Number(rib.dataset.t);
+          read.textContent = `V(t=${t}, ·) — the value of every state at this date, given everything after it`;
+        }, k * STEP));
+      });
+      const meshDone = byTime.length * STEP;
+      // 2. The state-lines join it up into a surface.
+      timers.push(window.setTimeout(() => {
+        for (const el of spines) el.classList.add('is-in');
+        read.textContent = 'Every state at every date now carries a value.';
+      }, meshDone + 120));
+      // 3. The many.
+      timers.push(window.setTimeout(() => {
+        cands.classList.add('is-in');
+        read.textContent = 'Candidate policies — every fixed allocation, and the simple switches.';
+      }, meshDone + 900));
+      // 4. The one, traced forward.
+      timers.push(window.setTimeout(() => {
+        opt.classList.add('is-in');
+        read.textContent = 'And the optimum, read off the surface — solve backward, act forward.';
+        nodes.forEach((n, i) => {
+          timers.push(window.setTimeout(() => n.classList.add('is-in'), i * 90));
+        });
+      }, meshDone + 1700));
+      // 5. Hold, then run it again — a reader arriving mid-loop still sees the whole argument.
+      timers.push(window.setTimeout(run, meshDone + 1700 + periods * 90 + 4200));
+    };
+
+    let started = false;
+    const io = new IntersectionObserver((entries) => {
+      const visible = entries.some((e) => e.isIntersecting);
+      if (visible && !started) { started = true; run(); }
+      else if (!visible && started) { started = false; clearAll(); showAll(); }
+    }, { threshold: 0.35 });
+    io.observe(section);
+
+    return () => { clearAll(); io.disconnect(); };
+  }
+
+  let teardown: (() => void) | null = null;
+  document.addEventListener('astro:page-load', () => {
+    teardown?.();
+    teardown = initLattice();
+  });
+</script>

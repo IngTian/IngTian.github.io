@@ -21,9 +21,9 @@
 const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
   { label: 'About',    href: '#heights',   zone: 'light' },
   { label: 'Story',    href: '#story',     zone: 'light' },
-  { label: 'Problem',  href: '#lesson',    zone: 'light' },
-  { label: 'Decide',   href: '#moment',    zone: 'light' },
-  { label: 'Method',   href: '#method',    zone: 'light' },
+  { label: 'Choice',   href: '#choice',    zone: 'light' },
+  { label: 'Rules',    href: '#rules',     zone: 'light' },
+  { label: 'Solve',    href: '#solve',     zone: 'dark'  },
   { label: 'Work',     href: '#work',      zone: 'light' },
   { label: 'Links',    href: '#signature', zone: 'dark'  },
 ];
@@ -169,8 +169,10 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
     // ALL of them, not just the first: the page now has three paper panels in a row (the career story,
     // the research question, the writing/projects slide). Testing only #story meant the rail reverted to
     // light sky ink over the other two, where it is nearly invisible against the panel.
+    // The opaque LIGHT panels. .so-paper is deliberately absent: the Solve slide is dark in both themes, so the
+    // rail wants its normal light-on-dark ink there rather than the dark-on-paper override.
     const paperPanels = Array.from(
-      document.querySelectorAll<HTMLElement>('.story-paper, .ls-paper, .mo-paper, .mt-paper, .wk-paper'),
+      document.querySelectorAll<HTMLElement>('.story-paper, .ch-paper, .ru-paper, .wk-paper'),
     );
 
     function update() {

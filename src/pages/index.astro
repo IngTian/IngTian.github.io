@@ -8,9 +8,9 @@ import Heights from '../sections/Heights.astro';
 import Interlude from '../sections/Interlude.astro';
 import DescentPath from '../components/DescentPath.astro';
 import Story from '../sections/Story.astro';
-import Lesson from '../sections/Lesson.astro';
-import Moment from '../sections/Moment.astro';
-import Method from '../sections/Method.astro';
+import Choice from '../sections/Choice.astro';
+import Rules from '../sections/Rules.astro';
+import Solve from '../sections/Solve.astro';
 import Work from '../sections/Work.astro';
 import Signature from '../sections/Signature.astro';
 import Deck from '../components/Deck.astro';
@@ -32,24 +32,26 @@ import Deck from '../components/Deck.astro';
     <Story>
       <DescentPath />
     </Story>
-    <!-- THE FIELD, IN THREE SLIDES, on the owner's own framing of the goal: "our job is to illustrate
-         1. what this topic is 2. why is it important and hard 3. what's my job."
-           1. Lesson — the topic. Assets with pixel marks, then "How would you invest?", then four RULES
-              (not fixed mixes) with the multi-period paths they actually produce. The honest punchline is
-              that the tallest curve is not the answer: the naive rule ends highest and falls 22%.
-           2. Method — why it is hard, in arithmetic a non-specialist can check (48 decisions vs 72,000,
-              and more corner portfolios than atoms in the universe), then what the job is.
-           3. Work — publications, writings, projects, stated plainly.
-         Two earlier drafts are gone: the single-question Inquiry slide (it asked before teaching) and the
-         published-results chart (it framed the work as "this is mine" rather than "this is what we are
-         trying to find" — the owner's correction, and the right one). -->
-    <Lesson />
-    <!-- The jump from the fan straight to "how would you invest?" was abrupt, so the question now gets its
-         own slide with a concrete setting: the book you hold this morning, three dated events, the structural
-         pressure underneath, and what a reweight actually costs at size. The difficulty is felt before it is
-         explained. -->
-    <Moment />
-    <Method />
+    <!-- THREE SLIDES, ONE ARGUMENT, on the owner's plan: "3 slides, thousands of tickers, thousands of
+         constraints, and the last slide animate a 3D route in a Bellman propagation of many that we highlight
+         as our goal." Audience, in his words: non-finance first, finance second — a QR/PM goes straight to the
+         papers anyway, so this exists to give a curious outsider a clue.
+           1. Choice — what the decision IS, and how much of it there is. Six names you recognise, thousands you
+              do not, and the fan of forty-eight people reading the same six headlines to 0.85x-1.34x.
+           2. Rules — what you are not allowed to do, as the feasible set collapsing. Real convex geometry:
+              constraints are half-spaces, so the polytope is clipped and measured (100 -> 20%), not drawn.
+           3. Solve — the method, as the algorithm running: a real Bellman lattice filling in backward from the
+              horizon, then the optimal route traced forward past 29 candidates.
+
+         THIS REPLACES FOUR SLIDES (Lesson, Moment, Method) and the reason is rhythm, not content. All four used
+         the same toned ground, the same inset, the same two-column split — four walls of the same wall — and
+         three of them sat at 1040 of 1050px, which is cramming rather than restraint. Two of them (the fan and
+         the Monday briefing) were also both answering "how hard is this decision", so the second re-established
+         what the first had earned. Solve breaks the register deliberately: it is the one dark panel, because it
+         is the arrival. -->
+    <Choice />
+    <Rules />
+    <Solve />
     <Work />
     <!-- MOUNTAINS IS GONE from the homepage, on the owner's instruction: "you may delete everything
          from below. The record, the experience, everything." It was the résumé — research interests,

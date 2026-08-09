@@ -1,0 +1,327 @@
+---
+// src/sections/Rules.astro
+// SLIDE 2 OF 3 — THE RULES, drawn as the feasible set collapsing.
+//
+// The owner's answer to the one thing I was unsure about: "for a feasible set, it can be animated in linear
+// algebra right". Exactly right, and it is what makes this slide buildable. A constraint is a linear
+// inequality, which is a half-space; the legal set is their intersection, a convex polytope. So the collapse
+// is a computation rather than a metaphor: add a half-space, clip the polygon, measure what survives.
+//
+// Three assets with a budget constraint and no shorting give the 2-simplex — a triangle — drawn in barycentric
+// coordinates so it is equilateral and the areas on screen are the REAL relative areas. Each rule cuts it with
+// a straight line, and the number beside it is the actual remaining fraction: 100 -> 69.7 -> 46.7 -> 43.2 ->
+// 28.2 -> 20%.
+//
+// SCALING IS STATED, NOT HIDDEN. Three assets cannot carry a real 5% single-name cap (three names at 5% cannot
+// sum to 100%), so the bounds are loosened for the illustration and the caption says so. What transfers exactly
+// is the shape of the argument; the count is what scales.
+//
+// Geometry in lib/feasible.ts (pure, 29 tests, including the barycentric derivation checked against the
+// original inequalities at 66 sample points).
+import { CONSTRAINTS, SIMPLEX, ASSETS, feasibleAfter, areaSeries, toWeights, centroid } from '../lib/feasible';
+import { FUND } from '../data/desk';
+import { humanCount } from '../lib/problemSize';
+
+const series = areaSeries();
+// Every stage precomputed: the client animates between ready-made polygons rather than clipping at paint time.
+const stages = CONSTRAINTS.map((c, i) => ({
+  label: c.label,
+  why: c.why,
+  poly: feasibleAfter(i + 1),
+  remaining: series[i + 1],
+}));
+const finalPoly = feasibleAfter(CONSTRAINTS.length);
+const finalWeights = toWeights(centroid(finalPoly));
+
+// Drawing box. The simplex spans x 0..1 and y 0..sqrt(3)/2, so the viewBox matches its aspect exactly and
+// nothing is stretched — the whole point of using barycentric coordinates.
+const S = 300;
+const H = S * (Math.sqrt(3) / 2);
+// Pad generously: the corner labels sit OUTSIDE the triangle, and at 16px they were clipped by the viewBox
+// ("100% NVDA" rendered as "'DA"). The pad has to hold the longest label, not just the triangle.
+const pad = 46;
+const sx = (x: number) => pad + x * S;
+const sy = (y: number) => pad + (H - y * S);
+const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ');
+---
+<section id="rules" class="ru" aria-labelledby="ru-heading">
+  <div class="ru-paper">
+    <div class="ru-inner">
+      <p class="ru-kicker">2 / 3 · the rules</p>
+
+      <div class="ru-split">
+        <div class="ru-say">
+          <h2 id="ru-heading" class="ru-head">Then you learn what you are not allowed to do.</h2>
+          <p class="ru-lede">
+            Every rule a fund carries is a straight line through the space of legal portfolios. Each one removes
+            a slab. They compound.
+          </p>
+
+          <!-- The rules, revealed with the cuts. Each carries its remaining-area figure, which is the real
+               measured fraction rather than a label. -->
+          <ol class="ru-list">
+            {stages.map((s, i) => (
+              <li class="ru-item" data-stage={i}>
+                <span class="ru-num">{i + 1}</span>
+                <span class="ru-label">{s.label}</span>
+                <span class="ru-pct">{(s.remaining * 100).toFixed(0)}%</span>
+                <span class="ru-why">{s.why}</span>
+              </li>
+            ))}
+          </ol>
+
+          <p class="ru-scale">
+            Five rules on three assets leave <strong>{(series[series.length - 1] * 100).toFixed(0)}%</strong> of
+            the space legal. A real mandate carries <strong>{humanCount(FUND.constraints)}+</strong> of them
+            across <strong>{humanCount(FUND.tickers)}</strong> names — and the survivors still have to be the
+            best portfolio in there, not merely a permitted one.
+          </p>
+        </div>
+
+        <figure class="ru-fig">
+          <p class="ru-fig-head">Legal portfolios of {ASSETS.join(' · ')}</p>
+
+          <svg class="ru-chart" viewBox={`0 0 ${S + pad * 2} ${H + pad * 2}`} role="img"
+               aria-label={`The set of legal portfolios shrinking as five constraints are applied, from the whole simplex down to ${(series[series.length - 1] * 100).toFixed(0)} percent of it.`}>
+            <!-- The unconstrained simplex, always visible as the ghost of what was possible. -->
+            <polygon class="ru-simplex" points={pts(SIMPLEX)} />
+
+            <!-- Each stage's polygon, stacked. The script reveals them in order; with no JS the final one is
+                 shown, which is the finished state. -->
+            {stages.map((s, i) => (
+              <polygon class="ru-stage" data-poly={i} points={pts(s.poly)} />
+            ))}
+
+            <!-- The corners, labelled with what they mean: an all-in-one-name portfolio. -->
+            {SIMPLEX.map((p, i) => (
+              <circle class="ru-vertex" cx={sx(p.x)} cy={sy(p.y)} r="2.5" />
+            ))}
+            <!-- Corner labels sit outside the triangle, anchored so they grow away from it. -->
+            <text class="ru-vlabel" x={sx(SIMPLEX[0].x)} y={sy(SIMPLEX[0].y) + 18} text-anchor="middle">100% {ASSETS[0]}</text>
+            <text class="ru-vlabel" x={sx(SIMPLEX[1].x)} y={sy(SIMPLEX[1].y) + 18} text-anchor="middle">100% {ASSETS[1]}</text>
+            <text class="ru-vlabel" x={sx(SIMPLEX[2].x)} y={sy(SIMPLEX[2].y) - 12} text-anchor="middle">100% {ASSETS[2]}</text>
+          </svg>
+
+          <p class="ru-read" data-read aria-live="polite">
+            <span class="ru-read-label" data-read-label>Unconstrained</span>
+            <span class="ru-read-body" data-read-body>every split of the money is available</span>
+          </p>
+
+          <figcaption class="ru-cap">
+            One surviving portfolio: <strong>{finalWeights.map((w, i) => `${(w * 100).toFixed(0)}% ${ASSETS[i]}`).join(' · ')}</strong>.
+            Bounds are loosened to fit three assets — a real 5% single-name cap is infeasible on three names.
+            The shape of the argument is exact; the count is what scales.
+          </figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .ru { position: relative; z-index: 1; width: 100vw; margin-left: calc(50% - 50vw); --deck-lead: 0px; }
+  .ru-paper {
+    --r-bg: #c4b7a1; --r-edge: rgba(74,66,54,0.26); --r-ink: #1f1b14;
+    --r-soft: #423b30; --r-faint: #6a6153; --r-accent: #7c5522;
+    background: var(--r-bg);
+    border-top: 1px solid var(--r-edge); border-bottom: 1px solid var(--r-edge);
+    padding: clamp(30px, 4vh, 62px) 0;
+  }
+  :global(html[data-theme='dark']) .ru-paper {
+    --r-bg: #14161a; --r-edge: rgba(184,177,161,0.14); --r-ink: #dce1dc;
+    --r-soft: #a8b0a9; --r-faint: #6d746e; --r-accent: #7fc9a0;
+  }
+  .ru-inner {
+    padding-left: clamp(150px, 9.5vw, 190px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
+  }
+  @media (max-width: 1099px) { .ru-inner { padding-left: clamp(28px, 6vw, 80px); } }
+
+  .ru-kicker {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--r-accent); margin: 0 0 14px;
+  }
+  .ru-split {
+    display: grid; grid-template-columns: 55fr 45fr; gap: 0 clamp(26px, 3.4vw, 66px); align-items: start;
+  }
+  .ru-fig { border-left: 1px solid var(--r-edge); padding-left: clamp(26px, 3.4vw, 66px); margin: 0; }
+  @media (max-width: 1040px) {
+    .ru-split { grid-template-columns: 1fr; gap: 4vh 0; }
+    .ru-fig { border-left: 0; padding-left: 0; padding-top: 4vh; border-top: 1px solid var(--r-edge); }
+  }
+
+  .ru-head {
+    font-family: var(--font-display); font-weight: 300;
+    font-size: clamp(24px, 2.4vw, 38px); line-height: 1.16;
+    color: var(--r-ink); margin: 0; max-width: 30ch; letter-spacing: -0.012em;
+  }
+  .ru-lede {
+    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.62; color: var(--r-soft);
+    margin: 12px 0 0; max-width: 50ch;
+  }
+
+  /* The rules, as a numbered ledger: each dims until its cut has been made, so the list and the drawing are
+     the same event seen twice. */
+  .ru-list { list-style: none; margin: clamp(16px, 2.2vh, 26px) 0 0; padding: 0; display: grid; gap: 9px; }
+  .ru-item {
+    display: grid; grid-template-columns: auto 1fr auto; gap: 2px clamp(10px, 1.2vw, 16px);
+    align-items: baseline; opacity: 0.42;
+  }
+  .ru-item.is-done { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) { .ru-item { transition: opacity .5s ease; } }
+  /* No JS: every rule shown at full strength, matching the final polygon. */
+  :global(html.no-poly-js) .ru-item { opacity: 1; }
+
+  .ru-num {
+    font-family: var(--font-mono); font-size: 9.5px; color: var(--r-accent);
+    border: 1px solid currentColor; border-radius: 50%;
+    width: 16px; height: 16px; display: grid; place-items: center;
+  }
+  .ru-label { font-size: 14px; line-height: 1.35; color: var(--r-ink); }
+  .ru-pct {
+    font-family: var(--font-mono); font-size: 13px; color: var(--r-accent);
+    font-variant-numeric: tabular-nums; text-align: right;
+  }
+  .ru-why { grid-column: 2 / -1; font-size: 11.5px; line-height: 1.45; color: var(--r-faint); max-width: 52ch; }
+
+  .ru-scale {
+    font-size: clamp(13px, 0.98vw, 14.5px); line-height: 1.6; color: var(--r-soft);
+    margin: clamp(14px, 2vh, 22px) 0 0; max-width: 56ch;
+    padding-top: clamp(10px, 1.4vh, 14px); border-top: 1px solid var(--r-edge);
+  }
+  .ru-scale strong {
+    font-family: var(--font-mono); font-weight: 400; color: var(--r-accent); font-variant-numeric: tabular-nums;
+  }
+
+  .ru-fig-head {
+    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--r-faint); margin: 0 0 10px;
+  }
+  .ru-chart { width: 100%; max-width: 340px; height: auto; display: block; margin: 0 auto; }
+
+  /* The simplex stays visible as a ghost: the argument is about what was REMOVED, so the original space has to
+     remain legible behind the survivor. */
+  .ru-simplex {
+    fill: color-mix(in srgb, var(--r-ink) 7%, transparent);
+    stroke: var(--r-faint); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.5;
+  }
+  /* The survivor needs to READ against the ghost simplex, and at 22% fill on a toned ground it did not — the
+     remaining region was barely distinguishable from the space it survived inside, which is the one contrast
+     the slide depends on. */
+  .ru-stage {
+    fill: color-mix(in srgb, var(--r-accent) 42%, transparent);
+    stroke: var(--r-accent); stroke-width: 2; vector-effect: non-scaling-stroke;
+    opacity: 0;
+  }
+  .ru-stage.is-shown { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    .ru-stage { transition: opacity .55s ease; }
+  }
+  /* No JS / reduced motion: the last stage is the finished state. */
+  :global(html.no-poly-js) .ru-stage { opacity: 0; }
+  :global(html.no-poly-js) .ru-stage:last-of-type { opacity: 1; }
+
+  .ru-vertex { fill: var(--r-faint); }
+  .ru-vlabel {
+    font-family: var(--font-mono); font-size: 8px; fill: var(--r-faint);
+    letter-spacing: 0.04em;
+  }
+
+  .ru-read {
+    display: grid; grid-template-columns: auto 1fr; gap: 0 12px; align-items: baseline;
+    margin: clamp(10px, 1.4vh, 16px) 0 0; min-height: 2.4em;
+  }
+  .ru-read-label {
+    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--r-accent); white-space: nowrap;
+  }
+  .ru-read-body { font-size: 12.5px; line-height: 1.5; color: var(--r-soft); }
+
+  .ru-cap {
+    font-size: 10.5px; line-height: 1.5; color: var(--r-faint);
+    margin: clamp(8px, 1.2vh, 14px) 0 0; max-width: 56ch;
+  }
+  .ru-cap strong { font-family: var(--font-mono); font-weight: 400; color: var(--r-soft); }
+</style>
+
+<script>
+  // THE COLLAPSE, one rule at a time. It cycles so a reader arriving mid-loop still sees the whole argument,
+  // and it holds on the final state longest — that is the state the caption describes.
+  //
+  // Progressive enhancement in the safe direction: html.no-poly-js (added here, cleared once this runs) makes
+  // the CSS show the FINAL polygon and every rule at full strength, so a JS failure leaves the finished
+  // picture rather than an empty triangle.
+  document.documentElement.classList.add('no-poly-js');
+
+  function initPoly(): (() => void) | null {
+    const section = document.querySelector<HTMLElement>('#rules');
+    if (!section) return null;
+    const polys = Array.from(section.querySelectorAll<SVGPolygonElement>('[data-poly]'));
+    const items = Array.from(section.querySelectorAll<HTMLElement>('[data-stage]'));
+    const label = section.querySelector<HTMLElement>('[data-read-label]');
+    const body = section.querySelector<HTMLElement>('[data-read-body]');
+    if (!polys.length || !items.length || !label || !body) return null;
+    document.documentElement.classList.remove('no-poly-js');
+
+    // Read the copy off the DOM the page already rendered, so the readout cannot drift from the list.
+    const stages = items.map((li) => ({
+      label: li.querySelector('.ru-label')?.textContent?.trim() ?? '',
+      pct: li.querySelector('.ru-pct')?.textContent?.trim() ?? '',
+      why: li.querySelector('.ru-why')?.textContent?.trim() ?? '',
+    }));
+
+    const showAll = () => {
+      polys.forEach((p, i) => p.classList.toggle('is-shown', i === polys.length - 1));
+      items.forEach((li) => li.classList.add('is-done'));
+      label.textContent = stages[stages.length - 1].pct + ' left';
+      body.textContent = 'after all five rules';
+    };
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      showAll();
+      return null;
+    }
+
+    // -1 is the unconstrained state, then one step per rule.
+    let step = -1;
+    let timer = 0;
+
+    const render = () => {
+      polys.forEach((p, i) => p.classList.toggle('is-shown', i === step));
+      items.forEach((li, i) => li.classList.toggle('is-done', i <= step));
+      if (step < 0) {
+        label.textContent = 'Unconstrained';
+        body.textContent = 'every split of the money is available';
+      } else {
+        const s = stages[step];
+        label.textContent = `${s.pct} left`;
+        body.textContent = s.label.toLowerCase() + ' — ' + s.why.replace(/\.$/, '');
+      }
+    };
+
+    const advance = () => {
+      step = step >= stages.length - 1 ? -1 : step + 1;
+      render();
+      // Hold longest on the final state: it is the one the caption and the argument rest on.
+      const dwell = step === stages.length - 1 ? 3400 : step < 0 ? 1500 : 1700;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(advance, dwell);
+    };
+
+    render();
+
+    const io = new IntersectionObserver((entries) => {
+      const visible = entries.some((e) => e.isIntersecting);
+      if (visible && !timer) timer = window.setTimeout(advance, 1200);
+      else if (!visible && timer) { window.clearTimeout(timer); timer = 0; }
+    }, { threshold: 0.3 });
+    io.observe(section);
+
+    return () => { window.clearTimeout(timer); io.disconnect(); };
+  }
+
+  let teardown: (() => void) | null = null;
+  document.addEventListener('astro:page-load', () => {
+    teardown?.();
+    teardown = initPoly();
+  });
+</script>
