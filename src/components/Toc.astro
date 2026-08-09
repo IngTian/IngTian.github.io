@@ -15,10 +15,12 @@
 // 'Work' pointed at #mountains, which no longer exists on the homepage — the résumé section was
 // deleted (see index.astro). A rail stop whose target is missing is dead: the scrollspy silently drops
 // it, but it still renders as a clickable link that goes nowhere. Removed rather than repointed.
+// 'Ask' pointed at #ground — the terminal — which is deleted (see index.astro), and 'Work' before it
+// pointed at #mountains, also deleted. Both are removed rather than repointed: a rail stop whose target
+// is missing still renders as a clickable link that goes nowhere.
 const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
   { label: 'About', href: '#heights',   zone: 'light' },
   { label: 'Story', href: '#story',     zone: 'light' },
-  { label: 'Ask',   href: '#ground',    zone: 'dark'  },
   { label: 'Links', href: '#signature', zone: 'dark'  },
 ];
 ---

@@ -2,7 +2,6 @@
 import { defineConfig, fontProviders } from 'astro/config';
 
 import tailwindcss from '@tailwindcss/vite';
-import react from '@astrojs/react';
 import sitemap from '@astrojs/sitemap';
 
 // https://astro.build/config
@@ -23,7 +22,11 @@ export default defineConfig({
     plugins: [tailwindcss()]
   },
 
-  integrations: [react(), sitemap({
+  // NO REACT. The terminal was the site's only island and it is deleted, so nothing renders a
+  // component: no .tsx files, no client:* directives, no react imports remain. Keeping the integration
+  // would ship the client runtime for nothing — the site is now entirely static HTML plus vanilla
+  // scripts. If an island is ever needed again, re-add @astrojs/react here (it stays in devDeps).
+  integrations: [sitemap({
     // Prototype routes carry noindex, but an unfiltered sitemap still advertises
     // them to crawlers — and their rendered bodies quote internal review notes.
     filter: (page) => !page.includes('/proto-'),

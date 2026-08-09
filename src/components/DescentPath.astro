@@ -131,7 +131,9 @@ const facts = trajectoryFacts();
   :global(.story-paper) .dp { display: grid; }
   :global(.story-paper) .dp-stage {
     aspect-ratio: auto;
-    height: min(84vh, 96vw);
+    /* Slightly short of the full slide, leaving a clear strip at the foot for the "why the climb" cue —
+       the drawing spans the whole width now, so without this the cue sits on top of contour ink. */
+    height: min(78vh, 92vw);
     margin: 0;
   }
   :global(.story-paper) .dp-head {

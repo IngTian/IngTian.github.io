@@ -45,7 +45,19 @@ const figures = STORY_FIGURES.map((f) => {
   <div class="story-paper">
     <!-- The graph, on the same paper. Passed in as a slot so this component owns the surface and the
          ink tokens, and DescentPath stays a self-contained piece that inherits them. -->
-    <div class="story-figure-slot"><slot /></div>
+    <div class="story-figure-slot">
+      <slot />
+
+      <!-- WHAT IS BELOW, NAMED. The hero carries a "scroll" cue and the tagline slide reveals the
+           descent beneath it, but the graph slide ended with nothing — in a deck, where each slide
+           fills the screen, an unmarked bottom edge reads as the end of the page. This names the next
+           slide rather than just gesturing down: the reader learns the graph HAS an explanation.
+           A real link, so it works without the deck (and for keyboard). -->
+      <a class="story-next" href="#story-heading">
+        <span class="story-next-label">Why the climb</span>
+        <span class="story-next-arrow" aria-hidden="true"></span>
+      </a>
+    </div>
 
     <div class="story-inner">
       <h2 id="story-heading" class="story-title">Why the climb</h2>
@@ -93,17 +105,27 @@ const figures = STORY_FIGURES.map((f) => {
        --paper as the text colour (which would vanish);
      - dark: a cool near-black slate a shade above --bg, so the panel is felt rather than seen. */
   .story-paper {
-    --story-bg: #efe7d8;
-    --story-edge: rgba(90, 84, 74, 0.16);
+    /* DARKER THAN THE FIRST DRAFT, and this was measured rather than eyeballed. The owner: "in the
+       light theme it might be better to have a darker background for the two bottom tabs, because when
+       you pass the tagline the fluid is already mildly warm-dark, so getting back to full light is a
+       sharp contrast."
+       Sampled at the seam, light theme: the sky just above reads rgb(115,115,123), luminance 0.173,
+       while the old #efe7d8 panel was 0.805 — a 4.5x jump at the boundary, which is exactly the snap
+       back to full light he describes. This tone (0.482) more than halves it to 2.4x while keeping the
+       ink at 8.7:1, far above the 4.5:1 floor. A toned printing stock rather than bright paper. */
+    --story-bg: #c4b7a1;
+    --story-edge: rgba(74, 66, 54, 0.26);
     --story-ink: #1f1b14;
-    --story-ink-soft: #4a4438;
-    --story-ink-faint: #7d7566;
-    --story-accent: #9a6f34;
+    --story-ink-soft: #423b30;
+    --story-ink-faint: #6a6153;
+    --story-accent: #7c5522;
     /* The graph's own ink, dark-on-paper. The canvas reads these (see DescentPath) because its
        default tokens — --paper, --ink-3..5 — are LIGHT inks chosen for the dark sky, and on a light
        paper ground they render invisible. Same reason the panel can't reuse --paper as a background. */
-    --story-line: rgba(60, 54, 44, 0.72);
-    --story-line-soft: rgba(96, 88, 74, 0.6);
+    /* Darker than before to hold up on the toned ground: the old values were chosen against a near-white
+       panel, and a 0.72-alpha mid-grey on 0.48 luminance stock loses the faint contour dots. */
+    --story-line: rgba(46, 40, 31, 0.8);
+    --story-line-soft: rgba(72, 64, 52, 0.7);
 
     background: var(--story-bg);
     border-top: 1px solid var(--story-edge);
@@ -121,8 +143,20 @@ const figures = STORY_FIGURES.map((f) => {
     --story-line-soft: rgba(160, 168, 161, 0.5);
   }
 
-  /* The PROSE keeps a measure — long lines are unreadable, and this is a journal spread. */
-  .story-inner { width: min(1180px, 84vw); margin: 0 auto; }
+  /* The PROSE keeps a measure — long lines are unreadable, and this is a journal spread. It shares the
+     graph's LEFT EDGE rather than being centred: the two are one slide, and a centred text block under
+     a left-aligned drawing reads as two unrelated pieces. Centring also put the prose at x=260 while
+     the graph began at x=43, which is what made the graph look pushed against the boundary. */
+  .story-inner {
+    width: 100%;
+    margin: 0;
+    padding-left: clamp(96px, 8.5vw, 168px);
+    padding-right: clamp(16px, 2vw, 40px);
+    box-sizing: border-box;
+    max-width: none;
+  }
+  /* The prose itself keeps a comfortable measure inside that full-width box. */
+  .story-cols, .story-figures, .story-coda, .story-title { max-width: 1300px; }
 
   /* The GRAPH does not. It is the showpiece and it was too small inside the text measure, so it spans
      the panel edge to edge; only enough side padding to keep the outermost labels off the edge. The
@@ -134,19 +168,70 @@ const figures = STORY_FIGURES.map((f) => {
   .story-figure-slot {
     --deck-lead: 60px;
     width: 100%;
-    padding: 0 clamp(16px, 2.5vw, 44px);
+    /* INDENTED PAST THE RAIL, not merely padded off the viewport edge. Measured before this: the
+       drawing began at x=43 while the fixed Toc occupies x=34..86 — they overlapped, which is why the
+       graph read as jammed against the left boundary. The left inset now clears the rail with room to
+       breathe; the right stays tight so the extra space goes to the DRAWING rather than to margin. */
+    padding-left: clamp(96px, 8.5vw, 168px);
+    padding-right: clamp(16px, 2vw, 40px);
     box-sizing: border-box;
-    /* The gap below must EXCEED the lead, or the next slide bleeds into this one's resting screen: the
-       stop sits 60px above the slot's top, so the viewport reaches 60px further down than the slot
-       does. Measured: with a 7vh gap the editorial's heading appeared 35px inside the graph slide. */
-    margin: 0 0 max(12vh, 120px);
+    /* The gap below must exceed the LEAD PLUS whatever the slot is short of a full screen, or the next
+       slide bleeds into this one's resting view. The stop sits 60px above the slot's top, so the
+       viewport reaches 60px further down than the slot does; the stage is also deliberately shorter
+       than the slide (leaving room for the cue), which adds to the shortfall.
+       Measured at 1700x1050: slot 819px, rest at 1989, viewport reaches 3039 — and the editorial began
+       at 2994, i.e. 45px inside the graph slide. Sized to clear both terms with room to spare. */
+    margin: 0 0 max(22vh, 230px);
   }
   /* The editorial gets the same air when the deck rests on it. */
   .story-inner { --deck-lead: 60px; }
 
+  /* ── THE "MORE BELOW" CUE, at the foot of the graph slide.
+     Centred on the slide rather than the drawing, and low enough to read as an edge marker instead of a
+     caption. Quiet by default; the arrow bobs under no-preference exactly like the hero's cue. */
+  .story-next {
+    position: absolute;
+    left: 50%; bottom: 1.4vh;
+    transform: translateX(-50%);
+    display: inline-flex; flex-direction: column; align-items: center; gap: 7px;
+    text-decoration: none;
+    color: var(--story-ink-soft);
+    z-index: 3;
+    /* Its own ground. The drawing now spans the full slide, so the cue sits ON the contour dots and was
+       unreadable against them — measured by eye against the settled frame, where "WHY THE CLIMB" ran
+       straight through a band of ink. A soft pad of the panel colour clears just enough room without
+       reading as a button. */
+    padding: 10px 18px 8px;
+    border-radius: 3px;
+    background: radial-gradient(60% 60% at 50% 50%,
+      color-mix(in srgb, var(--story-bg) 96%, transparent) 40%,
+      color-mix(in srgb, var(--story-bg) 0%, transparent) 100%);
+  }
+  .story-next-label {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  /* A chevron from two borders — no glyph, no asset, and it inherits the ink. */
+  .story-next-arrow {
+    width: 8px; height: 8px;
+    border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg);
+  }
+  .story-next:hover { color: var(--story-ink); }
+  .story-next:focus-visible { outline: 2px solid var(--story-accent); outline-offset: 6px; border-radius: 2px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .story-next-arrow { animation: story-next-bob 2.6s ease-in-out 1s infinite; }
+    @keyframes story-next-bob {
+      0%, 100% { opacity: 0.55; transform: rotate(45deg) translate(0, 0); }
+      50%      { opacity: 1;    transform: rotate(45deg) translate(3px, 3px); }
+    }
+  }
+  /* The slot is the positioning context for the cue. */
+  .story-figure-slot { position: relative; }
+
   .story-title {
     font-family: var(--font-display); font-weight: 300;
-    font-size: clamp(28px, 3.4vw, 46px);
+    font-size: clamp(30px, 3.8vw, 54px);
     color: var(--story-ink); margin: 0 0 5vh;
     letter-spacing: -0.01em;
   }
@@ -166,19 +251,22 @@ const figures = STORY_FIGURES.map((f) => {
   }
 
   .story-kicker {
-    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.24em;
-    text-transform: uppercase; color: var(--story-accent); margin: 0 0 14px;
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.24em;
+    text-transform: uppercase; color: var(--story-accent); margin: 0 0 18px;
   }
-  /* The lead is display-size: it is the sentence a skimmer reads, and the one that has to carry the
-     whole column on its own. */
+  /* ── TYPE SCALED UP to the proto-sketches register, which is the style the owner preferred.
+     That sketch pulled its two focal sentences out at 34px on a 44px line (see lib/sketches/batch1.ts
+     — the "forty-two sentences" frame, the only one that measured as not reading empty). The lead was
+     26px here, which is a subtitle rather than a focal sentence. Now it tops out at 34px on a 1.32
+     line, and the body follows to 17px: a journal spread's body is not a UI label. */
   .story-lead {
-    font-family: var(--font-display); font-size: clamp(19px, 1.9vw, 26px);
-    line-height: 1.38; color: var(--story-ink); margin: 0 0 20px;
+    font-family: var(--font-display); font-size: clamp(21px, 2.3vw, 34px);
+    line-height: 1.32; color: var(--story-ink); margin: 0 0 26px;
     text-wrap: balance;
   }
   .story-body {
-    font-size: 15px; line-height: 1.78; color: var(--story-ink-soft);
-    margin: 0 0 15px; max-width: 46ch;
+    font-size: clamp(15px, 1.15vw, 17px); line-height: 1.75; color: var(--story-ink-soft);
+    margin: 0 0 18px; max-width: 52ch;
   }
   .story-body:last-child { margin-bottom: 0; }
 
@@ -188,15 +276,15 @@ const figures = STORY_FIGURES.map((f) => {
     margin: 7vh 0 0; padding-top: 4vh; border-top: 1px solid var(--story-edge);
   }
   .story-figure dt {
-    font-family: var(--font-mono); font-size: clamp(24px, 2.6vw, 34px);
+    font-family: var(--font-mono); font-size: clamp(26px, 3vw, 40px);
     color: var(--story-accent); line-height: 1;
   }
   .story-figure dd {
-    margin: 12px 0 0; font-size: 13px; line-height: 1.6; color: var(--story-ink-faint);
+    margin: 14px 0 0; font-size: 14px; line-height: 1.6; color: var(--story-ink-faint);
   }
   .story-figure-label {
-    display: block; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em;
-    text-transform: uppercase; color: var(--story-ink-soft); margin-bottom: 6px;
+    display: block; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--story-ink-soft); margin-bottom: 7px;
   }
   @media (max-width: 700px) {
     .story-figures { grid-template-columns: 1fr; gap: 4vh 0; }
@@ -205,6 +293,6 @@ const figures = STORY_FIGURES.map((f) => {
   .story-coda {
     margin: 7vh 0 0; max-width: 62ch;
     font-family: var(--font-display); font-style: italic;
-    font-size: clamp(17px, 1.6vw, 21px); line-height: 1.6; color: var(--story-ink);
+    font-size: clamp(19px, 1.9vw, 26px); line-height: 1.55; color: var(--story-ink);
   }
 </style>

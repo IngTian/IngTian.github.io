@@ -8,7 +8,6 @@ import Heights from '../sections/Heights.astro';
 import Interlude from '../sections/Interlude.astro';
 import DescentPath from '../components/DescentPath.astro';
 import Story from '../sections/Story.astro';
-import Ground from '../sections/Ground.astro';
 import Signature from '../sections/Signature.astro';
 import Deck from '../components/Deck.astro';
 ---
@@ -35,7 +34,10 @@ import Deck from '../components/Deck.astro';
          and the editorial exist to replace. Nothing was lost: every block already has its own route
          (/research, /experience, /projects), and the footer + corner nav carry the doorways. The
          section file is kept, unreferenced, so the markup can be recovered from git or re-used. -->
-    <Ground />
+    <!-- THE TERMINAL IS GONE, on the owner's instruction: "you can delete the terminal at the bottom,
+         it's already useless." It was the site's only React island; with it removed the homepage ships
+         no client framework at all. Its data (data/script.ts), engine (useTypewriter) and spec are
+         deleted with it rather than left as dead weight — git holds them if it ever comes back. -->
     <Signature />
   </main>
   <Toc />
