@@ -83,6 +83,51 @@ body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body)
    trap; the offset now lives where the scrolling happens.
    ============================================================ */
 
+/* ============================================================
+   EVERY SLIDE OWNS THE SCREEN.
+
+   Measured at 1700x1050 before this rule, the shortfall per slide
+   was: choice 448px, work 477px, rules 378px, interlude 231px,
+   solve 147px. That shortfall is not empty space — it is exactly
+   how much of the NEXT slide is visible while the deck rests on
+   this one, which is why the Solve headline appeared at the foot
+   of the Rules slide. A deck whose slides each show a strip of the
+   following slide is not a deck; it is a scroll that pauses.
+
+   min-height rather than height: two slides (the hero at 1134px
+   and the career story at 1282px) are legitimately TALLER than a
+   screen, and lib/deck.ts already pages through those. Forcing a
+   fixed height would either crop them or reintroduce the overflow
+   this fixes.
+
+   The flex centring is what makes it look deliberate rather than
+   padded: a 600px slide in a 1050px frame sits in the middle of
+   its own screen instead of clinging to the top with 450px of
+   dead air under it. The paper panels stay full-bleed because
+   they are the flex ITEM, so the ground still reaches both edges.
+   ============================================================ */
+.is-slides > section {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+/* The panel inside a slide must be able to fill it, or the centring above just
+   moves a short panel down the screen and leaves sky above and below it. */
+.is-slides > section > .story-paper,
+.is-slides > section > .ch-paper,
+.is-slides > section > .ru-paper,
+.is-slides > section > .so-paper,
+.is-slides > section > .wk-paper {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+/* The signature is a footer strip, not a slide: giving it a full screen would end the
+   page on 850px of empty sky. */
+.is-slides > #signature { min-height: 0; display: block; }
+
 /* ── Atmosphere, upper sky (heights → interlude). Normal blend: these are warm
    LIGHT washes + a soft horizon haze that read on the pale paper. Localized to
    the top, they scroll away naturally. ── */

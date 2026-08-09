@@ -53,14 +53,19 @@
       const vh = window.innerHeight;
       const slides: DeckSlide[] = slideEls().map((el) => {
         const r = el.getBoundingClientRect();
-        // BREATHING AIR above each stop. Read from the element's own --deck-lead (in px) when it sets
-        // one, so a slide decides its own opening space in CSS; otherwise a small default.
+        // BREATHING AIR above each stop, opt-in per slide via --deck-lead (in px).
+        //
+        // THE DEFAULT IS NOW ZERO, and that changed when every slide became exactly one screen tall. A lead
+        // lifts the resting position ABOVE the slide, so on a full-height slide it leaves a strip of the
+        // PREVIOUS one showing: measured, the 4% default (42px at 1050) put the first stop at y=1008 instead
+        // of 1050, and the hero's foot stayed in frame under the tagline. Slides that genuinely want opening
+        // air set it themselves; a slide that fills the screen wants none.
         //
         // This cannot be scroll-margin-top: that property is only honoured by scrollIntoView(), and the
         // deck moves with window.scrollTo(). The CSS rule read correctly and did nothing, which is why
         // the paper panel's title came to rest hard against the browser chrome.
         const declared = parseFloat(getComputedStyle(el).getPropertyValue('--deck-lead'));
-        const lead = Number.isFinite(declared) ? declared : vh * 0.04;
+        const lead = Number.isFinite(declared) ? declared : 0;
         return { top: r.top + window.scrollY, height: r.height, lead };
       });
       const maxY = Math.max(0, document.documentElement.scrollHeight - vh);
