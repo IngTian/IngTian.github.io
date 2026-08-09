@@ -1,0 +1,172 @@
+---
+// src/sections/Work.astro
+// SLIDE 3 — "just say plainly, my publications, my writings, my projects."
+//
+// Plainly is the instruction and the whole design: after two slides that teach and argue, this one simply
+// says where the work is. Three columns, one line of what each holds, a real link each. No display-size
+// headline competing with the two slides before it, no counts, no "selected X" headings.
+//
+// WHY THIS IS NOT A RESUME even though it is a list. A résumé lists credentials — title, employer, dates,
+// reverse-chronological — and claims authorization. This lists ARTEFACTS and where to read them. The
+// distinction is that every row here is a thing a reader can go and check.
+import { publications, projects } from '../data/profile';
+import { WRITINGS_PROMISE, WRITINGS_TOPICS } from '../data/making';
+
+const featured = publications.find((p) => p.featured);
+const others = publications.filter((p) => !p.featured);
+const shownProjects = projects.slice(0, 2);
+---
+<section id="work" class="wk" aria-labelledby="wk-heading">
+  <div class="wk-paper">
+    <div class="wk-inner">
+      <h2 id="wk-heading" class="wk-title">The work</h2>
+
+      <div class="wk-cols">
+        <!-- PUBLICATIONS: the paper by name, so a reader knows what they are opening. -->
+        <div class="wk-col">
+          <p class="wk-col-kicker">Publications</p>
+          {featured && (
+            <div class="wk-item">
+              <p class="wk-item-name">{featured.shortTitle ?? 'RL-BHRP'}</p>
+              <p class="wk-item-line">
+                {featured.subject} · {featured.venue}
+                {featured.arxivId && <> · arXiv:{featured.arxivId}</>}
+              </p>
+            </div>
+          )}
+          {others.map((p) => (
+            <div class="wk-item">
+              <p class="wk-item-name">{p.title}</p>
+              <p class="wk-item-line">{p.venue} · {p.year}</p>
+            </div>
+          ))}
+          <a class="wk-link" href="/research">Read the research<span class="wk-arrow" aria-hidden="true">→</span></a>
+        </div>
+
+        <!-- WRITINGS: promised honestly, tagged. -->
+        <div class="wk-col">
+          <div class="wk-col-head">
+            <p class="wk-col-kicker">Writing</p>
+            <span class="wk-tag">coming</span>
+          </div>
+          <p class="wk-promise">{WRITINGS_PROMISE}</p>
+          <ul class="wk-topics">
+            {WRITINGS_TOPICS.slice(0, 3).map((t) => <li>{t}</li>)}
+          </ul>
+        </div>
+
+        <!-- PROJECTS: last, and briefest — for a quant reader this is supporting evidence. -->
+        <div class="wk-col">
+          <p class="wk-col-kicker">Projects</p>
+          {shownProjects.map((p) => (
+            <div class="wk-item">
+              <p class="wk-item-name">{p.name}</p>
+              <p class="wk-item-line">{p.tagline}</p>
+            </div>
+          ))}
+          <a class="wk-link" href="/projects">All projects<span class="wk-arrow" aria-hidden="true">→</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .wk {
+    position: relative; z-index: 1;
+    width: 100vw; margin-left: calc(50% - 50vw);
+    --deck-lead: 0px;
+  }
+  .wk-paper {
+    --wk-bg: #c4b7a1;
+    --wk-edge: rgba(74, 66, 54, 0.26);
+    --wk-ink: #1f1b14;
+    --wk-ink-soft: #423b30;
+    --wk-ink-faint: #6a6153;
+    --wk-accent: #7c5522;
+    background: var(--wk-bg);
+    border-top: 1px solid var(--wk-edge);
+    border-bottom: 1px solid var(--wk-edge);
+    padding: clamp(52px, 7.4vh, 104px) 0;
+  }
+  :global(html[data-theme='dark']) .wk-paper {
+    --wk-bg: #14161a;
+    --wk-edge: rgba(184, 177, 161, 0.14);
+    --wk-ink: #dce1dc;
+    --wk-ink-soft: #a8b0a9;
+    --wk-ink-faint: #6d746e;
+    --wk-accent: #7fc9a0;
+  }
+  .wk-inner {
+    padding-left: clamp(150px, 9.5vw, 190px);
+    padding-right: clamp(20px, 2.4vw, 52px);
+    box-sizing: border-box;
+  }
+  @media (max-width: 1099px) { .wk-inner { padding-left: clamp(28px, 6vw, 80px); } }
+
+  /* Smaller than the two slides before it: this one points, it does not argue. */
+  .wk-title {
+    font-family: var(--font-display); font-weight: 300;
+    font-size: clamp(24px, 2vw, 32px); line-height: 1.24;
+    color: var(--wk-ink); margin: 0; letter-spacing: -0.005em;
+  }
+
+  .wk-cols {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 clamp(26px, 3vw, 60px);
+    margin: clamp(28px, 3.8vh, 52px) 0 0;
+  }
+  .wk-col + .wk-col { border-left: 1px solid var(--wk-edge); padding-left: clamp(26px, 3vw, 60px); }
+  @media (max-width: 980px) {
+    .wk-cols { grid-template-columns: 1fr; gap: 4vh 0; }
+    .wk-col + .wk-col { border-left: 0; padding-left: 0; padding-top: 4vh; border-top: 1px solid var(--wk-edge); }
+  }
+
+  .wk-col-head { display: flex; align-items: baseline; gap: 10px; }
+  .wk-col-kicker {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--wk-accent); margin: 0 0 16px;
+  }
+  .wk-col-head .wk-col-kicker { margin-bottom: 16px; }
+  .wk-tag {
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--wk-ink-faint);
+    border: 1px solid var(--wk-edge); border-radius: 2px; padding: 2px 6px;
+  }
+
+  .wk-item { margin: 0 0 clamp(14px, 1.8vh, 20px); }
+  .wk-item-name {
+    font-family: var(--font-display); font-weight: 500; font-size: 15px; line-height: 1.3;
+    color: var(--wk-ink); margin: 0;
+  }
+  .wk-item-line {
+    font-size: 12.5px; line-height: 1.55; color: var(--wk-ink-faint); margin: 4px 0 0; max-width: 40ch;
+  }
+
+  .wk-promise {
+    font-family: var(--font-display); font-style: italic;
+    font-size: clamp(15px, 1.15vw, 17.5px); line-height: 1.48;
+    color: var(--wk-ink); margin: 0; max-width: 36ch;
+  }
+  .wk-topics { list-style: none; margin: clamp(13px, 1.7vh, 18px) 0 0; padding: 0; display: grid; gap: 7px; }
+  .wk-topics li {
+    font-size: 12.5px; line-height: 1.5; color: var(--wk-ink-soft);
+    padding-left: 14px; position: relative; max-width: 40ch;
+  }
+  .wk-topics li::before {
+    content: ""; position: absolute; left: 0; top: 0.62em;
+    width: 7px; height: 1px; background: var(--wk-accent); opacity: 0.7;
+  }
+
+  .wk-link {
+    display: inline-flex; align-items: baseline; gap: 8px;
+    margin: clamp(6px, 1vh, 12px) 0 0;
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.12em;
+    text-transform: uppercase; text-decoration: none;
+    color: var(--wk-accent);
+    border-bottom: 1px solid currentColor; padding-bottom: 3px;
+  }
+  .wk-arrow { transition: transform .28s cubic-bezier(.2,.7,.3,1); }
+  @media (hover: hover) { .wk-link:hover .wk-arrow { transform: translateX(4px); } }
+  .wk-link:focus-visible { outline: 2px solid var(--wk-accent); outline-offset: 4px; }
+</style>

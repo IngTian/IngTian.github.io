@@ -1,0 +1,278 @@
+---
+// src/sections/Lesson.astro
+// SLIDE 1 — teaches what portfolio optimization IS, with the cow as the naive voice.
+//
+// The owner's brief: one slide, a drafted asset table with historic-style performance, named constraints,
+// several example portfolios, and a cow easter egg acting as a teacher.
+//
+// WHY THE COW IS A PILL AND NOT A PICTURE. The site already has this idiom — TerrainHero drops a rare
+// "Moo!" pill at a settled optimum — and the project notes record three failed attempts at hand-authored
+// illustration. So the cow is a VOICE: it asks the question the reader is already thinking, in the margin,
+// and it costs no drawing. It cycles on click and on a slow timer, so it reads as a companion rather than
+// as a decoration that fired once.
+//
+// The numbers in the table are ILLUSTRATIVE and captioned as such — see data/lesson.ts for why that is
+// legitimate here and not elsewhere on the site.
+import { ASSETS, ASSETS_CAPTION, LESSON_QUESTION, CANDIDATES, CONSTRAINTS, COW_LINES, LESSON_CLOSE } from '../data/lesson';
+---
+<section id="lesson" class="ls" aria-labelledby="ls-heading">
+  <div class="ls-paper">
+    <div class="ls-inner">
+      <p class="ls-kicker">The problem</p>
+      <h2 id="ls-heading" class="ls-question">{LESSON_QUESTION}</h2>
+
+      <div class="ls-grid">
+        <!-- LEFT: the assets, as a set table rather than a spreadsheet — hairline rules, mono figures,
+             right-aligned numerals so the columns read down. -->
+        <div class="ls-col ls-col--table">
+          <table class="ls-table">
+            <caption class="sr-only">Illustrative long-run characteristics of four asset classes</caption>
+            <thead>
+              <tr>
+                <th scope="col">Asset</th>
+                <th scope="col" class="num">Return</th>
+                <th scope="col" class="num">Vol</th>
+                <th scope="col">Its job</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ASSETS.map((a) => (
+                <tr>
+                  <th scope="row">{a.label}</th>
+                  <td class="num">{a.ret}</td>
+                  <td class="num">{a.vol}</td>
+                  <td class="role">{a.role}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p class="ls-caption">{ASSETS_CAPTION}</p>
+
+          <!-- THE COW, in the margin under the table: a real button, so it is keyboard reachable and
+               announces its own content to a screen reader. -->
+          <div class="ls-cow">
+            <button
+              type="button"
+              class="ls-cow-btn"
+              data-cow
+              data-lines={JSON.stringify(COW_LINES)}
+              aria-live="polite"
+            >
+              <span class="ls-cow-mark" aria-hidden="true">◕</span>
+              <span class="ls-cow-say" data-cow-say>{COW_LINES[0]}</span>
+            </button>
+            <span class="ls-cow-hint" aria-hidden="true">ask again</span>
+          </div>
+        </div>
+
+        <!-- RIGHT: several candidate answers, then the constraints that make it hard. -->
+        <div class="ls-col">
+          <p class="ls-sub">Four defensible answers</p>
+          <ul class="ls-cands">
+            {CANDIDATES.map((c) => (
+              <li class="ls-cand">
+                <span class="ls-cand-name">{c.name}</span>
+                <span class="ls-cand-mix">{c.mix}</span>
+                <span class="ls-cand-body">{c.goal} — <em>{c.cost}</em></span>
+              </li>
+            ))}
+          </ul>
+
+          <p class="ls-sub ls-sub--rule">And the rules you must respect</p>
+          <ul class="ls-cons">
+            {CONSTRAINTS.map((c) => <li>{c}</li>)}
+          </ul>
+        </div>
+      </div>
+
+      <p class="ls-close">{LESSON_CLOSE}</p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .ls {
+    position: relative; z-index: 1;
+    width: 100vw; margin-left: calc(50% - 50vw);
+    --deck-lead: 0px;
+  }
+  .ls-paper {
+    --ls-bg: #c4b7a1;
+    --ls-edge: rgba(74, 66, 54, 0.26);
+    --ls-ink: #1f1b14;
+    --ls-ink-soft: #423b30;
+    --ls-ink-faint: #6a6153;
+    --ls-accent: #7c5522;
+    background: var(--ls-bg);
+    border-top: 1px solid var(--ls-edge);
+    border-bottom: 1px solid var(--ls-edge);
+    /* This is the densest slide on the page — a table, four candidates, five constraints and the cow — and
+       it has to fit ONE screen or the deck pages through it and the composition is never seen whole.
+       Measured at 1700x1050 it overflowed by 10px at 6.2vh; this lands it inside. */
+    padding: clamp(38px, 5.4vh, 80px) 0;
+  }
+  :global(html[data-theme='dark']) .ls-paper {
+    --ls-bg: #14161a;
+    --ls-edge: rgba(184, 177, 161, 0.14);
+    --ls-ink: #dce1dc;
+    --ls-ink-soft: #a8b0a9;
+    --ls-ink-faint: #6d746e;
+    --ls-accent: #7fc9a0;
+  }
+  .ls-inner {
+    padding-left: clamp(150px, 9.5vw, 190px);
+    padding-right: clamp(20px, 2.4vw, 52px);
+    box-sizing: border-box;
+  }
+  @media (max-width: 1099px) { .ls-inner { padding-left: clamp(28px, 6vw, 80px); } }
+
+  .ls-kicker {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em;
+    text-transform: uppercase; color: var(--ls-accent); margin: 0 0 14px;
+  }
+  .ls-question {
+    font-family: var(--font-display); font-weight: 300;
+    font-size: clamp(21px, 1.8vw, 30px); line-height: 1.28;
+    color: var(--ls-ink); margin: 0; max-width: 60ch;
+    text-wrap: pretty; letter-spacing: -0.005em;
+  }
+
+  .ls-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 0 clamp(30px, 3.6vw, 72px);
+    margin: clamp(24px, 3.2vh, 44px) 0 0;
+  }
+  .ls-col + .ls-col { border-left: 1px solid var(--ls-edge); padding-left: clamp(30px, 3.6vw, 72px); }
+  @media (max-width: 980px) {
+    .ls-grid { grid-template-columns: 1fr; gap: 4vh 0; }
+    .ls-col + .ls-col { border-left: 0; padding-left: 0; padding-top: 4vh; border-top: 1px solid var(--ls-edge); }
+  }
+
+  /* THE TABLE, set rather than dumped: hairline rules only, no fills, no borders around cells, mono
+     tabular figures so the columns align down the page. This is the difference between a set table and a
+     spreadsheet, and the project's taste rules care about it. */
+  .ls-table { width: 100%; border-collapse: collapse; }
+  .ls-table th, .ls-table td {
+    text-align: left; padding: 8px 12px 8px 0; vertical-align: baseline;
+  }
+  .ls-table thead th {
+    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ls-ink-faint); font-weight: 400;
+    border-bottom: 1px solid var(--ls-edge); padding-bottom: 7px;
+  }
+  .ls-table tbody th {
+    font-family: var(--font-display); font-weight: 500; font-size: 15.5px; color: var(--ls-ink);
+  }
+  .ls-table tbody tr + tr th, .ls-table tbody tr + tr td {
+    border-top: 1px solid color-mix(in srgb, var(--ls-edge) 55%, transparent);
+  }
+  .ls-table .num {
+    font-family: var(--font-mono); font-size: 13.5px; color: var(--ls-ink-soft);
+    font-variant-numeric: tabular-nums; text-align: right; padding-right: clamp(10px, 1.4vw, 22px);
+  }
+  .ls-table .role { font-size: 13px; line-height: 1.5; color: var(--ls-ink-faint); }
+  .ls-caption {
+    font-size: 11.5px; line-height: 1.55; color: var(--ls-ink-faint);
+    margin: 10px 0 0; max-width: 44ch; font-style: italic;
+  }
+
+  /* THE COW. A pill in the same idiom as the hero's easter egg, but here it is the teaching voice, so it
+     is always present rather than rare. */
+  .ls-cow { display: flex; align-items: center; gap: 10px; margin: clamp(18px, 2.4vh, 30px) 0 0; flex-wrap: wrap; }
+  .ls-cow-btn {
+    display: inline-flex; align-items: baseline; gap: 9px;
+    font: inherit; cursor: pointer; text-align: left;
+    background: color-mix(in srgb, var(--ls-accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ls-accent) 42%, transparent);
+    border-radius: 999px; padding: 7px 15px;
+    color: var(--ls-ink);
+  }
+  .ls-cow-mark { color: var(--ls-accent); font-size: 12px; line-height: 1; }
+  .ls-cow-say { font-family: var(--font-display); font-style: italic; font-size: 14.5px; line-height: 1.4; }
+  @media (hover: hover) {
+    .ls-cow-btn { transition: background-color .28s, border-color .28s; }
+    .ls-cow-btn:hover { background: color-mix(in srgb, var(--ls-accent) 20%, transparent); }
+  }
+  .ls-cow-btn:focus-visible { outline: 2px solid var(--ls-accent); outline-offset: 3px; }
+  .ls-cow-hint {
+    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--ls-ink-faint);
+  }
+
+  .ls-sub {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--ls-accent); margin: 0 0 12px;
+  }
+  .ls-sub--rule { margin-top: clamp(20px, 2.6vh, 32px); }
+
+  .ls-cands { list-style: none; margin: 0; padding: 0; display: grid; gap: 11px; }
+  .ls-cand { display: grid; gap: 2px; }
+  .ls-cand-name {
+    font-family: var(--font-display); font-weight: 500; font-size: 15px; color: var(--ls-ink);
+  }
+  .ls-cand-mix {
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--ls-accent);
+  }
+  .ls-cand-body { font-size: 13px; line-height: 1.55; color: var(--ls-ink-soft); max-width: 52ch; }
+  .ls-cand-body em { font-style: italic; color: var(--ls-ink-faint); }
+
+  .ls-cons { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+  .ls-cons li {
+    font-size: 12.5px; line-height: 1.5; color: var(--ls-ink-soft);
+    padding-left: 15px; position: relative; max-width: 54ch;
+  }
+  .ls-cons li::before {
+    content: ""; position: absolute; left: 0; top: 0.62em;
+    width: 7px; height: 1px; background: var(--ls-accent); opacity: 0.7;
+  }
+
+  .ls-close {
+    font-family: var(--font-display); font-style: italic;
+    font-size: clamp(16px, 1.4vw, 21px); line-height: 1.5;
+    color: var(--ls-ink); margin: clamp(22px, 3vh, 40px) 0 0; max-width: 66ch;
+    padding-top: clamp(18px, 2.4vh, 30px); border-top: 1px solid var(--ls-edge);
+  }
+</style>
+
+<script>
+  // THE COW CYCLES. Its questions are the naive ones a reader is already asking, so it should be able to
+  // ask the next one — a single fixed line would read as decoration. Clicking advances it; it also
+  // advances slowly on its own so the affordance announces itself, and that timer stops for good on the
+  // first interaction (the reader has taken over) and never runs under reduced motion.
+  function initCow(): (() => void) | null {
+    const btn = document.querySelector<HTMLButtonElement>('[data-cow]');
+    const say = document.querySelector<HTMLElement>('[data-cow-say]');
+    if (!btn || !say) return null;
+
+    let lines: string[] = [];
+    try { lines = JSON.parse(btn.dataset.lines || '[]'); } catch { lines = []; }
+    if (lines.length < 2) return null;
+
+    let i = 0;
+    let timer = 0;
+    const advance = () => { i = (i + 1) % lines.length; say.textContent = lines[i]; };
+
+    const onClick = () => { window.clearInterval(timer); timer = 0; advance(); };
+    btn.addEventListener('click', onClick);
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reduced) {
+      // Only while the slide is actually on screen — a timer mutating text in an unseen section is waste,
+      // and an aria-live region changing off-screen is noise for a screen reader.
+      const io = new IntersectionObserver((entries) => {
+        const visible = entries.some((e) => e.isIntersecting);
+        if (visible && !timer) timer = window.setInterval(advance, 6200);
+        else if (!visible && timer) { window.clearInterval(timer); timer = 0; }
+      }, { threshold: 0.4 });
+      io.observe(btn.closest('#lesson')!);
+      return () => { btn.removeEventListener('click', onClick); window.clearInterval(timer); io.disconnect(); };
+    }
+    return () => { btn.removeEventListener('click', onClick); window.clearInterval(timer); };
+  }
+
+  let cowTeardown: (() => void) | null = null;
+  document.addEventListener('astro:page-load', () => {
+    cowTeardown?.();
+    cowTeardown = initCow();
+  });
+</script>

@@ -1,0 +1,414 @@
+---
+// src/sections/Method.astro
+// SLIDE 2 — "I make and justify my decisions systematically, with maths, and ML as a tool", plus the chart.
+//
+// The owner's brief for the graph: "just show the pnl graph of several strategies, pick the highest one to
+// be mine and highlight it with the highest pnl and the highest sharpe/sortino. that's it."
+//
+// THE HONESTY PROBLEM AND ITS SOLUTION, because the naive build of that sentence is a fabricated track
+// record. Three invented curves with the flattering one labelled "mine" would be a performance claim about
+// the owner — the same class of mistake the site just removed (build-time numbers off an invented surface,
+// printed where they read as results), and worse, because a quant reader may check it.
+//
+// The rescue: that comparison ALREADY EXISTS as published data. RL-BHRP (arXiv:2508.11856) reports exactly
+// three strategies over one out-of-sample window with cumulative return, CAGR, Sharpe, Sortino and max
+// drawdown for each. So the chart draws the paper's own results and every number is quotable.
+//
+// What is published is endpoints and rates; the PATH is not. So the curves are smooth compounding at each
+// published CAGR — the only shape the data supports — and the caption says that rather than implying a
+// simulated equity path. Verified: (1+CAGR)^5.5 reproduces each stated cumulative return to within 0.02,
+// asserted in tests/growth.test.ts.
+//
+// Maths in lib/growth.ts (pure, 31 tests). Canvas is decoration; the figures are a real <table>, so the
+// content works with JS off and for a screen reader.
+import { STRATEGIES, WINDOW_LABEL, WINDOW_YEARS, TRACK_CAPTION, TRACK_CLAIM } from '../data/track';
+import { METHOD_HEADLINE, METHOD_BODY, METHOD_TOOLS } from '../data/method';
+import { highlighted } from '../lib/growth';
+
+const mine = highlighted(STRATEGIES)!;
+---
+<section id="method" class="mt" aria-labelledby="mt-heading">
+  <div class="mt-paper">
+    <div class="mt-inner">
+      <div class="mt-split">
+        <!-- LEFT: how the decision gets made. Short — the chart is the argument here. -->
+        <div class="mt-say">
+          <p class="mt-kicker">How I decide</p>
+          <h2 id="mt-heading" class="mt-headline">{METHOD_HEADLINE}</h2>
+          {METHOD_BODY.map((p) => <p class="mt-body">{p}</p>)}
+          <ul class="mt-tools">
+            {METHOD_TOOLS.map((t) => (
+              <li><span class="mt-tool-name">{t.name}</span><span class="mt-tool-role">{t.role}</span></li>
+            ))}
+          </ul>
+        </div>
+
+        <!-- RIGHT: the chart. -->
+        <figure class="mt-fig">
+          <div class="mt-chart" data-chart-stage>
+            <canvas class="mt-canvas" data-chart-canvas aria-hidden="true"></canvas>
+          </div>
+
+          <!-- The same data as a real table: the accessible and no-JS form of the chart, visually hidden
+               because the chart labels every line and states the leader on screen. -->
+          <table class="sr-only">
+            <caption>{TRACK_CAPTION} {WINDOW_LABEL}.</caption>
+            <thead>
+              <tr>
+                <th scope="col">Strategy</th><th scope="col">Cumulative return</th>
+                <th scope="col">CAGR</th><th scope="col">Sharpe</th><th scope="col">Sortino</th>
+                <th scope="col">Max drawdown</th>
+              </tr>
+            </thead>
+            <tbody>
+              {STRATEGIES.map((s) => (
+                <tr>
+                  <th scope="row">{s.label}</th>
+                  <td>{`+${Math.round(s.cumulative * 100)}%`}</td>
+                  <td>{`${(s.cagr * 100).toFixed(1)}%`}</td>
+                  <td>{s.sharpe.toFixed(2)}</td>
+                  <td>{s.sortino.toFixed(2)}</td>
+                  <td>{`${(s.maxDrawdown * 100).toFixed(1)}%`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <!-- The claim, and the three figures it rests on. Drawdown is deliberately not here: RL-BHRP
+               does not lead on it, and a test asserts that so the copy cannot drift. -->
+          <div class="mt-readout">
+            <p class="mt-claim"><strong>{mine.label}</strong> — {TRACK_CLAIM}</p>
+            <dl class="mt-figs">
+              <div><dt>{`+${Math.round(mine.cumulative * 100)}%`}</dt><dd>cumulative</dd></div>
+              <div><dt>{mine.sharpe.toFixed(2)}</dt><dd>Sharpe</dd></div>
+              <div><dt>{mine.sortino.toFixed(2)}</dt><dd>Sortino</dd></div>
+            </dl>
+          </div>
+
+          <figcaption class="mt-caption">{TRACK_CAPTION}</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .mt {
+    position: relative; z-index: 1;
+    width: 100vw; margin-left: calc(50% - 50vw);
+    --deck-lead: 0px;
+  }
+  .mt-paper {
+    --mt-bg: #c4b7a1;
+    --mt-edge: rgba(74, 66, 54, 0.26);
+    --mt-ink: #1f1b14;
+    --mt-ink-soft: #423b30;
+    --mt-ink-faint: #6a6153;
+    --mt-accent: #7c5522;
+    /* The chart's own ink, read by the canvas script off this element. */
+    --mt-line: rgba(46, 40, 31, 0.34);
+    --mt-grid: rgba(74, 66, 54, 0.16);
+    background: var(--mt-bg);
+    border-top: 1px solid var(--mt-edge);
+    border-bottom: 1px solid var(--mt-edge);
+    padding: clamp(48px, 6.6vh, 96px) 0;
+  }
+  :global(html[data-theme='dark']) .mt-paper {
+    --mt-bg: #14161a;
+    --mt-edge: rgba(184, 177, 161, 0.14);
+    --mt-ink: #dce1dc;
+    --mt-ink-soft: #a8b0a9;
+    --mt-ink-faint: #6d746e;
+    --mt-accent: #7fc9a0;
+    --mt-line: rgba(214, 220, 214, 0.3);
+    --mt-grid: rgba(184, 177, 161, 0.12);
+  }
+  .mt-inner {
+    padding-left: clamp(150px, 9.5vw, 190px);
+    padding-right: clamp(20px, 2.4vw, 52px);
+    box-sizing: border-box;
+  }
+  @media (max-width: 1099px) { .mt-inner { padding-left: clamp(28px, 6vw, 80px); } }
+
+  /* The words are the smaller half: the chart carries this slide. */
+  .mt-split {
+    display: grid; grid-template-columns: 38fr 62fr;
+    gap: 0 clamp(30px, 3.4vw, 68px);
+    align-items: start;
+  }
+  @media (max-width: 1080px) {
+    .mt-split { grid-template-columns: 1fr; gap: 5vh 0; }
+  }
+
+  .mt-kicker {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em;
+    text-transform: uppercase; color: var(--mt-accent); margin: 0 0 14px;
+  }
+  .mt-headline {
+    font-family: var(--font-display); font-weight: 300;
+    font-size: clamp(21px, 1.8vw, 29px); line-height: 1.28;
+    color: var(--mt-ink); margin: 0 0 18px; max-width: 30ch;
+    letter-spacing: -0.005em; text-wrap: pretty;
+  }
+  .mt-body {
+    font-size: clamp(14px, 1vw, 15.5px); line-height: 1.72; color: var(--mt-ink-soft);
+    margin: 0 0 13px; max-width: 44ch;
+  }
+  .mt-tools { list-style: none; margin: clamp(16px, 2.2vh, 26px) 0 0; padding: 0; display: grid; gap: 9px; }
+  .mt-tools li { display: grid; gap: 2px; }
+  .mt-tool-name {
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.06em; color: var(--mt-accent);
+  }
+  .mt-tool-role { font-size: 13px; line-height: 1.5; color: var(--mt-ink-soft); max-width: 42ch; }
+
+  .mt-fig { margin: 0; }
+  /* Height from the viewport, so the slide stays one screen. */
+  .mt-chart { position: relative; width: 100%; height: min(46vh, 44vw); }
+  .mt-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  .mt-readout {
+    margin: clamp(14px, 2vh, 22px) 0 0;
+    padding-top: clamp(12px, 1.6vh, 18px);
+    border-top: 1px solid var(--mt-edge);
+  }
+  .mt-claim {
+    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.55; color: var(--mt-ink-soft); margin: 0;
+  }
+  .mt-claim strong { color: var(--mt-ink); font-weight: 500; }
+  .mt-figs {
+    display: flex; flex-wrap: wrap; gap: 0 clamp(24px, 3vw, 52px);
+    margin: clamp(10px, 1.4vh, 16px) 0 0;
+  }
+  .mt-figs > div { display: grid; gap: 3px; }
+  .mt-figs dt {
+    font-family: var(--font-mono); font-size: clamp(18px, 1.6vw, 24px);
+    color: var(--mt-accent); line-height: 1;
+  }
+  .mt-figs dd {
+    margin: 0; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--mt-ink-faint);
+  }
+  .mt-caption {
+    font-size: 11.5px; line-height: 1.55; color: var(--mt-ink-faint);
+    margin: clamp(10px, 1.4vh, 16px) 0 0; max-width: 62ch; font-style: italic;
+  }
+</style>
+
+<script>
+  import { growthCurve, valueBounds, project, gridValues, highlighted } from '../lib/growth';
+  import { STRATEGIES, WINDOW_YEARS } from '../data/track';
+
+  // THE CHART. Vanilla canvas, no island, re-inits on astro:page-load with teardown — the project's
+  // pattern for every non-terminal interactive piece.
+  //
+  // The reveal is a left-to-right draw, which is the honest animation for this object: it advances along
+  // the time axis, so nothing is shown before the window it belongs to. Under reduced motion it paints
+  // finished immediately, which is also the no-JS state (the <table> carries the data either way).
+  function initChart(): (() => void) | null {
+    const stage = document.querySelector<HTMLElement>('[data-chart-stage]');
+    const canvas = document.querySelector<HTMLCanvasElement>('[data-chart-canvas]');
+    if (!stage || !canvas) return null;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    const paper = stage.closest<HTMLElement>('.mt-paper');
+    if (!paper) return null;
+
+    let W = 0, H = 0, dpr = 1;
+    let reveal = 1;
+    let raf = 0;
+
+    // Palette read ONCE per paint-invalidation, not per frame: getComputedStyle in a rAF loop is a
+    // forced style recalc per call, which is exactly what pinned an earlier canvas on this site at
+    // 0.6fps.
+    type Pal = Record<string, string>;
+    let pal: Pal | null = null;
+    const palette = (): Pal => {
+      if (pal) return pal;
+      const cs = getComputedStyle(paper);
+      const get = (n: string, fb: string) => cs.getPropertyValue(n).trim() || fb;
+      pal = {
+        ink: get('--mt-ink', '#1f1b14'),
+        soft: get('--mt-ink-soft', '#423b30'),
+        faint: get('--mt-ink-faint', '#6a6153'),
+        accent: get('--mt-accent', '#7c5522'),
+        line: get('--mt-line', 'rgba(46,40,31,0.34)'),
+        grid: get('--mt-grid', 'rgba(74,66,54,0.16)'),
+        mono: get('--font-mono', 'monospace'),
+      };
+      return pal;
+    };
+
+    function size(): void {
+      const r = canvas!.getBoundingClientRect();
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      W = Math.max(1, Math.round(r.width));
+      H = Math.max(1, Math.round(r.height));
+      canvas!.width = Math.round(W * dpr);
+      canvas!.height = Math.round(H * dpr);
+    }
+
+    const mine = highlighted(STRATEGIES);
+    const bounds = valueBounds(STRATEGIES, WINDOW_YEARS);
+    // Curves computed once — the data is static, so recomputing per frame would be pure waste.
+    const curves = STRATEGIES.map((s) => ({ s, pts: growthCurve(s, WINDOW_YEARS, 120) }));
+
+    function draw(): void {
+      const p = palette();
+      // Right gutter for the end labels, bottom for the year axis, left for the value axis.
+      //
+      // The gutter is MEASURED from the widest label rather than guessed: at 96px the labels were clipped
+      // ("RL-BHF", "BHRP, s"), because "2.20x  RL-BHRP" is ~120px at 11.5px mono. Measuring means it stays
+      // correct if a strategy is renamed or the font changes.
+      ctx!.font = `11.5px ${p.mono}`;
+      let widest = 0;
+      for (const s of STRATEGIES) {
+        widest = Math.max(widest, ctx!.measureText(`${(1 + s.cumulative).toFixed(2)}x  ${s.label}`).width);
+      }
+      const gutter = Math.ceil(widest) + 16;
+      const box = { x: 44, y: 14, w: Math.max(10, W - 44 - gutter), h: Math.max(10, H - 14 - 26) };
+
+      ctx!.save();
+      ctx!.scale(dpr, dpr);
+      ctx!.clearRect(0, 0, W, H);
+      ctx!.lineJoin = 'round';
+      ctx!.lineCap = 'round';
+
+      // ── Gridlines and the value axis. Horizontal only: the eye reads levels here, and vertical rules
+      // would fight the curves.
+      ctx!.font = `10px ${p.mono}`;
+      ctx!.textBaseline = 'middle';
+      for (const v of gridValues(bounds, 4)) {
+        const [, y] = project({ t: 0, value: v }, WINDOW_YEARS, bounds, box);
+        ctx!.strokeStyle = p.grid;
+        ctx!.lineWidth = 1;
+        ctx!.beginPath();
+        ctx!.moveTo(box.x, y);
+        ctx!.lineTo(box.x + box.w, y);
+        ctx!.stroke();
+        ctx!.fillStyle = p.faint;
+        ctx!.textAlign = 'right';
+        ctx!.fillText(`${v.toFixed(1)}x`, box.x - 8, y);
+      }
+
+      // The 1.0 baseline, drawn stronger: it is the "you got your money back" line, and every curve's
+      // meaning is relative to it.
+      const [, yBase] = project({ t: 0, value: 1 }, WINDOW_YEARS, bounds, box);
+      ctx!.strokeStyle = p.line;
+      ctx!.lineWidth = 1;
+      ctx!.setLineDash([3, 4]);
+      ctx!.beginPath();
+      ctx!.moveTo(box.x, yBase);
+      ctx!.lineTo(box.x + box.w, yBase);
+      ctx!.stroke();
+      ctx!.setLineDash([]);
+
+      // ── The year axis, at the foot.
+      ctx!.textAlign = 'center';
+      ctx!.fillStyle = p.faint;
+      for (let yr = 0; yr <= Math.floor(WINDOW_YEARS); yr++) {
+        const [x] = project({ t: yr, value: 1 }, WINDOW_YEARS, bounds, box);
+        ctx!.fillText(yr === 0 ? 'start' : `yr ${yr}`, x, box.y + box.h + 14);
+      }
+
+      // ── The curves. Everything that is not the paper's method is a thin neutral line; the method is
+      // the one emphasised stroke. That is the whole visual argument, and it needs no colour beyond the
+      // existing accent.
+      for (const { s, pts } of curves) {
+        const isMine = s === mine;
+        const upto = Math.max(2, Math.floor(pts.length * reveal));
+        ctx!.strokeStyle = isMine ? p.accent : p.line;
+        ctx!.lineWidth = isMine ? 2.6 : 1.3;
+        ctx!.globalAlpha = isMine ? 1 : 0.85;
+        ctx!.beginPath();
+        for (let i = 0; i < upto; i++) {
+          const [x, y] = project(pts[i], WINDOW_YEARS, bounds, box);
+          if (i === 0) ctx!.moveTo(x, y);
+          else ctx!.lineTo(x, y);
+        }
+        ctx!.stroke();
+      }
+      ctx!.globalAlpha = 1;
+
+      // ── End labels, once each curve has arrived. Placed at the PUBLISHED final value rather than the
+      // compounded one, because that is the figure the paper states.
+      if (reveal > 0.985) {
+        ctx!.textAlign = 'left';
+        ctx!.textBaseline = 'middle';
+        // Labels can collide when two strategies finish close together (2.01x and 1.91x are ~11px apart
+        // at this scale). Nudge each one down until it clears the previous, so the text stays readable
+        // even though the leader lines then point slightly off — legibility wins over exactness for a
+        // label, and the values are printed on it anyway.
+        const placed: number[] = [];
+        const MIN_GAP = 14;
+        for (const { s } of curves) {
+          const isMine = s === mine;
+          const [x, y0] = project({ t: WINDOW_YEARS, value: 1 + s.cumulative }, WINDOW_YEARS, bounds, box);
+          let y = y0;
+          for (const prev of placed) {
+            if (Math.abs(y - prev) < MIN_GAP) y = prev + MIN_GAP;
+          }
+          placed.push(y);
+          ctx!.fillStyle = isMine ? p.accent : p.faint;
+          ctx!.font = `${isMine ? '11.5' : '10.5'}px ${p.mono}`;
+          ctx!.fillText(`${(1 + s.cumulative).toFixed(2)}x  ${s.label}`, x + 9, y);
+        }
+      }
+
+      ctx!.restore();
+    }
+
+    function animate(): void {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        reveal = 1; draw(); return;
+      }
+      const t0 = performance.now();
+      const DUR = 1500;
+      const step = (now: number) => {
+        const raw = Math.min(1, (now - t0) / DUR);
+        // Ease so the draw settles rather than stopping dead.
+        reveal = raw < 0.5 ? 2 * raw * raw : 1 - Math.pow(-2 * raw + 2, 2) / 2;
+        draw();
+        if (raw < 1) raf = requestAnimationFrame(step);
+      };
+      raf = requestAnimationFrame(step);
+    }
+
+    size();
+    reveal = 1;
+    draw();          // paint a finished frame first, so there is never an empty box
+
+    let started = false;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting) && !started) {
+        started = true;
+        reveal = 0;
+        animate();
+      }
+    }, { threshold: 0.45 });
+    io.observe(stage);
+
+    let rt = 0;
+    const onResize = () => {
+      window.clearTimeout(rt);
+      rt = window.setTimeout(() => { size(); draw(); }, 140);
+    };
+    window.addEventListener('resize', onResize);
+
+    const mo = new MutationObserver(() => { pal = null; draw(); });
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', onResize);
+      window.clearTimeout(rt);
+      io.disconnect();
+      mo.disconnect();
+    };
+  }
+
+  let chartTeardown: (() => void) | null = null;
+  document.addEventListener('astro:page-load', () => {
+    chartTeardown?.();
+    chartTeardown = initChart();
+  });
+</script>

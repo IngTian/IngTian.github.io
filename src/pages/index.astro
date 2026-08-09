@@ -8,8 +8,9 @@ import Heights from '../sections/Heights.astro';
 import Interlude from '../sections/Interlude.astro';
 import DescentPath from '../components/DescentPath.astro';
 import Story from '../sections/Story.astro';
-import Inquiry from '../sections/Inquiry.astro';
-import Making from '../sections/Making.astro';
+import Lesson from '../sections/Lesson.astro';
+import Method from '../sections/Method.astro';
+import Work from '../sections/Work.astro';
 import Signature from '../sections/Signature.astro';
 import Deck from '../components/Deck.astro';
 ---
@@ -30,12 +31,19 @@ import Deck from '../components/Deck.astro';
     <Story>
       <DescentPath />
     </Story>
-    <!-- After the career story: WHAT the work actually is. An open question with one concrete example
-         (Inquiry), then the quieter slide of writing and software (Making). Neither is a list of roles —
-         the question leads and the artifacts arrive as its answer, which is the whole point of not
-         going back to a résumé. -->
-    <Inquiry />
-    <Making />
+    <!-- THE FIELD, IN THREE SLIDES, on the owner's structure: teach it, then show how the decision gets
+         made, then say plainly where the work is.
+           1. Lesson — what portfolio optimization IS, with a drafted illustrative asset table, several
+              candidate portfolios, the constraints, and the cow as the naive teaching voice.
+           2. Method — "systematically, with maths, ML as a tool" plus the chart: three strategies from the
+              paper's PUBLISHED out-of-sample results, the owner's method highlighted. Real numbers only —
+              see data/track.ts for why an invented equity curve was not an option.
+           3. Work — publications, writings, projects, stated plainly.
+         The single-question Inquiry slide this replaces was the earlier draft of the same idea; it taught
+         nothing before asking, which is what the lesson slide now fixes. -->
+    <Lesson />
+    <Method />
+    <Work />
     <!-- MOUNTAINS IS GONE from the homepage, on the owner's instruction: "you may delete everything
          from below. The record, the experience, everything." It was the résumé — research interests,
          selected writing, selected experience, projects, recognition — and it is the thing the graph
