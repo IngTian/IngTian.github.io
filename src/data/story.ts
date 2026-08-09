@@ -59,18 +59,11 @@ export const STORY_CODA =
   'The deepest point on that surface is not marked, because I do not know where it is. ' +
   'What I know is the direction, and that the descent is still running.';
 
-/** The measured facts the prose leans on, so the page can state numbers next to the claims and a
- *  reader can check the arithmetic against the graph above. Values are computed at build time from
- *  the same field the graph draws — see lib/sensitivity.ts and lib/trajectory.ts. */
-export interface StoryFigure {
-  label: string;
-  /** Filled at build time. */
-  value?: string;
-  note: string;
-}
-
-export const STORY_FIGURES: StoryFigure[] = [
-  { label: 'feedback ratio', note: 'signal per step on the research side, against inside the engineering basin' },
-  { label: 'climb to leave', note: 'height a gradient method cannot pay, so the exit was a choice' },
-  { label: 'blind stops', note: 'positions walked before a deeper basin came into view at all' },
-];
+// STORY_FIGURES is deleted. It held three "measured facts" — feedback ratio, climb to leave, blind stops
+// — computed at build time from the hero's field. The computation was real; the field is invented. So the
+// page printed exact numbers about a fiction in a place where a reader would take them for facts about a
+// career, which is a worse failure than having no numbers at all: it borrows the authority of measurement
+// for something unmeasured. The owner's call, and the right one.
+//
+// The graph still draws from those same modules — the difference is that a drawing of an invented surface
+// reads as an illustration, while "260x" reads as a claim.

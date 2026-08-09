@@ -15,21 +15,25 @@
 // walkers, and this shows ONE trajectory, named, with its barrier called out. Same field,
 // different subject. The caption says so rather than pretending the surface is new.
 //
-// No React island (the terminal is the only one). Vanilla script, re-inits on astro:page-load with
-// teardown, matching TerrainHero / Toc. Canvas is decoration; the waypoints are a real <ol> so the
-// content works with JS off and for a screen reader.
-import { WAYPOINTS, trajectoryFacts } from '../lib/trajectory';
-
-const facts = trajectoryFacts();
+// No React island (the terminal is deleted). Vanilla script, re-inits on astro:page-load with teardown,
+// matching TerrainHero / Toc. Canvas is decoration; the waypoints are a real <ol> so the content works
+// with JS off and for a screen reader.
+//
+// NO MEASUREMENTS IN THE COPY. The lede used to quote the climb's height and the readout its "reach".
+// Both were true numbers about an INVENTED surface, which beside real job titles read as quantified
+// claims about a career. trajectoryFacts() is still used inside the drawing (it locates the basins), but
+// nothing it returns is printed as text any more.
+import { WAYPOINTS } from '../lib/trajectory';
 ---
 <section id="descent-path" class="dp" aria-labelledby="dp-heading">
   <header class="dp-head">
     <h2 id="dp-heading">A descent, with one climb</h2>
+    <!-- SHORT, and no number. The lede used to state the climb's height as a figure — but the height is
+         a real measurement of an INVENTED surface, so quoting it next to a career reads as a claim about
+         the career, which it is not. The owner: "you don't need the numbers, the numbers are made up."
+         What is left is the only thing the picture needs said out loud. -->
     <p class="dp-lede">
-      The same loss surface the page opens with — but one named path across it. The engineering
-      years sit in a real local minimum. Leaving it costs a
-      <strong>{facts.climbRequired.toFixed(2)} climb</strong>, because a gradient method cannot
-      walk out of a basin. That climb is the whole story.
+      Years in engineering, and a pivot to quantitative research.
     </p>
 
     <!-- 3D was offered as a comparison and lost: the relief view measured 2.0% ink against the
@@ -65,10 +69,10 @@ const facts = trajectoryFacts();
     ))}
   </ol>
 
-  <p class="dp-foot">
-    The deepest point is not marked. Where the global minimum actually is remains unknown — the
-    descent is still running.
-  </p>
+  <!-- The "deepest point is not marked" footnote is deleted on the owner's instruction. The idea it
+       carried survives where it belongs: the graph draws the deeper basin unlabelled (see
+       unknownAttractor), and the editorial's closing line says it in the writing's own voice. Saying it
+       three times in one section was two too many. -->
 </section>
 
 <style>
@@ -536,7 +540,10 @@ const facts = trajectoryFacts();
         ctx.lineTo(mx - 54, my - 38);
         ctx.stroke();
         ctx.globalAlpha = 1;
-        label(ctx, mx - 58, my - 44, `climb +${facts.climbRequired.toFixed(2)}`, 13, seal, 'end');
+        // Named, not measured. It used to read "climb +1.26" — a true height on an invented surface,
+        // which beside a real career reads as a quantified claim about the career. The red stretch
+        // already shows WHERE the climb is; the word says what it is.
+        label(ctx, mx - 58, my - 44, 'the climb', 13, seal, 'end');
       }
 
       ctx.restore();
@@ -603,12 +610,14 @@ const facts = trajectoryFacts();
       const kShown = Math.min(WAYPOINTS.length, Math.round(k));
       const att = attractor;
       const found = known(att.x, att.y) > 0.02;
-      const r = knowledgeRadius(k - 1).toFixed(2);
+      // "reach" is dropped: it was knowledgeRadius(), a true number about a made-up surface, and printing
+      // it beside real job titles invited it to be read as a fact about the career. The stop counter
+      // stays — those ARE the real waypoints — and so does the discovery line, which is the point of the
+      // whole device and is a statement rather than a measurement.
       readout.innerHTML = found
-        ? `stop <b>${kShown}/${WAYPOINTS.length}</b> · reach <b>${r}</b> · ` +
+        ? `stop <b>${kShown}/${WAYPOINTS.length}</b> · ` +
           `<i>a deeper basin is now visible</i> — it was there the whole time`
-        : `stop <b>${kShown}/${WAYPOINTS.length}</b> · reach <b>${r}</b> · ` +
-          `nothing deeper is visible from here`;
+        : `stop <b>${kShown}/${WAYPOINTS.length}</b> · nothing deeper is visible from here`;
     }
 
     const onReplay = () => animate();

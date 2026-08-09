@@ -22,24 +22,11 @@
 // a <slot> inside this panel rather than as a sibling floating on the sky. Turning the fluid off
 // behind it is done by the panel being opaque, not by touching the fluid layer: the sky keeps
 // running above and below, and this slide simply sits on paper.
-import { STORY, STORY_CODA, STORY_FIGURES } from '../data/story';
-import { trajectoryFacts, WAYPOINTS } from '../lib/trajectory';
-import { curvature } from '../lib/sensitivity';
-import { discoveryOf } from '../lib/knowledge';
-
-const facts = trajectoryFacts();
-const swe = WAYPOINTS.find((w) => w.label.includes('Senior SWE'))!;
-const phd = WAYPOINTS.find((w) => w.label.includes('PhD'))!;
-const inBasin = curvature(swe.x, swe.y).signal;
-const onDescent = curvature(phd.x, phd.y).signal;
-const discovery = discoveryOf(facts.globalBasin.x, facts.globalBasin.y);
-
-// Fill the figures from the real measurements.
-const figures = STORY_FIGURES.map((f) => {
-  if (f.label === 'feedback ratio') return { ...f, value: `${Math.round(onDescent / inBasin)}×` };
-  if (f.label === 'climb to leave') return { ...f, value: `+${facts.climbRequired.toFixed(2)}` };
-  return { ...f, value: String(discovery?.blindStops ?? 0) };
-});
+// The figure row is deleted (see below), so the measurement imports go with it — curvature(),
+// discoveryOf() and trajectoryFacts() were only ever called here to fill those three numbers. The
+// modules stay: lib/sensitivity and lib/knowledge are what the GRAPH is drawn from, and they keep their
+// own specs.
+import { STORY, STORY_CODA } from '../data/story';
 ---
 <section id="story" class="story" aria-labelledby="story-heading">
   <div class="story-paper">
@@ -70,16 +57,13 @@ const figures = STORY_FIGURES.map((f) => {
           ))}
         </div>
 
-        <!-- The numbers the prose leans on, so a reader can check them against the graph beside it. -->
-        <dl class="story-figures">
-          {figures.map((f) => (
-            <div class="story-figure">
-              <dt>{f.value}</dt>
-              <dd><span class="story-figure-label">{f.label}</span>{f.note}</dd>
-            </div>
-          ))}
-        </dl>
-
+        <!-- THE FIGURES ARE GONE. They were computed at build time rather than typed, but computed from
+             the HERO'S INVENTED FIELD — so "260x feedback ratio" was an exact measurement of a fiction,
+             printed where a reader would take it as a fact about a career. The owner: "drop the figures,
+             they are made up." A true number about a made-up surface is worse than no number, because it
+             borrows the authority of measurement for something unmeasured.
+             The coda stays (explicitly kept): it makes the same point as a statement, in the writing's
+             own voice, claiming nothing quantitative. -->
         <p class="story-coda">{STORY_CODA}</p>
       </div>
     </div>

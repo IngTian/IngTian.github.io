@@ -61,21 +61,11 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
 
   .toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
 
-  /* ── FROST BEHIND THE RAIL, over the paper slide only.
-     The descent graph now spans the panel's full width, so its contour dots and the leftmost labels
-     pass under the fixed rail. A frosted pad lifts the labels off that texture without hiding the
-     drawing: it is the panel's own colour at partial opacity plus a blur, so it reads as the paper
-     coming forward rather than as a card. Only on the paper slide — over the open sky the rail is a
-     whisper and a pad would be an object. */
-  .toc.over-paper ul {
-    padding: 14px 16px 14px 12px;
-    margin: -14px 0 -14px -12px;              /* keep the labels' optical position unchanged */
-    border-radius: 3px;
-    background: color-mix(in srgb, var(--toc-frost, #efe7d8) 78%, transparent);
-    -webkit-backdrop-filter: blur(7px);
-    backdrop-filter: blur(7px);
-  }
-  :global(html[data-theme='dark']) .toc.over-paper ul { --toc-frost: #14161a; }
+  /* The frosted pad behind the rail is deleted on the owner's instruction. It was added when the drawing
+     spanned the full slide and its contours ran under the rail; the graph is now indented into its own
+     column, so the rail sits on clean paper and the pad was solving a problem that no longer exists —
+     it only read as a floating chip. The .over-paper INK adaptation below stays: that is what keeps the
+     labels legible against the panel, and it is still needed. */
 
   .toc a {
     pointer-events: auto;
