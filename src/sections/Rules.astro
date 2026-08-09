@@ -140,13 +140,20 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
     font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
     text-transform: uppercase; color: var(--r-accent); margin: 0 0 14px;
   }
+  /* ── THE DRAWING IS THE SLIDE, which is the one thing the descent piece does that this did not.
+     Measured before this change: the descent graph occupies 35.7% of its slide with NO divider rule — the
+     drawing spans the panel and the text sits in its negative space. This slide gave its triangle 5.8% (340px
+     in a 1700px frame), boxed in a right-hand column behind a hairline, which reads as an illustration beside
+     an essay rather than as the subject. Same template on three consecutive slides is what made the sequence
+     feel "off" even though each slide was individually fine.
+     So the geometry now gets the room: no divider, a much larger simplex, and the type placed around it. */
   .ru-split {
-    display: grid; grid-template-columns: 55fr 45fr; gap: 0 clamp(26px, 3.4vw, 66px); align-items: start;
+    display: grid; grid-template-columns: 42fr 58fr; gap: 0 clamp(24px, 3vw, 56px); align-items: center;
   }
-  .ru-fig { border-left: 1px solid var(--r-edge); padding-left: clamp(26px, 3.4vw, 66px); margin: 0; }
+  .ru-fig { margin: 0; }
   @media (max-width: 1040px) {
     .ru-split { grid-template-columns: 1fr; gap: 4vh 0; }
-    .ru-fig { border-left: 0; padding-left: 0; padding-top: 4vh; border-top: 1px solid var(--r-edge); }
+    .ru-fig { padding-top: 4vh; border-top: 1px solid var(--r-edge); }
   }
 
   .ru-head {
@@ -196,7 +203,11 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
     font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase;
     color: var(--r-faint); margin: 0 0 10px;
   }
-  .ru-chart { width: 100%; max-width: 340px; height: auto; display: block; margin: 0 auto; }
+  /* Sized to the SLIDE, not to a column: the triangle is the object the slide is about, so it takes the height
+     it can get. 340px was a thumbnail; this is the subject. */
+  .ru-chart {
+    width: 100%; max-width: min(620px, 100%); height: auto; display: block; margin: 0 auto;
+  }
 
   /* The simplex stays visible as a ghost: the argument is about what was REMOVED, so the original space has to
      remain legible behind the survivor. */

@@ -171,13 +171,15 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
     text-transform: uppercase; color: var(--s-accent); margin: 0 0 14px;
   }
+  /* The lattice is the payoff of the whole sequence, so it is the most dominant figure of the three — and it
+     loses the divider rule for the same reason the others do. */
   .so-split {
-    display: grid; grid-template-columns: 42fr 58fr; gap: 0 clamp(26px, 3.2vw, 62px); align-items: start;
+    display: grid; grid-template-columns: 34fr 66fr; gap: 0 clamp(24px, 3vw, 54px); align-items: center;
   }
-  .so-fig { border-left: 1px solid var(--s-edge); padding-left: clamp(26px, 3.2vw, 62px); margin: 0; }
+  .so-fig { margin: 0; }
   @media (max-width: 1080px) {
     .so-split { grid-template-columns: 1fr; gap: 4vh 0; }
-    .so-fig { border-left: 0; padding-left: 0; padding-top: 4vh; border-top: 1px solid var(--s-edge); }
+    .so-fig { padding-top: 4vh; border-top: 1px solid var(--s-edge); }
   }
 
   .so-head {
@@ -211,7 +213,9 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
   }
   .so-tool-role { font-size: 12px; line-height: 1.45; color: var(--s-soft); max-width: 46ch; }
 
-  .so-chart { width: 100%; height: clamp(220px, 32vh, 340px); display: block; }
+  /* Tall enough for the surface to read as a surface: at 340px the lattice's depth collapsed and the twelve
+     time-slices crowded into a band. */
+  .so-chart { width: 100%; height: clamp(300px, 50vh, 520px); display: block; }
 
   /* The wireframe surface: hairlines, so it reads as structure rather than as a filled object. */
   .so-rib, .so-spine {
