@@ -1,119 +1,172 @@
 ---
 // src/sections/Choice.astro
-// SLIDE 1 OF 3 — THE CHOICE. Six names you recognise, thousands you do not, and what happens when people
-// decide.
+// SLIDE 1 OF 3 — WHAT THE WORDS MEAN, defined by one example rather than by prose.
 //
-// The owner's plan: "3 slides, thousands of tickers, thousands of constraints, and the last slide animate a
-// 3D route in a Bellman propagation of many that we highlight as our goal." This is the first: what the
-// decision IS, and that there is an enormous amount of it.
+// The owner: "I prefer saying it out loud with 'What is multi-period blablabla?' … it's best illustrated with
+// an example. Very concrete example. Maybe we can't even state this in one slide. Maybe we can first explain
+// what is portfolio optimization?"
 //
-// It replaces the old Lesson + Moment pair. Both were trying to be "how hard is this decision", so the second
-// re-established what the first had already earned — and four slides in an identical register read as four
-// walls of the same wall. This one keeps what worked (the outcome fan, the real tickers, the news) and drops
-// the duplication.
+// THE AUDIT THAT MADE THIS NECESSARY. The previous version of this slide opened with "Every month, decide how
+// much of each to own" — which ASSUMES the concept. Grepping the built page confirmed nothing anywhere said
+// what a portfolio is, what optimising one means, or what "multi-period" adds. A reader with no finance
+// background had no way in, which is fatal for the one slide that is supposed to let them in.
 //
-// THE FAN IS STILL THE ARGUMENT: forty-eight people, one year, the same six headlines, outcomes from 0.85x to
-// 1.34x. Same news, different reflexes. Everything is computed at build time from lib/scenario.ts (32 tests,
-// seeded PRNG — the project bans Math.random() at paint time and a shimmering fan would be the worst possible
-// violation of it).
+// AND IT DOES FIT ON ONE SLIDE, but only because the EXAMPLE does the defining and the prose only labels what
+// is already on screen. Three beats over ONE object — a hundred pounds in a bar:
+//    1. a portfolio IS this            -> the bar divides four ways
+//    2. optimising it is choosing      -> the same bar, split three other ways, with what each is worth after
+//                                         one piece of news
+//    3. multi-period is choosing again -> the bar re-divided, month after month, paying to change
+// The object never changes; only what is being said about it does. That is what keeps it one slide instead of
+// three, and it is the same trick the descent piece uses — one drawing, text in its negative space.
+//
+// £100 rather than percentages, deliberately: a share of an unnamed total is an abstraction, and a hundred
+// pounds split four ways is something anyone can hold in their head.
+//
+// Arithmetic in lib/split.ts (20 tests, including the assertion that the three alternatives give three
+// DIFFERENT outcomes — if they did not, "optimising is choosing" would be an empty claim).
 import { TICKER_GLYPHS, type TickerGlyphKey } from '../data/tickerGlyphs';
-import { INSTRUMENTS, NEWS, TRADER_COUNT, DESK_DISCLAIMER, FUND } from '../data/desk';
-import { buildWorld, makeTraders, runTrader, runSystematic, dispersion, landmarks, WEEKS } from '../lib/scenario';
-import { humanCount, multiPeriodVars } from '../lib/problemSize';
+import { BEATS, HOLDINGS, SPLITS, EVENT, DEFINE_DISCLAIMER } from '../data/define';
+import { afterEvent, changePct, segments } from '../lib/split';
 
-const world = buildWorld(INSTRUMENTS, NEWS);
-const paths = makeTraders(TRADER_COUNT).map((t) => runTrader(t, world, INSTRUMENTS, NEWS));
-const sys = runSystematic(world, INSTRUMENTS);
-const spread = dispersion(paths);
-const marks = landmarks(paths);
-const markIndex = new Map(marks.map((m, i) => [m.index, i]));
+const opening = HOLDINGS.map((h) => h.weight);
+const openingSegs = segments(opening);
+const openingAfter = afterEvent(opening, EVENT.moves);
 
-const bigVars = multiPeriodVars(FUND.tickers, FUND.periods);
+// Each alternative with what it is worth after the event — computed, never typed.
+const alts = SPLITS.map((s) => ({
+  ...s,
+  segs: segments(s.weights),
+  value: afterEvent(s.weights, EVENT.moves),
+  change: changePct(s.weights, EVENT.moves),
+}));
 
-const allValues = [...paths.flatMap((p) => p.values), ...sys.values];
-const lo = Math.min(...allValues);
-const hi = Math.max(...allValues);
-const VW = 1000, VH = 300;
-const poly = (values: readonly number[]) =>
-  values.map((v, i) => `${((i / WEEKS) * VW).toFixed(1)},${(VH - ((v - lo) / (hi - lo || 1)) * VH).toFixed(1)}`).join(' ');
-const yOf = (v: number) => VH - ((v - lo) / (hi - lo || 1)) * VH;
-const xOfWeek = (w: number) => (w / WEEKS) * VW;
+// The months of beat 3: the same split re-chosen. Declared rather than solved — this slide is defining the
+// word, and the actual optimisation is what slide 3 shows.
+const MONTHS = [
+  { label: 'Jan', weights: [40, 25, 20, 15] },
+  { label: 'Feb', weights: [30, 25, 20, 25] },
+  { label: 'Mar', weights: [22, 22, 21, 35] },
+  { label: 'Apr', weights: [34, 24, 18, 24] },
+  { label: 'May', weights: [42, 22, 16, 20] },
+].map((m) => ({ ...m, segs: segments(m.weights) }));
+
 const CELL = 3;
 ---
 <section id="choice" class="ch" aria-labelledby="ch-heading">
   <div class="ch-paper">
     <div class="ch-inner">
-      <p class="ch-kicker">1 / 3 · the choice</p>
+      <p class="ch-kicker">1 / 3</p>
+      <h2 id="ch-heading" class="ch-head">What is multi-period portfolio optimization?</h2>
 
-      <div class="ch-split">
-        <div class="ch-say">
-          <h2 id="ch-heading" class="ch-head">Every month, decide how much of each to own.</h2>
+      <!-- Beats LEFT, the object RIGHT — the definition and its illustration read together, and the object
+           gets the larger share. Stacking them left the right half of the slide empty and pushed the money bar
+           below the fold of attention. -->
+      <div class="ch-body">
+      <!-- THE THREE BEATS. Each is a question a stranger would actually ask, answered against the same
+           object. The reveal is sequential so the definition builds; with no JS all three show at once,
+           which is the finished state and still reads in order. -->
+      <ol class="ch-beats">
+        {BEATS.map((b, i) => (
+          <li class="ch-beat" data-beat={i}>
+            <p class="ch-ask">{b.ask}</p>
+            <p class="ch-say">{b.say}</p>
+          </li>
+        ))}
+      </ol>
 
-          <!-- The six names, then the multiplication. Concrete first, scale second: a reader has to hold
-               something familiar before "three thousand" means anything. -->
-          <ul class="ch-names">
-            {INSTRUMENTS.map((inst) => {
-              const g = TICKER_GLYPHS[inst.glyph as TickerGlyphKey];
+      <div class="ch-stage">
+        <!-- BEAT 1: the portfolio, as one bar of money divided four ways. -->
+        <figure class="ch-panel" data-panel="0">
+          <p class="ch-panel-head">£100, split four ways</p>
+          <div class="ch-bar ch-bar--big" role="img"
+               aria-label={HOLDINGS.map((h) => `${h.weight} pounds in ${h.plain}`).join(', ')}>
+            {openingSegs.map((seg, i) => (
+              <span class:list={['ch-seg', `ch-seg--${i}`]} style={`left:${seg.start}%;width:${seg.width}%`}></span>
+            ))}
+          </div>
+          <ul class="ch-legend">
+            {HOLDINGS.map((h, i) => {
+              const g = TICKER_GLYPHS[h.glyph as TickerGlyphKey];
               return (
                 <li>
+                  <span class:list={['ch-swatch', `ch-seg--${i}`]} aria-hidden="true"></span>
                   <svg class="ch-glyph" viewBox={`0 0 ${g.w * CELL} ${g.h * CELL}`}
                        width={g.w * CELL} height={g.h * CELL} aria-hidden="true" shape-rendering="crispEdges">
                     {g.cells.map((c) => <rect x={c.x * CELL} y={c.y * CELL} width={CELL} height={CELL} />)}
                   </svg>
-                  <span class="ch-tick">{inst.ticker}</span>
+                  <span class="ch-money">£{h.weight}</span>
+                  <span class="ch-what">{h.plain}</span>
+                  <span class="ch-tick">{h.ticker}</span>
                 </li>
               );
             })}
           </ul>
+          <p class="ch-panel-foot">That is a portfolio. Nothing more — a decision about where money sits.</p>
+        </figure>
 
-          <p class="ch-scale">
-            Six is a teaching example. A real book holds <strong>{humanCount(FUND.tickers)}</strong> names and
-            revisits every one of them <strong>{FUND.periods}</strong> times a year —
-            <strong>{humanCount(bigVars)}</strong> weights to choose, and each one changes what the next choice
-            costs.
+        <!-- BEAT 2: the same money, split differently, and what one piece of news does to each. -->
+        <figure class="ch-panel" data-panel="1">
+          <p class="ch-panel-head">
+            <span class="ch-when">{EVENT.when}</span> {EVENT.what}
           </p>
-
-          <p class="ch-news-head">And the year does not sit still</p>
-          <ol class="ch-news">
-            {NEWS.map((n) => <li><span class="ch-wk">wk {n.week}</span>{n.headline}</li>)}
-          </ol>
-        </div>
-
-        <!-- The fan: what actually happened, forty-eight times. -->
-        <figure class="ch-fig">
-          <p class="ch-fig-head">{TRADER_COUNT} people · one year · the same headlines</p>
-          <svg class="ch-chart" viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" role="img"
-               aria-label={`Forty-eight portfolio paths over one year, ending between ${spread.worst.toFixed(2)} and ${spread.best.toFixed(2)} times the starting capital.`}>
-            <line class="ch-base" x1="0" y1={yOf(1)} x2={VW} y2={yOf(1)} />
-            {world.newsWeeks.map((w) => <line class="ch-newsline" x1={xOfWeek(w)} y1="0" x2={xOfWeek(w)} y2={VH} />)}
-            {paths.map((p, i) => (
-              <polyline class:list={['ch-path', markIndex.has(i) && 'is-mark']}
-                        data-mark={markIndex.has(i) ? markIndex.get(i) : undefined}
-                        points={poly(p.values)} />
-            ))}
-          </svg>
-
-          <div class="ch-callout" data-callout aria-live="polite">
-            {marks.map((m, i) => (
-              <p class="ch-call" data-call={i}>
-                <span class="ch-call-label">{m.label}</span>
-                <span class="ch-call-body">
-                  ended at <strong>{paths[m.index].final.toFixed(2)}×</strong>, worst fall{' '}
-                  <strong>{(paths[m.index].maxDrawdown * 100).toFixed(0)}%</strong>
+          <ul class="ch-alts">
+            <li class="ch-alt is-yours">
+              <span class="ch-alt-label">your split</span>
+              <span class="ch-bar" aria-hidden="true">
+                {openingSegs.map((seg, i) => (
+                  <span class:list={['ch-seg', `ch-seg--${i}`]} style={`left:${seg.start}%;width:${seg.width}%`}></span>
+                ))}
+              </span>
+              <span class="ch-alt-val">£{openingAfter.toFixed(0)}</span>
+            </li>
+            {alts.map((a) => (
+              <li class="ch-alt">
+                <span class="ch-alt-label">{a.label}</span>
+                <span class="ch-bar" aria-hidden="true">
+                  {a.segs.map((seg, i) => (
+                    <span class:list={['ch-seg', `ch-seg--${i}`]} style={`left:${seg.start}%;width:${seg.width}%`}></span>
+                  ))}
                 </span>
-              </p>
+                <span class="ch-alt-val">£{a.value.toFixed(0)}</span>
+                <span class="ch-alt-note">{a.note}</span>
+              </li>
             ))}
-          </div>
-
-          <p class="ch-punch">
-            Nobody was foolish. They read the same six headlines and reacted differently, and that alone spread
-            the year from <strong>{spread.worst.toFixed(2)}×</strong> to <strong>{spread.best.toFixed(2)}×</strong>,
-            with falls as deep as <strong>{(spread.worstDrawdown * 100).toFixed(0)}%</strong>. The deciding is
-            the hard part — and there is a great deal of it.
+          </ul>
+          <p class="ch-panel-foot">
+            Same hundred pounds, same news, and it is worth anywhere from
+            <strong>£{Math.min(...alts.map((a) => a.value)).toFixed(0)}</strong> to
+            <strong>£{Math.max(...alts.map((a) => a.value)).toFixed(0)}</strong> afterwards. Choosing the
+            split is the optimisation.
           </p>
-          <figcaption class="ch-cap">{DESK_DISCLAIMER}</figcaption>
+        </figure>
+
+        <!-- BEAT 3: and you choose again. The same bar, month after month. -->
+        <figure class="ch-panel" data-panel="2">
+          <p class="ch-panel-head">And then you choose again</p>
+          <ul class="ch-months">
+            {MONTHS.map((m) => (
+              <li>
+                <span class="ch-month-label">{m.label}</span>
+                <span class="ch-bar" aria-hidden="true">
+                  {m.segs.map((seg, i) => (
+                    <span class:list={['ch-seg', `ch-seg--${i}`]} style={`left:${seg.start}%;width:${seg.width}%`}></span>
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p class="ch-panel-foot">
+            Every month the world has moved and the split is wrong again — and every change costs you
+            something to make. That is the <em>multi-period</em> part: not one decision, but a sequence of
+            them, each one starting from wherever the last one left you.
+          </p>
         </figure>
       </div>
+
+      </div>
+
+      <p class="ch-cap">{DEFINE_DISCLAIMER}</p>
     </div>
   </div>
 </section>
@@ -122,14 +175,18 @@ const CELL = 3;
   .ch { position: relative; z-index: 1; width: 100vw; margin-left: calc(50% - 50vw); --deck-lead: 0px; }
   .ch-paper {
     --c-bg: #c4b7a1; --c-edge: rgba(74,66,54,0.26); --c-ink: #1f1b14;
-    --c-soft: #423b30; --c-faint: #6a6153; --c-accent: #7c5522; --c-fan: rgba(66,59,48,0.28);
+    --c-soft: #423b30; --c-faint: #6a6153; --c-accent: #7c5522;
+    /* Four holding colours, from the palette only: the accent, two ink tones, and the indigo. No new hues —
+       the site allows exactly one saturated colour in light theme and it is the seal, which is reserved. */
+    --c-h0: #7c5522; --c-h1: #9a8353; --c-h2: #5d6472; --c-h3: #b9a880;
     background: var(--c-bg);
     border-top: 1px solid var(--c-edge); border-bottom: 1px solid var(--c-edge);
-    padding: clamp(30px, 4vh, 62px) 0;
+    padding: clamp(28px, 3.6vh, 56px) 0;
   }
   :global(html[data-theme='dark']) .ch-paper {
     --c-bg: #14161a; --c-edge: rgba(184,177,161,0.14); --c-ink: #dce1dc;
-    --c-soft: #a8b0a9; --c-faint: #6d746e; --c-accent: #7fc9a0; --c-fan: rgba(168,176,169,0.24);
+    --c-soft: #a8b0a9; --c-faint: #6d746e; --c-accent: #7fc9a0;
+    --c-h0: #7fc9a0; --c-h1: #5f9b7c; --c-h2: #6b7686; --c-h3: #a9b4a5;
   }
   .ch-inner {
     padding-left: clamp(150px, 9.5vw, 190px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
@@ -138,153 +195,180 @@ const CELL = 3;
 
   .ch-kicker {
     font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
-    text-transform: uppercase; color: var(--c-accent); margin: 0 0 14px;
+    text-transform: uppercase; color: var(--c-accent); margin: 0 0 12px;
   }
-  /* No divider rule, and the fan gets the larger share. See Rules.astro for the measurement that drove this:
-     the descent piece gives its drawing 35.7% of the slide with no rule between text and figure, and that is
-     the difference between "the drawing is the slide" and "a chart sits in the right column". */
-  .ch-split {
-    display: grid; grid-template-columns: 36fr 64fr; gap: 0 clamp(24px, 3vw, 56px); align-items: center;
-  }
-  .ch-fig { margin: 0; }
-  @media (max-width: 1100px) {
-    .ch-split { grid-template-columns: 1fr; gap: 4vh 0; }
-    .ch-fig { padding-top: 4vh; border-top: 1px solid var(--c-edge); }
-  }
-
+  /* THE QUESTION, said out loud, as the owner asked. Largest thing on the slide because it is what the slide
+     answers. */
   .ch-head {
     font-family: var(--font-display); font-weight: 300;
-    font-size: clamp(24px, 2.4vw, 38px); line-height: 1.16;
-    color: var(--c-ink); margin: 0 0 clamp(16px, 2.2vh, 26px); max-width: 26ch; letter-spacing: -0.012em;
+    font-size: clamp(26px, 2.8vw, 46px); line-height: 1.1;
+    color: var(--c-ink); margin: 0 0 clamp(18px, 2.4vh, 32px); max-width: 30ch;
+    letter-spacing: -0.014em; text-wrap: balance;
   }
 
-  .ch-names { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 14px; }
-  .ch-names li { display: inline-flex; align-items: center; gap: 6px; }
-  .ch-glyph { display: block; }
-  .ch-glyph rect { fill: var(--c-accent); }
-  .ch-tick { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.03em; color: var(--c-ink); }
+  /* The beats sit left, the object right — but the beats are a LIST, not a column of prose: each is dim until
+     its turn, so the definition reads as three steps rather than a wall. */
+  .ch-beats { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(12px, 1.8vh, 20px); }
+  .ch-beat { opacity: 0.3; max-width: 46ch; }
+  .ch-beat.is-on { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) { .ch-beat { transition: opacity .5s ease; } }
+  :global(html.no-define-js) .ch-beat { opacity: 1; }
 
-  .ch-scale {
-    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.62; color: var(--c-soft);
-    margin: clamp(14px, 1.8vh, 22px) 0 0; max-width: 44ch;
+  .ch-ask {
+    font-family: var(--font-display); font-size: clamp(16px, 1.4vw, 21px); line-height: 1.3;
+    color: var(--c-ink); margin: 0 0 4px;
   }
-  .ch-scale strong {
-    font-family: var(--font-mono); font-weight: 400; color: var(--c-accent);
-    font-variant-numeric: tabular-nums;
-  }
+  .ch-say { font-size: clamp(13px, 0.98vw, 14.5px); line-height: 1.6; color: var(--c-soft); margin: 0; }
 
-  .ch-news-head {
-    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase;
-    color: var(--c-faint); margin: clamp(16px, 2.2vh, 26px) 0 8px;
-  }
-  .ch-news { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-  .ch-news li {
-    font-size: 11.5px; line-height: 1.42; color: var(--c-soft);
-    display: grid; grid-template-columns: 5ch 1fr; gap: 0 9px;
-  }
-  .ch-wk { font-family: var(--font-mono); font-size: 9.5px; color: var(--c-accent); }
+  /* THE OBJECT. One stage, three panels stacked in it — only one visible at a time, so the money bar is the
+     same object being spoken about three ways rather than three different figures. */
+  .ch-stage { position: relative; margin: clamp(20px, 2.8vh, 36px) 0 0; min-height: clamp(240px, 34vh, 400px); }
+  .ch-panel { position: absolute; inset: 0; margin: 0; opacity: 0; pointer-events: none; }
+  .ch-panel.is-on { opacity: 1; pointer-events: auto; }
+  @media (prefers-reduced-motion: no-preference) { .ch-panel { transition: opacity .5s ease; } }
+  /* No JS: show the FIRST panel, which is the definition's starting point, and let the beats read as text. */
+  :global(html.no-define-js) .ch-panel { position: relative; inset: auto; opacity: 0; }
+  :global(html.no-define-js) .ch-panel[data-panel='0'] { opacity: 1; }
 
-  .ch-fig-head {
-    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
-    color: var(--c-faint); margin: 0 0 10px;
+  .ch-panel-head {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.14em;
+    color: var(--c-faint); margin: 0 0 12px; text-transform: uppercase;
   }
-  /* The fan is the argument, so it gets real height. At 280px forty-eight paths compressed into a strip and
-     the dispersion — the whole point — was hard to read. */
-  .ch-chart { width: 100%; height: clamp(260px, 44vh, 460px); display: block; }
-  .ch-base {
-    stroke: var(--c-faint); stroke-width: 1; stroke-dasharray: 3 5;
-    vector-effect: non-scaling-stroke; opacity: 0.6;
+  .ch-when { color: var(--c-accent); }
+  .ch-panel-foot {
+    font-size: clamp(12.5px, 0.95vw, 14px); line-height: 1.6; color: var(--c-soft);
+    margin: clamp(12px, 1.8vh, 18px) 0 0; max-width: 62ch;
   }
-  .ch-newsline { stroke: var(--c-accent); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.22; }
-  .ch-path {
-    fill: none; stroke: var(--c-fan); stroke-width: 1; vector-effect: non-scaling-stroke;
-    stroke-linejoin: round; opacity: 0.5;
+  .ch-panel-foot strong {
+    font-family: var(--font-mono); font-weight: 400; color: var(--c-ink); font-variant-numeric: tabular-nums;
   }
-  .ch-path.is-lit { stroke: var(--c-ink); stroke-width: 2.2; opacity: 1; }
+  .ch-panel-foot em { font-style: italic; color: var(--c-ink); }
+
+  /* THE BAR: one hundred pounds, divided. The whole definition rests on this being obviously ONE thing cut
+     into parts rather than four separate things. */
+  .ch-bar {
+    position: relative; display: block; width: 100%; height: 14px;
+    background: color-mix(in srgb, var(--c-faint) 18%, transparent);
+    border-radius: 2px; overflow: hidden;
+  }
+  .ch-bar--big { height: clamp(34px, 4.4vh, 52px); border-radius: 3px; }
+  .ch-seg { position: absolute; top: 0; bottom: 0; display: block; }
+  .ch-seg--0 { background: var(--c-h0); }
+  .ch-seg--1 { background: var(--c-h1); }
+  .ch-seg--2 { background: var(--c-h2); }
+  .ch-seg--3 { background: var(--c-h3); }
   @media (prefers-reduced-motion: no-preference) {
-    .ch-path { transition: stroke .5s ease, stroke-width .5s ease, opacity .5s ease; }
+    /* The bar re-dividing between months is the visual of "choosing again", so the segments move rather than
+       cut. Transform-only would be ideal but left/width on an absolutely-positioned child does not reflow
+       anything outside the bar, so it stays cheap. */
+    .ch-seg { transition: left .6s cubic-bezier(.2,.7,.3,1), width .6s cubic-bezier(.2,.7,.3,1); }
   }
 
-  .ch-callout { position: relative; margin: 8px 0 0; min-height: 2.6em; }
-  .ch-call {
-    margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0 12px; align-items: baseline;
-    position: absolute; inset: 0; opacity: 0;
+  .ch-legend {
+    list-style: none; margin: clamp(12px, 1.8vh, 18px) 0 0; padding: 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px clamp(16px, 2vw, 32px);
   }
-  .ch-call.is-shown { opacity: 1; position: relative; }
-  @media (prefers-reduced-motion: no-preference) { .ch-call { transition: opacity .45s ease; } }
-  /* No JS: show every readout in flow, which is the finished state rather than a blank strip. */
-  :global(html.no-fan-js) .ch-call { position: relative; opacity: 1; margin-bottom: 5px; }
-  :global(html.no-fan-js) .ch-callout { min-height: 0; }
-  .ch-call-label {
-    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase;
-    color: var(--c-faint); white-space: nowrap;
+  .ch-legend li { display: grid; grid-template-columns: auto auto auto 1fr auto; align-items: center; gap: 0 9px; }
+  .ch-swatch { width: 9px; height: 9px; border-radius: 1px; display: block; }
+  .ch-glyph { display: block; }
+  .ch-glyph rect { fill: var(--c-faint); }
+  .ch-money {
+    font-family: var(--font-mono); font-size: 13.5px; color: var(--c-ink); font-variant-numeric: tabular-nums;
   }
-  .ch-call-body { font-size: clamp(12.5px, 0.92vw, 14px); line-height: 1.5; color: var(--c-soft); }
-  .ch-call-body strong {
-    font-family: var(--font-mono); font-weight: 400; color: var(--c-ink); font-variant-numeric: tabular-nums;
-  }
+  .ch-what { font-size: 12.5px; color: var(--c-soft); }
+  .ch-tick { font-family: var(--font-mono); font-size: 9.5px; color: var(--c-faint); letter-spacing: 0.06em; }
 
-  .ch-punch {
-    font-size: clamp(13px, 0.98vw, 14.5px); line-height: 1.6; color: var(--c-soft);
-    margin: clamp(10px, 1.4vh, 16px) 0 0; max-width: 66ch;
-    padding-top: clamp(10px, 1.4vh, 14px); border-top: 1px solid var(--c-edge);
+  /* BEAT 2: the alternatives, each a bar and a number. */
+  .ch-alts { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(9px, 1.4vh, 14px); }
+  .ch-alt {
+    display: grid; grid-template-columns: 11ch minmax(0, 1fr) 5ch; align-items: center;
+    gap: 2px clamp(10px, 1.4vw, 20px);
   }
-  .ch-punch strong {
-    font-family: var(--font-mono); font-weight: 400; color: var(--c-ink); font-variant-numeric: tabular-nums;
+  .ch-alt.is-yours .ch-alt-label { color: var(--c-accent); }
+  .ch-alt-label { font-family: var(--font-mono); font-size: 10.5px; color: var(--c-soft); letter-spacing: 0.04em; }
+  .ch-alt-val {
+    font-family: var(--font-mono); font-size: 14px; color: var(--c-ink);
+    font-variant-numeric: tabular-nums; text-align: right;
   }
+  .ch-alt-note { grid-column: 2 / -1; font-size: 11px; line-height: 1.4; color: var(--c-faint); }
+
+  /* BEAT 3: the same bar, month after month. */
+  .ch-months { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(8px, 1.2vh, 12px); }
+  .ch-months li { display: grid; grid-template-columns: 4ch minmax(0, 1fr); align-items: center; gap: 0 clamp(10px, 1.4vw, 18px); }
+  .ch-month-label { font-family: var(--font-mono); font-size: 10px; color: var(--c-accent); letter-spacing: 0.06em; }
+
   .ch-cap {
     font-size: 10.5px; line-height: 1.45; color: var(--c-faint);
-    margin: 8px 0 0; max-width: 66ch; font-style: italic;
+    margin: clamp(12px, 1.8vh, 20px) 0 0; max-width: 62ch; font-style: italic;
+  }
+
+  /* Beats beside the object, so the definition and its illustration are read together and the money bar sits
+     where the eye already is. The object takes the larger share — same principle as the other slides: the
+     drawing is the subject, not an aside. */
+  @media (min-width: 1101px) {
+    .ch-body {
+      display: grid; grid-template-columns: 33fr 67fr;
+      gap: 0 clamp(26px, 3vw, 56px); align-items: center;
+    }
+    /* The stage no longer needs the vertical gap that separated it from stacked beats. */
+    .ch-stage { margin-top: 0; }
   }
 </style>
 
 <script>
-  // Highlight the three landmark paths in turn. Sequential rather than all at once: three lit curves is one
-  // blur, three in sequence is three separate realisations of "that could have been me".
+  // THE DEFINITION BUILDS: beat 1, beat 2, beat 3, then it holds and repeats. Sequential because a definition
+  // is an ORDER — what a portfolio is, then what optimising means, then what multi-period adds — and showing
+  // all three at once is a wall of text that a reader has to sort themselves.
   //
-  // Progressive enhancement in the safe direction — html.no-fan-js (added here, cleared once this runs) makes
-  // the CSS show every readout, so a JS failure leaves the fan and all three labels visible.
-  document.documentElement.classList.add('no-fan-js');
+  // Safe direction for progressive enhancement: html.no-define-js (added here, cleared once this runs) shows
+  // every beat at full strength and the first panel, so a JS failure leaves a readable definition rather than
+  // a dim list and an empty stage.
+  document.documentElement.classList.add('no-define-js');
 
-  function initFan(): (() => void) | null {
+  function initDefine(): (() => void) | null {
     const section = document.querySelector<HTMLElement>('#choice');
     if (!section) return null;
-    const marks = Array.from(section.querySelectorAll<SVGPolylineElement>('[data-mark]'));
-    const calls = Array.from(section.querySelectorAll<HTMLElement>('[data-call]'));
-    if (!marks.length || !calls.length) return null;
-    document.documentElement.classList.remove('no-fan-js');
+    const beats = Array.from(section.querySelectorAll<HTMLElement>('[data-beat]'));
+    const panels = Array.from(section.querySelectorAll<HTMLElement>('[data-panel]'));
+    if (beats.length !== panels.length || !beats.length) return null;
+    document.documentElement.classList.remove('no-define-js');
 
-    const ordered = [...marks].sort((a, b) => Number(a.dataset.mark) - Number(b.dataset.mark));
+    const show = (i: number) => {
+      beats.forEach((el, k) => el.classList.toggle('is-on', k === i));
+      panels.forEach((el, k) => el.classList.toggle('is-on', k === i));
+    };
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      for (const el of ordered) el.classList.add('is-lit');
-      for (const el of calls) el.classList.add('is-shown');
+      // Finished state: every beat legible, first panel shown. No sequence.
+      for (const el of beats) el.classList.add('is-on');
+      panels[0].classList.add('is-on');
       return null;
     }
 
     let step = 0;
     let timer = 0;
-    const show = (i: number) => {
-      ordered.forEach((el, k) => el.classList.toggle('is-lit', k === i));
-      calls.forEach((el, k) => el.classList.toggle('is-shown', k === i));
-    };
     show(0);
-    const advance = () => { step = (step + 1) % ordered.length; show(step); };
+    const advance = () => {
+      step = (step + 1) % beats.length;
+      show(step);
+      // Hold longest on the last beat: it is the one the slide is named after.
+      window.clearTimeout(timer);
+      timer = window.setTimeout(advance, step === beats.length - 1 ? 6200 : 4600);
+    };
 
-    // Only while on screen: an aria-live region mutating off-screen is noise for a screen reader.
     const io = new IntersectionObserver((entries) => {
       const visible = entries.some((e) => e.isIntersecting);
-      if (visible && !timer) timer = window.setInterval(advance, 2600);
-      else if (!visible && timer) { window.clearInterval(timer); timer = 0; }
+      if (visible && !timer) timer = window.setTimeout(advance, 4600);
+      else if (!visible && timer) { window.clearTimeout(timer); timer = 0; }
     }, { threshold: 0.3 });
     io.observe(section);
 
-    return () => { window.clearInterval(timer); io.disconnect(); };
+    return () => { window.clearTimeout(timer); io.disconnect(); };
   }
 
   let teardown: (() => void) | null = null;
   document.addEventListener('astro:page-load', () => {
     teardown?.();
-    teardown = initFan();
+    teardown = initDefine();
   });
 </script>
