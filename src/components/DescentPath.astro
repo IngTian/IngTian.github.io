@@ -32,9 +32,11 @@ const facts = trajectoryFacts();
       walk out of a basin. That climb is the whole story.
     </p>
 
-    <div class="dp-controls" role="group" aria-label="Projection">
-      <button type="button" class="dp-btn" data-proj="2d" aria-pressed="true">plan · 2D</button>
-      <button type="button" class="dp-btn" data-proj="3d" aria-pressed="false">relief · 3D</button>
+    <!-- 3D was offered as a comparison and lost: the relief view measured 2.0% ink against the
+         plan view's 3.4% because the surface itself was never rendered, so it read as a 2D curve on
+         a distorted grid. The owner chose plan, so the control is gone rather than left as a
+         half-good option. descentPath.ts keeps the projection parameter, which costs nothing. -->
+    <div class="dp-controls">
       <button type="button" class="dp-btn dp-replay" data-replay>replay the walk</button>
     </div>
 
@@ -94,24 +96,14 @@ const facts = trajectoryFacts();
     background: transparent; color: var(--ink-4);
     border: 1px solid rgba(var(--hairline-rgb), 0.3); border-radius: 2px;
   }
-  .dp-btn[aria-pressed='true'] {
-    color: var(--on-accent); background: var(--ochre); border-color: var(--ochre);
-    /* An unmistakable pressed state: filled, plus a marker. The previous version differed only by
-       fill and the owner could not tell whether a press had registered. */
-    font-weight: 500;
-  }
-  .dp-btn[aria-pressed='true']::before { content: '● '; letter-spacing: 0; }
-  .dp-btn:hover { color: var(--paper); }
-  .dp-btn[aria-pressed='true']:hover { color: var(--on-accent); }
+  .dp-btn:hover { color: var(--paper); border-color: rgba(var(--hairline-rgb), 0.55); }
   .dp-btn:focus-visible { outline: 1px solid var(--ochre); outline-offset: 2px; }
-  .dp-replay { margin-left: auto; }
+
 
   .dp-stage {
     position: relative; margin: 3vh 0 0; width: 100%; aspect-ratio: 16 / 9;
     transition: opacity .18s ease;
   }
-  /* A brief dip when the projection changes, so the switch is felt as well as seen. */
-  .dp-stage.is-switching { opacity: 0.55; }
   .dp-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   /* The fallback text sits under the canvas and is revealed only when the canvas cannot draw, so
      the no-JS state is informative rather than an empty box. */
@@ -180,12 +172,11 @@ const facts = trajectoryFacts();
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return null;
     const section = stage.closest('#descent-path') as HTMLElement;
-    const buttons = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-proj]'));
     const replay = section.querySelector<HTMLButtonElement>('[data-replay]');
     const stops = Array.from(section.querySelectorAll<HTMLElement>('[data-stop]'));
     const readout = section.querySelector<HTMLElement>('[data-readout]');
 
-    let projection: Projection = '2d';
+    const projection: Projection = '2d';   // plan only; see the note in the markup above
     let reveal = 0;                 // 0..1, how much of the trail is drawn
     let raf = 0;
     let W = 0, H = 0, dpr = 1;
@@ -222,11 +213,14 @@ const facts = trajectoryFacts();
       return { w: W, h: H, projection, pad: { l: 70, r: 210, t: 50, b: 70 } };
     }
 
-    /** How many stops the walker has completed at the current reveal. Knowledge is a function of
-     *  EXPERIENCE, so it advances stop by stop rather than continuously — you learn a place by
-     *  having been there, not by being partway to it. */
-    function stopsWalked(): number {
-      return Math.max(1, Math.floor(reveal * (WAYPOINTS.length - 1)) + 1);
+    /** How much experience the walker has at the current reveal, as a CONTINUOUS quantity.
+     *
+     *  Was Math.floor(...) + 1, which quantised knowledge into seven discrete jumps: nothing changed
+     *  for ~740ms and then the whole surface lurched. That is exactly the "too extreme, almost seems
+     *  stuck" the owner reported — a quantisation artefact, not a duration problem. knownAfter()
+     *  accepts a fractional value and eases the newest disc in from zero. */
+    function experience(): number {
+      return reveal * (WAYPOINTS.length - 1) + 1;
     }
 
     function draw(): void {
@@ -259,7 +253,7 @@ const facts = trajectoryFacts();
         for (const run of runs) {
           let open = false;
           run.forEach((p) => {
-            const kn = knownness(p[0], p[1], stopsWalked());
+            const kn = knownness(p[0], p[1], experience());
             const [sx, sy] = project(p[0], p[1], v);
             if (kn <= 0.02) {
               if (open) { ctx.stroke(); open = false; }
@@ -285,7 +279,7 @@ const facts = trajectoryFacts();
           // Only wash a bowl once its centre is known, or the deep basin would glow before it has
           // been discovered — which would give the ending away.
           const mid = run[Math.floor(run.length / 2)];
-          if (knownness(mid[0], mid[1], stopsWalked()) <= 0.05) continue;
+          if (knownness(mid[0], mid[1], experience()) <= 0.05) continue;
           ctx.beginPath();
           run.forEach((p, k) => {
             const [sx, sy] = project(p[0], p[1], v);
@@ -297,22 +291,23 @@ const facts = trajectoryFacts();
       });
       ctx.globalAlpha = 1;
 
-      // ── THE HORIZON OF KNOWLEDGE. One faint disc per place stood, radius growing with
-      // experience. This is the sensitivity function made visible: the field is known only where it
-      // has been walked, and the reach improves as you learn to read it.
-      const discs = knownAfter(stopsWalked());
+      // ── THE EDGE OF KNOWLEDGE, drawn as a hairline rather than as a wash.
+      //
+      // The first version filled each disc with a radial gradient. Additive fills over eight
+      // overlapping discs took ink coverage from 3.4% to 57.6% — the frame flooded and the contours
+      // drowned. Knowledge should REVEAL the field, not paint light on top of it, so the discs now
+      // contribute only a faint boundary and the actual masking happens in the contour pass.
+      const discs = knownAfter(experience());
+      ctx.globalAlpha = 0.13;
+      ctx.strokeStyle = ink5;
+      ctx.lineWidth = 1;
       for (const d of discs) {
+        if (d.r < 0.02) continue;
         const [cx0, cy0] = project(d.x, d.y, v);
         const [ex] = project(d.x + d.r, d.y, v);
-        const rr = Math.abs(ex - cx0);
-        const g = ctx.createRadialGradient(cx0, cy0, rr * 0.55, cx0, cy0, rr);
-        g.addColorStop(0, 'rgba(0,0,0,0)');
-        g.addColorStop(1, ink5);
-        ctx.globalAlpha = 0.055;
-        ctx.fillStyle = g;
         ctx.beginPath();
-        ctx.arc(cx0, cy0, rr, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.arc(cx0, cy0, Math.abs(ex - cx0), 0, Math.PI * 2);
+        ctx.stroke();
       }
       ctx.globalAlpha = 1;
 
@@ -320,7 +315,7 @@ const facts = trajectoryFacts();
       // invisible for seven of eight stops and discovered at the last, missing by 0.01 at the stop
       // before. Drawing it earlier would give away an ending the walker had not yet earned.
       const att = unknownAttractor();
-      const discovered = knownness(att.x, att.y, stopsWalked()) > 0.02;
+      const discovered = knownness(att.x, att.y, experience()) > 0.02;
       const [ax, ay] = project(att.x, att.y, v);
       if (!discovered) {
         // Not yet known: nothing is drawn here at all. The absence IS the point.
@@ -436,14 +431,19 @@ const facts = trajectoryFacts();
       // per leg. This is a WALK: it has to be slow enough to see one stop arrive after another, and
       // now the surface is being discovered as it goes, so the pacing carries information rather
       // than just decoration.
-      const DURATION_MS = 5200;
+      const DURATION_MS = 6400;
       const t0 = performance.now();
       reveal = 0;
+      // Smootherstep: zero velocity AND zero acceleration at both ends, so the walk starts without a
+      // jolt and settles into the discovery instead of stopping dead. A linear ramp made the finish
+      // feel abrupt even at the right duration.
+      const ease = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
       const step = (now: number) => {
-        reveal = Math.min(1, (now - t0) / DURATION_MS);
+        const raw = Math.min(1, (now - t0) / DURATION_MS);
+        reveal = ease(raw);
         markStops();
         draw();
-        if (reveal < 1) raf = requestAnimationFrame(step);
+        if (raw < 1) raf = requestAnimationFrame(step);
       };
       raf = requestAnimationFrame(step);
     }
@@ -455,32 +455,20 @@ const facts = trajectoryFacts();
         el.style.opacity = arrival <= reveal + 1e-6 ? '1' : '0.32';
       });
       if (!readout) return;
-      const k = stopsWalked();
+      // Experience is continuous now, so the READOUT has to round it — an earlier build printed
+      // "stop 1.0000000994998548/8" straight from the float.
+      const k = experience();
+      const kShown = Math.min(WAYPOINTS.length, Math.round(k));
       const att = unknownAttractor();
       const found = knownness(att.x, att.y, k) > 0.02;
       const r = knowledgeRadius(k - 1).toFixed(2);
       readout.innerHTML = found
-        ? `stop <b>${k}/${WAYPOINTS.length}</b> · reach <b>${r}</b> · ` +
+        ? `stop <b>${kShown}/${WAYPOINTS.length}</b> · reach <b>${r}</b> · ` +
           `<i>a deeper basin is now visible</i> — it was there the whole time`
-        : `stop <b>${k}/${WAYPOINTS.length}</b> · reach <b>${r}</b> · ` +
+        : `stop <b>${kShown}/${WAYPOINTS.length}</b> · reach <b>${r}</b> · ` +
           `nothing deeper is visible from here`;
     }
 
-    const onProj = (e: Event) => {
-      const b = e.currentTarget as HTMLButtonElement;
-      const next = (b.dataset.proj as Projection) ?? '2d';
-      if (next === projection) return;
-      projection = next;
-      for (const btn of buttons) btn.setAttribute('aria-pressed', String(btn === b));
-      // Feedback that the press LANDED. Without this the two views are similar enough at a glance
-      // that the owner could not tell whether the button had done anything.
-      stage.classList.remove('is-switching');
-      void stage.offsetWidth;                 // restart the CSS transition
-      stage.classList.add('is-switching');
-      window.setTimeout(() => stage.classList.remove('is-switching'), 420);
-      draw();
-    };
-    for (const b of buttons) b.addEventListener('click', onProj);
     const onReplay = () => animate();
     replay?.addEventListener('click', onReplay);
 
@@ -523,7 +511,6 @@ const facts = trajectoryFacts();
       window.removeEventListener('resize', onResize);
       io.disconnect();
       mo.disconnect();
-      for (const b of buttons) b.removeEventListener('click', onProj);
       replay?.removeEventListener('click', onReplay);
     };
   }

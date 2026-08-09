@@ -53,11 +53,31 @@ export interface KnownDisc {
   label: string;
 }
 
-/** The discs of known field after walking `k` stops (k = 0 means nothing known yet). */
+/** The discs of known field after walking `k` stops.
+ *
+ *  `k` is CONTINUOUS, not an integer count. A fractional k means the walker is between two stops,
+ *  and the newest disc grows in from zero rather than popping into existence at full size.
+ *
+ *  WHY THIS MATTERS: the first version floored k, so knowledge advanced in seven discrete jumps.
+ *  Nothing changed for ~740ms and then the whole surface lurched — which reads as "stuck, then
+ *  extreme" rather than as learning. Continuity is the entire fix. */
 export function knownAfter(k: number): KnownDisc[] {
-  return WAYPOINTS.slice(0, Math.max(0, k)).map((w, i) => ({
-    x: w.x, y: w.y, r: knowledgeRadius(i), index: i, label: w.label,
-  }));
+  const kk = Math.max(0, k);
+  const full = Math.floor(kk);
+  const frac = kk - full;
+  const out: KnownDisc[] = [];
+  for (let i = 0; i < Math.min(full, WAYPOINTS.length); i++) {
+    const w = WAYPOINTS[i];
+    out.push({ x: w.x, y: w.y, r: knowledgeRadius(i), index: i, label: w.label });
+  }
+  // The disc currently being learned: its radius eases in, so arriving somewhere expands what you
+  // can see smoothly instead of instantly.
+  if (full < WAYPOINTS.length && frac > 0) {
+    const w = WAYPOINTS[full];
+    const ease = frac * frac * (3 - 2 * frac);        // smoothstep
+    out.push({ x: w.x, y: w.y, r: knowledgeRadius(full) * ease, index: full, label: w.label });
+  }
+  return out;
 }
 
 /** Is a world point inside anything you have learned after `k` stops? */
