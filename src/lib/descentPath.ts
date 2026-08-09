@@ -36,8 +36,24 @@ export interface View {
 }
 
 /** World bounds that contain the whole story: every waypoint plus both basins, with margin.
- *  Deriving this rather than using RANGE is what fixes the corner-cram. */
+ *  Deriving this rather than using RANGE is what fixes the corner-cram.
+ *
+ *  MEMOISED, and this is the fix for a 0.6fps animation rather than a micro-optimisation.
+ *  storyBounds() calls trajectoryFacts(), which runs FOUR 3000-step gradient descents. project()
+ *  calls storyBounds() once per point, and the renderer projects ~3000 contour points per frame —
+ *  about 36 MILLION gradient steps per frame. A CPU profile put 89% of all time in settle(); five
+ *  earlier fixes missed it because the call was buried two levels down inside project(). The bounds
+ *  depend only on module constants, so they are computed once. */
+let boundsCache: { margin: number; v: ReturnType<typeof computeBounds> } | null = null;
+
 export function storyBounds(margin = 0.55) {
+  if (boundsCache && boundsCache.margin === margin) return boundsCache.v;
+  const v = computeBounds(margin);
+  boundsCache = { margin, v };
+  return v;
+}
+
+function computeBounds(margin: number) {
   const f = trajectoryFacts();
   const xs = [...WAYPOINTS.map((w) => w.x), f.localBasin.x, f.globalBasin.x];
   const ys = [...WAYPOINTS.map((w) => w.y), f.localBasin.y, f.globalBasin.y];
@@ -225,9 +241,10 @@ export function climbSpan(pts: readonly TrailPoint[]): { t0: number; t1: number 
 }
 
 /** The unknown attractor: the field's deepest point, drawn WITHOUT a label. It is where the trail
- *  is heading, not where it has arrived. */
+ *  is heading, not where it has arrived. Memoised for the same reason as storyBounds. */
+let attractorCache: { x: number; y: number; depth: number } | null = null;
 export function unknownAttractor(): { x: number; y: number; depth: number } {
-  return trajectoryFacts().globalBasin;
+  return (attractorCache ??= trajectoryFacts().globalBasin);
 }
 
 export type { Waypoint };

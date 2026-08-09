@@ -111,16 +111,39 @@ export function walkerKnowledge(
   return out;
 }
 
-/** knownness against a walker-derived frontier. Same soft edge as the stop-based version. */
+/**
+ * A knownness FUNCTION for a fixed frontier — build once per frame, call thousands of times.
+ *
+ * THE PERFORMANCE BUG THIS FIXES, because it made the animation a slideshow: the previous
+ * walkerKnownness(x, y, u, pathAt) rebuilt the entire frontier on EVERY CALL. At full reveal that is
+ * up to 97 discs, each requiring a spline sample, and the draw calls it once per contour point —
+ * roughly 290,000 disc constructions per frame. Measured: a single 1739ms synchronous long task per
+ * frame, i.e. 0.6fps, which is exactly the "step function, like a powerpoint" symptom.
+ *
+ * Hoisting the frontier out of the inner loop is the whole fix. The caller builds this once per frame
+ * and then the per-point cost is just a distance test against a fixed array.
+ */
+export function knownnessFn(
+  u: number, pathAt: (t: number) => { x: number; y: number },
+): (x: number, y: number) => number {
+  const discs = walkerKnowledge(u, pathAt);
+  return (x: number, y: number) => {
+    let best = 0;
+    for (let i = 0; i < discs.length; i++) {
+      const d = discs[i];
+      const t = 1 - Math.hypot(x - d.x, y - d.y) / d.r;
+      if (t > best) best = t;
+    }
+    return best < 0 ? 0 : best > 1 ? 1 : best;
+  };
+}
+
+/** Convenience wrapper. Correct but SLOW — it rebuilds the frontier per call, so never use it inside
+ *  a render loop. Kept for tests and one-off queries. */
 export function walkerKnownness(
   x: number, y: number, u: number, pathAt: (t: number) => { x: number; y: number },
 ): number {
-  let best = 0;
-  for (const d of walkerKnowledge(u, pathAt)) {
-    const t = 1 - Math.hypot(x - d.x, y - d.y) / d.r;
-    if (t > best) best = t;
-  }
-  return Math.max(0, Math.min(1, best));
+  return knownnessFn(u, pathAt)(x, y);
 }
 
 /** Is a world point inside anything you have learned after `k` stops? */

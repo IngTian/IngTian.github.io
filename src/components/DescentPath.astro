@@ -154,7 +154,7 @@ const facts = trajectoryFacts();
     type Projection, type View,
   } from '../lib/descentPath';
   import { WAYPOINTS, trajectoryFacts } from '../lib/trajectory';
-  import { walkerKnownness, knowledgeRadius } from '../lib/knowledge';
+  import { knownnessFn, knowledgeRadius } from '../lib/knowledge';
   import { prefersReducedMotion } from '../lib/motion';
 
   const teardowns: Array<() => void> = [];
@@ -185,7 +185,11 @@ const facts = trajectoryFacts();
     // they do not change as the trail animates.
     const pts = trail();
     const span = climbSpan(pts);
+    // HOISTED, and this is load-bearing for the animation, not a micro-optimisation. Both facts and
+    // the attractor come from trajectoryFacts(), which runs four 3000-step gradient descents. Calling
+    // it inside draw() cost ~1.8s per frame and produced a 0.6fps slideshow.
     const facts = trajectoryFacts();
+    const attractor = unknownAttractor();
     const levels = contourLevels(11);
     const contourCache = new Map<string, [number, number][][]>();
     const contoursFor = (lv: number) => {
@@ -195,8 +199,26 @@ const facts = trajectoryFacts();
       return c;
     };
 
-    const tok = (name: string, fb: string) =>
-      getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fb;
+    // PALETTE CACHE. tok() called getComputedStyle() and it ran SIX TIMES PER DRAW — six forced
+    // style recalculations per animation frame. Measured before this fix: 0.6 fps, mean 1758ms per
+    // frame, which is precisely the "step function, like a powerpoint" symptom. The canvas work
+    // itself was never the problem: only ~270 draw calls per frame, and the pure maths costs 10ms.
+    // Read the tokens once and invalidate only when the theme attribute changes.
+    type Pal = Record<string, string>;
+    let palCache: Pal | null = null;
+    const readPalette = (): Pal => {
+      const cs = getComputedStyle(document.documentElement);
+      const get = (n: string, fb: string) => cs.getPropertyValue(n).trim() || fb;
+      return {
+        ink5: get('--ink-5', '#b8b1a1'),
+        ink4: get('--ink-4', '#8c8576'),
+        ink3: get('--ink-3', '#5a544a'),
+        paper: get('--paper', '#efe9dd'),
+        ochre: get('--ochre', '#c8a36a'),
+        seal: get('--seal', '#b23a2e'),
+      };
+    };
+    const palette = (): Pal => (palCache ??= readPalette());
 
     function size(): void {
       const r = canvas.getBoundingClientRect();
@@ -232,19 +254,18 @@ const facts = trajectoryFacts();
     }
 
     /** How well a world point is understood right now. Driven by where the walker HAS BEEN along the
-     *  curve, so the left half of the field fades in smoothly as the descent proceeds. */
-    function known(x: number, y: number): number {
-      return walkerKnownness(x, y, reveal, pathAt);
-    }
+     *  curve, so the left half of the field fades in smoothly as the descent proceeds.
+     *
+     *  The frontier is built ONCE PER FRAME (see refreshKnown) rather than per point: rebuilding it
+     *  per call cost ~290,000 disc constructions per frame and pinned the animation at 0.6fps. */
+    let knownAt: (x: number, y: number) => number = () => 0;
+    function refreshKnown(): void { knownAt = knownnessFn(reveal, pathAt); }
+    function known(x: number, y: number): number { return knownAt(x, y); }
 
     function draw(): void {
+      refreshKnown();
       const v = view();
-      const ink5 = tok('--ink-5', '#b8b1a1');
-      const ink4 = tok('--ink-4', '#8c8576');
-      const ink3 = tok('--ink-3', '#5a544a');
-      const paper = tok('--paper', '#efe9dd');
-      const ochre = tok('--ochre', '#c8a36a');
-      const seal = tok('--seal', '#b23a2e');
+      const { ink5, ink4, ink3, paper, ochre, seal } = palette();
 
       ctx.save();
       ctx.scale(dpr, dpr);
@@ -321,7 +342,7 @@ const facts = trajectoryFacts();
       // ── The deeper basin. HELD BACK until experience actually reaches it: measured, it is
       // invisible for seven of eight stops and discovered at the last, missing by 0.01 at the stop
       // before. Drawing it earlier would give away an ending the walker had not yet earned.
-      const att = unknownAttractor();
+      const att = attractor;
       const discovered = known(att.x, att.y) > 0.02;
       const [ax, ay] = project(att.x, att.y, v);
       if (!discovered) {
@@ -466,7 +487,7 @@ const facts = trajectoryFacts();
       // "stop 1.0000000994998548/8" straight from the float.
       const k = experience();
       const kShown = Math.min(WAYPOINTS.length, Math.round(k));
-      const att = unknownAttractor();
+      const att = attractor;
       const found = known(att.x, att.y) > 0.02;
       const r = knowledgeRadius(k - 1).toFixed(2);
       readout.innerHTML = found
@@ -486,7 +507,7 @@ const facts = trajectoryFacts();
     };
     window.addEventListener('resize', onResize);
 
-    const mo = new MutationObserver(() => draw());
+    const mo = new MutationObserver(() => { palCache = null; draw(); });
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
     // Start when it is on screen, so the reveal is seen rather than missed.
