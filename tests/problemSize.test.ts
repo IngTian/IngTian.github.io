@@ -2,7 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   singlePeriodVars, multiPeriodVars, scaleFactor, humanCount, log10Combinations,
 } from '../src/lib/problemSize';
-import { TOY, REAL } from '../src/data/scale';
+// The declared sizes moved into data/desk.ts alongside the rest of the concrete example, so the toy
+// problem is now the six instruments over 52 weeks and the real one is the fund's own figures.
+import { FUND, INSTRUMENTS } from '../src/data/desk';
+
+const TOY = { assets: INSTRUMENTS.length, periods: 52 };
+const REAL = { tickers: FUND.tickers, periods: FUND.periods };
 
 describe('singlePeriodVars / multiPeriodVars', () => {
   it('single period is one weight per holding', () => {
@@ -28,8 +33,14 @@ describe('singlePeriodVars / multiPeriodVars', () => {
 
 describe('scaleFactor', () => {
   it('reports how much larger the real problem is than the example', () => {
-    // 3000*24 / (4*12) = 72000/48 = 1500
-    expect(scaleFactor(TOY, REAL)).toBe(1500);
+    // Derived rather than hardcoded: the declared sizes live in data/desk.ts and a change there should not
+    // silently break an assertion about arithmetic that is still correct.
+    const expected = (REAL.tickers * REAL.periods) / (TOY.assets * TOY.periods);
+    expect(scaleFactor(TOY, REAL)).toBeCloseTo(expected, 9);
+  });
+
+  it('the real problem is orders of magnitude larger, which is the slide\'s point', () => {
+    expect(scaleFactor(TOY, REAL)).toBeGreaterThan(100);
   });
 
   it('is zero rather than Infinity when the toy problem is empty', () => {
@@ -85,10 +96,17 @@ describe('log10Combinations', () => {
 });
 
 describe('the declared problem sizes', () => {
+  // The slide claims "thousands of tickers and countless constraints" in its copy, so the declared figures
+  // have to actually be in the thousands.
   it('the real problem is thousands of tickers and thousands of constraints, as claimed', () => {
-    expect(REAL.tickers).toBeGreaterThanOrEqual(1000);
-    expect(REAL.constraints).toBeGreaterThanOrEqual(1000);
-    expect(REAL.periods).toBeGreaterThan(1);
+    expect(FUND.tickers).toBeGreaterThanOrEqual(1000);
+    expect(FUND.constraints).toBeGreaterThanOrEqual(1000);
+    expect(FUND.periods).toBeGreaterThan(1);
+  });
+
+  it('the drawdown limit is a real bound, not decoration', () => {
+    expect(FUND.drawdownLimit).toBeGreaterThan(0);
+    expect(FUND.drawdownLimit).toBeLessThan(0.25);
   });
 
   it('the toy problem is small enough to teach with', () => {

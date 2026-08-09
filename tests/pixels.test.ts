@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { compileGlyph, coverage, inBounds } from '../src/lib/pixels';
-import { ASSET_GLYPHS } from '../src/data/assetGlyphs';
+// The glyph set moved from generic asset classes to the concrete instruments the slide actually shows
+// (AAPL, NVDA, META, BAC, gold, crude), so these assertions follow it.
+import { TICKER_GLYPHS as ASSET_GLYPHS } from '../src/data/tickerGlyphs';
 
 describe('compileGlyph', () => {
   it('fills every non-empty cell', () => {
@@ -35,8 +37,8 @@ describe('compileGlyph', () => {
 describe('the shipped asset glyphs', () => {
   const entries = Object.entries(ASSET_GLYPHS);
 
-  it('there is one per asset class the slide shows', () => {
-    expect(entries.map(([k]) => k).sort()).toEqual(['bonds', 'cash', 'commodities', 'equities']);
+  it('there is a mark for every instrument category the slide shows', () => {
+    expect(entries.map(([k]) => k).sort()).toEqual(['bank', 'chip', 'gold', 'oil', 'tech']);
   });
 
   it('all share one grid size, so they align in a column', () => {
@@ -64,19 +66,25 @@ describe('the shipped asset glyphs', () => {
     expect(new Set(sigs).size).toBe(entries.length);
   });
 
-  // The marks are diagrams of what each asset IS, so a few structural properties are worth pinning:
-  // equities should rise, cash should be flat, bonds should be regular.
-  it('the equities mark rises left to right', () => {
-    const g = ASSET_GLYPHS.equities;
-    const topOf = (x: number) => Math.min(...g.cells.filter((c) => c.x === x).map((c) => c.y), Infinity);
-    const left = topOf(1);
-    const right = topOf(9);
-    expect(right).toBeLessThan(left);   // smaller y = taller
+  // The marks are diagrams of a CATEGORY, so a few structural properties are worth pinning against a
+  // careless edit: the chip has pins on both sides, the bank stands on columns, the gold bar is a solid
+  // trapezoid.
+  it('the chip mark has pins reaching both edges', () => {
+    const g = ASSET_GLYPHS.chip;
+    const xs = g.cells.map((c) => c.x);
+    expect(Math.min(...xs)).toBe(0);
+    expect(Math.max(...xs)).toBe(g.w - 1);
   });
 
-  it('the cash mark is a flat line', () => {
-    const g = ASSET_GLYPHS.cash;
-    const rows = new Set(g.cells.map((c) => c.y));
-    expect(rows.size).toBeLessThanOrEqual(3);
+  it('the bank mark is wider at the base than at the apex', () => {
+    const g = ASSET_GLYPHS.bank;
+    const widthAt = (y: number) => g.cells.filter((c) => c.y === y).length;
+    expect(widthAt(0)).toBeLessThan(widthAt(3));
+  });
+
+  it('the gold mark is solid through its middle', () => {
+    const g = ASSET_GLYPHS.gold;
+    const mid = Math.floor(g.h / 2);
+    expect(g.cells.filter((c) => c.y === mid).length).toBe(g.w);
   });
 });

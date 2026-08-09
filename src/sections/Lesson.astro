@@ -1,81 +1,70 @@
 ---
 // src/sections/Lesson.astro
-// SLIDE 1 — WHAT THE TOPIC IS. Assets with pixel marks, one big question, then candidate strategies with
-// their actual multi-period paths.
+// SLIDE 1 — THE CONCRETE EXAMPLE. Six real tickers, one invented year, six headlines, and forty-eight ways
+// of trading it.
 //
-// The owner's layout, verbatim: "the slide opens with a handful of assets, each with pixel art images, then
-// followed by a Big question, 'How would you invest?' then these moves on to the left, on the right you can
-// show a few strategies and their prospective return curve etc."
+// The owner's brief: "let's say you have AAPL, NVDA, META, BOA, XAUUSD, WTIOIL, etc. imagine that you have
+// news now and then, and you pick initial portfolio weights, during news, during the 1 year horizon, you
+// shifted positions (just like every trader), you probably resulted in a turbulent portfolio pnl (this you
+// can show lots of pnl curves and sequentially highlight a few indicating where the user may stand)."
 //
-// And the correction that reshaped the content: "seems like we didnt bake in multi period at all for the
-// examples." Right — the previous version offered four FIXED MIXES, which is a one-shot choice, the exact
-// thing multi-period optimisation is not. Each candidate here is a RULE that decides again every period and
-// pays for changing its mind, and the curves are what those rules actually produce (lib/multiperiod.ts,
-// 28 tests).
+// So the fan IS the argument: every curve is the same year, read by someone with a different reflex. The
+// reader is invited to find themselves in it, which is the "where you may stand" the owner asked for — the
+// three landmarks (lucky / middle / unlucky) are highlighted in sequence rather than all at once, so the
+// spread lands as three separate realisations instead of one blur.
 //
-// WHAT THE CURVES SHOW, and why it is not a flattering result. Measured in this declared world: buying only
-// equities ends HIGHEST at 1.35x — and pays a 22% drawdown to get there, while the optimised rule ends at
-// 1.26x with 0.5%. The honest lesson is that the highest curve is not automatically the one you want, and
-// the copy says exactly that. A test asserts the naive rule wins on raw return, so this cannot quietly drift
-// into "mine is best".
+// HONESTY IS LOAD-BEARING HERE. Real tickers make invented numbers look authoritative, so the slide states
+// in its own copy that the prices, headlines and paths are made up. It is a worked example, not a backtest,
+// and nothing on it is attributed to anyone's record.
 //
-// The cow is a VOICE in a pill (the existing easter-egg idiom), never a drawn animal — three attempts at
-// hand-authored illustration have been rejected on this project.
-import { ASSET_GLYPHS, type AssetGlyphKey } from '../data/assetGlyphs';
-import { TOY_ASSETS, PERIOD_RETURNS, runRule, finalValue, realisedVol, maxDrawdown } from '../lib/multiperiod';
-import { RULES, COST_PER_TURNOVER } from '../data/rules';
-import { COW_LINES } from '../data/lesson';
+// Maths in lib/scenario.ts (pure, 32 tests, deterministic — a seeded PRNG, because forty-eight curves that
+// shimmered between repaints would be the worst possible violation of the project's no-random-at-paint rule).
+import { TICKER_GLYPHS, type TickerGlyphKey } from '../data/tickerGlyphs';
+import { INSTRUMENTS, NEWS, TRADER_COUNT, DESK_DISCLAIMER } from '../data/desk';
+import {
+  buildWorld, makeTraders, runTrader, runSystematic, dispersion, landmarks, WEEKS,
+} from '../lib/scenario';
 
-// Everything is computed at BUILD time — the return table is declared, so the paths are deterministic and
-// the client ships numbers rather than a solver.
-const paths = RULES.map((r) => {
-  const path = runRule(r, PERIOD_RETURNS, COST_PER_TURNOVER);
-  return {
-    key: r.key,
-    label: r.label,
-    gloss: r.gloss,
-    isTarget: !!r.isTarget,
-    final: finalValue(path),
-    vol: realisedVol(path),
-    dd: maxDrawdown(path),
-    // Screen-space polyline for an inline SVG sparkline, computed here so the client draws nothing.
-    points: path,
-  };
-});
+// Everything is computed at BUILD time: the client ships coordinates, not a simulator.
+const world = buildWorld(INSTRUMENTS, NEWS);
+const traders = makeTraders(TRADER_COUNT);
+const paths = traders.map((t) => runTrader(t, world, INSTRUMENTS, NEWS));
+const sys = runSystematic(world, INSTRUMENTS);
+const spread = dispersion(paths);
+const marks = landmarks(paths);
+const markIndex = new Map(marks.map((m, i) => [m.index, i]));
 
-// One shared scale across all four sparklines, or they cannot be compared.
-const lo = Math.min(1, ...paths.flatMap((p) => p.points.map((q) => q.value)));
-const hi = Math.max(...paths.flatMap((p) => p.points.map((q) => q.value)));
-const SW = 100, SH = 30;
-const spark = (pts: { t: number; value: number }[]) => {
-  const tMax = pts[pts.length - 1].t || 1;
-  return pts
-    .map((q) => {
-      const x = (q.t / tMax) * SW;
-      const y = SH - ((q.value - lo) / (hi - lo || 1)) * SH;
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
+// One shared scale across the fan and the systematic path, or they cannot be compared.
+const allValues = [...paths.flatMap((p) => p.values), ...sys.values];
+const lo = Math.min(...allValues);
+const hi = Math.max(...allValues);
+const VW = 1000, VH = 340;
+const poly = (values: readonly number[]) =>
+  values
+    .map((v, i) => {
+      const x = (i / WEEKS) * VW;
+      const y = VH - ((v - lo) / (hi - lo || 1)) * VH;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(' ');
-};
 
-const CELL = 3;   // px per pixel-art cell
+const CELL = 3;
+const yOf = (v: number) => VH - ((v - lo) / (hi - lo || 1)) * VH;
+const xOfWeek = (w: number) => (w / WEEKS) * VW;
 ---
 <section id="lesson" class="ls" aria-labelledby="ls-heading">
   <div class="ls-paper">
     <div class="ls-inner">
-      <div class="ls-split">
-        <!-- LEFT: the assets, then the question. This is the reading order the owner asked for — you meet
-             the ingredients before you are asked what to do with them. -->
-        <div class="ls-ask">
-          <p class="ls-kicker">The topic</p>
+      <p class="ls-kicker">The topic</p>
 
+      <div class="ls-split">
+        <!-- LEFT: the book you start with, then the question. -->
+        <div class="ls-ask">
           <ul class="ls-assets">
-            {TOY_ASSETS.map((a) => {
-              const g = ASSET_GLYPHS[a.key as AssetGlyphKey];
+            {INSTRUMENTS.map((inst) => {
+              const g = TICKER_GLYPHS[inst.glyph as TickerGlyphKey];
               return (
                 <li class="ls-asset">
-                  <!-- The pixel mark: a matrix of cells compiled from data (lib/pixels.ts), rendered as
-                       rects. Not a drawing — a diagram of what the asset does. -->
                   <svg
                     class="ls-glyph"
                     viewBox={`0 0 ${g.w * CELL} ${g.h * CELL}`}
@@ -88,63 +77,114 @@ const CELL = 3;   // px per pixel-art cell
                       <rect x={c.x * CELL} y={c.y * CELL} width={CELL} height={CELL} />
                     ))}
                   </svg>
-                  <span class="ls-asset-name">{a.label}</span>
-                  <span class="ls-asset-num">{Math.round(a.mu * 100)}% <span class="ls-dim">return</span></span>
-                  <span class="ls-asset-num">{Math.round(a.sigma * 100)}% <span class="ls-dim">swing</span></span>
+                  <span class="ls-tick">{inst.ticker}</span>
+                  <span class="ls-name">{inst.name}</span>
+                  <span class="ls-vol">{Math.round(inst.vol * 100)}%<span class="ls-dim"> swing</span></span>
                 </li>
               );
             })}
           </ul>
-          <p class="ls-illus">Illustrative long-run figures, rounded — the shape of the problem, not anyone’s results.</p>
 
-          <!-- THE BIG QUESTION. -->
           <h2 id="ls-heading" class="ls-question">How would you invest?</h2>
           <p class="ls-lede">
-            And then — because the year does not end — how would you change it next period, knowing every
-            change costs you {(COST_PER_TURNOVER * 10000).toFixed(0)}bp of whatever you move?
+            Pick your weights. Then the year happens — six headlines, and after each one you will want to
+            change something. Every change costs money, and the next decision starts from wherever this one
+            leaves you.
           </p>
+
+          <!-- The headlines, as a list: this is the information every trader in the fan received. -->
+          <ol class="ls-news">
+            {NEWS.map((n) => (
+              <li><span class="ls-news-wk">wk {n.week}</span>{n.headline}</li>
+            ))}
+          </ol>
 
           <div class="ls-cow">
             <button
               type="button"
               class="ls-cow-btn"
               data-cow
-              data-lines={JSON.stringify(COW_LINES)}
+              data-lines={JSON.stringify([
+                'Why not just buy whichever one went up?',
+                'If everyone read the same news, why did they end up so far apart?',
+                'So is the best outcome the one to aim for, or the reliable one?',
+              ])}
               aria-live="polite"
             >
               <span class="ls-cow-mark" aria-hidden="true">◕</span>
-              <span class="ls-cow-say" data-cow-say>{COW_LINES[0]}</span>
+              <span class="ls-cow-say" data-cow-say>Why not just buy whichever one went up?</span>
             </button>
             <span class="ls-cow-hint" aria-hidden="true">ask again</span>
           </div>
         </div>
 
-        <!-- RIGHT: four rules, each with the path it actually produces. -->
-        <div class="ls-answers">
-          <p class="ls-kicker">Four rules, twelve periods, same world</p>
-          <ul class="ls-rules">
-            {paths.map((p) => (
-              <li class:list={['ls-rule', p.isTarget && 'is-target']}>
-                <div class="ls-rule-head">
-                  <span class="ls-rule-name">{p.label}</span>
-                  <svg class="ls-spark" viewBox={`0 0 ${SW} ${SH}`} preserveAspectRatio="none" aria-hidden="true">
-                    <polyline points={spark(p.points)} />
-                  </svg>
-                  <span class="ls-rule-final">{p.final.toFixed(2)}×</span>
-                </div>
-                <p class="ls-rule-gloss">{p.gloss}</p>
-                <p class="ls-rule-stats">
-                  <span>worst fall <strong>{(p.dd * 100).toFixed(1)}%</strong></span>
-                  <span>swing <strong>{(p.vol * 100).toFixed(1)}%</strong></span>
+        <!-- RIGHT: what actually happened, forty-eight times. -->
+        <div class="ls-fan">
+          <p class="ls-fan-head">
+            {TRADER_COUNT} people, the same year, the same headlines
+          </p>
+
+          <figure class="ls-figure">
+            <svg
+              class="ls-chart"
+              viewBox={`0 0 ${VW} ${VH}`}
+              preserveAspectRatio="none"
+              role="img"
+              aria-label={`Forty-eight portfolio value paths over one year, ending between ${spread.worst.toFixed(2)} and ${spread.best.toFixed(2)} times the starting capital, with a systematic path ending at ${sys.final.toFixed(2)}.`}
+            >
+              <!-- The break-even line: every curve's meaning is relative to it. -->
+              <line class="ls-base" x1="0" y1={yOf(1)} x2={VW} y2={yOf(1)} />
+
+              <!-- News weeks, as faint verticals — the moments where the paths diverge. -->
+              {world.newsWeeks.map((w) => (
+                <line class="ls-newsline" x1={xOfWeek(w)} y1="0" x2={xOfWeek(w)} y2={VH} />
+              ))}
+
+              <!-- THE FAN. Every path drawn, the three landmarks marked for sequential highlighting. -->
+              {paths.map((p, i) => (
+                <polyline
+                  class:list={['ls-path', markIndex.has(i) && 'is-mark']}
+                  data-mark={markIndex.has(i) ? markIndex.get(i) : undefined}
+                  points={poly(p.values)}
+                />
+              ))}
+
+              <!-- The systematic path, last so it sits on top. Revealed after the fan. -->
+              <polyline class="ls-sys" data-sys points={poly(sys.values)} />
+            </svg>
+
+            <!-- The sequential readout: one landmark at a time, so the spread lands as three realisations
+                 rather than one blur. -->
+            <div class="ls-callout" data-callout aria-live="polite">
+              {marks.map((m, i) => (
+                <p class="ls-call" data-call={i}>
+                  <span class="ls-call-label">{m.label}</span>
+                  <span class="ls-call-body">
+                    ended at <strong>{paths[m.index].final.toFixed(2)}×</strong>, worst fall{' '}
+                    <strong>{(paths[m.index].maxDrawdown * 100).toFixed(0)}%</strong>, Sharpe{' '}
+                    <strong>{paths[m.index].sharpe.toFixed(2)}</strong>
+                  </span>
                 </p>
-              </li>
-            ))}
-          </ul>
+              ))}
+              <p class="ls-call" data-call={marks.length}>
+                <span class="ls-call-label ls-call-label--sys">systematic</span>
+                <span class="ls-call-body">
+                  ended at <strong>{sys.final.toFixed(2)}×</strong>, worst fall{' '}
+                  <strong>{(sys.maxDrawdown * 100).toFixed(0)}%</strong>, Sharpe{' '}
+                  <strong>{sys.sharpe.toFixed(2)}</strong> — not the highest, the most consistent
+                </span>
+              </p>
+            </div>
+
+            <figcaption class="ls-caption">{DESK_DISCLAIMER}</figcaption>
+          </figure>
+
           <p class="ls-punch">
-            The tallest curve is not the answer. Buying only equities ends highest and falls
-            {' '}{(Math.abs(paths[0].dd) * 100).toFixed(0)}% on the way; the optimised rule gives up a little
-            to fall {(Math.abs(paths[3].dd) * 100).toFixed(1)}%. Which one is right depends on what you can
-            survive — and that is a question with a mathematical answer.
+            Nobody here was foolish. They read the same six headlines and reacted differently, and that alone
+            spread the year from <strong>{spread.worst.toFixed(2)}×</strong> to
+            {' '}<strong>{spread.best.toFixed(2)}×</strong>, with falls as deep as
+            {' '}<strong>{(spread.worstDrawdown * 100).toFixed(0)}%</strong>. Where would you have landed?
+            That is the question my job exists to stop being a matter of luck.
           </p>
         </div>
       </div>
@@ -165,10 +205,11 @@ const CELL = 3;   // px per pixel-art cell
     --ls-ink-soft: #423b30;
     --ls-ink-faint: #6a6153;
     --ls-accent: #7c5522;
+    --ls-fan-line: rgba(66, 59, 48, 0.28);
     background: var(--ls-bg);
     border-top: 1px solid var(--ls-edge);
     border-bottom: 1px solid var(--ls-edge);
-    padding: clamp(38px, 5.4vh, 80px) 0;
+    padding: clamp(34px, 4.6vh, 68px) 0;
   }
   :global(html[data-theme='dark']) .ls-paper {
     --ls-bg: #14161a;
@@ -177,6 +218,7 @@ const CELL = 3;   // px per pixel-art cell
     --ls-ink-soft: #a8b0a9;
     --ls-ink-faint: #6d746e;
     --ls-accent: #7fc9a0;
+    --ls-fan-line: rgba(168, 176, 169, 0.24);
   }
   .ls-inner {
     padding-left: clamp(150px, 9.5vw, 190px);
@@ -185,127 +227,234 @@ const CELL = 3;   // px per pixel-art cell
   }
   @media (max-width: 1099px) { .ls-inner { padding-left: clamp(28px, 6vw, 80px); } }
 
-  .ls-split {
-    display: grid; grid-template-columns: 44fr 56fr;
-    gap: 0 clamp(28px, 3.4vw, 68px);
-    align-items: start;
-  }
-  .ls-answers { border-left: 1px solid var(--ls-edge); padding-left: clamp(28px, 3.4vw, 68px); }
-  @media (max-width: 1040px) {
-    .ls-split { grid-template-columns: 1fr; gap: 4vh 0; }
-    .ls-answers { border-left: 0; padding-left: 0; padding-top: 4vh; border-top: 1px solid var(--ls-edge); }
-  }
-
   .ls-kicker {
     font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
-    text-transform: uppercase; color: var(--ls-accent); margin: 0 0 16px;
+    text-transform: uppercase; color: var(--ls-accent); margin: 0 0 14px;
   }
 
-  /* THE ASSETS: pixel mark, name, and its two numbers, in a four-column grid so the figures align down. */
-  .ls-assets { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .ls-split {
+    display: grid; grid-template-columns: 40fr 60fr;
+    gap: 0 clamp(26px, 3.2vw, 62px);
+    align-items: start;
+  }
+  .ls-fan { border-left: 1px solid var(--ls-edge); padding-left: clamp(26px, 3.2vw, 62px); }
+  @media (max-width: 1100px) {
+    .ls-split { grid-template-columns: 1fr; gap: 4vh 0; }
+    .ls-fan { border-left: 0; padding-left: 0; padding-top: 4vh; border-top: 1px solid var(--ls-edge); }
+  }
+
+  /* THE BOOK: ticker, name, and the one number that matters for the story (how much it swings). */
+  .ls-assets { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
   .ls-asset {
-    display: grid;
-    grid-template-columns: auto 1fr auto auto;
-    align-items: center;
-    gap: 0 clamp(10px, 1.2vw, 20px);
+    display: grid; grid-template-columns: auto auto 1fr auto;
+    align-items: center; gap: 0 clamp(9px, 1.1vw, 16px);
   }
   .ls-glyph { display: block; }
   .ls-glyph rect { fill: var(--ls-accent); }
-  .ls-asset-name {
-    font-family: var(--font-display); font-weight: 500; font-size: 16px; color: var(--ls-ink);
+  .ls-tick {
+    font-family: var(--font-mono); font-size: 13.5px; letter-spacing: 0.04em; color: var(--ls-ink);
   }
-  .ls-asset-num {
-    font-family: var(--font-mono); font-size: 13px; color: var(--ls-ink-soft);
-    font-variant-numeric: tabular-nums; text-align: right; min-width: 8ch;
+  .ls-name { font-size: 13px; color: var(--ls-ink-faint); }
+  .ls-vol {
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--ls-ink-soft);
+    font-variant-numeric: tabular-nums; text-align: right;
   }
-  .ls-dim { color: var(--ls-ink-faint); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
-  .ls-illus {
-    font-size: 11.5px; line-height: 1.5; color: var(--ls-ink-faint);
-    margin: 12px 0 0; max-width: 46ch; font-style: italic;
-  }
+  .ls-dim { color: var(--ls-ink-faint); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; }
 
-  /* THE BIG QUESTION — the largest thing on the slide, because it is the thing being asked. */
   .ls-question {
     font-family: var(--font-display); font-weight: 300;
-    font-size: clamp(30px, 3.2vw, 52px); line-height: 1.1;
-    color: var(--ls-ink); margin: clamp(22px, 3vh, 40px) 0 0;
+    font-size: clamp(28px, 2.9vw, 46px); line-height: 1.08;
+    color: var(--ls-ink); margin: clamp(18px, 2.4vh, 32px) 0 0;
     letter-spacing: -0.015em;
   }
   .ls-lede {
-    font-size: clamp(14px, 1.05vw, 16px); line-height: 1.68; color: var(--ls-ink-soft);
-    margin: 14px 0 0; max-width: 44ch;
+    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.62; color: var(--ls-ink-soft);
+    margin: 12px 0 0; max-width: 44ch;
   }
 
-  .ls-cow { display: flex; align-items: center; gap: 10px; margin: clamp(16px, 2.2vh, 26px) 0 0; flex-wrap: wrap; }
+  /* The headlines: numbered, quiet, and the same information every path in the fan received. */
+  .ls-news {
+    list-style: none; margin: clamp(14px, 1.8vh, 22px) 0 0; padding: 0;
+    display: grid; gap: 5px;
+  }
+  .ls-news li {
+    font-size: 12px; line-height: 1.45; color: var(--ls-ink-soft);
+    display: grid; grid-template-columns: 5ch 1fr; gap: 0 10px;
+  }
+  .ls-news-wk {
+    font-family: var(--font-mono); font-size: 10px; color: var(--ls-accent);
+    letter-spacing: 0.04em; padding-top: 1px;
+  }
+
+  .ls-cow { display: flex; align-items: center; gap: 10px; margin: clamp(14px, 1.8vh, 22px) 0 0; flex-wrap: wrap; }
   .ls-cow-btn {
-    display: inline-flex; align-items: baseline; gap: 9px;
+    display: inline-flex; align-items: baseline; gap: 8px;
     font: inherit; cursor: pointer; text-align: left;
     background: color-mix(in srgb, var(--ls-accent) 12%, transparent);
     border: 1px solid color-mix(in srgb, var(--ls-accent) 42%, transparent);
-    border-radius: 999px; padding: 7px 15px;
-    color: var(--ls-ink);
+    border-radius: 999px; padding: 6px 14px; color: var(--ls-ink);
   }
-  .ls-cow-mark { color: var(--ls-accent); font-size: 12px; line-height: 1; }
-  .ls-cow-say { font-family: var(--font-display); font-style: italic; font-size: 14.5px; line-height: 1.4; }
+  .ls-cow-mark { color: var(--ls-accent); font-size: 11px; line-height: 1; }
+  .ls-cow-say { font-family: var(--font-display); font-style: italic; font-size: 13.5px; line-height: 1.4; }
   @media (hover: hover) {
     .ls-cow-btn { transition: background-color .28s, border-color .28s; }
     .ls-cow-btn:hover { background: color-mix(in srgb, var(--ls-accent) 20%, transparent); }
   }
   .ls-cow-btn:focus-visible { outline: 2px solid var(--ls-accent); outline-offset: 3px; }
   .ls-cow-hint {
-    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase;
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
     color: var(--ls-ink-faint);
   }
 
-  /* THE RULES, each with the path it produces. */
-  .ls-rules { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(12px, 1.6vh, 18px); }
-  .ls-rule { padding-bottom: clamp(12px, 1.6vh, 18px); border-bottom: 1px solid color-mix(in srgb, var(--ls-edge) 60%, transparent); }
-  .ls-rule:last-of-type { border-bottom: 0; padding-bottom: 0; }
-  .ls-rule-head {
-    display: grid; grid-template-columns: 1fr auto auto;
-    align-items: center; gap: 0 clamp(12px, 1.4vw, 22px);
+  /* THE FAN. */
+  .ls-fan-head {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--ls-ink-faint); margin: 0 0 12px;
   }
-  .ls-rule-name {
-    font-family: var(--font-display); font-weight: 500; font-size: 15.5px; color: var(--ls-ink);
+  .ls-figure { margin: 0; }
+  .ls-chart { width: 100%; height: clamp(200px, 30vh, 320px); display: block; }
+
+  .ls-base {
+    stroke: var(--ls-ink-faint); stroke-width: 1; stroke-dasharray: 3 5;
+    vector-effect: non-scaling-stroke; opacity: 0.6;
   }
-  /* The sparkline: one shared scale across all four, or they could not be compared. */
-  .ls-spark { width: clamp(90px, 11vw, 150px); height: 30px; display: block; }
-  .ls-spark polyline {
-    fill: none; stroke: var(--ls-ink-faint); stroke-width: 1.4;
-    vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round;
+  .ls-newsline {
+    stroke: var(--ls-accent); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.22;
   }
-  .is-target .ls-spark polyline { stroke: var(--ls-accent); stroke-width: 2.2; }
-  .ls-rule-final {
-    font-family: var(--font-mono); font-size: 15px; color: var(--ls-ink-soft);
-    font-variant-numeric: tabular-nums; min-width: 5ch; text-align: right;
+  .ls-path {
+    fill: none; stroke: var(--ls-fan-line); stroke-width: 1;
+    vector-effect: non-scaling-stroke; stroke-linejoin: round;
+    opacity: 0.5;
   }
-  .is-target .ls-rule-final { color: var(--ls-accent); }
-  .is-target .ls-rule-name { color: var(--ls-ink); }
-  .ls-rule-gloss {
-    font-size: 13px; line-height: 1.55; color: var(--ls-ink-soft); margin: 5px 0 0; max-width: 56ch;
+  /* A highlighted landmark: full-strength ink, thicker, and the rest of the fan stays put — the eye finds
+     it by contrast rather than by the others disappearing. */
+  .ls-path.is-lit { stroke: var(--ls-ink); stroke-width: 2.2; opacity: 1; }
+  .ls-sys {
+    fill: none; stroke: var(--ls-accent); stroke-width: 2.6;
+    vector-effect: non-scaling-stroke; stroke-linejoin: round;
+    opacity: 0;
   }
-  .ls-rule-stats {
-    display: flex; gap: 0 clamp(14px, 1.6vw, 26px); margin: 5px 0 0;
-    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; color: var(--ls-ink-faint);
+  .ls-sys.is-lit { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    .ls-path, .ls-sys { transition: stroke .5s ease, stroke-width .5s ease, opacity .5s ease; }
   }
-  .ls-rule-stats strong { color: var(--ls-ink-soft); font-weight: 400; }
+  /* The finished state with no JS and no motion: everything visible, which reads as the full fan plus the
+     systematic path — the same argument, without the sequence. */
+  :global(html.no-fan-js) .ls-sys { opacity: 1; }
+
+  /* THE SEQUENTIAL READOUT: all four stacked, one shown at a time. Height is reserved by the tallest so
+     the layout never jumps as they cycle. */
+  .ls-callout {
+    position: relative; margin: clamp(10px, 1.4vh, 16px) 0 0;
+    min-height: 3.6em;
+  }
+  .ls-call {
+    margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0 12px; align-items: baseline;
+    position: absolute; inset: 0; opacity: 0;
+  }
+  .ls-call.is-shown { opacity: 1; position: relative; }
+  @media (prefers-reduced-motion: no-preference) {
+    .ls-call { transition: opacity .45s ease; }
+  }
+  /* No JS: show them all, stacked in flow. */
+  :global(html.no-fan-js) .ls-call { position: relative; opacity: 1; margin-bottom: 6px; }
+  :global(html.no-fan-js) .ls-callout { min-height: 0; }
+
+  .ls-call-label {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--ls-ink-faint); white-space: nowrap;
+  }
+  .ls-call-label--sys { color: var(--ls-accent); }
+  .ls-call-body { font-size: clamp(13px, 0.95vw, 14.5px); line-height: 1.5; color: var(--ls-ink-soft); }
+  .ls-call-body strong {
+    font-family: var(--font-mono); font-weight: 400; color: var(--ls-ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ls-caption {
+    font-size: 11px; line-height: 1.5; color: var(--ls-ink-faint);
+    margin: clamp(8px, 1.2vh, 14px) 0 0; max-width: 66ch; font-style: italic;
+  }
 
   .ls-punch {
-    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.65; color: var(--ls-ink-soft);
-    margin: clamp(16px, 2.2vh, 26px) 0 0; max-width: 62ch;
-    padding-top: clamp(12px, 1.6vh, 18px); border-top: 1px solid var(--ls-edge);
+    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.62; color: var(--ls-ink-soft);
+    margin: clamp(12px, 1.8vh, 22px) 0 0; max-width: 68ch;
+    padding-top: clamp(10px, 1.4vh, 16px); border-top: 1px solid var(--ls-edge);
+  }
+  .ls-punch strong {
+    font-family: var(--font-mono); font-weight: 400; color: var(--ls-ink);
+    font-variant-numeric: tabular-nums;
   }
 </style>
 
 <script>
-  // The cow cycles: its lines are the naive questions a reader is already asking, so it should be able to
-  // ask the next one. Clicking advances it; it also advances slowly while on screen so the affordance
-  // announces itself, and that timer stops for good on the first click and never runs under reduced motion.
+  // THE SEQUENCE: highlight the landmarks one at a time, then the systematic path.
+  //
+  // The owner asked to "sequentially highlight a few indicating where the user may stand". Sequential rather
+  // than all-at-once because four lit curves at the same time is one blur — the point is three separate
+  // realisations ("that could have been me") before the alternative arrives.
+  //
+  // Progressive enhancement in the safe direction: html.no-fan-js (added by this script, cleared once it
+  // runs) makes the CSS show everything, so a JS failure leaves the full fan and all four readouts visible
+  // rather than an empty chart. Under reduced motion the sequence does not run at all; the finished state is
+  // simply everything shown.
+  document.documentElement.classList.add('no-fan-js');
+
+  function initFan(): (() => void) | null {
+    const section = document.querySelector<HTMLElement>('#lesson');
+    if (!section) return null;
+    const marks = Array.from(section.querySelectorAll<SVGPolylineElement>('[data-mark]'));
+    const sys = section.querySelector<SVGPolylineElement>('[data-sys]');
+    const calls = Array.from(section.querySelectorAll<HTMLElement>('[data-call]'));
+    if (!marks.length || !sys || !calls.length) return null;
+
+    document.documentElement.classList.remove('no-fan-js');
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Ordered by the data-mark index, so the highlight order matches the readout order.
+    const ordered = [...marks].sort(
+      (a, b) => Number(a.dataset.mark) - Number(b.dataset.mark),
+    );
+    const steps = [...ordered, sys];
+
+    function show(i: number): void {
+      for (const [k, el] of steps.entries()) el.classList.toggle('is-lit', k === i);
+      for (const [k, el] of calls.entries()) el.classList.toggle('is-shown', k === i);
+    }
+
+    if (reduced) {
+      // Finished state: everything lit, every readout shown. No sequence.
+      for (const el of steps) el.classList.add('is-lit');
+      for (const el of calls) el.classList.add('is-shown');
+      return null;
+    }
+
+    let step = 0;
+    let timer = 0;
+    show(0);
+
+    const advance = () => {
+      step = (step + 1) % steps.length;
+      show(step);
+    };
+
+    // Only run while the slide is on screen: a timer mutating an aria-live region off-screen is noise for a
+    // screen reader, and animating an unseen chart is waste.
+    const io = new IntersectionObserver((entries) => {
+      const visible = entries.some((e) => e.isIntersecting);
+      if (visible && !timer) timer = window.setInterval(advance, 2600);
+      else if (!visible && timer) { window.clearInterval(timer); timer = 0; }
+    }, { threshold: 0.35 });
+    io.observe(section);
+
+    return () => { window.clearInterval(timer); io.disconnect(); };
+  }
+
   function initCow(): (() => void) | null {
     const btn = document.querySelector<HTMLButtonElement>('[data-cow]');
     const say = document.querySelector<HTMLElement>('[data-cow-say]');
     if (!btn || !say) return null;
-
     let lines: string[] = [];
     try { lines = JSON.parse(btn.dataset.lines || '[]'); } catch { lines = []; }
     if (lines.length < 2) return null;
@@ -316,15 +465,15 @@ const CELL = 3;   // px per pixel-art cell
     const onClick = () => { window.clearInterval(timer); timer = 0; advance(); };
     btn.addEventListener('click', onClick);
 
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced) return () => { btn.removeEventListener('click', onClick); };
-
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return () => btn.removeEventListener('click', onClick);
+    }
     const section = btn.closest('#lesson');
     const io = new IntersectionObserver((entries) => {
       const visible = entries.some((e) => e.isIntersecting);
-      if (visible && !timer) timer = window.setInterval(advance, 6200);
+      if (visible && !timer) timer = window.setInterval(advance, 7000);
       else if (!visible && timer) { window.clearInterval(timer); timer = 0; }
-    }, { threshold: 0.4 });
+    }, { threshold: 0.35 });
     if (section) io.observe(section);
 
     return () => {
@@ -334,9 +483,13 @@ const CELL = 3;   // px per pixel-art cell
     };
   }
 
-  let cowTeardown: (() => void) | null = null;
+  let teardowns: (() => void)[] = [];
   document.addEventListener('astro:page-load', () => {
-    cowTeardown?.();
-    cowTeardown = initCow();
+    for (const t of teardowns) t();
+    teardowns = [];
+    const a = initFan();
+    const b = initCow();
+    if (a) teardowns.push(a);
+    if (b) teardowns.push(b);
   });
 </script>
