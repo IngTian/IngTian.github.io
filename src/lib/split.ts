@@ -6,7 +6,7 @@
 // the money is worth afterwards. Anything more would be teaching the wrong thing.
 //
 // It lives in lib/ with a spec rather than inline in the component because the numbers appear as COPY on the
-// slide ("£100 becomes £91"), and a number in copy that nothing checks is exactly how a page starts lying.
+// slide ("$100 becomes $91"), and a number in copy that nothing checks is exactly how a page starts lying.
 //
 // Pure: no DOM. Deterministic.
 

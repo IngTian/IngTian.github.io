@@ -12,7 +12,7 @@
 // background had no way in, which is fatal for the one slide that is supposed to let them in.
 //
 // AND IT DOES FIT ON ONE SLIDE, but only because the EXAMPLE does the defining and the prose only labels what
-// is already on screen. Three beats over ONE object — a hundred pounds in a bar:
+// is already on screen. Three beats over ONE object — a hundred dollars in a bar:
 //    1. a portfolio IS this            -> the bar divides four ways
 //    2. optimising it is choosing      -> the same bar, split three other ways, with what each is worth after
 //                                         one piece of news
@@ -20,14 +20,27 @@
 // The object never changes; only what is being said about it does. That is what keeps it one slide instead of
 // three, and it is the same trick the descent piece uses — one drawing, text in its negative space.
 //
-// £100 rather than percentages, deliberately: a share of an unnamed total is an abstraction, and a hundred
-// pounds split four ways is something anyone can hold in their head.
+// $100 rather than percentages, deliberately: a share of an unnamed total is an abstraction, and a hundred
+// dollars split four ways is something anyone can hold in their head.
 //
 // Arithmetic in lib/split.ts (20 tests, including the assertion that the three alternatives give three
 // DIFFERENT outcomes — if they did not, "optimising is choosing" would be an empty claim).
 import { TICKER_GLYPHS, type TickerGlyphKey } from '../data/tickerGlyphs';
-import { BEATS, HOLDINGS, SPLITS, EVENT, DEFINE_DISCLAIMER } from '../data/define';
+import { BEATS, HOLDINGS, SPLITS, EVENT, DEFINE_DISCLAIMER, POLICIES, BEAT4 } from '../data/define';
 import { afterEvent, changePct, segments } from '../lib/split';
+import { runPolicy, pnlBounds, project as projectPnl, MONTHS as PNL_MONTHS } from '../lib/policyPnl';
+
+// BEAT 4 — the PnL curves. Computed at build time, so the client ships coordinates rather than a simulator.
+const runs = POLICIES.map((p) => runPolicy(p));
+const pBounds = pnlBounds(runs);
+const PW = 560, PH = 260;
+const pBox = { x: 0, y: 8, w: PW, h: PH - 16 };
+const pnlPath = (r: typeof runs[number]) =>
+  r.path.map((pt) => projectPnl(pt, PNL_MONTHS, pBounds, pBox).map((n) => n.toFixed(1)).join(',')).join(' ');
+// The break-even line: every curve's meaning is relative to "you got your money back".
+const yStart = projectPnl({ month: 0, value: 100 }, PNL_MONTHS, pBounds, pBox)[1];
+const best = runs.reduce((b, r) => (r.final > b.final ? r : b));
+const worst = runs.reduce((b, r) => (r.final < b.final ? r : b));
 
 const opening = HOLDINGS.map((h) => h.weight);
 const openingSegs = segments(opening);
@@ -73,14 +86,19 @@ const CELL = 3;
             <p class="ch-say">{b.say}</p>
           </li>
         ))}
+        <!-- Beat 4 closes the definition: the sequence has consequences, in return AND in risk. -->
+        <li class="ch-beat" data-beat="3">
+          <p class="ch-ask">{BEAT4.ask}</p>
+          <p class="ch-say">{BEAT4.say}</p>
+        </li>
       </ol>
 
       <div class="ch-stage">
         <!-- BEAT 1: the portfolio, as one bar of money divided four ways. -->
         <figure class="ch-panel" data-panel="0">
-          <p class="ch-panel-head">£100, split four ways</p>
+          <p class="ch-panel-head">$100, split four ways</p>
           <div class="ch-bar ch-bar--big" role="img"
-               aria-label={HOLDINGS.map((h) => `${h.weight} pounds in ${h.plain}`).join(', ')}>
+               aria-label={HOLDINGS.map((h) => `${h.weight} dollars in ${h.plain}`).join(', ')}>
             {openingSegs.map((seg, i) => (
               <span class:list={['ch-seg', `ch-seg--${i}`]} style={`left:${seg.start}%;width:${seg.width}%`}></span>
             ))}
@@ -95,7 +113,7 @@ const CELL = 3;
                        width={g.w * CELL} height={g.h * CELL} aria-hidden="true" shape-rendering="crispEdges">
                     {g.cells.map((c) => <rect x={c.x * CELL} y={c.y * CELL} width={CELL} height={CELL} />)}
                   </svg>
-                  <span class="ch-money">£{h.weight}</span>
+                  <span class="ch-money">${h.weight}</span>
                   <span class="ch-what">{h.plain}</span>
                   <span class="ch-tick">{h.ticker}</span>
                 </li>
@@ -118,7 +136,7 @@ const CELL = 3;
                   <span class:list={['ch-seg', `ch-seg--${i}`]} style={`left:${seg.start}%;width:${seg.width}%`}></span>
                 ))}
               </span>
-              <span class="ch-alt-val">£{openingAfter.toFixed(0)}</span>
+              <span class="ch-alt-val">${openingAfter.toFixed(0)}</span>
             </li>
             {alts.map((a) => (
               <li class="ch-alt">
@@ -128,15 +146,15 @@ const CELL = 3;
                     <span class:list={['ch-seg', `ch-seg--${i}`]} style={`left:${seg.start}%;width:${seg.width}%`}></span>
                   ))}
                 </span>
-                <span class="ch-alt-val">£{a.value.toFixed(0)}</span>
+                <span class="ch-alt-val">${a.value.toFixed(0)}</span>
                 <span class="ch-alt-note">{a.note}</span>
               </li>
             ))}
           </ul>
           <p class="ch-panel-foot">
-            Same hundred pounds, same news, and it is worth anywhere from
-            <strong>£{Math.min(...alts.map((a) => a.value)).toFixed(0)}</strong> to
-            <strong>£{Math.max(...alts.map((a) => a.value)).toFixed(0)}</strong> afterwards. Choosing the
+            Same hundred dollars, same news, and it is worth anywhere from
+            <strong>${Math.min(...alts.map((a) => a.value)).toFixed(0)}</strong> to
+            <strong>${Math.max(...alts.map((a) => a.value)).toFixed(0)}</strong> afterwards. Choosing the
             split is the optimisation.
           </p>
         </figure>
@@ -162,9 +180,55 @@ const CELL = 3;
             them, each one starting from wherever the last one left you.
           </p>
         </figure>
-      </div>
 
-      </div>
+        <!-- BEAT 4: four sequences of decisions through the same year, as PnL curves. The point is that they
+             differ in BOTH outcomes — the highest curve is also the shallowest fall here, but the panicker
+             shows the honest complication: it reduces the fall and costs return. -->
+        <figure class="ch-panel" data-panel="3">
+          <p class="ch-panel-head">{BEAT4.head}</p>
+
+          <svg class="ch-pnl" viewBox={`0 0 ${PW} ${PH}`} preserveAspectRatio="none" role="img"
+               aria-label={runs.map((r) => `${r.label} ends at ${r.final.toFixed(0)} dollars with a worst fall of ${r.worstFall.toFixed(0)} percent`).join('; ')}>
+            <line class="ch-pnl-base" x1="0" y1={yStart} x2={PW} y2={yStart} />
+            {runs.map((r, i) => (
+              <polyline class:list={['ch-pnl-line', `ch-line--${i}`]} points={pnlPath(r)} />
+            ))}
+          </svg>
+
+          <!-- Two numbers per policy, because the beat's claim is that BOTH differ. The per-policy gloss is
+               dropped: with four rows it pushed the panel to 1050px against a 357px stage and the whole thing
+               escaped its container. The label plus the two figures carries the point; the prose below says
+               what they mean. -->
+          <ul class="ch-pnl-legend">
+            <li class="ch-pnl-head-row" aria-hidden="true">
+              <span></span><span></span>
+              <span class="ch-pnl-col">ends</span>
+              <span class="ch-pnl-col">worst fall</span>
+            </li>
+            {runs.map((r, i) => (
+              <li>
+                {/* The key draws the actual line — same class, same dash pattern — so a reader matches the
+                    sample to the curve rather than to a colour they may not be able to tell apart. */}
+                <svg class="ch-key" viewBox="0 0 26 6" width="26" height="6" aria-hidden="true">
+                  <line class:list={['ch-pnl-line', `ch-line--${i}`]} x1="0" y1="3" x2="26" y2="3" />
+                </svg>
+                <span class="ch-pnl-name">{r.label}</span>
+                <span class="ch-pnl-end">${r.final.toFixed(0)}</span>
+                <span class="ch-pnl-fall">{r.worstFall.toFixed(0)}%</span>
+              </li>
+            ))}
+          </ul>
+
+          <p class="ch-panel-foot">
+            <strong>{best.label}</strong> ends at <strong>${best.final.toFixed(0)}</strong> having fallen only
+            <strong>{best.worstFall.toFixed(0)}%</strong>; <strong>{worst.label}</strong> ends at
+            <strong>${worst.final.toFixed(0)}</strong> and fell <strong>{worst.worstFall.toFixed(0)}%</strong> on
+            the way. Two answers, not one — how much you made, and what it cost you to sit through. <em>That</em>
+            is what there is to optimise.
+          </p>
+        </figure>
+      </div><!-- /.ch-stage -->
+      </div><!-- /.ch-body -->
 
       <p class="ch-cap">{DEFINE_DISCLAIMER}</p>
     </div>
@@ -179,6 +243,11 @@ const CELL = 3;
     /* Four holding colours, from the palette only: the accent, two ink tones, and the indigo. No new hues —
        the site allows exactly one saturated colour in light theme and it is the seal, which is reserved. */
     --c-h0: #7c5522; --c-h1: #9a8353; --c-h2: #5d6472; --c-h3: #b9a880;
+    /* FOUR POLICY colours, separate from the holding colours — the last beat draws ways of DECIDING, not
+       things owned, and reusing the holding ramp made two policies share a hue (in dark, h0 and h1 are both
+       emerald, so the winner and the chaser drew as one line). Only the subject carries the accent; the other
+       three are ink tones separated by lightness. */
+    --c-p0: #4a5464; --c-p1: #3a3428; --c-p2: #6e6555; --c-p3: var(--c-accent);
     background: var(--c-bg);
     border-top: 1px solid var(--c-edge); border-bottom: 1px solid var(--c-edge);
     padding: clamp(28px, 3.6vh, 56px) 0;
@@ -187,6 +256,8 @@ const CELL = 3;
     --c-bg: #14161a; --c-edge: rgba(184,177,161,0.14); --c-ink: #dce1dc;
     --c-soft: #a8b0a9; --c-faint: #6d746e; --c-accent: #7fc9a0;
     --c-h0: #7fc9a0; --c-h1: #5f9b7c; --c-h2: #6b7686; --c-h3: #a9b4a5;
+    /* Dark: three cool greys stepped in lightness, plus the phosphor accent for the subject. */
+    --c-p0: #7d8798; --c-p1: #d3d8d2; --c-p2: #5f6763; --c-p3: var(--c-accent);
   }
   .ch-inner {
     padding-left: clamp(150px, 9.5vw, 190px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
@@ -209,10 +280,17 @@ const CELL = 3;
   /* The beats sit left, the object right — but the beats are a LIST, not a column of prose: each is dim until
      its turn, so the definition reads as three steps rather than a wall. */
   .ch-beats { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(12px, 1.8vh, 20px); }
-  .ch-beat { opacity: 0.3; max-width: 46ch; }
-  .ch-beat.is-on { opacity: 1; }
+  /* DEFAULT = the finished state, and the script dims from there. An inverse guard class alone was not
+     enough: html.no-define-js is added BY the script, so with JavaScript switched off entirely it never
+     appears and every beat stayed at 0.3 while all four panels sat at opacity 0 — measured, the slide
+     rendered blank. Defaulting to legible means the worst case is "all four beats visible at once", which
+     is the reduced-motion state and reads fine. */
+  .ch-beat { opacity: 1; max-width: 46ch; }
+  /* html.define-js is set by the script before it starts sequencing, so dimming only happens where the
+     sequence can actually run. */
+  :global(html.define-js) .ch-beat { opacity: 0.3; }
+  :global(html.define-js) .ch-beat.is-on { opacity: 1; }
   @media (prefers-reduced-motion: no-preference) { .ch-beat { transition: opacity .5s ease; } }
-  :global(html.no-define-js) .ch-beat { opacity: 1; }
 
   .ch-ask {
     font-family: var(--font-display); font-size: clamp(16px, 1.4vw, 21px); line-height: 1.3;
@@ -222,13 +300,31 @@ const CELL = 3;
 
   /* THE OBJECT. One stage, three panels stacked in it — only one visible at a time, so the money bar is the
      same object being spoken about three ways rather than three different figures. */
-  .ch-stage { position: relative; margin: clamp(20px, 2.8vh, 36px) 0 0; min-height: clamp(240px, 34vh, 400px); }
-  .ch-panel { position: absolute; inset: 0; margin: 0; opacity: 0; pointer-events: none; }
-  .ch-panel.is-on { opacity: 1; pointer-events: auto; }
+  /* The stage must NOT stretch. .ch-paper is a full-height flex column (global.css makes every slide own the
+     screen), so a stage that grows to fill it makes the absolutely-positioned panels inherit 1050px — measured,
+     beat 4's panel reported 1050 while its own children totalled 351, and it escaped the slide entirely,
+     overlapping the headline and the rail. align-self keeps the stage at its own height inside that column. */
+  /* The stage takes the height the BEATS column sets, so the drawing sits opposite the words rather than
+     floating in the top third of an empty half. Panels are absolute inside it, so they all share one frame and
+     cross-fade without reflow — which only works because every panel is a CHILD of this element. It was once
+     a sibling by an editing slip, and `inset: 0` then resolved against the 1050px section: the panel escaped
+     the slide and covered the headline. Keep the panels inside. */
+  .ch-stage {
+    position: relative; margin: clamp(20px, 2.8vh, 36px) 0 0;
+    /* Measured: the whole slide used 611px of a 1050px screen with the stage at 34vh, and the PnL curves read
+       as four near-flat ribbons because the value range (100→122) had only 168px to spend. 42vh puts the
+       drawing at roughly the height of the words beside it and gives the curves their shape back. */
+    min-height: clamp(240px, 42vh, 460px);
+    width: 100%;
+  }
+  /* Same rule for the panels: without the script they stack in normal flow and only the FIRST is shown —
+     the definition's starting point — rather than an empty stage. The absolute, cross-fading arrangement is
+     an enhancement that applies only under html.define-js. */
+  .ch-panel { position: relative; margin: 0; opacity: 0; pointer-events: none; }
+  .ch-panel[data-panel='0'] { opacity: 1; pointer-events: auto; }
+  :global(html.define-js) .ch-panel { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+  :global(html.define-js) .ch-panel.is-on { opacity: 1; pointer-events: auto; }
   @media (prefers-reduced-motion: no-preference) { .ch-panel { transition: opacity .5s ease; } }
-  /* No JS: show the FIRST panel, which is the definition's starting point, and let the beats read as text. */
-  :global(html.no-define-js) .ch-panel { position: relative; inset: auto; opacity: 0; }
-  :global(html.no-define-js) .ch-panel[data-panel='0'] { opacity: 1; }
 
   .ch-panel-head {
     font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.14em;
@@ -244,7 +340,7 @@ const CELL = 3;
   }
   .ch-panel-foot em { font-style: italic; color: var(--c-ink); }
 
-  /* THE BAR: one hundred pounds, divided. The whole definition rests on this being obviously ONE thing cut
+  /* THE BAR: one hundred dollars, divided. The whole definition rests on this being obviously ONE thing cut
      into parts rather than four separate things. */
   .ch-bar {
     position: relative; display: block; width: 100%; height: 14px;
@@ -297,6 +393,55 @@ const CELL = 3;
   .ch-months li { display: grid; grid-template-columns: 4ch minmax(0, 1fr); align-items: center; gap: 0 clamp(10px, 1.4vw, 18px); }
   .ch-month-label { font-family: var(--font-mono); font-size: 10px; color: var(--c-accent); letter-spacing: 0.06em; }
 
+  /* BEAT 4: the PnL curves. One shared scale, so the four are comparable — and the winner is the one line at
+     full ink, because the beat's claim is that the sequences differ rather than that they are all equal. */
+  /* The chart takes whatever height the stage has left after the legend and the footer, with a floor so it
+     never collapses to a flat ribbon. preserveAspectRatio="none" is deliberate: a value-through-time plot has
+     no meaningful aspect to preserve, and letting it fill the frame is what makes the four sequences legible
+     as different SHAPES rather than four near-parallel lines. */
+  .ch-panel[data-panel='3'] { display: flex; flex-direction: column; }
+  .ch-pnl { width: 100%; flex: 1 1 auto; min-height: clamp(120px, 16vh, 200px); display: block; }
+  .ch-pnl-base {
+    stroke: var(--c-faint); stroke-width: 1; stroke-dasharray: 3 5;
+    vector-effect: non-scaling-stroke; opacity: 0.55;
+  }
+  .ch-pnl-line {
+    fill: none; stroke-width: 1.8; vector-effect: non-scaling-stroke;
+    stroke-linejoin: round; stroke-linecap: round;
+  }
+  /* DASH PATTERN, not colour alone, separates the four. Measured: in a two-hue palette no four tones clear
+     1.6:1 against each other AND 2.9:1 against the paper — at least one pair always collapses. A pattern is a
+     second channel that costs no hue, and it survives colour-blindness and a greyscale print. */
+  .ch-line--0 { stroke: var(--c-p0); stroke-dasharray: 7 4; }
+  .ch-line--1 { stroke: var(--c-p1); stroke-dasharray: 1.5 4; }
+  .ch-line--2 { stroke: var(--c-p2); stroke-dasharray: 12 3 2 3; }
+  /* The measured policy is the argument's subject: accent, solid, heaviest — the one unbroken line on screen. */
+  .ch-line--3 { stroke: var(--c-p3); stroke-width: 2.8; }
+
+  .ch-pnl-legend {
+    list-style: none; margin: clamp(8px, 1.2vh, 14px) 0 0; padding: 0;
+    display: grid; gap: 4px;
+  }
+  .ch-pnl-legend li {
+    display: grid; grid-template-columns: 26px minmax(0, 1fr) 6ch 7ch;
+    align-items: baseline; gap: 0 clamp(8px, 1vw, 14px);
+  }
+  /* A header row, so the two figures are labelled once rather than in every row. */
+  .ch-pnl-head-row { margin-bottom: 2px; }
+  .ch-pnl-col {
+    font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--c-faint); text-align: right;
+  }
+  /* The legend's line samples: same width as a swatch column, vertically centred on the label's baseline. */
+  .ch-key { display: block; align-self: center; overflow: visible; }
+  .ch-pnl-name { font-size: 13px; color: var(--c-ink); }
+  .ch-pnl-end, .ch-pnl-fall {
+    font-family: var(--font-mono); font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right;
+  }
+  .ch-pnl-end { color: var(--c-ink); }
+  .ch-pnl-fall { color: var(--c-faint); }
+  .ch-pnl-gloss { grid-column: 2 / -1; font-size: 11px; line-height: 1.4; color: var(--c-faint); }
+
   .ch-cap {
     font-size: 10.5px; line-height: 1.45; color: var(--c-faint);
     margin: clamp(12px, 1.8vh, 20px) 0 0; max-width: 62ch; font-style: italic;
@@ -320,18 +465,24 @@ const CELL = 3;
   // is an ORDER — what a portfolio is, then what optimising means, then what multi-period adds — and showing
   // all three at once is a wall of text that a reader has to sort themselves.
   //
-  // Safe direction for progressive enhancement: html.no-define-js (added here, cleared once this runs) shows
-  // every beat at full strength and the first panel, so a JS failure leaves a readable definition rather than
-  // a dim list and an empty stage.
-  document.documentElement.classList.add('no-define-js');
+  // PROGRESSIVE ENHANCEMENT, in the only safe direction: the CSS default is the FINISHED state (all beats
+  // legible, first panel shown), and html.define-js — added only once the sequence is about to run — is what
+  // switches on the dimming and the absolute cross-fade. The earlier inverse guard (no-define-js, added here
+  // and removed on success) covered a script that RAN AND FAILED but not JavaScript being off entirely, where
+  // the class never appeared at all: measured with script execution disabled, every panel computed to
+  // opacity 0 and the slide rendered blank.
+  document.documentElement.classList.add('define-js');
 
   function initDefine(): (() => void) | null {
     const section = document.querySelector<HTMLElement>('#choice');
     if (!section) return null;
     const beats = Array.from(section.querySelectorAll<HTMLElement>('[data-beat]'));
     const panels = Array.from(section.querySelectorAll<HTMLElement>('[data-panel]'));
-    if (beats.length !== panels.length || !beats.length) return null;
-    document.documentElement.classList.remove('no-define-js');
+    if (beats.length !== panels.length || !beats.length) {
+      // Nothing to sequence — hand the slide back to its CSS default rather than leaving it dimmed.
+      document.documentElement.classList.remove('define-js');
+      return null;
+    }
 
     const show = (i: number) => {
       beats.forEach((el, k) => el.classList.toggle('is-on', k === i));

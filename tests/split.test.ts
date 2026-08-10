@@ -6,7 +6,7 @@ const OPENING = HOLDINGS.map((h) => h.weight);
 
 describe('the declared splits', () => {
   // A split that does not sum to 100 would silently make one alternative look better than another, and the
-  // slide's whole claim is that these are the SAME hundred pounds arranged differently.
+  // slide's whole claim is that these are the SAME hundred dollars arranged differently.
   it('the opening split allocates the whole hundred', () => {
     expect(sumsToWhole(OPENING)).toBe(true);
   });
