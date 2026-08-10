@@ -23,6 +23,10 @@ import {
 } from '../lib/feasible';
 import { FUND } from '../data/desk';
 import { humanCount } from '../lib/problemSize';
+import {
+  PATH_LEVELS, PATH_PERIODS, PATH_RULES, ALL_PATHS,
+  survivors, killedBy, survivalSeries as pathSeries, countFuturesFrom, compoundedFraction, pathPoints,
+} from '../lib/pathspace';
 
 const series = areaSeries();
 const whole = area(SIMPLEX);
@@ -56,6 +60,50 @@ const pad = 46;
 const sx = (x: number) => pad + x * S;
 const sy = (y: number) => pad + (H - y * S);
 const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ');
+
+// ── ACT TWO: THE SAME QUESTION, ONE PERIOD LATER ────────────────────────────────────────────────────────
+//
+// The owner: "triangle might not be enough actually. for single period might be yes. for multi period we are
+// shrinking many potential paths right?"
+//
+// Right, and it is the correction the slide needed. The triangle is the feasible set of ONE weight vector; the
+// field is multi-PERIOD, so the object actually being constrained is a whole SEQUENCE of decisions. Two acts on
+// one stage: the triangle answers "what may I hold", then it cross-fades to a thicket of candidate paths and the
+// same rules comb them away. Sharing the stage box is what makes the second object cost no vertical space — the
+// slide already owns exactly one screen and had 241px of headroom, which is not enough for a second figure.
+//
+// Grid stated on the slide, because it is a modelling choice: PATH_LEVELS bands x PATH_PERIODS decisions. The
+// COMPOUNDING figure below is exact and grid-free; the path counts are exact given the grid.
+const pathStages = PATH_RULES.map((r, i) => ({
+  label: r.label,
+  why: r.why,
+  kind: r.kind,
+  kept: survivors(i + 1),
+  killed: killedBy(i + 1),
+  remaining: pathSeries()[i + 1],
+}));
+const pathTotal = ALL_PATHS.length;
+const pathLeft = pathStages[pathStages.length - 1].kept.length;
+
+// The lattice shares the triangle's viewBox so the two acts occupy the identical rectangle and the cross-fade
+// does not shift the composition. Inset a little so the band labels have room.
+const lBox = { x: pad + 6, y: pad + 14, w: S - 12, h: H - 34 };
+const ppts = (path: number[]) => pathPoints(path, lBox, PATH_LEVELS, PATH_PERIODS);
+
+// THE STRUCTURAL NUMBER, and the one that earns the whole second act: how many legal futures exist from each
+// starting band. If they differ, the periods cannot be chosen separately — which is exactly why the next slide
+// needs dynamic programming. Measured on this grid: band 2 has 14 futures, band 3 has 6, the edges have none.
+const futures = Array.from({ length: PATH_LEVELS }, (_, b) => countFuturesFrom(b));
+const bestBand = futures.indexOf(Math.max(...futures));
+const liveBands = futures.filter((f) => f > 0);
+const leanestBand = futures.indexOf(Math.min(...liveBands.length ? liveBands : [0]));
+
+// Compounding at the fund's real horizon, from the single-period figure this slide already measures.
+const singlePeriodLegal = series[series.length - 1];
+const compounded = compoundedFraction(singlePeriodLegal, FUND.periods);
+// "one in N", which is how a reader actually holds a number this small.
+const oneIn = compounded > 0 ? 1 / compounded : Infinity;
+const oneInExp = Math.floor(Math.log10(oneIn));
 ---
 <section id="rules" class="ru" aria-labelledby="ru-heading">
   <div class="ru-paper">
@@ -98,19 +146,40 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
             ))}
           </ol>
 
+          <!-- THE MULTI-PERIOD CLOSE. The single-period figure is only the setup; the compounded one is the
+               point, and it is exact arithmetic rather than a grid count — a rule leaving f of splits legal in
+               one month leaves f^T of sequences legal over T months. At this slide's own measured f and the
+               fund's own horizon that is one in 10^17.
+               Then the structural line, which is what act two exists to earn and what no single-period picture
+               can show: the number of legal futures depends on WHERE YOU STAND, so the months cannot be chosen
+               one at a time. That is the sentence the Method slide answers. -->
           <p class="ru-scale">
-            Five rules on three assets leave <strong>{(series[series.length - 1] * 100).toFixed(0)}%</strong> of
-            the space legal. A real mandate carries <strong>{humanCount(FUND.constraints)}+</strong> of them
-            across <strong>{humanCount(FUND.tickers)}</strong> names — and the survivors still have to be the
-            best portfolio in there, not merely a permitted one.
+            <strong>{(series[series.length - 1] * 100).toFixed(0)}%</strong> of splits survive one month. Do it
+            for {FUND.periods} months and only <strong>1 in 10<sup>{oneInExp}</sup></strong> of the possible
+            sequences is legal — and a real mandate carries <strong>{humanCount(FUND.constraints)}+</strong>
+            rules across <strong>{humanCount(FUND.tickers)}</strong> names.
+          </p>
+          <p class="ru-sep">
+            The rules also interlock: from band <strong>{bestBand}</strong> there are
+            <strong>{futures[bestBand]}</strong> legal futures, from band <strong>{leanestBand}</strong> only
+            <strong>{futures[leanestBand]}</strong>. What you may do next depends on where you are now — so you
+            cannot choose the months one at a time.
           </p>
         </div>
 
         <figure class="ru-fig">
-          <p class="ru-fig-head">Legal portfolios of {ASSETS.join(' · ')}</p>
+          <p class="ru-fig-head">
+            <span class="ru-act ru-act--1" data-act-head="1">Legal portfolios of {ASSETS.join(' · ')} — one month</span>
+            <span class="ru-act ru-act--2" data-act-head="2">
+              Every way to hold it for {PATH_PERIODS} months — {pathTotal} sequences
+            </span>
+          </p>
 
           <svg class="ru-chart" viewBox={`0 0 ${S + pad * 2} ${H + pad * 2}`} role="img"
-               aria-label={`The set of legal portfolios shrinking as five constraints are applied, from the whole simplex down to ${(series[series.length - 1] * 100).toFixed(0)} percent of it.`}>
+               aria-label={`Two drawings in one frame. First, the set of legal portfolios of three assets shrinking as five constraints are applied, from the whole space down to ${(series[series.length - 1] * 100).toFixed(0)} percent of it. Then the same rules applied to whole sequences of decisions: of ${pathTotal} ways to hold the money over ${PATH_PERIODS} months, ${pathLeft} survive.`}>
+            <!-- ══ ACT ONE — ONE PERIOD. The feasible set of a single weight vector: real convex clipping on
+                 the 2-simplex. This is the whole story if you only ever decide once. ══ -->
+            <g class="ru-act ru-act--1" data-act="1">
             <!-- The unconstrained simplex, always visible as the ghost of what was possible. -->
             <polygon class="ru-simplex" points={pts(SIMPLEX)} />
 
@@ -152,6 +221,59 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
             <text class="ru-vlabel" x={sx(SIMPLEX[0].x)} y={sy(SIMPLEX[0].y) + 18} text-anchor="middle">100% {ASSETS[0]}</text>
             <text class="ru-vlabel" x={sx(SIMPLEX[1].x)} y={sy(SIMPLEX[1].y) + 18} text-anchor="middle">100% {ASSETS[1]}</text>
             <text class="ru-vlabel" x={sx(SIMPLEX[2].x)} y={sy(SIMPLEX[2].y) - 12} text-anchor="middle">100% {ASSETS[2]}</text>
+            </g><!-- /act one -->
+
+            <!-- ══ ACT TWO — THE SEQUENCE. Same rules, but now the object is a PATH: one decision per month, so
+                 the feasible set is a set of sequences rather than a set of points. The same stage box, so the
+                 second object costs no vertical space on a slide that already owns exactly one screen.
+                 Every candidate path is drawn once; the rules comb them away. ══ -->
+            <g class="ru-act ru-act--2" data-act="2">
+              <!-- The band gridlines: exposure, low at the bottom. Drawn first so paths sit over them. -->
+              {Array.from({ length: PATH_LEVELS }, (_, b) => {
+                const y = lBox.y + (1 - b / (PATH_LEVELS - 1)) * lBox.h;
+                return <line class="ru-band" x1={lBox.x} y1={y} x2={lBox.x + lBox.w} y2={y} />;
+              })}
+              {Array.from({ length: PATH_PERIODS }, (_, t) => {
+                const x = lBox.x + (t / (PATH_PERIODS - 1)) * lBox.w;
+                return <line class="ru-tick" x1={x} y1={lBox.y - 8} x2={x} y2={lBox.y + lBox.h + 8} />;
+              })}
+
+              <!-- THE WHOLE THICKET, as the ghost of what was possible — the counterpart of the simplex
+                   outline in act one. All 625 sequences, drawn once, faintly. -->
+              <g class="ru-thicket">
+                {ALL_PATHS.map((path) => <polyline class="ru-path" points={ppts(path)} />)}
+              </g>
+
+              <!-- THE PATHS EACH RULE KILLS, revealed with that rule. Drawn under the survivors, so a reader
+                   sees the deletion rather than only the remainder — the same discipline as act one's slab. -->
+              {pathStages.map((st, i) => (
+                <g class="ru-pathkill" data-pathkill={i}>
+                  {st.killed.map((path) => <polyline class="ru-path ru-path--killed" points={ppts(path)} />)}
+                </g>
+              ))}
+
+              <!-- WHAT SURVIVES after each rule. One group per stage, revealed in step with the list. -->
+              {pathStages.map((st, i) => (
+                <g class="ru-pathkeep" data-pathkeep={i}
+                   data-rule-label={st.label} data-rule-why={st.why}
+                   data-rule-pct={`${(st.remaining * 100).toFixed(1)}%`}
+                   data-rule-kept={String(st.kept.length)}>
+                  {st.kept.map((path) => <polyline class="ru-path ru-path--kept" points={ppts(path)} />)}
+                </g>
+              ))}
+
+              <!-- The decision points themselves, so the reader sees this is a sequence of CHOICES. -->
+              {Array.from({ length: PATH_PERIODS }, (_, t) =>
+                Array.from({ length: PATH_LEVELS }, (_, b) => {
+                  const x = lBox.x + (t / (PATH_PERIODS - 1)) * lBox.w;
+                  const y = lBox.y + (1 - b / (PATH_LEVELS - 1)) * lBox.h;
+                  return <circle class="ru-node" cx={x} cy={y} r="1.6" />;
+                }))}
+
+              <text class="ru-vlabel" x={lBox.x} y={lBox.y - 14} text-anchor="start">more risk</text>
+              <text class="ru-vlabel" x={lBox.x} y={lBox.y + lBox.h + 22} text-anchor="start">less risk</text>
+              <text class="ru-vlabel" x={lBox.x + lBox.w} y={lBox.y + lBox.h + 22} text-anchor="end">month {PATH_PERIODS}</text>
+            </g><!-- /act two -->
           </svg>
 
           <p class="ru-read" data-read aria-live="polite">
@@ -160,9 +282,17 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
           </p>
 
           <figcaption class="ru-cap">
-            One surviving portfolio: <strong>{finalWeights.map((w, i) => `${(w * 100).toFixed(0)}% ${ASSETS[i]}`).join(' · ')}</strong>.
-            Bounds are loosened to fit three assets — a real 5% single-name cap is infeasible on three names.
-            The shape of the argument is exact; the count is what scales.
+            <span class="ru-act ru-act--1" data-act-head="1">
+              One surviving portfolio: <strong>{finalWeights.map((w, i) => `${(w * 100).toFixed(0)}% ${ASSETS[i]}`).join(' · ')}</strong>.
+              Bounds are loosened to fit three assets — a real 5% single-name cap is infeasible on three names.
+              The shape of the argument is exact; the count is what scales.
+            </span>
+            <span class="ru-act ru-act--2" data-act-head="2">
+              <strong>{pathLeft}</strong> of <strong>{pathTotal}</strong> sequences survive all
+              {PATH_RULES.length} rules. {PATH_LEVELS} exposure bands over {PATH_PERIODS} months is a modelling
+              choice so the paths can be counted; the counts on that grid are exact, and the compounding figure
+              needs no grid at all.
+            </span>
           </figcaption>
         </figure>
       </div>
@@ -370,6 +500,71 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
   }
   .ru-read-body { font-size: 12.5px; line-height: 1.5; color: var(--r-soft); }
 
+  /* ══ TWO ACTS ON ONE STAGE ═══════════════════════════════════════════════════════════════════════════
+     Act one is the triangle (one period), act two the path lattice (a sequence). They share the drawing box
+     and cross-fade, which is the only reason the second object costs no vertical space — the slide already
+     owns exactly one screen and had 241px of measured headroom, nowhere near a second figure's worth.
+     DEFAULT = act two, because it is the finished state: it is the multi-period picture, and the slide is
+     about a multi-period field. With JavaScript off a reader therefore gets the object the slide is really
+     about, and the sequencing is the enhancement. */
+  .ru-act--1 { opacity: 0; }
+  .ru-act--2 { opacity: 1; }
+  :global(html.poly-js) .ru-act { opacity: 0; }
+  :global(html.poly-js) .ru-act.is-live { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    .ru-act { transition: opacity .6s ease; }
+  }
+  /* The two heads and the two captions occupy the same line rather than stacking, so switching act cannot
+     reflow the column. Grid-stacked: both children in cell 1/1, the taller one setting the height. */
+  .ru-fig-head, .ru-cap { display: grid; }
+  .ru-fig-head > .ru-act, .ru-cap > .ru-act { grid-area: 1 / 1; }
+
+  /* ── ACT TWO: THE THICKET. Every candidate sequence drawn once, hairline and nearly transparent — the
+     counterpart of act one's ghost simplex. At 625 paths the overlap does the work: dense where many
+     sequences pass, empty where none can. */
+  .ru-path {
+    fill: none; stroke-width: 1; vector-effect: non-scaling-stroke; stroke-linejoin: round;
+  }
+  /* MEASURED AND CORRECTED: at 0.11 opacity, 625 overlapping hairlines accumulated into a solid plaid — a mesh
+     with no legible structure, which is worse than no drawing. Alpha compounds where paths coincide, and on a
+     5x4 grid they coincide constantly (every path shares every node with dozens of others). 0.03 is the level
+     at which the DENSITY reads as texture instead of as a fill. */
+  .ru-thicket .ru-path { stroke: var(--r-faint); opacity: 0.03; }
+  /* A killed path is drawn ONCE, in ink, so the deletion is the visible event — same discipline as the slab
+     in act one, where showing only the remainder made the rule invisible. Also thinned for the same reason:
+     a rule can kill 530 paths at once. */
+  .ru-path--killed { stroke: var(--r-ink); opacity: 0.07; }
+  /* Survivors carry the accent and are the only confident marks on the stage — by the last rule there are 31
+     of them, few enough to be followed individually, which is the whole reason the grid is small. */
+  .ru-path--kept { stroke: var(--r-accent); opacity: 0.5; stroke-width: 1.5; }
+
+  .ru-pathkill, .ru-pathkeep { opacity: 0; }
+  .ru-pathkill.is-shown, .ru-pathkeep.is-shown { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    .ru-pathkill, .ru-pathkeep { transition: opacity .5s ease; }
+  }
+  /* No JS: the last stage is the finished state, exactly as act one does with its final polygon. */
+  .ru-pathkeep { opacity: 0; }
+  .ru-pathkeep:last-of-type { opacity: 1; }
+  :global(html.poly-js) .ru-pathkeep:last-of-type { opacity: 0; }
+  :global(html.poly-js) .ru-pathkeep.is-shown { opacity: 1; }
+
+  /* The band grid and the decision points: structure, not data, so they stay quiet. */
+  .ru-band { stroke: var(--r-faint); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.2; }
+  .ru-tick { stroke: var(--r-faint); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.13; }
+  .ru-node { fill: var(--r-faint); opacity: 0.4; }
+
+  /* The non-separability line — the sentence act two exists to earn, so it gets its own weight rather than
+     being folded into the paragraph above it. */
+  .ru-sep {
+    font-size: clamp(12.5px, 0.94vw, 14px); line-height: 1.6; color: var(--r-soft);
+    margin: clamp(8px, 1.2vh, 12px) 0 0; max-width: 56ch;
+  }
+  .ru-sep strong {
+    font-family: var(--font-mono); font-weight: 400; color: var(--r-accent); font-variant-numeric: tabular-nums;
+  }
+  .ru-scale sup { font-size: 0.72em; }
+
   .ru-cap {
     font-size: 10.5px; line-height: 1.5; color: var(--r-faint);
     margin: clamp(8px, 1.2vh, 14px) 0 0; max-width: 56ch;
@@ -390,6 +585,7 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
     .ru-chart { max-width: min(500px, 100%); }
     .ru-read { min-height: 2em; }
     .ru-scale { font-size: 12.5px; line-height: 1.5; }
+    .ru-sep { font-size: 12px; line-height: 1.45; margin-top: 6px; }
   }
 
   /* STACKED LAYOUT. Below 1040px the drawing sits UNDER the text rather than beside it, so the two heights are
@@ -410,12 +606,19 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
     .ru-item { padding-top: 2px; padding-bottom: 2px; }
     .ru-why { font-size: 10.5px; line-height: 1.36; }
     .ru-scale { font-size: 12.5px; line-height: 1.5; padding-top: 8px; }
+    /* The non-separability line is new vertical weight the stacked layout did not budget for — measured 17px
+       over at three widths. It closes up here rather than being cut, because it is the sentence act two exists
+       to earn. */
+    .ru-sep { font-size: 12px; line-height: 1.45; margin-top: 6px; }
     .ru-cap { font-size: 10px; line-height: 1.42; }
     .ru-read { min-height: 0; margin-top: 8px; }
     /* The last 30px, taken from the paper's own padding and the gap between the two halves rather than from the
        type — everything above is already at the smallest size that reads. Measured after: fits exactly. */
-    .ru-paper { padding-top: clamp(14px, 2vh, 24px); padding-bottom: clamp(14px, 2vh, 24px); }
-    .ru-split { gap: 2vh 0; }
+    /* Measured repeatedly: with act two's extra paragraph the stacked slide sat 5px over at three widths, and
+       every text size here is already at its floor. The last pixels come from the paper's own padding and the
+       gap between the halves, which cost nothing to read. */
+    .ru-paper { padding-top: clamp(10px, 1.4vh, 18px); padding-bottom: clamp(10px, 1.4vh, 18px); }
+    .ru-split { gap: 1.4vh 0; }
     .ru-list { margin-top: 10px; }
     .ru-scale { margin-top: 10px; }
   }
@@ -439,50 +642,88 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
     const items = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-stage]'));
     const label = section.querySelector<HTMLElement>('[data-read-label]');
     const body = section.querySelector<HTMLElement>('[data-read-body]');
-    // TWO groups carry each stage index now — the slab (under the survivor) and the cutting line (over it) —
-    // so the count is 2x the polygon count rather than equal to it. Asserting equality here is what would have
-    // silently disabled the whole slide when the line moved on top.
+    // ACT TWO's pieces. Absent means the second act was not rendered, which must degrade to act one rather
+    // than disabling the slide.
+    const kills = Array.from(section.querySelectorAll<SVGGElement>('[data-pathkill]'));
+    const keeps = Array.from(section.querySelectorAll<SVGGElement>('[data-pathkeep]'));
+    const acts = Array.from(section.querySelectorAll<HTMLElement>('[data-act], [data-act-head]'));
     if (!polys.length || !items.length || !label || !body || cuts.length !== polys.length * 2) {
-      // Nothing to step — hand the slide back to its CSS default rather than leaving it dimmed.
       document.documentElement.classList.remove('poly-js');
       return null;
     }
 
-    // Read the copy off the DOM the page already rendered, so the readout cannot drift from the list.
-    const stages = items.map((li) => ({
+    // ── THE SCRIPT, in two acts.
+    //
+    // Act one steps the triangle through its five cuts: the feasible set of ONE decision. Act two steps the
+    // path lattice through its rules: the feasible set of a SEQUENCE. One timeline, so a reader who does
+    // nothing sees the whole argument, and the act changes under them at the hinge.
+    //
+    // Step numbering is one flat line so freezing, arrow keys and the observer need no special cases:
+    //   -1                     unconstrained triangle
+    //   0 .. nOne-1            triangle cuts
+    //   nOne .. nOne+nTwo-1    path rules
+    const nOne = items.length;
+    const nTwo = keeps.length;
+    const LAST = nOne + nTwo - 1;
+
+    const oneStages = items.map((li) => ({
       label: li.querySelector('.ru-label')?.textContent?.trim() ?? '',
       cut: li.querySelector('.ru-cut')?.textContent?.trim() ?? '',
       pct: li.querySelector('.ru-pct')?.textContent?.trim() ?? '',
       why: li.querySelector('.ru-why')?.textContent?.trim() ?? '',
     }));
+    // Act two's copy comes off the data the page rendered into the list's dataset, so the readout cannot drift
+    // from the geometry. Falls back to nothing rather than to invented text.
+    const twoStages = keeps.map((g) => ({
+      label: g.dataset.ruleLabel ?? '',
+      why: g.dataset.ruleWhy ?? '',
+      pct: g.dataset.rulePct ?? '',
+      kept: g.dataset.ruleKept ?? '',
+    }));
 
-    // -1 is the unconstrained state, then one step per rule.
     let step = -1;
     let timer = 0;
-    // FROZEN ONCE CLICKED, and it stays frozen — same rule as the defining slide. The numbers on this slide
-    // invite comparison ("which rule cost the most?"), and that is a question you answer by going back to a
-    // row and staying there.
     let frozen = false;
-
     const stop = () => { window.clearTimeout(timer); timer = 0; };
 
+    const inActTwo = (st: number) => st >= nOne;
+
     const render = () => {
-      // The SURVIVOR after this step, the SLAB this step removed, and the row that owns both.
-      polys.forEach((p, i) => p.classList.toggle('is-shown', i === step));
-      // Match on the data-cut VALUE: with two groups per stage, list position is no longer the stage index.
-      cuts.forEach((g) => g.classList.toggle('is-shown', Number(g.dataset.cut) === step));
+      const act = inActTwo(step) ? '2' : '1';
+      for (const el of acts) {
+        const mine = el.dataset.act ?? el.dataset.actHead;
+        el.classList.toggle('is-live', mine === act);
+      }
+
+      // Act one: the survivor polygon and the slab its rule removed.
+      const oneIdx = inActTwo(step) ? -1 : step;
+      polys.forEach((pg, i) => pg.classList.toggle('is-shown', i === oneIdx));
+      cuts.forEach((g) => g.classList.toggle('is-shown', Number(g.dataset.cut) === oneIdx));
+
+      // Act two: what this rule killed, and what still survives.
+      const twoIdx = inActTwo(step) ? step - nOne : -1;
+      kills.forEach((g) => g.classList.toggle('is-shown', Number(g.dataset.pathkill) === twoIdx));
+      keeps.forEach((g) => g.classList.toggle('is-shown', Number(g.dataset.pathkeep) === twoIdx));
+
+      // The list marks act one's rules as done, and goes fully quiet in act two — its rows describe the
+      // single-period cuts, so leaving one highlighted while the lattice is on screen would be a lie.
       items.forEach((li, i) => {
-        li.classList.toggle('is-done', i <= step);
-        li.classList.toggle('is-current', i === step);
-        li.setAttribute('aria-pressed', String(i === step));
+        li.classList.toggle('is-done', !inActTwo(step) && i <= step);
+        li.classList.toggle('is-current', !inActTwo(step) && i === step);
+        li.setAttribute('aria-pressed', String(!inActTwo(step) && i === step));
       });
+
       if (step < 0) {
         label.textContent = 'Unconstrained';
         body.textContent = 'every split of the money is available';
-      } else {
-        const st = stages[step];
+      } else if (!inActTwo(step)) {
+        const st = oneStages[step];
         label.textContent = `${st.cut} → ${st.pct} left`;
         body.textContent = st.label.toLowerCase() + ' — ' + st.why.replace(/\.$/, '');
+      } else {
+        const st = twoStages[twoIdx];
+        label.textContent = st.pct ? `${st.kept} paths → ${st.pct} left` : 'paths';
+        body.textContent = st.label ? st.label.toLowerCase() + ' — ' + st.why.replace(/\.$/, '') : '';
       }
     };
 
@@ -500,21 +741,23 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
     };
     for (const b of items) b.addEventListener('click', pick);
 
-    // Arrow keys walk the rules, so a keyboard reader need not tab through five buttons to reach the last cut.
+    // Arrow keys walk the WHOLE timeline, both acts, so a keyboard reader can reach the path lattice — which
+    // the list's five buttons alone cannot get to.
     const onKey = (e: KeyboardEvent) => {
       const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1
         : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
       if (!dir) return;
       e.preventDefault();
-      freeze((step + dir + items.length + (step < 0 ? 1 : 0)) % items.length);
-      items[step].focus();
+      const from = step < 0 ? 0 : step;
+      freeze((from + dir + (LAST + 1)) % (LAST + 1));
+      if (!inActTwo(step)) items[step]?.focus();
     };
     for (const b of items) b.addEventListener('keydown', onKey);
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      // Finished state: every rule legible, the final polygon shown, no stepping. The buttons still work, so a
-      // reduced-motion reader gets the same control without anything moving on its own.
-      step = stages.length - 1;
+      // Finished state: the multi-period picture, fully constrained. The buttons still work, so the same
+      // control exists without anything moving on its own.
+      step = LAST;
       render();
       return () => {
         for (const b of items) { b.removeEventListener('click', pick); b.removeEventListener('keydown', onKey); }
@@ -522,10 +765,15 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
     }
 
     const advance = () => {
-      step = step >= stages.length - 1 ? -1 : step + 1;
+      step = step >= LAST ? -1 : step + 1;
       render();
-      // Hold longest on the final state: it is the one the caption and the argument rest on.
-      const dwell = step === stages.length - 1 ? 3400 : step < 0 ? 1500 : 1700;
+      // Hold longest on the two arrivals: the end of act one (the collapsed triangle) and the end of act two
+      // (the surviving paths), because those are the two states the copy rests on. And hold a beat longer on
+      // the hinge, where the object on the stage changes underneath the reader.
+      const dwell = step === LAST ? 4200
+        : step === nOne - 1 ? 3000
+        : step === nOne ? 2600
+        : step < 0 ? 1500 : 1700;
       timer = window.setTimeout(advance, dwell);
     };
 
@@ -533,7 +781,7 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
 
     const io = new IntersectionObserver((entries) => {
       const visible = entries.some((e) => e.isIntersecting);
-      if (frozen) return;                        // a reader's choice outranks the observer
+      if (frozen) return;
       if (visible && !timer) timer = window.setTimeout(advance, 1200);
       else if (!visible) stop();
     }, { threshold: 0.3 });
