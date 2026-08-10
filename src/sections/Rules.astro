@@ -69,74 +69,19 @@ const HIGHLIGHT = [7, 41, 88];
     <div class="ru-inner">
       <p class="ru-kicker">2 / 3 · the difficulty</p>
 
-      <div class="ru-split">
-        <div class="ru-say">
-          <h2 id="ru-heading" class="ru-head">Now imagine it is not your money.</h2>
-
-          <!-- THE FOUR BEATS, in the owner's order. Each is a real button: same interaction as the defining
-               slide, because these beats carry numbers a reader will want to go back to. -->
-          <ol class="ru-beats">
-            <li>
-              <button class="ru-beat" type="button" data-beat="0" aria-pressed="true">
-                <span class="ru-beat-n">1</span>
-                <span class="ru-beat-say">
-                  <span class="ru-beat-head">You run a billion dollars.</span>
-                  <span class="ru-beat-body">
-                    Move a fifth of it and you are <strong>{(quoted.participation * 100).toFixed(1)}%</strong>
-                    of everything that trades that day, in the most liquid stock there is — the price moves away
-                    from you before you are done, and <strong>${Math.round(quoted.cost).toLocaleString()}</strong>
-                    is gone on one decision. With {you.label} the same trade costs nothing, which is why you have
-                    never had to think about it.
-                  </span>
-                </span>
-              </button>
-            </li>
-            <li>
-              <button class="ru-beat" type="button" data-beat="1" aria-pressed="false">
-                <span class="ru-beat-n">2</span>
-                <span class="ru-beat-say">
-                  <span class="ru-beat-head">And you are not allowed to do most of it.</span>
-                  <span class="ru-beat-body">
-                    Four kinds of rule, of the <strong>{humanCount(FUND.constraints)}+</strong> a real mandate
-                    carries. They are not a checklist — they refer to each other, so obeying one can breach
-                    another.
-                  </span>
-                </span>
-              </button>
-            </li>
-            <li>
-              <button class="ru-beat" type="button" data-beat="2" aria-pressed="false">
-                <span class="ru-beat-n">3</span>
-                <span class="ru-beat-say">
-                  <span class="ru-beat-head">Nobody knows what any of it will do.</span>
-                  <span class="ru-beat-body">
-                    {TRAJ_COUNT} possible years for <em>one</em> holding. A real book holds
-                    <strong>{humanCount(FUND.tickers)}</strong> names, each with its own fan — and they move
-                    together in ways that change exactly when it matters.
-                  </span>
-                </span>
-              </button>
-            </li>
-            <li>
-              <button class="ru-beat" type="button" data-beat="3" aria-pressed="false">
-                <span class="ru-beat-n">4</span>
-                <span class="ru-beat-say">
-                  <span class="ru-beat-head">Now choose. Every month. For all of it.</span>
-                  <span class="ru-beat-body">
-                    <strong>{vars.toLocaleString()}</strong> numbers to pick across {FUND.periods} rebalances,
-                    under interlocking rules, against <strong>10<sup>{leafExp}</sup></strong> possible futures —
-                    paying slippage every time you change your mind.
-                  </span>
-                </span>
-              </button>
-            </li>
-          </ol>
-
-          <p class="ru-scale">
-            That is the job. Not picking a winner — choosing a whole sequence of positions that stays legal and
-            stays affordable, whichever of those futures actually arrives.
-          </p>
-        </div>
+      <!-- ══ TURNED AXIS. The owner: "now this slide is essentially the same format as the previous one, which
+           might seem to be a repetition. is there anyway we can wrap the second slide in a new format while
+           keeping the contents?"
+           Correct, and the honest fix is to change the DIRECTION the slide reads rather than to invent a new
+           gimmick. Slide one reads across — words in a column, figure beside them. This one reads DOWN: the
+           drawing spans the full width, and the four beats sit beneath it as a horizontal band of stations.
+           Same content, same interaction, but the eye travels the other way and the pair stops feeling like one
+           template used twice.
+           It also buys the room the larger type needed. The figure goes from 56% of the width to all of it, so
+           it can be shorter and still be a bigger drawing, and the beats get a whole band instead of a narrow
+           column. Budgeted at every viewport before it was built: the figure still gets 381px at 1366x768. ══ -->
+      <div class="ru-flow">
+        <h2 id="ru-heading" class="ru-head">Now imagine it is not your money.</h2>
 
         <figure class="ru-fig">
           <!-- ONE FIGURE, FOUR STATES. The drawing answers whichever beat is live: the cost ladder, the rule
@@ -261,7 +206,72 @@ const HIGHLIGHT = [7, 41, 88];
             </span>
           </figcaption>
         </figure>
+
+        <!-- THE FOUR BEATS, now a horizontal band. Each is still a real button with the same freeze-on-click
+             behaviour; only the direction changed. -->
+        <ol class="ru-beats">
+            <li>
+              <button class="ru-beat" type="button" data-beat="0" aria-pressed="true">
+                <span class="ru-beat-title">
+                  <span class="ru-beat-n">1</span>
+                  <span class="ru-beat-head">You run a billion dollars.</span>
+                </span>
+                  <span class="ru-beat-body">
+                    Move a fifth of it and you are <strong>{(quoted.participation * 100).toFixed(1)}%</strong>
+                    of everything that trades that day, in the most liquid stock there is — the price moves away
+                    from you before you are done, and <strong>${Math.round(quoted.cost).toLocaleString()}</strong>
+                    is gone on one decision. With {you.label} the same trade costs nothing, which is why you have
+                    never had to think about it.
+                  </span>
+              </button>
+            </li>
+            <li>
+              <button class="ru-beat" type="button" data-beat="1" aria-pressed="false">
+                <span class="ru-beat-title">
+                  <span class="ru-beat-n">2</span>
+                  <span class="ru-beat-head">And you are not allowed to do most of it.</span>
+                </span>
+                  <span class="ru-beat-body">
+                    Four kinds of rule, of the <strong>{humanCount(FUND.constraints)}+</strong> a real mandate
+                    carries. They are not a checklist — they refer to each other, so obeying one can breach
+                    another.
+                  </span>
+              </button>
+            </li>
+            <li>
+              <button class="ru-beat" type="button" data-beat="2" aria-pressed="false">
+                <span class="ru-beat-title">
+                  <span class="ru-beat-n">3</span>
+                  <span class="ru-beat-head">Nobody knows what any of it will do.</span>
+                </span>
+                  <span class="ru-beat-body">
+                    {TRAJ_COUNT} possible years for <em>one</em> holding. A real book holds
+                    <strong>{humanCount(FUND.tickers)}</strong> names, each with its own fan — and they move
+                    together in ways that change exactly when it matters.
+                  </span>
+              </button>
+            </li>
+            <li>
+              <button class="ru-beat" type="button" data-beat="3" aria-pressed="false">
+                <span class="ru-beat-title">
+                  <span class="ru-beat-n">4</span>
+                  <span class="ru-beat-head">Now choose. Every month. For all of it.</span>
+                </span>
+                  <span class="ru-beat-body">
+                    <strong>{vars.toLocaleString()}</strong> numbers to pick across {FUND.periods} rebalances,
+                    under interlocking rules, against <strong>10<sup>{leafExp}</sup></strong> possible futures —
+                    paying slippage every time you change your mind.
+                  </span>
+              </button>
+            </li>
+          </ol>
+
+        <p class="ru-scale">
+          That is the job. Not picking a winner — choosing a whole sequence of positions that stays legal and
+          stays affordable, whichever of those futures actually arrives.
+        </p>
       </div>
+
     </div>
   </div>
 </section>
@@ -291,10 +301,20 @@ const HIGHLIGHT = [7, 41, 88];
     text-transform: uppercase; color: var(--r-accent); margin: 0 0 12px;
   }
 
-  .ru-split {
-    display: grid; grid-template-columns: 44fr 56fr; gap: 0 clamp(24px, 3vw, 56px); align-items: center;
+  /* ── THE TURNED AXIS. A vertical flow instead of two columns: headline, then the drawing across the whole
+     width, then the four beats as a horizontal band, then the closing line. The slide reads DOWN where slide
+     one reads ACROSS, which is what stops the pair feeling like one template used twice.
+     Budgeted before it was built, at every viewport: content height minus kicker, headline, gaps, band and
+     closing line leaves the figure 381px at the tightest (1366x768) and 640px at 1700x1050. */
+  .ru-flow {
+    display: grid; grid-template-rows: auto auto auto auto;
+    gap: clamp(10px, 1.6vh, 22px) 0;
+    align-content: center;
+    min-height: 0;
   }
   .ru-fig { margin: 0; min-width: 0; }
+  /* The head no longer shares a row with the figure, so it can run wider than 26ch. */
+  .ru-head { max-width: 34ch; }
 
   .ru-head {
     font-family: var(--font-display); font-weight: 300;
@@ -303,21 +323,31 @@ const HIGHLIGHT = [7, 41, 88];
   }
 
   /* ── THE FOUR BEATS. Buttons, like the defining slide's, so a reader can go back to a number. */
-  .ru-beats { list-style: none; margin: clamp(16px, 2.4vh, 28px) 0 0; padding: 0; display: grid; gap: 4px; }
+  /* FOUR STATIONS ACROSS, not four rows down. Equal columns so the band reads as a sequence of stops rather
+     than as a list, and the active one is marked along its TOP edge — a horizontal rule for a horizontal band,
+     where slide one uses a vertical rule for its vertical list. */
+  .ru-beats {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0 clamp(14px, 1.8vw, 30px);
+    border-top: 1px solid var(--r-edge);
+  }
+  .ru-beats > li { display: flex; min-width: 0; }
   .ru-beat {
-    display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 0 12px;
-    align-items: start; width: 100%; text-align: left; margin: 0;
-    background: none; border: 0; border-radius: 3px; font: inherit; color: inherit;
-    padding: 7px 8px 8px 10px;
-    /* Reserved at all times, so switching beats never reflows the column. */
-    border-left: 2px solid transparent;
+    display: grid; grid-template-rows: auto auto; gap: 6px 0;
+    align-content: start; width: 100%; text-align: left; margin: 0;
+    background: none; border: 0; font: inherit; color: inherit;
+    padding: clamp(10px, 1.4vh, 16px) 0 0;
+    /* Reserved at all times, so switching beats never reflows the band. */
+    border-top: 2px solid transparent;
+    margin-top: -1px;              /* sit the marker ON the band's hairline */
     opacity: 1;
     -webkit-appearance: none; appearance: none;
   }
   /* html.complex-js is added by the script before it starts stepping, so the dimming and the pointer affordance
      only appear where the sequence can actually run. Default = every beat legible, which is the no-JS state. */
   :global(html.complex-js) .ru-beat { cursor: pointer; opacity: 0.4; }
-  :global(html.complex-js) .ru-beat.is-on { opacity: 1; border-left-color: var(--r-accent); }
+  :global(html.complex-js) .ru-beat.is-on { opacity: 1; border-top-color: var(--r-accent); }
   @media (hover: hover) {
     :global(html.complex-js) .ru-beat:not(.is-on):hover { opacity: 0.7; }
   }
@@ -325,40 +355,54 @@ const HIGHLIGHT = [7, 41, 88];
   @media (prefers-reduced-motion: no-preference) {
     .ru-beat { transition: opacity .45s ease, border-color .4s ease; }
   }
+  /* The number sits inline with the head in a band this narrow — a 17px circle above three lines of text would
+     waste a whole row of the column's height. */
+  .ru-beat-title { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
 
   .ru-beat-n {
+    flex: none;
     font-family: var(--font-mono); font-size: 9.5px; color: var(--r-accent);
     border: 1px solid currentColor; border-radius: 50%;
-    width: 17px; height: 17px; display: grid; place-items: center; margin-top: 2px;
+    width: 18px; height: 18px; display: grid; place-items: center;
   }
   .ru-beat-say { display: block; min-width: 0; }
   .ru-beat-head {
-    display: block; font-size: clamp(14px, 1.08vw, 16px); line-height: 1.3; color: var(--r-ink);
+    /* Floor 16px: measured at 1366x768 this rendered 13.4px, barely above its own body copy. */
+    display: block; font-size: clamp(16px, 1.18vw, 19px); line-height: 1.3; color: var(--r-ink);
   }
+  /* THE BULLET POINTS, and the owner's actual complaint: "the text is a little bit small, especially the
+     bullet points." Measured before this pass: 13px at 1700x1050 and 11.2px at 1366x768 — below caption size
+     for the slide's main reading text, because the vw term was collapsing it. The FLOOR is what rose.
+     --r-soft rather than --r-faint too: this is body copy, not an aside. No max-width — each band column is
+     its own measure now. */
   .ru-beat-body {
-    display: block; font-size: clamp(11.5px, 0.88vw, 13px); line-height: 1.5; color: var(--r-faint);
-    margin-top: 3px; max-width: 46ch;
+    display: block; font-size: clamp(14px, 1.02vw, 16px); line-height: 1.55; color: var(--r-soft);
+    margin-top: 0; max-width: none;
   }
   .ru-beat-body strong {
     font-family: var(--font-mono); font-weight: 400; color: var(--r-accent); font-variant-numeric: tabular-nums;
   }
   .ru-beat-body sup { font-size: 0.7em; }
 
+  /* THE CONCLUSION, under the whole band rather than under its first column. Measured: with a 52ch measure and
+     a left-aligned rule it sat beneath beat one and read as that beat's footnote instead of as the slide's
+     closing sentence. Centred and wider, with no rule of its own — the band above already has one. */
   .ru-scale {
-    font-size: clamp(13px, 0.98vw, 14.5px); line-height: 1.6; color: var(--r-soft);
-    margin: clamp(14px, 2vh, 22px) 0 0; max-width: 52ch;
-    padding-top: clamp(10px, 1.4vh, 14px); border-top: 1px solid var(--r-edge);
+    font-size: clamp(15px, 1.12vw, 17.5px); line-height: 1.62; color: var(--r-soft);
+    margin: 0 auto; max-width: 78ch; text-align: center;
+    padding-top: clamp(8px, 1.2vh, 14px); border-top: 0;
   }
 
   .ru-fig-head {
-    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase;
-    color: var(--r-faint); margin: 0 0 12px; display: grid;
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--r-faint); margin: 0 0 10px; display: grid;
   }
   .ru-fig-head > .ru-panel { grid-area: 1 / 1; }
 
   /* ── ONE BOX, FOUR PANELS, absolutely positioned inside a fixed-height stage so switching beats never
      reflows the column — the same arrangement the defining slide uses, and for the same reason. */
-  .ru-stagebox { position: relative; width: 100%; min-height: clamp(280px, 40vh, 400px); }
+  /* FULL WIDTH now, so the stage can be SHORTER than it was at 56% and still be a bigger drawing. */
+  .ru-stagebox { position: relative; width: 100%; min-height: clamp(250px, 34vh, 420px); }
   .ru-panel { opacity: 0; pointer-events: none; }
   .ru-panel.is-on { opacity: 1; pointer-events: auto; }
   .ru-stagebox > .ru-panel { position: absolute; inset: 0; }
@@ -374,22 +418,30 @@ const HIGHLIGHT = [7, 41, 88];
   /* ── BEAT 1: the cost ladder. */
   .ru-ladder { display: flex; flex-direction: column; justify-content: center; }
   .ru-rungs { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(12px, 2vh, 22px); }
+  /* FOUR CELLS ON TWO LINES, and the numbers share the second one. At the old 56% width the label and the AUM
+     had to stack above the bar; across the full width they sit on one line with the bar beneath, so the two
+     right-hand figures stop reading as a second column of labels. */
   .ru-rungs li {
-    display: grid; grid-template-columns: minmax(0, 1fr) 6ch; gap: 3px clamp(10px, 1.4vw, 18px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 7ch 9ch;
+    gap: 4px clamp(10px, 1.4vw, 20px);
     align-items: baseline;
   }
-  .ru-rung-label { font-size: 13.5px; color: var(--r-ink); }
+  .ru-rung-track { grid-column: 1 / -1; }
+  .ru-rung-cost { grid-column: 3 / 4; grid-row: 1; }
+  .ru-rung-aum { grid-column: 2 / 3; grid-row: 1; }
+  .ru-rung-label { font-size: clamp(14px, 1.02vw, 16px); color: var(--r-ink); }
   .ru-rung-aum {
     font-family: var(--font-mono); font-size: 12px; color: var(--r-faint); text-align: right;
     font-variant-numeric: tabular-nums;
   }
   .ru-rung-track {
-    grid-column: 1 / 2; height: 9px; background: color-mix(in srgb, var(--r-ink) 8%, transparent);
+    height: 9px; background: color-mix(in srgb, var(--r-ink) 8%, transparent);
     border-radius: 1px; overflow: hidden;
   }
   .ru-rung-bar { display: block; height: 100%; background: var(--r-accent); opacity: 0.75; }
   .ru-rung-cost {
-    grid-column: 2 / 3; font-family: var(--font-mono); font-size: 12.5px; color: var(--r-accent);
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--r-accent);
     text-align: right; font-variant-numeric: tabular-nums;
   }
 
@@ -401,12 +453,17 @@ const HIGHLIGHT = [7, 41, 88];
     font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase;
     color: var(--r-accent);
   }
-  .ru-cat-rule { font-size: 13px; line-height: 1.35; color: var(--r-ink); }
-  .ru-cat-why { font-size: 11.5px; line-height: 1.45; color: var(--r-faint); max-width: 54ch; }
+  .ru-cat-rule { font-size: clamp(14px, 1.02vw, 16px); line-height: 1.38; color: var(--r-ink); }
+  .ru-cat-why { font-size: clamp(12.5px, 0.9vw, 14px); line-height: 1.5; color: var(--r-faint); max-width: 60ch; }
 
   /* ── BEATS 3 AND 4: the fan of futures. */
   .ru-fan { display: flex; flex-direction: column; justify-content: center; }
-  .ru-fanchart { width: 100%; height: clamp(190px, 27vh, 300px); display: block; }
+  /* The fan stops stretching. At full width it became a 4.7:1 letterbox and the vertical spread — the entire
+     point of the drawing — was squashed flat. Capped to a measure that keeps the cone's shape, and centred. */
+  .ru-fanchart {
+    width: 100%; max-width: min(1100px, 100%); margin: 0 auto;
+    height: clamp(210px, 30vh, 330px); display: block;
+  }
   .ru-traj {
     fill: none; stroke: var(--r-faint); stroke-width: 1; vector-effect: non-scaling-stroke;
     opacity: 0.22; stroke-linejoin: round;
@@ -440,17 +497,18 @@ const HIGHLIGHT = [7, 41, 88];
     text-align: right; font-variant-numeric: tabular-nums;
   }
   .ru-tally-n sup { font-size: 0.68em; }
-  .ru-tally-l { font-size: clamp(11.5px, 0.88vw, 13px); line-height: 1.4; color: var(--r-soft); }
+  .ru-tally-l { font-size: clamp(13.5px, 1vw, 15.5px); line-height: 1.45; color: var(--r-soft); }
   .ru-tally--big .ru-tally-n { font-size: clamp(16px, 1.5vw, 22px); color: var(--r-ink); }
 
   .ru-note {
-    font-family: var(--font-mono); font-size: 9px; line-height: 1.5; letter-spacing: 0.04em;
+    /* 9px is not a readable size for a sentence that qualifies the drawing above it. */
+    font-family: var(--font-mono); font-size: 10.5px; line-height: 1.55; letter-spacing: 0.04em;
     color: var(--r-faint); margin: clamp(8px, 1.2vh, 14px) 0 0; max-width: 60ch;
   }
 
   .ru-cap {
-    font-size: 10.5px; line-height: 1.5; color: var(--r-faint);
-    margin: clamp(8px, 1.2vh, 14px) 0 0; max-width: 60ch; display: grid;
+    font-size: 12px; line-height: 1.55; color: var(--r-faint);
+    margin: clamp(6px, 1vh, 12px) 0 0; max-width: 82ch; display: grid;
   }
   .ru-cap > .ru-panel { grid-area: 1 / 1; }
   .ru-cap sup { font-size: 0.72em; }
@@ -458,21 +516,27 @@ const HIGHLIGHT = [7, 41, 88];
   /* ── RESPONSIVE, at the END of the sheet on purpose: every declaration here overrides one of the same
      specificity above, so source order is the whole mechanism. */
   @media (max-height: 860px) {
-    /* Measured: the rule-categories panel is the tallest of the four and overflowed the shared stagebox by
-       10-15px at 1366x768 and 1280x800 — the box is sized to the fan, and four stacked rules with reasons need
-       more than that. The categories close up here rather than the box growing, because the box growing would
-       push the whole slide past the screen. */
-    .ru-cats { gap: clamp(6px, 1vh, 12px); }
-    .ru-cat-rule { font-size: 12px; line-height: 1.3; }
-    .ru-cat-why { font-size: 10.5px; line-height: 1.38; }
+    /* Measured: on a short screen the two TALLEST panels set the shared stagebox — the four rule categories with
+       their reasons, and the four ladder rungs now that each takes two lines. Both close up here rather than the
+       box growing, because a taller box pushes the whole slide past the screen. The fan has already given up
+       height twice and is at its floor. */
+    .ru-rungs { gap: clamp(6px, 1vh, 12px); }
+    .ru-rung-track { height: 7px; }
+    .ru-rung-label, .ru-rung-cost, .ru-rung-aum { font-size: 13px; }
+    /* Measured at 1366x768: the categories panel needed 257px against a 246px box — exactly the four `why`
+       lines. Widening their measure is what fixes it, because at full slide width each reason fits on one line
+       instead of wrapping to two. */
+    .ru-cats { gap: clamp(5px, 0.9vh, 11px); }
+    .ru-cat-rule { font-size: 13.5px; line-height: 1.34; }
+    .ru-cat-why { font-size: 12px; line-height: 1.42; max-width: 100ch; }
     .ru-head { font-size: clamp(22px, 2vw, 30px); }
     .ru-beats { gap: 2px; margin-top: clamp(12px, 1.8vh, 20px); }
     .ru-beat { padding-top: 4px; padding-bottom: 5px; }
-    .ru-beat-head { font-size: clamp(13px, 0.98vw, 15px); }
-    .ru-beat-body { font-size: clamp(11px, 0.82vw, 12px); line-height: 1.44; }
-    .ru-stagebox { min-height: clamp(240px, 34vh, 330px); }
-    .ru-fanchart { height: clamp(160px, 22vh, 240px); }
-    .ru-scale { font-size: 12.5px; line-height: 1.5; }
+    .ru-beat-head { font-size: clamp(15px, 1.1vw, 17px); }
+    .ru-beat-body { font-size: clamp(13.5px, 0.95vw, 15px); line-height: 1.5; }
+    .ru-stagebox { min-height: clamp(230px, 32vh, 320px); }
+    .ru-fanchart { height: clamp(160px, 21vh, 240px); }
+    .ru-scale { font-size: 14px; line-height: 1.55; }
     .ru-rungs { gap: clamp(9px, 1.4vh, 16px); }
   }
 
@@ -483,11 +547,11 @@ const HIGHLIGHT = [7, 41, 88];
     .ru-head { font-size: clamp(22px, 3.4vw, 30px); }
     .ru-beats { gap: 1px; }
     .ru-beat { padding-top: 4px; padding-bottom: 4px; }
-    .ru-beat-body { font-size: clamp(11px, 1.4vw, 12.5px); line-height: 1.44; }
+    .ru-beat-body { font-size: clamp(13.5px, 1.6vw, 15px); line-height: 1.5; }
     .ru-stagebox { min-height: clamp(220px, 28vh, 290px); }
     .ru-fanchart { height: clamp(140px, 19vh, 210px); }
-    .ru-scale { font-size: 12.5px; line-height: 1.5; padding-top: 8px; }
-    .ru-note, .ru-cap { font-size: 9.5px; line-height: 1.42; }
+    .ru-scale { font-size: 14px; line-height: 1.55; padding-top: 8px; }
+    .ru-note, .ru-cap { font-size: 11px; line-height: 1.5; }
     .ru-rungs { gap: clamp(8px, 1.2vh, 14px); }
     .ru-cats { gap: clamp(7px, 1vh, 12px); }
   }

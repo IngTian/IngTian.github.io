@@ -380,10 +380,16 @@ const allBeats = [...BEATS, BEAT4];
   /* Spans, not <p> — a <button> may only contain phrasing content, so these are blocked out by hand. */
   .ch-ask {
     display: block;
-    font-family: var(--font-display); font-size: clamp(16px, 1.4vw, 21px); line-height: 1.3;
-    color: var(--c-ink); margin: 0 0 4px;
+    /* Floor raised from 16px: at 1366x768 the question rendered 15.7px, barely above its own answer. */
+    font-family: var(--font-display); font-size: clamp(18px, 1.45vw, 22px); line-height: 1.3;
+    color: var(--c-ink); margin: 0 0 5px;
   }
-  .ch-say { display: block; font-size: clamp(13px, 0.98vw, 14.5px); line-height: 1.6; color: var(--c-soft); margin: 0; }
+  /* MEASURED, and raised on the owner's note that the bullet points read small. Before: 14.5px at 1700x1050,
+     12px at 1366x768 — the vw term collapsed it below caption size for the slide's main reading text. The FLOOR
+     is what matters, so it goes to 14.5px and the ceiling to 17px. */
+  .ch-say {
+    display: block; font-size: clamp(14.5px, 1.08vw, 17px); line-height: 1.62; color: var(--c-soft); margin: 0;
+  }
 
   /* THE OBJECT. One stage, three panels stacked in it — only one visible at a time, so the money bar is the
      same object being spoken about three ways rather than three different figures. */
@@ -401,7 +407,10 @@ const allBeats = [...BEATS, BEAT4];
     /* Measured: the whole slide used 611px of a 1050px screen with the stage at 34vh, and the PnL curves read
        as four near-flat ribbons because the value range (100→122) had only 168px to spend. 42vh puts the
        drawing at roughly the height of the words beside it and gives the curves their shape back. */
-    min-height: clamp(240px, 42vh, 460px);
+    /* 44vh, up from 42: raising the body type to a readable floor grew beat four's legend and verdict, and the
+       panel clipped by 11-18px at 1440x900 and 768x1024. The stage is the right place to find it — the fan and
+       the bars both scale, whereas the type has just been set at its floor deliberately. */
+    min-height: clamp(240px, 44vh, 470px);
     width: 100%;
   }
   /* Same rule for the panels: without the script they stack in normal flow and only the FIRST is shown —
@@ -415,12 +424,12 @@ const allBeats = [...BEATS, BEAT4];
   @media (prefers-reduced-motion: no-preference) { .ch-panel { transition: opacity .5s ease; } }
 
   .ch-panel-head {
-    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.14em;
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.14em;
     color: var(--c-faint); margin: 0 0 12px; text-transform: uppercase;
   }
   .ch-when { color: var(--c-accent); }
   .ch-panel-foot {
-    font-size: clamp(12.5px, 0.95vw, 14px); line-height: 1.6; color: var(--c-soft);
+    font-size: clamp(14px, 1.02vw, 16px); line-height: 1.6; color: var(--c-soft);
     margin: clamp(12px, 1.8vh, 18px) 0 0; max-width: 62ch;
   }
   .ch-panel-foot strong {
@@ -525,7 +534,7 @@ const allBeats = [...BEATS, BEAT4];
   }
   /* The legend's line samples: same width as a swatch column, vertically centred on the label's baseline. */
   .ch-key { display: block; align-self: center; overflow: visible; }
-  .ch-pnl-name { font-size: 13px; color: var(--c-ink); }
+  .ch-pnl-name { font-size: 14.5px; color: var(--c-ink); }
   .ch-pnl-end, .ch-pnl-fall, .ch-pnl-exp {
     font-family: var(--font-mono); font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right;
   }
@@ -559,7 +568,8 @@ const allBeats = [...BEATS, BEAT4];
   .ch-pnl-gloss { grid-column: 2 / -1; font-size: 11px; line-height: 1.4; color: var(--c-faint); }
 
   .ch-cap {
-    font-size: 10.5px; line-height: 1.45; color: var(--c-faint);
+    /* 10.5px is a footnote size and this is a real disclaimer a reader should be able to read. */
+    font-size: 12px; line-height: 1.5; color: var(--c-faint);
     margin: clamp(12px, 1.8vh, 20px) 0 0; max-width: 62ch; font-style: italic;
   }
 
@@ -574,11 +584,12 @@ const allBeats = [...BEATS, BEAT4];
   @media (max-height: 860px) {
     .ch-beats { gap: 2px; }
     .ch-beat { padding-top: 2px; padding-bottom: 2px; }
-    .ch-ask { font-size: clamp(14px, 1.15vw, 17px); margin-bottom: 2px; }
-    .ch-say { font-size: clamp(12px, 0.85vw, 13px); line-height: 1.5; }
+    /* Short screens still get readable body copy: 12px was the measured low point that prompted this pass. */
+    .ch-ask { font-size: clamp(16px, 1.22vw, 19px); margin-bottom: 3px; }
+    .ch-say { font-size: clamp(13.5px, 0.95vw, 15px); line-height: 1.55; }
     .ch-stage { min-height: clamp(300px, 46vh, 380px); }
     .ch-pnl { min-height: 92px; }
-    .ch-panel-foot { font-size: 11.5px; line-height: 1.45; }
+    .ch-panel-foot { font-size: 13px; line-height: 1.5; }
     .ch-cap { margin-top: 8px; }
   }
 
@@ -587,7 +598,9 @@ const allBeats = [...BEATS, BEAT4];
      The chart has the full width here, so it can be shorter without losing legibility — that is the slack the
      stacked layout spends. */
   @media (max-width: 1100px) {
-    .ch-stage { min-height: clamp(280px, 34vh, 380px); }
+    /* Raised with the base stage: the larger body type grew beat four's legend, and at 768x1024 the panel
+       clipped by 18px against a 34vh cap. */
+    .ch-stage { min-height: clamp(310px, 36vh, 400px); }
     .ch-beats { gap: clamp(2px, 0.5vh, 6px); }
     .ch-pnl { min-height: clamp(90px, 11vh, 130px); }
     .ch-panel-foot { font-size: 12px; line-height: 1.45; }
