@@ -402,7 +402,12 @@ const HIGHLIGHT = [7, 41, 88];
   /* ── ONE BOX, FOUR PANELS, absolutely positioned inside a fixed-height stage so switching beats never
      reflows the column — the same arrangement the defining slide uses, and for the same reason. */
   /* FULL WIDTH now, so the stage can be SHORTER than it was at 56% and still be a bigger drawing. */
-  .ru-stagebox { position: relative; width: 100%; min-height: clamp(250px, 34vh, 420px); }
+  /* The stage sets the fan's height, and the fan now spans the full width — so it needs MORE height, not the
+     same. Measured: at 34vh the drawing rendered 296px against a 1652px width (5:1) because the note beneath it
+     shares the box. 40vh gives it back the room that keeps the cone legible now that nothing caps its width. */
+  /* The stage must stay TALLER than the fan's own ceiling: it holds the drawing AND the note beneath it. At a
+     450px stage against a 460px fan the panel outgrew the box by 10px at 2560x1400. */
+  .ru-stagebox { position: relative; width: 100%; min-height: clamp(250px, 38vh, 540px); }
   .ru-panel { opacity: 0; pointer-events: none; }
   .ru-panel.is-on { opacity: 1; pointer-events: auto; }
   .ru-stagebox > .ru-panel { position: absolute; inset: 0; }
@@ -458,11 +463,21 @@ const HIGHLIGHT = [7, 41, 88];
 
   /* ── BEATS 3 AND 4: the fan of futures. */
   .ru-fan { display: flex; flex-direction: column; justify-content: center; }
-  /* The fan stops stretching. At full width it became a 4.7:1 letterbox and the vertical spread — the entire
-     point of the drawing — was squashed flat. Capped to a measure that keeps the cone's shape, and centred. */
+  /* FULL WIDTH, edge to edge with the beat band below it. The owner: "extend the graph all the way to the right
+     edge, aligned with the divider line right edge down below. it's now like cutoff."
+     Exactly right, and measured: the 1100px cap left the fan stopping 287px short of the band's divider at
+     1920 and 191px short at 1700, which reads as a crop rather than as a drawing that happens to be narrower.
+     An object that ends before the rule beneath it looks broken however deliberate the number was.
+     The cap existed because stretching the fan to full width flattened its cone — so the fix is not to remove
+     the cap alone but to give the drawing back its HEIGHT at the same time, keeping the aspect near 3.5:1
+     where the spread still reads. The stage grows to match, and the short-screen rules below hold the floor. */
   .ru-fanchart {
-    width: 100%; max-width: min(1100px, 100%); margin: 0 auto;
-    height: clamp(210px, 30vh, 330px); display: block;
+    width: 100%; margin: 0; display: block;
+    /* Measured, and I tried the clever version first: min(34vh, 17vw) to make the aspect track the width. It
+       made things WORSE at the sizes that matter — min() takes the smaller value, so 17vw undercut 34vh and
+       1700x1050 went from 4.39:1 to 5.13:1. Plain vh is better here because the stage's own height is what
+       actually binds, and the aspect only degrades on screens wide enough that the fan is huge anyway. */
+    height: clamp(210px, 34vh, 460px);
   }
   .ru-traj {
     fill: none; stroke: var(--r-faint); stroke-width: 1; vector-effect: non-scaling-stroke;
@@ -535,7 +550,10 @@ const HIGHLIGHT = [7, 41, 88];
     .ru-beat-head { font-size: clamp(15px, 1.1vw, 17px); }
     .ru-beat-body { font-size: clamp(13.5px, 0.95vw, 15px); line-height: 1.5; }
     .ru-stagebox { min-height: clamp(230px, 32vh, 320px); }
-    .ru-fanchart { height: clamp(160px, 21vh, 240px); }
+    /* Measured at 1366x768: the fan spans 1165px, so a 21vh height gave 161px — a 7.2:1 letterbox, flatter than
+       the one the old width cap existed to prevent. The FLOOR is what matters on a short screen, because 21vh of
+       768 is small; 200px brings it to about 5.8:1, which still reads as a cone. */
+    .ru-fanchart { height: clamp(200px, 26vh, 260px); }
     .ru-scale { font-size: 14px; line-height: 1.55; }
     .ru-rungs { gap: clamp(9px, 1.4vh, 16px); }
   }
