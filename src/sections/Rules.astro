@@ -650,31 +650,33 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     display: grid; grid-template-columns: auto minmax(0, 1.25fr);
     gap: 0 clamp(24px, 3.4vw, 64px); align-items: center;
   }
-  .ru-web { display: block; height: clamp(150px, 23vh, 260px); width: auto; }
+  .ru-web { display: block; height: clamp(190px, 33vh, 380px); width: auto; }
 
   /* ── THE MATHEMATICS. Baked MathML, so the only styling needed is size and colour — the typesetting is
      already correct, which is the whole reason for going through KaTeX rather than hand-setting spans. */
-  .ru-math { display: grid; gap: clamp(4px, 0.7vh, 9px); min-width: 0; }
+  .ru-math { display: grid; gap: clamp(5px, 0.9vh, 12px); min-width: 0; }
   .ru-math-lead, .ru-math-mid {
-    font-size: clamp(12.5px, 0.92vw, 14px); line-height: 1.5; color: var(--r-faint); margin: 0;
+    font-size: clamp(13.5px, 1.05vw, 16px); line-height: 1.5; color: var(--r-faint); margin: 0;
   }
   .ru-eq {
     color: var(--r-ink);
     /* MathML inherits font-size, and KaTeX's display mode already sizes the operators — so one declaration
        controls the whole expression. Slightly larger than body copy: this is the subject, not an aside. */
-    font-size: clamp(13px, 1.05vw, 16.5px);
+    /* The equation is the subject of this panel, so it is set well above body copy — measured at 16.5px it read
+       as a footnote beside the drawing it is supposed to anchor. */
+    font-size: clamp(15px, 1.45vw, 23px);
     overflow-x: auto; overflow-y: hidden;
   }
   .ru-eq :global(math) { display: block; margin: 0 auto; }
   .ru-math-punch {
-    font-size: clamp(13px, 0.98vw, 15px); line-height: 1.55; color: var(--r-soft); margin: 0;
+    font-size: clamp(14px, 1.12vw, 17.5px); line-height: 1.55; color: var(--r-soft); margin: 0;
   }
   .ru-math-punch strong {
     font-family: var(--font-mono); font-weight: 400; color: var(--r-accent); font-variant-numeric: tabular-nums;
   }
   .ru-math-punch sup { font-size: 0.72em; }
   .ru-math-foot {
-    font-size: clamp(12px, 0.9vw, 13.5px); line-height: 1.5; color: var(--r-faint); margin: 0;
+    font-size: clamp(13px, 1vw, 15.5px); line-height: 1.5; color: var(--r-faint); margin: 0;
     padding-top: clamp(3px, 0.6vh, 7px); border-top: 1px solid var(--r-edge);
   }
   /* The chords carry the meaning, so they are the only confident marks. Curved through the centre: straight
@@ -719,6 +721,16 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
        their reasons, and the four ladder rungs now that each takes two lines. Both close up here rather than the
        box growing, because a taller box pushes the whole slide past the screen. The fan has already given up
        height twice and is at its floor. */
+    /* THE CIRCLE AND THE EQUATION, held to what a short screen has. The owner asked for all three bigger, and on
+       a tall screen there was a third of a panel spare — but at 768px tall the box is only 246px, and 33vh of web
+       is 253px on its own. Measured: the web overflowed by 7px at 1366x768 and 8px at 1280x800, so here it is
+       sized off the box rather than the viewport, and the equation steps down with it. */
+    .ru-web { height: clamp(170px, 27vh, 230px); }
+    .ru-eq { font-size: clamp(14.5px, 1.32vw, 19px); }
+    .ru-math-lead, .ru-math-mid { font-size: clamp(12.5px, 0.98vw, 14.5px); }
+    .ru-math-punch { font-size: clamp(13px, 1.05vw, 15.5px); }
+    .ru-math-foot { font-size: clamp(12px, 0.94vw, 14px); }
+
     /* Measured at 1366x768: the ladder panel needed 253px against a 246px box — the note beneath it plus four
        two-line rungs. The note's own line-height is the cheapest 7px on the panel. */
     .ru-rungs { gap: clamp(5px, 0.9vh, 11px); }
