@@ -21,25 +21,48 @@
 // ORDER FOLLOWS THE PAGE, and the page now answers "what do I do" before "how I got here" — so Story moved
 // below the explainer. A rail whose order disagrees with the document is worse than no rail: the scrollspy
 // sorts by measured position, so a mismatched list would light stops out of sequence.
-const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
-  { label: 'About',    href: '#heights',   zone: 'light' },
-  { label: 'Choice',   href: '#choice',    zone: 'light' },
-  { label: 'Rules',    href: '#rules',     zone: 'light' },
-  { label: 'Solve',    href: '#solve',     zone: 'dark'  },
-  { label: 'Path',     href: '#story',     zone: 'light' },
-  { label: 'Work',     href: '#work',      zone: 'light' },
-  { label: 'Links',    href: '#signature', zone: 'dark'  },
-];
+//
+// NESTED, and the labels are the sections' own subjects. The owner: "the ToC still says choices. i think this
+// is more a 'the problem' section. similarly that An OR Quant slide deserves a ToC Tag as well… for the
+// problem, the constraint, stuff, you can maybe learn from research's nested ToC. this way it's clearer on the
+// top level."
+//
+// The tree lives in lib/pageStops (homeStops), the same module the /research, /projects and /experience rails
+// read — one place that knows what a rail carries, and unit-tested. Zones stay HERE on the top-level stops
+// because they are a property of the sky behind a stop, not of the page's structure.
+import { homeStops, flattenStops } from '../lib/pageStops';
+
+const stops = homeStops();
+// Children inherit their parent's zone: they are slides inside the same stretch of sky, and a child with a
+// mismatched zone would render light-on-light for exactly as long as its parent read correctly.
+const zoneOf = new Map<string, 'light' | 'dark'>();
+for (const s of stops) {
+  zoneOf.set(s.target, s.zone);
+  for (const c of s.children ?? []) zoneOf.set(c.target, s.zone);
+}
 ---
 <nav class="toc" aria-label="Sections" data-toc>
   <ul>
     {stops.map((s) => (
       <li>
-        <a href={s.href} data-zone={s.zone} aria-label={s.label}>
+        <a href={`#${s.target}`} data-zone={s.zone} aria-label={s.label}>
           <span class="rule" aria-hidden="true"></span>
           <span class="dot" aria-hidden="true"></span>
           <span class="label">{s.label}</span>
         </a>
+        {s.children && s.children.length > 0 && (
+          <ul class="sub">
+            {s.children.map((c) => (
+              <li>
+                <a href={`#${c.target}`} data-zone={zoneOf.get(c.target)} aria-label={c.label}>
+                  <span class="rule" aria-hidden="true"></span>
+                  <span class="dot" aria-hidden="true"></span>
+                  <span class="label">{c.label}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
       </li>
     ))}
   </ul>
@@ -67,6 +90,16 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
   .toc.toc--visible { opacity: 1; visibility: visible; transition: opacity 0.6s ease, visibility 0s; }
 
   .toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+  /* THE NESTED TIER. A group reads as a group: tighter gaps, one indent step, and a hairline spine so the
+     three children visibly belong to the field above them. Indent is small on purpose — the rail sits in a
+     ~34px margin and a deep step would push the labels into the slide. */
+  .toc .sub {
+    gap: 9px; margin-top: 9px; padding-left: 9px;
+    border-left: 1px solid currentColor;
+    /* The spine must be quieter than the text it groups, or it becomes the loudest thing in the margin. */
+    opacity: 1;
+  }
+  .toc .sub > li > a { opacity: 0.34; }
 
   /* The frosted pad behind the rail is deleted on the owner's instruction. It was added when the drawing
      spanned the full slide and its contours ran under the rail; the graph is now indented into its own
@@ -107,15 +140,34 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
   .toc a[data-zone="dark"]  { color: var(--ink-5); }
   .toc a { opacity: 0.4; }
 
-  /* active state — full opacity ink/paper + extended rule */
-  .toc a.is-active { opacity: 1; }
+  /* Child rows are a step down in size and tracking — hierarchy by WEIGHT, which is what the /research rail
+     learned: a thin margin cannot afford to carry hierarchy by indent alone. */
+  .toc .sub a { font-size: 10px; letter-spacing: 0.08em; gap: 7px; }
+
+  /* ── STATE BEATS TIER. Written with :where() on the tier part, which contributes ZERO specificity, so a
+     state class always wins. This is the exact bug the /research rail hit: plainly-written `.toc a.is-active`
+     (0,4,1) loses to `.toc .sub a` (0,5,1), and the active indicator then never appears on any nested row —
+     which here would be every one of the three explainer slides. */
+  .toc a.is-active,
+  .toc :where(.sub) a.is-active { opacity: 1; }
   .toc a[data-zone="light"].is-active { color: var(--ink-1); }
   .toc a[data-zone="dark"].is-active  { color: var(--paper); }
-  .toc a.is-active .rule { width: 18px; }
+  .toc a.is-active .rule,
+  .toc :where(.sub) a.is-active .rule { width: 18px; }
 
-  /* hover affordance for the dimmed ones */
+  /* THE PARENT OF THE ACTIVE CHILD is lit, but quieter than the child — so you can see which part of the
+     page you are inside without it competing with the slide you are actually on. */
+  .toc a.is-ancestor,
+  .toc :where(.sub) a.is-ancestor { opacity: 0.72; }
+  .toc a[data-zone="light"].is-ancestor { color: var(--ink-2); }
+  .toc a.is-ancestor .rule { width: 10px; }
+
+  /* hover affordance for the dimmed ones. The :not() guards stop a hover from DIMMING the active row —
+     these rules come later in the sheet, so without them pointing at the current stop would drop it from
+     1.0 to 0.85. */
   @media (hover: hover) {
-    .toc a:hover { opacity: 0.85; }
+    .toc a:not(.is-active):not(.is-ancestor):hover { opacity: 0.85; }
+    .toc :where(.sub) a:not(.is-active):not(.is-ancestor):hover { opacity: 0.68; }
   }
 
   /* ── OVER THE PAPER SLIDE. Set by the script whenever the story panel is behind the rail. The
@@ -134,7 +186,13 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
   @media (max-width: 1100px) {
     .toc .rule, .toc .label { display: none; }
     .toc .dot { display: block; }
-    .toc a.is-active .dot { opacity: 1; transform: scale(1.5); }
+    .toc a.is-active .dot,
+    .toc :where(.sub) a.is-active .dot { opacity: 1; transform: scale(1.5); }
+    /* As dots there is no room for a tier: the spine and indent would read as a stray mark, and a smaller
+       child dot would look like a rendering fault rather than a hierarchy. Flatten to one column of dots. */
+    .toc .sub { padding-left: 0; border-left: 0; margin-top: 14px; gap: 14px; }
+    .toc .sub > li > a { opacity: 0.4; }
+    .toc .sub .dot { width: 4px; height: 4px; }
   }
 
   /* Mobile: tighter still */
@@ -175,6 +233,20 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
     const stops = links
       .map((a) => ({ a, el: document.getElementById(a.getAttribute('href')?.slice(1) ?? '') }))
       .filter((s): s is { a: HTMLAnchorElement; el: HTMLElement } => !!s.el);
+
+    // Each link's ancestor links, so activating a nested stop can also light its parent. Same shape as the
+    // /research rail: walk up the <li> chain and collect the direct child <a> of each enclosing <li>.
+    const ancestorsOf = new Map<HTMLAnchorElement, HTMLAnchorElement[]>();
+    for (const { a } of stops) {
+      const chain: HTMLAnchorElement[] = [];
+      let li = a.closest('li')?.parentElement?.closest('li') ?? null;
+      while (li) {
+        const parentLink = li.querySelector<HTMLAnchorElement>(':scope > a');
+        if (parentLink) chain.push(parentLink);
+        li = li.parentElement?.closest('li') ?? null;
+      }
+      ancestorsOf.set(a, chain);
+    }
     const hero = document.getElementById('heights');
     // The opaque paper slides. The rail is fixed, so its ink has to follow whatever is actually behind
     // it rather than the stop's own position in the page.
@@ -215,12 +287,23 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
         document.documentElement.scrollHeight,
       );
 
+      // The active leaf, then its ancestors — a parent is never BOTH, or a nested active stop's parent would
+      // render at ancestor weight and the leaf's own row would be indistinguishable from it.
+      const lit = new Set<HTMLAnchorElement>();
       stops.forEach((s, i) => {
         const on = heroPast && i === activeIdx;
         s.a.classList.toggle('is-active', on);
-        if (on) s.a.setAttribute('aria-current', 'true');
-        else s.a.removeAttribute('aria-current');
+        if (on) {
+          s.a.setAttribute('aria-current', 'true');
+          lit.add(s.a);
+          for (const p of ancestorsOf.get(s.a) ?? []) lit.add(p);
+        } else {
+          s.a.removeAttribute('aria-current');
+        }
       });
+      for (const { a } of stops) {
+        a.classList.toggle('is-ancestor', lit.has(a) && !a.classList.contains('is-active'));
+      }
     }
 
     let ticking = false;

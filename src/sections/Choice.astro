@@ -318,7 +318,9 @@ const allBeats = [...BEATS, BEAT4];
     --c-p0: #7d8798; --c-p1: #d3d8d2; --c-p2: #a98cb0; --c-p3: #5f6763; --c-p4: var(--c-accent);
   }
   .ch-inner {
-    padding-left: clamp(150px, 9.5vw, 190px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
+    /* Clears the fixed Toc rail, whose right edge moved from x=129 to x=151 once it gained an indented tier
+       ("Problem / Limits / Method" under "The field"). Shared across the five paper slides. */
+    padding-left: clamp(168px, 10.4vw, 200px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
   }
   @media (max-width: 1100px) { .ch-inner { padding-left: clamp(28px, 6vw, 80px); } }
 
@@ -337,7 +339,11 @@ const allBeats = [...BEATS, BEAT4];
 
   /* The beats sit left, the object right — but the beats are a LIST, not a column of prose: each is dim until
      its turn, so the definition reads as three steps rather than a wall. */
-  .ch-beats { list-style: none; margin: 0 0 0 -12px; padding: 0; display: grid; gap: clamp(6px, 1vh, 12px); }
+  /* No negative left margin. It was there to keep the beats' optical left edge aligned with the headline once
+     they became padded buttons — but it also pulled them 12px INTO the rail's gutter, and with the rail now
+     carrying an indented tier that left 1px of clearance at 1440px. The button's own left padding plus the
+     active rule reads as the inset; the rail needs the margin more. */
+  .ch-beats { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(6px, 1vh, 12px); }
   /* DEFAULT = the finished state, and the script dims from there. An inverse guard class alone was not
      enough: html.no-define-js is added BY the script, so with JavaScript switched off entirely it never
      appears and every beat stayed at 0.3 while all four panels sat at opacity 0 — measured, the slide

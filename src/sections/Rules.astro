@@ -132,7 +132,9 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
     --r-soft: #a8b0a9; --r-faint: #6d746e; --r-accent: #7fc9a0;
   }
   .ru-inner {
-    padding-left: clamp(150px, 9.5vw, 190px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
+    /* Clears the fixed Toc rail, whose right edge moved from x=129 to x=151 once it gained an indented tier
+       ("Problem / Limits / Method" under "The field"). Shared across the five paper slides. */
+    padding-left: clamp(168px, 10.4vw, 200px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
   }
   @media (max-width: 1099px) { .ru-inner { padding-left: clamp(28px, 6vw, 80px); } }
 

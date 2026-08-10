@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   researchStops, projectStops, paperSectionId, paperAnchorId, projectSectionId,
-  experienceStops, experienceSectionId, railLabel,
+  experienceStops, experienceSectionId, railLabel, homeStops,
   flattenStops, type Stop,
 } from '../src/lib/pageStops';
 import type { Publication, Project, TimelineEntry } from '../src/data/profile';
@@ -253,5 +253,68 @@ describe('the REAL site data', () => {
 
   it('gives /projects a stop per project', () => {
     expect(projectStops(projects)).toHaveLength(projects.length);
+  });
+});
+
+// ── THE HOMEPAGE RAIL ─────────────────────────────────────────────────────────────────────────────────
+// The rail is the only wayfinding on a page with no headings above the fold, and a stop pointing at a
+// missing id renders as a link that goes nowhere — the exact bug that removed the old 'Work' and 'Ask'
+// stops. These tests pin the SHAPE (nested, so the top level reads as structure) and the CONTRACT (every
+// target exists in index.astro's section list).
+describe('homeStops', () => {
+  const stops = homeStops();
+  const flat = flattenStops(stops);
+
+  // Section ids actually rendered by src/pages/index.astro, in document order.
+  const RENDERED = ['heights', 'interlude', 'choice', 'rules', 'solve', 'story', 'work', 'signature'];
+
+  it('points every stop at a section the homepage renders', () => {
+    for (const s of flat) {
+      expect(RENDERED, `${s.label} -> #${s.target}`).toContain(s.target);
+    }
+  });
+
+  it('has no duplicate targets or labels', () => {
+    const targets = flat.map((s) => s.target);
+    expect(new Set(targets).size).toBe(targets.length);
+    const labels = flat.map((s) => s.label);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  // The owner asked for the field slide to have a stop at all, and for the explainer slides to sit under it
+  // so the top level reads as structure rather than as five unrelated words.
+  it('nests the three explainer slides under the field that names them', () => {
+    const field = stops.find((s) => s.target === 'interlude');
+    expect(field, 'the field slide must have its own stop').toBeDefined();
+    expect(field!.children?.map((c) => c.target)).toEqual(['choice', 'rules', 'solve']);
+  });
+
+  it('keeps the top level short — structure, not a list of every slide', () => {
+    expect(stops.length).toBeLessThanOrEqual(5);
+  });
+
+  it('no longer calls the problem slide "Choice"', () => {
+    const problem = flat.find((s) => s.target === 'choice');
+    expect(problem!.label.toLowerCase()).not.toBe('choice');
+  });
+
+  // TREE ORDER MUST MATCH DOCUMENT ORDER. The scrollspy walks stops as rendered and marks the last one whose
+  // top crossed the reference line; a rail whose order disagrees with the page lights stops out of sequence.
+  it('lists stops in the order the page renders them', () => {
+    const positions = flat.map((s) => RENDERED.indexOf(s.target));
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  });
+
+  // A thin left margin is the constraint that shortened these labels: at "The problem" / "Constraints" the
+  // indented tier measured past the slide's text edge.
+  it('keeps rail labels short enough for an 11px mono margin', () => {
+    for (const s of stops) expect(s.label.length, s.label).toBeLessThanOrEqual(11);
+    for (const c of stops.flatMap((s) => s.children ?? [])) {
+      expect(c.label.length, c.label).toBeLessThanOrEqual(8);
+    }
+  });
+
+  it('zones every top-level stop, since the label colour follows the sky behind it', () => {
+    for (const s of stops) expect(['light', 'dark']).toContain(s.zone);
   });
 });

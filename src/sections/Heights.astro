@@ -192,6 +192,15 @@ for (const phrase of bio.strong) {
       from { opacity: 0; transform: translate3d(0, 16px, 0); }
       to   { opacity: 1; transform: translate3d(0, 0, 0); }
     }
+
+    /* THE TAGLINE ARRIVES LAST, on its own beat. On the tagline slide it rose in on a staggered scroll
+       range; folded into the name block it inherited that block's single fade and stopped reading as a
+       separate thought — the owner noticed it as a dropped animation, and it was. This restores the beat:
+       the name and role line land, then the tagline follows a third of a second later, which is also when
+       the marker-wash hint begins (1.1s) so the arrival and the invitation are one gesture.
+       It animates its OWN opacity, so it must not fight the parent's: .hero-rise finishes at opacity 1, and
+       this starts after it. */
+    .hero-doors-line { animation: hero-rise 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.62s both; }
     .scroll-cue { animation: cue-bob 2.6s ease-in-out 1.4s infinite; }
     @keyframes cue-bob {
       0%, 100% { opacity: 0.5; transform: translate(-50%, 0); }

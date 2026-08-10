@@ -163,6 +163,47 @@ export function railLabel(entry: TimelineEntry): string {
   return tail.length > 24 ? `${tail.slice(0, 23)}…` : tail;
 }
 
+/**
+ * THE HOMEPAGE RAIL, nested — the deck's three explainer slides live under the field that names them.
+ *
+ * The owner: "the ToC still says choices. i think this is more a 'the problem' section. similarly that An OR
+ * Quant slide deserves a ToC Tag as well… for the problem, the constraint, stuff, you can maybe learn from
+ * research's nested ToC. this way it's clearer on the top level."
+ *
+ * Both halves are right, and the flat rail was hiding the page's actual shape. "Choice" was a label for a file
+ * name, not for a slide: that slide asks what multi-period portfolio optimization IS, which is the problem
+ * statement. And the field slide — the one that says "An OR quant in multi-period portfolio optimization" —
+ * had no stop at all, so the rail skipped straight from About to a slide about constraints.
+ *
+ * Nesting fixes the top level. An optimisation problem is an objective, a feasible set, and a way to search
+ * it — which is exactly what the three slides are, in order. Read as a tree the rail now says: here is the
+ * field, and here are the three things it consists of. Flat, it said five unrelated words.
+ *
+ * The three children keep the mathematical names rather than the slide names, because those are the words a
+ * reader will meet again everywhere else in the field.
+ */
+export function homeStops(): (Stop & { zone: 'light' | 'dark' })[] {
+  return [
+    { label: 'About', target: 'heights', zone: 'light' },
+    {
+      label: 'The field',
+      target: 'interlude',
+      zone: 'light',
+      // SHORT labels, like /research's "The idea / Method / Results". Measured: with "The problem" and
+      // "Constraints" the indented tier's right edge reached x=151 while the slide headline starts at 143
+      // (at 1440px) — the rail printed over the words. A rail label is a bookmark, not a sentence.
+      children: [
+        { label: 'Problem', target: 'choice' },
+        { label: 'Limits', target: 'rules' },
+        { label: 'Method', target: 'solve' },
+      ],
+    },
+    { label: 'The climb', target: 'story', zone: 'light' },
+    { label: 'The work', target: 'work', zone: 'light' },
+    { label: 'Links', target: 'signature', zone: 'dark' },
+  ];
+}
+
 /** Flatten a stop tree depth-first (parent before its children).
  *  NOTE this is TREE order, which is NOT the same as top-to-bottom VISUAL order —
  *  /research puts "Results" in a right-hand grid column beside "The idea", so it
