@@ -17,9 +17,15 @@ export interface NavPage {
   label: string;
 }
 
-/** Ordered by the site's own hierarchy: research first, art last — quant before avocation. */
+/** Ordered by the site's own hierarchy: research first, art last — quant before avocation.
+ *
+ *  /writing sits directly after /research because it is the same subject at a different formality: the papers,
+ *  then the thinking around them. It is a separate route rather than sections on /research on the owner's
+ *  choice — a paper and a post have different contracts, and filing them together lets the informal writing
+ *  borrow the paper's authority. */
 export const PAGES: NavPage[] = [
   { href: '/research', label: 'Research' },
+  { href: '/writing', label: 'Writing' },
   { href: '/projects', label: 'Projects' },
   { href: '/experience', label: 'Experience' },
   { href: '/art', label: 'Art' },

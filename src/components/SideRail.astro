@@ -87,7 +87,11 @@ const { stops, id, label = 'On this page' } = Astro.props;
      bought hierarchy that was already there at the cost of readability. */
   .side-rail .sub a { font-size: 10px; letter-spacing: 0.12em; opacity: 0.45; }
   .side-rail .rule { width: 0; height: 1px; background: currentColor; opacity: 0.55; transition: width 0.4s ease; flex: none; }
-  .side-rail .label { min-width: 0; }
+  /* ONE LINE PER ROW. Measured with a real long title in the data: a truncated 22-char label still wrapped to
+     two lines in a 190px rail, which broke the even vertical rhythm and pushed the neighbouring rows
+     off-centre. The ellipsis is the rail's own, so a label that still cannot fit degrades to a clean cut
+     rather than to a second line. */
+  .side-rail .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* ── STATE beats TIER, and state beats hover. ──
      These are written with :where() on the tier part so the STATE selectors win

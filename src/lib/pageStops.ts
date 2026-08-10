@@ -14,6 +14,9 @@
 // spells it.
 
 import type { Publication, Project, TimelineEntry } from '../data/profile';
+import {
+  type WritingKind, sorted as sortedEntries, kindSectionId, entrySectionId,
+} from '../data/writing';
 import { mathFor } from './paperMath';
 
 export interface Stop {
@@ -161,6 +164,32 @@ export function railLabel(entry: TimelineEntry): string {
   const parts = entry.title.split('·').map((s) => s.trim());
   const tail = parts.length > 1 ? parts[parts.length - 1] : parts[0];
   return tail.length > 24 ? `${tail.slice(0, 23)}…` : tail;
+}
+
+/**
+ * The /writing rail: one group per KIND, its pieces nested underneath.
+ *
+ * Same shape as /experience — a page that mixes kinds gets a group per kind — and for the same reason: the
+ * distinction between a research note and an essay is the page's whole organising idea, so the rail should
+ * carry it rather than flatten it.
+ *
+ * An EMPTY kind still gets its stop, because the page still renders its heading and its "nothing here yet"
+ * line. This is the one place the rule differs from /research, where a paper with no renderable section is
+ * dropped: there, a stop with no section would point at nothing; here the section genuinely exists.
+ */
+export function writingStops(kinds: readonly WritingKind[]): Stop[] {
+  return kinds.map((k) => {
+    const children = sortedEntries(k).map((e) => ({
+      // 18, not 22: measured with a real title, a 22-character label still wrapped to two lines in the rail's
+      // 190px box. SideRail also clips with an ellipsis as a backstop, but the tree should hand it something
+      // that fits rather than relying on the fallback.
+      label: e.title.length > 18 ? `${e.title.slice(0, 17)}…` : e.title,
+      target: entrySectionId(k.key, e.slug),
+    }));
+    return children.length
+      ? { label: k.railLabel, target: kindSectionId(k.key), children }
+      : { label: k.railLabel, target: kindSectionId(k.key) };
+  });
 }
 
 /**

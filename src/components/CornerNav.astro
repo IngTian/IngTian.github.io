@@ -252,10 +252,12 @@ const items: Item[] = [
     100% { transform: translateY(0); }
   }
 
-  /* Narrow: the page WORDS are what must survive (they are the navigation), so the contact marks go first.
-     Below 1000px the capsule keeps pages + the theme toggle and drops GitHub/Email/CV/LinkedIn — every one of
-     which is still reachable from the Signature section at the foot of the page. */
-  @media (max-width: 999px) {
+  /* Narrow: the page WORDS are what must survive (they are the navigation), so the contact marks go first —
+     every one of them is still reachable from the Signature section at the foot of the page.
+     The threshold is 1200px, not 1000: with five pages the full capsule measures 664px, which is 65% of a
+     1024px viewport and 52% of a 1280px one. A nav is a corner affordance, and at two thirds of the width it
+     has stopped being one. Dropping the marks brings it to 512px (50% at 1024). */
+  @media (max-width: 1199px) {
     .cnav .mark, .cnav .sep:first-of-type { display: none; }
   }
 
