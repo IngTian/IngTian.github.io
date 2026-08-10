@@ -76,3 +76,31 @@ export function factorExpansion(
     { ...display, trust: true },
   );
 }
+
+// ── THE CURSE OF DIMENSIONALITY, for the difficulty slide's fourth beat ──────────────────────────────────
+//
+// The owner: "it's time to use math equations to show that how bellman blowup for such horribly complex
+// problems. the curse of dimensionality and the dimension scales exponentially."
+//
+// Right, and this is the one place on the site where an equation IS the argument rather than an ornament: the
+// recursion says precisely where the blowup comes from, which no amount of prose does as compactly.
+//
+// THE MATHS HAS TO BE EXACTLY TRUE — the project's rule, and doubly so on a quant's own portfolio. What is
+// stated below is the finite-horizon Bellman recursion for this problem and the size of the state space it has
+// to be solved over. Two things people conflate and these keep apart:
+//   * |X| = m^N is the STATE-SPACE size — Bellman's own curse (1957), exponential in the number of assets.
+//   * the per-state max runs over the reachable controls, so a naive backward pass is worse still, T·m^(2N).
+// The slide quotes the first, because it is the honest headline and the second needs a caveat about reachability.
+//
+// Baked to MathML at build time like everything else here, so the client ships no KaTeX runtime.
+export const BELLMAN_EQUATIONS = {
+  /** The recursion itself. Finite-horizon, expectation over next state — the standard form. */
+  recursion: katex.renderToString(
+    String.raw`V_t(x) \;=\; \max_{u \in U(x)} \Big\{\, r(x,u) \;+\; \mathbb{E}\big[\,V_{t+1}(x')\,\big] \Big\}`,
+    display,
+  ),
+  /** Where it breaks: the state space is exponential in the number of assets. */
+  curse: katex.renderToString(String.raw`\lvert \mathcal{X} \rvert \;=\; m^{N}`, display),
+  /** The number, with the slide's own m and N substituted — inline, so it can sit in a sentence. */
+  atScale: katex.renderToString(String.raw`10^{3000}`, opts),
+};

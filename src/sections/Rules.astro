@@ -29,6 +29,7 @@
 // whose whole claim is that this scale is real. Arithmetic in lib/complexity.ts (30 tests).
 import { CONSTRAINTS, FUND } from '../data/desk';
 import { RULE_GLYPHS, RULE_TAGS, type RuleGlyphKey } from '../data/ruleGlyphs';
+import { BELLMAN_EQUATIONS } from '../lib/equations';
 import { humanCount } from '../lib/problemSize';
 import {
   sizeLadder, trajectories, trajBounds, trajPoints,
@@ -84,6 +85,23 @@ const WEB_R = 118;
 const WEB_CX = 150, WEB_CY = 150;
 const pairsAll = rulePairs(FUND.constraints);
 const webPt = (i: number) => rulePoint(i, WEB_N, WEB_CX, WEB_CY, WEB_R);
+
+// ── THE CURSE OF DIMENSIONALITY, typeset. The owner: "it's time to use math equations to show how bellman
+// blows up for such horribly complex problems. the curse of dimensionality and the dimension scales
+// exponentially."
+//
+// This is the one place on the slide where an equation IS the argument. The recursion says exactly where the
+// blowup comes from — the max runs over a set whose size is exponential in the number of names — which no
+// amount of prose says as compactly.
+//
+// The numbers are computed, not typed, so the sentence beside the equation cannot drift from it. m = 10 levels
+// per asset is deliberately crude and the caption says so; even at that coarseness the arithmetic is brutal.
+const DP_LEVELS = 10;
+/** Decimal exponent of m^N — the size of the state table, per period. */
+const dpStateExp = Math.round(FUND.tickers * Math.log10(DP_LEVELS));
+/** How many assets it takes to exceed the atoms in the observable universe (10^80). */
+const ATOMS_EXP = 80;
+const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
 ---
 <section id="rules" class="ru" aria-labelledby="ru-heading">
   <div class="ru-paper">
@@ -112,7 +130,7 @@ const webPt = (i: number) => rulePoint(i, WEB_N, WEB_CX, WEB_CY, WEB_R);
             <span class="ru-panel" data-head="0">The same decision, at four sizes</span>
             <span class="ru-panel" data-head="1">Four kinds of rule, all binding at once</span>
             <span class="ru-panel" data-head="2">{TRAJ_COUNT} possible outcomes — for one holding</span>
-            <span class="ru-panel" data-head="3">Every rule against every other rule</span>
+            <span class="ru-panel" data-head="3">Interlocking rules, and a table that cannot be filled</span>
           </p>
 
           <div class="ru-stagebox">
@@ -237,17 +255,32 @@ const webPt = (i: number) => rulePoint(i, WEB_N, WEB_CX, WEB_CY, WEB_R);
                     return <circle class="ru-webnode" cx={x.toFixed(1)} cy={y.toFixed(1)} r="3" />;
                   })}
                 </svg>
-                <ul class="ru-tally">
-                  <li><span class="ru-tally-n">{humanCount(FUND.tickers)}</span><span class="ru-tally-l">names to choose among</span></li>
-                  <li><span class="ru-tally-n">{vars.toLocaleString()}</span><span class="ru-tally-l">weights, across {FUND.periods} rebalances</span></li>
-                  <li><span class="ru-tally-n">{humanCount(FUND.constraints)}+</span><span class="ru-tally-l">rules to satisfy at once</span></li>
-                  <li class="ru-tally--big">
-                    <span class="ru-tally-n">{(pairsAll / 1e6).toFixed(1)}M</span>
-                    <span class="ru-tally-l">
-                      pairs of rules that can fight each other — fixing one breach can open another
-                    </span>
-                  </li>
-                </ul>
+                <!-- THE MATHEMATICS, in the panel's right half — which was empty, and is the one place on this
+                     slide where an equation is the subject rather than an ornament. Baked to MathML at build
+                     time through the same KaTeX path as the terrain pill and the paper showcase, so the client
+                     ships no KaTeX runtime. A first instinct would be to set this as styled text; the factor
+                     fan's notes record why that was rejected there — hand-built maths reads as "monospace
+                     pretending to be mathematics". -->
+                <div class="ru-math">
+                  <p class="ru-math-lead">
+                    Solve it the exact way — dynamic programming, working backward from the horizon:
+                  </p>
+                  <div class="ru-eq" set:html={BELLMAN_EQUATIONS.recursion} />
+                  <p class="ru-math-mid">
+                    The <em>max</em> is the problem. It runs over every legal holding, so the table you would
+                    have to fill has one entry per state:
+                  </p>
+                  <div class="ru-eq" set:html={BELLMAN_EQUATIONS.curse} />
+                  <p class="ru-math-punch">
+                    At just <strong>{DP_LEVELS}</strong> levels per name, you pass the atoms in the observable
+                    universe at <strong>{dpUniverseAt}</strong> names. A real book holds
+                    <strong>{humanCount(FUND.tickers)}</strong> — a table of
+                    <strong>10<sup>{dpStateExp.toLocaleString()}</sup></strong> states, every month.
+                  </p>
+                  <p class="ru-math-foot">
+                    So nobody fills it. You approximate <em>V</em> instead — and choosing how is the research.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -268,9 +301,8 @@ const webPt = (i: number) => rulePoint(i, WEB_N, WEB_CX, WEB_CY, WEB_R);
               to.
             </span>
             <span class="ru-panel" data-head="3">
-              {WEB_N} rules standing for {humanCount(FUND.constraints)}, with a line where two can conflict —
-              drawn sparse, because real mandates are. The count that matters is not the rules but the
-              {pairsAll.toLocaleString()} pairs: the difficulty is the interlock, not the total.
+              {WEB_N} rules standing for {humanCount(FUND.constraints)}; {DP_LEVELS} levels per name is a
+              deliberately crude discretisation, and the blowup is exponential in N regardless of it.
             </span>
           </figcaption>
         </figure>
@@ -326,10 +358,10 @@ const webPt = (i: number) => rulePoint(i, WEB_N, WEB_CX, WEB_CY, WEB_R);
                   <span class="ru-beat-head">Now choose. Every month. For all of it.</span>
                 </span>
                   <span class="ru-beat-body">
-                    <strong>{vars.toLocaleString()}</strong> numbers to pick across {FUND.periods} rebalances —
-                    and the rules are not a list, they are a web. Two thousand of them make
-                    <strong>{(pairsAll / 1e6).toFixed(1)} million</strong> pairs that can fight each other, so
-                    fixing one breach can open another.
+                    The rules are not a list but a web — <strong>{(pairsAll / 1e6).toFixed(1)}M</strong> pairs
+                    that can fight each other. And solving it exactly means a table of
+                    <strong>10<sup>{dpStateExp.toLocaleString()}</sup></strong> states, every month. You run out
+                    of universe at <strong>{dpUniverseAt}</strong> names.
                   </span>
               </button>
             </li>
@@ -611,11 +643,40 @@ const webPt = (i: number) => rulePoint(i, WEB_N, WEB_CX, WEB_CY, WEB_R);
   /* ── BEAT 4: the conflict web beside its tally. Two columns rather than a tally floating over a ghosted fan —
      the web IS the argument now, so it gets its own space instead of being a backdrop. */
   .ru-all { display: grid; align-items: center; }
+  /* The web on the left, the mathematics on the right. The web is the "many interlocking rules" half and the
+     equation is the "and you cannot solve it exactly" half — two different reasons the problem is hard, which
+     is why they sit side by side rather than one under the other. */
   .ru-webwrap {
-    display: grid; grid-template-columns: auto minmax(0, 1fr);
-    gap: 0 clamp(20px, 3vw, 56px); align-items: center;
+    display: grid; grid-template-columns: auto minmax(0, 1.25fr);
+    gap: 0 clamp(24px, 3.4vw, 64px); align-items: center;
   }
-  .ru-web { display: block; height: clamp(170px, 26vh, 300px); width: auto; }
+  .ru-web { display: block; height: clamp(150px, 23vh, 260px); width: auto; }
+
+  /* ── THE MATHEMATICS. Baked MathML, so the only styling needed is size and colour — the typesetting is
+     already correct, which is the whole reason for going through KaTeX rather than hand-setting spans. */
+  .ru-math { display: grid; gap: clamp(4px, 0.7vh, 9px); min-width: 0; }
+  .ru-math-lead, .ru-math-mid {
+    font-size: clamp(12.5px, 0.92vw, 14px); line-height: 1.5; color: var(--r-faint); margin: 0;
+  }
+  .ru-eq {
+    color: var(--r-ink);
+    /* MathML inherits font-size, and KaTeX's display mode already sizes the operators — so one declaration
+       controls the whole expression. Slightly larger than body copy: this is the subject, not an aside. */
+    font-size: clamp(13px, 1.05vw, 16.5px);
+    overflow-x: auto; overflow-y: hidden;
+  }
+  .ru-eq :global(math) { display: block; margin: 0 auto; }
+  .ru-math-punch {
+    font-size: clamp(13px, 0.98vw, 15px); line-height: 1.55; color: var(--r-soft); margin: 0;
+  }
+  .ru-math-punch strong {
+    font-family: var(--font-mono); font-weight: 400; color: var(--r-accent); font-variant-numeric: tabular-nums;
+  }
+  .ru-math-punch sup { font-size: 0.72em; }
+  .ru-math-foot {
+    font-size: clamp(12px, 0.9vw, 13.5px); line-height: 1.5; color: var(--r-faint); margin: 0;
+    padding-top: clamp(3px, 0.6vh, 7px); border-top: 1px solid var(--r-edge);
+  }
   /* The chords carry the meaning, so they are the only confident marks. Curved through the centre: straight
      chords read as a star burst, curves read as a tangle, and a tangle is the honest impression. */
   .ru-chord {
@@ -687,6 +748,13 @@ const webPt = (i: number) => rulePoint(i, WEB_N, WEB_CX, WEB_CY, WEB_R);
   @media (max-width: 1040px) {
     /* One column of rules again: at this width two columns of rule-plus-reason wrap to four lines each. */
     .ru-cats { grid-template-columns: minmax(0, 1fr); }
+    /* Measured: stacking the web above the maths made beat four need ~380px against a ~300px box — the two
+       halves' heights simply add. So on a narrow screen the WEB steps aside and the equation keeps the panel.
+       That is the right priority: the web restates "the rules interlock", which beat two already showed, while
+       the equation is the only place the exponential blowup is stated at all. The web's own figure survives in
+       the beat's copy and in the caption, so nothing measured is lost. */
+    .ru-webwrap { grid-template-columns: minmax(0, 1fr); gap: 0; }
+    .ru-web { display: none; }
     .ru-split { grid-template-columns: 1fr; gap: 3vh 0; }
     .ru-fig { padding-top: 3vh; border-top: 1px solid var(--r-edge); }
     .ru-paper { padding-top: clamp(14px, 2vh, 24px); padding-bottom: clamp(14px, 2vh, 24px); }
