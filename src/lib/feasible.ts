@@ -197,6 +197,31 @@ export const CONSTRAINTS: Constraint[] = [
   },
 ];
 
+/**
+ * THE SLAB constraint `n` removes — what was legal before it and is not legal after.
+ *
+ * This is the piece the slide was missing. Its copy says "every rule is a straight line through the space of
+ * legal portfolios; each one removes a slab", and the drawing showed only the survivor: the reader saw a shape
+ * get smaller without ever seeing the cut that did it, so the sentence was doing work the picture should do.
+ *
+ * Computed as the complement, by clipping the previous polygon with the constraint FLIPPED. Negating `a` and
+ * `b` turns `a·w <= b` into `a·w >= b`, and the intersection of the old region with that is exactly the part
+ * the rule deletes. Done this way the slab cannot disagree with the survivor — they are clipped from the same
+ * polygon by the same routine, so `area(slab) + area(survivor) === area(before)` holds by construction, and
+ * the test asserts it.
+ */
+export function removedBy(n: number): P2[] {
+  if (n < 1 || n > CONSTRAINTS.length) return [];
+  const before = feasibleAfter(n - 1);
+  const c = CONSTRAINTS[n - 1];
+  const flipped: Constraint = {
+    ...c,
+    a: [-c.a[0], -c.a[1], -c.a[2]],
+    b: -c.b,
+  };
+  return clip(before, flipped);
+}
+
 /** The polytope after applying the first `n` constraints to the simplex. */
 export function feasibleAfter(n: number): P2[] {
   let poly: P2[] = [...SIMPLEX];

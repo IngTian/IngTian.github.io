@@ -18,17 +18,30 @@
 //
 // Geometry in lib/feasible.ts (pure, 29 tests, including the barycentric derivation checked against the
 // original inequalities at 66 sample points).
-import { CONSTRAINTS, SIMPLEX, ASSETS, feasibleAfter, areaSeries, toWeights, centroid } from '../lib/feasible';
+import {
+  CONSTRAINTS, SIMPLEX, ASSETS, feasibleAfter, areaSeries, toWeights, centroid, removedBy, cutLine, area,
+} from '../lib/feasible';
 import { FUND } from '../data/desk';
 import { humanCount } from '../lib/problemSize';
 
 const series = areaSeries();
+const whole = area(SIMPLEX);
 // Every stage precomputed: the client animates between ready-made polygons rather than clipping at paint time.
+//
+// Each stage now also carries the SLAB IT REMOVES and the LINE THAT REMOVES IT. The slide's own copy says
+// "every rule is a straight line through the space of legal portfolios; each one removes a slab" — and the
+// drawing showed neither. A reader watched a shape get smaller without ever seeing the cut, so the sentence was
+// doing the work the picture should have been doing. lib/feasible already had cutLine() written and tested; it
+// had simply never been used.
 const stages = CONSTRAINTS.map((c, i) => ({
   label: c.label,
   why: c.why,
   poly: feasibleAfter(i + 1),
+  cut: removedBy(i + 1),
+  line: cutLine(c),
   remaining: series[i + 1],
+  // What THIS rule costs, as a share of the whole space — the number that says which rules actually bite.
+  removed: area(removedBy(i + 1)) / whole,
 }));
 const finalPoly = feasibleAfter(CONSTRAINTS.length);
 const finalWeights = toWeights(centroid(finalPoly));
@@ -57,15 +70,30 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
             a slab. They compound.
           </p>
 
-          <!-- The rules, revealed with the cuts. Each carries its remaining-area figure, which is the real
-               measured fraction rather than a label. -->
+          <!-- THE RULES, AND EACH ONE IS CLICKABLE. Same reasoning as the defining slide's beats: a sequence
+               that only advances on its own timer reads at the slide's pace, not the reader's, and here the
+               numbers invite comparison — "which rule cost the most?" is a question you can only answer by
+               going back to one. Clicking freezes; there is no resume timer, because a timer that restarts
+               takes the slide away mid-thought.
+               Two figures per rule now: what it COSTS (this rule's slab) and what is LEFT after it. The old
+               list had only the second, so "they compound" was visible but "some of them barely bite" was
+               not — rule 3 removes 3.5% of the space and rule 1 removes 30%, and that difference is the
+               interesting part of a mandate. -->
           <ol class="ru-list">
+            <li class="ru-head-row" aria-hidden="true">
+              <span></span><span></span>
+              <span class="ru-col">cuts</span>
+              <span class="ru-col">left</span>
+            </li>
             {stages.map((s, i) => (
-              <li class="ru-item" data-stage={i}>
-                <span class="ru-num">{i + 1}</span>
-                <span class="ru-label">{s.label}</span>
-                <span class="ru-pct">{(s.remaining * 100).toFixed(0)}%</span>
-                <span class="ru-why">{s.why}</span>
+              <li>
+                <button class="ru-item" type="button" data-stage={i} aria-pressed="false">
+                  <span class="ru-num">{i + 1}</span>
+                  <span class="ru-label">{s.label}</span>
+                  <span class="ru-cut">−{(s.removed * 100).toFixed(0)}%</span>
+                  <span class="ru-pct">{(s.remaining * 100).toFixed(0)}%</span>
+                  <span class="ru-why">{s.why}</span>
+                </button>
               </li>
             ))}
           </ol>
@@ -86,10 +114,34 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
             <!-- The unconstrained simplex, always visible as the ghost of what was possible. -->
             <polygon class="ru-simplex" points={pts(SIMPLEX)} />
 
-            <!-- Each stage's polygon, stacked. The script reveals them in order; with no JS the final one is
+            <!-- THE SLAB EACH RULE REMOVES, drawn as a hatched region with the cutting line along its edge.
+                 This is what makes the collapse legible as an ACT rather than as a shape that got smaller:
+                 you see the line arrive, the slab it takes, and what is left. Drawn before the survivor so
+                 the survivor sits on top. -->
+            {stages.map((s, i) => (
+              <g class="ru-cutgroup" data-cut={i}>
+                <polygon class="ru-slab" points={pts(s.cut)} />
+              </g>
+            ))}
+
+            <!-- Each stage's surviving polygon. The script reveals them in order; with no JS the final one is
                  shown, which is the finished state. -->
             {stages.map((s, i) => (
               <polygon class="ru-stage" data-poly={i} points={pts(s.poly)} />
+            ))}
+
+            <!-- THE CUTTING LINE LAST, on purpose. It lies exactly along the survivor's new edge, so drawn
+                 before it the survivor's 2px accent stroke painted straight over the dashes — measured, not a
+                 single pixel of the line survived. The line is the slide's central claim ("every rule is a
+                 straight line"), so it goes on top of everything. -->
+            {stages.map((s, i) => (
+              <g class="ru-cutgroup" data-cut={i}>
+                {s.line && (
+                  <line class="ru-cutline"
+                        x1={sx(s.line[0].x)} y1={sy(s.line[0].y)}
+                        x2={sx(s.line[1].x)} y2={sy(s.line[1].y)} />
+                )}
+              </g>
             ))}
 
             <!-- The corners, labelled with what they mean: an all-in-one-name portfolio. -->
@@ -170,15 +222,48 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
 
   /* The rules, as a numbered ledger: each dims until its cut has been made, so the list and the drawing are
      the same event seen twice. */
-  .ru-list { list-style: none; margin: clamp(16px, 2.2vh, 26px) 0 0; padding: 0; display: grid; gap: 9px; }
-  .ru-item {
-    display: grid; grid-template-columns: auto 1fr auto; gap: 2px clamp(10px, 1.2vw, 16px);
-    align-items: baseline; opacity: 0.42;
+  .ru-list { list-style: none; margin: clamp(14px, 2vh, 22px) 0 0; padding: 0; display: grid; gap: 4px; }
+  /* The two figure columns are labelled once, so neither needs a unit repeated on every row. */
+  .ru-head-row {
+    display: grid; grid-template-columns: 16px 1fr 5ch 5ch; gap: 0 clamp(10px, 1.2vw, 16px);
+    padding: 0 8px 2px 10px;
   }
+  .ru-col {
+    font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--r-faint); text-align: right;
+  }
+
+  /* EACH RULE IS A BUTTON, reset to read as a ledger row. Full width and left-aligned so the whole row is the
+     target rather than just the words — the same choice the defining slide's beats made. */
+  .ru-item {
+    display: grid; grid-template-columns: 16px 1fr 5ch 5ch; gap: 2px clamp(10px, 1.2vw, 16px);
+    align-items: baseline; opacity: 0.42;
+    width: 100%; text-align: left; margin: 0;
+    background: none; border: 0; border-radius: 3px; font: inherit; color: inherit;
+    padding: 4px 8px 5px 10px;
+    /* Reserved at all times, so switching rules never reflows the column. */
+    border-left: 2px solid transparent;
+    -webkit-appearance: none; appearance: none;
+  }
+  /* html.poly-js is set by the script before it starts stepping, so dimming and the pointer affordance only
+     happen where the sequence can actually run. Default = the finished state, which is also what a reader with
+     JavaScript off gets: every rule legible. */
+  :global(html.poly-js) .ru-item { cursor: pointer; }
+  :global(html.poly-js) .ru-item:not(.is-done) { opacity: 0.42; }
   .ru-item.is-done { opacity: 1; }
-  @media (prefers-reduced-motion: no-preference) { .ru-item { transition: opacity .5s ease; } }
+  /* The rule being drawn right now — the one the readout and the slab belong to. */
+  .ru-item.is-current { opacity: 1; border-left-color: var(--r-accent); }
+  @media (hover: hover) {
+    :global(html.poly-js) .ru-item:hover { opacity: 0.72; }
+    :global(html.poly-js) .ru-item.is-done:hover,
+    :global(html.poly-js) .ru-item.is-current:hover { opacity: 1; }
+  }
+  .ru-item:focus-visible { outline: 2px solid var(--r-accent); outline-offset: 2px; opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    .ru-item { transition: opacity .5s ease, border-color .4s ease; }
+  }
   /* No JS: every rule shown at full strength, matching the final polygon. */
-  :global(html.no-poly-js) .ru-item { opacity: 1; }
+  .ru-item { opacity: 1; }
 
   .ru-num {
     font-family: var(--font-mono); font-size: 9.5px; color: var(--r-accent);
@@ -186,8 +271,15 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
     width: 16px; height: 16px; display: grid; place-items: center;
   }
   .ru-label { font-size: 14px; line-height: 1.35; color: var(--r-ink); }
+  /* WHAT THIS RULE COSTS, and what is left after it. Two different jobs, so two different weights: the cost is
+     the new information (it is what makes some rules matter more than others) and reads in the accent; the
+     remainder is running context and reads quieter. */
+  .ru-cut {
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--r-accent);
+    font-variant-numeric: tabular-nums; text-align: right;
+  }
   .ru-pct {
-    font-family: var(--font-mono); font-size: 13px; color: var(--r-accent);
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--r-faint);
     font-variant-numeric: tabular-nums; text-align: right;
   }
   .ru-why { grid-column: 2 / -1; font-size: 11.5px; line-height: 1.45; color: var(--r-faint); max-width: 52ch; }
@@ -229,9 +321,38 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
   @media (prefers-reduced-motion: no-preference) {
     .ru-stage { transition: opacity .55s ease; }
   }
-  /* No JS / reduced motion: the last stage is the finished state. */
-  :global(html.no-poly-js) .ru-stage { opacity: 0; }
-  :global(html.no-poly-js) .ru-stage:last-of-type { opacity: 1; }
+  /* No JS / reduced motion: the last stage is the finished state. Default (no guard class) shows the last
+     polygon, so a reader with JavaScript off gets the finished picture rather than an empty triangle. */
+  .ru-stage { opacity: 0; }
+  .ru-stage:last-of-type { opacity: 1; }
+  :global(html.poly-js) .ru-stage:last-of-type { opacity: 0; }
+  :global(html.poly-js) .ru-stage.is-shown { opacity: 1; }
+
+  /* ── THE REMOVED SLAB. Hatched rather than filled: a second solid tone would compete with the survivor for
+     "this is the region that matters", and hatching reads as deleted in a way a flat wash does not. The
+     pattern is a repeating linear-gradient on a foreignObject-free SVG fill, so it needs a real <pattern> —
+     defined inline below via CSS on the polygon instead, using a dashed stroke plus a light wash, which keeps
+     it to two paint properties and no extra defs. ── */
+  .ru-cutgroup { opacity: 0; }
+  .ru-cutgroup.is-shown { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    .ru-cutgroup { transition: opacity .45s ease; }
+  }
+  .ru-slab {
+    fill: color-mix(in srgb, var(--r-ink) 13%, transparent);
+    stroke: none;
+  }
+  /* THE LINE THAT DOES THE CUTTING — the slide's central claim, finally drawn. Dashed so it reads as a boundary
+     being imposed rather than as an edge of the shape, and heavier than the polygon strokes because it is the
+     event. */
+  .ru-cutline {
+    /* Measured at 1.6px / 0.5 opacity: only 65 dark pixels survived along a ~500px line, because it runs
+       exactly along the survivor's own 2px accent edge and reads as a texture on that stroke rather than as a
+       line of its own. Heavier, fully opaque, and with a longer dash so the gaps are legible at this size —
+       this is the slide's central claim ("every rule is a straight line"), not an annotation. */
+    stroke: var(--r-ink); stroke-width: 2.6; vector-effect: non-scaling-stroke;
+    stroke-dasharray: 9 5; stroke-linecap: round; opacity: 0.9;
+  }
 
   .ru-vertex { fill: var(--r-faint); }
   .ru-vlabel {
@@ -254,69 +375,157 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
     margin: clamp(8px, 1.2vh, 14px) 0 0; max-width: 56ch;
   }
   .ru-cap strong { font-family: var(--font-mono); font-weight: 400; color: var(--r-soft); }
+  /* ── RESPONSIVE BLOCK, at the END of the stylesheet on purpose: every declaration here overrides a base rule
+     of the same specificity, so source order IS the mechanism. ── */
+
+  /* SHORT SCREENS. Nothing here is broken by width, only by height, so the query is on height. Measured at
+     1366x768 the slide ran 795px against a 768px screen; the list and the drawing each give up a little. */
+  @media (max-height: 860px) {
+    .ru-head { font-size: clamp(22px, 2vw, 30px); }
+    .ru-lede { font-size: 13px; line-height: 1.5; }
+    .ru-list { gap: 2px; }
+    .ru-item { padding-top: 2px; padding-bottom: 3px; }
+    .ru-label { font-size: 13px; }
+    .ru-why { font-size: 11px; line-height: 1.38; }
+    .ru-chart { max-width: min(500px, 100%); }
+    .ru-read { min-height: 2em; }
+    .ru-scale { font-size: 12.5px; line-height: 1.5; }
+  }
+
+  /* STACKED LAYOUT. Below 1040px the drawing sits UNDER the text rather than beside it, so the two heights are
+     additive — measured, the slide ran to 1465px against a 1050px screen at three separate widths, because
+     nothing capped the triangle once it had the full column width. It does not need to be tall when it is that
+     wide, and the prose closes up to pay for the rest. */
+  @media (max-width: 1040px) {
+    /* The triangle's aspect is FIXED (an equilateral simplex, so drawn areas are real areas), so its height is
+       0.866 x its width and the only way to shorten it is to narrow it. max-height does nothing here — measured,
+       at a 400px width cap the chart drew 359px tall and a 420px max-height never bound. Sized from the
+       viewport height instead, so the drawing shrinks on exactly the screens that cannot afford it:
+       say 492 + fig 507 + chrome = 1156 against 1050 before this. */
+    .ru-chart { max-width: min(30vh, 78%); }
+    .ru-fig { padding-top: 2.4vh; }
+    .ru-head { font-size: clamp(22px, 3.4vw, 30px); }
+    .ru-lede { font-size: 13px; line-height: 1.55; }
+    .ru-list { gap: 1px; }
+    .ru-item { padding-top: 2px; padding-bottom: 2px; }
+    .ru-why { font-size: 10.5px; line-height: 1.36; }
+    .ru-scale { font-size: 12.5px; line-height: 1.5; padding-top: 8px; }
+    .ru-cap { font-size: 10px; line-height: 1.42; }
+    .ru-read { min-height: 0; margin-top: 8px; }
+    /* The last 30px, taken from the paper's own padding and the gap between the two halves rather than from the
+       type — everything above is already at the smallest size that reads. Measured after: fits exactly. */
+    .ru-paper { padding-top: clamp(14px, 2vh, 24px); padding-bottom: clamp(14px, 2vh, 24px); }
+    .ru-split { gap: 2vh 0; }
+    .ru-list { margin-top: 10px; }
+    .ru-scale { margin-top: 10px; }
+  }
 </style>
 
 <script>
-  // THE COLLAPSE, one rule at a time. It cycles so a reader arriving mid-loop still sees the whole argument,
-  // and it holds on the final state longest — that is the state the caption describes.
+  // THE COLLAPSE, one rule at a time, and the reader can drive it.
   //
-  // Progressive enhancement in the safe direction: html.no-poly-js (added here, cleared once this runs) makes
-  // the CSS show the FINAL polygon and every rule at full strength, so a JS failure leaves the finished
-  // picture rather than an empty triangle.
-  document.documentElement.classList.add('no-poly-js');
+  // PROGRESSIVE ENHANCEMENT in the only safe direction: the CSS default is the FINISHED state (every rule
+  // legible, the final polygon shown), and html.poly-js — added only once the sequence is about to run — is
+  // what switches on the dimming and the stepping. The earlier inverse guard (no-poly-js, added here and
+  // removed on success) covered a script that RAN AND FAILED but not JavaScript being off entirely, where the
+  // class never appeared at all.
+  document.documentElement.classList.add('poly-js');
 
   function initPoly(): (() => void) | null {
     const section = document.querySelector<HTMLElement>('#rules');
     if (!section) return null;
     const polys = Array.from(section.querySelectorAll<SVGPolygonElement>('[data-poly]'));
-    const items = Array.from(section.querySelectorAll<HTMLElement>('[data-stage]'));
+    const cuts = Array.from(section.querySelectorAll<SVGGElement>('[data-cut]'));
+    const items = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-stage]'));
     const label = section.querySelector<HTMLElement>('[data-read-label]');
     const body = section.querySelector<HTMLElement>('[data-read-body]');
-    if (!polys.length || !items.length || !label || !body) return null;
-    document.documentElement.classList.remove('no-poly-js');
+    // TWO groups carry each stage index now — the slab (under the survivor) and the cutting line (over it) —
+    // so the count is 2x the polygon count rather than equal to it. Asserting equality here is what would have
+    // silently disabled the whole slide when the line moved on top.
+    if (!polys.length || !items.length || !label || !body || cuts.length !== polys.length * 2) {
+      // Nothing to step — hand the slide back to its CSS default rather than leaving it dimmed.
+      document.documentElement.classList.remove('poly-js');
+      return null;
+    }
 
     // Read the copy off the DOM the page already rendered, so the readout cannot drift from the list.
     const stages = items.map((li) => ({
       label: li.querySelector('.ru-label')?.textContent?.trim() ?? '',
+      cut: li.querySelector('.ru-cut')?.textContent?.trim() ?? '',
       pct: li.querySelector('.ru-pct')?.textContent?.trim() ?? '',
       why: li.querySelector('.ru-why')?.textContent?.trim() ?? '',
     }));
 
-    const showAll = () => {
-      polys.forEach((p, i) => p.classList.toggle('is-shown', i === polys.length - 1));
-      items.forEach((li) => li.classList.add('is-done'));
-      label.textContent = stages[stages.length - 1].pct + ' left';
-      body.textContent = 'after all five rules';
-    };
-
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      showAll();
-      return null;
-    }
-
     // -1 is the unconstrained state, then one step per rule.
     let step = -1;
     let timer = 0;
+    // FROZEN ONCE CLICKED, and it stays frozen — same rule as the defining slide. The numbers on this slide
+    // invite comparison ("which rule cost the most?"), and that is a question you answer by going back to a
+    // row and staying there.
+    let frozen = false;
+
+    const stop = () => { window.clearTimeout(timer); timer = 0; };
 
     const render = () => {
+      // The SURVIVOR after this step, the SLAB this step removed, and the row that owns both.
       polys.forEach((p, i) => p.classList.toggle('is-shown', i === step));
-      items.forEach((li, i) => li.classList.toggle('is-done', i <= step));
+      // Match on the data-cut VALUE: with two groups per stage, list position is no longer the stage index.
+      cuts.forEach((g) => g.classList.toggle('is-shown', Number(g.dataset.cut) === step));
+      items.forEach((li, i) => {
+        li.classList.toggle('is-done', i <= step);
+        li.classList.toggle('is-current', i === step);
+        li.setAttribute('aria-pressed', String(i === step));
+      });
       if (step < 0) {
         label.textContent = 'Unconstrained';
         body.textContent = 'every split of the money is available';
       } else {
-        const s = stages[step];
-        label.textContent = `${s.pct} left`;
-        body.textContent = s.label.toLowerCase() + ' — ' + s.why.replace(/\.$/, '');
+        const st = stages[step];
+        label.textContent = `${st.cut} → ${st.pct} left`;
+        body.textContent = st.label.toLowerCase() + ' — ' + st.why.replace(/\.$/, '');
       }
     };
+
+    const freeze = (i: number) => {
+      frozen = true;
+      stop();
+      section.dataset.frozen = 'true';
+      step = i;
+      render();
+    };
+
+    const pick = (e: Event) => {
+      const i = items.indexOf(e.currentTarget as HTMLButtonElement);
+      if (i >= 0) freeze(i);
+    };
+    for (const b of items) b.addEventListener('click', pick);
+
+    // Arrow keys walk the rules, so a keyboard reader need not tab through five buttons to reach the last cut.
+    const onKey = (e: KeyboardEvent) => {
+      const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1
+        : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+      if (!dir) return;
+      e.preventDefault();
+      freeze((step + dir + items.length + (step < 0 ? 1 : 0)) % items.length);
+      items[step].focus();
+    };
+    for (const b of items) b.addEventListener('keydown', onKey);
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      // Finished state: every rule legible, the final polygon shown, no stepping. The buttons still work, so a
+      // reduced-motion reader gets the same control without anything moving on its own.
+      step = stages.length - 1;
+      render();
+      return () => {
+        for (const b of items) { b.removeEventListener('click', pick); b.removeEventListener('keydown', onKey); }
+      };
+    }
 
     const advance = () => {
       step = step >= stages.length - 1 ? -1 : step + 1;
       render();
       // Hold longest on the final state: it is the one the caption and the argument rest on.
       const dwell = step === stages.length - 1 ? 3400 : step < 0 ? 1500 : 1700;
-      window.clearTimeout(timer);
       timer = window.setTimeout(advance, dwell);
     };
 
@@ -324,12 +533,17 @@ const pts = (poly: { x: number; y: number }[]) => poly.map((p) => `${sx(p.x).toF
 
     const io = new IntersectionObserver((entries) => {
       const visible = entries.some((e) => e.isIntersecting);
+      if (frozen) return;                        // a reader's choice outranks the observer
       if (visible && !timer) timer = window.setTimeout(advance, 1200);
-      else if (!visible && timer) { window.clearTimeout(timer); timer = 0; }
+      else if (!visible) stop();
     }, { threshold: 0.3 });
     io.observe(section);
 
-    return () => { window.clearTimeout(timer); io.disconnect(); };
+    return () => {
+      stop();
+      io.disconnect();
+      for (const b of items) { b.removeEventListener('click', pick); b.removeEventListener('keydown', onKey); }
+    };
   }
 
   let teardown: (() => void) | null = null;

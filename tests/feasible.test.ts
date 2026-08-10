@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   SIMPLEX, CONSTRAINTS, toPlane, toWeights, toHalfPlane, slack, clip, area, centroid,
-  feasibleAfter, areaSeries, satisfies, cutLine, type P2,
+  feasibleAfter, areaSeries, satisfies, cutLine, removedBy, type P2,
 } from '../src/lib/feasible';
 
 describe('the simplex and its coordinates', () => {
@@ -220,5 +220,77 @@ describe('cutLine', () => {
 
   it('returns null for a constraint that misses the triangle', () => {
     expect(cutLine({ label: 'far', why: '', a: [1, 1, 1], b: 50 })).toBeNull();
+  });
+});
+
+// ── THE REMOVED SLAB ──────────────────────────────────────────────────────────────────────────────────
+// The slide's copy says every rule "removes a slab", and until now the drawing showed only the survivor: a
+// reader watched a shape shrink without ever seeing the cut. These tests pin the piece that fixed that, and the
+// property that makes it trustworthy — the slab and the survivor are clipped from the SAME polygon, so their
+// areas must reconstruct the region they came from exactly.
+describe('removedBy', () => {
+  it('partitions the previous region exactly: survivor + slab = before', () => {
+    for (let n = 1; n <= CONSTRAINTS.length; n++) {
+      const before = area(feasibleAfter(n - 1));
+      const after = area(feasibleAfter(n));
+      const slab = area(removedBy(n));
+      expect(after + slab, `constraint ${n}`).toBeCloseTo(before, 12);
+    }
+  });
+
+  it('removes a positive area for every rule — a rule that cuts nothing is decoration', () => {
+    for (let n = 1; n <= CONSTRAINTS.length; n++) {
+      expect(area(removedBy(n)), `constraint ${n}`).toBeGreaterThan(0);
+    }
+  });
+
+  it('gives every slab at least three vertices, so it is drawable', () => {
+    for (let n = 1; n <= CONSTRAINTS.length; n++) {
+      expect(removedBy(n).length, `constraint ${n}`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  // Every point of the slab must VIOLATE the rule that removed it — that is what makes it the removed region
+  // rather than just some polygon of the right size.
+  it('contains only points the rule forbids', () => {
+    for (let n = 1; n <= CONSTRAINTS.length; n++) {
+      const c = CONSTRAINTS[n - 1];
+      const p = centroid(removedBy(n));
+      expect(slack(p, c), `constraint ${n} centroid`).toBeGreaterThan(0);
+    }
+  });
+
+  // And the survivor's interior must satisfy it, so the two regions really are on opposite sides.
+  it('sits on the opposite side of the cut from the survivor', () => {
+    for (let n = 1; n <= CONSTRAINTS.length; n++) {
+      const c = CONSTRAINTS[n - 1];
+      expect(slack(centroid(feasibleAfter(n)), c), `constraint ${n}`).toBeLessThanOrEqual(1e-12);
+    }
+  });
+
+  it('degrades safely outside the constraint range', () => {
+    expect(removedBy(0)).toEqual([]);
+    expect(removedBy(CONSTRAINTS.length + 1)).toEqual([]);
+  });
+});
+
+describe('cutLine, now that the slide actually draws it', () => {
+  it('crosses the simplex for every constraint', () => {
+    for (const c of CONSTRAINTS) expect(cutLine(c), c.label).not.toBeNull();
+  });
+
+  it('returns two distinct endpoints', () => {
+    for (const c of CONSTRAINTS) {
+      const L = cutLine(c)!;
+      expect(Math.hypot(L[0].x - L[1].x, L[0].y - L[1].y), c.label).toBeGreaterThan(0.01);
+    }
+  });
+
+  // The line must lie ON the constraint boundary, or it is drawn somewhere the rule does not actually cut.
+  it('has both endpoints on the constraint boundary', () => {
+    for (const c of CONSTRAINTS) {
+      const L = cutLine(c)!;
+      for (const p of L) expect(Math.abs(slack(p, c)), c.label).toBeLessThan(1e-9);
+    }
   });
 });

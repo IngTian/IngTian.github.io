@@ -195,15 +195,31 @@ const items: Item[] = [
   .cnav .ic { flex: none; display: block; }
 
   /* ── PAGES vs MARKS. The pages are the navigation and read as words; the contact marks are recognisable
-     glyphs and drop their labels above mobile so the capsule stays a capsule. Measured at 1700px: eight text
-     items ran 604px wide (36% of the viewport) and collided with the hero bio; icon-only marks bring it to
-     within a quarter. ── */
+     glyphs, so by default they carry only their icon and the capsule stays a capsule. The label is still in
+     the DOM (visually hidden, not display:none) so screen readers and the accessible name are unaffected. ── */
   .cnav .page .page-label { display: inline-block; }
   .cnav .mark .label {
     position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
   .cnav .mark .content { gap: 0; }
   .cnav .mark { padding: 9px 11px; }
+
+  /* ── VERY WIDE SCREENS GET THE WORDS TOO. The owner: "can you adaptively show the texts for
+     github/email/resume/linkedin as well? i have a large monitor."
+     The threshold is measured, not guessed. With all nine items labelled the capsule is 883px, which is:
+       46% of 1920   ·   40% of 2200   ·   34.5% of 2560   ·   23% of 3840
+     At 1920 it has stopped being a corner affordance and reads as a header bar, so the labels appear from
+     2200px up — where the capsule is at most two fifths of the screen and there is still more empty space to
+     its left than capsule. Below that the icons carry the meaning, and every mark is also in the footer.
+     `unset` rather than re-declaring each property: the hidden state is a clip-path trick with four
+     interacting declarations, and undoing them one by one is how one gets left behind. */
+  @media (min-width: 2200px) {
+    .cnav .mark .label {
+      position: unset; width: unset; height: unset; overflow: unset; clip-path: unset;
+    }
+    .cnav .mark .content { gap: 7px; }
+    .cnav .mark { padding: 9px 14px; }
+  }
 
   /* THE PAGE YOU ARE ON, marked without colour alone: a hairline under the label, in the accent. Colour alone
      would fail for a reader who cannot see it, and the bloom pill is already spoken for by hover. */
