@@ -27,22 +27,19 @@ for (const phrase of bio.strong) {
     </h1>
     <p class="font-display italic text-ink-3 mt-5 text-[clamp(15px,2.2vw,21px)]">{roles}</p>
     <p class="font-mono uppercase tracking-[0.22em] text-ink-3/90 mt-2.5 text-[11px]">{phd} &nbsp;·&nbsp; {rolesSub}</p>
-  </div>
 
-  <!-- THE TWO DOORWAYS, moved here from the tagline slide. The owner: "why not move 'A researcher by day, an
-       artist by night' tagline to the hero? The lower right corner. Seems crowded now and as the tagline gets
-       smaller I bet people don't know to click on it."
-       Both halves of that are right. The field slide had grown to four stacked lines, and demoting this one to
-       fit made two real LINKS look like decoration. The hero's lower right is the one empty quadrant of its
-       composition (name bottom-left, bio top-right), so the doorways get room of their own — and at this size
-       they read as things you can click. -->
-  <nav class="hero-doors absolute bottom-[16vh] right-[7vw] text-right" aria-label="Research and art">
-    <p class="hero-doors-line font-display italic text-ink-2 leading-[1.5] text-[clamp(14px,1.5vw,19px)]">
-      <a class="research-link" href="/research">A researcher by day</a>,<br />
-      <a class="art-link" href="/art">an artist by night</a>,<br />
+    <!-- THE TAGLINE, directly under the role line. The owner: "maybe put A researcher by day tag line
+         underneath the Quant Researcher · Portfolio Optimization."
+         It now reads as the third beat of one introduction — who I am, what I work on, how I spend the day —
+         instead of a line floating in the opposite corner. It is still two real LINKS, but they are no longer
+         load-bearing navigation: the corner nav carries the page set at all times, so per the owner "the click
+         stays an easter egg". That is what the marker-wash and underline affordances below are for — a reward
+         for the curious rather than the only door in. -->
+    <p class="hero-doors-line font-display italic text-ink-3 leading-[1.5] mt-4 text-[clamp(13.5px,1.35vw,17px)]">
+      <a class="research-link" href="/research">A researcher by day</a>, <a class="art-link" href="/art">an artist by night</a>,<br />
       and a mathematician at heart.
     </p>
-  </nav>
+  </div>
 
   <div class="scroll-cue absolute bottom-8 left-1/2 -translate-x-1/2 font-mono text-ink-4 text-[11px] tracking-[0.2em]">scroll</div>
 </section>

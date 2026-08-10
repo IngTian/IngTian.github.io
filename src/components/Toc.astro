@@ -127,7 +127,17 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
   :global(html[data-theme='dark']) .toc.over-paper a { color: #b9c0b9; }
   :global(html[data-theme='dark']) .toc.over-paper a.is-active { color: #eef2ee; }
 
-  /* Mobile: dots only, no labels, tighter — a minimal progress cue */
+  /* THE LABELS NEED A MARGIN TO LIVE IN. The slide papers reserve a wide left gutter for this rail only in
+     their two-column layout (min-width: 1101px); below that they reclaim it and pad to just 28-80px, so the
+     labelled rail lands ON the body text. Measured at 900px: "ABOUT / CHOICE / RULES" printed across the
+     defining slide's beats. Dots carry the same progress information in a width that always fits. */
+  @media (max-width: 1100px) {
+    .toc .rule, .toc .label { display: none; }
+    .toc .dot { display: block; }
+    .toc a.is-active .dot { opacity: 1; transform: scale(1.5); }
+  }
+
+  /* Mobile: tighter still */
   @media (max-width: 640px) {
     .toc { left: 12px; }
     .toc ul { gap: 16px; }

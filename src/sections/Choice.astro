@@ -28,9 +28,14 @@
 import { TICKER_GLYPHS, type TickerGlyphKey } from '../data/tickerGlyphs';
 import { BEATS, HOLDINGS, SPLITS, EVENT, DEFINE_DISCLAIMER, POLICIES, BEAT4 } from '../data/define';
 import { afterEvent, changePct, segments } from '../lib/split';
-import { runPolicy, pnlBounds, project as projectPnl, MONTHS as PNL_MONTHS } from '../lib/policyPnl';
+import {
+  runPolicy, pnlBounds, project as projectPnl, MONTHS as PNL_MONTHS, QUARTER_MARKS, MAINTENANCE,
+} from '../lib/policyPnl';
 
 // BEAT 4 — the PnL curves. Computed at build time, so the client ships coordinates rather than a simulator.
+// FIFTY-TWO WEEKS, on the owner's ask for more periods and more granularity. The resolution is what makes the
+// levered player honest: exposure drifts between rebalances, financing accrues weekly, and the thinnest margin
+// moment lands on a specific week. None of that exists at twelve points.
 const runs = POLICIES.map((p) => runPolicy(p));
 const pBounds = pnlBounds(runs);
 const PW = 560, PH = 260;
@@ -39,8 +44,29 @@ const pnlPath = (r: typeof runs[number]) =>
   r.path.map((pt) => projectPnl(pt, PNL_MONTHS, pBounds, pBox).map((n) => n.toFixed(1)).join(',')).join(' ');
 // The break-even line: every curve's meaning is relative to "you got your money back".
 const yStart = projectPnl({ month: 0, value: 100 }, PNL_MONTHS, pBounds, pBox)[1];
-const best = runs.reduce((b, r) => (r.final > b.final ? r : b));
-const worst = runs.reduce((b, r) => (r.final < b.final ? r : b));
+
+// Quarter gridlines, so 52 points read as a YEAR rather than as an unlabelled sequence.
+const quarters = QUARTER_MARKS.filter((q) => q.week > 0).map((q) => ({
+  ...q,
+  x: projectPnl({ month: q.week, value: 100 }, PNL_MONTHS, pBounds, pBox)[0],
+}));
+
+// THE VERDICT IS COMPUTED, never typed — the numbers move whenever the year or a rule is edited, and prose that
+// disagreed with the chart beside it would be worse than no prose. Return per unit of worst fall is the ranking
+// that matters here, and it is deliberately NOT the same as the highest curve.
+const topReturn = runs.reduce((b, r) => (r.final > b.final ? r : b));
+const bestRatio = runs.reduce((b, r) => (r.returnPerRisk > b.returnPerRisk ? r : b));
+const deepest = runs.reduce((b, r) => (r.worstFall < b.worstFall ? r : b));
+const levered = runs.find((r) => r.key === 'levered');
+// Grouped by who actually holds these books, because that division is the point of the beat.
+const retail = runs.filter((r) => r.kind === 'retail');
+const institutional = runs.filter((r) => r.kind === 'institutional');
+const groups = [
+  { label: 'Retail', rows: retail },
+  { label: 'Institutional', rows: institutional },
+];
+// Row index in `runs` order, so a legend row's line style matches its curve.
+const styleOf = (key: string) => runs.findIndex((r) => r.key === key);
 
 const opening = HOLDINGS.map((h) => h.weight);
 const openingSegs = segments(opening);
@@ -65,6 +91,10 @@ const MONTHS = [
 ].map((m) => ({ ...m, segs: segments(m.weights) }));
 
 const CELL = 3;
+
+// One list, so the markup can't drift from the panel count — the script asserts beats.length === panels.length
+// and silently disables itself if they differ, which is a failure mode worth making structurally impossible.
+const allBeats = [...BEATS, BEAT4];
 ---
 <section id="choice" class="ch" aria-labelledby="ch-heading">
   <div class="ch-paper">
@@ -76,21 +106,24 @@ const CELL = 3;
            gets the larger share. Stacking them left the right half of the slide empty and pushed the money bar
            below the fold of attention. -->
       <div class="ch-body">
-      <!-- THE THREE BEATS. Each is a question a stranger would actually ask, answered against the same
-           object. The reveal is sequential so the definition builds; with no JS all three show at once,
-           which is the finished state and still reads in order. -->
+      <!-- THE FOUR BEATS. Each is a question a stranger would actually ask, answered against the same object.
+           The reveal is sequential so the definition builds; with no JS all four show at once, which is the
+           finished state and still reads in order.
+           EACH ONE IS A REAL BUTTON. The owner: "i should be able to click on the 4 phases and read. it can be
+           automatic by default but once i clicked it should freeze there... i need time to read." A carousel
+           that only advances on its own timer is a slide that reads at ITS pace, not the reader's — and four
+           beats at 4.6s each means the one you want is up to 18s away. Buttons rather than a click handler on a
+           <li>, so the beats are keyboard-operable and announced; aria-pressed carries which one is showing.
+           A <button> may only contain phrasing content, hence spans styled as blocks rather than <p>. -->
       <ol class="ch-beats">
-        {BEATS.map((b, i) => (
-          <li class="ch-beat" data-beat={i}>
-            <p class="ch-ask">{b.ask}</p>
-            <p class="ch-say">{b.say}</p>
+        {allBeats.map((b, i) => (
+          <li>
+            <button class="ch-beat" type="button" data-beat={i} aria-pressed={i === 0 ? 'true' : 'false'}>
+              <span class="ch-ask">{b.ask}</span>
+              <span class="ch-say">{b.say}</span>
+            </button>
           </li>
         ))}
-        <!-- Beat 4 closes the definition: the sequence has consequences, in return AND in risk. -->
-        <li class="ch-beat" data-beat="3">
-          <p class="ch-ask">{BEAT4.ask}</p>
-          <p class="ch-say">{BEAT4.say}</p>
-        </li>
       </ol>
 
       <div class="ch-stage">
@@ -181,51 +214,73 @@ const CELL = 3;
           </p>
         </figure>
 
-        <!-- BEAT 4: four sequences of decisions through the same year, as PnL curves. The point is that they
-             differ in BOTH outcomes — the highest curve is also the shallowest fall here, but the panicker
-             shows the honest complication: it reduces the fall and costs return. -->
+        <!-- BEAT 4: five ways of running the SAME four holdings through the same year, as weekly PnL curves.
+             Grouped retail vs institutional because that is the real division — retail books are shaped by
+             attention and by leverage sold to beginners, institutional ones by mandates and risk limits.
+             The argument the panel has to make is that return and risk are TWO outcomes, not one: the levered
+             account takes twice the exposure and still ends below a quarterly rebalancer, because financing on
+             the borrowed half is a real cost and the deepest fall is a real price. -->
         <figure class="ch-panel" data-panel="3">
           <p class="ch-panel-head">{BEAT4.head}</p>
 
           <svg class="ch-pnl" viewBox={`0 0 ${PW} ${PH}`} preserveAspectRatio="none" role="img"
-               aria-label={runs.map((r) => `${r.label} ends at ${r.final.toFixed(0)} dollars with a worst fall of ${r.worstFall.toFixed(0)} percent`).join('; ')}>
+               aria-label={runs.map((r) => `${r.label}: ends at ${r.final.toFixed(0)} dollars, worst fall ${r.worstFall.toFixed(0)} percent, average exposure ${r.avgExposure.toFixed(0)} percent`).join('; ')}>
+            {/* Quarter marks first, so they sit under the curves. */}
+            {quarters.map((q) => (
+              <line class="ch-pnl-grid" x1={q.x} y1="0" x2={q.x} y2={PH} />
+            ))}
             <line class="ch-pnl-base" x1="0" y1={yStart} x2={PW} y2={yStart} />
             {runs.map((r, i) => (
               <polyline class:list={['ch-pnl-line', `ch-line--${i}`]} points={pnlPath(r)} />
             ))}
           </svg>
-
-          <!-- Two numbers per policy, because the beat's claim is that BOTH differ. The per-policy gloss is
-               dropped: with four rows it pushed the panel to 1050px against a 357px stage and the whole thing
-               escaped its container. The label plus the two figures carries the point; the prose below says
-               what they mean. -->
-          <ul class="ch-pnl-legend">
-            <li class="ch-pnl-head-row" aria-hidden="true">
-              <span></span><span></span>
-              <span class="ch-pnl-col">ends</span>
-              <span class="ch-pnl-col">worst fall</span>
-            </li>
-            {runs.map((r, i) => (
-              <li>
-                {/* The key draws the actual line — same class, same dash pattern — so a reader matches the
-                    sample to the curve rather than to a colour they may not be able to tell apart. */}
-                <svg class="ch-key" viewBox="0 0 26 6" width="26" height="6" aria-hidden="true">
-                  <line class:list={['ch-pnl-line', `ch-line--${i}`]} x1="0" y1="3" x2="26" y2="3" />
-                </svg>
-                <span class="ch-pnl-name">{r.label}</span>
-                <span class="ch-pnl-end">${r.final.toFixed(0)}</span>
-                <span class="ch-pnl-fall">{r.worstFall.toFixed(0)}%</span>
-              </li>
+          <ul class="ch-pnl-axis" aria-hidden="true">
+            {QUARTER_MARKS.map((q) => (
+              <li style={`left:${(q.week / PNL_MONTHS) * 100}%`}>{q.label}</li>
             ))}
           </ul>
 
+          <!-- TWO COLUMNS, one per kind of holder. Measured: as a single stacked list with group headers the
+               legend was 204px and the panel needed 545px against a 441px stage — it clipped the footer at every
+               viewport width, including 1700. Side by side it costs ~110px instead, and it says the thing the
+               beat is about (these are two different KINDS of book) with position rather than with a label.
+               Three numbers per player: where it ended, what it fell, and how much exposure it carried to get
+               there. Exposure is the column that makes the levered row explicable rather than magic. -->
+          <div class="ch-pnl-groups">
+            {groups.map((g) => (
+              <ul class="ch-pnl-legend">
+                <li class="ch-pnl-group"><span class="ch-pnl-group-label">{g.label}</span></li>
+                <li class="ch-pnl-head-row" aria-hidden="true">
+                  <span></span><span></span>
+                  <span class="ch-pnl-col">ends</span>
+                  <span class="ch-pnl-col">fall</span>
+                  <span class="ch-pnl-col">expo</span>
+                </li>
+                {g.rows.map((r) => (
+                  <li>
+                    {/* The key draws the actual line — same class, same dash pattern — so a reader matches the
+                        sample to the curve rather than to a colour they may not be able to tell apart. */}
+                    <svg class="ch-key" viewBox="0 0 26 6" width="26" height="6" aria-hidden="true">
+                      <line class:list={['ch-pnl-line', `ch-line--${styleOf(r.key)}`]} x1="0" y1="3" x2="26" y2="3" />
+                    </svg>
+                    <span class="ch-pnl-name">{r.label}</span>
+                    <span class="ch-pnl-end">${r.final.toFixed(0)}</span>
+                    <span class="ch-pnl-fall">{r.worstFall.toFixed(0)}%</span>
+                    <span class="ch-pnl-exp">{r.avgExposure.toFixed(0)}%</span>
+                  </li>
+                ))}
+              </ul>
+            ))}
+          </div>
+
           <p class="ch-panel-foot">
-            <strong>{best.label}</strong> ends at <strong>${best.final.toFixed(0)}</strong> having fallen only
-            <strong>{best.worstFall.toFixed(0)}%</strong>; <strong>{worst.label}</strong> ends at
-            <strong>${worst.final.toFixed(0)}</strong> and fell <strong>{worst.worstFall.toFixed(0)}%</strong> on
-            the way. Two answers, not one — how much you made, and what it cost you to sit through. <em>That</em>
-            is what there is to optimise.
-          </p>
+            The tallest line is the <strong>2x account</strong> — and it is not the answer: it paid
+            <strong>${levered?.financingPaid.toFixed(0)}</strong> to borrow and fell
+            <strong>{levered?.worstFall.toFixed(0)}%</strong>, while
+            <strong>{bestRatio.label.toLowerCase()}</strong> reached
+            <strong>${bestRatio.final.toFixed(0)}</strong> on a
+            <strong>{bestRatio.worstFall.toFixed(0)}%</strong> fall. Two answers, not one — <em>that</em> is
+            what there is to optimise.          </p>
         </figure>
       </div><!-- /.ch-stage -->
       </div><!-- /.ch-body -->
@@ -247,7 +302,10 @@ const CELL = 3;
        things owned, and reusing the holding ramp made two policies share a hue (in dark, h0 and h1 are both
        emerald, so the winner and the chaser drew as one line). Only the subject carries the accent; the other
        three are ink tones separated by lightness. */
-    --c-p0: #4a5464; --c-p1: #3a3428; --c-p2: #6e6555; --c-p3: var(--c-accent);
+    /* p2 is the LEVERED book and must not be the accent — it was literally #7c5522, the same value
+       --c-accent resolves to in light, so two of the five curves drew in one colour. A desaturated plum is a
+       distinct hue that still holds the palette's rule (the seal stays the only saturated colour). */
+    --c-p0: #4a5464; --c-p1: #3a3428; --c-p2: #5d4a5e; --c-p3: #6e6555; --c-p4: var(--c-accent);
     background: var(--c-bg);
     border-top: 1px solid var(--c-edge); border-bottom: 1px solid var(--c-edge);
     padding: clamp(28px, 3.6vh, 56px) 0;
@@ -257,12 +315,12 @@ const CELL = 3;
     --c-soft: #a8b0a9; --c-faint: #6d746e; --c-accent: #7fc9a0;
     --c-h0: #7fc9a0; --c-h1: #5f9b7c; --c-h2: #6b7686; --c-h3: #a9b4a5;
     /* Dark: three cool greys stepped in lightness, plus the phosphor accent for the subject. */
-    --c-p0: #7d8798; --c-p1: #d3d8d2; --c-p2: #5f6763; --c-p3: var(--c-accent);
+    --c-p0: #7d8798; --c-p1: #d3d8d2; --c-p2: #a98cb0; --c-p3: #5f6763; --c-p4: var(--c-accent);
   }
   .ch-inner {
     padding-left: clamp(150px, 9.5vw, 190px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
   }
-  @media (max-width: 1099px) { .ch-inner { padding-left: clamp(28px, 6vw, 80px); } }
+  @media (max-width: 1100px) { .ch-inner { padding-left: clamp(28px, 6vw, 80px); } }
 
   .ch-kicker {
     font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
@@ -279,24 +337,47 @@ const CELL = 3;
 
   /* The beats sit left, the object right — but the beats are a LIST, not a column of prose: each is dim until
      its turn, so the definition reads as three steps rather than a wall. */
-  .ch-beats { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(12px, 1.8vh, 20px); }
+  .ch-beats { list-style: none; margin: 0 0 0 -12px; padding: 0; display: grid; gap: clamp(6px, 1vh, 12px); }
   /* DEFAULT = the finished state, and the script dims from there. An inverse guard class alone was not
      enough: html.no-define-js is added BY the script, so with JavaScript switched off entirely it never
      appears and every beat stayed at 0.3 while all four panels sat at opacity 0 — measured, the slide
      rendered blank. Defaulting to legible means the worst case is "all four beats visible at once", which
      is the reduced-motion state and reads fine. */
-  .ch-beat { opacity: 1; max-width: 46ch; }
-  /* html.define-js is set by the script before it starts sequencing, so dimming only happens where the
-     sequence can actually run. */
-  :global(html.define-js) .ch-beat { opacity: 0.3; }
-  :global(html.define-js) .ch-beat.is-on { opacity: 1; }
-  @media (prefers-reduced-motion: no-preference) { .ch-beat { transition: opacity .5s ease; } }
+  /* Each beat is a BUTTON, reset to read as text. Full width of its column and left-aligned so the click
+     target is the whole paragraph, not just the words — a 46ch line whose hit area is only the glyphs is a
+     target you have to aim at. */
+  .ch-beat {
+    opacity: 1; max-width: 46ch; width: 100%;
+    display: block; text-align: left; margin: 0;
+    background: none; border: 0; border-radius: 3px;
+    font: inherit; color: inherit;
+    padding: 6px 10px 6px 12px;
+    /* The left rule is the "you are here" mark, drawn on the currently-shown beat. Its width is reserved at
+       all times so switching beats never reflows the column. */
+    border-left: 2px solid transparent;
+    -webkit-appearance: none; appearance: none;
+  }
+  /* html.define-js is set by the script before it starts sequencing, so dimming — and the pointer affordance —
+     only happen where the sequence can actually run. */
+  :global(html.define-js) .ch-beat { opacity: 0.3; cursor: pointer; }
+  :global(html.define-js) .ch-beat.is-on { opacity: 1; border-left-color: var(--c-accent); }
+  /* Hovering a dim beat previews that it is reachable, without pretending it is the active one. */
+  @media (hover: hover) {
+    :global(html.define-js) .ch-beat:hover { opacity: 0.72; }
+    :global(html.define-js) .ch-beat.is-on:hover { opacity: 1; }
+  }
+  .ch-beat:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    .ch-beat { transition: opacity .5s ease, border-color .5s ease; }
+  }
 
+  /* Spans, not <p> — a <button> may only contain phrasing content, so these are blocked out by hand. */
   .ch-ask {
+    display: block;
     font-family: var(--font-display); font-size: clamp(16px, 1.4vw, 21px); line-height: 1.3;
     color: var(--c-ink); margin: 0 0 4px;
   }
-  .ch-say { font-size: clamp(13px, 0.98vw, 14.5px); line-height: 1.6; color: var(--c-soft); margin: 0; }
+  .ch-say { display: block; font-size: clamp(13px, 0.98vw, 14.5px); line-height: 1.6; color: var(--c-soft); margin: 0; }
 
   /* THE OBJECT. One stage, three panels stacked in it — only one visible at a time, so the money bar is the
      same object being spoken about three ways rather than three different figures. */
@@ -320,6 +401,7 @@ const CELL = 3;
   /* Same rule for the panels: without the script they stack in normal flow and only the FIRST is shown —
      the definition's starting point — rather than an empty stage. The absolute, cross-fading arrangement is
      an enhancement that applies only under html.define-js. */
+
   .ch-panel { position: relative; margin: 0; opacity: 0; pointer-events: none; }
   .ch-panel[data-panel='0'] { opacity: 1; pointer-events: auto; }
   :global(html.define-js) .ch-panel { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
@@ -414,17 +496,20 @@ const CELL = 3;
      second channel that costs no hue, and it survives colour-blindness and a greyscale print. */
   .ch-line--0 { stroke: var(--c-p0); stroke-dasharray: 7 4; }
   .ch-line--1 { stroke: var(--c-p1); stroke-dasharray: 1.5 4; }
-  .ch-line--2 { stroke: var(--c-p2); stroke-dasharray: 12 3 2 3; }
-  /* The measured policy is the argument's subject: accent, solid, heaviest — the one unbroken line on screen. */
-  .ch-line--3 { stroke: var(--c-p3); stroke-width: 2.8; }
+  /* The 2x account: the widest swing on the chart, so it gets the long-dash-dot that reads as "different kind
+     of thing" even at a glance, and a slightly heavier stroke because its excursions are the story. */
+  .ch-line--2 { stroke: var(--c-p2); stroke-dasharray: 14 3 3 3; stroke-width: 2.1; }
+  .ch-line--3 { stroke: var(--c-p3); stroke-dasharray: 5 3 1.5 3; }
+  /* The risk-targeted book is the argument's subject: accent, solid, heaviest — the one unbroken line here. */
+  .ch-line--4 { stroke: var(--c-p4); stroke-width: 2.8; }
 
   .ch-pnl-legend {
-    list-style: none; margin: clamp(8px, 1.2vh, 14px) 0 0; padding: 0;
-    display: grid; gap: 4px;
+    list-style: none; margin: 0; padding: 0;
+    display: grid; gap: 3px;
   }
   .ch-pnl-legend li {
-    display: grid; grid-template-columns: 26px minmax(0, 1fr) 6ch 7ch;
-    align-items: baseline; gap: 0 clamp(8px, 1vw, 14px);
+    display: grid; grid-template-columns: 26px minmax(0, 1fr) 5ch 5ch 5ch;
+    align-items: baseline; gap: 0 clamp(5px, 0.6vw, 10px);
   }
   /* A header row, so the two figures are labelled once rather than in every row. */
   .ch-pnl-head-row { margin-bottom: 2px; }
@@ -435,11 +520,36 @@ const CELL = 3;
   /* The legend's line samples: same width as a swatch column, vertically centred on the label's baseline. */
   .ch-key { display: block; align-self: center; overflow: visible; }
   .ch-pnl-name { font-size: 13px; color: var(--c-ink); }
-  .ch-pnl-end, .ch-pnl-fall {
+  .ch-pnl-end, .ch-pnl-fall, .ch-pnl-exp {
     font-family: var(--font-mono); font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right;
   }
   .ch-pnl-end { color: var(--c-ink); }
   .ch-pnl-fall { color: var(--c-faint); }
+  .ch-pnl-exp { color: var(--c-faint); }
+
+  /* QUARTER MARKS. Fifty-two points is a year only if the year is labelled; without these the x axis is an
+     unlabelled sequence and "week 19" means nothing to a reader. Faint enough to sit under the curves. */
+  .ch-pnl-grid { stroke: var(--c-faint); stroke-width: 1; opacity: 0.2; vector-effect: non-scaling-stroke; }
+  .ch-pnl-axis {
+    position: relative; list-style: none; margin: 3px 0 0; padding: 0; height: 12px;
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; color: var(--c-faint);
+    text-transform: uppercase;
+  }
+  .ch-pnl-axis li { position: absolute; top: 0; transform: translateX(-1px); }
+
+  /* RETAIL vs INSTITUTIONAL, as two columns. The grouping is the beat's second idea — that these are different
+     KINDS of book, held by different kinds of holder — and side by side it costs about half the height of a
+     stacked list with headers, which is what let the footer stop clipping. */
+  .ch-pnl-groups {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0 clamp(16px, 2vw, 34px);
+    align-items: start; margin: clamp(6px, 1vh, 12px) 0 0;
+  }
+  .ch-pnl-group { display: block !important; margin: 0 0 1px; }
+  .ch-pnl-group:first-child { margin-top: 0; }
+  .ch-pnl-group-label {
+    font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--c-accent);
+  }
   .ch-pnl-gloss { grid-column: 2 / -1; font-size: 11px; line-height: 1.4; color: var(--c-faint); }
 
   .ch-cap {
@@ -447,9 +557,62 @@ const CELL = 3;
     margin: clamp(12px, 1.8vh, 20px) 0 0; max-width: 62ch; font-style: italic;
   }
 
+  /* ── RESPONSIVE BLOCK, at the END of the stylesheet on purpose: every declaration here overrides a base rule
+     of the same specificity, so source order IS the mechanism. Placed earlier (twice, while building this) it
+     silently did nothing and the slide kept overflowing. ── */
+
+  /* SHORT SCREENS. A laptop at 1366x768 has 768px for a slide whose beats column alone wanted 444 — measured,
+     that left the stage 323px against a panel needing 350 and the footer clipped. Nothing here is broken by
+     width, only by height, so the query is on height: the words tighten and the chart gives up the slack it can
+     afford, because a clipped verdict is worse than a shorter drawing. */
+  @media (max-height: 860px) {
+    .ch-beats { gap: 2px; }
+    .ch-beat { padding-top: 2px; padding-bottom: 2px; }
+    .ch-ask { font-size: clamp(14px, 1.15vw, 17px); margin-bottom: 2px; }
+    .ch-say { font-size: clamp(12px, 0.85vw, 13px); line-height: 1.5; }
+    .ch-stage { min-height: clamp(300px, 46vh, 380px); }
+    .ch-pnl { min-height: 92px; }
+    .ch-panel-foot { font-size: 11.5px; line-height: 1.45; }
+    .ch-cap { margin-top: 8px; }
+  }
+
+  /* STACKED LAYOUT. Below the two-column breakpoint the beats sit ABOVE the stage rather than beside it, so the
+     two heights are additive: measured at 900x1050 the slide ran 15px past the screen it is supposed to own.
+     The chart has the full width here, so it can be shorter without losing legibility — that is the slack the
+     stacked layout spends. */
+  @media (max-width: 1100px) {
+    .ch-stage { min-height: clamp(280px, 34vh, 380px); }
+    .ch-beats { gap: clamp(2px, 0.5vh, 6px); }
+    .ch-pnl { min-height: clamp(90px, 11vh, 130px); }
+    .ch-panel-foot { font-size: 12px; line-height: 1.45; }
+    .ch-beat { padding-top: 3px; padding-bottom: 3px; }
+    .ch-say { font-size: clamp(12px, 1.5vw, 13.5px); line-height: 1.5; }
+  }
+
   /* Beats beside the object, so the definition and its illustration are read together and the money bar sits
      where the eye already is. The object takes the larger share — same principle as the other slides: the
      drawing is the subject, not an aside. */
+  /* STACKED **AND** SHORT — the tightest case on the grid, and the one that needed its own rule. At 1100x900 the
+     beats stack above the stage (359px) AND the screen is short (900px), so the two earlier queries each solved
+     half of it and the slide still ran 21px over. Nothing is left to trim from the drawing at 99px of chart, so
+     this trims the paper's own padding and the heading, which are the last genuinely slack things here. */
+  @media (max-width: 1100px) and (max-height: 940px) {
+    .ch-paper { padding-top: clamp(16px, 2vh, 26px); padding-bottom: clamp(16px, 2vh, 26px); }
+    .ch-head { font-size: clamp(24px, 3.2vw, 34px); }
+    .ch-stage { margin-top: clamp(10px, 1.4vh, 18px); min-height: clamp(300px, 34vh, 360px); }
+    .ch-cap { margin-top: 6px; }
+    /* The panel's own contents also have to fit the box, not just the box the screen: at 99px of chart there is
+       nothing left to take from the drawing, so the legend rows and the verdict close up to the tightest size
+       that still reads. Measured after: 0px clipped. */
+    .ch-pnl-legend { gap: 1px; }
+    .ch-pnl-name { font-size: 12px; }
+    .ch-pnl-end, .ch-pnl-fall, .ch-pnl-exp { font-size: 11.5px; }
+    .ch-panel-foot { font-size: 11px; line-height: 1.4; margin-top: 6px; }
+    .ch-panel-head { margin-bottom: 6px; }
+  }
+
+  /* 1101 vs 1100: the pair must ABUT. At exactly 1100px the old bounds (max 1099 / min 1101) matched neither
+     query, so that one width got the two-column gutter with no two-column grid and the slide overflowed. */
   @media (min-width: 1101px) {
     .ch-body {
       display: grid; grid-template-columns: 33fr 67fr;
@@ -476,7 +639,7 @@ const CELL = 3;
   function initDefine(): (() => void) | null {
     const section = document.querySelector<HTMLElement>('#choice');
     if (!section) return null;
-    const beats = Array.from(section.querySelectorAll<HTMLElement>('[data-beat]'));
+    const beats = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-beat]'));
     const panels = Array.from(section.querySelectorAll<HTMLElement>('[data-panel]'));
     if (beats.length !== panels.length || !beats.length) {
       // Nothing to sequence — hand the slide back to its CSS default rather than leaving it dimmed.
@@ -485,36 +648,86 @@ const CELL = 3;
     }
 
     const show = (i: number) => {
-      beats.forEach((el, k) => el.classList.toggle('is-on', k === i));
+      beats.forEach((el, k) => {
+        el.classList.toggle('is-on', k === i);
+        el.setAttribute('aria-pressed', String(k === i));
+      });
       panels.forEach((el, k) => el.classList.toggle('is-on', k === i));
     };
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      // Finished state: every beat legible, first panel shown. No sequence.
+      // Finished state: every beat legible, first panel shown. No automatic walk — but the buttons still work,
+      // so a reduced-motion reader gets exactly the same control, just without anything moving on its own.
       for (const el of beats) el.classList.add('is-on');
       panels[0].classList.add('is-on');
-      return null;
+      const pickStill = (e: Event) => {
+        const i = beats.indexOf(e.currentTarget as HTMLButtonElement);
+        if (i >= 0) show(i);
+      };
+      for (const b of beats) b.addEventListener('click', pickStill);
+      return () => { for (const b of beats) b.removeEventListener('click', pickStill); };
     }
 
     let step = 0;
     let timer = 0;
+    // FROZEN ONCE CLICKED, and it stays frozen. The owner: "once i clicked it should freeze there (i dont know
+    // if it's wise to add a timer so it starts automatic again) i need time to read."
+    // It is not wise, so there is no resume timer. A timer that restarts is the original complaint in a new
+    // costume: it would pull the slide out from under a reader in the middle of the beat they deliberately
+    // asked for. No interval is both long enough to be safe for a chart that takes a while to read and short
+    // enough to feel automatic. The walk exists to show a reader there is something here; a click says they
+    // already know, and from then on the slide is theirs.
+    let frozen = false;
+
+    const stop = () => { window.clearTimeout(timer); timer = 0; };
+
     show(0);
     const advance = () => {
       step = (step + 1) % beats.length;
       show(step);
-      // Hold longest on the last beat: it is the one the slide is named after.
-      window.clearTimeout(timer);
+      // Hold longest on the last beat: it is the one the slide is named after, and it carries a chart.
       timer = window.setTimeout(advance, step === beats.length - 1 ? 6200 : 4600);
     };
 
+    const freeze = (i: number) => {
+      frozen = true;
+      stop();
+      section.dataset.frozen = 'true';
+      step = i;
+      show(i);
+    };
+
+    const pick = (e: Event) => {
+      const i = beats.indexOf(e.currentTarget as HTMLButtonElement);
+      if (i >= 0) freeze(i);
+    };
+    for (const b of beats) b.addEventListener('click', pick);
+
+    // Arrow keys walk the group the way a tablist does, so a keyboard reader need not tab through four buttons
+    // to reach the last beat. Arrowing freezes too — it is just as deliberate as a click.
+    const onKey = (e: KeyboardEvent) => {
+      const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1
+        : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+      if (!dir) return;
+      e.preventDefault();
+      freeze((step + dir + beats.length) % beats.length);
+      beats[step].focus();
+    };
+    for (const b of beats) b.addEventListener('keydown', onKey);
+
     const io = new IntersectionObserver((entries) => {
       const visible = entries.some((e) => e.isIntersecting);
+      if (frozen) return;                        // a reader's choice outranks the observer
       if (visible && !timer) timer = window.setTimeout(advance, 4600);
-      else if (!visible && timer) { window.clearTimeout(timer); timer = 0; }
+      else if (!visible) stop();
     }, { threshold: 0.3 });
     io.observe(section);
 
-    return () => { window.clearTimeout(timer); io.disconnect(); };
+    return () => {
+      stop();
+      io.disconnect();
+      for (const b of beats) { b.removeEventListener('click', pick); b.removeEventListener('keydown', onKey); }
+    };
   }
 
   let teardown: (() => void) | null = null;

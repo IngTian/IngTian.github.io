@@ -108,52 +108,109 @@ export const DEFINE_DISCLAIMER =
 // Each is a full SCHEDULE of splits rather than a rule, because this slide defines the idea rather than solving
 // it. The optimising is slide 3.
 
-import type { Policy } from '../lib/policyPnl';
+import type { Player, PlayerContext } from '../lib/policyPnl';
+import { gross } from '../lib/policyPnl';
 
-const flat = (w: number[], n = 12) => new Array(n).fill(0).map(() => [...w]);
+/** The policy weights the institutional players are mandated to hold — a plain 60/20/10/10 book. */
+const MANDATE = [45, 22, 15, 18];
 
-export const POLICIES: Policy[] = [
+/** Normalise a weight vector to a target gross exposure, preserving its shape. */
+const scaleTo = (w: readonly number[], target: number): number[] => {
+  const g = gross(w);
+  if (g <= 1e-9) return w.map(() => target / w.length);
+  return w.map((x) => (x * target) / g);
+};
+
+/**
+ * FIVE PLAYERS, drawn from how real books behave rather than from strategy names.
+ *
+ * The owner: "maybe even you can add a leveraged player into this as well. think about how real retail traders
+ * and institutional traders portfolios do."
+ *
+ * So they are grouped by WHO holds them, because that is the real division: retail accounts are shaped by
+ * attention and by leverage products sold to them, institutional books by mandates and risk limits. A reader
+ * should be able to find themselves in one of the retail rows and see what the other side of the market is
+ * doing in the institutional ones.
+ *
+ * Every player is a RULE evaluated weekly, never a typed schedule. At 52 weeks a schedule would be 208 numbers
+ * per player — unverifiable by inspection, and dishonest about what a policy is.
+ */
+export const POLICIES: Player[] = [
   {
-    key: 'never',
-    label: 'Never touches it',
-    gloss: 'Picks a split in January and leaves it alone. Pays nothing to trade, and rides the fall all the way down.',
-    weights: flat([40, 25, 20, 15]),
+    key: 'buyhold',
+    label: 'Buys once, never looks',
+    kind: 'retail',
+    gloss:
+      'The most common real portfolio there is. Never rebalances, so the winner quietly grows into most of the book — the risk arrives by neglect rather than by decision.',
+    // Sets the book in week 0 and never trades again. Drift does the rest, which is the whole point: by the
+    // autumn this is a chipmaker bet whether or not that was ever the intention.
+    target: (c: PlayerContext) => (c.week === 0 ? [40, 25, 20, 15] : null),
   },
   {
     key: 'panics',
-    label: 'Panics after the fall',
-    gloss: 'Sells the chipmaker into gold once it has already dropped — locking in the loss and missing the recovery.',
-    weights: [
-      [40, 25, 20, 15], [40, 25, 20, 15], [40, 25, 20, 15], [40, 25, 20, 15],
-      [12, 14, 24, 50], [12, 14, 24, 50], [14, 16, 24, 46], [16, 18, 24, 42],
-      [16, 18, 24, 42], [18, 20, 24, 38], [20, 20, 24, 36], [20, 20, 24, 36],
-    ],
+    label: 'Sells after the fall',
+    kind: 'retail',
+    gloss:
+      'Holds through the first bad week, capitulates near the bottom, and comes back only once it feels safe — paying twice for one decision.',
+    target: (c: PlayerContext) => {
+      if (c.week === 0) return [40, 25, 20, 15];
+      // Week 19 is the second leg down, after the false rally at 17 — where real capitulation happens, not at
+      // the first red week. Into gold and cash, which feels like safety and is priced like insurance.
+      if (c.week === 19) return [10, 12, 18, 40];
+      // Re-enters late, once the recovery is already obvious — in week 45, four weeks after it began.
+      if (c.week === 45) return [34, 22, 18, 16];
+      return null;
+    },
   },
   {
-    key: 'chases',
-    label: 'Chases the winner',
-    gloss: 'Piles into whatever moved up last month, and pays the toll every single time.',
-    weights: [
-      [40, 25, 20, 15], [62, 20, 12,  6], [70, 18,  8,  4], [72, 16,  8,  4],
-      [18, 16, 16, 50], [16, 14, 14, 56], [58, 20, 14,  8], [66, 18, 12,  4],
-      [64, 18, 14,  4], [20, 18, 18, 44], [68, 18, 10,  4], [66, 18, 12,  4],
-    ],
+    key: 'levered',
+    label: 'Trades it at 2x',
+    kind: 'retail',
+    gloss:
+      'The margin account. Twice the exposure, so twice the move — plus financing on the borrowed half, and a broker who closes the position for you if equity gets thin.',
+    target: (c: PlayerContext) => {
+      // Opens at 2x gross and tops back up monthly, which is what a levered retail account actually does: it
+      // does NOT let the position drift down after a loss, it re-adds. That is the behaviour that turns a bad
+      // quarter into a margin call.
+      if (c.week === 0) return scaleTo([40, 25, 20, 15], 200);
+      if (c.week % 4 === 0 && gross(c.held) > 1e-9) return scaleTo(c.held, 200);
+      return null;
+    },
   },
   {
-    key: 'measured',
-    label: 'Trims and adds',
-    gloss: 'Cuts risk before the year turns rough, buys it back when nobody wants it, and moves rarely.',
-    weights: [
-      [40, 25, 20, 15], [36, 24, 20, 20], [30, 22, 20, 28], [26, 20, 20, 34],
-      [30, 22, 20, 28], [38, 24, 20, 18], [42, 24, 18, 16], [40, 24, 18, 18],
-      [36, 22, 20, 22], [44, 24, 16, 16], [44, 24, 16, 16], [42, 24, 18, 16],
-    ],
+    key: 'mandate',
+    label: 'Rebalances on schedule',
+    kind: 'institutional',
+    gloss:
+      'A mandate, not a view: every quarter it returns to policy weight, selling whatever rose and buying whatever fell because the document says so.',
+    target: (c: PlayerContext) => (c.week % 13 === 0 ? [...MANDATE] : null),
+  },
+  {
+    key: 'risktarget',
+    label: 'Sizes to a risk budget',
+    kind: 'institutional',
+    gloss:
+      'Targets a level of volatility rather than a level of return: leans in while markets are calm, cuts exposure hard when they are not, and never borrows much.',
+    target: (c: PlayerContext) => {
+      // Warm-up: hold the mandate until there is enough history to measure volatility against.
+      if (c.week === 0) return [...MANDATE];
+      if (c.week < 6 || c.week % 2 !== 0) return null;
+      // Exposure = target vol / realised vol, capped well below the levered player's 2x. This is the one player
+      // whose exposure is an OUTPUT of measured risk rather than an input, which is the idea the later slides
+      // are about.
+      const TARGET_VOL = 11;
+      const measured = Math.max(4, c.vol);
+      const want = Math.max(35, Math.min(130, (TARGET_VOL / measured) * 100));
+      // Only trade when the gap is worth the toll — a risk model that rebalances on noise pays for the privilege.
+      if (Math.abs(want - gross(c.held)) < 12) return null;
+      return scaleTo(MANDATE, want);
+    },
   },
 ];
 
 /** The fourth beat's copy. */
 export const BEAT4 = {
   ask: 'So does the sequence matter?',
-  say: 'Four people, the same four holdings, the same year — and different decisions along the way. They do not just end at different numbers. They take different punishment getting there.',
-  head: 'Same year, four ways of deciding',
+  say: 'Five books, the same four holdings, the same fifty-two weeks — and different decisions along the way. They do not just end at different numbers. They take different punishment getting there, and one of them borrows to do it.',
+  head: 'One year, five ways of running the same four things',
 };
