@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   SPREAD_BPS, SIGMA_DAILY, IMPACT_K, DAILY_VOLUME, TRAJ_COUNT, TRAJ_WEEKS,
   slippageBps, slippageCost, sizeLadder, trajectories, trajBounds, trajPoints,
-  decisionVariables, scenarioLeaves, magnitude,
+  decisionVariables, scenarioLeaves, magnitude, rulePairs, conflictWeb, rulePoint,
 } from '../src/lib/complexity';
 import { FUND } from '../src/data/desk';
 
@@ -221,5 +221,117 @@ describe('the size of the question — beat four', () => {
     expect(magnitude(1000)).toBe(3);
     expect(magnitude(0)).toBe(0);
     expect(magnitude(-5)).toBe(0);
+  });
+});
+
+// ── THE CONFLICT WEB — beat four's new drawing ────────────────────────────────────────────────────────
+// The owner asked how to convey the magnitude, and probing the alternatives first is what produced this: the
+// scenario count is a TRAP (10^11 is fewer than grains of sand, and brute-forceable in 282 seconds at a billion
+// checks a second), so the drawing shows COUPLING instead. These tests pin the arithmetic behind that claim.
+describe('rulePairs', () => {
+  it('counts distinct pairs, which is the number that actually grows', () => {
+    expect(rulePairs(2)).toBe(1);
+    expect(rulePairs(4)).toBe(6);
+    expect(rulePairs(2000)).toBe(1_999_000);
+  });
+
+  it('grows quadratically — ten times the rules is a hundred times the pairs', () => {
+    expect(rulePairs(2000) / rulePairs(200)).toBeCloseTo(100, 0);
+  });
+
+  it('degrades safely below two rules', () => {
+    expect(rulePairs(1)).toBe(0);
+    expect(rulePairs(0)).toBe(0);
+    expect(rulePairs(-5)).toBe(0);
+  });
+
+  it('is enormous for the fund the slide describes, which is the point', () => {
+    expect(rulePairs(FUND.constraints)).toBeGreaterThan(1e6);
+  });
+});
+
+describe('conflictWeb', () => {
+  const web = conflictWeb();
+
+  it('is deterministic — the drawing must not shimmer between builds', () => {
+    expect(conflictWeb()).toEqual(web);
+  });
+
+  it('emits each interaction once, as an upper-triangle edge', () => {
+    for (const [a, b] of web) expect(a).toBeLessThan(b);
+    const seen = new Set(web.map(([a, b]) => `${a},${b}`));
+    expect(seen.size).toBe(web.length);
+  });
+
+  it('stays inside the node count', () => {
+    for (const [a, b] of conflictWeb(28)) {
+      expect(a).toBeGreaterThanOrEqual(0);
+      expect(b).toBeLessThan(28);
+    }
+  });
+
+  // SPARSE ON PURPOSE. A complete graph would overstate it — real mandates do not have every rule touching
+  // every other — and it would also draw as a solid disc, which shows nothing.
+  it('is sparse enough to read as a web rather than a filled disc', () => {
+    const density = web.length / rulePairs(28);
+    expect(density).toBeGreaterThan(0.05);
+    expect(density).toBeLessThan(0.3);
+  });
+
+  it('is dense enough that the tangle is visible', () => {
+    expect(web.length).toBeGreaterThan(20);
+  });
+
+  it('scales with the requested density', () => {
+    expect(conflictWeb(28, 0.5).length).toBeGreaterThan(conflictWeb(28, 0.1).length);
+  });
+
+  it('degrades safely on a trivial web', () => {
+    expect(conflictWeb(1)).toEqual([]);
+    expect(conflictWeb(0)).toEqual([]);
+  });
+});
+
+describe('rulePoint', () => {
+  it('starts at the top of the circle', () => {
+    const [x, y] = rulePoint(0, 12, 100, 100, 50);
+    expect(x).toBeCloseTo(100, 6);
+    expect(y).toBeCloseTo(50, 6);
+  });
+
+  it('keeps every node on the circle', () => {
+    for (let i = 0; i < 28; i++) {
+      const [x, y] = rulePoint(i, 28, 150, 150, 118);
+      expect(Math.hypot(x - 150, y - 150)).toBeCloseTo(118, 6);
+    }
+  });
+
+  it('runs clockwise, the way a reader reads a dial', () => {
+    const [x] = rulePoint(1, 12, 100, 100, 50);
+    expect(x).toBeGreaterThan(100);
+  });
+
+  it('degrades safely on a degenerate circle', () => {
+    const [x, y] = rulePoint(0, 0, 10, 20, 5);
+    expect(Number.isFinite(x)).toBe(true);
+    expect(Number.isFinite(y)).toBe(true);
+  });
+});
+
+// ── THE m^1.5 LAW, which the owner named from memory and the code already implemented ────────────────
+describe('the dollar cost of trading grows as m^1.5', () => {
+  it('has a local exponent converging to 1.5 as the order grows', () => {
+    // cost = m x bps and bps ~ sqrt(m), so cost ~ m^1.5. Fitted numerically rather than asserted from the
+    // formula, so a change to the impact model cannot silently break the claim the slide now makes on-screen.
+    const a = 1e9, b = 1e10;
+    const p = (Math.log(slippageCost(b)) - Math.log(slippageCost(a))) / (Math.log(b) - Math.log(a));
+    expect(p).toBeGreaterThan(1.48);
+    expect(p).toBeLessThan(1.52);
+  });
+
+  it('means ten times the size is about thirty times the cost', () => {
+    const ratio = slippageCost(1e10) / slippageCost(1e9);
+    expect(ratio).toBeGreaterThan(28);
+    expect(ratio).toBeLessThan(34);
   });
 });

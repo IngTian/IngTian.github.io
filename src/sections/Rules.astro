@@ -28,10 +28,12 @@
 // trajectories are a seeded walk — identical on every build, because a fan that shimmered would undercut a slide
 // whose whole claim is that this scale is real. Arithmetic in lib/complexity.ts (30 tests).
 import { CONSTRAINTS, FUND } from '../data/desk';
+import { RULE_GLYPHS, RULE_TAGS, type RuleGlyphKey } from '../data/ruleGlyphs';
 import { humanCount } from '../lib/problemSize';
 import {
   sizeLadder, trajectories, trajBounds, trajPoints,
   decisionVariables, scenarioLeaves, magnitude, TRAJ_COUNT, TRAJ_WEEKS,
+  rulePairs, conflictWeb, rulePoint,
 } from '../lib/complexity';
 
 const ladder = sizeLadder();
@@ -63,6 +65,25 @@ const leafExp = magnitude(scenarioLeaves(3, FUND.periods));
 // Three threads picked out in ink over the fan, so a reader sees that each line is one name's possible future
 // rather than an abstract wash. Fixed indices, so the choice is deterministic like everything else here.
 const HIGHLIGHT = [7, 41, 88];
+
+// Pixel cell size for the rule marks. 3px on an 11x11 grid gives a 33px mark, which sits with 14px type without
+// dominating it — the same scale the defining slide uses for its ticker glyphs.
+const RULE_CELL = 3;
+
+// ── BEAT 4: THE CONFLICT WEB. The owner asked how to exemplify the magnitude, and the answer turned out to be
+// "not with a bigger number". Probing five framings first: 10^11 futures is a hundred million times FEWER than
+// grains of sand, and brute-forceable in 282 seconds at a billion checks a second — quoting it undermines the
+// claim rather than making it. What no tally can show is that the rules INTERLOCK, and that is the property
+// that actually makes the problem hard.
+// So beat four draws the web: rules around a circle, a chord wherever satisfying one can breach another. 28
+// nodes and ~50 chords, because at that density it reads as tangled rather than as a solid disc — and the
+// caption scales it to the real 2,000 rules and their two million pairs.
+const WEB_N = 28;
+const WEB = conflictWeb(WEB_N);
+const WEB_R = 118;
+const WEB_CX = 150, WEB_CY = 150;
+const pairsAll = rulePairs(FUND.constraints);
+const webPt = (i: number) => rulePoint(i, WEB_N, WEB_CX, WEB_CY, WEB_R);
 ---
 <section id="rules" class="ru" aria-labelledby="ru-heading">
   <div class="ru-paper">
@@ -90,8 +111,8 @@ const HIGHLIGHT = [7, 41, 88];
           <p class="ru-fig-head">
             <span class="ru-panel" data-head="0">The same decision, at four sizes</span>
             <span class="ru-panel" data-head="1">Four kinds of rule, all binding at once</span>
-            <span class="ru-panel" data-head="2">{TRAJ_COUNT} futures — for one holding</span>
-            <span class="ru-panel" data-head="3">All of it, simultaneously</span>
+            <span class="ru-panel" data-head="2">{TRAJ_COUNT} possible outcomes — for one holding</span>
+            <span class="ru-panel" data-head="3">Every rule against every other rule</span>
           </p>
 
           <div class="ru-stagebox">
@@ -120,7 +141,9 @@ const HIGHLIGHT = [7, 41, 88];
                 })}
               </ul>
               <p class="ru-note">
-                Cost of moving a fifth of the book at once. Bars are log-scaled: the span is
+                Cost of moving a fifth of the book at once. Price impact grows as the square root of your
+                share of the day's volume, so the DOLLAR cost grows as <strong>m<sup>1.5</sup></strong> — ten
+                times the size is thirty times the cost. Bars are log-scaled: the span is
                 <strong>{magnitude(big.cost)}</strong> orders of magnitude, so a linear axis would draw one bar
                 and three slivers.
               </p>
@@ -129,14 +152,38 @@ const HIGHLIGHT = [7, 41, 88];
             <!-- ── BEAT 2: THE RULE CATEGORIES, each with the reason it exists. Four KINDS, not four examples,
                  and every one of them is a real category with a real cause. -->
             <div class="ru-panel ru-rules" data-panel="1">
+              <!-- A PIXEL MARK PER CATEGORY. The owner: "maybe you can now have some pixel arts with SEC, GOV,
+                   FED, etc. just to illustrate the ideas of regulations" — the panel's right half was empty and
+                   four bare paragraphs is the one beat with nothing to look at.
+                   Abstract marks, not agency seals: a document, a facade, a balance, a ledger. Reproducing the
+                   SEC's eagle would be a trademark problem and would read as costume; what a reader needs is
+                   "an authority wrote this down", which a generic facade says without borrowing anyone's
+                   identity. Compiled from character matrices in data/ruleGlyphs.ts, so they are data. -->
               <ul class="ru-cats">
-                {named.map((c) => (
-                  <li>
-                    <span class="ru-cat">{c.group}</span>
-                    <span class="ru-cat-rule">{c.rule}</span>
-                    <span class="ru-cat-why">{c.why}</span>
-                  </li>
-                ))}
+                {named.map((c) => {
+                  const g = RULE_GLYPHS[c.group as RuleGlyphKey];
+                  return (
+                    <li>
+                      <span class="ru-cat-mark" aria-hidden="true">
+                        {g && (
+                          <svg class="ru-glyph" viewBox={`0 0 ${g.w * RULE_CELL} ${g.h * RULE_CELL}`}
+                               width={g.w * RULE_CELL} height={g.h * RULE_CELL} shape-rendering="crispEdges">
+                            {g.cells.map((cell) => (
+                              <rect x={cell.x * RULE_CELL} y={cell.y * RULE_CELL}
+                                    width={RULE_CELL} height={RULE_CELL} />
+                            ))}
+                          </svg>
+                        )}
+                        <span class="ru-cat-tag">{RULE_TAGS[c.group as RuleGlyphKey]}</span>
+                      </span>
+                      <span class="ru-cat-text">
+                        <span class="ru-cat">{c.group}</span>
+                        <span class="ru-cat-rule">{c.rule}</span>
+                        <span class="ru-cat-why">{c.why}</span>
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
 
@@ -160,28 +207,48 @@ const HIGHLIGHT = [7, 41, 88];
                 </g>
               </svg>
               <p class="ru-note">
-                One holding, {TRAJ_WEEKS} weeks, {TRAJ_COUNT} of its possible futures. Three drawn in ink so the
-                individual threads are visible; the dotted line is where you started.
+                One holding, {TRAJ_WEEKS} weeks, {TRAJ_COUNT} of the outcomes it could reach. Three drawn in ink
+                so the individual threads are visible; the dotted line is where you started.
               </p>
             </div>
 
             <!-- ── BEAT 4: the same fan, ghosted, with the scale of the question laid over it — because "all of
                  it at once" should look like all of it at once rather than like a new subject. -->
+            <!-- ── BEAT 4: THE CONFLICT WEB, beside the tally rather than a bigger number.
+                 The drawing is the argument: rules on a circle, a chord wherever one can breach another. A list
+                 of 2,000 rules sounds like 2,000 things to check; the web shows it is really two million PAIRS,
+                 any of which can put you in breach while you fix something else. -->
             <div class="ru-panel ru-all" data-panel="3">
-              <svg class="ru-fanchart ru-fanchart--ghost" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
-                {/* Reuses beat three's geometry rather than re-emitting 120 polylines — same picture, ghosted. */}
-                <use href="#ru-fan-paths" />
-              </svg>
-              <ul class="ru-tally">
-                <li><span class="ru-tally-n">{humanCount(FUND.tickers)}</span><span class="ru-tally-l">names, each with its own fan</span></li>
-                <li><span class="ru-tally-n">{FUND.periods}</span><span class="ru-tally-l">rebalances in the year</span></li>
-                <li><span class="ru-tally-n">{vars.toLocaleString()}</span><span class="ru-tally-l">weights to choose</span></li>
-                <li><span class="ru-tally-n">{humanCount(FUND.constraints)}+</span><span class="ru-tally-l">rules, all interlocking</span></li>
-                <li class="ru-tally--big">
-                  <span class="ru-tally-n">10<sup>{leafExp}</sup></span>
-                  <span class="ru-tally-l">futures to be right in — and that is at three outcomes a month</span>
-                </li>
-              </ul>
+              <div class="ru-webwrap">
+                <svg class="ru-web" viewBox="0 0 300 300" role="img"
+                     aria-label={`A web of ${WEB_N} rules drawn on a circle with ${WEB.length} lines between those that can conflict, standing for ${humanCount(FUND.constraints)} real rules and their ${pairsAll.toLocaleString()} interacting pairs.`}>
+                  {WEB.map(([a, b]) => {
+                    const [x1, y1] = webPt(a);
+                    const [x2, y2] = webPt(b);
+                    // Quadratic through the centre: a straight chord bundle reads as a star, whereas curves
+                    // pulled toward the middle read as a tangle, which is the honest impression.
+                    return (
+                      <path class="ru-chord"
+                            d={`M ${x1.toFixed(1)} ${y1.toFixed(1)} Q ${WEB_CX} ${WEB_CY} ${x2.toFixed(1)} ${y2.toFixed(1)}`} />
+                    );
+                  })}
+                  {Array.from({ length: WEB_N }, (_, i) => {
+                    const [x, y] = webPt(i);
+                    return <circle class="ru-webnode" cx={x.toFixed(1)} cy={y.toFixed(1)} r="3" />;
+                  })}
+                </svg>
+                <ul class="ru-tally">
+                  <li><span class="ru-tally-n">{humanCount(FUND.tickers)}</span><span class="ru-tally-l">names to choose among</span></li>
+                  <li><span class="ru-tally-n">{vars.toLocaleString()}</span><span class="ru-tally-l">weights, across {FUND.periods} rebalances</span></li>
+                  <li><span class="ru-tally-n">{humanCount(FUND.constraints)}+</span><span class="ru-tally-l">rules to satisfy at once</span></li>
+                  <li class="ru-tally--big">
+                    <span class="ru-tally-n">{(pairsAll / 1e6).toFixed(1)}M</span>
+                    <span class="ru-tally-l">
+                      pairs of rules that can fight each other — fixing one breach can open another
+                    </span>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
 
@@ -201,8 +268,9 @@ const HIGHLIGHT = [7, 41, 88];
               to.
             </span>
             <span class="ru-panel" data-head="3">
-              The scenario count is a deliberate lower bound: three outcomes a month is far cruder than anyone
-              would model, and it still reaches 10<sup>{leafExp}</sup>.
+              {WEB_N} rules standing for {humanCount(FUND.constraints)}, with a line where two can conflict —
+              drawn sparse, because real mandates are. The count that matters is not the rules but the
+              {pairsAll.toLocaleString()} pairs: the difficulty is the interlock, not the total.
             </span>
           </figcaption>
         </figure>
@@ -245,7 +313,7 @@ const HIGHLIGHT = [7, 41, 88];
                   <span class="ru-beat-head">Nobody knows what any of it will do.</span>
                 </span>
                   <span class="ru-beat-body">
-                    {TRAJ_COUNT} possible years for <em>one</em> holding. A real book holds
+                    {TRAJ_COUNT} possible outcomes for <em>one</em> holding, over one year. A real book holds
                     <strong>{humanCount(FUND.tickers)}</strong> names, each with its own fan — and they move
                     together in ways that change exactly when it matters.
                   </span>
@@ -258,9 +326,10 @@ const HIGHLIGHT = [7, 41, 88];
                   <span class="ru-beat-head">Now choose. Every month. For all of it.</span>
                 </span>
                   <span class="ru-beat-body">
-                    <strong>{vars.toLocaleString()}</strong> numbers to pick across {FUND.periods} rebalances,
-                    under interlocking rules, against <strong>10<sup>{leafExp}</sup></strong> possible futures —
-                    paying slippage every time you change your mind.
+                    <strong>{vars.toLocaleString()}</strong> numbers to pick across {FUND.periods} rebalances —
+                    and the rules are not a list, they are a web. Two thousand of them make
+                    <strong>{(pairsAll / 1e6).toFixed(1)} million</strong> pairs that can fight each other, so
+                    fixing one breach can open another.
                   </span>
               </button>
             </li>
@@ -452,8 +521,29 @@ const HIGHLIGHT = [7, 41, 88];
 
   /* ── BEAT 2: the rule categories. */
   .ru-rules { display: flex; flex-direction: column; justify-content: center; }
-  .ru-cats { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(10px, 1.6vh, 18px); }
-  .ru-cats li { display: grid; gap: 2px; }
+  /* TWO COLUMNS PER RULE: the pixel mark, then the words. The marks give the panel's right half something to
+     hold, and they also let a reader scan the four KINDS by shape before reading a word of it. */
+  /* TWO ACROSS, TWO DOWN. The owner's complaint was that this panel's right half was empty, and adding a mark
+     to each row did not fix that — four rules stacked in one column leave half the slide blank however nicely
+     they are set. A 2x2 grid uses the width the turned axis gave us. */
+  .ru-cats {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(10px, 1.6vh, 20px) clamp(24px, 3vw, 60px);
+    align-content: center;
+  }
+  .ru-cats li {
+    display: grid; grid-template-columns: 46px minmax(0, 1fr);
+    gap: 0 clamp(14px, 1.6vw, 26px); align-items: start;
+  }
+  .ru-cat-mark { display: grid; justify-items: center; gap: 4px; }
+  .ru-glyph { display: block; }
+  .ru-glyph rect { fill: var(--r-accent); opacity: 0.85; }
+  .ru-cat-tag {
+    font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.12em;
+    color: var(--r-faint);
+  }
+  .ru-cat-text { display: grid; gap: 2px; min-width: 0; }
   .ru-cat {
     font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase;
     color: var(--r-accent);
@@ -483,6 +573,28 @@ const HIGHLIGHT = [7, 41, 88];
     fill: none; stroke: var(--r-faint); stroke-width: 1; vector-effect: non-scaling-stroke;
     opacity: 0.22; stroke-linejoin: round;
   }
+
+  /* ── THE PATHS DRAW THEMSELVES, left to right. The owner: "can you animate the paths from beginning to the
+     end? it gives a sense of evolution of paths and time." Right — a fan that simply appears is a picture of
+     uncertainty, and a fan that GROWS is a picture of time passing, which is what the beat is about.
+     stroke-dashoffset, not transform: this is how SVG line-drawing works, there is no transform or opacity
+     equivalent that reads as "advancing through the year", and dashoffset repaints only the stroke it belongs
+     to. The stroke length is set per element by the script, because each trajectory has its own length.
+     Staggered by index so the fan opens as a spray rather than as one sweeping wall. */
+  @media (prefers-reduced-motion: no-preference) {
+    .ru-fan.is-on .ru-traj {
+      /* TWO values, not one. `stroke-dasharray: L` means "L on, L off, repeating", so the pattern tiles and the
+         line appeared to draw from BOTH ends at once with a gap in the middle — visible in the capture. Naming
+         the gap explicitly (L on, L off, once) is what makes it a single dash that slides. */
+      stroke-dasharray: var(--len) var(--len);
+      stroke-dashoffset: var(--len);
+      animation: ru-draw 1.9s cubic-bezier(0.33, 0.9, 0.35, 1) forwards;
+      animation-delay: calc(var(--i) * 9ms);
+    }
+    @keyframes ru-draw { to { stroke-dashoffset: 0; } }
+  }
+  /* Reduced motion, and the state before the beat is live: the finished line. Never a blank chart. */
+  .ru-traj { stroke-dashoffset: 0; }
   /* Three threads in ink, so a reader sees that each line is one name's possible future. */
   .ru-traj--lit { stroke: var(--r-accent); opacity: 0.9; stroke-width: 1.8; }
   .ru-base {
@@ -496,9 +608,20 @@ const HIGHLIGHT = [7, 41, 88];
   .ru-fanchart--ghost .ru-traj { opacity: 0.1; }
   .ru-fanchart--ghost .ru-traj--lit { stroke: var(--r-faint); stroke-width: 1; opacity: 0.14; }
 
-  /* ── BEAT 4: the tally, laid over the ghosted fan. */
+  /* ── BEAT 4: the conflict web beside its tally. Two columns rather than a tally floating over a ghosted fan —
+     the web IS the argument now, so it gets its own space instead of being a backdrop. */
   .ru-all { display: grid; align-items: center; }
-  .ru-all > * { grid-area: 1 / 1; }
+  .ru-webwrap {
+    display: grid; grid-template-columns: auto minmax(0, 1fr);
+    gap: 0 clamp(20px, 3vw, 56px); align-items: center;
+  }
+  .ru-web { display: block; height: clamp(170px, 26vh, 300px); width: auto; }
+  /* The chords carry the meaning, so they are the only confident marks. Curved through the centre: straight
+     chords read as a star burst, curves read as a tangle, and a tangle is the honest impression. */
+  .ru-chord {
+    fill: none; stroke: var(--r-accent); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.42;
+  }
+  .ru-webnode { fill: var(--r-faint); opacity: 0.8; }
   .ru-tally {
     list-style: none; margin: 0; padding: 0; align-self: center;
     display: grid; gap: clamp(5px, 0.9vh, 10px);
@@ -535,9 +658,12 @@ const HIGHLIGHT = [7, 41, 88];
        their reasons, and the four ladder rungs now that each takes two lines. Both close up here rather than the
        box growing, because a taller box pushes the whole slide past the screen. The fan has already given up
        height twice and is at its floor. */
-    .ru-rungs { gap: clamp(6px, 1vh, 12px); }
-    .ru-rung-track { height: 7px; }
+    /* Measured at 1366x768: the ladder panel needed 253px against a 246px box — the note beneath it plus four
+       two-line rungs. The note's own line-height is the cheapest 7px on the panel. */
+    .ru-rungs { gap: clamp(5px, 0.9vh, 11px); }
+    .ru-rung-track { height: 6px; }
     .ru-rung-label, .ru-rung-cost, .ru-rung-aum { font-size: 13px; }
+    .ru-note { line-height: 1.42; margin-top: 6px; }
     /* Measured at 1366x768: the categories panel needed 257px against a 246px box — exactly the four `why`
        lines. Widening their measure is what fixes it, because at full slide width each reason fits on one line
        instead of wrapping to two. */
@@ -559,6 +685,8 @@ const HIGHLIGHT = [7, 41, 88];
   }
 
   @media (max-width: 1040px) {
+    /* One column of rules again: at this width two columns of rule-plus-reason wrap to four lines each. */
+    .ru-cats { grid-template-columns: minmax(0, 1fr); }
     .ru-split { grid-template-columns: 1fr; gap: 3vh 0; }
     .ru-fig { padding-top: 3vh; border-top: 1px solid var(--r-edge); }
     .ru-paper { padding-top: clamp(14px, 2vh, 24px); padding-bottom: clamp(14px, 2vh, 24px); }
@@ -595,6 +723,53 @@ const HIGHLIGHT = [7, 41, 88];
       document.documentElement.classList.remove('complex-js');
       return null;
     }
+
+    // EACH PATH'S OWN LENGTH, measured once and written to a CSS variable, so the draw animation can dash it.
+    //
+    // AND MEASURED IN THE RIGHT UNITS, which took a debugging pass. getTotalLength() returns USER units — the
+    // viewBox's coordinate system — but `vector-effect: non-scaling-stroke` makes the dash pattern resolve in
+    // SCREEN pixels. The fan is drawn with preserveAspectRatio="none", so the two differ by a lot: measured, the
+    // viewBox is 560 wide rendered at 1482, a 2.65x x-scale against 1.13x in y. Feeding a user-unit length to a
+    // screen-pixel dash left every line about 60% short, so the fan finished with a permanent gap in it — the
+    // animation looked like it was drawing from both ends and stopping.
+    //
+    // The honest fix is to measure the path in the space the dash lives in: walk the points and sum the segment
+    // lengths after applying the element's own x and y scale.
+    const measurePaths = () => {
+      const svg = section.querySelector<SVGSVGElement>('.ru-fanchart');
+      const vb = svg?.viewBox?.baseVal;
+      const rect = svg?.getBoundingClientRect();
+      const sx = vb && rect && vb.width ? rect.width / vb.width : 1;
+      const sy = vb && rect && vb.height ? rect.height / vb.height : 1;
+
+      for (const [i, el] of Array.from(section.querySelectorAll<SVGPolylineElement>('.ru-traj')).entries()) {
+        let len = 0;
+        const raw = el.getAttribute('points');
+        if (raw) {
+          const nums = raw.trim().split(/[\s,]+/).map(Number);
+          for (let k = 2; k + 1 < nums.length; k += 2) {
+            const dx = (nums[k] - nums[k - 2]) * sx;
+            const dy = (nums[k + 1] - nums[k - 1]) * sy;
+            len += Math.hypot(dx, dy);
+          }
+        }
+        // Fall back to the user-unit length rather than to nothing: a slightly-off dash still animates, whereas
+        // an unset --len leaves the line solid (which is also acceptable, just not animated).
+        if (!(len > 0)) {
+          try { len = typeof el.getTotalLength === 'function' ? el.getTotalLength() : 0; } catch { len = 0; }
+        }
+        if (len > 0) el.style.setProperty('--len', String(Math.ceil(len)));
+        el.style.setProperty('--i', String(i));
+      }
+    };
+    measurePaths();
+    // The box is responsive, so a resize changes every path's length. Re-measure, throttled to a frame.
+    let resizeTick = 0;
+    const onResize = () => {
+      if (resizeTick) return;
+      resizeTick = requestAnimationFrame(() => { resizeTick = 0; measurePaths(); });
+    };
+    window.addEventListener('resize', onResize, { passive: true });
 
     const show = (i: number) => {
       beats.forEach((b, k) => {
@@ -647,6 +822,8 @@ const HIGHLIGHT = [7, 41, 88];
       step = beats.length - 1;
       show(step);
       return () => {
+        if (resizeTick) cancelAnimationFrame(resizeTick);
+        window.removeEventListener('resize', onResize);
         for (const b of beats) { b.removeEventListener('click', pick); b.removeEventListener('keydown', onKey); }
       };
     }
@@ -669,6 +846,8 @@ const HIGHLIGHT = [7, 41, 88];
     return () => {
       stop();
       io.disconnect();
+      if (resizeTick) cancelAnimationFrame(resizeTick);
+      window.removeEventListener('resize', onResize);
       for (const b of beats) { b.removeEventListener('click', pick); b.removeEventListener('keydown', onKey); }
     };
   }

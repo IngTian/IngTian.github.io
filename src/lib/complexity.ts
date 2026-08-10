@@ -225,3 +225,66 @@ export function magnitude(x: number): number {
   if (!Number.isFinite(x) || x <= 0) return 0;
   return Math.floor(Math.log10(x));
 }
+
+// ── BEAT 4: THE MAGNITUDE, AND WHY IT IS NOT A COUNTING PROBLEM ──────────────────────────────────────────
+//
+// The owner: "in the 4th panel we might need a different graph to further exemplify the complexity of it. in
+// the 3rd panel you named routes for one holding, now you have 3000 plus 2000 regulations, how gigantic is
+// that? what's the best way to exemplify the magnitude of difficulty there is."
+//
+// I probed five framings before building anything, and two of them are traps worth recording:
+//
+//   * COSMIC COMPARISON. "10^11 futures" sounds enormous until you compare it: grains of sand on Earth are
+//     10^19, so the scenario tree is a hundred million times SMALLER than sand. Reaching for scale invites a
+//     comparison you lose.
+//   * BRUTE FORCE. At a billion candidates a second, 3^24 takes 282 seconds. A number a laptop can exhaust
+//     over lunch is not evidence of difficulty — quoting it actively undermines the claim.
+//
+// So the magnitude that matters is NOT how many combinations exist. It is that the problem has three hard
+// properties at once, and the third is the one no tally can show:
+//   1. stochastic  — you must choose before knowing which future arrives
+//   2. sequential  — today's choice constrains tomorrow's, and changing your mind costs m^1.5
+//   3. COUPLED     — the rules refer to each other, so satisfying one can breach another
+//
+// Coupling is what a drawing can carry. 2,000 rules do not form a list of 2,000 things to check; they form a
+// web with 1,999,000 pairs, any of which can conflict. That is the number, and unlike the others it grows
+// quadratically in something a reader can hold.
+
+/** Distinct pairs among n rules — every pair is a chance for one rule to conflict with another. */
+export function rulePairs(n: number): number {
+  if (n < 2) return 0;
+  return (n * (n - 1)) / 2;
+}
+
+/**
+ * A deterministic conflict web for the drawing: which rules interact with which.
+ *
+ * Not every pair of real rules conflicts, so a fully-connected graph would overstate it. This builds a sparse
+ * symmetric adjacency on a small grid — enough edges that the web reads as tangled, few enough that a reader
+ * can see it IS a web rather than a solid block. Seeded, like everything else drawn on this site.
+ *
+ * Returns the upper-triangle edges only, so each interaction is drawn once.
+ */
+export function conflictWeb(n = 28, density = 0.14, seed = 0x9e37): [number, number][] {
+  const rand = mulberry32(seed);
+  const out: [number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (rand() < density) out.push([i, j]);
+    }
+  }
+  return out;
+}
+
+/** Position rule `i` of `n` evenly around a circle, so the web is drawn as a chord diagram. */
+export function rulePoint(
+  i: number,
+  n: number,
+  cx: number,
+  cy: number,
+  r: number,
+): [number, number] {
+  // Start at the top and go clockwise, which is how a reader expects an index around a dial to run.
+  const a = -Math.PI / 2 + (i / Math.max(1, n)) * Math.PI * 2;
+  return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+}
