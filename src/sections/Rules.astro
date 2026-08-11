@@ -790,19 +790,19 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
   // legible as text, and html.complex-js — added only once the sequence is about to run — is what switches on
   // the dimming and the stepping. So JavaScript switched off entirely leaves a readable slide rather than an
   // empty one, which is the failure mode the inverse-guard pattern used to have.
-  document.documentElement.classList.add('complex-js');
-
+  //
+  // ADDED INSIDE initComplex, NOT AT MODULE SCOPE, for the reason spelled out at the same point in
+  // Choice.astro: Astro's ClientRouter swaps <html> and its class list on every in-site navigation, while this
+  // bundled module runs once — so the class did not survive the reader's first trip to another page and back.
   function initComplex(): (() => void) | null {
     const section = document.querySelector<HTMLElement>('#rules');
     if (!section) return null;
     const beats = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-beat]'));
     const panels = Array.from(section.querySelectorAll<HTMLElement>('[data-panel]'));
     const heads = Array.from(section.querySelectorAll<HTMLElement>('[data-head]'));
-    if (!beats.length || panels.length !== beats.length) {
-      // Nothing to step — hand the slide back to its CSS default rather than leaving it dimmed.
-      document.documentElement.classList.remove('complex-js');
-      return null;
-    }
+    // Nothing to step — hand the slide back to its CSS default, before the class is added rather than after.
+    if (!beats.length || panels.length !== beats.length) return null;
+    document.documentElement.classList.add('complex-js');
 
     // EACH PATH'S OWN LENGTH, measured once and written to a CSS variable, so the draw animation can dash it.
     //

@@ -678,18 +678,23 @@ const allBeats = [...BEATS, BEAT4];
   // and removed on success) covered a script that RAN AND FAILED but not JavaScript being off entirely, where
   // the class never appeared at all: measured with script execution disabled, every panel computed to
   // opacity 0 and the slide rendered blank.
-  document.documentElement.classList.add('define-js');
-
+  //
+  // THE CLASS IS ADDED INSIDE initDefine, NOT AT MODULE SCOPE, and that is a bug fix rather than a tidy-up.
+  // Astro's ClientRouter replaces <html> on every in-site swap, taking its class list with it, while a bundled
+  // module only ever executes once — so a class added out here survived exactly until the reader's first
+  // navigation. Measured, home -> /research -> home at 1440x900: html went "define-js complex-js solve-js" to
+  // just "solve-js", #choice grew from 900px to 1585px, every panel fell back to position: relative and all four
+  // stacked at once, and the beat buttons became silent no-ops. solve-js was the survivor precisely because
+  // Solve.astro already adds its class inside its init, which re-runs on astro:page-load. This now matches it.
   function initDefine(): (() => void) | null {
     const section = document.querySelector<HTMLElement>('#choice');
     if (!section) return null;
     const beats = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-beat]'));
     const panels = Array.from(section.querySelectorAll<HTMLElement>('[data-panel]'));
-    if (beats.length !== panels.length || !beats.length) {
-      // Nothing to sequence — hand the slide back to its CSS default rather than leaving it dimmed.
-      document.documentElement.classList.remove('define-js');
-      return null;
-    }
+    // Nothing to sequence — hand the slide back to its CSS default. Returning before the class is added is why
+    // there is no longer anything to remove here.
+    if (beats.length !== panels.length || !beats.length) return null;
+    document.documentElement.classList.add('define-js');
 
     const show = (i: number) => {
       beats.forEach((el, k) => {
