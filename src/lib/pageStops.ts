@@ -224,7 +224,9 @@ export function homeStops(): (Stop & { zone: 'light' | 'dark' })[] {
       children: [
         { label: 'Problem', target: 'choice' },
         { label: 'Limits', target: 'rules' },
-        { label: 'Method', target: 'solve' },
+        // 'Method' claimed a method exists. The slide says the opposite — the problem is open and what it
+        // names are directions of attack — so the rail must not promise a solution the section withdraws.
+        { label: 'Open', target: 'solve' },
       ],
     },
     { label: 'The climb', target: 'story', zone: 'light' },
