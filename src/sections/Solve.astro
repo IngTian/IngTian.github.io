@@ -257,21 +257,23 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
 
   /* ── THE LATTICE, EMPHASISED PER MOVE. The drawing is reused rather than rebuilt (the owner: "i think we can
      reuse the same graph we have right now") — each move just changes which layer carries the ink. */
-  /* THREE stages now, not four — the fourth direction (the paper) was dropped, so the settled state moved from
-     stage 3 to stage 2. Leaving a rule on stage 3 would have been dead CSS and the final state would never have
-     shown its emphasis. */
+  /* FOUR stages, one per family, so the settled state is stage 3. This has moved with the tab count twice now
+     (four -> three -> four); the rule to keep is that the LAST stage must carry the emphasis, or the figure
+     finishes mid-argument. */
   .so-chart[data-stage='0'] .so-cands, .so-chart[data-stage='0'] .so-opt,
   .so-chart[data-stage='0'] .so-opt-node { opacity: 0; }
-  .so-chart[data-stage='1'] .so-opt, .so-chart[data-stage='1'] .so-opt-node { opacity: 0; }
-  .so-chart[data-stage='2'] .so-cand { opacity: 0.1; }
-  .so-chart[data-stage='2'] .so-opt { stroke-width: 3; }
+  .so-chart[data-stage='1'] .so-cands, .so-chart[data-stage='1'] .so-opt,
+  .so-chart[data-stage='1'] .so-opt-node { opacity: 0; }
+  .so-chart[data-stage='2'] .so-opt, .so-chart[data-stage='2'] .so-opt-node { opacity: 0; }
+  .so-chart[data-stage='3'] .so-cand { opacity: 0.1; }
+  .so-chart[data-stage='3'] .so-opt { stroke-width: 3; }
   @media (prefers-reduced-motion: no-preference) {
     .so-cands, .so-opt, .so-opt-node, .so-cand { transition: opacity 300ms ease, stroke-width 300ms ease; }
   }
 
   @media (max-width: 1099px) {
-    /* Three term buttons in one row need the width; below this they stack. */
-    .so-terms { grid-template-columns: minmax(0, 1fr); }
+    /* Four term buttons in one row need the width; below this they go two-by-two. */
+    .so-terms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 
   .so-kicker {

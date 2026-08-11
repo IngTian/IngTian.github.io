@@ -168,20 +168,40 @@ export const JOB_NOTE =
 // The restraint is the honesty here. A general direction, plainly stated, cannot overclaim; a survey with dates
 // on it starts to sound like a solution assembled from parts.
 export interface Methodology {
-  key: 'probability' | 'optimisation' | 'learning';
-  /** The discipline, as the owner named it — the small tag above the name on the selector. */
+  key: 'probability' | 'estimation' | 'optimisation' | 'control';
+  /** The role this family plays — the small tag above the name on the selector. */
   tag: string;
   /** The selector label. */
   name: string;
   /** One line: what this brings. */
   lede: string;
   /** Two or three plain sentences. The last one says what it does not settle — kept in the prose rather than a
-   *  labelled block, because a labelled block is what made the previous version read as a survey. */
+   *  labelled block, because a labelled block is what made an earlier version read as a survey. */
   detail: string;
   /** What the lattice is evidence of while this direction is live. Never the word "solved". */
   read: string;
 }
 
+/**
+ * FOUR GENERAL FAMILIES, and explicitly not the whole toolbox.
+ *
+ * An earlier version listed three — probability, convex optimisation, reinforcement learning — and the owner
+ * pushed back: "probability + convex optimization + rl might just be tools to do this. but there are more
+ * right? i dont think only these 3 actually."
+ *
+ * He is right, and there were two separate faults. The list was short of things that genuinely matter (nothing
+ * about ESTIMATION, which is where most real damage happens; nothing about the integer side of optimisation,
+ * which is what a rule book actually forces), and it was FRAMED as though it were complete, which is the worse
+ * of the two. The fix does both: a fourth family, and a thesis that says outright this is not a full toolbox.
+ *
+ * Reinforcement learning now sits inside "stochastic control" rather than standing alone, which is also more
+ * truthful about it: for this problem RL is approximate dynamic programming, not a separate idea.
+ *
+ * Left out on purpose, and it is worth knowing what: robust and distributionally-robust optimisation,
+ * simulation and scenario generation, filtering for regime estimation, time-series econometrics, multiple-
+ * testing correction. Each is real. Naming them all would be the survey the owner already rejected — hence the
+ * thesis saying "a few of", which is what makes the omission honest rather than a claim of completeness.
+ */
 export const METHODOLOGIES: Methodology[] = [
   {
     key: 'probability',
@@ -189,25 +209,34 @@ export const METHODOLOGIES: Methodology[] = [
     name: 'probability, stochastic processes',
     lede: 'You cannot optimise against a future you have not described.',
     detail:
-      'Before any solver there has to be a model of how prices and risk actually move: drift, volatility, how names move together, and how all of that changes. Everything else on this slide is built on top of whatever goes here. It is also where the deepest problem sits, because a model fitted on one short history is a statement about that history.',
+      'Before any solver there has to be a model of how prices and risk move: drift, volatility, how names move together, and how all of that changes through time. Everything else here is built on top of whatever goes in that slot. Choosing it is a modelling decision, not a technical one, and it is rarely the part that gets argued about.',
     read: 'The surface exists because this world’s movement was written down in advance. A real book’s has to be estimated.',
+  },
+  {
+    key: 'estimation',
+    tag: 'the inputs',
+    name: 'statistics, estimation',
+    lede: 'The model has to be fitted, and that is where most of the damage happens.',
+    detail:
+      'A full covariance over three thousand names carries about four and a half million free parameters, and needs more observations than there are names before it can even be inverted — roughly twelve years of daily data. Shrinkage, factor structure and Bayesian priors are how that is made usable at all. Expected returns are worse: they matter most and are estimated least well.',
+    read: 'Every number behind this surface was chosen, not measured. That is the difference between a toy and a book.',
   },
   {
     key: 'optimisation',
     tag: 'the mathematics',
-    name: 'convex optimisation',
+    name: 'convex and integer optimisation',
     lede: 'Where the problem is convex, the answer comes with a proof attached.',
     detail:
-      'For a single date, thousands of names and thousands of rules, this is settled and industrial: a global optimum, exact feasibility, and a price for every constraint that binds. It is the part of the problem that is genuinely solved. What it does not do on its own is span the sequence of dates, which is where the difficulty was.',
+      'For a single date, thousands of names and thousands of convex rules, this part is settled and industrial: a global optimum, exact feasibility, and a price for every constraint that binds. Position counts, minimum sizes and round lots break convexity and turn it into an integer problem, which is where the guarantees stop and the search begins.',
     read: 'An answer for every state on the surface, exactly — and 29 stated rivals drawn behind it.',
   },
   {
-    key: 'learning',
-    tag: 'the adaptation',
-    name: 'reinforcement learning',
-    lede: 'Where the structure runs out, learn a policy instead of tabulating one.',
+    key: 'control',
+    tag: 'the sequence',
+    name: 'stochastic control, learning',
+    lede: 'The decisions are a sequence, and the sequence is what makes it hard.',
     detail:
-      'Rather than filling a table that cannot exist, fit the decision rule from simulated experience and let it improve against the model. That is what makes a problem this size approachable at all. It buys scale and gives up the guarantee: there is no bound on how far the result sits from optimal, which is the one thing a mandate asks for.',
+      'Dynamic programming is the frame for weighing a trade now against what it costs later. At this size it cannot be solved as written, so what is usable are its approximations: roll a short horizon forward and re-solve, or fit a policy from simulated experience rather than tabulating one, which is what reinforcement learning is doing here. Both buy scale and give up the bound on how far from optimal you are.',
     read: 'One route, read off a surface filled exactly, node by node. Fit the surface instead and no node is checkable again.',
   },
 ];
@@ -216,14 +245,17 @@ export const METHODOLOGIES: Methodology[] = [
 export const OPEN_HEADING = 'Still an open problem.';
 
 /**
- * The modest version of the ambition, which is the one he asked for: a chunk first, more later.
+ * WHAT IS MISSING, and nothing about what is realistic.
  *
- * Deliberately does NOT say anything is solved. An earlier heading opened "Large pieces of this are solved" and
- * he rejected exactly that: "i wouldnt say this as solved."
+ * An earlier version said "The realistic ambition is a chunk: solve a small part properly, then widen." The
+ * owner asked for evidence for it and there is none — it was my editorialising dressed as a finding, and a
+ * confident sentence about what is achievable is exactly the kind of thing this slide exists to avoid. Dropped.
+ *
+ * What replaces it is the honest disclaimer the list needs: these are a few of the families, not all of them.
  */
 export const OPEN_STATEMENT =
-  'No one has a method for the whole of it at this size — one that runs at three thousand names and still tells you how far from optimal it is. The realistic ambition is a chunk: solve a small part properly, then widen. These are the general directions worth starting from.';
+  'No one has a method for the whole of it at this size — one that runs at three thousand names and still tells you how far from optimal it is. What follows is not a plan and not a full toolbox: a few of the general families any attempt would be assembled from.';
 
-/** The closing line. Points at where the actual work is, since the paper is no longer a tab here. */
+/** The closing line. Points at where the actual work is, since the paper is not a tab here. */
 export const OPEN_CLOSE =
-  'Directions, not results. What has actually been built is further down, under the work.';
+  'Directions, not results, and not a complete list. What has actually been built is further down, under the work.';
