@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   COW_BODY, COW_PATCH, COW_MUZZLE, COW_HORN, COW_OUTLINE, COW_W, COW_H,
+  COW_MOO, COW_TAIL_FILL, COW_TAIL_INK, COW_TAIL_W, COW_TAIL_H,
   COW_LINES, COW_LINES_404, COW_LINES_WRITING,
 } from '../src/data/cowGlyph';
 import { inBounds } from '../src/lib/pixels';
@@ -95,6 +96,69 @@ describe('the cow, structurally', () => {
   });
 });
 
+// THE BUBBLE. The owner asked for the cow's words in a dialogue bubble with pixel type, "way bigger", and picked
+// 10px cells. These pin the two things that made earlier passes wrong on the page rather than in the file.
+describe('the speech bubble', () => {
+  it('spells MOO! as four separated marks', () => {
+    expect(COW_MOO.h).toBe(5);
+    expect(inBounds(COW_MOO)).toBe(true);
+    // M, O, O, ! — four column-runs. Catches letters fused together by a lost tracking column, which is what a
+    // hand-count of the first matrix got wrong.
+    expect(runs(COW_MOO.cells.map((c) => c.x)), 'expected four marks: M O O !').toBe(4);
+  });
+
+  it("gives the '!' its gap, so it is not a solid bar", () => {
+    const maxX = Math.max(...COW_MOO.cells.map((c) => c.x));
+    const bang = COW_MOO.cells.filter((c) => c.x === maxX).map((c) => c.y).sort((a, b) => a - b);
+    expect(bang.length, 'the bang lost cells').toBe(4);
+    expect(runs(bang), "an exclamation mark is a stroke and a point, not one bar").toBe(2);
+  });
+
+  it('has both O glyphs closed, with a hole in the middle', () => {
+    // A ring, not a block: the middle row of each O must have exactly two cells (its two sides).
+    const cols = [...new Set(COW_MOO.cells.map((c) => c.x))].sort((a, b) => a - b);
+    const os = [cols.slice(6, 11), cols.slice(12, 17)];
+    for (const [n, o] of os.entries()) {
+      const mid = COW_MOO.cells.filter((c) => c.y === 2 && o.includes(c.x));
+      expect(mid.length, `O number ${n + 1} is not hollow`).toBe(2);
+    }
+  });
+
+  // The tail is TWO layers on purpose. One ink-coloured tail was invisible on the homepage, whose footer is the
+  // near-black end of the descent; one paper-coloured tail would vanish on the light /404 and /writing grounds.
+  it('draws the tail as a paper interior inside an ink edge', () => {
+    for (const g of [COW_TAIL_FILL, COW_TAIL_INK]) {
+      expect(g.w).toBe(COW_TAIL_W);
+      expect(g.h).toBe(COW_TAIL_H);
+      expect(g.cells.length).toBeGreaterThan(0);
+      expect(inBounds(g)).toBe(true);
+    }
+    // The two layers partition the shape — no cell is both, or the ink would paint over its own fill.
+    const fill = new Set(COW_TAIL_FILL.cells.map(key));
+    for (const c of COW_TAIL_INK.cells) {
+      expect(fill.has(key(c)), `tail ink overlaps its fill at ${key(c)}`).toBe(false);
+    }
+  });
+
+  it('opens the bubble: the tail\'s top row is all paper', () => {
+    // That row is painted OVER the bubble's one-cell ink border, and the overlap is what makes the tail read as
+    // a mouth rather than as a detached blob under a closed box. Any ink there re-seals it.
+    const top = COW_TAIL_FILL.cells.filter((c) => c.y === 0);
+    expect(top.length, 'the tail does not open the bubble').toBe(COW_TAIL_W);
+    expect(COW_TAIL_INK.cells.some((c) => c.y === 0), 'ink in the mouth re-seals the bubble').toBe(false);
+  });
+
+  it('tapers to a point, so it reads as a tail', () => {
+    const widthAt = (y: number) =>
+      [...COW_TAIL_FILL.cells, ...COW_TAIL_INK.cells].filter((c) => c.y === y).length;
+    const widths = Array.from({ length: COW_TAIL_H }, (_, y) => widthAt(y));
+    for (let y = 1; y < widths.length; y++) {
+      expect(widths[y], `row ${y} is wider than the row above it`).toBeLessThanOrEqual(widths[y - 1]);
+    }
+    expect(widths[widths.length - 1], 'the tip is as wide as the base').toBeLessThan(widths[0]);
+  });
+});
+
 describe('what the cow says', () => {
   const SETS: [string, readonly string[]][] = [
     ['homepage', COW_LINES],
@@ -122,6 +186,14 @@ describe('what the cow says', () => {
   it('moos somewhere in every set — it is a cow', () => {
     for (const [where, lines] of SETS) {
       expect(lines.some((l) => /moo/i.test(l)), where).toBe(true);
+    }
+  });
+
+  // The bubble now says MOO! in pixel type ABOVE whichever line is showing, so a line that was only "Moo."
+  // rendered the same word twice, once large and once small.
+  it('never uses a bare "Moo." — the bubble already says it', () => {
+    for (const [where, lines] of SETS) {
+      for (const l of lines) expect(l.toLowerCase(), where).not.toBe('moo.');
     }
   });
 

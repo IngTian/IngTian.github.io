@@ -31,12 +31,16 @@ const year = new Date().getFullYear();
       © {year} Zeying Tian
     </span>
   </nav>
-  <!-- ONE EXPLICIT ROW FOR THE SEAL AND THE COW, rather than letting them fall wherever flex-wrap puts them.
-       They were siblings of the nav, so the wrap point decided the layout — and it MOVED when the cow stopped
-       stretching, which bumped the seal out of place. A row of its own is deterministic: seal left, cow right,
-       whatever the widths do. -->
-  <div class="w-full flex justify-between items-end gap-7">
-    <SealMark />
+  <!-- THE SEAL STAYS EXACTLY WHERE IT SHIPPED: the second child of this justify-between row, so it sits at the
+       bottom-RIGHT of the footer. Two earlier attempts moved it and the owner called both out as drift — the
+       second one ("one explicit row for the seal and the cow") put it at the far LEFT of a new full-width row,
+       which is a bigger move than the bug it was fixing. The lesson is that the seal's position is not mine to
+       spend on layout convenience; the cow has to fit around it. -->
+  <SealMark />
+  <!-- THE COW GETS ITS OWN FULL-WIDTH ROW, below the nav and the seal, pushed right — "in the front page, you
+       can put the moo at the lower right corner". w-full forces the wrap, so the cow can never change where the
+       nav and the seal break, which is what bumped the seal the first time. -->
+  <div class="w-full flex justify-end">
     <PlushCow />
   </div>
 </section>

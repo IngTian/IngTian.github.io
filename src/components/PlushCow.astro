@@ -1,24 +1,27 @@
 ---
 // src/components/PlushCow.astro
-// THE COW. The owner loves cows, so it gets to be a real drawing rather than a decoration.
+// THE COW, AND WHAT IT SAYS. The owner loves cows, so it gets to be a real drawing rather than a decoration.
 //
-// He asked for three things: a big one on /writing "instead of scaffolding something that doesn\'t exist yet",
-// one on the 404 page, and for it to actually look like a cow — the first attempt "looks like a dragon". The art
-// is rebuilt in data/cowGlyph.ts; see that file for the four specific reasons the first one failed.
+// He asked for a big one on /writing "instead of scaffolding something that doesn't exist yet", one on the 404,
+// one at the homepage's lower-right corner, and for it to actually look like a cow — the first five attempts did
+// not. The art is a transcription of a grid he supplied; see data/cowGlyph.ts for why that was necessary.
 //
-// TWO LAYERS, ONE COLOUR. The dark markings and the light body are separate glyphs compiled from one matrix, and
-// both are currentColor — the light layer just runs at lower opacity. That is what makes the Holstein patches
-// read without introducing a second colour, which the palette rules would not permit.
+// THE BUBBLE. "why not have a dialogue bubble to wrap those words? also, the font can be more pixel like, let
+// the texts be bigger. way bigger." So the words moved inside a pixel speech bubble: a one-cell ink border with
+// no radius (pixel art has no curves), a paper interior, and a stepped tail pointing at the cow. He chose 10px
+// cells from the two sizes I mocked up, and that one number drives the whole bubble — border thickness, the MOO
+// type, and the tail's steps all measure exactly one cell, which is what makes it read as pixel art rather than
+// as a rounded chat bubble with a blocky font.
 //
-// SIZES. `small` is furniture at the foot of a section, quiet until you look at it. `large` is the subject of the
-// page it is on, so it is fully opaque from the start: on /writing and /404 the cow is not hiding, it IS the
-// content, and pretending otherwise would just make it look broken.
+// MOO! IS TYPE, NOT DECORATION — drawn from a matrix in data/cowGlyph.ts, 190x50 on screen against the 11.5px
+// mono line it replaced. The rotating sentence sits under it, also enlarged. Both live inside the bubble.
 import {
-  COW_BODY, COW_PATCH, COW_MUZZLE, COW_HORN, COW_OUTLINE, COW_W, COW_H, COW_LINES,
+  COW_BODY, COW_PATCH, COW_MUZZLE, COW_HORN, COW_OUTLINE, COW_MOO, COW_W, COW_H, COW_LINES,
+  COW_TAIL_FILL, COW_TAIL_INK, COW_TAIL_W, COW_TAIL_H,
 } from '../data/cowGlyph';
 
 interface Props {
-  /** 'small' hides at the foot of a section; 'large' is the page\'s subject. */
+  /** 'small' is the corner mark at the foot of the homepage; 'large' is the page's subject. */
   size?: 'small' | 'large';
   /** Override what it says. Defaults to the homepage lines. */
   lines?: readonly string[];
@@ -28,14 +31,58 @@ interface Props {
 
 const { size = 'small', lines = COW_LINES, label = 'A cow. Press it.' } = Astro.props;
 
-// 2px cells for furniture, 7px when the cow is the subject — a 147x98 drawing, big enough that the patches and
-// the muzzle read as drawing rather than as noise.
-// The transcribed cow is 22x26 — taller than the old side view was, so `large` takes a smaller cell to
-// land at a similar drawing size rather than towering over the page.
-const CELL = size === 'large' ? 6 : 2;
+// The cow grew with the bubble. At 2px cells (44x52) it was a speck beside a 270px bubble — the pair has to
+// read as one object, so the small cow is now 5px cells (110x130) and the large one 8px (176x208).
+const CELL = size === 'large' ? 8 : 5;
+// One cell, the owner's pick, shared by the border, the type and the tail. See the note above.
+const MOO_CELL = 10;
 ---
 
 <div class:list={['cow-wrap', `cow-wrap--${size}`]} data-cow-lines={JSON.stringify(lines)}>
+  <!-- THE BUBBLE COMES FIRST in source order so a screen reader hears what the cow says before being told it
+       can press it, and so the visual order (bubble left, cow right) needs no reordering. -->
+  <div class="cow-bubble">
+    <svg
+      class="cow-moo"
+      viewBox={`0 0 ${COW_MOO.w * MOO_CELL} ${COW_MOO.h * MOO_CELL}`}
+      width={COW_MOO.w * MOO_CELL}
+      height={COW_MOO.h * MOO_CELL}
+      role="img"
+      aria-label="Moo"
+      shape-rendering="crispEdges"
+    >
+      {COW_MOO.cells.map((c) => (
+        <rect x={c.x * MOO_CELL} y={c.y * MOO_CELL} width={MOO_CELL} height={MOO_CELL} />
+      ))}
+    </svg>
+    <!-- The lines travel as JSON on the wrapper, so the copy stays in data/cowGlyph.ts and the script stays
+         generic. A first pass joined them with a separator and wrote a literal NUL byte into the source; JSON
+         cannot be ambiguous about where a line ends, and cannot smuggle a control character.
+         The first line is rendered at build time, so the bubble is never an empty box: the no-JS and
+         before-first-press states both look finished, which is the project's rule for every default state. -->
+    <p class="cow-says" data-cow-says aria-live="polite">{lines[0]}</p>
+    {size === 'large' && (
+      <!-- A hint that the cow is pressable — on /writing and /404 it is the only interactive thing on the page.
+           aria-hidden because the button's own label already says so; announcing it twice is noise. -->
+      <p class="cow-hint" aria-hidden="true">press the cow</p>
+    )}
+    <!-- The tail, from a matrix like every other pixel mark here. Not a CSS border-triangle: that has
+         anti-aliased diagonals, which would be the one non-pixel edge in the drawing. -->
+    <svg
+      class="cow-tail"
+      viewBox={`0 0 ${COW_TAIL_W} ${COW_TAIL_H}`}
+      aria-hidden="true"
+      shape-rendering="crispEdges"
+    >
+      <g class="cow-tail-fill">
+        {COW_TAIL_FILL.cells.map((c) => <rect x={c.x} y={c.y} width="1" height="1" />)}
+      </g>
+      <g class="cow-tail-ink">
+        {COW_TAIL_INK.cells.map((c) => <rect x={c.x} y={c.y} width="1" height="1" />)}
+      </g>
+    </svg>
+  </div>
+
   <button type="button" class="cow" data-cow aria-label={label}>
     <svg
       class="cow-art"
@@ -71,42 +118,97 @@ const CELL = size === 'large' ? 6 : 2;
       </g>
     </svg>
   </button>
-  <!-- The lines travel as JSON on the wrapper, so the copy stays in data/cowGlyph.ts and the script stays
-       generic. A first pass joined them with a separator and wrote a literal NUL byte into the source; JSON
-       cannot be ambiguous about where a line ends, and cannot smuggle a control character. -->
-  <p class="cow-says" data-cow-says aria-live="polite"></p>
-  {size === 'large' && (
-    <!-- The big cow is the only interactive thing on its page, so it says so. aria-hidden because the button's
-         own label already tells a screen reader to press it; announcing it twice is noise. -->
-    <p class="cow-hint" aria-hidden="true">press the cow</p>
-  )}
 </div>
 
 <style>
-  /* HUGS ITS CONTENT, which matters when the cow is itself a flex child. In the homepage footer the wrapper came
+  /* ONE CELL, ONE NUMBER. Everything pixel-sized in the bubble derives from --moo-cell, so the whole thing
+     rescales from a single edit and can never end up with a 10px border around 7px type. */
+  /* ── TWO PALETTES, AND ONLY ONE OF THEM FLIPS. This is the exception tokens.css already names for --bg and
+     --on-accent: a role that must NOT ride the ink ramp.
+     THE COW IS AN ILLUSTRATION, so its four colours are pinned. It was drawn from --paper/--ink-1/--ochre, and
+     under the dark theme that produced two separate faults, both of them seen in a screenshot: --paper (#dfe3df)
+     and --ink-1 (#dce1dc) differ by three values per channel, so the body and the outline collapsed and the
+     animal lost every patch, hoof and eye; and --ochre becomes the terminal phosphor green in dark, so it grew
+     EMERALD HORNS. A Holstein is white with black markings, a pink nose and tan horns — that is a drawing, not a
+     surface, and inverting it is as wrong as inverting a photograph on /art. The footer it sits in is the
+     near-black ground of the descent in BOTH themes anyway, so there was never a legibility reason to flip it.
+     THE BUBBLE IS A TEXT SURFACE, so it does follow the theme, through its own two tokens.
+
+     HUGS ITS CONTENT, which matters when the cow is itself a flex child. In the homepage footer the wrapper came
      out 1361px wide around 56px of drawing, so the cow sat at the far LEFT of its own box — the opposite of
      where it was asked to go. `flex: 0 0 auto` alone did not fix it (measured: still 1361px), so the width is
-     stated outright. margin-left:auto then pins it to the right of whatever row it lands in. */
+     stated outright. The bubble's own width is fixed, so max-content is now well-defined rather than the
+     longest unwrapped sentence. */
   .cow-wrap {
-    display: flex; align-items: center; gap: 10px;
+    --cow-hide: #e9e3d7;   /* the white of the animal */
+    --cow-mark: #16140f;   /* the black markings, and the derived outline */
+    --cow-nose: #b23a2e;   /* the seal's vermilion, mixed to pink by 0.42 over the hide */
+    --cow-horn: #c8a36a;   /* the ochre of the light palette — the reference's tan */
+    --moo-paper: var(--paper);
+    --moo-ink: var(--ink-1);
+    --moo-cell: 10px;
+    /* 21 cells: the MOO type is 19 wide, and the longest line ("Past performance is not indicative of future
+       grass.", 51 characters) wraps to two lines of mono at this measure. Two lines is what .cow-says reserves,
+       so the bubble is the same height whichever line is showing and the cow never shifts under it. */
+    --moo-cols: 21;
+    display: flex; align-items: flex-end; gap: clamp(4px, 0.6vw, 10px);
     flex: 0 0 auto; width: max-content; max-width: 100%;
   }
-  .cow-wrap--small { min-height: 30px; margin-left: auto; }
-  /* Large: stacked and centred, because it is the page\'s subject rather than a note at the end of one. */
-  .cow-wrap--large {
-    flex-direction: column; align-items: flex-start; gap: clamp(14px, 2vh, 22px);
-    margin-top: clamp(24px, 4vh, 56px);
+  /* #14161a is the paper slides' dark surface, byte-identical to Choice/Rules/Work/Solve, so the bubble is the
+     same material as every other panel in dark theme. */
+  :global(html[data-theme='dark']) .cow-wrap { --moo-paper: #14161a; }
+  .cow-wrap--small { margin-left: auto; }
+  /* Large: the pair is the page's subject rather than a note at the end of one, so it gets air above it. */
+  .cow-wrap--large { margin-top: clamp(24px, 4vh, 56px); }
+
+  /* ── THE BUBBLE. Square corners and a one-cell border: this is pixel art, so nothing here is rounded and
+     nothing is anti-aliased. */
+  .cow-bubble {
+    position: relative;
+    box-sizing: content-box;
+    width: calc(var(--moo-cols) * var(--moo-cell));
+    border: var(--moo-cell) solid var(--moo-ink);
+    background: var(--moo-paper);
+    padding: calc(var(--moo-cell) * 1.4);
+    /* The tail hangs below the border box, so the margin reserves its room instead of letting it overlap the
+       cow — and it lifts the bubble to sit above the cow's shoulder, where the tail points. */
+    margin-bottom: calc(var(--moo-cell) * 3);
+  }
+
+  .cow-moo { display: block; width: 100%; height: auto; }
+  .cow-moo rect { fill: var(--moo-ink); }
+
+  .cow-tail {
+    position: absolute;
+    /* Pulled up by one cell so the tail's paper top row paints over the bubble's ink bottom border — that
+       overlap IS the mouth of the bubble. Anchored from the right so it sits under the bubble's right end,
+       which is the side the cow is on. */
+    top: calc(100% - var(--moo-cell));
+    right: calc(var(--moo-cell) * 2);
+    width: calc(var(--moo-cell) * 4); height: calc(var(--moo-cell) * 4);
+    display: block;
+  }
+  .cow-tail-fill rect { fill: var(--moo-paper); }
+  .cow-tail-ink rect { fill: var(--moo-ink); }
+
+  /* THE LINE, INSIDE THE BUBBLE and much bigger than the 11.5px mono it replaced. Ink on paper now, not paper
+     on the near-black footer — the bubble brought its own ground with it. */
+  .cow-says {
+    margin: calc(var(--moo-cell) * 1.2) 0 0;
+    font-family: var(--font-mono); font-size: 13.5px; line-height: 1.45; letter-spacing: 0.01em;
+    color: var(--ink-2);
+    /* Two lines held open, so rotating through the sentences never resizes the bubble. */
+    min-height: calc(2 * 1.45 * 13.5px);
   }
 
   .cow {
     -webkit-appearance: none; appearance: none; background: none; border: 0; padding: 0;
     display: block; cursor: pointer; line-height: 0; color: inherit;
   }
-  /* Quiet enough to be missed while reading, visible enough to be found while looking. 22% was measured as too
-     faint against the near-black footer the cow now sits in — it disappeared rather than hid. */
-  .cow-wrap--small .cow { opacity: 0.5; }
-  .cow-wrap--small .cow:hover, .cow-wrap--small .cow:focus-visible { opacity: 0.85; }
-  /* The subject of its page, so it is simply there. */
+  /* Quiet enough to be missed while reading, visible enough to be found while looking — but no longer the 0.5
+     it was when it had no bubble to belong to: half-opacity beside a full-strength bubble read as unfinished. */
+  .cow-wrap--small .cow { opacity: 0.8; }
+  .cow-wrap--small .cow:hover, .cow-wrap--small .cow:focus-visible { opacity: 1; }
   .cow-wrap--large .cow { opacity: 0.9; }
   .cow-wrap--large .cow:hover, .cow-wrap--large .cow:focus-visible { opacity: 1; }
   .cow:focus-visible { outline: 2px solid currentColor; outline-offset: 6px; }
@@ -117,33 +219,31 @@ const CELL = size === 'large' ? 6 : 2;
      and the outline can never collapse into each other.
      The muzzle is the vermilion seal, the one saturated colour the palette allows, at half strength so it reads
      as a soft nose rather than as a brand mark. */
-  .cow-fill rect { fill: var(--paper); }
-  .cow-ink rect { fill: var(--ink-1); }
+  .cow-fill rect { fill: var(--cow-hide); }
+  .cow-ink rect { fill: var(--cow-mark); }
   /* Over paper (the body layer covers these cells too), so 0.42 of the seal mixes to a soft pink rather
      than the brick red it produced when it painted straight onto the page. */
-  .cow-muzzle rect { fill: var(--seal); opacity: 0.42; }
+  .cow-muzzle rect { fill: var(--cow-nose); opacity: 0.42; }
   /* The horns take the ochre accent, which is the palette's warm tone — the reference's tan. */
-  .cow-horn rect { fill: var(--ochre); opacity: 0.85; }
+  .cow-horn rect { fill: var(--cow-horn); opacity: 0.85; }
 
-  .cow-says {
-    margin: 0;
-    font-family: var(--font-mono); letter-spacing: 0.02em;
-    color: var(--ink-4, currentColor); opacity: 0;
-  }
-  .cow-wrap--small .cow-says { font-size: 11.5px; }
-  .cow-wrap--large .cow-says { font-size: clamp(12.5px, 1.05vw, 15px); }
-  .cow-says.is-said { opacity: 0.9; }
-
-  /* A hint that the big cow is pressable — it is the only interactive thing on those pages. */
-  .cow-wrap--large .cow-hint {
+  .cow-hint {
+    margin: calc(var(--moo-cell) * 0.9) 0 0;
     font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.14em;
-    text-transform: uppercase; color: var(--ink-4, currentColor); opacity: 0.5;
+    /* ink-3 at full strength, not ink-4 at 0.75: this sits on the bubble's PAPER now rather than on a dark page,
+       and 10.5px counts as small text, so it needs the 4.5:1 ramp. ink-4 on paper measures about 2.8:1, and an
+       opacity below 1 lowers the effective ratio further. */
+    text-transform: uppercase; color: var(--ink-3);
   }
+
+  /* Large: same bubble, bigger cell — the one number does the work. */
+  .cow-wrap--large { --moo-cell: 12px; }
+  .cow-wrap--large .cow-says { font-size: 15px; min-height: calc(2 * 1.45 * 15px); }
 
   @media (prefers-reduced-motion: no-preference) {
-    /* transform and opacity only — the project\'s rule. */
+    /* transform and opacity only — the project's rule. */
     .cow { transition: opacity 220ms ease, transform 220ms ease; }
-    .cow-says { transition: opacity 260ms ease; }
+    .cow-says { transition: opacity 200ms ease; }
     .cow:active { transform: translateY(1px) scale(0.98); }
     .cow.is-poked .cow-art { animation: cow-nudge 420ms ease-out; }
     @keyframes cow-nudge {
@@ -152,11 +252,26 @@ const CELL = size === 'large' ? 6 : 2;
       70%  { transform: translateY(0) rotate(2deg); }
       100% { transform: translateY(0) rotate(0deg); }
     }
+    /* The line fades out and back rather than swapping mid-sentence. */
+    .cow-says.is-swapping { opacity: 0; }
   }
 
-  @media (max-width: 700px) {
-    /* A 147px-wide drawing is most of a phone screen; scale it down rather than letting it set the page width. */
+  /* ── NARROW SCREENS. Bubble beside cow is ~400px, which is most of a phone; below this the pair stacks with
+     the bubble above the cow. The tail needs no mirroring — both are right-aligned, so it already points down
+     at the animal — but the cell shrinks and the measure widens, because a narrow column of mono wraps badly. */
+  @media (max-width: 620px) {
+    .cow-wrap { --moo-cell: 8px; --moo-cols: 26; flex-direction: column; align-items: flex-end; }
+    .cow-wrap--large { --moo-cell: 9px; }
+    .cow-wrap--small .cow-art { width: 88px; height: auto; }
     .cow-wrap--large .cow-art { width: min(100%, 210px); height: auto; }
+  }
+  /* SMALLEST PHONES. The bubble's width is an exact multiple of the cell (pixel art cannot have a fractional
+     cell), so it is a hard min-content floor — and on /404 at 320px it became the whole PAGE's floor: the
+     document measured 333px against a 320px viewport, with the 277px bubble plus the page's padding setting it.
+     The cell comes down and the measure goes UP in cells, which keeps the two reserved lines of copy fitting at
+     ~26 characters while the box gets narrower: 7 x (30 + 4.8) = 244px, inside 320 less padding. */
+  @media (max-width: 430px) {
+    .cow-wrap, .cow-wrap--large { --moo-cell: 7px; --moo-cols: 30; }
   }
 </style>
 
@@ -184,13 +299,21 @@ const CELL = size === 'large' ? 6 : 2;
       // No lines means no egg: leave the button inert rather than shipping one that does nothing visible.
       if (!lines.length) continue;
 
-      let i = -1;
+      // Line 0 is already in the bubble from the build, so the first press advances to line 1 rather than
+      // re-showing what is on screen.
+      let i = 0;
       let nudgeTimer = 0;
+      let swapTimer = 0;
 
       const poke = () => {
         i = (i + 1) % lines.length;
-        says.textContent = lines[i];
-        says.classList.add('is-said');
+        // Fade the old line out, swap at the trough, fade in — a hard cut mid-sentence read as a glitch.
+        says.classList.add('is-swapping');
+        window.clearTimeout(swapTimer);
+        swapTimer = window.setTimeout(() => {
+          says.textContent = lines[i];
+          says.classList.remove('is-swapping');
+        }, 170);
         // Restart the nudge even on a rapid second press: removing the class, forcing a reflow read, then
         // re-adding it is the only reliable way to replay a CSS animation.
         btn.classList.remove('is-poked');
@@ -203,6 +326,7 @@ const CELL = size === 'large' ? 6 : 2;
       btn.addEventListener('click', poke);
       cleanups.push(() => {
         window.clearTimeout(nudgeTimer);
+        window.clearTimeout(swapTimer);
         btn.removeEventListener('click', poke);
       });
     }

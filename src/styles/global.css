@@ -106,7 +106,14 @@ body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body)
    dead air under it. The paper panels stay full-bleed because
    they are the flex ITEM, so the ground still reaches both edges.
    ============================================================ */
-.is-slides > section {
+/* EXCLUDES THE SIGNATURE rather than overriding it afterwards, and that distinction was a real bug. The footer
+   is not a slide — it is a strip — and it used to be exempted below with `display: block`, which silently beat
+   its own Tailwind `flex justify-between items-end` (an ID selector outranks a utility class). So on the
+   homepage, and ONLY on the homepage, the footer laid out as three stacked blocks and the IT seal rendered at
+   the far LEFT instead of the bottom right. The owner reported it twice as the seal "drifting"; both of my
+   earlier attempts edited the markup, which could not have worked, because the markup was never the problem.
+   Excluding it here means the utilities in Signature.astro simply apply, and there is nothing left to override. */
+.is-slides > section:not(#signature) {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -124,9 +131,9 @@ body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body)
   flex-direction: column;
   justify-content: center;
 }
-/* The signature is a footer strip, not a slide: giving it a full screen would end the
-   page on 850px of empty sky. */
-.is-slides > #signature { min-height: 0; display: block; }
+/* (The signature's exemption moved INTO the selector above — it never reaches the footer now, so the strip
+   keeps its natural height and its own flex row. Giving it a full screen would end the page on 850px of empty
+   sky, which is why it is exempt at all.) */
 
 /* ── Atmosphere, upper sky (heights → interlude). Normal blend: these are warm
    LIGHT washes + a soft horizon haze that read on the pale paper. Localized to
