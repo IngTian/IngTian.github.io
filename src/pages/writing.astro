@@ -13,6 +13,7 @@
 // Composition is deliberately IDENTICAL to /projects: same left margin, same reading measure, same rail, same
 // reading gradient. Three reading pages that each guessed their own margins would read as three sites.
 import BaseLayout from '../layouts/BaseLayout.astro';
+import PlushCow from '../components/PlushCow.astro';
 import FluidSky from '../components/proto/FluidSky.astro';
 import SkyWash from '../components/SkyWash.astro';
 import SideRail from '../components/SideRail.astro';
@@ -92,6 +93,10 @@ const longDate = (iso: string) =>
           </section>
         ))}
       </div>
+
+      <!-- THE EASTER EGG, the same cow as the homepage's work section — inside .writing-block, or it renders in
+           the gutter and collides with the fixed rail. A shelf still filling up is a good place to hide one. -->
+      <PlushCow />
 
       <footer class="writing-foot"><a class="back" href="/">← back to the descent</a></footer>
     </div>

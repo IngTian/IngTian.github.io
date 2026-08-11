@@ -1,0 +1,145 @@
+---
+// src/components/PlushCow.astro
+// THE EASTER EGG — a pixel plush cow that says something when you poke it.
+//
+// The owner: "for the work, for the writing. let's leave an easter egg there. have a pixel art plush cow says
+// something."
+//
+// The cow is an existing motif: the terrain hero's rare pill can read "Moo!" instead of the KKT condition, and
+// the original quant-pod brief put a plush cow on the desk. This is the same animal with a body and an opinion.
+//
+// EASTER EGG, SO IT HIDES — but it is still a real control, not a trap. It sits at 22% opacity until hovered or
+// focused, which is enough to be missed by anyone reading the page and found by anyone looking at it. It is a
+// genuine <button> with an accessible name, reachable by keyboard, and what it says lands in a polite live
+// region — an egg that a screen-reader user cannot find is not restraint, it is an omission.
+//
+// Restraint check: one small mark, one line of dry text, no sound, no confetti, nothing that moves unless you
+// press it. The glyph is compiled from a character matrix in data/cowGlyph.ts like every other pixel mark here.
+import { COW, COW_LINES } from '../data/cowGlyph';
+
+// 2px cells: a 30x26 mark. Big enough to read as a cow, small enough to be furniture.
+const CELL = 2;
+---
+
+<div class="cow-wrap" data-cow-lines={JSON.stringify(COW_LINES)}>
+  <button
+    type="button"
+    class="cow"
+    data-cow
+    aria-label="A plush cow. Press it."
+  >
+    <svg
+      class="cow-art"
+      viewBox={`0 0 ${COW.w * CELL} ${COW.h * CELL}`}
+      width={COW.w * CELL}
+      height={COW.h * CELL}
+      aria-hidden="true"
+      shape-rendering="crispEdges"
+    >
+      {COW.cells.map((c) => (
+        <rect x={c.x * CELL} y={c.y * CELL} width={CELL} height={CELL} />
+      ))}
+    </svg>
+  </button>
+  <p class="cow-says" data-cow-says aria-live="polite"></p>
+  <!-- The lines travel as JSON on the wrapper, so the copy stays in data/cowGlyph.ts and the script stays
+       generic. A first pass joined them with a separator character and wrote a literal NUL byte into the
+       source; JSON cannot be ambiguous about where a line ends, and cannot smuggle a control character. -->
+</div>
+
+<style>
+  .cow-wrap {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: clamp(20px, 3vh, 40px);
+    min-height: 30px;
+  }
+
+  .cow {
+    -webkit-appearance: none; appearance: none; background: none; border: 0; padding: 0;
+    display: block; cursor: pointer; line-height: 0;
+    /* Quiet enough to be missed while reading, visible enough to be found while looking. */
+    opacity: 0.22;
+    color: inherit;
+  }
+  .cow:hover, .cow:focus-visible { opacity: 0.85; }
+  .cow:focus-visible { outline: 2px solid var(--ink-3, currentColor); outline-offset: 4px; }
+  .cow-art rect { fill: currentColor; }
+
+  .cow-says {
+    margin: 0;
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.02em;
+    color: var(--ink-4, currentColor); opacity: 0;
+  }
+  .cow-says.is-said { opacity: 0.9; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    /* transform and opacity only — the project's rule, and a nudge is all the animation an egg needs. */
+    .cow { transition: opacity 220ms ease, transform 220ms ease; }
+    .cow-says { transition: opacity 260ms ease; }
+    .cow:active { transform: translateY(1px) scale(0.96); }
+    .cow.is-poked .cow-art { animation: cow-nudge 420ms ease-out; }
+    @keyframes cow-nudge {
+      0%   { transform: translateY(0) rotate(0deg); }
+      35%  { transform: translateY(-3px) rotate(-4deg); }
+      70%  { transform: translateY(0) rotate(3deg); }
+      100% { transform: translateY(0) rotate(0deg); }
+    }
+  }
+</style>
+
+<script>
+  // One cow, one line per press, in order and wrapping. Deterministic on purpose: this project bans
+  // Math.random() at paint time, and an egg that says the same thing in the same order is also easier to test.
+  function initCows(): (() => void) | null {
+    const wraps = Array.from(document.querySelectorAll<HTMLElement>('.cow-wrap'));
+    if (!wraps.length) return null;
+
+    const cleanups: (() => void)[] = [];
+
+    for (const wrap of wraps) {
+      const btn = wrap.querySelector<HTMLButtonElement>('[data-cow]');
+      const says = wrap.querySelector<HTMLElement>('[data-cow-says]');
+      if (!btn || !says) continue;
+
+      let lines: string[] = [];
+      try {
+        const parsed = JSON.parse(wrap.dataset.cowLines ?? '[]');
+        if (Array.isArray(parsed)) lines = parsed.filter((l): l is string => typeof l === 'string' && !!l);
+      } catch {
+        lines = [];
+      }
+      // No lines means no egg: leave the button inert rather than shipping one that does nothing visible.
+      if (!lines.length) continue;
+
+      let i = -1;
+      let nudgeTimer = 0;
+
+      const poke = () => {
+        i = (i + 1) % lines.length;
+        says.textContent = lines[i];
+        says.classList.add('is-said');
+        // Restart the nudge even on a rapid second press: removing the class, forcing a reflow read, then
+        // re-adding it is the only reliable way to replay a CSS animation.
+        btn.classList.remove('is-poked');
+        void btn.offsetWidth;
+        btn.classList.add('is-poked');
+        window.clearTimeout(nudgeTimer);
+        nudgeTimer = window.setTimeout(() => btn.classList.remove('is-poked'), 460);
+      };
+
+      btn.addEventListener('click', poke);
+      cleanups.push(() => {
+        window.clearTimeout(nudgeTimer);
+        btn.removeEventListener('click', poke);
+      });
+    }
+
+    return cleanups.length ? () => { for (const c of cleanups) c(); } : null;
+  }
+
+  let teardownCows: (() => void) | null = null;
+  document.addEventListener('astro:page-load', () => {
+    teardownCows?.();
+    teardownCows = initCows();
+  });
+</script>
