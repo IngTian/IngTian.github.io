@@ -15,6 +15,14 @@ import { WRITINGS_PROMISE, WRITINGS_TOPICS } from '../data/making';
 const featured = publications.find((p) => p.featured);
 const others = publications.filter((p) => !p.featured);
 const shownProjects = projects.slice(0, 2);
+
+// THE TWO HEADLINE NUMBERS, recovered from the shipped homepage. This slide replaced a "Selected writing" glass
+// card that carried them, and dropping them cost the homepage every number on it — which on a quant's site is the
+// wrong thing to spend for breadth: the Sharpe against its two baselines is the most checkable claim here, and it
+// is the one thing a reader cannot get from a title. Derived exactly as the shipped card derived them, so
+// profile.ts stays the single source and the figures cannot drift from the paper's own table.
+const compounded = featured?.results?.[0];
+const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
 ---
 <section id="work" class="wk" aria-labelledby="wk-heading">
   <div class="wk-paper">
@@ -32,6 +40,22 @@ const shownProjects = projects.slice(0, 2);
                 {featured.subject} · {featured.venue}
                 {featured.arxivId && <> · arXiv:{featured.arxivId}</>}
               </p>
+              <!-- Out-of-sample, against two baselines, both named — a number with nothing to compare it to is
+                   decoration. Full table on /research. -->
+              <div class="wk-stats">
+                {compounded && (
+                  <div class="wk-stat">
+                    <p class="wk-stat-value">{compounded.value}</p>
+                    <p class="wk-stat-label">wealth compounded · OOS ’20–’25</p>
+                  </div>
+                )}
+                {sharpe && (
+                  <div class="wk-stat">
+                    <p class="wk-stat-value">{sharpe.values[0]}</p>
+                    <p class="wk-stat-label">Sharpe · vs {sharpe.values[1]} / {sharpe.values[2]}</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           {others.map((p) => (
@@ -151,6 +175,27 @@ const shownProjects = projects.slice(0, 2);
   .wk-item-line {
     font-size: clamp(13.5px, 1vw, 15px); line-height: 1.58; color: var(--wk-ink-faint);
     margin: 6px 0 0; max-width: 40ch;
+  }
+
+  /* THE NUMBERS. Display face for the figure, mono for what it is measured against — the same pairing the
+     shipped card used, so the homepage reads as continuous with what is live rather than as a different site.
+     Two across at this column width (~350px at 1440), stacking below where that stops fitting. */
+  .wk-stats {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(10px, 1.4vw, 22px);
+    margin: clamp(12px, 1.7vh, 20px) 0 0;
+  }
+  .wk-stat-value {
+    font-family: var(--font-display); font-weight: 400;
+    font-size: clamp(21px, 1.9vw, 29px); line-height: 1; color: var(--wk-ink); margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .wk-stat-label {
+    font-family: var(--font-mono); font-size: clamp(9px, 0.68vw, 10.5px); line-height: 1.4;
+    letter-spacing: 0.02em; color: var(--wk-ink-faint); margin: 6px 0 0;
+  }
+  @media (max-width: 1180px) {
+    .wk-stats { grid-template-columns: 1fr; gap: 12px; }
   }
 
   .wk-promise {
