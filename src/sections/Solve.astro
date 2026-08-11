@@ -157,22 +157,23 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
 
 <style>
   .so { position: relative; z-index: 1; width: 100vw; margin-left: calc(50% - 50vw); --deck-lead: 0px; }
-  /* THE ONE DARK SLIDE, deliberately. Four consecutive paper panels read as four walls of the same wall, and
-     this is the payoff of the sequence — a lattice of light is what it wants to be, and the register break
-     marks it as the arrival rather than another exposition. The dark theme leaves it nearly unchanged, which is
-     correct: it is already the night end of the descent. */
+  /* FOLLOWS THE THEME, like every other slide. This was built as "the one dark slide" — a deliberate register
+     break marking the arrival of the explainer — and the owner rejected it outright: "in light theme, the Still
+     an open problem slide, the background is dark." He is right, and the reason is worth keeping: a light-theme
+     reader has no way to read one dark slab as a *register* choice, only as a bug or a half-loaded panel. A
+     theme is a promise about the whole page, and one surface opting out breaks it.
+     The values below are byte-identical to Choice, Rules and Work, so the four paper slides cannot drift apart.
+     Every colour on this slide routes through these six variables, including the lattice, so the drawing
+     re-themes with the panel and nothing needed to be re-drawn. */
   .so-paper {
-    --s-bg: #1b1a17; --s-edge: rgba(214,206,190,0.16); --s-ink: #ece6da;
-    /* Ochre, which is the palette's accent — on this dark ground it reads as the lit route without needing a
-       new colour. The tokens are hardcoded rather than inherited because this panel is the one surface that
-       does NOT flip with the theme: it is dark in both. */
-    --s-soft: #b9b2a4; --s-faint: #8a8377; --s-accent: #c8a36a;
+    --s-bg: #c4b7a1; --s-edge: rgba(74,66,54,0.26); --s-ink: #1f1b14;
+    --s-soft: #423b30; --s-faint: #6a6153; --s-accent: #7c5522;
     background: var(--s-bg);
     border-top: 1px solid var(--s-edge); border-bottom: 1px solid var(--s-edge);
     padding: clamp(30px, 4vh, 62px) 0;
   }
   :global(html[data-theme='dark']) .so-paper {
-    --s-bg: #101215; --s-edge: rgba(184,177,161,0.14); --s-ink: #dce1dc;
+    --s-bg: #14161a; --s-edge: rgba(184,177,161,0.14); --s-ink: #dce1dc;
     --s-soft: #a8b0a9; --s-faint: #6d746e; --s-accent: #7fc9a0;
   }
   .so-inner {
