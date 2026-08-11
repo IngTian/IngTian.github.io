@@ -555,8 +555,13 @@ const allBeats = [...BEATS, BEAT4];
   /* RETAIL vs INSTITUTIONAL, as two columns. The grouping is the beat's second idea — that these are different
      KINDS of book, held by different kinds of holder — and side by side it costs about half the height of a
      stacked list with headers, which is what let the footer stop clipping. */
+  /* minmax(0, 1fr), NOT 1fr — and this was a real horizontal-scrollbar bug on the phone homepage. A bare `1fr`
+     is `minmax(auto, 1fr)`, so a track cannot shrink below its content's min-content width; these legends have
+     three fixed 5ch numeric columns and so measure 197px each, which at 390px wide made two 197px tracks in a
+     342px box and pushed the document to 438px. Measured: scrollWidth 438 against a 390 viewport. The same
+     minmax(0, …) form is already what every other grid on the site uses, for exactly this reason. */
   .ch-pnl-groups {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 0 clamp(16px, 2vw, 34px);
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 clamp(16px, 2vw, 34px);
     align-items: start; margin: clamp(6px, 1vh, 12px) 0 0;
   }
   .ch-pnl-group { display: block !important; margin: 0 0 1px; }
@@ -628,6 +633,26 @@ const allBeats = [...BEATS, BEAT4];
     .ch-pnl-end, .ch-pnl-fall, .ch-pnl-exp { font-size: 11.5px; }
     .ch-panel-foot { font-size: 11px; line-height: 1.4; margin-top: 6px; }
     .ch-panel-head { margin-bottom: 6px; }
+  }
+
+  /* ── PHONES: THE TWO LEGENDS STACK. Side by side they need about 410px of container (two 197px legends and a
+     gap) and a phone gives 342px, which was a horizontal scrollbar on the homepage — the document measured 438px
+     against a 390px viewport. Letting the tracks shrink instead is worse, not better: measured at 390px, the
+     name column collapsed to 0 and "Buys once, never looks" wrapped to 72px of one-character lines. These
+     labels are short sentences, so the only width that works for them is the full column.
+     The cost is roughly one legend's height, which this slide can afford: it is already taller than a phone
+     viewport here, and lib/deck.ts pages through slides that are legitimately taller than a screen. */
+  @media (max-width: 700px) {
+    .ch-pnl-groups { grid-template-columns: minmax(0, 1fr); row-gap: 2px; }
+    /* Stacking costs about 70px, and the panels are absolutely positioned to fill a fixed-height stage, so that
+       cost does not push the box — it overflows it, and the last legend row landed on top of the caption
+       (measured: legend bottom 775 against a panel bottom of 747). The chart gives the room back, which is this
+       slide's own rule at every other narrow breakpoint: at phone width the curves are a sparkline that says
+       "these five diverge", while the legend carries the actual numbers. */
+    .ch-pnl { min-height: clamp(64px, 8.5vh, 96px); }
+    .ch-pnl-legend { gap: 0; }
+    .ch-pnl-head-row { margin-bottom: 0; }
+    .ch-panel-foot { font-size: 11px; line-height: 1.38; }
   }
 
   /* 1101 vs 1100: the pair must ABUT. At exactly 1100px the old bounds (max 1099 / min 1101) matched neither
