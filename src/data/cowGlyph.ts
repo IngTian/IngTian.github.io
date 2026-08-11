@@ -1,74 +1,66 @@
 // src/data/cowGlyph.ts
-// THE COW — the site's one joke, in pixels, and the owner loves cows so it had better look like one.
+// THE COW — transcribed from the grid the owner supplied, after five failed attempts of my own.
 //
-// THREE FAILURES ON THE WAY HERE, all worth recording so nobody re-treads them.
+// WHAT WENT WRONG, FIVE TIMES, and the lesson: I was hand-drawing silhouettes in a text file and judging them in
+// a terminal. The owner's verdicts, in order — "looks like a dragon", then a robot, then "doesn't read like a
+// cow", then "horribly wrong ... they are monsters not cows". Two errors underneath all of it:
 //
-//   TAKE ONE — a single-tone front-facing head. The owner: "your pixel art cow doesn't quite look like a cow
-//   btw. looks like a dragon." Right: the two pointed shapes on top read as horns or wings, the outline tapered
-//   to a snout, and one flat tone cannot carry patches, which are the strongest "this is a cow" signal.
+//   1. THE POSE. I drew a full profile (one eye, muzzle pointing sideways). The reference is a CHIBI
+//      FRONT-FACING cow: it looks straight at you, and the muzzle is a large block in the middle of the face.
+//      That silhouette is most of what makes it read as a cow rather than as some quadruped.
+//   2. THE PALETTE. I had two tones. The reference needs four — black markings, white body, PINK muzzle, and
+//      TAN horns — and the horns and muzzle are exactly the features that say "cow" rather than "dog".
 //
-//   TAKE TWO — same view, with sideways ears, a patch and an outlined muzzle. It stopped looking like a dragon
-//   and started looking like a ROBOT, because every feature was a rectangle: the muzzle outline became a grille,
-//   the ears became bolts, the patch became a bar.
+// So this is a transcription, not a design. Structure, proportion and colour roles all come from the grid the
+// owner sent: horns at the top corners, black patches over the ears and around the eyes, a wide pink muzzle with
+// two nostrils, a white body with a black patch each side, a tail with a dark tuft, and hooves.
 //
-//   TAKE THREE — the SIDE silhouette, which is the one people recognise instantly: a long body on four legs, the
-//   head carried low at the shoulder, a tail. That read as an animal at last, but the TONES came out inverted.
-//   The site's ink is currentColor, which is LIGHT on the dark pages — so the layer meant to be "dark markings"
-//   rendered brightest and the patches read as lit windows on a dark hull. The robot again, in miniature.
-//
-// SO THE TONES ARE NAMED BY ROLE, NOT BY DARKNESS. COW_BODY is the animal — silhouette, legs, ear, tail, muzzle
-// — and is drawn at full ink. COW_PATCH is only the markings, drawn at reduced opacity so they RECEDE into the
-// body. That works out correctly in both themes without a second colour, which the palette rules would not
-// allow: on the dark pages a bright cow with dimmer patches, on light a dark cow with softer patches. The eye is
-// a HOLE in the silhouette, so the page shows through it.
-//
-// Same discipline as every other pixel mark here (tickerGlyphs, ruleGlyphs): the art IS data, so it is
-// inspectable and every claim about it is testable. Hand-drawn illustration has failed on this project
-// repeatedly; compiled matrices have not.
+// The art is still DATA, like every other pixel mark here, so it stays inspectable and testable.
 
 import { compileGlyph, type Glyph } from '../lib/pixels';
 
 /**
- * The cow, in profile, facing left.
+ * The cow, facing the viewer.
  *
- * `+` the animal itself · `#` a patch · `.` transparent (including the eye, which is a hole).
- * The patches are deliberately different sizes and off-centre: real cows are irregular, and matched patches
- * read as a manufactured pattern rather than as an animal.
+ * `#` black markings · `+` white body · `o` pink muzzle · `t` tan horn · `.` transparent.
  */
 const MATRIX = [
-  '..++......................',
-  '..++++....................',
-  '..+++++.....++++++++++.+..',
-  '.+++++++..++++++++++++++..',
-  '.+.+++++++++++##++++++++..',
-  '++++++++++++++##++++++++..',
-  'oo++++++++++++++++++++++..',
-  'oo+++++++####+++++++++++..',
-  '.++++++#####+++++++++++++.',
-  '..+++++++++++++++++++++++.',
-  '...+++++++++++++++++++++..',
-  '....++++++oo++++++++++++..',
-  '.....++...++.....++...++..',
-  '.....++...++.....++...++..',
-  '.....++...++.....++...++..',
-  '.....++...++.....++...++..',
+  '....t..........t....',
+  '...tt..........tt...',
+  '...tt...++++...tt...',
+  '..#tt..++++++..tt#..',
+  '..##t.++++++++.t##..',
+  '.####+++++++++++###.',
+  '.####+++++++++++###.',
+  '..##+++++++++++++##.',
+  '..+++##+++++##+++++.',
+  '..+++##+++++##+++++.',
+  '..++oooooooooooo++..',
+  '..+oooooooooooooo+..',
+  '..+oo##oooo##ooooo..',
+  '..+oooooooooooooo+..',
+  '..++oooooooooooo++..',
+  '...++++++++++++++...',
+  '....++++++++++++....',
+  '...+####++++####+..#',
+  '...+####++++####+.##',
+  '...++++++++++++++.#.',
+  '...++++++++++++++...',
+  '...##++##..##++##...',
+  '...##++##..##++##...',
+  '...######..######...',
 ] as const;
 
 /**
- * The matrix with a one-cell transparent border on every side.
- *
- * The outline is derived by growing one cell outward from the animal, so the animal cannot touch the edge of the
- * grid or its outline gets clipped — measured: without this the legs had no bottom edge, the ear had no top, and
- * the muzzle ran off the left. Padding here rather than in the matrix keeps the drawing above readable as a
- * drawing, with no border of dots to count.
+ * One transparent cell of margin on every side, so the derived outline has somewhere to live.
+ * Without it the horns lose their tops and the hooves their bottoms.
  */
 const PADDED: readonly string[] = (() => {
-  const w = MATRIX[0].length;
-  const blank = '.'.repeat(w + 2);
+  const blank = '.'.repeat(MATRIX[0].length + 2);
   return [blank, ...MATRIX.map((r) => `.${r}.`), blank];
 })();
 
-/** Keep only the wanted characters, blanking the rest — one matrix, one glyph per role. */
+/** Keep only the wanted characters, blanking the rest — one matrix, one glyph per colour role. */
 function layer(...keep: string[]): Glyph {
   const want = new Set(keep);
   return compileGlyph(
@@ -77,15 +69,11 @@ function layer(...keep: string[]): Glyph {
 }
 
 /**
- * THE OUTLINE, DERIVED — not drawn.
+ * THE OUTLINE, DERIVED — every transparent cell orthogonally touching the cow becomes ink.
  *
- * The owner's reference is a classic 8-bit Holstein: white FILL inside dark INK, and that outline is most of why
- * it reads as a drawing of a cow rather than a silhouette with legs. Two hand-drawn attempts at one produced
- * diagonal wedges and a shape worse than no outline at all, so it is computed: every transparent cell
- * orthogonally adjacent to the animal becomes ink. Correct by construction, cannot drift when the silhouette is
- * edited, and trivially testable.
- *
- * Diagonal neighbours are excluded deliberately — including them thickens every corner into a blob.
+ * Computed rather than drawn because two hand-drawn attempts produced diagonal wedges and a shape worse than no
+ * outline at all. Correct by construction, cannot drift when the matrix is edited, and testable. Diagonals are
+ * excluded deliberately: including them thickens every corner into a blob.
  */
 function derivedOutline(): Glyph {
   const filled = new Set<string>();
@@ -110,19 +98,28 @@ function derivedOutline(): Glyph {
   return compileGlyph(rows);
 }
 
-/** The fill — the white of the cow: everything it occupies that is not a marking or the muzzle. */
-export const COW_BODY = layer('+');
+/**
+ * The white of the cow — and the muzzle cells too.
+ *
+ * The muzzle is painted ON TOP of this at partial opacity, so it needs white underneath or the seal red mixes
+ * with the page instead of with paper and comes out brick rather than pink. Measured on the 404: without this the
+ * nose read as dark red.
+ */
+export const COW_BODY = layer('+', 'o');
 
-/** The markings: two body patches and the udder. Same ink as the outline, as in the reference. */
+/** The black markings: head patches, eyes, nostrils, body patches, tail tuft, hooves. */
 export const COW_PATCH = layer('#');
 
-/** The muzzle, its own role so it can carry the one warm colour the palette allows. */
+/** The muzzle — the large pink block in the middle of the face, and the single strongest cow signal. */
 export const COW_MUZZLE = layer('o');
+
+/** The horns. Their own role so they can take a warm tan rather than the muzzle's pink. */
+export const COW_HORN = layer('t');
 
 /** One cell of ink outside the animal on every side. Computed, never hand-drawn. */
 export const COW_OUTLINE = derivedOutline();
 
-/** Grid size, shared by both layers — they come from one matrix, so they cannot disagree. */
+/** Grid size, shared by every layer — they come from one matrix, so they cannot disagree. */
 export const COW_W = PADDED[0].length;
 export const COW_H = PADDED.length;
 

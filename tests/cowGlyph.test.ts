@@ -1,129 +1,97 @@
 import { describe, it, expect } from 'vitest';
 import {
-  COW_BODY, COW_PATCH, COW_MUZZLE, COW_OUTLINE, COW_W, COW_H,
+  COW_BODY, COW_PATCH, COW_MUZZLE, COW_HORN, COW_OUTLINE, COW_W, COW_H,
   COW_LINES, COW_LINES_404, COW_LINES_WRITING,
 } from '../src/data/cowGlyph';
 import { inBounds } from '../src/lib/pixels';
 
-// The owner loves cows, and the first two attempts did not look like one — "looks like a dragon", then a robot.
-// So these tests pin the STRUCTURAL properties that make the side silhouette read as a cow: the things that were
-// missing when it failed. Shape assertions, not a pixel snapshot — a snapshot breaks on every touch-up and tells
-// you nothing about whether it still looks like an animal.
+// FIVE ATTEMPTS FAILED before the owner supplied a grid — "looks like a dragon", then a robot, then "doesn't read
+// like a cow", then "horribly wrong ... they are monsters not cows". The cow is now a TRANSCRIPTION of his
+// reference, so these tests pin the properties that separate that reference from everything I got wrong. Chiefly:
+// it FACES THE VIEWER — two eyes, a central muzzle, horns on top — where every version I invented was in profile.
+//
+// Shape assertions rather than a pixel snapshot: a snapshot breaks on any touch-up and tells you nothing about
+// whether the thing still reads as a cow.
 
-const cellSet = (g: { cells: { x: number; y: number }[] }) => new Set(g.cells.map((c) => `${c.x},${c.y}`));
-const rowCells = (g: { cells: { x: number; y: number }[] }, y: number) => g.cells.filter((c) => c.y === y);
-const allInk = [...COW_BODY.cells, ...COW_PATCH.cells];
+const key = (c: { x: number; y: number }) => `${c.x},${c.y}`;
+const rowOf = (g: { cells: { x: number; y: number }[] }, y: number) => g.cells.filter((c) => c.y === y);
+const runs = (xs: number[]) => {
+  const s = [...xs].sort((a, b) => a - b);
+  let n = s.length ? 1 : 0;
+  for (let i = 1; i < s.length; i++) if (s[i] - s[i - 1] > 1) n++;
+  return n;
+};
+const animal = [...COW_BODY.cells, ...COW_PATCH.cells, ...COW_MUZZLE.cells, ...COW_HORN.cells];
 
 describe('the cow, structurally', () => {
-  it('compiled both tones on one grid', () => {
-    expect(COW_W).toBe(28);
-    expect(COW_H).toBe(18);
-    expect(COW_BODY.w).toBe(COW_W);
-    expect(COW_PATCH.w).toBe(COW_W);
-    expect(COW_BODY.cells.length).toBeGreaterThan(0);
-    expect(COW_PATCH.cells.length).toBeGreaterThan(0);
-  });
-
-  it('keeps every cell inside the grid', () => {
-    expect(inBounds(COW_BODY)).toBe(true);
-    expect(inBounds(COW_PATCH)).toBe(true);
-  });
-
-  // A cell is body OR patch, never both. The component stacks the layers, so an overlap would paint twice and the
-  // patch opacity would come out wrong exactly where the markings are.
-  it('never puts a body cell and a patch cell in the same place', () => {
-    const body = cellSet(COW_BODY);
-    const overlap = COW_PATCH.cells.filter((c) => body.has(`${c.x},${c.y}`));
-    expect(overlap).toHaveLength(0);
-  });
-
-  // IS IT A COW? Wider than tall — a cow in profile is a long animal. Both failed takes were roughly square,
-  // which is part of why they read as a face rather than as livestock.
-  it('is a long animal in profile, not a square face', () => {
-    expect(COW_W / COW_H).toBeGreaterThan(1.4);
-  });
-
-  // FOUR LEGS, which is what makes it unmistakably livestock rather than a head.
-  it('stands on four legs', () => {
-    const bottom = rowCells(COW_BODY, COW_H - 2).map((c) => c.x).sort((a, b) => a - b);
-    expect(bottom.length).toBeGreaterThan(0);
-    let runs = 1;
-    for (let i = 1; i < bottom.length; i++) if (bottom[i] - bottom[i - 1] > 1) runs++;
-    expect(runs, 'the cow should have four legs').toBe(4);
-  });
-
-  it('carries its head low and to the left', () => {
-    const topRow = Math.min(...allInk.map((c) => c.y));
-    const headInk = allInk.filter((c) => c.y >= topRow && c.y <= topRow + 1);
-    expect(Math.min(...headInk.map((c) => c.x))).toBeLessThan(COW_W / 3);
-  });
-
-  it('has one eye, as a hole in the head — it is in profile', () => {
-    // The eye is transparent, so the page shows through it. A gap in the BODY layer is only an eye if the PATCH
-    // layer does not fill it — a patch leaves a gap in the body too, which is what made a first version of this
-    // test report two eyes.
-    const patch = cellSet(COW_PATCH);
-    const inked = new Set(rowCells(COW_BODY, 4).map((c) => c.x));
-    const span = [...inked].sort((a, b) => a - b);
-    const holes = [];
-    for (let x = span[0]; x < span[span.length - 1]; x++) {
-      if (!inked.has(x) && !patch.has(`${x},5`)) holes.push(x);
+  it('compiled every layer on one grid', () => {
+    for (const g of [COW_BODY, COW_PATCH, COW_MUZZLE, COW_HORN, COW_OUTLINE]) {
+      expect(g.w).toBe(COW_W);
+      expect(g.h).toBe(COW_H);
+      expect(g.cells.length).toBeGreaterThan(0);
+      expect(inBounds(g)).toBe(true);
     }
-    // Count RUNS, not cells: the eye is two cells wide, so counting cells reported two eyes for one eye.
-    let runs = 0;
-    for (let i = 0; i < holes.length; i++) if (i === 0 || holes[i] - holes[i - 1] > 1) runs++;
-    expect(runs, `expected exactly one eye, got holes ${JSON.stringify(holes)}`).toBe(1);
-    expect(holes[0], 'the eye belongs in the head, in the left half').toBeLessThan(COW_W / 2);
   });
 
-  it('has a tail at the opposite end from the head', () => {
-    const tail = COW_BODY.cells.filter((c) => c.x > COW_W - 6 && c.y < 7);
-    expect(tail.length, 'no tail').toBeGreaterThan(0);
+  // THE POSE — the error that took five tries. A front-facing chibi cow is TALLER than wide; every profile
+  // version was wider than tall. This fails the moment anyone reverts to a side view.
+  it('faces the viewer — taller than wide, not a profile', () => {
+    expect(COW_H).toBeGreaterThan(COW_W);
   });
 
-  // PATCHES ARE THE SIGNAL, and they must be irregular. Uniform-width rows are rectangles, which is exactly what
-  // made the second attempt look like a robot.
-  it('has irregular patches rather than matched rectangles', () => {
-    // Reads the PATCH layer, which is the thing being asserted about — an earlier version measured the body and
-    // so proved nothing about the markings at all.
-    const marks = COW_PATCH.cells.filter((c) => c.y > 4 && c.y < 13);
-    expect(marks.length).toBeGreaterThan(8);
-    const byRow = new Map<number, number>();
-    for (const c of marks) byRow.set(c.y, (byRow.get(c.y) ?? 0) + 1);
-    expect(new Set(byRow.values()).size, 'every patch row the same width is a rectangle').toBeGreaterThan(1);
+  it('has a wide muzzle in the middle of the face', () => {
+    const xs = COW_MUZZLE.cells.map((c) => c.x);
+    const mid = (Math.min(...xs) + Math.max(...xs)) / 2;
+    expect(Math.abs(mid - (COW_W - 1) / 2), 'the muzzle is off-centre').toBeLessThan(2.5);
+    expect(Math.max(...xs) - Math.min(...xs), 'the muzzle should dominate the face').toBeGreaterThan(COW_W / 2);
   });
 
-  // THE OUTLINE IS DERIVED, so this asserts the derivation rather than a drawing: every outline cell must touch
-  // the animal, and no outline cell may sit on top of it. Two hand-drawn attempts produced wedges; this cannot.
-  it('has an outline that hugs the animal and never overlaps it', () => {
-    const animal = new Set([...COW_BODY.cells, ...COW_PATCH.cells, ...COW_MUZZLE.cells].map((c) => `${c.x},${c.y}`));
+  it('has TWO eyes, side by side above the muzzle', () => {
+    const muzzleTop = Math.min(...COW_MUZZLE.cells.map((c) => c.y));
+    const xs = rowOf(COW_PATCH, muzzleTop - 2).map((c) => c.x);
+    expect(xs.length, 'no eyes found above the muzzle').toBeGreaterThan(0);
+    expect(runs(xs), 'a front-facing cow has two eyes').toBe(2);
+  });
+
+  it('has two horns at the top of the head, one each side', () => {
+    expect(COW_HORN.cells.length).toBeGreaterThan(6);
+    expect(runs(COW_HORN.cells.map((c) => c.x)), 'expected a horn on each side').toBe(2);
+    expect(Math.max(...COW_HORN.cells.map((c) => c.y)), 'horns belong on top').toBeLessThan(COW_H / 2);
+  });
+
+  it('paints white underneath the muzzle so the pink mixes with paper', () => {
+    // The muzzle is drawn over the body at partial opacity. Without the body covering those cells the seal red
+    // mixes with the PAGE and comes out brick — measured on the 404 before this was fixed.
+    const body = new Set(COW_BODY.cells.map(key));
+    for (const c of COW_MUZZLE.cells) {
+      expect(body.has(key(c)), `no white under the muzzle at ${key(c)}`).toBe(true);
+    }
+  });
+
+  it('stands on hooves', () => {
+    const xs = rowOf(COW_PATCH, COW_H - 2).map((c) => c.x);
+    expect(xs.length, 'no hooves').toBeGreaterThan(0);
+    expect(runs(xs), 'expected two hooves from the front').toBe(2);
+  });
+
+  // The outline is DERIVED, so this asserts the derivation rather than a drawing.
+  it('has an outline that hugs the cow and never overlaps it', () => {
+    const inked = new Set(animal.map(key));
     expect(COW_OUTLINE.cells.length).toBeGreaterThan(40);
     for (const c of COW_OUTLINE.cells) {
-      expect(animal.has(`${c.x},${c.y}`), `outline overlaps the animal at ${c.x},${c.y}`).toBe(false);
+      expect(inked.has(key(c)), `outline overlaps the cow at ${key(c)}`).toBe(false);
       const touches =
-        animal.has(`${c.x - 1},${c.y}`) || animal.has(`${c.x + 1},${c.y}`) ||
-        animal.has(`${c.x},${c.y - 1}`) || animal.has(`${c.x},${c.y + 1}`);
-      expect(touches, `stray outline cell at ${c.x},${c.y}`).toBe(true);
+        inked.has(`${c.x - 1},${c.y}`) || inked.has(`${c.x + 1},${c.y}`) ||
+        inked.has(`${c.x},${c.y - 1}`) || inked.has(`${c.x},${c.y + 1}`);
+      expect(touches, `stray outline cell at ${key(c)}`).toBe(true);
     }
   });
 
-  it('encloses the animal on all four sides — nothing runs off the grid', () => {
-    // This is what the one-cell padding buys: without it the legs had no bottom edge and the ear no top.
-    const animal = [...COW_BODY.cells, ...COW_PATCH.cells, ...COW_MUZZLE.cells];
+  it('never runs off the grid, so the outline is never clipped', () => {
     expect(Math.min(...animal.map((c) => c.x))).toBeGreaterThan(0);
     expect(Math.min(...animal.map((c) => c.y))).toBeGreaterThan(0);
     expect(Math.max(...animal.map((c) => c.x))).toBeLessThan(COW_W - 1);
     expect(Math.max(...animal.map((c) => c.y))).toBeLessThan(COW_H - 1);
-  });
-
-  it('has a muzzle at the front, low on the head', () => {
-    expect(COW_MUZZLE.cells.length).toBeGreaterThan(2);
-    expect(Math.min(...COW_MUZZLE.cells.map((c) => c.x))).toBeLessThan(4);
-  });
-
-  it('is mostly animal, with markings as a minority of it', () => {
-    // If the patches outgrew the body the drawing would read as a pattern with legs.
-    expect(COW_BODY.cells.length).toBeGreaterThan(COW_PATCH.cells.length * 2);
   });
 });
 
@@ -174,7 +142,6 @@ describe('what the cow says', () => {
   });
 
   it('says the right thing in the right place', () => {
-    // Swapping these would leave each page with a non-sequitur.
     expect(COW_LINES_404.join(' ').toLowerCase()).toMatch(/does not exist|nothing here/);
     expect(COW_LINES_WRITING.join(' ').toLowerCase()).toMatch(/nothing written|holding the space/);
   });

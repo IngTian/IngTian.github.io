@@ -13,7 +13,9 @@
 // SIZES. `small` is furniture at the foot of a section, quiet until you look at it. `large` is the subject of the
 // page it is on, so it is fully opaque from the start: on /writing and /404 the cow is not hiding, it IS the
 // content, and pretending otherwise would just make it look broken.
-import { COW_BODY, COW_PATCH, COW_MUZZLE, COW_OUTLINE, COW_W, COW_H, COW_LINES } from '../data/cowGlyph';
+import {
+  COW_BODY, COW_PATCH, COW_MUZZLE, COW_HORN, COW_OUTLINE, COW_W, COW_H, COW_LINES,
+} from '../data/cowGlyph';
 
 interface Props {
   /** 'small' hides at the foot of a section; 'large' is the page\'s subject. */
@@ -28,7 +30,9 @@ const { size = 'small', lines = COW_LINES, label = 'A cow. Press it.' } = Astro.
 
 // 2px cells for furniture, 7px when the cow is the subject — a 147x98 drawing, big enough that the patches and
 // the muzzle read as drawing rather than as noise.
-const CELL = size === 'large' ? 7 : 2;
+// The transcribed cow is 22x26 — taller than the old side view was, so `large` takes a smaller cell to
+// land at a similar drawing size rather than towering over the page.
+const CELL = size === 'large' ? 6 : 2;
 ---
 
 <div class:list={['cow-wrap', `cow-wrap--${size}`]} data-cow-lines={JSON.stringify(lines)}>
@@ -57,6 +61,11 @@ const CELL = size === 'large' ? 7 : 2;
       </g>
       <g class="cow-muzzle">
         {COW_MUZZLE.cells.map((c) => (
+          <rect x={c.x * CELL} y={c.y * CELL} width={CELL} height={CELL} />
+        ))}
+      </g>
+      <g class="cow-horn">
+        {COW_HORN.cells.map((c) => (
           <rect x={c.x * CELL} y={c.y * CELL} width={CELL} height={CELL} />
         ))}
       </g>
@@ -110,7 +119,11 @@ const CELL = size === 'large' ? 7 : 2;
      as a soft nose rather than as a brand mark. */
   .cow-fill rect { fill: var(--paper); }
   .cow-ink rect { fill: var(--ink-1); }
-  .cow-muzzle rect { fill: var(--seal); opacity: 0.55; }
+  /* Over paper (the body layer covers these cells too), so 0.42 of the seal mixes to a soft pink rather
+     than the brick red it produced when it painted straight onto the page. */
+  .cow-muzzle rect { fill: var(--seal); opacity: 0.42; }
+  /* The horns take the ochre accent, which is the palette's warm tone — the reference's tan. */
+  .cow-horn rect { fill: var(--ochre); opacity: 0.85; }
 
   .cow-says {
     margin: 0;
