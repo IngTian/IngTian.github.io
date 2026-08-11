@@ -15,6 +15,12 @@
   --color-ochre: var(--ochre);
   --color-indigo: var(--indigo);
   --color-seal: var(--seal);
+  /* Text sitting ON the accent, as a utility. tokens.css has defined --on-accent all along and names the CV
+     button as the reason it exists, but the footer never used it: it set text-ink-1, which rides the ink ramp,
+     so in dark theme the button painted near-white #dce1dc on phosphor green #66c28c — measured at 1.64:1,
+     against a 4.5:1 requirement. Exposing it here means the fix is a utility swap rather than a hand-written
+     override, and any future accent chip can reach it the same way. */
+  --color-on-accent: var(--on-accent);
   --font-display: 'Fraunces', Georgia, serif;
   --font-body: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
