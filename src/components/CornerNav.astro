@@ -281,10 +281,24 @@ const items: Item[] = [
      would be stranded on whichever page they landed on. */
   @media (max-width: 640px) {
     .cnav { top: 12px; right: 14px; left: 14px; }
-    .cnav ul { padding: 3px; justify-content: flex-end; }
+    /* WRAPS, and that is a bug fix. The capsule was one non-wrapping flex row with justify-content: flex-end,
+       so once its contents outgrew the phone the overflow escaped to the LEFT, off the side of the screen —
+       measured on /research at 390px, "Research" sat at x -32..41 and read as "earch"; at 320px it was gone
+       entirely (-102..-29) and "Writing" was clipped too. The first destination in the nav was unreachable on
+       every inner route, which is the opposite of the comment above this block.
+       Wrapping keeps every destination on screen. The radius comes down to match, because a 999px pill drawn
+       around two rows reads as a lozenge with the end links pushed into its curve. */
+    .cnav ul {
+      padding: 3px; justify-content: flex-end;
+      flex-wrap: wrap; row-gap: 1px; border-radius: 16px;
+    }
     .cnav a, .cnav .toggle { padding: 8px 9px; }
     .cnav .page { font-size: 11px; letter-spacing: 0.02em; }
     .cnav .content { gap: 0; }
+    /* The icon links are already display:none from 1199px down, so the rule that separated them from the pages
+       has nothing left to separate — and once the capsule wraps it opened the second row as a stray tick before
+       the theme toggle. */
+    .cnav .sep { display: none; }
   }
 
   /* Reduced motion: no bloom scale / nudge — the pill still appears (instant)

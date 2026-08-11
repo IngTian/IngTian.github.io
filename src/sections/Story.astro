@@ -181,6 +181,18 @@ import { STORY } from '../data/story';
     width: 100%;
     box-sizing: border-box;
   }
+  /* ── AND IT STOPS STICKING ONCE THE SPLIT STACKS. Sticky is what keeps the graph beside its explanation, and
+     that only means anything while there IS a column beside it. Stacked, the figure sits ABOVE the prose, so
+     pinning it makes it ride down OVER the writing: measured at 390x844, a 744px-tall figure pinned at
+     top: 50.6px, printing its heading and replay button across the paragraphs at two of the three phone deck
+     stops. The rule was written for the two-column layout and was never bounded to it.
+     PLACED AFTER THE BASE RULE ON PURPOSE. My first attempt put this inside the max-width: 1180px block above,
+     which sits BEFORE this declaration — same specificity, so source order won and the override did nothing
+     (measured: still position: sticky at 320 and 390). The same trap this file's own notes describe for the
+     Toc, and it is silent every time. */
+  @media (max-width: 1180px) {
+    .story-figure-slot { position: static; top: auto; }
+  }
   /* The horizontal insets live on .story-split now, so both columns share one left edge and the rail is
      cleared once rather than per-column. */
 

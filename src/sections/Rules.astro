@@ -774,12 +774,30 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     .ru-beats { gap: 1px; }
     .ru-beat { padding-top: 4px; padding-bottom: 4px; }
     .ru-beat-body { font-size: clamp(13.5px, 1.6vw, 15px); line-height: 1.5; }
-    .ru-stagebox { min-height: clamp(220px, 28vh, 290px); }
+    /* THE FLOOR IS 256px, NOT 220px, AND THAT IS AN OVERLAP FIX. The beat panels are absolutely positioned to
+       fill this box, so when a panel's content is taller than the box it does not push anything — it prints
+       straight over .ru-cap, which sits after the stagebox in flow. Measured, .ru-note's bottom past .ru-cap's
+       top: 31.8px at 320x700, 8.3px at 390x844, and 7.6px at 1024x768 — so this was overlapping body text on a
+       small laptop too, not only on phones. 256px clears the worst of the three with room to spare. */
+    .ru-stagebox { min-height: clamp(256px, 30vh, 300px); }
     .ru-fanchart { height: clamp(140px, 19vh, 210px); }
     .ru-scale { font-size: 14px; line-height: 1.55; padding-top: 8px; }
     .ru-note, .ru-cap { font-size: 11px; line-height: 1.5; }
     .ru-rungs { gap: clamp(8px, 1.2vh, 14px); }
     .ru-cats { gap: clamp(7px, 1vh, 12px); }
+  }
+
+  /* ── PHONES: THE BEAT BAND GOES 2x2. Four columns is right on a desktop and nonsense on a phone: measured,
+     each beat was 84.75px wide at 390px and 67.25px at 320px, which is about ten characters per line for a body
+     that has to be read to be chosen. Two columns give roughly 175px at 390px. It costs one row of height on a
+     slide already taller than a phone screen, which the deck pages through by design — an unreadable selector
+     costs more. */
+  @media (max-width: 700px) {
+    .ru-beats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: clamp(6px, 1.2vh, 12px); }
+    /* More floor again, twice measured: the note wraps to more lines the narrower it gets, so 256px still left
+       it printing 13.8px over .ru-cap at 320x700 and 272px still left 5.8px. 288px clears the worst of the four
+       notes at both phone widths with a few pixels to spare. */
+    .ru-stagebox { min-height: clamp(288px, 30vh, 310px); }
   }
 </style>
 
