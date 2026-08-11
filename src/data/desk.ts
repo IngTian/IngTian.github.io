@@ -146,3 +146,64 @@ export const TOOLKIT: { name: string; role: string }[] = [
   { name: 'Reinforcement learning', role: 'how exposures adapt as conditions shift, once the structure around it is fixed' },
   { name: 'Out-of-sample testing', role: 'the part that decides whether any of it was real' },
 ];
+
+// ── THE METHOD SLIDE: FOUR MOVES ON ONE EQUATION ─────────────────────────────────────────────────────────
+//
+// The owner: "our main emphasis is our approach to solve the problem, with RL, math, stochastic process, and
+// bellman. i dont know how to merge all these into one slide."
+//
+// THE MERGE is that those four are not four subjects — they are the parts of the Bellman recursion the previous
+// slide ends on. Each move below annotates a different part of the SAME equation and says what the approach
+// supplies there. See lib/equations.ts METHOD_EQUATIONS for the typeset annotations.
+//
+// Honesty rules that bind this copy:
+//   * the PhD is incoming — nothing here may imply present-tense doctoral work
+//   * RL-BHRP is real and published (arXiv:2508.11856); its reward is described, not invented
+//   * the lattice on screen is NOT the paper's model. It is a small honest DP; the paper is the paper.
+export interface MethodMove {
+  /** Which METHOD_EQUATIONS / METHOD_CHIPS key this move annotates. */
+  key: 'principle' | 'process' | 'learned' | 'objective';
+  /** The short name on the selector, beside the math chip. */
+  name: string;
+  /** One line — the move's claim. */
+  lede: string;
+  /** The substance. */
+  detail: string;
+  /** What the lattice is showing while this move is live. */
+  read: string;
+}
+
+export const METHOD_MOVES: MethodMove[] = [
+  {
+    key: 'principle',
+    name: 'the principle',
+    lede: 'Work the sequence backwards.',
+    detail:
+      'What is the last decision worth? Given that, the one before it? Carry it back and every state at every date holds a value — so today\u2019s best move is just the one leading to the highest of them. That is the whole method, and the other three moves are pieces this one equation demands.',
+    read: 'V(t, \u00b7) — solved backward from the horizon, one date at a time.',
+  },
+  {
+    key: 'process',
+    name: 'the world model',
+    lede: 'You cannot take an expectation over nothing.',
+    detail:
+      'That E needs a stochastic process behind it: drift, volatility, and a correlation structure that tightens exactly when you would rather it did not. The fan on the last slide was one holding\u2019s version of it. Get this part wrong and the optimiser is confidently, precisely wrong.',
+    read: 'Candidate policies — every fixed allocation, and the simple switches.',
+  },
+  {
+    key: 'learned',
+    name: 'learned, not stored',
+    lede: 'The table has 10\u00b3\u2070\u2070\u2070 entries. So do not build it.',
+    detail:
+      'Parameterise the value — or the policy directly — and fit it from simulated experience instead of tabulating it. The policy then improves against the model rather than against a lookup. That is what reinforcement learning buys here, and it is the only reason a problem this size is approachable at all.',
+    read: 'The route, traced forward through the states it beats.',
+  },
+  {
+    key: 'objective',
+    name: 'the objective',
+    lede: 'And you are not maximising return.',
+    detail:
+      'Our reward is gross return, minus what the trading cost, minus a penalty on how unevenly the risk is spread — over a Bayesian hierarchy of sectors rather than three thousand loose names. The structure is the point: it is what keeps a learned policy from being a black box you cannot certify.',
+    read: 'Solved. The optimum is read off the surface, not searched for.',
+  },
+];

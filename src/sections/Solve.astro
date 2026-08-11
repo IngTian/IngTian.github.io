@@ -22,7 +22,8 @@ import {
   LEVELS, PERIODS, WORLD, solve, route, candidates, utilityOf, bestConstant,
   exposureOf, project3, valueBounds,
 } from '../lib/bellman';
-import { TOOLKIT, JOB_STATEMENT } from '../data/desk';
+import { JOB_STATEMENT, METHOD_MOVES } from '../data/desk';
+import { METHOD_EQUATIONS, METHOD_CHIPS } from '../lib/equations';
 
 const sol = solve();
 const optimal = route(sol, 0);
@@ -61,18 +62,28 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
       <p class="so-kicker">3 / 3 · the method</p>
 
       <div class="so-split">
+        <!-- ── THE EQUATION, WALKED IN FOUR MOVES.
+             The owner asked how to merge RL, maths, stochastic process and Bellman into one slide. They are not
+             four subjects: they are the PARTS of the recursion the previous slide ends on. So the left column is
+             one equation, annotated four ways, and the reader clicks its TERMS rather than numbered beats —
+             which is also why this slide does not repeat the previous one's format. -->
         <div class="so-say">
           <h2 id="so-heading" class="so-head">{JOB_STATEMENT}</h2>
 
-          <p class="so-body">
-            The way to solve a sequence is to work it <em>backwards</em>. What is the last decision worth? Given
-            that, what is the one before it worth? Keep going and every state at every date carries a value —
-            and the best move today is simply the one that leads to the highest of them.
-          </p>
-          <p class="so-body">
-            That is dynamic programming, and it is why the surface fills in from the right. Once it exists, the
-            optimal route is not searched for. It is read off.
-          </p>
+          <div class="so-eqbox">
+            {METHOD_MOVES.map((m, i) => (
+              <div class="so-eq so-panel" data-eq={i} set:html={METHOD_EQUATIONS[m.key]} />
+            ))}
+          </div>
+
+          <div class="so-textbox">
+            {METHOD_MOVES.map((m, i) => (
+              <div class="so-panel so-move" data-move={i}>
+                <p class="so-move-lede">{m.lede}</p>
+                <p class="so-move-detail">{m.detail}</p>
+              </div>
+            ))}
+          </div>
 
           <dl class="so-figs">
             <div>
@@ -80,20 +91,10 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
               <dd>candidate policies drawn behind it</dd>
             </div>
             <div>
-              <dt>{optUtility.toFixed(3)}</dt>
-              <dd>the optimum's utility</dd>
-            </div>
-            <div>
               <dt>+{(optUtility - constant.utility).toFixed(3)}</dt>
-              <dd>its margin over the best fixed allocation</dd>
+              <dd>the optimum's margin over the best fixed allocation</dd>
             </div>
           </dl>
-
-          <ul class="so-tools">
-            {TOOLKIT.slice(0, 4).map((t) => (
-              <li><span class="so-tool-name">{t.name}</span><span class="so-tool-role">{t.role}</span></li>
-            ))}
-          </ul>
         </div>
 
         <figure class="so-fig">
@@ -138,6 +139,21 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
           </figcaption>
         </figure>
       </div>
+
+      <!-- THE SELECTOR IS THE EQUATION'S OWN TERMS. Slide two's band was numbered prose; this is the same
+           affordance in the same place, but what you click is a piece of mathematics — which is the honest
+           navigation for a slide whose argument is "each of these is part of one equation". -->
+      <ol class="so-terms" aria-label="The parts of the equation">
+        {METHOD_MOVES.map((m, i) => (
+          <li>
+            <button type="button" class="so-term" data-term={i} data-readline={m.read}
+                    aria-pressed={i === 0 ? 'true' : 'false'}>
+              <span class="so-term-math" set:html={METHOD_CHIPS[m.key]} />
+              <span class="so-term-name">{m.name}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
     </div>
   </div>
 </section>
@@ -166,8 +182,101 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     /* Clears the fixed Toc rail, whose right edge moved from x=129 to x=151 once it gained an indented tier
        ("Problem / Limits / Method" under "The field"). Shared across the five paper slides. */
     padding-left: clamp(168px, 10.4vw, 200px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
+    /* Measured: content ended at y=902 in a 1050px slide, so 148px sat dead at the foot while the equation was
+       cramped. Centring the block spends that slack on the drawing and the mathematics instead. */
+    display: grid; align-content: center;
   }
   @media (max-width: 1099px) { .so-inner { padding-left: clamp(28px, 6vw, 80px); } }
+
+  /* ── THE EQUATION WALK. One equation, four annotations, one visible at a time — the same overlay pattern the
+     other two slides use for their panels, so the height is set by the tallest and nothing jumps. */
+  .so-eqbox, .so-textbox { display: grid; }
+  .so-eqbox > *, .so-textbox > * { grid-area: 1 / 1; }
+  .so-panel { opacity: 0; pointer-events: none; }
+  /* Default = FINISHED, not empty: with no JS the first move stands alone and reads as a complete slide. The
+     script adds .solve-js and takes over which panel is on. Source order matters below — .is-on must win. */
+  .so-panel:first-child { opacity: 1; pointer-events: auto; }
+  :global(html.solve-js) .so-panel:first-child { opacity: 0; pointer-events: none; }
+  :global(html.solve-js) .so-panel.is-on { opacity: 1; pointer-events: auto; }
+  @media (prefers-reduced-motion: no-preference) {
+    .so-panel { transition: opacity 260ms ease; }
+  }
+
+  .so-eqbox {
+    margin: clamp(14px, 2.2vh, 26px) 0 clamp(12px, 1.8vh, 22px);
+    /* The equation is the subject of this slide, so it is set well above body copy — and measured, there were
+       148px of dead space at the foot of the panel to pay for it. */
+    font-size: clamp(16px, 1.62vw, 26px);
+    color: var(--s-ink);
+    /* The brace hangs below the baseline, and overflow-x:auto makes this a scroll container — measured, it was
+       clipping the brace by 9-14px at every size. The padding is the brace's room. */
+    overflow-x: auto; overflow-y: hidden; padding-bottom: 18px;
+    /* Reserves the equation's height so nothing jumps when only one variant is laid out (see below). The four
+       variants measured 55-57px against a 26px font at three viewports — a stable 2.2em — so 2.25em covers the
+       tallest everywhere without hardcoding a pixel height that would break when the clamp moves. */
+    min-height: 2.25em;
+  }
+
+  .so-eq :global(math) { display: block; margin: 0; }
+
+  /* THE BRACE IN THE ACCENT, so the eye goes to the annotated term without a word being spent.
+     `munder > mo` hits the brace and nothing else — verified by measurement: it matches exactly the three
+     braced equations and every match is the ⏟ glyph. \max_{u \in U(x)} also builds a munder, but its second
+     child is an mrow of limits rather than an operator, so it is not caught. */
+  .so-eq :global(munder > mo) { color: var(--s-accent); }
+
+  .so-move-lede {
+    margin: 0 0 6px; font-size: clamp(15px, 1.16vw, 19px); line-height: 1.42; color: var(--s-ink);
+  }
+  .so-move-detail {
+    margin: 0; font-size: clamp(13px, 1vw, 15.5px); line-height: 1.62; color: var(--s-soft);
+  }
+
+  /* ── THE TERM SELECTOR. Real buttons: this is the slide's only control, and it has to be keyboard-reachable
+     and screen-reader legible like the other two slides' bands. */
+  .so-terms {
+    list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0; margin: clamp(18px, 2.6vh, 34px) 0 0; padding: 0;
+    border-top: 1px solid var(--s-edge);
+  }
+  .so-term {
+    -webkit-appearance: none; appearance: none; background: none; border: 0;
+    border-top: 2px solid transparent; margin-top: -1px;
+    display: grid; gap: 3px; justify-items: start; text-align: left;
+    padding: clamp(9px, 1.3vh, 15px) clamp(12px, 1.4vw, 22px) 0 0;
+    cursor: pointer; color: inherit; width: 100%;
+    opacity: 0.42;
+  }
+  .so-term:hover { opacity: 0.72; }
+  .so-term[aria-pressed='true'] { opacity: 1; border-top-color: var(--s-accent); }
+  .so-term:focus-visible { outline: 2px solid var(--s-accent); outline-offset: 3px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .so-term { transition: opacity 200ms ease, border-color 200ms ease; }
+  }
+  .so-term-math { font-size: clamp(12px, 1.02vw, 15.5px); color: var(--s-accent); }
+  .so-term-math :global(math) { display: inline; }
+  .so-term-name {
+    font-family: var(--font-mono); font-size: clamp(10px, 0.76vw, 11.5px);
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--s-faint);
+  }
+  .so-term[aria-pressed='true'] .so-term-name { color: var(--s-soft); }
+
+  /* ── THE LATTICE, EMPHASISED PER MOVE. The drawing is reused rather than rebuilt (the owner: "i think we can
+     reuse the same graph we have right now") — each move just changes which layer carries the ink. */
+  .so-chart[data-stage='0'] .so-cands, .so-chart[data-stage='0'] .so-opt,
+  .so-chart[data-stage='0'] .so-opt-node { opacity: 0; }
+  .so-chart[data-stage='1'] .so-opt, .so-chart[data-stage='1'] .so-opt-node { opacity: 0; }
+  .so-chart[data-stage='2'] .so-cand { opacity: 0.13; }
+  .so-chart[data-stage='3'] .so-cand { opacity: 0.1; }
+  .so-chart[data-stage='3'] .so-opt { stroke-width: 3; }
+  @media (prefers-reduced-motion: no-preference) {
+    .so-cands, .so-opt, .so-opt-node, .so-cand { transition: opacity 300ms ease, stroke-width 300ms ease; }
+  }
+
+  @media (max-width: 1099px) {
+    /* Four term buttons in one row need the width; below this they wrap to two. */
+    .so-terms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
 
   .so-kicker {
     font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
@@ -271,6 +380,27 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     font-size: 10.5px; line-height: 1.5; color: var(--s-faint);
     margin: 8px 0 0; max-width: 62ch;
   }
+
+  /* ── NARROW SCREENS: MAKE THE SLIDE FIT ─────────────────────────────────────────────────────────────────
+     Below 1100px the split stacks, so the two columns' heights add and the slide outgrew the viewport.
+     Measured at 1024x1050: 1363px against 1050, of which the chart alone was 520. The committed slide was
+     WORSE (1539), so this is a pre-existing fault being fixed rather than a regression being patched.
+
+     PLACED AT THE END DELIBERATELY. A first attempt put these in the existing max-width block higher up and
+     nothing happened — that block sits before the base `.so-chart`/`.so-head` rules, and at equal specificity
+     source order wins. The same trap that bit the Toc's nested tier.
+
+     The chart takes the cut because a stacked lattice is decoration at this width, while the equation and the
+     prose ARE the argument. The two stats go with it: they corroborate, and the caption still carries the
+     algorithm's shape. */
+  @media (max-width: 1099px) {
+    /* 900x1050 was the last holdout, 5px over — the chart's own floor was what remained to give. */
+    .so-chart { height: clamp(180px, 23vh, 260px); }
+    .so-figs { display: none; }
+    .so-head { font-size: clamp(21px, 3.4vw, 30px); line-height: 1.16; }
+    .so-eqbox { margin: clamp(10px, 1.6vh, 18px) 0 clamp(8px, 1.2vh, 14px); }
+  }
+
 </style>
 
 <script>
@@ -296,83 +426,145 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     const read = section.querySelector<HTMLElement>('[data-read]');
     if (!ribs.length || !cands || !opt || !read) return null;
     document.documentElement.classList.remove('no-lattice-js');
+    // Announces that the equation walk has a driver, which is what lets the CSS stop showing move one outright.
+    document.documentElement.classList.add('solve-js');
 
-    // Ribs are lines of constant time; sort descending so the reveal runs from the horizon backward.
+
+    // ── FOUR MOVES ON ONE EQUATION, and the lattice follows them.
+    //
+    // The owner asked to reuse this drawing, and it turns out the old one-shot timeline already ran in exactly
+    // four phases (mesh backward, candidates, route forward, settled) — so the moves map onto it 1:1 rather than
+    // needing a new animation. What changes is that a reader can now DRIVE it: the phases became states.
+    //
+    // Interaction copied deliberately from the two slides before it — auto-advance, click to freeze, and frozen
+    // stays frozen. Same dwell times too, so the three explainer slides feel like one instrument.
+    const terms = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-term]'));
+    const eqs = Array.from(section.querySelectorAll<HTMLElement>('[data-eq]'));
+    const moves = Array.from(section.querySelectorAll<HTMLElement>('[data-move]'));
+    const chart = section.querySelector<SVGSVGElement>('.so-chart');
+    if (!terms.length || !chart) return null;
+
+    // Ribs are lines of constant time; descending so a reveal runs from the horizon backward, which is the
+    // direction backward induction actually runs. Animating it the other way would misrepresent the method.
     const byTime = [...ribs].sort((a, b) => Number(b.dataset.t) - Number(a.dataset.t));
-    const periods = byTime.length - 1;
 
-    const showAll = () => {
-      for (const el of [...ribs, ...spines]) el.classList.add('is-in');
+    const meshIn = (on: boolean) => {
+      for (const el of [...ribs, ...spines]) el.classList.toggle('is-in', on);
+    };
+    const solvedLattice = () => {
+      meshIn(true);
       cands.classList.add('is-in');
       opt.classList.add('is-in');
       for (const n of nodes) n.classList.add('is-in');
-      read.textContent = 'Solved. The optimum is read off the surface, not searched for.';
     };
+
+    let meshTimers: number[] = [];
+    const clearMesh = () => {
+      for (const t of meshTimers) window.clearTimeout(t);
+      meshTimers = [];
+    };
+
+    // Move one gets the reveal: the surface filling in from the horizon is the principle it is describing.
+    const revealMesh = () => {
+      clearMesh();
+      meshIn(false);
+      const STEP = 90;
+      byTime.forEach((rib, k) => {
+        meshTimers.push(window.setTimeout(() => rib.classList.add('is-in'), k * STEP));
+      });
+      meshTimers.push(window.setTimeout(() => {
+        for (const el of spines) el.classList.add('is-in');
+      }, byTime.length * STEP + 90));
+    };
+
+    const show = (i: number, animate: boolean) => {
+      terms.forEach((t, k) => t.setAttribute('aria-pressed', String(k === i)));
+      eqs.forEach((e, k) => e.classList.toggle('is-on', k === i));
+      moves.forEach((m, k) => m.classList.toggle('is-on', k === i));
+
+      // The lattice's layers are driven by CSS off this one attribute, so the drawing and the prose cannot
+      // disagree about which move is live.
+      chart.dataset.stage = String(i);
+
+      clearMesh();
+      if (i === 0 && animate) revealMesh();
+      else meshIn(true);
+      cands.classList.add('is-in');
+      opt.classList.add('is-in');
+      for (const n of nodes) n.classList.add('is-in');
+
+      read.textContent = terms[i].dataset.readline ?? '';
+    };
+
+    let step = 0;
+    let timer = 0;
+    let frozen = false;
+    const stop = () => { window.clearTimeout(timer); timer = 0; };
+
+    const freeze = (i: number) => {
+      frozen = true;
+      stop();
+      section.dataset.frozen = 'true';
+      step = i;
+      show(i, i === 0);
+    };
+
+    const pick = (e: Event) => {
+      const i = terms.indexOf(e.currentTarget as HTMLButtonElement);
+      if (i >= 0) freeze(i);
+    };
+    for (const t of terms) t.addEventListener('click', pick);
+
+    // Arrow keys walk the four terms, so a keyboard reader need not tab to reach the last one.
+    const onKey = (e: KeyboardEvent) => {
+      const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1
+        : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+      if (!dir) return;
+      e.preventDefault();
+      freeze((step + dir + terms.length) % terms.length);
+      terms[step].focus();
+    };
+    for (const t of terms) t.addEventListener('keydown', onKey);
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      showAll();
-      return null;
+      // Finished state: the LAST move, which is the one the slide rests on — our own objective. The solved
+      // lattice, and the buttons still work, so nothing is lost by not animating.
+      step = terms.length - 1;
+      show(step, false);
+      solvedLattice();
+      return () => {
+        clearMesh();
+        for (const t of terms) { t.removeEventListener('click', pick); t.removeEventListener('keydown', onKey); }
+      };
     }
 
-    let raf = 0;
-    let timers: number[] = [];
-    const clearAll = () => {
-      for (const t of timers) window.clearTimeout(t);
-      timers = [];
-      cancelAnimationFrame(raf);
+    show(0, false);
+
+    const advance = () => {
+      step = (step + 1) % terms.length;
+      show(step, true);
+      // Hold longest on the last move: it is the slide's whole point, and it is the one describing our own work.
+      timer = window.setTimeout(advance, step === terms.length - 1 ? 6400 : 4600);
     };
 
-    const reset = () => {
-      for (const el of [...ribs, ...spines]) el.classList.remove('is-in');
-      cands.classList.remove('is-in');
-      opt.classList.remove('is-in');
-      for (const n of nodes) n.classList.remove('is-in');
-      read.textContent = 'Solving backward from the horizon…';
-    };
-
-    const run = () => {
-      reset();
-      const STEP = 130;
-      // 1. The surface fills in backward, one time-slice at a time.
-      byTime.forEach((rib, k) => {
-        timers.push(window.setTimeout(() => {
-          rib.classList.add('is-in');
-          const t = Number(rib.dataset.t);
-          read.textContent = `V(t=${t}, ·) — the value of every state at this date, given everything after it`;
-        }, k * STEP));
-      });
-      const meshDone = byTime.length * STEP;
-      // 2. The state-lines join it up into a surface.
-      timers.push(window.setTimeout(() => {
-        for (const el of spines) el.classList.add('is-in');
-        read.textContent = 'Every state at every date now carries a value.';
-      }, meshDone + 120));
-      // 3. The many.
-      timers.push(window.setTimeout(() => {
-        cands.classList.add('is-in');
-        read.textContent = 'Candidate policies — every fixed allocation, and the simple switches.';
-      }, meshDone + 900));
-      // 4. The one, traced forward.
-      timers.push(window.setTimeout(() => {
-        opt.classList.add('is-in');
-        read.textContent = 'And the optimum, read off the surface — solve backward, act forward.';
-        nodes.forEach((n, i) => {
-          timers.push(window.setTimeout(() => n.classList.add('is-in'), i * 90));
-        });
-      }, meshDone + 1700));
-      // 5. Hold, then run it again — a reader arriving mid-loop still sees the whole argument.
-      timers.push(window.setTimeout(run, meshDone + 1700 + periods * 90 + 4200));
-    };
-
-    let started = false;
     const io = new IntersectionObserver((entries) => {
       const visible = entries.some((e) => e.isIntersecting);
-      if (visible && !started) { started = true; run(); }
-      else if (!visible && started) { started = false; clearAll(); showAll(); }
-    }, { threshold: 0.35 });
+      if (frozen) return;                        // a reader's choice outranks the observer
+      if (visible && !timer) {
+        if (step === 0) revealMesh();
+        timer = window.setTimeout(advance, 4200);
+      } else if (!visible) {
+        stop();
+      }
+    }, { threshold: 0.3 });
     io.observe(section);
 
-    return () => { clearAll(); io.disconnect(); };
+    return () => {
+      stop();
+      clearMesh();
+      io.disconnect();
+      for (const t of terms) { t.removeEventListener('click', pick); t.removeEventListener('keydown', onKey); }
+    };
   }
 
   let teardown: (() => void) | null = null;
