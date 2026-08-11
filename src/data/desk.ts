@@ -140,109 +140,90 @@ export const JOB_NOTE =
 /** The toolkit, named as instruments with the job each does. */
 
 
-// ── THE METHOD SLIDE: WHAT IS OPEN, AND WHERE IT WOULD BE ATTACKED ───────────────────────────────────────
+// ── THE LAST SLIDE: STILL AN OPEN PROBLEM, AND A FEW GENERAL DIRECTIONS ──────────────────────────────────
 //
-// THIS REPLACED A WRONG SLIDE, and the correction is worth keeping in the file. An earlier version typeset the
-// Bellman recursion as this slide's spine and walked four "moves" over it — "That is the whole method", "Our
-// reward is gross return minus...". The owner stopped it:
+// THIS FILE HAS BEEN WRONG TWICE, in opposite directions, and both corrections belong here.
 //
-//   "well, now you are being too precise. we dont know how to solve this problem yet. it's an open problem. so
-//    dont write out that equation as if it's known. it's not. i only have some ideas how to attack this, from
-//    RL, with math, or, stochastic process, probability, as the backbone."
+// First it typeset the Bellman recursion as this slide's spine and walked four "moves" over it — "That is the
+// whole method". The owner:
 //
-// He is right, and the error was structural rather than a matter of wording. Writing the recursion as an
-// equality, on the slide labelled "the method", asserts a formulation AND a solution. Neither is in hand. It
-// was redundant besides: the difficulty slide already shows that recursion as the thing that blows up.
+//   "we dont know how to solve this problem yet. it's an open problem. so dont write out that equation as if
+//    it's known. it's not. i only have some ideas how to attack this, from RL, with math, or, stochastic
+//    process, probability, as the backbone."
 //
-// So the slide now says what is true — large pieces are solved exactly, the whole of it at this size is not —
-// and names where the attack would go. The owner's own four words map onto the four moves below: probability
-// and stochastic processes are the BACKBONE, mathematics (convexity, duality, certificates) and reinforcement
-// learning are the two attacks standing on it, and the fourth is his own preprint, located as one attempt.
+// The fix went too far the other way: four directions, each with a named-and-dated literature and a labelled
+// limit block. Accurate, but it read as a survey of a field the slide had just called open. The owner again:
 //
-// HONESTY RULES THIS COPY IS HELD TO, and a test asserts each:
-//   * nothing may claim the problem is solved, or that a working method exists
-//   * every move carries its own LIMIT, on the slide, not hidden in a footnote
-//   * the PhD is incoming — never present tense
-//   * arXiv:2508.11856 is a PREPRINT, never "published"
-//   * every named result and date is real and checkable; every figure about the paper is corroborated by
-//     profile.ts, which transcribes its Table 2 (67 periods, 2020-02-29 -> 2025-08-31)
-//   * under-claiming is also a failure. "It is hard and I have ideas" would be worthless — each direction
-//     carries specific, checkable content or it does not belong on the slide.
-export interface AttackMove {
-  key: 'backbone' | 'structure' | 'learning' | 'attempt';
-  /** The discipline, in the owner's own terms — the small tag above the name on the selector. */
+//   "i wouldnt say this as solved. probably at first we can only solve a small chunk of it. in the future maybe
+//    we can do more. so my idea is that we only name a few methodologies only general ones to begin with.
+//    thats more truthful. so the entire headline should be something like: Still an open problem. in the tabs,
+//    we list a few viable methodologies. that's it. we dont need to go that deep. you can also drop the first
+//    one attempt. that's what work is for."
+//
+// So: the heading states the openness outright, the tabs name THREE GENERAL methodologies — the three families
+// he named himself — and each gets a couple of plain sentences rather than a reading list. The RL-BHRP tab is
+// gone: the paper is work, and the work section is where work goes. Naming a published attempt on a slide about
+// an open problem also quietly implied the attempt had closed part of it.
+//
+// The restraint is the honesty here. A general direction, plainly stated, cannot overclaim; a survey with dates
+// on it starts to sound like a solution assembled from parts.
+export interface Methodology {
+  key: 'probability' | 'optimisation' | 'learning';
+  /** The discipline, as the owner named it — the small tag above the name on the selector. */
   tag: string;
   /** The selector label. */
   name: string;
-  /** One line: the move's claim. */
+  /** One line: what this brings. */
   lede: string;
-  /** The substance. Specific and checkable, or it does not belong here. */
+  /** Two or three plain sentences. The last one says what it does not settle — kept in the prose rather than a
+   *  labelled block, because a labelled block is what made the previous version read as a survey. */
   detail: string;
-  /** What this direction does NOT give you. Shown on the slide, which is the whole point. */
-  limit: string;
-  /** What the lattice is evidence of while this move is live. Never the word "solved". */
+  /** What the lattice is evidence of while this direction is live. Never the word "solved". */
   read: string;
 }
 
-export const ATTACK_MOVES: AttackMove[] = [
+export const METHODOLOGIES: Methodology[] = [
   {
-    key: 'backbone',
-    tag: 'stochastic process · probability',
-    name: 'the backbone',
-    lede: 'The expectation has to be taken over something, and that choice decides what is solvable.',
+    key: 'probability',
+    tag: 'the backbone',
+    name: 'probability, stochastic processes',
+    lede: 'You cannot optimise against a future you have not described.',
     detail:
-      'It is the process together with the objective — never the solver — that decides whether a closed form exists. Independent returns, no costs, no constraints, and twenty-four dates collapse into twenty-four copies of one date (Mossin 1968, Samuelson 1969). Linear dynamics with quadratic costs, and the optimal policy is linear at any number of names (Gârleanu–Pedersen 2013).',
-    limit:
-      'It supplies no algorithm, and it cannot deliver the drift: finer sampling pins down variance and does almost nothing for the mean (Merton 1980). Variance does not add across time either, so one stated preference gives different portfolios depending on when you commit to it.',
-    read: 'The surface fills backward from the horizon — and it exists because this world’s tilt was written down in advance.',
+      'Before any solver there has to be a model of how prices and risk actually move: drift, volatility, how names move together, and how all of that changes. Everything else on this slide is built on top of whatever goes here. It is also where the deepest problem sits, because a model fitted on one short history is a statement about that history.',
+    read: 'The surface exists because this world’s movement was written down in advance. A real book’s has to be estimated.',
   },
   {
-    key: 'structure',
-    tag: 'convex optimisation · duality',
-    name: 'the certificate',
-    lede: 'Where the structure is convex, ask for a certificate and not just an answer.',
+    key: 'optimisation',
+    tag: 'the mathematics',
+    name: 'convex optimisation',
+    lede: 'Where the problem is convex, the answer comes with a proof attached.',
     detail:
-      'One date, three thousand names, thousands of convex rules is a convex program: a global optimum, exact feasibility, and a shadow price saying what each rule cost. The m^1.5 impact from the last slide does not spoil it — that function is convex. Production rolls the solve forward: optimise a short path, trade only today, re-solve tomorrow (Boyd et al. 2017).',
-    limit:
-      'A tower of certified single-date solves is not a certified policy, and prices no value of waiting. Convexity ends at cardinality limits, minimum sizes and round lots — that selection problem is NP-hard. And a certificate is precision, not accuracy: an exact optimum of an estimated covariance loads where the estimate is most wrong (Michaud 1989).',
-    read: 'An answer for every state, exactly: 108 decisions, 972 comparisons, 29 stated rivals drawn behind it.',
+      'For a single date, thousands of names and thousands of rules, this is settled and industrial: a global optimum, exact feasibility, and a price for every constraint that binds. It is the part of the problem that is genuinely solved. What it does not do on its own is span the sequence of dates, which is where the difficulty was.',
+    read: 'An answer for every state on the surface, exactly — and 29 stated rivals drawn behind it.',
   },
   {
     key: 'learning',
-    tag: 'reinforcement learning',
-    name: 'learning, kept small',
-    lede: 'Put the learning where the dimension is small enough for the data that exists.',
+    tag: 'the adaptation',
+    name: 'reinforcement learning',
+    lede: 'Where the structure runs out, learn a policy instead of tabulating one.',
     detail:
-      'Reinforcement learning has a real home here, narrower than the literature suggests: execution and hedging under frictions, where the horizon is minutes and the data is millions of decisions a day (Nevmyvaka et al. 2006; Buehler et al. 2019). Monthly whole-book allocation has none of that — a decade is about a hundred and twenty decisions along one path that never repeats.',
-    limit:
-      'So it relocates the curse of dimensionality rather than beating it. With function approximation there is no computable distance to the optimum, and constrained-MDP methods buy feasibility in expectation — for a compliance limit, “usually satisfied” is not satisfied.',
+      'Rather than filling a table that cannot exist, fit the decision rule from simulated experience and let it improve against the model. That is what makes a problem this size approachable at all. It buys scale and gives up the guarantee: there is no bound on how far the result sits from optimal, which is the one thing a mandate asks for.',
     read: 'One route, read off a surface filled exactly, node by node. Fit the surface instead and no node is checkable again.',
-  },
-  {
-    key: 'attempt',
-    tag: 'arXiv:2508.11856',
-    name: 'one attempt',
-    lede: 'RL-BHRP is one attempt at one piece of this — a preprint, so it can be checked.',
-    detail:
-      'Co-authored with S. Kang. The useful idea is structural: make the hierarchy the unit of decision, so the learned layer chooses in sector space instead of emitting three thousand weights, and risk parity needs a covariance and no expected returns at all. Evaluated out of sample over sixty-seven monthly rebalances, February 2020 to August 2025.',
-    limit:
-      'Risk parity over a hierarchy is a heuristic with no optimality property, so a learned layer inside it inherits no bound. And it was not measured against a tuned myopic-plus-turnover rule or a Gârleanu–Pedersen aim policy: naming the bar I have not cleared is the point of putting it here.',
-    read: 'The optimum of a world handed to the solver complete. Nothing on this surface is evidence about a market.',
   },
 ];
 
-/** The heading: precise about what is and is not settled. */
-export const OPEN_HEADING = 'Large pieces of this are solved. The whole of it, at this size, is not.';
+/** The heading, in the owner's own words. */
+export const OPEN_HEADING = 'Still an open problem.';
 
 /**
- * The precise statement of what is missing — the sentence the whole slide rests on.
+ * The modest version of the ambition, which is the one he asked for: a chunk first, more later.
  *
- * Deliberately NOT "nobody knows anything": Merton 1969, Davis–Norman 1990, Almgren–Chriss 2000 and
- * Gârleanu–Pedersen 2013 are real closed forms and the dates are old. What is absent is the pairing.
+ * Deliberately does NOT say anything is solved. An earlier heading opened "Large pieces of this are solved" and
+ * he rejected exactly that: "i wouldnt say this as solved."
  */
 export const OPEN_STATEMENT =
-  'What is missing is not the equation. It is an objective everyone agrees on across time, a law of motion you can identify from one short history that never repeats, and a policy that runs at three thousand names while carrying a bound on how far from optimal it sits. At one date you can have scale and a certificate. Across twenty-four, nobody has shown how.';
+  'No one has a method for the whole of it at this size — one that runs at three thousand names and still tells you how far from optimal it is. The realistic ambition is a chunk: solve a small part properly, then widen. These are the general directions worth starting from.';
 
-/** The closing line, under the selector. */
+/** The closing line. Points at where the actual work is, since the paper is no longer a tab here. */
 export const OPEN_CLOSE =
-  'None of this is a method yet: three directions with known failure modes, one backbone they share, and one attempt on the record.';
+  'Directions, not results. What has actually been built is further down, under the work.';

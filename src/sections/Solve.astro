@@ -22,7 +22,7 @@ import {
   LEVELS, PERIODS, WORLD, solve, route, candidates,
   project3, valueBounds,
 } from '../lib/bellman';
-import { ATTACK_MOVES, OPEN_HEADING, OPEN_STATEMENT, OPEN_CLOSE } from '../data/desk';
+import { METHODOLOGIES, OPEN_HEADING, OPEN_STATEMENT, OPEN_CLOSE } from '../data/desk';
 
 const sol = solve();
 const optimal = route(sol, 0);
@@ -48,7 +48,11 @@ const candLines = cands.map((c) =>
   c.map((level, t) => at(t, level, sol.value[t][level])),
 );
 const optLine = optimal.map((s) => at(s.t, s.level, sol.value[s.t][s.level]));
-const path = (pt: [number, number][]) => pt.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+// WHOLE PIXELS, not tenths. The lattice emits 29 candidate polylines plus 13 ribs and 9 spines; at one decimal
+// place that is several KB of HTML for precision nobody can see, since the 760x380 viewBox is scaled up on
+// screen. It is also load-bearing for performance: the extra bytes pushed the document across a congestion-window
+// boundary and cost one simulated round-trip (~150ms) in Lighthouse's throttled LCP.
+const path = (pt: [number, number][]) => pt.map(([x, y]) => `${Math.round(x)},${Math.round(y)}`).join(' ');
 
 // Which periods the model expects to punish risk — the reason the route moves at all.
 const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0).map(({ i }) => i);
@@ -56,7 +60,7 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
 <section id="solve" class="so" aria-labelledby="so-heading">
   <div class="so-paper">
     <div class="so-inner">
-      <p class="so-kicker">3 / 3 · what is open</p>
+      <p class="so-kicker">3 / 3 · where to start</p>
 
       <div class="so-split">
         <!-- ── WHAT IS OPEN, AND WHERE IT WOULD BE ATTACKED.
@@ -70,11 +74,10 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
           <p class="so-open">{OPEN_STATEMENT}</p>
 
           <div class="so-textbox">
-            {ATTACK_MOVES.map((m, i) => (
+            {METHODOLOGIES.map((m, i) => (
               <div class="so-panel so-move" data-move={i}>
                 <p class="so-move-lede">{m.lede}</p>
                 <p class="so-move-detail">{m.detail}</p>
-                <p class="so-move-limit"><span class="so-limit-tag">what it does not give you</span>{m.limit}</p>
               </div>
             ))}
           </div>
@@ -102,7 +105,7 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
             <!-- THE ONE. Revealed last, forward through time. -->
             <polyline class="so-opt" data-opt points={path(optLine)} />
             {optLine.map(([x, y], i) => (
-              <circle class="so-opt-node" data-opt-node={i} cx={x} cy={y} r="3" />
+              <circle class="so-opt-node" data-opt-node={i} cx={Math.round(x)} cy={Math.round(y)} r="3" />
             ))}
           </svg>
 
@@ -135,8 +138,8 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
            process, probability, as the backbone". It used to be the terms of an equation, which died with the
            equation. Same affordance and position as slide two's band, but what you click is a direction of
            attack rather than a numbered beat. -->
-      <ol class="so-terms" aria-label="Three directions, and one attempt">
-        {ATTACK_MOVES.map((m, i) => (
+      <ol class="so-terms" aria-label="A few general methodologies">
+        {METHODOLOGIES.map((m, i) => (
           <li>
             <button type="button" class="so-term" data-term={i} data-readline={m.read}
                     aria-pressed={i === 0 ? 'true' : 'false'}>
@@ -176,8 +179,9 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     /* Clears the fixed Toc rail, whose right edge moved from x=129 to x=151 once it gained an indented tier
        ("Problem / Limits / Method" under "The field"). Shared across the five paper slides. */
     padding-left: clamp(168px, 10.4vw, 200px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
-    /* Measured: content ended at y=902 in a 1050px slide, so 148px sat dead at the foot while the equation was
-       cramped. Centring the block spends that slack on the drawing and the mathematics instead. */
+    /* Measured: content ended at y=902 in a 1050px slide, so 148px sat dead at the foot. Centring the block
+       spends that slack on the drawing and the type. (Tested as the cause of the Lighthouse point and cleared —
+       removing it left LCP at 2709ms, unchanged.) */
     display: grid; align-content: center;
   }
   @media (max-width: 1099px) { .so-inner { padding-left: clamp(28px, 6vw, 80px); } }
@@ -211,19 +215,6 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     margin: 0; font-size: clamp(13px, 1vw, 15.5px); line-height: 1.62; color: var(--s-soft);
   }
 
-  /* ── THE LIMIT, ON THE SLIDE. Every direction states what it does NOT give you, in the same panel and not in
-     a footnote — that is the mechanism that keeps this slide honest rather than a list of things I like.
-     Set quieter than the detail but not hidden: a reader skimming should still see that each one has a cost. */
-  .so-move-limit {
-    margin: clamp(7px, 1vh, 12px) 0 0;
-    font-size: clamp(12px, 0.94vw, 14.5px); line-height: 1.58; color: var(--s-faint);
-    padding-left: clamp(9px, 0.8vw, 14px); border-left: 1px solid var(--s-edge);
-  }
-  .so-limit-tag {
-    display: block;
-    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--s-accent); opacity: 0.75; margin-bottom: 3px;
-  }
 
   /* The closing line, under the selector: names what the slide is and is not. */
   .so-close {
@@ -266,19 +257,21 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
 
   /* ── THE LATTICE, EMPHASISED PER MOVE. The drawing is reused rather than rebuilt (the owner: "i think we can
      reuse the same graph we have right now") — each move just changes which layer carries the ink. */
+  /* THREE stages now, not four — the fourth direction (the paper) was dropped, so the settled state moved from
+     stage 3 to stage 2. Leaving a rule on stage 3 would have been dead CSS and the final state would never have
+     shown its emphasis. */
   .so-chart[data-stage='0'] .so-cands, .so-chart[data-stage='0'] .so-opt,
   .so-chart[data-stage='0'] .so-opt-node { opacity: 0; }
   .so-chart[data-stage='1'] .so-opt, .so-chart[data-stage='1'] .so-opt-node { opacity: 0; }
-  .so-chart[data-stage='2'] .so-cand { opacity: 0.13; }
-  .so-chart[data-stage='3'] .so-cand { opacity: 0.1; }
-  .so-chart[data-stage='3'] .so-opt { stroke-width: 3; }
+  .so-chart[data-stage='2'] .so-cand { opacity: 0.1; }
+  .so-chart[data-stage='2'] .so-opt { stroke-width: 3; }
   @media (prefers-reduced-motion: no-preference) {
     .so-cands, .so-opt, .so-opt-node, .so-cand { transition: opacity 300ms ease, stroke-width 300ms ease; }
   }
 
   @media (max-width: 1099px) {
-    /* Four term buttons in one row need the width; below this they wrap to two. */
-    .so-terms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    /* Three term buttons in one row need the width; below this they stack. */
+    .so-terms { grid-template-columns: minmax(0, 1fr); }
   }
 
   .so-kicker {
@@ -392,7 +385,6 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     .so-chart { height: clamp(130px, 16vh, 195px); }
     .so-open { padding-bottom: clamp(7px, 1vh, 12px); }
     .so-move-detail { font-size: clamp(12.5px, 1.15vw, 14px); line-height: 1.55; }
-    .so-move-limit { font-size: clamp(11.5px, 1.05vw, 13px); line-height: 1.5; }
     .so-legend { display: none; }
     /* The caption is the longest fixed block left (110px measured) — it carries the counts AND the five things
        the toy was handed, and neither is droppable, so it gets smaller rather than shorter. The closing line
@@ -416,7 +408,6 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     .so-open { font-size: clamp(12px, 0.95vw, 14px); line-height: 1.5; }
     .so-move-lede { font-size: clamp(14px, 1.08vw, 17px); }
     .so-move-detail { font-size: clamp(12.5px, 0.95vw, 14.5px); line-height: 1.52; }
-    .so-move-limit { font-size: clamp(11.5px, 0.88vw, 13.5px); line-height: 1.48; }
   }
 
 </style>
