@@ -178,10 +178,10 @@ const stops = researchStops(publications, researchInterests);
       })}
 
       <!-- STATE BEFORE PAINT — but no longer the COLLAPSE before paint. The `html.paper-js` class set in this
-           page's head already makes the CSS present every panel closed on the first frame, so this snippet
-           does not need to touch them, and it must not: it used to set `hidden` (i.e. display:none), and
-           coming out of display:none is why the first open of each card never animated. See the fold note in
-           the stylesheet.
+           page's head already makes the CSS present every panel closed on the first frame, so this snippet does
+           not need to touch them: setting `hidden` as well was a second mechanism for one job, and it was the
+           one that made a deep link open nothing (it exempted the linked panel from `hidden` but not from the
+           collapsing CSS, and revealFromHash then bailed on a `hidden` test that exemption had made false).
            What is still needed here, synchronously and during parsing, is the two things CSS cannot do: OPEN
            the panel a deep link points into, and mirror the resulting state onto the buttons so the chevron
            and the label are right on the first frame rather than one frame late. Closed panels are marked
@@ -376,20 +376,27 @@ const stops = researchStops(publications, researchInterests);
   }
 
   /* ── THE FOLD. The owner, twice: he wanted animation on the fold, and then that the animation was "not smooth
-     at all, almost like a ppt". Three separate faults caused that, and all three are fixed here rather than
-     re-tuned, because none of them was a timing problem.
+     at all, almost like a ppt". The box was already interpolating by then — measured, ~36 frames from 0 to
+     769px — so the height was never the problem. What was missing was everything else:
 
-     1. THE FIRST OPEN DID NOT ANIMATE AT ALL. The panel was collapsed with the `hidden` attribute, i.e.
-        `display: none`. Removing that attribute and setting the target height in the same frame gives the
-        browser no previous computed value to interpolate from, so the very first open of every card SNAPPED,
-        and only repeat opens animated. The collapse is now purely max-height, so the panel is always laid
-        out and a transition always has somewhere to start.
-     2. THERE WAS NO FADE, only a rectangular wipe. A leftover `detail-in` keyframe animation from the previous
-        implementation ran with `fill-mode: both` and so pinned opacity to 1 forever — and an animation outranks
-        a transition, so the fold's own opacity transition could never be seen. That is precisely the "ppt"
-        read: content at full strength, revealed by a growing clip box.
-     3. The content did not move. Now it fades and lifts on its own — transform and opacity, per the project's
-        motion rule — which is what makes this read as an unfold rather than as a blind opening.
+     1. THERE WAS NO FADE, only a rectangular wipe, and that is the whole of the "ppt" read: type at full
+        strength revealed by a growing shutter. A leftover `detail-in` keyframe animation from the previous
+        implementation ran with `fill-mode: both`, and a filled animation OVERRIDES the element's own declared
+        value — so `opacity: 0` on the closed panel never took effect and the fold's opacity transition could
+        never start. Measured on a reduction of the old rules: computed opacity 1 while closed, and asking for
+        the fade started 0 transitions. Deleted rather than disabled.
+     2. THE CONTENT DID NOT MOVE, for the same reason — the same filled animation pinned `transform: none`. The
+        two columns now fade and lift on their own timeline, which is what reads as unfolding rather than as a
+        blind being raised.
+     3. A DEEP LINK OPENED NOTHING. The pre-paint snippet exempted a deep-linked panel from the `hidden`
+        attribute but not from the collapsing CSS, and revealFromHash then bailed out on a `hidden` test that
+        the exemption had already made false. It now opens the panel outright and the guard tests `is-open`.
+
+     A NOTE ON WHAT WAS NOT WRONG, since a plausible story sent me the wrong way first: collapsing with `hidden`
+     (display:none) and setting the target height in the same task DOES still animate here — I tested the exact
+     pattern and both it and a forced-reflow control started a transition. So the old `hidden` was not breaking
+     the first open. It is gone anyway, because the CSS collapse gated on html.paper-js already did that job and
+     the attribute only added a second mechanism to keep in sync.
 
      max-height rather than height because you cannot transition to or from `auto`, and rather than
      grid-template-rows 0fr->1fr because this element is ALREADY a two-column grid whose rows are load bearing.
