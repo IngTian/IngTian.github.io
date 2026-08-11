@@ -57,10 +57,13 @@
     #dcd5cf 100%
   );
 
-  /* fonts (families resolved via astro:fonts) */
-  --font-display: 'Fraunces', Georgia, serif;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* FONTS ARE NOT DECLARED HERE ANY MORE, and that is the fix for a site-wide bug rather than a move for
+     tidiness. These three lines used to read `--font-display: 'Fraunces', Georgia, serif` and so on, with a
+     comment claiming the families were "resolved via astro:fonts" — they were the very thing preventing that.
+     astro:fonts writes its own hashed family name into the same custom property from an inline <style> earlier
+     in the head; this file, loaded later, overwrote it with a bare "Fraunces" that matches no @font-face. Net
+     effect: not one of the three webfonts rendered, on any route, in either theme, live included.
+     The role tokens now live in exactly one place — global.css's @theme, built from astro:fonts' --ff-* vars. */
 }
 
 /* ============================================================

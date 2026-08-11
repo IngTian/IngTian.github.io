@@ -116,9 +116,13 @@ const personLd = {
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://ingtian.github.io/og-card.png" />
     <script type="application/ld+json" set:html={JSON.stringify(personLd)} />
-    <Font cssVariable="--font-display" preload />
-    <Font cssVariable="--font-body" preload />
-    <Font cssVariable="--font-mono" />
+    {/* --ff-* are astro:fonts' own variables, deliberately NOT the site's --font-display/-body/-mono
+        role tokens — pointing them at the same names meant our stylesheet overrode astro:fonts and no
+        webfont rendered anywhere. See the long note in astro.config.mjs. The role tokens are built
+        from these in global.css's @theme. */}
+    <Font cssVariable="--ff-fraunces" preload />
+    <Font cssVariable="--ff-inter" preload />
+    <Font cssVariable="--ff-jetbrains" />
     <ClientRouter />
     <title>{title}</title>
   </head>

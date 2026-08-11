@@ -21,9 +21,17 @@
      against a 4.5:1 requirement. Exposing it here means the fix is a utility swap rather than a hand-written
      override, and any future accent chip can reach it the same way. */
   --color-on-accent: var(--on-accent);
-  --font-display: 'Fraunces', Georgia, serif;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* THE TYPE ROLES, built from astro:fonts' own --ff-* variables and declared in exactly ONE place.
+     They used to be literal stacks written out here AND again in tokens.css, and that duplication is what hid
+     a total failure: whichever copy came last won, and both named "Fraunces" — a family with no @font-face rule
+     anywhere, because astro:fonts registers its faces under a hashed name. Nothing self-hosted rendered.
+     No tail after the var(): astro:fonts already builds the whole stack, ending in the generic family, from the
+     per-family `fallbacks` in astro.config.mjs. Appending our own repeated it — the computed value came out as
+     "…, serif, Georgia, 'Times New Roman', serif" — so the var()'s DEFAULT carries the safety instead, and it
+     only applies if astro:fonts stops emitting the variable at all. */
+  --font-display: var(--ff-fraunces, Georgia, serif);
+  --font-body: var(--ff-inter, system-ui, sans-serif);
+  --font-mono: var(--ff-jetbrains, ui-monospace, monospace);
 }
 
 /* overflow-x:hidden guards against the .descent::before/::after atmosphere
