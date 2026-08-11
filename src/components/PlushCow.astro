@@ -1,95 +1,136 @@
 ---
 // src/components/PlushCow.astro
-// THE EASTER EGG — a pixel plush cow that says something when you poke it.
+// THE COW. The owner loves cows, so it gets to be a real drawing rather than a decoration.
 //
-// The owner: "for the work, for the writing. let's leave an easter egg there. have a pixel art plush cow says
-// something."
+// He asked for three things: a big one on /writing "instead of scaffolding something that doesn\'t exist yet",
+// one on the 404 page, and for it to actually look like a cow — the first attempt "looks like a dragon". The art
+// is rebuilt in data/cowGlyph.ts; see that file for the four specific reasons the first one failed.
 //
-// The cow is an existing motif: the terrain hero's rare pill can read "Moo!" instead of the KKT condition, and
-// the original quant-pod brief put a plush cow on the desk. This is the same animal with a body and an opinion.
+// TWO LAYERS, ONE COLOUR. The dark markings and the light body are separate glyphs compiled from one matrix, and
+// both are currentColor — the light layer just runs at lower opacity. That is what makes the Holstein patches
+// read without introducing a second colour, which the palette rules would not permit.
 //
-// EASTER EGG, SO IT HIDES — but it is still a real control, not a trap. It sits at 22% opacity until hovered or
-// focused, which is enough to be missed by anyone reading the page and found by anyone looking at it. It is a
-// genuine <button> with an accessible name, reachable by keyboard, and what it says lands in a polite live
-// region — an egg that a screen-reader user cannot find is not restraint, it is an omission.
-//
-// Restraint check: one small mark, one line of dry text, no sound, no confetti, nothing that moves unless you
-// press it. The glyph is compiled from a character matrix in data/cowGlyph.ts like every other pixel mark here.
-import { COW, COW_LINES } from '../data/cowGlyph';
+// SIZES. `small` is furniture at the foot of a section, quiet until you look at it. `large` is the subject of the
+// page it is on, so it is fully opaque from the start: on /writing and /404 the cow is not hiding, it IS the
+// content, and pretending otherwise would just make it look broken.
+import { COW_BODY, COW_PATCH, COW_W, COW_H, COW_LINES } from '../data/cowGlyph';
 
-// 2px cells: a 30x26 mark. Big enough to read as a cow, small enough to be furniture.
-const CELL = 2;
+interface Props {
+  /** 'small' hides at the foot of a section; 'large' is the page\'s subject. */
+  size?: 'small' | 'large';
+  /** Override what it says. Defaults to the homepage lines. */
+  lines?: readonly string[];
+  /** Accessible name — worth tailoring, since on /404 and /writing the cow is the main thing on the page. */
+  label?: string;
+}
+
+const { size = 'small', lines = COW_LINES, label = 'A cow. Press it.' } = Astro.props;
+
+// 2px cells for furniture, 7px when the cow is the subject — a 147x98 drawing, big enough that the patches and
+// the muzzle read as drawing rather than as noise.
+const CELL = size === 'large' ? 7 : 2;
 ---
 
-<div class="cow-wrap" data-cow-lines={JSON.stringify(COW_LINES)}>
-  <button
-    type="button"
-    class="cow"
-    data-cow
-    aria-label="A plush cow. Press it."
-  >
+<div class:list={['cow-wrap', `cow-wrap--${size}`]} data-cow-lines={JSON.stringify(lines)}>
+  <button type="button" class="cow" data-cow aria-label={label}>
     <svg
       class="cow-art"
-      viewBox={`0 0 ${COW.w * CELL} ${COW.h * CELL}`}
-      width={COW.w * CELL}
-      height={COW.h * CELL}
+      viewBox={`0 0 ${COW_W * CELL} ${COW_H * CELL}`}
+      width={COW_W * CELL}
+      height={COW_H * CELL}
       aria-hidden="true"
       shape-rendering="crispEdges"
     >
-      {COW.cells.map((c) => (
-        <rect x={c.x * CELL} y={c.y * CELL} width={CELL} height={CELL} />
-      ))}
+      {/* The animal at full ink, then the markings at reduced opacity so they recede INTO it. Naming these by
+          role rather than by darkness is deliberate: currentColor is light on the dark pages, so a layer called
+          "dark" rendered brightest and the patches read as lit windows. */}
+      <g class="cow-body">
+        {COW_BODY.cells.map((c) => (
+          <rect x={c.x * CELL} y={c.y * CELL} width={CELL} height={CELL} />
+        ))}
+      </g>
+      <g class="cow-patch">
+        {COW_PATCH.cells.map((c) => (
+          <rect x={c.x * CELL} y={c.y * CELL} width={CELL} height={CELL} />
+        ))}
+      </g>
     </svg>
   </button>
-  <p class="cow-says" data-cow-says aria-live="polite"></p>
   <!-- The lines travel as JSON on the wrapper, so the copy stays in data/cowGlyph.ts and the script stays
-       generic. A first pass joined them with a separator character and wrote a literal NUL byte into the
-       source; JSON cannot be ambiguous about where a line ends, and cannot smuggle a control character. -->
+       generic. A first pass joined them with a separator and wrote a literal NUL byte into the source; JSON
+       cannot be ambiguous about where a line ends, and cannot smuggle a control character. -->
+  <p class="cow-says" data-cow-says aria-live="polite"></p>
+  {size === 'large' && (
+    <!-- The big cow is the only interactive thing on its page, so it says so. aria-hidden because the button's
+         own label already tells a screen reader to press it; announcing it twice is noise. -->
+    <p class="cow-hint" aria-hidden="true">press the cow</p>
+  )}
 </div>
 
 <style>
-  .cow-wrap {
-    display: flex; align-items: center; gap: 10px;
-    margin-top: clamp(20px, 3vh, 40px);
-    min-height: 30px;
+  .cow-wrap { display: flex; align-items: center; gap: 10px; }
+  .cow-wrap--small { margin-top: clamp(20px, 3vh, 40px); min-height: 30px; }
+  /* Large: stacked and centred, because it is the page\'s subject rather than a note at the end of one. */
+  .cow-wrap--large {
+    flex-direction: column; align-items: flex-start; gap: clamp(14px, 2vh, 22px);
+    margin-top: clamp(24px, 4vh, 56px);
   }
 
   .cow {
     -webkit-appearance: none; appearance: none; background: none; border: 0; padding: 0;
-    display: block; cursor: pointer; line-height: 0;
-    /* Quiet enough to be missed while reading, visible enough to be found while looking. */
-    opacity: 0.22;
-    color: inherit;
+    display: block; cursor: pointer; line-height: 0; color: inherit;
   }
-  .cow:hover, .cow:focus-visible { opacity: 0.85; }
-  .cow:focus-visible { outline: 2px solid var(--ink-3, currentColor); outline-offset: 4px; }
-  .cow-art rect { fill: currentColor; }
+  /* Quiet enough to be missed while reading, visible enough to be found while looking. */
+  .cow-wrap--small .cow { opacity: 0.22; }
+  .cow-wrap--small .cow:hover, .cow-wrap--small .cow:focus-visible { opacity: 0.85; }
+  /* The subject of its page, so it is simply there. */
+  .cow-wrap--large .cow { opacity: 0.9; }
+  .cow-wrap--large .cow:hover, .cow-wrap--large .cow:focus-visible { opacity: 1; }
+  .cow:focus-visible { outline: 2px solid currentColor; outline-offset: 6px; }
+
+  /* ONE COLOUR, TWO ROLES. The body is full ink; the patches are the same ink at low opacity so they sit BACK
+     from it. This is what keeps the drawing readable in both themes without a second colour. */
+  .cow-body rect { fill: currentColor; }
+  .cow-patch rect { fill: currentColor; opacity: 0.34; }
 
   .cow-says {
     margin: 0;
-    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.02em;
+    font-family: var(--font-mono); letter-spacing: 0.02em;
     color: var(--ink-4, currentColor); opacity: 0;
   }
+  .cow-wrap--small .cow-says { font-size: 11.5px; }
+  .cow-wrap--large .cow-says { font-size: clamp(12.5px, 1.05vw, 15px); }
   .cow-says.is-said { opacity: 0.9; }
 
+  /* A hint that the big cow is pressable — it is the only interactive thing on those pages. */
+  .cow-wrap--large .cow-hint {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--ink-4, currentColor); opacity: 0.5;
+  }
+
   @media (prefers-reduced-motion: no-preference) {
-    /* transform and opacity only — the project's rule, and a nudge is all the animation an egg needs. */
+    /* transform and opacity only — the project\'s rule. */
     .cow { transition: opacity 220ms ease, transform 220ms ease; }
     .cow-says { transition: opacity 260ms ease; }
-    .cow:active { transform: translateY(1px) scale(0.96); }
+    .cow:active { transform: translateY(1px) scale(0.98); }
     .cow.is-poked .cow-art { animation: cow-nudge 420ms ease-out; }
     @keyframes cow-nudge {
       0%   { transform: translateY(0) rotate(0deg); }
-      35%  { transform: translateY(-3px) rotate(-4deg); }
-      70%  { transform: translateY(0) rotate(3deg); }
+      35%  { transform: translateY(-3px) rotate(-3deg); }
+      70%  { transform: translateY(0) rotate(2deg); }
       100% { transform: translateY(0) rotate(0deg); }
     }
+  }
+
+  @media (max-width: 700px) {
+    /* A 147px-wide drawing is most of a phone screen; scale it down rather than letting it set the page width. */
+    .cow-wrap--large .cow-art { width: min(100%, 210px); height: auto; }
   }
 </style>
 
 <script>
   // One cow, one line per press, in order and wrapping. Deterministic on purpose: this project bans
-  // Math.random() at paint time, and an egg that says the same thing in the same order is also easier to test.
+  // Math.random() at paint time, and an egg that says the same thing in the same order is also testable.
   function initCows(): (() => void) | null {
     const wraps = Array.from(document.querySelectorAll<HTMLElement>('.cow-wrap'));
     if (!wraps.length) return null;

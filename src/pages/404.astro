@@ -1,6 +1,8 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { PAGES } from '../data/nav';
+import PlushCow from '../components/PlushCow.astro';
+import { COW_LINES_404 } from '../data/cowGlyph';
 import FluidSky from '../components/proto/FluidSky.astro';
 import SkyWash from '../components/SkyWash.astro';
 ---
@@ -18,6 +20,16 @@ import SkyWash from '../components/SkyWash.astro';
       <p class="nf-code">404</p>
       <h1 class="nf-title">You've descended past the edge of the map.</h1>
       <p class="nf-sub">There's no page here — but the path back is just a step up.</p>
+
+      <!-- A COW ON THE 404. The owner asked for one, and a lost reader is exactly who could use the company.
+           It goes above the links rather than below them, so the way out is still the last thing read. -->
+      <div class="nf-cow">
+        <PlushCow
+          size="large"
+          lines={COW_LINES_404}
+          label="A cow, keeping you company on a page that does not exist. Press it."
+        />
+      </div>
       <nav class="nf-links">
         <a class="nf-primary" href="/">← back to the descent</a>
         {/* DRIVEN BY data/nav.ts, not hand-listed. This block had gone stale twice over: it was missing
@@ -42,6 +54,8 @@ import SkyWash from '../components/SkyWash.astro';
   /* The primary button on its own row, the five page links centred beneath it. As one wrapping flex row the
      fifth link ("Art") broke onto a line by itself and read as an orphan — a stack of two intentional rows is
      better than one row that wraps at an accidental place, and it no longer changes shape as pages are added. */
+  .nf-cow { margin: clamp(18px, 3vh, 36px) 0 clamp(4px, 1vh, 12px); }
+
   .nf-links { margin-top: 40px; display: flex; flex-direction: column; gap: 20px; align-items: center; }
   .nf-pages { display: flex; gap: 16px; justify-content: center; align-items: baseline; flex-wrap: wrap; }
   .nf-primary { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.04em; text-decoration: none;

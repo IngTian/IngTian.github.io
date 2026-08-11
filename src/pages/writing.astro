@@ -18,6 +18,7 @@ import FluidSky from '../components/proto/FluidSky.astro';
 import SkyWash from '../components/SkyWash.astro';
 import SideRail from '../components/SideRail.astro';
 import { KINDS, sorted, totalEntries, kindSectionId, entrySectionId } from '../data/writing';
+import { COW_LINES_WRITING } from '../data/cowGlyph';
 import { writingStops } from '../lib/pageStops';
 
 const stops = writingStops(KINDS);
@@ -40,7 +41,10 @@ const longDate = (iso: string) =>
     <FluidSky strength={3} variant="reading" />
     <SkyWash />
 
-    <SideRail stops={stops} id="writing-toc" />
+    {/* NO RAIL WHEN THERE IS NOTHING TO POINT AT. The kind sections only render once something is published,
+        so rendering the rail unconditionally would leave a column of anchors pointing at ids that do not
+        exist. */}
+    {total > 0 && <SideRail stops={stops} id="writing-toc" />}
 
     <div class="writing-block">
       <header class="writing-head">
@@ -52,16 +56,32 @@ const longDate = (iso: string) =>
           shorter, less formal, and revisable.
         </p>
         {total === 0 && (
-          /* THE HONEST OPENING. The shelf is empty today, and saying so once at the top is better than three
-             identical apologies further down — a reader learns the state of the page before they scroll it. */
+          /* THE HONEST OPENING. One line, and then a cow. */
           <p class="state">
             <span class="state-mark" aria-hidden="true"></span>
-            Nothing published yet. The sections below are what will fill, and in what order.
+            Nothing published yet.
           </p>
         )}
       </header>
 
-      <div class="kind-list">
+      {/* ── EMPTY: A COW, NOT A SCAFFOLD.
+          The owner: "instead of scaffolding something that doesn't exist yet, let's just put that big cow
+          there." Right — three sections each promising what will one day fill them is three apologies and no
+          content, and it makes the page look abandoned rather than early. A cow holding the space is honest
+          about there being nothing here, and better company.
+          The structure is not lost: the moment data/writing.ts holds one entry, the kind sections below render
+          exactly as before and the cow steps aside. Nothing to lay out again. */}
+      {total === 0 && (
+        <div class="writing-cow">
+          <PlushCow
+            size="large"
+            lines={COW_LINES_WRITING}
+            label="A cow, holding the space until something is written here. Press it."
+          />
+        </div>
+      )}
+
+      <div class="kind-list" hidden={total === 0}>
         {KINDS.map((kind) => (
           <section class="kind" id={kindSectionId(kind.key)} aria-labelledby={`${kindSectionId(kind.key)}-h`}>
             <header class="kind-head">
@@ -94,10 +114,6 @@ const longDate = (iso: string) =>
         ))}
       </div>
 
-      <!-- THE EASTER EGG, the same cow as the homepage's work section — inside .writing-block, or it renders in
-           the gutter and collides with the fixed rail. A shelf still filling up is a good place to hide one. -->
-      <PlushCow />
-
       <footer class="writing-foot"><a class="back" href="/">← back to the descent</a></footer>
     </div>
   </main>
@@ -109,6 +125,8 @@ const longDate = (iso: string) =>
   /* Shared reading gradient — the same token /research and /projects use, so the three reading pages stay one
      system rather than three guesses. */
   .writing.descent { background: var(--reading-grad); }
+
+  .writing-cow { margin: clamp(10px, 2vh, 26px) 0 clamp(20px, 4vh, 48px); }
 
   .writing-block {
     width: min(64%, 860px);
@@ -181,7 +199,9 @@ const longDate = (iso: string) =>
   /* Narrow: the rail hides itself at the same 1100px breakpoint SideRail uses, so the column re-centers at the
      reading measure rather than keeping a margin for a rail that is gone. */
   @media (max-width: 1100px) {
-    .writing-block { width: auto; margin: 0 auto; padding: 0 24px; max-width: 760px; }
+    .writing-cow { margin: clamp(10px, 2vh, 26px) 0 clamp(20px, 4vh, 48px); }
+
+  .writing-block { width: auto; margin: 0 auto; padding: 0 24px; max-width: 760px; }
   }
 
   @media (prefers-reduced-motion: no-preference) {
