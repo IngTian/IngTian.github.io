@@ -157,7 +157,10 @@ const MOO_CELL = 10;
   /* #14161a is the paper slides' dark surface, byte-identical to Choice/Rules/Work/Solve, so the bubble is the
      same material as every other panel in dark theme. */
   :global(html[data-theme='dark']) .cow-wrap { --moo-paper: #14161a; }
-  .cow-wrap--small { margin-left: auto; }
+  /* NO margin-left: auto ANY MORE. It used to pin the cow to the right of whatever row it landed in; the footer
+     now centres it explicitly, and an auto left margin absorbs all the free space on that side, so leaving it
+     would have quietly cancelled the centring and pushed the cow back to the right edge. Placement belongs to
+     the container, which is the only thing that knows what the row is for. */
   /* Large: the pair is the page's subject rather than a note at the end of one, so it gets air above it. */
   .cow-wrap--large { margin-top: clamp(24px, 4vh, 56px); }
 

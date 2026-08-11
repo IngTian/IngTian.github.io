@@ -37,10 +37,13 @@ const year = new Date().getFullYear();
        which is a bigger move than the bug it was fixing. The lesson is that the seal's position is not mine to
        spend on layout convenience; the cow has to fit around it. -->
   <SealMark />
-  <!-- THE COW GETS ITS OWN FULL-WIDTH ROW, below the nav and the seal, pushed right — "in the front page, you
-       can put the moo at the lower right corner". w-full forces the wrap, so the cow can never change where the
-       nav and the seal break, which is what bumped the seal the first time. -->
-  <div class="w-full flex justify-end">
+  <!-- THE COW GETS ITS OWN FULL-WIDTH ROW, below the nav and the seal, and CENTRED — "maybe move the cow to the
+       middle in the bottom". It was pushed right, which put it directly under the seal and made the two read as
+       one crowded corner while the whole left of the strip sat empty. Centred, the footer balances: links left,
+       seal right, cow between and below them.
+       w-full forces the wrap, so the cow can never change where the nav and the seal break — which is what
+       bumped the seal out of place the first time round. -->
+  <div class="w-full flex justify-center">
     <PlushCow />
   </div>
 </section>
