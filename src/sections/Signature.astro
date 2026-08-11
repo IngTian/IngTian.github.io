@@ -31,12 +31,12 @@ const year = new Date().getFullYear();
       © {year} Zeying Tian
     </span>
   </nav>
-  <SealMark />
-
-  <!-- THE COW, LOWER RIGHT. The owner: "in the front page, you can put the moo at the lower right corner."
-       It was at the foot of the work section, where it sat oddly close to the Toc rail. Here it lands in the
-       empty right half of the footer: the section is flex/justify-between with wrapping, so the links take the
-       first line and the seal and the cow spread across the second — seal left, cow right, which is exactly the
-       gap he pointed at. -->
-  <PlushCow />
+  <!-- ONE EXPLICIT ROW FOR THE SEAL AND THE COW, rather than letting them fall wherever flex-wrap puts them.
+       They were siblings of the nav, so the wrap point decided the layout — and it MOVED when the cow stopped
+       stretching, which bumped the seal out of place. A row of its own is deterministic: seal left, cow right,
+       whatever the widths do. -->
+  <div class="w-full flex justify-between items-end gap-7">
+    <SealMark />
+    <PlushCow />
+  </div>
 </section>
