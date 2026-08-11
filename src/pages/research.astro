@@ -365,6 +365,42 @@ const stops = researchStops(publications, researchInterests);
     align-items: start;
     margin-top: 5vh;
   }
+
+  /* ── THE FOLD, ANIMATED. The owner: "when going from fold to collapse and vice versa i want animations."
+     It used to toggle the `hidden` attribute, which snaps — the panel appeared and vanished with no motion at
+     all, which is what he noticed.
+     max-height rather than height, because you cannot transition to or from `auto`, and rather than
+     grid-template-rows 0fr->1fr because this element is ALREADY a two-column grid and its own rows are load
+     bearing. The cap is generous enough for the longest paper; the cost is that the first moments of a close
+     move faster than the last, which at this duration is not visible.
+     This is a deliberate exception to the project's transform/opacity-only rule: an accordion cannot be built
+     without animating size, and it is one element rather than a full-page layer.
+     The closed state also drops out of the accessibility tree and the tab order — a zero-height panel whose
+     links are still focusable is a keyboard trap on a page that looks empty. */
+  .paper-body {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+  }
+  /* No cap here: the script sets max-height to the panel's OWN measured height, then clears it once the
+     transition lands so later reflows are never clipped. A fixed generous cap was tried first and did not
+     animate at all — measured, a 400vh cap against 795px of content reached full height inside 140ms of a
+     460ms transition, because the interpolation is over the CAP, not over the content. */
+  .paper-body.is-open { opacity: 1; margin-top: 5vh; }
+
+  /* NO-JS AND FIRST PAINT: the panel is never `hidden` in the markup, so without the script it must be fully
+     readable rather than a collapsed sliver. html.paper-js is added by the page's own script before it folds
+     anything, so the closed state only ever applies once something can open it again. */
+  html:not(.paper-js) .paper-body { max-height: none; opacity: 1; margin-top: 5vh; overflow: visible; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .paper-body {
+      transition: max-height 460ms cubic-bezier(0.22, 0.85, 0.3, 1),
+                  opacity 300ms ease,
+                  margin-top 460ms cubic-bezier(0.22, 0.85, 0.3, 1);
+    }
+  }
   /* THE DETAIL SHIPS VISIBLE, and the script collapses it. This direction is deliberate and it is the
      second attempt: the first shipped `hidden` in the markup with an `html.no-paper-js` class meant to
      reveal it as a fallback — but that class was ADDED BY THE SCRIPT, so with JS disabled it never
@@ -510,7 +546,34 @@ const stops = researchStops(publications, researchInterests);
       const detail = detailOf(card);
       if (!detail) return;
       card.setAttribute('aria-expanded', String(open));
-      detail.toggleAttribute('hidden', !open);
+      // `hidden` would snap. The CSS animates grid-template-rows from 0fr to 1fr instead, so the panel measures
+      // ITSELF — nothing to compute in JS, and it stays correct when the copy changes length. `hidden` is still
+      // removed on first open so the no-JS state (never hidden at all) is unaffected.
+      detail.removeAttribute('hidden');
+
+      // MEASURE, then animate to that number. max-height interpolates over whatever value you give it, so a
+      // generous cap makes the panel snap: 400vh against 795px of content finished inside 140ms of a 460ms
+      // transition. Setting the real height makes the whole duration visible.
+      if (open) {
+        detail.style.maxHeight = `${detail.scrollHeight}px`;
+        detail.classList.add('is-open');
+        // Once open, drop the cap so a resize or a font swap cannot clip the panel.
+        const done = (e: TransitionEvent) => {
+          if (e.propertyName !== 'max-height') return;
+          detail.style.maxHeight = 'none';
+          detail.removeEventListener('transitionend', done);
+        };
+        detail.addEventListener('transitionend', done);
+      } else {
+        // Going the other way needs a concrete starting height, or there is nothing to animate FROM.
+        detail.style.maxHeight = `${detail.scrollHeight}px`;
+        void detail.offsetHeight;
+        detail.classList.remove('is-open');
+        detail.style.maxHeight = '0px';
+      }
+      // Keep it out of the tab order and the accessibility tree while it is closed — a zero-height panel whose
+      // links are still focusable is a keyboard trap in a page that looks like it has nothing there.
+      detail.setAttribute('aria-hidden', String(!open));
       // The side rail's rows follow what is actually rendered (see SideRail) and it re-measures on
       // scroll — but an expand is not a scroll, so nudge it, or the rail keeps the old rows until the
       // reader happens to move.
@@ -549,12 +612,11 @@ const stops = researchStops(publications, researchInterests);
     window.addEventListener('hashchange', revealFromHash);
     revealFromHash();
 
-    // The first featured paper opens by default: this page's job is to show the work, and a wall of
-    // shut cards would make a reader click before they can read anything at all. Only when nothing is
-    // already open — a deep link, or a View Transition returning to a page the reader had expanded,
-    // must not be overridden.
-    const anyOpen = cards.some((c) => c.getAttribute('aria-expanded') === 'true');
-    if (!anyOpen && !location.hash) setOpen(cards[0], true);
+    // FOLDED BY DEFAULT, on the owner's instruction: "i want the research card to be folded by default."
+    // An earlier version opened the first featured paper on load, reasoning that a wall of shut cards makes a
+    // reader click before they can read anything. But the collapsed card already carries the title, the subject,
+    // the takeaway and the headline numbers — enough to decide with — so opening one by default just picked a
+    // winner on the reader's behalf. A deep link still opens its own card (revealFromHash, above).
 
     return () => {
       for (const card of cards) card.removeEventListener('click', onClick);
