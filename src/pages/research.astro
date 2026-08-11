@@ -177,25 +177,34 @@ const stops = researchStops(publications, researchInterests);
         );
       })}
 
-      <!-- COLLAPSE BEFORE PAINT. Placed here, immediately after the papers, because a detail cannot be
-           collapsed before it is parsed — and a deferred module script would run after first paint,
-           flashing every expanded paper. A synchronous inline script at this point in the document
-           collapses them during parsing, so the first thing painted is already the card view.
-           The details ship VISIBLE (see the .paper-body markup) so a JS failure leaves the papers
-           readable rather than unreachable; this snippet is the enhancement, not the mechanism. -->
+      <!-- STATE BEFORE PAINT — but no longer the COLLAPSE before paint. The `html.paper-js` class set in this
+           page's head already makes the CSS present every panel closed on the first frame, so this snippet
+           does not need to touch them, and it must not: it used to set `hidden` (i.e. display:none), and
+           coming out of display:none is why the first open of each card never animated. See the fold note in
+           the stylesheet.
+           What is still needed here, synchronously and during parsing, is the two things CSS cannot do: OPEN
+           the panel a deep link points into, and mirror the resulting state onto the buttons so the chevron
+           and the label are right on the first frame rather than one frame late. Closed panels are marked
+           `inert` so their links are out of the tab order while they measure zero — a focusable link inside a
+           zero-height box is a keyboard trap on a page that looks empty. -->
       <script is:inline>
         (() => {
-          const details = document.querySelectorAll('[data-paper-detail]');
           const hash = location.hash.slice(1);
-          for (const d of details) {
-            // Never collapse the panel a deep link points into.
-            if (hash && (d.id === hash || d.querySelector('#' + CSS.escape(hash)))) continue;
-            d.setAttribute('hidden', '');
+          for (const d of document.querySelectorAll('[data-paper-detail]')) {
+            const deep = !!hash && (d.id === hash || d.querySelector('#' + CSS.escape(hash)));
+            if (deep) {
+              d.classList.add('is-open');
+              // No cap, so a deep-linked panel is never clipped; it opens without animating, which is right
+              // for a panel that was already open when the page arrived.
+              d.style.maxHeight = 'none';
+            } else {
+              d.setAttribute('inert', '');
+              d.setAttribute('aria-hidden', 'true');
+            }
           }
-          // Mirror the state onto the buttons so the chevron and label are right on the first frame.
           for (const b of document.querySelectorAll('[data-paper-toggle]')) {
             const panel = document.getElementById(b.getAttribute('aria-controls'));
-            b.setAttribute('aria-expanded', String(!!panel && !panel.hasAttribute('hidden')));
+            b.setAttribute('aria-expanded', String(!!panel && panel.classList.contains('is-open')));
           }
         })();
       </script>
@@ -366,49 +375,60 @@ const stops = researchStops(publications, researchInterests);
     margin-top: 5vh;
   }
 
-  /* ── THE FOLD, ANIMATED. The owner: "when going from fold to collapse and vice versa i want animations."
-     It used to toggle the `hidden` attribute, which snaps — the panel appeared and vanished with no motion at
-     all, which is what he noticed.
-     max-height rather than height, because you cannot transition to or from `auto`, and rather than
-     grid-template-rows 0fr->1fr because this element is ALREADY a two-column grid and its own rows are load
-     bearing. The cap is generous enough for the longest paper; the cost is that the first moments of a close
-     move faster than the last, which at this duration is not visible.
-     This is a deliberate exception to the project's transform/opacity-only rule: an accordion cannot be built
-     without animating size, and it is one element rather than a full-page layer.
-     The closed state also drops out of the accessibility tree and the tab order — a zero-height panel whose
-     links are still focusable is a keyboard trap on a page that looks empty. */
+  /* ── THE FOLD. The owner, twice: he wanted animation on the fold, and then that the animation was "not smooth
+     at all, almost like a ppt". Three separate faults caused that, and all three are fixed here rather than
+     re-tuned, because none of them was a timing problem.
+
+     1. THE FIRST OPEN DID NOT ANIMATE AT ALL. The panel was collapsed with the `hidden` attribute, i.e.
+        `display: none`. Removing that attribute and setting the target height in the same frame gives the
+        browser no previous computed value to interpolate from, so the very first open of every card SNAPPED,
+        and only repeat opens animated. The collapse is now purely max-height, so the panel is always laid
+        out and a transition always has somewhere to start.
+     2. THERE WAS NO FADE, only a rectangular wipe. A leftover `detail-in` keyframe animation from the previous
+        implementation ran with `fill-mode: both` and so pinned opacity to 1 forever — and an animation outranks
+        a transition, so the fold's own opacity transition could never be seen. That is precisely the "ppt"
+        read: content at full strength, revealed by a growing clip box.
+     3. The content did not move. Now it fades and lifts on its own — transform and opacity, per the project's
+        motion rule — which is what makes this read as an unfold rather than as a blind opening.
+
+     max-height rather than height because you cannot transition to or from `auto`, and rather than
+     grid-template-rows 0fr->1fr because this element is ALREADY a two-column grid whose rows are load bearing.
+     Animating a size is a deliberate exception to the transform/opacity-only rule: an accordion cannot be
+     built without it, and this is one panel rather than a full-page layer. */
   .paper-body {
+    --fold-ease: cubic-bezier(0.4, 0.02, 0.2, 1);
     overflow: hidden;
     max-height: 0;
-    opacity: 0;
     margin-top: 0;
   }
-  /* No cap here: the script sets max-height to the panel's OWN measured height, then clears it once the
-     transition lands so later reflows are never clipped. A fixed generous cap was tried first and did not
-     animate at all — measured, a 400vh cap against 795px of content reached full height inside 140ms of a
-     460ms transition, because the interpolation is over the CAP, not over the content. */
-  .paper-body.is-open { opacity: 1; margin-top: 5vh; }
+  /* No cap: the script sets max-height to the panel's OWN measured height, then clears it once the transition
+     lands so later reflows are never clipped. A fixed generous cap was tried first and did not animate at all —
+     measured, a 400vh cap against 795px of content reached full height inside 140ms of a 460ms transition,
+     because the interpolation is over the CAP, not over the content. */
+  .paper-body.is-open { margin-top: 5vh; }
 
-  /* NO-JS AND FIRST PAINT: the panel is never `hidden` in the markup, so without the script it must be fully
-     readable rather than a collapsed sliver. html.paper-js is added by the page's own script before it folds
-     anything, so the closed state only ever applies once something can open it again. */
-  html:not(.paper-js) .paper-body { max-height: none; opacity: 1; margin-top: 5vh; overflow: visible; }
+  /* The two columns carry the fade and the lift, so the clip box is not the only thing moving. */
+  .paper-body > * { opacity: 0; transform: translate3d(0, -10px, 0); }
+  .paper-body.is-open > * { opacity: 1; transform: none; }
+
+  /* NO-JS: the panel is never `hidden` in the markup, so without the script it must be fully readable rather
+     than a collapsed sliver. html.paper-js is added by an inline script in the head of this page, before any
+     .paper-body is parsed, so the collapsed state only ever applies once something can open it again — which
+     is also why the pre-paint snippet no longer needs to touch the panels at all. */
+  html:not(.paper-js) .paper-body { max-height: none; margin-top: 5vh; overflow: visible; }
+  html:not(.paper-js) .paper-body > * { opacity: 1; transform: none; }
 
   @media (prefers-reduced-motion: no-preference) {
     .paper-body {
-      transition: max-height 460ms cubic-bezier(0.22, 0.85, 0.3, 1),
-                  opacity 300ms ease,
-                  margin-top 460ms cubic-bezier(0.22, 0.85, 0.3, 1);
+      transition: max-height 400ms var(--fold-ease), margin-top 400ms var(--fold-ease);
     }
+    /* CLOSING (the base rule): the content leaves first and fast, so it is gone before the box has finished
+       shrinking — otherwise you watch text slide up behind a closing shutter. */
+    .paper-body > * { transition: opacity 160ms ease, transform 220ms var(--fold-ease); }
+    /* OPENING: the content arrives just behind the box, which is what reads as unfolding. The delay is on the
+       open state only, so it applies in that direction and not on the way back. */
+    .paper-body.is-open > * { transition: opacity 300ms ease 90ms, transform 420ms var(--fold-ease) 60ms; }
   }
-  /* THE DETAIL SHIPS VISIBLE, and the script collapses it. This direction is deliberate and it is the
-     second attempt: the first shipped `hidden` in the markup with an `html.no-paper-js` class meant to
-     reveal it as a fallback — but that class was ADDED BY THE SCRIPT, so with JS disabled it never
-     existed, the fallback never applied, and the entire paper was unreachable. Measured with script
-     execution disabled: 1 detail panel, 0 with a rendered box.
-     Shipping visible cannot fail that way. The trade is a brief flash of the full paper before the
-     script collapses it, which the guard below removes for anyone whose JS does run. */
-  .paper-body[hidden] { display: none; }
 
   /* The guard is emitted INTO THE HTML by an inline head script (see BaseLayout's paper-collapse
      snippet), so it is present on the very first paint and absent when JS is off. Belt and braces:
@@ -417,16 +437,8 @@ const stops = researchStops(publications, researchInterests);
   :global(html:not(.paper-js)) .card-cue { display: none; }
   :global(html:not(.paper-js)) .paper-card { cursor: default; }
 
-  @media (prefers-reduced-motion: no-preference) {
-    /* Opening animates the panel in — transform and opacity only, per the project's motion rule.
-       Height is not animated: it would need a fixed value or a layout-thrashing measure, and the
-       project bans animating anything that forces layout. */
-    .paper-body:not([hidden]) { animation: detail-in .42s cubic-bezier(.2,.7,.3,1) both; }
-    @keyframes detail-in {
-      from { opacity: 0; transform: translate3d(0, -10px, 0); }
-      to   { opacity: 1; transform: none; }
-    }
-  }
+  /* (The `detail-in` keyframe animation that used to live here is deleted, not disabled — see fault 2 in the
+     note above the fold. Its fill-mode pinned opacity to 1 and silently outranked the fold's own transition.) */
   .paper-left, .paper-right { min-width: 0; }
 
   .block { scroll-margin-top: 12vh; }
@@ -523,10 +535,12 @@ const stops = researchStops(publications, researchInterests);
   // future, so I guess it's fine to have that card in the research tab with fluid background. After
   // clicking on the card, it expands to a more detailed summary. I think that's the right shape."
   //
-  // Progressive enhancement, and the DIRECTION matters: the detail is `hidden` in the MARKUP so the
-  // collapsed state is right before any script runs (no flash of every full paper), while
-  // `html.no-paper-js` — added here and cleared here — makes the CSS reveal everything if this script
-  // never executes. The content is therefore never trapped behind JS that failed to load.
+  // Progressive enhancement, in the safe direction: the detail ships fully OPEN in the markup, and the
+  // collapse is CSS gated on `html.paper-js` — a class set by an inline script in this page's head. So a
+  // reader whose JS never runs gets every paper in full, and a reader whose JS does run gets the card view on
+  // the first frame with no flash. The content is never trapped behind a script that failed to load, which an
+  // earlier version did manage: it shipped the panels `hidden` and put the fallback behind a class the script
+  // itself added (measured with script execution disabled: 1 panel, 0 rendered).
   //
   // No React island (the terminal is the only one). Re-inits on astro:page-load with teardown.
 
@@ -542,38 +556,62 @@ const stops = researchStops(publications, researchInterests);
       return id ? document.getElementById(id) : null;
     };
 
+    // One settle handler per panel at most. Held in a map rather than left to accumulate, because a stale one
+    // was a real bug: closing a card BEFORE its open transition finished left the open's listener attached, the
+    // close's own transitionend then fired it, and it set max-height back to `none` — so the panel sprang open
+    // again as an empty gap. Reachable by double-clicking a card.
+    const settling = new WeakMap<HTMLElement, (e: TransitionEvent) => void>();
+
     function setOpen(card: HTMLButtonElement, open: boolean): void {
       const detail = detailOf(card);
       if (!detail) return;
       card.setAttribute('aria-expanded', String(open));
-      // `hidden` would snap. The CSS animates grid-template-rows from 0fr to 1fr instead, so the panel measures
-      // ITSELF — nothing to compute in JS, and it stays correct when the copy changes length. `hidden` is still
-      // removed on first open so the no-JS state (never hidden at all) is unaffected.
-      detail.removeAttribute('hidden');
 
-      // MEASURE, then animate to that number. max-height interpolates over whatever value you give it, so a
-      // generous cap makes the panel snap: 400vh against 795px of content finished inside 140ms of a 460ms
-      // transition. Setting the real height makes the whole duration visible.
+      const stale = settling.get(detail);
+      if (stale) {
+        detail.removeEventListener('transitionend', stale);
+        settling.delete(detail);
+      }
+
+      // MEASURE, then animate to that number, in BOTH directions — you cannot interpolate from or to `none`,
+      // and a generous cap makes the panel snap instead of animating: 400vh against 795px of content finished
+      // inside 140ms of a 460ms transition, because the interpolation is over the cap.
       if (open) {
+        // `inert` first: it must be gone before the panel is measured, and before anything inside can be focused.
+        detail.removeAttribute('inert');
+        detail.removeAttribute('aria-hidden');
         detail.style.maxHeight = `${detail.scrollHeight}px`;
         detail.classList.add('is-open');
-        // Once open, drop the cap so a resize or a font swap cannot clip the panel.
+        // Once open, drop the cap so a resize or a font swap cannot clip the panel. Guarded on the class, so if
+        // a close overtakes this open the cap is not restored on a panel that is meant to be shut.
         const done = (e: TransitionEvent) => {
-          if (e.propertyName !== 'max-height') return;
-          detail.style.maxHeight = 'none';
+          if (e.propertyName !== 'max-height' || e.target !== detail) return;
           detail.removeEventListener('transitionend', done);
+          settling.delete(detail);
+          if (detail.classList.contains('is-open')) detail.style.maxHeight = 'none';
         };
+        settling.set(detail, done);
         detail.addEventListener('transitionend', done);
       } else {
-        // Going the other way needs a concrete starting height, or there is nothing to animate FROM.
+        // A concrete starting height, committed with a forced reflow, or there is nothing to animate FROM.
         detail.style.maxHeight = `${detail.scrollHeight}px`;
         void detail.offsetHeight;
         detail.classList.remove('is-open');
         detail.style.maxHeight = '0px';
+        // Out of the tab order and the accessibility tree, but only once it has finished closing — marking it
+        // inert immediately would blur whatever is focused inside it mid-animation.
+        const done = (e: TransitionEvent) => {
+          if (e.propertyName !== 'max-height' || e.target !== detail) return;
+          detail.removeEventListener('transitionend', done);
+          settling.delete(detail);
+          if (!detail.classList.contains('is-open')) {
+            detail.setAttribute('inert', '');
+            detail.setAttribute('aria-hidden', 'true');
+          }
+        };
+        settling.set(detail, done);
+        detail.addEventListener('transitionend', done);
       }
-      // Keep it out of the tab order and the accessibility tree while it is closed — a zero-height panel whose
-      // links are still focusable is a keyboard trap in a page that looks like it has nothing there.
-      detail.setAttribute('aria-hidden', String(!open));
       // The side rail's rows follow what is actually rendered (see SideRail) and it re-measures on
       // scroll — but an expand is not a scroll, so nudge it, or the rail keeps the old rows until the
       // reader happens to move.
@@ -602,7 +640,9 @@ const stops = researchStops(publications, researchInterests);
       const target = document.getElementById(id);
       if (!target) return;
       const detail = target.closest<HTMLElement>('[data-paper-detail]');
-      if (!detail || !detail.hasAttribute('hidden')) return;
+      // Already open? Nothing to reveal. This used to test for the `hidden` attribute, which the fold no longer
+      // uses — so the guard was always true and deep links silently stopped opening their card.
+      if (!detail || detail.classList.contains('is-open')) return;
       const card = document.querySelector<HTMLButtonElement>(`[aria-controls="${detail.id}"]`);
       if (!card) return;
       setOpen(card, true);
