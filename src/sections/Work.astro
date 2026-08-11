@@ -10,7 +10,6 @@
 // reverse-chronological — and claims authorization. This lists ARTEFACTS and where to read them. The
 // distinction is that every row here is a thing a reader can go and check.
 import { publications, projects } from '../data/profile';
-import PlushCow from '../components/PlushCow.astro';
 import { WRITINGS_PROMISE, WRITINGS_TOPICS } from '../data/making';
 
 const featured = publications.find((p) => p.featured);
@@ -69,9 +68,6 @@ const shownProjects = projects.slice(0, 2);
         </div>
       </div>
 
-      <!-- THE EASTER EGG, INSIDE .wk-inner. It has to live in the padded column: placed as a sibling of it, the
-           cow rendered in the left gutter and collided with the fixed Toc rail. -->
-      <PlushCow />
     </div>
   </div>
 </section>

@@ -13,7 +13,7 @@
 // SIZES. `small` is furniture at the foot of a section, quiet until you look at it. `large` is the subject of the
 // page it is on, so it is fully opaque from the start: on /writing and /404 the cow is not hiding, it IS the
 // content, and pretending otherwise would just make it look broken.
-import { COW_BODY, COW_PATCH, COW_W, COW_H, COW_LINES } from '../data/cowGlyph';
+import { COW_BODY, COW_PATCH, COW_MUZZLE, COW_OUTLINE, COW_W, COW_H, COW_LINES } from '../data/cowGlyph';
 
 interface Props {
   /** 'small' hides at the foot of a section; 'large' is the page\'s subject. */
@@ -41,16 +41,22 @@ const CELL = size === 'large' ? 7 : 2;
       aria-hidden="true"
       shape-rendering="crispEdges"
     >
-      {/* The animal at full ink, then the markings at reduced opacity so they recede INTO it. Naming these by
-          role rather than by darkness is deliberate: currentColor is light on the dark pages, so a layer called
-          "dark" rendered brightest and the patches read as lit windows. */}
-      <g class="cow-body">
+      {/* FOUR LAYERS, built like the owner's reference: a light FILL inside a dark OUTLINE, with the patches in
+          the same ink as the outline and one warm note for the muzzle. Earlier versions drew the animal as a
+          solid silhouette in currentColor, which is what made it read as a blob with legs rather than as a
+          drawing of a cow. The outline is derived from the shape, not hand-drawn — see data/cowGlyph.ts. */}
+      <g class="cow-fill">
         {COW_BODY.cells.map((c) => (
           <rect x={c.x * CELL} y={c.y * CELL} width={CELL} height={CELL} />
         ))}
       </g>
-      <g class="cow-patch">
-        {COW_PATCH.cells.map((c) => (
+      <g class="cow-ink">
+        {[...COW_OUTLINE.cells, ...COW_PATCH.cells].map((c) => (
+          <rect x={c.x * CELL} y={c.y * CELL} width={CELL} height={CELL} />
+        ))}
+      </g>
+      <g class="cow-muzzle">
+        {COW_MUZZLE.cells.map((c) => (
           <rect x={c.x * CELL} y={c.y * CELL} width={CELL} height={CELL} />
         ))}
       </g>
@@ -68,8 +74,15 @@ const CELL = size === 'large' ? 7 : 2;
 </div>
 
 <style>
-  .cow-wrap { display: flex; align-items: center; gap: 10px; }
-  .cow-wrap--small { margin-top: clamp(20px, 3vh, 40px); min-height: 30px; }
+  /* HUGS ITS CONTENT, which matters when the cow is itself a flex child. In the homepage footer the wrapper came
+     out 1361px wide around 56px of drawing, so the cow sat at the far LEFT of its own box — the opposite of
+     where it was asked to go. `flex: 0 0 auto` alone did not fix it (measured: still 1361px), so the width is
+     stated outright. margin-left:auto then pins it to the right of whatever row it lands in. */
+  .cow-wrap {
+    display: flex; align-items: center; gap: 10px;
+    flex: 0 0 auto; width: max-content; max-width: 100%;
+  }
+  .cow-wrap--small { min-height: 30px; margin-left: auto; }
   /* Large: stacked and centred, because it is the page\'s subject rather than a note at the end of one. */
   .cow-wrap--large {
     flex-direction: column; align-items: flex-start; gap: clamp(14px, 2vh, 22px);
@@ -80,18 +93,24 @@ const CELL = size === 'large' ? 7 : 2;
     -webkit-appearance: none; appearance: none; background: none; border: 0; padding: 0;
     display: block; cursor: pointer; line-height: 0; color: inherit;
   }
-  /* Quiet enough to be missed while reading, visible enough to be found while looking. */
-  .cow-wrap--small .cow { opacity: 0.22; }
+  /* Quiet enough to be missed while reading, visible enough to be found while looking. 22% was measured as too
+     faint against the near-black footer the cow now sits in — it disappeared rather than hid. */
+  .cow-wrap--small .cow { opacity: 0.5; }
   .cow-wrap--small .cow:hover, .cow-wrap--small .cow:focus-visible { opacity: 0.85; }
   /* The subject of its page, so it is simply there. */
   .cow-wrap--large .cow { opacity: 0.9; }
   .cow-wrap--large .cow:hover, .cow-wrap--large .cow:focus-visible { opacity: 1; }
   .cow:focus-visible { outline: 2px solid currentColor; outline-offset: 6px; }
 
-  /* ONE COLOUR, TWO ROLES. The body is full ink; the patches are the same ink at low opacity so they sit BACK
-     from it. This is what keeps the drawing readable in both themes without a second colour. */
-  .cow-body rect { fill: currentColor; }
-  .cow-patch rect { fill: currentColor; opacity: 0.34; }
+  /* PALETTE TOKENS, not currentColor — because this drawing needs two tones with guaranteed contrast between
+     them, and currentColor only gives one. --paper and --ink-1 flip together with the theme, so the cow is a
+     pale animal with dark ink on the light pages and inverts coherently on the dark ones; either way the fill
+     and the outline can never collapse into each other.
+     The muzzle is the vermilion seal, the one saturated colour the palette allows, at half strength so it reads
+     as a soft nose rather than as a brand mark. */
+  .cow-fill rect { fill: var(--paper); }
+  .cow-ink rect { fill: var(--ink-1); }
+  .cow-muzzle rect { fill: var(--seal); opacity: 0.55; }
 
   .cow-says {
     margin: 0;

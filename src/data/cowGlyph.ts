@@ -40,36 +40,91 @@ const MATRIX = [
   '..++++....................',
   '..+++++.....++++++++++.+..',
   '.+++++++..++++++++++++++..',
-  '.+.+++++++++++###+++++++..',
-  '++++++++++++++###+++++++..',
-  '++++++++++++++++++++++++..',
-  '+++++++++####+++++++++++..',
+  '.+.+++++++++++##++++++++..',
+  '++++++++++++++##++++++++..',
+  'oo++++++++++++++++++++++..',
+  'oo+++++++####+++++++++++..',
   '.++++++#####+++++++++++++.',
   '..+++++++++++++++++++++++.',
   '...+++++++++++++++++++++..',
-  '....++++++##++++++++++++..',
+  '....++++++oo++++++++++++..',
   '.....++...++.....++...++..',
   '.....++...++.....++...++..',
   '.....++...++.....++...++..',
   '.....++...++.....++...++..',
 ] as const;
 
-/** Keep only `keep`, blanking everything else — one matrix, one glyph per role. */
-function layer(keep: '+' | '#'): Glyph {
+/**
+ * The matrix with a one-cell transparent border on every side.
+ *
+ * The outline is derived by growing one cell outward from the animal, so the animal cannot touch the edge of the
+ * grid or its outline gets clipped — measured: without this the legs had no bottom edge, the ear had no top, and
+ * the muzzle ran off the left. Padding here rather than in the matrix keeps the drawing above readable as a
+ * drawing, with no border of dots to count.
+ */
+const PADDED: readonly string[] = (() => {
+  const w = MATRIX[0].length;
+  const blank = '.'.repeat(w + 2);
+  return [blank, ...MATRIX.map((r) => `.${r}.`), blank];
+})();
+
+/** Keep only the wanted characters, blanking the rest — one matrix, one glyph per role. */
+function layer(...keep: string[]): Glyph {
+  const want = new Set(keep);
   return compileGlyph(
-    MATRIX.map((row) => row.split('').map((c) => (c === keep ? '#' : '.')).join('')),
+    PADDED.map((row) => row.split('').map((c) => (want.has(c) ? '#' : '.')).join('')),
   );
 }
 
-/** The animal: silhouette, legs, ear, tail, head. Drawn at full ink. */
+/**
+ * THE OUTLINE, DERIVED — not drawn.
+ *
+ * The owner's reference is a classic 8-bit Holstein: white FILL inside dark INK, and that outline is most of why
+ * it reads as a drawing of a cow rather than a silhouette with legs. Two hand-drawn attempts at one produced
+ * diagonal wedges and a shape worse than no outline at all, so it is computed: every transparent cell
+ * orthogonally adjacent to the animal becomes ink. Correct by construction, cannot drift when the silhouette is
+ * edited, and trivially testable.
+ *
+ * Diagonal neighbours are excluded deliberately — including them thickens every corner into a blob.
+ */
+function derivedOutline(): Glyph {
+  const filled = new Set<string>();
+  PADDED.forEach((row, y) => {
+    row.split('').forEach((c, x) => {
+      if (c !== '.') filled.add(`${x},${y}`);
+    });
+  });
+  const w = PADDED[0].length;
+  const rows: string[] = [];
+  for (let y = 0; y < PADDED.length; y++) {
+    let row = '';
+    for (let x = 0; x < w; x++) {
+      const empty = !filled.has(`${x},${y}`);
+      const touches =
+        filled.has(`${x - 1},${y}`) || filled.has(`${x + 1},${y}`) ||
+        filled.has(`${x},${y - 1}`) || filled.has(`${x},${y + 1}`);
+      row += empty && touches ? '#' : '.';
+    }
+    rows.push(row);
+  }
+  return compileGlyph(rows);
+}
+
+/** The fill — the white of the cow: everything it occupies that is not a marking or the muzzle. */
 export const COW_BODY = layer('+');
 
-/** The markings only. Drawn at reduced opacity so they recede into the body rather than sitting on it. */
+/** The markings: two body patches and the udder. Same ink as the outline, as in the reference. */
 export const COW_PATCH = layer('#');
 
+/** The muzzle, its own role so it can carry the one warm colour the palette allows. */
+export const COW_MUZZLE = layer('o');
+
+/** One cell of ink outside the animal on every side. Computed, never hand-drawn. */
+export const COW_OUTLINE = derivedOutline();
+
 /** Grid size, shared by both layers — they come from one matrix, so they cannot disagree. */
-export const COW_W = MATRIX[0].length;
-export const COW_H = MATRIX.length;
+export const COW_W = PADDED[0].length;
+export const COW_H = PADDED.length;
 
 /**
  * What the cow says on the homepage, in order, one line per press.

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  COW_BODY, COW_PATCH, COW_W, COW_H, COW_LINES, COW_LINES_404, COW_LINES_WRITING,
+  COW_BODY, COW_PATCH, COW_MUZZLE, COW_OUTLINE, COW_W, COW_H,
+  COW_LINES, COW_LINES_404, COW_LINES_WRITING,
 } from '../src/data/cowGlyph';
 import { inBounds } from '../src/lib/pixels';
 
@@ -15,8 +16,8 @@ const allInk = [...COW_BODY.cells, ...COW_PATCH.cells];
 
 describe('the cow, structurally', () => {
   it('compiled both tones on one grid', () => {
-    expect(COW_W).toBe(26);
-    expect(COW_H).toBe(16);
+    expect(COW_W).toBe(28);
+    expect(COW_H).toBe(18);
     expect(COW_BODY.w).toBe(COW_W);
     expect(COW_PATCH.w).toBe(COW_W);
     expect(COW_BODY.cells.length).toBeGreaterThan(0);
@@ -44,7 +45,7 @@ describe('the cow, structurally', () => {
 
   // FOUR LEGS, which is what makes it unmistakably livestock rather than a head.
   it('stands on four legs', () => {
-    const bottom = rowCells(COW_BODY, COW_H - 1).map((c) => c.x).sort((a, b) => a - b);
+    const bottom = rowCells(COW_BODY, COW_H - 2).map((c) => c.x).sort((a, b) => a - b);
     expect(bottom.length).toBeGreaterThan(0);
     let runs = 1;
     for (let i = 1; i < bottom.length; i++) if (bottom[i] - bottom[i - 1] > 1) runs++;
@@ -66,14 +67,17 @@ describe('the cow, structurally', () => {
     const span = [...inked].sort((a, b) => a - b);
     const holes = [];
     for (let x = span[0]; x < span[span.length - 1]; x++) {
-      if (!inked.has(x) && !patch.has(`${x},4`)) holes.push(x);
+      if (!inked.has(x) && !patch.has(`${x},5`)) holes.push(x);
     }
-    expect(holes.length, `expected exactly one eye hole, got ${JSON.stringify(holes)}`).toBe(1);
-    expect(holes[0], 'the eye belongs in the head, at the left').toBeLessThan(8);
+    // Count RUNS, not cells: the eye is two cells wide, so counting cells reported two eyes for one eye.
+    let runs = 0;
+    for (let i = 0; i < holes.length; i++) if (i === 0 || holes[i] - holes[i - 1] > 1) runs++;
+    expect(runs, `expected exactly one eye, got holes ${JSON.stringify(holes)}`).toBe(1);
+    expect(holes[0], 'the eye belongs in the head, in the left half').toBeLessThan(COW_W / 2);
   });
 
   it('has a tail at the opposite end from the head', () => {
-    const tail = COW_BODY.cells.filter((c) => c.x > COW_W - 5 && c.y < 6);
+    const tail = COW_BODY.cells.filter((c) => c.x > COW_W - 6 && c.y < 7);
     expect(tail.length, 'no tail').toBeGreaterThan(0);
   });
 
@@ -82,11 +86,39 @@ describe('the cow, structurally', () => {
   it('has irregular patches rather than matched rectangles', () => {
     // Reads the PATCH layer, which is the thing being asserted about — an earlier version measured the body and
     // so proved nothing about the markings at all.
-    const marks = COW_PATCH.cells.filter((c) => c.y > 3 && c.y < 12);
+    const marks = COW_PATCH.cells.filter((c) => c.y > 4 && c.y < 13);
     expect(marks.length).toBeGreaterThan(8);
     const byRow = new Map<number, number>();
     for (const c of marks) byRow.set(c.y, (byRow.get(c.y) ?? 0) + 1);
     expect(new Set(byRow.values()).size, 'every patch row the same width is a rectangle').toBeGreaterThan(1);
+  });
+
+  // THE OUTLINE IS DERIVED, so this asserts the derivation rather than a drawing: every outline cell must touch
+  // the animal, and no outline cell may sit on top of it. Two hand-drawn attempts produced wedges; this cannot.
+  it('has an outline that hugs the animal and never overlaps it', () => {
+    const animal = new Set([...COW_BODY.cells, ...COW_PATCH.cells, ...COW_MUZZLE.cells].map((c) => `${c.x},${c.y}`));
+    expect(COW_OUTLINE.cells.length).toBeGreaterThan(40);
+    for (const c of COW_OUTLINE.cells) {
+      expect(animal.has(`${c.x},${c.y}`), `outline overlaps the animal at ${c.x},${c.y}`).toBe(false);
+      const touches =
+        animal.has(`${c.x - 1},${c.y}`) || animal.has(`${c.x + 1},${c.y}`) ||
+        animal.has(`${c.x},${c.y - 1}`) || animal.has(`${c.x},${c.y + 1}`);
+      expect(touches, `stray outline cell at ${c.x},${c.y}`).toBe(true);
+    }
+  });
+
+  it('encloses the animal on all four sides — nothing runs off the grid', () => {
+    // This is what the one-cell padding buys: without it the legs had no bottom edge and the ear no top.
+    const animal = [...COW_BODY.cells, ...COW_PATCH.cells, ...COW_MUZZLE.cells];
+    expect(Math.min(...animal.map((c) => c.x))).toBeGreaterThan(0);
+    expect(Math.min(...animal.map((c) => c.y))).toBeGreaterThan(0);
+    expect(Math.max(...animal.map((c) => c.x))).toBeLessThan(COW_W - 1);
+    expect(Math.max(...animal.map((c) => c.y))).toBeLessThan(COW_H - 1);
+  });
+
+  it('has a muzzle at the front, low on the head', () => {
+    expect(COW_MUZZLE.cells.length).toBeGreaterThan(2);
+    expect(Math.min(...COW_MUZZLE.cells.map((c) => c.x))).toBeLessThan(4);
   });
 
   it('is mostly animal, with markings as a minority of it', () => {
