@@ -19,10 +19,11 @@ import {
   COW_BODY, COW_PATCH, COW_MUZZLE, COW_HORN, COW_OUTLINE, COW_MOO, COW_W, COW_H, COW_LINES,
   COW_TAIL_FILL, COW_TAIL_INK, COW_TAIL_W, COW_TAIL_H,
 } from '../data/cowGlyph';
+import { splitAll, widestHalf } from '../lib/cowSpeech';
 
 interface Props {
-  /** 'small' is the corner mark at the foot of the homepage; 'large' is the page's subject. */
-  size?: 'small' | 'large';
+  /** 'mark' is the quiet corner mark on the Work slide; 'small' is a footer-scale cow; 'large' is the page's subject. */
+  size?: 'mark' | 'small' | 'large';
   /** Override what it says. Defaults to the homepage lines. */
   lines?: readonly string[];
   /** Accessible name — worth tailoring, since on /404 and /writing the cow is the main thing on the page. */
@@ -32,13 +33,33 @@ interface Props {
 const { size = 'small', lines = COW_LINES, label = 'A cow. Press it.' } = Astro.props;
 
 // The cow grew with the bubble. At 2px cells (44x52) it was a speck beside a 270px bubble — the pair has to
-// read as one object, so the small cow is now 5px cells (110x130) and the large one 8px (176x208).
-const CELL = size === 'large' ? 8 : 5;
-// One cell, the owner's pick, shared by the border, the type and the tail. See the note above.
-const MOO_CELL = 10;
+// read as one object. 'mark' is the smallest: the owner picked it for the Work slide so the pair reads as a
+// margin note rather than a fourth panel.
+const CELL = size === 'large' ? 8 : size === 'mark' ? 3 : 5;
+// One cell, shared by the border, the MOO type and the tail. 10px was the owner's pick at footer scale; the
+// mark halves it, which keeps the pixel grid intact because every dimension is a multiple of the cell.
+const MOO_CELL = size === 'mark' ? 5 : 10;
+
+// EVERY MESSAGE PRE-BROKEN INTO TWO LINES, at build time. See lib/cowSpeech.ts for why: the bubble has to keep
+// one height and vary its WIDTH, or pressing the cow reflows the page. Shipping the pairs means the client never
+// measures text or decides a break.
+const spoken = splitAll(lines);
+// THE FIRST MESSAGE'S wider half, not the widest of all of them. Sizing the box from the copy at build time is
+// what avoids a resize on first paint — but sizing it to the LONGEST message means the bubble ships too wide for
+// the message actually in it and then shrinks on the first press. Measured: 311px on load against the 132px that
+// message needs. With no JS the message never changes, so the first one is the only size that can be right.
+// Plus one character of slack. `ch` is the advance of "0", which for a monospace face is the advance of every
+// glyph — but only to within the browser's rounding, and measured at 620px the wider half came out 0.4px past
+// the content box. Nothing clips (the bubble does not hide overflow) but the type can touch the border, and on a
+// machine whose mono metrics differ it could be worse than 0.4px.
+const measure = widestHalf(lines.slice(0, 1)) + 1;
 ---
 
-<div class:list={['cow-wrap', `cow-wrap--${size}`]} data-cow-lines={JSON.stringify(lines)}>
+<div
+  class:list={['cow-wrap', `cow-wrap--${size}`]}
+  data-cow-lines={JSON.stringify(spoken)}
+  style={`--moo-measure: ${measure}ch`}
+>
   <!-- THE BUBBLE COMES FIRST in source order so a screen reader hears what the cow says before being told it
        can press it, and so the visual order (bubble left, cow right) needs no reordering. -->
   <div class="cow-bubble">
@@ -60,7 +81,14 @@ const MOO_CELL = 10;
          cannot be ambiguous about where a line ends, and cannot smuggle a control character.
          The first line is rendered at build time, so the bubble is never an empty box: the no-JS and
          before-first-press states both look finished, which is the project's rule for every default state. -->
-    <p class="cow-says" data-cow-says aria-live="polite">{lines[0]}</p>
+    <!-- TWO ROWS, ALWAYS. Each half is its own nowrap line, so the browser never chooses where to break and the
+         bubble's height cannot change between messages — which is what was shoving the panel up and down on
+         every press. The width follows the wider half instead. Rendered at build time so the no-JS and
+         before-first-press states both look finished. -->
+    <p class="cow-says" data-cow-says aria-live="polite">
+      <span class="cow-said" data-said-a>{spoken[0]?.[0]}</span>
+      <span class="cow-said" data-said-b>{spoken[0]?.[1]}</span>
+    </p>
     {size === 'large' && (
       <!-- A hint that the cow is pressable — on /writing and /404 it is the only interactive thing on the page.
            aria-hidden because the button's own label already says so; announcing it twice is noise. -->
@@ -166,10 +194,21 @@ const MOO_CELL = 10;
 
   /* ── THE BUBBLE. Square corners and a one-cell border: this is pixel art, so nothing here is rounded and
      nothing is anti-aliased. */
+  /* WIDTH FOLLOWS THE COPY, HEIGHT NEVER MOVES. The bubble used to be a fixed number of cells wide with two
+     lines of height reserved — and at the smaller mark size the longest message ("Past performance is not
+     indicative of future grass.", 51 characters) wrapped to four lines, so the box grew and every press shoved
+     the panel's layout up and down. Reserving more height would only have meant a taller bubble full of air.
+     Now each message is pre-split into two nowrap halves (lib/cowSpeech.ts), so the height is exactly two lines
+     for every message by construction, and --moo-measure — the widest half, in characters, computed at build
+     time — sets the box. A longer message grows SIDEWAYS, which is what the owner asked for, and because the
+     pair is right-aligned in its row the bubble grows leftward into empty panel while the cow stays put. */
   .cow-bubble {
     position: relative;
     box-sizing: content-box;
-    width: calc(var(--moo-cols) * var(--moo-cell));
+    width: var(--moo-measure, calc(var(--moo-cols) * var(--moo-cell)));
+    /* Never narrower than the MOO word above it, or the type would set the box and the pixel word would clip. */
+    min-width: calc(19 * var(--moo-cell));
+    max-width: 100%;
     border: var(--moo-cell) solid var(--moo-ink);
     background: var(--moo-paper);
     padding: calc(var(--moo-cell) * 1.4);
@@ -178,7 +217,9 @@ const MOO_CELL = 10;
     margin-bottom: calc(var(--moo-cell) * 3);
   }
 
-  .cow-moo { display: block; width: 100%; height: auto; }
+  /* NATURAL SIZE, not 100%: the bubble's width is now set by the copy, and a percentage would stretch the pixel
+     word to match it — scaling a crisp 5px grid to a fractional one. 19 cells is the glyph's own width. */
+  .cow-moo { display: block; width: calc(19 * var(--moo-cell)); height: auto; }
   .cow-moo rect { fill: var(--moo-ink); }
 
   .cow-tail {
@@ -200,9 +241,11 @@ const MOO_CELL = 10;
     margin: calc(var(--moo-cell) * 1.2) 0 0;
     font-family: var(--font-mono); font-size: 13.5px; line-height: 1.45; letter-spacing: 0.01em;
     color: var(--ink-2);
-    /* Two lines held open, so rotating through the sentences never resizes the bubble. */
-    min-height: calc(2 * 1.45 * 13.5px);
   }
+  /* Each half is its own row and never wraps. Two rows, always — that is the whole mechanism for keeping the
+     bubble's height constant, so no min-height is needed and none is wanted (it would add dead space). An empty
+     second half still occupies its row, which is why a one-word message does not shrink the box. */
+  .cow-said { display: block; white-space: nowrap; min-height: 1.45em; }
 
   .cow {
     -webkit-appearance: none; appearance: none; background: none; border: 0; padding: 0;
@@ -241,7 +284,14 @@ const MOO_CELL = 10;
 
   /* Large: same bubble, bigger cell — the one number does the work. */
   .cow-wrap--large { --moo-cell: 12px; }
-  .cow-wrap--large .cow-says { font-size: 15px; min-height: calc(2 * 1.45 * 15px); }
+  .cow-wrap--large .cow-says { font-size: 15px; }
+  /* THE MARK — the owner's pick for the Work slide. Small enough to read as a margin note beside the grid, but
+     the type stays at 11px rather than following the cell down: he asked for bigger text once already, and 9px
+     mono is decoration rather than a sentence. The bubble absorbs it by getting wider, which it can now do. */
+  .cow-wrap--mark { --moo-cell: 5px; }
+  .cow-wrap--mark .cow-says { font-size: 11px; }
+  .cow-wrap--mark .cow { opacity: 0.85; }
+  .cow-wrap--mark .cow:hover, .cow-wrap--mark .cow:focus-visible { opacity: 1; }
 
   @media (prefers-reduced-motion: no-preference) {
     /* transform and opacity only — the project's rule. */
@@ -257,24 +307,32 @@ const MOO_CELL = 10;
     }
     /* The line fades out and back rather than swapping mid-sentence. */
     .cow-says.is-swapping { opacity: 0; }
+    /* THE BUBBLE GROWS SIDEWAYS, and animating `width` is a deliberate exception to the transform/opacity rule,
+       for the same reason the research fold animates max-height: you cannot grow a box on the compositor. It is
+       cheap here — one small element, no descendants that reflow, and the growth happens into empty panel — and
+       the alternative the owner rejected is worse: an instant jump. transform: scaleX would distort the pixel
+       border and the type, so it is not an option for this drawing. */
+    .cow-bubble { transition: width 300ms cubic-bezier(0.32, 0.72, 0, 1); }
   }
 
   /* ── NARROW SCREENS. Bubble beside cow is ~400px, which is most of a phone; below this the pair stacks with
      the bubble above the cow. The tail needs no mirroring — both are right-aligned, so it already points down
      at the animal — but the cell shrinks and the measure widens, because a narrow column of mono wraps badly. */
   @media (max-width: 620px) {
-    .cow-wrap { --moo-cell: 8px; --moo-cols: 26; flex-direction: column; align-items: flex-end; }
+    .cow-wrap { --moo-cell: 8px; flex-direction: column; align-items: flex-end; }
     .cow-wrap--large { --moo-cell: 9px; }
     .cow-wrap--small .cow-art { width: 88px; height: auto; }
     .cow-wrap--large .cow-art { width: min(100%, 210px); height: auto; }
   }
-  /* SMALLEST PHONES. The bubble's width is an exact multiple of the cell (pixel art cannot have a fractional
-     cell), so it is a hard min-content floor — and on /404 at 320px it became the whole PAGE's floor: the
-     document measured 333px against a 320px viewport, with the 277px bubble plus the page's padding setting it.
-     The cell comes down and the measure goes UP in cells, which keeps the two reserved lines of copy fitting at
-     ~26 characters while the box gets narrower: 7 x (30 + 4.8) = 244px, inside 320 less padding. */
+  /* SMALLEST PHONES. The bubble's box is set by its COPY now (--moo-measure, in ch), so the lever that keeps it
+     inside a 320px screen is the type size, not a cell count — the old `--moo-cols` overrides here became dead
+     the moment the width came from the content, and are removed rather than left to mislead.
+     This still matters: the two halves are nowrap, so a box too narrow for them would overflow rather than wrap.
+     History for the next person — on /404 at 320px the bubble once set the whole PAGE's min width, giving a
+     333px document in a 320px viewport. */
   @media (max-width: 430px) {
-    .cow-wrap, .cow-wrap--large { --moo-cell: 7px; --moo-cols: 30; }
+    .cow-wrap, .cow-wrap--large { --moo-cell: 7px; }
+    .cow-wrap--large .cow-says { font-size: 13px; }
   }
 </style>
 
@@ -290,12 +348,21 @@ const MOO_CELL = 10;
     for (const wrap of wraps) {
       const btn = wrap.querySelector<HTMLButtonElement>('[data-cow]');
       const says = wrap.querySelector<HTMLElement>('[data-cow-says]');
-      if (!btn || !says) continue;
+      const bubble = wrap.querySelector<HTMLElement>('.cow-bubble');
+      const lineA = wrap.querySelector<HTMLElement>('[data-said-a]');
+      const lineB = wrap.querySelector<HTMLElement>('[data-said-b]');
+      if (!btn || !says || !bubble || !lineA || !lineB) continue;
 
-      let lines: string[] = [];
+      // Each entry is a PAIR — the message already broken into its two rendered lines by lib/cowSpeech.ts at
+      // build time. The client never decides where to wrap, which is what keeps the bubble's height fixed.
+      let lines: [string, string][] = [];
       try {
         const parsed = JSON.parse(wrap.dataset.cowLines ?? '[]');
-        if (Array.isArray(parsed)) lines = parsed.filter((l): l is string => typeof l === 'string' && !!l);
+        if (Array.isArray(parsed)) {
+          lines = parsed
+            .filter((p): p is [string, string] => Array.isArray(p) && p.length === 2 && typeof p[0] === 'string')
+            .filter((p) => !!p[0]);
+        }
       } catch {
         lines = [];
       }
@@ -308,13 +375,43 @@ const MOO_CELL = 10;
       let nudgeTimer = 0;
       let swapTimer = 0;
 
+      // WIDTH IS SET IN PIXELS SO IT CAN TRANSITION. The CSS width is a `ch` value, which is fine as a starting
+      // size but cannot animate from one message to the next unless both ends are concrete. So each swap
+      // measures the incoming pair's wider half against the live font and sets that, and the CSS transition
+      // carries the box across. Measured off a detached clone of the line element, so the visible bubble is
+      // never briefly wrong and the reader never sees a flash of the untransitioned width.
+      const probe = document.createElement('span');
+      probe.setAttribute('aria-hidden', 'true');
+      probe.style.cssText = 'position:absolute;left:-9999px;top:0;white-space:nowrap;visibility:hidden';
+      const widthFor = (pair: [string, string]): number => {
+        const cs = getComputedStyle(lineA);
+        probe.style.font = cs.font;
+        probe.style.letterSpacing = cs.letterSpacing;
+        says.appendChild(probe);
+        let w = 0;
+        for (const half of pair) {
+          probe.textContent = half;
+          w = Math.max(w, probe.getBoundingClientRect().width);
+        }
+        probe.remove();
+        return Math.ceil(w);
+      };
+      // Pin the current width in px before the first change, or the first transition would have no start value.
+      // The build-time `ch` box is sized for this same message, so this agrees with what is already on screen to
+      // within a character's rounding — no visible jump on load.
+      bubble.style.width = `${widthFor(lines[0])}px`;
+
       const poke = () => {
         i = (i + 1) % lines.length;
+        // The box starts moving immediately; only the TEXT waits for the fade trough. Growing the bubble first
+        // means the incoming line never has to appear in a box too small for it.
+        bubble.style.width = `${widthFor(lines[i])}px`;
         // Fade the old line out, swap at the trough, fade in — a hard cut mid-sentence read as a glitch.
         says.classList.add('is-swapping');
         window.clearTimeout(swapTimer);
         swapTimer = window.setTimeout(() => {
-          says.textContent = lines[i];
+          lineA.textContent = lines[i][0];
+          lineB.textContent = lines[i][1];
           says.classList.remove('is-swapping');
         }, 170);
         // Restart the nudge even on a rapid second press: removing the class, forcing a reflow read, then
@@ -331,6 +428,10 @@ const MOO_CELL = 10;
         window.clearTimeout(nudgeTimer);
         window.clearTimeout(swapTimer);
         btn.removeEventListener('click', poke);
+        probe.remove();
+        // Hand the width back to the stylesheet, or a View Transition would re-init over a px width measured
+        // against the OLD viewport and the bubble would come back the wrong size.
+        bubble.style.width = '';
       });
     }
 

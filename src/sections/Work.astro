@@ -99,7 +99,7 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
            content in a 900px slide). It is still the last thing before the footer, so it keeps its place as the
            page's closing aside. -->
       <div class="wk-cow">
-        <PlushCow />
+        <PlushCow size="mark" />
       </div>
 
     </div>
@@ -225,10 +225,15 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
     width: 7px; height: 1px; background: var(--wk-accent); opacity: 0.7;
   }
 
-  /* Centred, with real air above it so it reads as a closing mark rather than as a fourth column. The panel is
-     vertically centred by the deck, so this simply lives at the end of the content. */
+  /* RIGHT EDGE, NOT CENTRED — the owner picked this from six real renders. Centring was the version he called
+     "off … there by mistake", and the reason is structural: a three-column grid has no centre line, so a centred
+     mark lands in the gutter between the first two columns and aligns to nothing. Every other element on this
+     panel sits on the grid. Flush right puts it on the same edge the grid itself ends on, and at `mark` size it
+     reads as a margin note rather than a fourth column.
+     Right-aligned also makes the bubble's growth free: it expands leftward into empty panel while the cow stays
+     anchored, so pressing it never moves anything else. */
   .wk-cow {
-    display: flex; justify-content: center;
+    display: flex; justify-content: flex-end;
     margin: clamp(34px, 6vh, 84px) 0 0;
   }
 
