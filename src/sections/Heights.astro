@@ -189,8 +189,27 @@ for (const phrase of bio.strong) {
     #heights .hero-rise { position: static; inset: auto; max-width: 100%; text-align: left; right: auto; }
     #heights .hero-bio { order: 2; }
     #heights .hero-rise { order: 1; }
-    #heights .hero-legibility { display: none; }
-    #heights .terrain-canvas { opacity: 0.5; }
+    /* A WASH TUNED TO THE STACKED HERO, rather than none at all. The desktop halos are placed for the desktop
+       composition — one at 22% 74% for a name at bottom-left, one top-right for the bio — and mean nothing once
+       the hero becomes a single column, which is why they were switched off here. But switching them off left the
+       terrain as the only thing between the dots and the type, and the review found the 11px mono identity line
+       ("INCOMING PHD · UNIVERSITY OF TORONTO · FULL-STACK SDE / MLE") largely obliterated by the dense dot
+       cluster that runs straight through it. That line carries the incoming PhD, which the site's hierarchy
+       treats as load-bearing, so it cannot be atmosphere's to lose.
+       Lowering the canvas alone was not enough — measured at 0.32 the line was still broken up — so this is a
+       vertical band of paper across the middle, where every piece of hero text sits, fading out top and bottom so
+       the terrain still reads as terrain above and below it. */
+    #heights .hero-legibility {
+      display: block;
+      background: linear-gradient(
+        180deg,
+        transparent 0%,
+        color-mix(in oklab, var(--paper) 62%, transparent) 14%,
+        color-mix(in oklab, var(--paper) 62%, transparent) 82%,
+        transparent 100%
+      );
+    }
+    #heights .terrain-canvas { opacity: 0.4; }
   }
 
   @media (prefers-reduced-motion: no-preference) {

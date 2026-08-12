@@ -211,8 +211,14 @@ import { WAYPOINTS } from '../lib/trajectory';
   @media (prefers-reduced-motion: reduce) {
     .dp-coda { opacity: 1; }
   }
-  /* Narrow screens: the drawing gives way to the ordered list, so the coda returns to normal flow. */
-  @media (max-width: 1000px) {
+  /* Narrow screens: the drawing gives way to the ordered list, so the coda returns to normal flow.
+     720px, NOT 1000px — and the mismatch was a real collision. The sentence above states the condition
+     correctly ("the drawing gives way"), but the drawing gives way at 720px, so between 721px and 1000px the
+     canvas was still drawing AND the coda had already returned to flow INSIDE the stage, landing on top of the
+     graph. Measured at 844x390: stage y 256..474, coda static at y 267..311 — inside the drawing, with the
+     italic coda and the node label "B.Eng · McGill" interpenetrating at x≈420-476. Two breakpoints that mean
+     the same thing have to be the same number. */
+  @media (max-width: 720px) {
     .dp-coda {
       position: static; max-width: 60ch; text-align: left; opacity: 1; transform: none;
       margin: 3vh 0 0;
@@ -233,12 +239,20 @@ import { WAYPOINTS } from '../lib/trajectory';
   }
 
   /* Narrow screens: the graph's in-frame labels collide below ~720px, so the canvas gives way to the
-     ordered list, which stops being visually hidden and becomes the content. */
+     ordered list, which stops being visually hidden and becomes the content.
+     `clip-path: none` IS THE WHOLE FIX, and without it this entire fallback painted nothing. The rule reset
+     `clip`, the LEGACY property — but Tailwind v4's `sr-only` hides with `clip-path: inset(50%)`, which was never
+     reset, so on every phone the list was laid out and invisible at the same time. Measured at 320x568:
+     .dp-stage display none, .dp-stops display grid with 8 items, position static, visibility visible, opacity 1,
+     height 573px, clip-path inset(50%). The result was the career graph gone AND its replacement unpaintable —
+     573px of blank panel where the site's showpiece should be, on every phone, in both themes.
+     Undoing a visually-hidden helper means undoing EVERY property it sets, and the two clip properties are not
+     the same property. */
   @media (max-width: 720px) {
     .dp-stage { display: none; }
     .dp-stops.sr-only {
       position: static; width: auto; height: auto; margin: 3vh 0 0; padding: 0;
-      overflow: visible; clip: auto; white-space: normal;
+      overflow: visible; clip: auto; clip-path: none; white-space: normal;
       list-style: none; display: grid; gap: 14px;
     }
     .dp-stops li { font-size: 13.5px; line-height: 1.6; color: var(--dp-body); }

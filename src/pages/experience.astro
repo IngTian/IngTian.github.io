@@ -218,5 +218,17 @@ const roles = indexed.filter(({ entry }) => entry.kind === 'work');
   }
   .xp-award-title { font-size: 14.5px; color: var(--ink-2); }
 
+  /* THE AWARDS LIST COLLAPSES ON PHONES TOO, and it was simply missed when .node got the same treatment — an
+     identical `8.5rem 1fr` grid, the same problem, only one of them fixed. Measured at 320px: the year column
+     held 136px of mostly empty space while the award wrapped into the remaining 115px at about fourteen
+     characters a line ("Rio Tinto– / Richards Evans / Exchange Award / · McGill"). The year reads perfectly well
+     above its award, which is exactly what the timeline nodes beside it already do.
+     PLACED AFTER THE BASE RULE, because the .node collapse lives in a media block ABOVE it and putting this
+     there did nothing — measured, still "136px 115.219px". Same source-order trap as the Toc and the Story
+     figure; this file interleaves its queries, so an override has to come after what it overrides. */
+  @media (max-width: 640px) {
+    .xp-awards li { grid-template-columns: 1fr; gap: 4px; }
+  }
+
   .xp-foot { margin-top: 14vh; }
 </style>

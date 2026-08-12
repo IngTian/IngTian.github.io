@@ -110,6 +110,17 @@ import SkyWash from '../components/SkyWash.astro';
   .art-toc .rule { width: 0; height: 1px; background: currentColor; opacity: 0.55; transition: width 0.4s ease; }
   .art-toc a.is-active { opacity: 1; color: var(--ink-1); }
   .art-toc a.is-active .rule { width: 20px; }
+  /* THE DARK HALF OF THE DESCENT. The rail is fixed at the middle of the screen while the sky behind it runs from
+     paper to near-black, so dark ink stops working halfway down: measured at 50% scroll, the ACTIVE label was
+     rgb(22,20,15) on rgb(22,20,15) — ratio 1.0, the section you are in rendered invisible — and the inactive one
+     2.46:1. data-zone is set from the descent fraction behind the rail by the gallery script's existing scroll
+     handler (see scripts/artGallery.ts), the same idea CornerNav uses for itself.
+     In DARK theme the ink ramp is already light top-to-bottom, so this must not apply there — it would paint
+     paper-on-paper. */
+  .art-toc[data-zone='dark'] a { color: var(--paper); }
+  .art-toc[data-zone='dark'] a.is-active { color: var(--paper); opacity: 1; }
+  :global(html[data-theme='dark']) .art-toc[data-zone='dark'] a { color: var(--ink-3); }
+  :global(html[data-theme='dark']) .art-toc[data-zone='dark'] a.is-active { color: var(--ink-1); }
   @media (hover: hover) { .art-toc a:hover { opacity: 0.85; } }
 
   .placard { position: fixed; left: var(--placard-left);

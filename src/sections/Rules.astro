@@ -799,6 +799,17 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
        notes at both phone widths with a few pixels to spare. */
     .ru-stagebox { min-height: clamp(288px, 30vh, 310px); }
   }
+
+  /* ONE COLUMN ON THE SMALLEST PHONES. Two columns fixed the four-across case but not this one: at 320px each
+     column is 135.5px, which the review measured as roughly seventeen characters a line printing as a sixteen-line
+     sliver. A beat is a paragraph you have to read before you can choose it, so below 430px it takes the full
+     width.
+     PLACED AFTER THE 700px BLOCK ON PURPOSE. Both queries match at 320px, so at equal specificity the later one
+     wins — written above, this rule silently lost and the band stayed two columns. The same source-order trap
+     that has bitten the Toc, the Story figure and this file already. */
+  @media (max-width: 430px) {
+    .ru-beats { grid-template-columns: minmax(0, 1fr); }
+  }
 </style>
 
 <script>
