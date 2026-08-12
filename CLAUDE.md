@@ -25,19 +25,26 @@ pill, rendered as build-time MathML. When in doubt, remove rather than add.
 - **Astro 6** (static output) + **React 19** (exactly ONE island — the terminal)
   + **Tailwind v4** (`@tailwindcss/vite`; tokens via `@theme` in
   `src/styles/global.css`) + TypeScript (strict).
-- **Type: four roles, three faces.** `--font-display` is **Georgia** (a system
-  serif, no download); `--font-body` is **Inter**; `--font-mono` is **JetBrains
-  Mono**; `--font-accent` is **Fraunces**, used only on sub-headlines and italic
-  editorial lines. No CJK fonts.
-  - Georgia is deliberate, not a leftover. Fraunces was the display face and the
-    owner rejected it on sight — "prod's font is better, the current font is kind
-    of weird" — after a long-standing bug meant no webfont had EVER rendered and
-    the whole design had been judged in Georgia. Keep Georgia for structure.
-  - `astro:fonts` self-hosts the three webfonts under its own `--ff-*` variables.
-    Never point `cssVariable` at `--font-display`/`-body`/`-mono`: those are the
-    site's role tokens, and the collision is what stopped every webfont from
-    loading. All three are preloaded — removing either Fraunces' or Inter's
-    preload measured a worse FCP (see BaseLayout's note).
+- **Type: four roles, TWO downloaded faces.** `--font-display` is **Georgia** and
+  `--font-body` is the **system UI stack** — neither downloads anything.
+  `--font-mono` is **JetBrains Mono** and `--font-accent` is **Fraunces**, used
+  only on sub-headlines and italic editorial lines. No CJK fonts.
+  - Georgia and system-ui are deliberate, not leftovers. A long-standing bug meant
+    no webfont had EVER rendered, so the whole design was judged in Georgia + SF;
+    when Fraunces finally appeared the owner rejected it on sight ("prod's font is
+    better, the current font is kind of weird"). Both role faces are therefore what
+    the site has always actually looked like. Keep Georgia for structure.
+  - **The two webfonts are LOCAL files** in `src/assets/fonts/`, served through
+    `fontProviders.local()`. Do not go back to `fontProviders.google()`: fetching at
+    build time made every build depend on Google, and it failed a CI run with a 404
+    when they rotated a file hash mid-run — the same failure on a push to `main`
+    would silently leave the site stale. Variable fonts, one file per style, with
+    `weight` declared as a range. Provider config goes under `options.variants`, not
+    at the top level (the schema is strict).
+  - They live under their own `--ff-*` variables. Never point `cssVariable` at
+    `--font-display`/`-body`/`-mono`: those are the site's role tokens, and that
+    collision is what stopped every webfont from loading. Fraunces keeps its
+    preload — removing it measured a worse FCP (1956 → 2333ms; see BaseLayout).
 - `astro:assets` optimizes gallery images (responsive `widths`, webp/avif).
 - `site: 'https://ingtian.github.io'`, no `base` (user site at root).
 
