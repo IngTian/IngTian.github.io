@@ -222,4 +222,10 @@ const bubbles = JSON.stringify([
   // Run on first load and after every View Transition swap. astro:page-load
   // fires in both cases; if ClientRouter isn't present it still fires once.
   document.addEventListener('astro:page-load', initTerrain);
+  // A THEME FLIP REPAINTS THIS CANVAS, but must not re-init the whole page. The toggle used to dispatch
+  // astro:page-load, which re-ran every vanilla script — the deck's 7-slide re-measure, the Toc, three beat
+  // steppers, the cow — for a palette change none of them care about. Measured at 6x throttle: a 357ms long task
+  // on the homepage against 55ms on /404, and identical with the View Transition disabled, so the transition was
+  // never the cost. This canvas is one of only three surfaces that paint from JS and read the palette.
+  document.addEventListener('theme:change', initTerrain);
 </script>

@@ -362,8 +362,26 @@ const stops = researchStops(publications, researchInterests);
     transition: transform .32s cubic-bezier(.2,.7,.3,1);
   }
   .paper-card[aria-expanded='true'] .card-chevron { transform: rotate(225deg) translateY(-1px); }
-  /* Once open, the cue reads as the reverse action and the summary is redundant with the detail. */
-  .paper-card[aria-expanded='true'] .card-takeaway { display: none; }
+  /* Once open, the cue reads as the reverse action and the summary is redundant with the detail — but it has to
+     LEAVE smoothly, and `display: none` is what made the fold feel wrong however well the panel itself animated.
+     The owner: "the collapse/expand animation is not smooth for the research card." Measured frame by frame on
+     open: the document went 1656 -> 1636 -> 1882 -> 2173 -> … so the page jerked 20px BACKWARDS on the first
+     frame and then grew. That dip is exactly this line vanishing in one frame while the panel below it was still
+     at 56px — two movements in opposite directions at the same moment, which reads as a stutter at the start of
+     every expansion.
+     Collapsing it over the same duration and easing as the panel makes the motion monotonic: one thing shrinks
+     while a much larger thing grows, and the net travel is always downward. */
+  .card-takeaway { overflow: hidden; max-height: 8em; }
+  .paper-card[aria-expanded='true'] .card-takeaway {
+    max-height: 0; opacity: 0; margin-top: 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .card-takeaway {
+      transition: max-height 400ms cubic-bezier(0.4, 0.02, 0.2, 1),
+                  margin-top 400ms cubic-bezier(0.4, 0.02, 0.2, 1),
+                  opacity 200ms ease;
+    }
+  }
 
   /* two columns: LEFT (idea + formal math) is wider so equations show in full;
      RIGHT (results) is the narrower numeric column. */

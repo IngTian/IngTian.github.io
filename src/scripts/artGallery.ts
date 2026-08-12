@@ -165,7 +165,12 @@ function updateTocZone() {
   if (!h) return;
   const r = tocEl.getBoundingClientRect();
   const frac = (window.scrollY + (r.top + r.bottom) / 2) / h;
-  tocEl.dataset.zone = frac > DARK_FROM ? 'dark' : 'light';
+  // WRITE ONLY ON CHANGE. Assigning the same value to a dataset property still counts as an attribute mutation,
+  // so writing it every scroll frame invalidated the rail's subtree ~60 times a second for nothing. /art measured
+  // 294ms of style recalc across one drag-scroll — the highest of any page, and higher than pages with far more
+  // on screen. The zone only changes twice in the whole page, so this is the cheapest possible guard.
+  const next = frac > DARK_FROM ? 'dark' : 'light';
+  if (tocEl.dataset.zone !== next) tocEl.dataset.zone = next;
 }
 
 let ticking = false;

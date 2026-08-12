@@ -207,7 +207,14 @@ body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body)
   content: "";
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 120vh;
+  /* min(), NOT a bare 120vh — this wash was making short pages scrollable into nothing. It is absolutely
+     positioned, so it still contributes to the document's scroll height, and 120vh is TALLER THAN THE VIEWPORT by
+     definition. On the homepage that never showed, because the content is thousands of pixels tall. On /404,
+     whose content is exactly one screen, the document measured 1080px against a 900px viewport — 180px of empty
+     scrollable space below the page, which is precisely 120vh minus 100vh. Capping at the container's own height
+     leaves the homepage untouched (100% there is ~6600px, so 120vh still wins) and makes a one-screen page
+     exactly one screen. */
+  height: min(120vh, 100%);
   pointer-events: none;
   background:
     /* sun-glow, upper-right — lifted so the Monet light actually registers */

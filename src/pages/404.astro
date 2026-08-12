@@ -1,6 +1,5 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { PAGES } from '../data/nav';
 import PlushCow from '../components/PlushCow.astro';
 import { COW_LINES_404 } from '../data/cowGlyph';
 import FluidSky from '../components/proto/FluidSky.astro';
@@ -30,15 +29,16 @@ import SkyWash from '../components/SkyWash.astro';
           label="A cow, keeping you company on a page that does not exist. Press it."
         />
       </div>
+      {/* ONE LINK, NOT SIX. There used to be a second row listing every page, driven from data/nav.ts — and the
+          owner spotted that it was both unreadable and unnecessary: "in light theme, the bottom of the 404 page is
+          illegible. i wonder if you need that at all. after all we have the hovering nav bar."
+          Both halves are right. It was rendering the SAME `PAGES` array the corner nav renders, so it was exactly
+          duplicate links a few hundred pixels below a nav that is always on screen. And it was illegible by
+          construction: --ink-3 is a dark ink, while /404 rides the descent gradient into its dark half, so the row
+          sat dark-on-dark in the light theme.
+          What stays is the one link the corner nav does NOT offer — the way home. */}
       <nav class="nf-links">
         <a class="nf-primary" href="/">← back to the descent</a>
-        {/* DRIVEN BY data/nav.ts, not hand-listed. This block had gone stale twice over: it was missing
-            /experience (added months ago) and /writing (added with it), so the one page whose entire job is to
-            offer a way out was offering an out-of-date subset of the site. A list that has to be edited in two
-            places gets edited in one. */}
-        <span class="nf-pages">
-          {PAGES.map((pg) => <a class="nf-link" href={pg.href}>{pg.label}</a>)}
-        </span>
       </nav>
     </section>
   </main>
@@ -56,13 +56,12 @@ import SkyWash from '../components/SkyWash.astro';
      better than one row that wraps at an accidental place, and it no longer changes shape as pages are added. */
   .nf-cow { margin: clamp(18px, 3vh, 36px) 0 clamp(4px, 1vh, 12px); }
 
-  .nf-links { margin-top: 40px; display: flex; flex-direction: column; gap: 20px; align-items: center; }
-  .nf-pages { display: flex; gap: 16px; justify-content: center; align-items: baseline; flex-wrap: wrap; }
+  /* One row now, so no column stack and no wrap handling — the .nf-pages and .nf-link rules that lived here are
+     deleted with the markup rather than left behind as unreachable CSS. */
+  .nf-links { margin-top: 40px; display: flex; justify-content: center; }
   .nf-primary { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.04em; text-decoration: none;
     color: var(--ink-1); border: 1px solid var(--ink-4); border-radius: 999px; padding: 9px 20px; transition: border-color 0.3s, color 0.3s; }
   .nf-primary:hover { border-color: var(--seal); color: var(--seal); }
-  .nf-link { font-family: var(--font-mono); font-size: 12.5px; letter-spacing: 0.04em; color: var(--ink-3); text-decoration: none; }
-  .nf-link:hover { color: var(--seal); }
 
   @media (prefers-reduced-motion: no-preference) {
     .nf-inner { animation: nf-in 0.8s ease both; }
