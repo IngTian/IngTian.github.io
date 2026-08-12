@@ -125,9 +125,11 @@ const personLd = {
         fold waits for it. But the homepage still USES it (the Work slide's sub-headlines), so the file downloads
         either way, and without the preload it is discovered late in the critical chain: measured three times on a
         production build, FCP went 1956ms -> 2333ms for identical bytes. Late and unannounced is worse than early
-        and announced. Dropping Inter's preload measured worse too (FCP 2483ms). */}
+        and announced.
+        TWO FAMILIES NOW: Inter is gone and the body face is the system UI stack, so there is nothing to load for
+        it. Both remaining faces are LOCAL files (see astro.config.mjs), so these emit @font-face rules and
+        preload hints for files Astro copies out of src/ rather than anything fetched at build time. */}
     <Font cssVariable="--ff-fraunces" preload />
-    <Font cssVariable="--ff-inter" preload />
     <Font cssVariable="--ff-jetbrains" />
     <ClientRouter />
     <title>{title}</title>
