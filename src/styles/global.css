@@ -133,6 +133,37 @@ body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body)
   flex-direction: column;
   justify-content: center;
 }
+/* ── THE NAV MUST NOT LAND ON A HEADLINE, which on phones it did — on every slide.
+   The corner nav is a fixed capsule at the top; the deck rests with a slide's top at the viewport top; and a
+   paper panel puts its kicker and headline in the first ~90px. So at rest, on a phone, the capsule sat across
+   the headline of each explainer slide. Measured at 390x844 resting on each stop, covered widths:
+   "What is multi-period portfolio optimization?" 228px · "Now imagine it is not your money." 341px ·
+   "Still an open problem." 212px · "The work" 123px — plus every kicker ("1 / 3", "2 / 3 · the difficulty").
+   Not transient: these are the positions the deck comes to REST at, so the headline was permanently obscured.
+
+   THE FIX IS THE PANEL'S OWN PADDING, NOT --deck-lead. A lead was the obvious lever and it is the wrong one:
+   it lifts the deck's resting position ABOVE the slide, so a full-bleed opaque panel gets a strip of sky above
+   it and reads as a card that has slipped down — Story.astro measured exactly that (paper at 1953, deck resting
+   at 1893, 60px of sky) and documents why it carries no lead, naming the panel's padding-top as the right home
+   for this air. Padding keeps the paper flush to the top of the screen and moves only the content inside it.
+
+   78px clears the wrapped two-row capsule on phones (12px offset + ~54px tall) and the single-row capsule in
+   landscape (17px + ~44px). These selectors are (0,2,1) against Astro's scoped `.ch-paper[data-astro-cid-…]` at
+   (0,2,0), so the longhand wins over each panel's own `padding` shorthand — which is also why the first attempt
+   at this, a plain `.is-slides > section` rule, silently lost and changed nothing. */
+@media (max-width: 1100px), (max-height: 620px) {
+  .is-slides > section > .story-paper,
+  .is-slides > section > .ch-paper,
+  .is-slides > section > .ru-paper,
+  .is-slides > section > .so-paper,
+  .is-slides > section > .wk-paper { padding-top: 78px; }
+  /* The footer strip needs it too, and here it is an INTERACTIVE element at stake rather than a headline: when
+     the deck rests on #signature the strip's first row is at the top of the screen, so at 320px the nav capsule
+     sat across "Download CV ↓" (95px of it) and the Research pill — a tap in that band would hit the nav instead
+     of the link. (1,1,0) against Tailwind's py-14 at (0,1,0), so the longhand wins. */
+  .is-slides > #signature { padding-top: 96px; }
+}
+
 /* The panel inside a slide must be able to fill it, or the centring above just
    moves a short panel down the screen and leaves sky above and below it. */
 .is-slides > section > .story-paper,

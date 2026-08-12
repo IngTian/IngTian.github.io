@@ -176,7 +176,15 @@ for (const phrase of bio.strong) {
      (bio under the name), never re-centered. Static flow replaces the absolute
      positioning below the sm breakpoint. */
   @media (max-width: 640px) {
-    #heights { display: flex; flex-direction: column; justify-content: flex-end; gap: 1.75rem; padding-bottom: 16vh; }
+    /* padding-top CLEARS THE CORNER NAV, and without it the site's own name was unreadable. This column is
+       justify-content: flex-end, so when its content is taller than min-height the overflow goes out of the TOP
+       — and on a small phone it does. Measured at 320x568: the h1 sat at y=32..90 while the nav capsule, wrapped
+       to two rows, occupies y=12..80, so 48 of the name's 58px were behind it and "Ing Tian" was legible only
+       from the g's descender. Dark theme identical.
+       Padding rather than switching to flex-start: it fixes BOTH cases. When the content overflows, the box grows
+       and the name starts below the padding; when it fits, flex-end still parks the block at the foot of the
+       screen, which is the hero's intended composition. */
+    #heights { display: flex; flex-direction: column; justify-content: flex-end; gap: 1.75rem; padding-top: 96px; padding-bottom: 16vh; }
     #heights .hero-bio,
     #heights .hero-rise { position: static; inset: auto; max-width: 100%; text-align: left; right: auto; }
     #heights .hero-bio { order: 2; }

@@ -273,8 +273,12 @@ const items: Item[] = [
      The threshold is 1200px, not 1000: with five pages the full capsule measures 664px, which is 65% of a
      1024px viewport and 52% of a 1280px one. A nav is a corner affordance, and at two thirds of the width it
      has stopped being one. Dropping the marks brings it to 512px (50% at 1024). */
+  /* BOTH separators go with the icons, not just the first. Hiding the icon links but keeping the rule on each
+     side of them left a stray double divider with an empty slot between them: measured at 768px, rules at x=646
+     and x=663 with 14px of blank pill between, then the toggle at x=683. It read as a missing button.
+     (A later ≤640px rule also hid .sep, which is why this only showed between 641px and 1199px.) */
   @media (max-width: 1199px) {
-    .cnav .mark, .cnav .sep:first-of-type { display: none; }
+    .cnav .mark, .cnav .sep { display: none; }
   }
 
   /* Mobile: tighter capsule, and the pages shrink rather than disappear — a phone visitor with no nav at all
@@ -295,10 +299,6 @@ const items: Item[] = [
     .cnav a, .cnav .toggle { padding: 8px 9px; }
     .cnav .page { font-size: 11px; letter-spacing: 0.02em; }
     .cnav .content { gap: 0; }
-    /* The icon links are already display:none from 1199px down, so the rule that separated them from the pages
-       has nothing left to separate — and once the capsule wraps it opened the second row as a stray tick before
-       the theme toggle. */
-    .cnav .sep { display: none; }
   }
 
   /* Reduced motion: no bloom scale / nudge — the pill still appears (instant)
