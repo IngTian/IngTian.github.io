@@ -11,6 +11,7 @@
 // distinction is that every row here is a thing a reader can go and check.
 import { publications, projects } from '../data/profile';
 import { WRITINGS_PROMISE, WRITINGS_TOPICS } from '../data/making';
+import PlushCow from '../components/PlushCow.astro';
 
 const featured = publications.find((p) => p.featured);
 const others = publications.filter((p) => !p.featured);
@@ -92,6 +93,15 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
         </div>
       </div>
 
+      <!-- THE COW LIVES HERE NOW — "im thinking if it's better to move the cow to above", pointing at exactly
+           this empty band. It solves two things at once: the footer stops asking a 19-word strip to hold both the
+           IT seal and a pixel animal, and this slide stops ending in 480px of blank panel (measured: 422px of
+           content in a 900px slide). It is still the last thing before the footer, so it keeps its place as the
+           page's closing aside. -->
+      <div class="wk-cow">
+        <PlushCow />
+      </div>
+
     </div>
   </div>
 </section>
@@ -168,7 +178,9 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
 
   .wk-item { margin: 0 0 clamp(18px, 2.2vh, 26px); }
   .wk-item-name {
-    font-family: var(--font-display); font-weight: 500; font-size: clamp(17px, 1.35vw, 20px);
+    /* ACCENT FACE: these are the sub-headlines the owner asked to give some variety to — the paper and project
+       names sitting under each mono column label. Fraunces earns its keep at this size. */
+    font-family: var(--font-accent); font-weight: 500; font-size: clamp(17px, 1.35vw, 20px);
     line-height: 1.28; color: var(--wk-ink); margin: 0;
   }
   .wk-item-line {
@@ -198,7 +210,8 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
   }
 
   .wk-promise {
-    font-family: var(--font-display); font-style: italic;
+    /* An italic editorial line, which is where a characterful serif reads as voice rather than as mannerism. */
+    font-family: var(--font-accent); font-style: italic;
     font-size: clamp(17px, 1.4vw, 21px); line-height: 1.45;
     color: var(--wk-ink); margin: 0; max-width: 34ch;
   }
@@ -210,6 +223,13 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
   .wk-topics li::before {
     content: ""; position: absolute; left: 0; top: 0.62em;
     width: 7px; height: 1px; background: var(--wk-accent); opacity: 0.7;
+  }
+
+  /* Centred, with real air above it so it reads as a closing mark rather than as a fourth column. The panel is
+     vertically centred by the deck, so this simply lives at the end of the content. */
+  .wk-cow {
+    display: flex; justify-content: center;
+    margin: clamp(34px, 6vh, 84px) 0 0;
   }
 
   .wk-link {

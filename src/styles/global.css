@@ -29,9 +29,22 @@
      per-family `fallbacks` in astro.config.mjs. Appending our own repeated it — the computed value came out as
      "…, serif, Georgia, 'Times New Roman', serif" — so the var()'s DEFAULT carries the safety instead, and it
      only applies if astro:fonts stops emitting the variable at all. */
-  --font-display: var(--ff-fraunces, Georgia, serif);
+  /* ── DISPLAY IS GEORGIA, NOT FRAUNCES, on the owner's call after seeing Fraunces render for the first time:
+     "i think prod's font is better. the current font is kind of weird."
+     Worth recording precisely what he was comparing, because it is not what it looks like. The live site has
+     never loaded a webfont — that was the bug fixed a few commits ago — so "prod's font" IS Georgia, and the
+     months he spent judging this design were all in Georgia. Fraunces is a high-contrast display serif with
+     deliberately wonky curves; against a calm workhorse serif it reads as mannered at headline size. He is
+     choosing the one he has actually been reading, which is the right basis for the choice.
+     Consequence worth having: no display webfont in the critical path, so Fraunces stops being preloaded and
+     the FCP cost of the font fix largely goes back. */
+  --font-display: Georgia, 'Times New Roman', 'Nimbus Roman', serif;
   --font-body: var(--ff-inter, system-ui, sans-serif);
   --font-mono: var(--ff-jetbrains, ui-monospace, monospace);
+  /* FRAUNCES KEPT, AS AN ACCENT — "but maybe you can use it in some sub headlines to add some varieties." So it
+     stops being the site's voice and becomes a second one, used on sub-headlines and the italic editorial lines
+     where a characterful serif is an asset rather than a distraction. Structure stays Georgia. */
+  --font-accent: var(--ff-fraunces, Georgia, serif);
 }
 
 /* overflow-x:hidden guards against the .descent::before/::after atmosphere

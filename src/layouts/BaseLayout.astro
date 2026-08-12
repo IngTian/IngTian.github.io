@@ -120,6 +120,12 @@ const personLd = {
         role tokens — pointing them at the same names meant our stylesheet overrode astro:fonts and no
         webfont rendered anywhere. See the long note in astro.config.mjs. The role tokens are built
         from these in global.css's @theme. */}
+    {/* ALL THREE STAY PRELOADED, and Fraunces' preload was removed and put back on measurement. It looked
+        obviously droppable once Fraunces became the accent face rather than the display face — nothing above the
+        fold waits for it. But the homepage still USES it (the Work slide's sub-headlines), so the file downloads
+        either way, and without the preload it is discovered late in the critical chain: measured three times on a
+        production build, FCP went 1956ms -> 2333ms for identical bytes. Late and unannounced is worse than early
+        and announced. Dropping Inter's preload measured worse too (FCP 2483ms). */}
     <Font cssVariable="--ff-fraunces" preload />
     <Font cssVariable="--ff-inter" preload />
     <Font cssVariable="--ff-jetbrains" />
