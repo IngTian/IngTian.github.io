@@ -39,7 +39,11 @@
      Consequence worth having: no display webfont in the critical path, so Fraunces stops being preloaded and
      the FCP cost of the font fix largely goes back. */
   --font-display: Georgia, 'Times New Roman', 'Nimbus Roman', serif;
-  --font-body: var(--ff-inter, system-ui, sans-serif);
+  /* BODY IS THE SYSTEM UI STACK — no webfont. Inter is dropped: it was the most expensive face on the site
+     (100KB of 222KB) for a sans-serif almost indistinguishable from SF at body size, and it is also what the
+     live site has been rendering all along, since no webfont ever loaded until a few commits ago. The order
+     matters: system-ui resolves to SF on Apple and Segoe on Windows, with the rest as belt and braces. */
+  --font-body: system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   --font-mono: var(--ff-jetbrains, ui-monospace, monospace);
   /* FRAUNCES KEPT, AS AN ACCENT — "but maybe you can use it in some sub headlines to add some varieties." So it
      stops being the site's voice and becomes a second one, used on sub-headlines and the italic editorial lines
