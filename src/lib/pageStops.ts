@@ -230,8 +230,11 @@ export function homeStops(): (Stop & { zone: 'light' | 'dark' })[] {
       ],
     },
     { label: 'The climb', target: 'story', zone: 'light' },
-    { label: 'The work', target: 'work', zone: 'light' },
-    { label: 'Links', target: 'signature', zone: 'dark' },
+    // ONE STOP, NOT TWO. 'The work' and 'Links' were separate sections and so separate deck stops, which left
+    // 161px of empty panel below the work and made the last stop a 193px footer strip. They are one section now
+    // (see sections/Work.astro), so the rail names it once. 'light' because the stop begins on the tan panel;
+    // the footer inside it is where the descent reaches its dark ground.
+    { label: 'Appendix', target: 'appendix', zone: 'light' },
   ];
 }
 

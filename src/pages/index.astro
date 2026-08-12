@@ -11,8 +11,7 @@ import Story from '../sections/Story.astro';
 import Choice from '../sections/Choice.astro';
 import Rules from '../sections/Rules.astro';
 import Solve from '../sections/Solve.astro';
-import Work from '../sections/Work.astro';
-import Signature from '../sections/Signature.astro';
+import Appendix from '../sections/Work.astro';
 import Deck from '../components/Deck.astro';
 ---
 
@@ -48,7 +47,7 @@ import Deck from '../components/Deck.astro';
     <Story>
       <DescentPath />
     </Story>
-    <Work />
+    <Appendix />
     <!-- MOUNTAINS IS GONE from the homepage, on the owner's instruction: "you may delete everything
          from below. The record, the experience, everything." It was the résumé — research interests,
          selected writing, selected experience, projects, recognition — and it is the thing the graph
@@ -59,7 +58,6 @@ import Deck from '../components/Deck.astro';
          it's already useless." It was the site's only React island; with it removed the homepage ships
          no client framework at all. Its data (data/script.ts), engine (useTypewriter) and spec are
          deleted with it rather than left as dead weight — git holds them if it ever comes back. -->
-    <Signature />
   </main>
   <Toc />
   <Grain />

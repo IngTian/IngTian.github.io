@@ -12,6 +12,7 @@
 import { publications, projects } from '../data/profile';
 import { WRITINGS_PROMISE, WRITINGS_TOPICS } from '../data/making';
 import PlushCow from '../components/PlushCow.astro';
+import Signature from './Signature.astro';
 
 const featured = publications.find((p) => p.featured);
 const others = publications.filter((p) => !p.featured);
@@ -25,10 +26,19 @@ const shownProjects = projects.slice(0, 2);
 const compounded = featured?.results?.[0];
 const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
 ---
-<section id="work" class="wk" aria-labelledby="wk-heading">
+<!-- THE APPENDIX — the work AND the footer, as one slide. The owner: "i noticed that when i scroll down to the
+     work, it seems like you aligned the bottom with the footer so that leaves a huge space below the cow. why not
+     merge the footer and the last slide? name it appendix."
+     He read the symptom exactly right. The two were separate top-level sections, so the deck gave each its own
+     stop: resting on the work left 161px of empty tan below the cow with the footer entirely below the fold, and
+     the final stop was a 193px strip. One section, one stop — the page now ends where it stops.
+     `Appendix` is his word and it is the better one now: with the links, the seal and the copyright inside it,
+     this is no longer only "the work" but the reference matter at the end of a paper, which is exactly the
+     register the rest of the site is written in. -->
+<section id="appendix" class="wk" aria-labelledby="ap-heading">
   <div class="wk-paper">
     <div class="wk-inner">
-      <h2 id="wk-heading" class="wk-title">The work</h2>
+      <h2 id="ap-heading" class="wk-title">Appendix</h2>
 
       <div class="wk-cols">
         <!-- PUBLICATIONS: the paper by name, so a reader knows what they are opening. -->
@@ -104,7 +114,12 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
 
     </div>
   </div>
-</section>
+
+  <!-- The footer, NESTED rather than a sibling. lib/deck.ts counts only the direct <section> children of <main>,
+       so nesting is what collapses the two stops into one — no change to the deck itself. It keeps its own dark
+       ground because it sits on the descent gradient below the tan panel, which is where the sky reaches
+       near-black: the page still ENDS in the dark, which is the whole point of the descent. -->
+  <Signature />
 
 <style>
   .wk {

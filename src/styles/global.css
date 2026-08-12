@@ -139,8 +139,11 @@ body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body)
    homepage, and ONLY on the homepage, the footer laid out as three stacked blocks and the IT seal rendered at
    the far LEFT instead of the bottom right. The owner reported it twice as the seal "drifting"; both of my
    earlier attempts edited the markup, which could not have worked, because the markup was never the problem.
-   Excluding it here means the utilities in Signature.astro simply apply, and there is nothing left to override. */
-.is-slides > section:not(#signature) {
+   Excluding it here means the utilities in Signature.astro simply apply, and there is nothing left to override.
+   THE EXCLUSION IS GONE because the footer is no longer a top-level section: it is nested inside #appendix (see
+   sections/Work.astro), so this selector cannot reach it and there is nothing to exempt. Keeping a :not() for an
+   element that can never match would be a false clue about the layout. */
+.is-slides > section {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -170,11 +173,10 @@ body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body)
   .is-slides > section > .ru-paper,
   .is-slides > section > .so-paper,
   .is-slides > section > .wk-paper { padding-top: 78px; }
-  /* The footer strip needs it too, and here it is an INTERACTIVE element at stake rather than a headline: when
-     the deck rests on #signature the strip's first row is at the top of the screen, so at 320px the nav capsule
-     sat across "Download CV ↓" (95px of it) and the Research pill — a tap in that band would hit the nav instead
-     of the link. (1,1,0) against Tailwind's py-14 at (0,1,0), so the longhand wins. */
-  .is-slides > #signature { padding-top: 96px; }
+  /* The footer no longer needs its own clearance rule. It used to be a stop of its own, so the deck rested with
+     its first row at the top of the screen and the capsule sat across "Download CV ↓" — 95px of it at 320px, a
+     band where a tap would have hit the nav instead of the link. Nested inside #appendix it is never at the top
+     of the viewport at rest, and the appendix's own panel padding above covers the case. */
 }
 
 /* The panel inside a slide must be able to fill it, or the centring above just
@@ -189,9 +191,10 @@ body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body)
   flex-direction: column;
   justify-content: center;
 }
-/* (The signature's exemption moved INTO the selector above — it never reaches the footer now, so the strip
-   keeps its natural height and its own flex row. Giving it a full screen would end the page on 850px of empty
-   sky, which is why it is exempt at all.) */
+/* The nested footer must NOT stretch. It is the last flex item in #appendix, and a stretched footer would put its
+   links in the middle of a tall band instead of at the foot of the page. `flex: none` keeps it at its own height
+   and lets the tan panel above it take the slack. */
+.is-slides > section > #signature { flex: none; }
 
 /* ── Atmosphere, upper sky (heights → interlude). Normal blend: these are warm
    LIGHT washes + a soft horizon haze that read on the pale paper. Localized to

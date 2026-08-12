@@ -266,7 +266,11 @@ describe('homeStops', () => {
   const flat = flattenStops(stops);
 
   // Section ids actually rendered by src/pages/index.astro, in document order.
-  const RENDERED = ['heights', 'interlude', 'choice', 'rules', 'solve', 'story', 'work', 'signature'];
+  // 'work' and 'signature' became ONE section, #appendix: they were separate deck stops, which left 161px of
+  // empty panel below the work and made the final stop a 193px footer strip. The footer is now nested inside the
+  // appendix, so it is not a top-level section and the deck does not stop on it. This list is the guard that
+  // caught the rename — it is the only thing tying the rail's targets to the page's real ids.
+  const RENDERED = ['heights', 'interlude', 'choice', 'rules', 'solve', 'story', 'appendix'];
 
   it('points every stop at a section the homepage renders', () => {
     for (const s of flat) {
