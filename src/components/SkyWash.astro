@@ -93,5 +93,66 @@
       from { transform: scale(1);    opacity: 0.10; }
       to   { transform: scale(1.08); opacity: 0.16; }
     }
+
+    /* ── THE BREATHE HOLDS ITS BREATH WHILE YOU SCROLL, and this is the fix for the deck feeling rough.
+       The owner: "i found that scroll down and up the slides is not smooth enough."
+       MEASURED, because the obvious suspects were all wrong. During a deck advance the page was rendering a
+       median frame of 33.7ms — 82% of frames dropped, worst 142ms — where 16.7ms is 60fps. Bisecting the layers
+       cleared the corner-nav backdrop-filter, the descent washes, the grain and the hero canvas (all made no
+       difference), and landed here: each of these three elements is 1685 x 7812 = 13.2 MEGAPIXELS, because
+       `inset: 0` inside main.descent means the whole DOCUMENT, not one viewport. Three of them, each with
+       mix-blend-mode, animating without pause. Every frame re-blends about 40 megapixels against its backdrop.
+       Fix candidates, all measured against a four-advance walk:
+         will-change removed          32.5ms   (no help)
+         blend modes off              24.6ms   (helps, and costs the Monet look)
+         wash fixed to the viewport   25.0ms   (helps, and the sky stops descending with you)
+         ANIMATION PAUSED              8.4ms   (as good as deleting the wash outright, which also gave 8.4ms)
+       So the animation is the whole cost, and pausing it only WHILE SCROLLING costs nothing at all: the sky
+       still breathes whenever the reader is still, which is when they can actually see it breathe.
+       `animation-play-state: paused` freezes mid-cycle and resumes from the same point, so there is no jump.
+       Safe direction: the class is only ever ADDED by script, so with no JS the animation simply runs — the
+       current behaviour, and a finished state. */
+    :global(html.wash-still) .sky-warm,
+    :global(html.wash-still) .sky-cool,
+    :global(html.wash-still) .sky-sun {
+      animation-play-state: paused;
+    }
+    /* NOT also relaxing will-change here, though it looks like free savings: measured, dropping the promotion
+       on scroll start was neutral-to-worse (medians 24.9/24.3/24.9 against 16.6/16.7/25.0 with it kept),
+       because un-promoting forces a re-raster of a 13-megapixel layer at exactly the wrong moment. */
   }
 </style>
+
+<script>
+  // Pauses the sky's breathe for the duration of a scroll — see the CSS note above for the measurements.
+  // Lives with the wash rather than in the deck because SkyWash is on eight pages and the deck is only on one.
+  function initWashPause(): (() => void) | null {
+    if (!document.querySelector('.sky-wash')) return null;
+    // Nothing to pause when the animation was never started.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return null;
+
+    const root = document.documentElement;
+    let quiet = 0;
+
+    const onScroll = () => {
+      root.classList.add('wash-still');
+      window.clearTimeout(quiet);
+      // Long enough to cover the deck's own smooth scroll (measured at ~680ms for one slide gap) plus a beat,
+      // so the breathe does not restart mid-flight and cause a second round of dropped frames.
+      quiet = window.setTimeout(() => root.classList.remove('wash-still'), 260);
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.clearTimeout(quiet);
+      window.removeEventListener('scroll', onScroll);
+      root.classList.remove('wash-still');
+    };
+  }
+
+  let teardownWash: (() => void) | null = null;
+  document.addEventListener('astro:page-load', () => {
+    teardownWash?.();
+    teardownWash = initWashPause();
+  });
+</script>

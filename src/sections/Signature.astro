@@ -20,7 +20,7 @@ const year = new Date().getFullYear();
          class:list={[
            'text-[12.5px] px-4 py-2 rounded-full no-underline transition-colors border',
            l.primary
-             ? 'bg-ochre text-ink-1 border-ochre font-semibold'
+             ? 'bg-ochre text-on-accent border-ochre font-semibold'
              : 'text-paper/80 border-ochre/25 hover:border-ochre hover:text-paper',
          ]}>
         {l.label}{l.primary ? ' ↓' : ''}
@@ -30,5 +30,15 @@ const year = new Date().getFullYear();
       © {year} Zeying Tian
     </span>
   </nav>
+  <!-- THE SEAL STAYS EXACTLY WHERE IT SHIPPED: the second child of this justify-between row, so it sits at the
+       bottom-RIGHT of the footer. Two earlier attempts moved it and the owner called both out as drift — the
+       second one ("one explicit row for the seal and the cow") put it at the far LEFT of a new full-width row,
+       which is a bigger move than the bug it was fixing. The lesson is that the seal's position is not mine to
+       spend on layout convenience.
+       THE COW HAS LEFT THIS SECTION ENTIRELY, which is what finally settled it: "the IT logo still conflicts with
+       the cow. im thinking if it's better to move the cow to above". Right, then centred, was the second and third
+       position tried in this strip, and the position was never the problem — a footer this short cannot hold two
+       marks without them competing. The seal is the brand; the cow is an aside. The cow now sits at the foot of
+       the Work slide, where 480px of panel was doing nothing. See sections/Work.astro. -->
   <SealMark />
 </section>

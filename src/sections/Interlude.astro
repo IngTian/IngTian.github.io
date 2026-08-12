@@ -2,85 +2,74 @@
 // A short, quiet transition between the hero and the experience — a single
 // editorial statement set in the warming Monet sky. Swiss restraint: one line,
 // generous space, no ornament. Replaces the old (weak) painted-cloud section.
+//
+// THE FIELD IS NOW THE HEADLINE, on the owner: "for what I'm doing, maybe we should start right with what
+// am I doing: Multi-period Portfolio Optimization. That's the tag line."
+//
+// It used to open with "a researcher by day, an artist by night" — a charming line that names three hats and
+// no subject, so a reader arrived at the explainer without knowing what field it explains. Naming the work
+// first is also what the reordering downstream is about: what I do, then how I got here.
+//
+// The identity line survives BENEATH it, smaller. It still carries the two doorways (/research and /art) and
+// the site's stated hierarchy — quant first, engineer second — but it now qualifies a subject instead of
+// standing in for one.
 ---
-<section id="interlude" class="relative min-h-[78vh] flex items-center justify-center px-[8vw]">
-  <p class="statement max-w-[20ch] text-center font-display italic text-ink-2 leading-[1.35] text-[clamp(24px,3.6vw,40px)]">
-    <a class="research-link" href="/research">A researcher by day</a>, <a class="art-link" href="/art">an artist by night</a>, and a mathematician at heart.
+<section id="interlude" class="relative min-h-[78vh] flex flex-col items-center justify-center px-[8vw]">
+  <!-- "An OR quant in multi-period portfolio optimization" rather than the bare field name, on the owner:
+       "maybe it's smoother running An OR Quant in Multi-Period Portfolio Optimization." It reads better and
+       it says more — the discipline he works IN (operations research) and the problem he works ON, in one
+       breath, where the field name alone gave only the second. -->
+  <p class="field text-center font-display text-ink-1 leading-[1.06] text-[clamp(27px,4.4vw,58px)]">
+    An OR quant in multi-period<br />portfolio optimization
+  </p>
+  <p class="field-sub text-center font-mono uppercase text-ink-3 tracking-[0.2em] text-[clamp(10px,1.1vw,12.5px)]">
+    deciding, and deciding again, under constraints
+  </p>
+
+  <!-- "A researcher by day, an artist by night" MOVED TO THE HERO'S LOWER RIGHT. The owner: "seems crowded now
+       and as the tagline gets smaller I bet people don't know to click on it." Both halves correct — this slide
+       had grown to four stacked lines, and shrinking that one to fit made two real LINKS look like decoration.
+       They now have the hero's one empty quadrant to themselves.
+       What stays here is the hierarchy line, because it qualifies the FIELD above it: this is a subject, and
+       this is the order in which I come at it. -->
+  <p class="reasons text-center font-display italic text-ink-3 max-w-[36ch] leading-[1.45] text-[clamp(15px,1.8vw,21px)]">
+    A quant who reasons in structure,<br />an engineer who makes the math run.
   </p>
 </section>
 
 <style>
-  /* Quiet doorway: ink text with an underline that draws in from the left on
-     hover/focus. No color shift (the seal stays reserved for the seal mark). */
-  .art-link {
-    color: inherit;
-    text-decoration: none;
-    position: relative;
-    white-space: nowrap;
+  /* THE FIELD, as the headline. Display weight rather than italic: this is a subject being named, not an
+     aside. Tight leading because it wraps to two lines at most widths and the two lines should read as one
+     object. */
+  .field {
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    max-width: 22ch;
+    text-wrap: balance;
+    margin: 0;
   }
-  .art-link::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    bottom: -0.06em;
-    width: 100%;
-    height: 1px;
-    background: currentColor;
-    opacity: 0.7;
-    transform: scaleX(0);
-    transform-origin: left center;
-    transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
-  }
-  .art-link:hover::after,
-  .art-link:focus-visible::after { transform: scaleX(1); }
-  /* keyboard focus stays visible even where transitions are reduced */
-  .art-link:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; border-radius: 2px; }
-  /* reduced motion / no animation-timeline: show the underline statically so
-     the affordance is never lost, just without the draw-in sweep */
-  @media (prefers-reduced-motion: reduce) {
-    .art-link::after { transition: none; }
-    .art-link:hover::after, .art-link:focus-visible::after { transform: scaleX(1); }
-  }
+  .field-sub { margin: clamp(14px, 2vh, 24px) 0 0; }
+  /* Generous gap: the hierarchy line is a separate thought, and running it close under the field would read as
+     a subtitle of it. */
+  .reasons { margin: clamp(34px, 5.5vh, 68px) 0 0; }
 
-  /* The "day" doorway → /research. A DIFFERENT affordance from the artist
-     underline: a soft ochre highlighter wash sweeps in BEHIND the words on
-     hover/focus (like a marker stroke), then the text rides on top. Transform-
-     only; the seal red stays reserved. */
-  .research-link {
-    color: inherit;
-    text-decoration: none;
-    position: relative;
-    white-space: nowrap;
-    isolation: isolate; /* keep the wash's z-index local to this link */
-  }
-  .research-link::before {
-    content: "";
-    position: absolute;
-    left: -0.12em;
-    right: -0.12em;
-    bottom: 0.02em;
-    height: 0.62em;        /* a marker stripe over the lower part of the text */
-    background: var(--ochre);
-    opacity: 0.34;
-    border-radius: 1px;
-    z-index: -1;
-    transform: scaleX(0);
-    transform-origin: left center;
-    transition: transform 0.42s cubic-bezier(0.2, 0.7, 0.2, 1);
-  }
-  .research-link:hover::before,
-  .research-link:focus-visible::before { transform: scaleX(1); }
-  .research-link:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; border-radius: 2px; }
-  @media (prefers-reduced-motion: reduce) {
-    .research-link::before { transition: none; }
-    .research-link:hover::before, .research-link:focus-visible::before { transform: scaleX(1); }
-  }
-
+  /* Three lines, arriving in reading order on staggered scroll ranges — the field first, because it is the
+     subject. Same keyframes throughout, so there is only one animation to keep in sync. */
   @media (prefers-reduced-motion: no-preference) {
-    .statement {
+    .field {
       animation: statement-in linear both;
       animation-timeline: view();
-      animation-range: entry 5% cover 38%;
+      animation-range: entry 2% cover 30%;
+    }
+    .field-sub {
+      animation: statement-in linear both;
+      animation-timeline: view();
+      animation-range: entry 8% cover 36%;
+    }
+    .reasons {
+      animation: statement-in linear both;
+      animation-timeline: view();
+      animation-range: entry 16% cover 44%;
     }
     @keyframes statement-in {
       from { opacity: 0.15; transform: translate3d(0, 28px, 0); }

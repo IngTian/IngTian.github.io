@@ -1,0 +1,266 @@
+---
+// src/sections/Work.astro
+// SLIDE 3 — "just say plainly, my publications, my writings, my projects."
+//
+// Plainly is the instruction and the whole design: after two slides that teach and argue, this one simply
+// says where the work is. Three columns, one line of what each holds, a real link each. No display-size
+// headline competing with the two slides before it, no counts, no "selected X" headings.
+//
+// WHY THIS IS NOT A RESUME even though it is a list. A résumé lists credentials — title, employer, dates,
+// reverse-chronological — and claims authorization. This lists ARTEFACTS and where to read them. The
+// distinction is that every row here is a thing a reader can go and check.
+import { publications, projects } from '../data/profile';
+import { WRITINGS_PROMISE, WRITINGS_TOPICS } from '../data/making';
+import PlushCow from '../components/PlushCow.astro';
+import Signature from './Signature.astro';
+
+const featured = publications.find((p) => p.featured);
+const others = publications.filter((p) => !p.featured);
+const shownProjects = projects.slice(0, 2);
+
+// THE TWO HEADLINE NUMBERS, recovered from the shipped homepage. This slide replaced a "Selected writing" glass
+// card that carried them, and dropping them cost the homepage every number on it — which on a quant's site is the
+// wrong thing to spend for breadth: the Sharpe against its two baselines is the most checkable claim here, and it
+// is the one thing a reader cannot get from a title. Derived exactly as the shipped card derived them, so
+// profile.ts stays the single source and the figures cannot drift from the paper's own table.
+const compounded = featured?.results?.[0];
+const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
+---
+<!-- THE APPENDIX — the work AND the footer, as one slide. The owner: "i noticed that when i scroll down to the
+     work, it seems like you aligned the bottom with the footer so that leaves a huge space below the cow. why not
+     merge the footer and the last slide? name it appendix."
+     He read the symptom exactly right. The two were separate top-level sections, so the deck gave each its own
+     stop: resting on the work left 161px of empty tan below the cow with the footer entirely below the fold, and
+     the final stop was a 193px strip. One section, one stop — the page now ends where it stops.
+     `Appendix` is his word and it is the better one now: with the links, the seal and the copyright inside it,
+     this is no longer only "the work" but the reference matter at the end of a paper, which is exactly the
+     register the rest of the site is written in. -->
+<section id="appendix" class="wk" aria-labelledby="ap-heading">
+  <div class="wk-paper">
+    <div class="wk-inner">
+      <h2 id="ap-heading" class="wk-title">Appendix</h2>
+
+      <div class="wk-cols">
+        <!-- PUBLICATIONS: the paper by name, so a reader knows what they are opening. -->
+        <div class="wk-col">
+          <p class="wk-col-kicker">Publications</p>
+          {featured && (
+            <div class="wk-item">
+              <p class="wk-item-name">{featured.shortTitle ?? 'RL-BHRP'}</p>
+              <p class="wk-item-line">
+                {featured.subject} · {featured.venue}
+                {featured.arxivId && <> · arXiv:{featured.arxivId}</>}
+              </p>
+              <!-- Out-of-sample, against two baselines, both named — a number with nothing to compare it to is
+                   decoration. Full table on /research. -->
+              <div class="wk-stats">
+                {compounded && (
+                  <div class="wk-stat">
+                    <p class="wk-stat-value">{compounded.value}</p>
+                    <p class="wk-stat-label">wealth compounded · OOS ’20–’25</p>
+                  </div>
+                )}
+                {sharpe && (
+                  <div class="wk-stat">
+                    <p class="wk-stat-value">{sharpe.values[0]}</p>
+                    <p class="wk-stat-label">Sharpe · vs {sharpe.values[1]} / {sharpe.values[2]}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {others.map((p) => (
+            <div class="wk-item">
+              <p class="wk-item-name">{p.title}</p>
+              <p class="wk-item-line">{p.venue} · {p.year}</p>
+            </div>
+          ))}
+          <a class="wk-link" href="/research">Read the research<span class="wk-arrow" aria-hidden="true">→</span></a>
+        </div>
+
+        <!-- WRITINGS: promised honestly, tagged. -->
+        <div class="wk-col">
+          <div class="wk-col-head">
+            <p class="wk-col-kicker">Writing</p>
+            <span class="wk-tag">coming</span>
+          </div>
+          <p class="wk-promise">{WRITINGS_PROMISE}</p>
+          <ul class="wk-topics">
+            {WRITINGS_TOPICS.slice(0, 3).map((t) => <li>{t}</li>)}
+          </ul>
+        </div>
+
+        <!-- PROJECTS: last, and briefest — for a quant reader this is supporting evidence. -->
+        <div class="wk-col">
+          <p class="wk-col-kicker">Projects</p>
+          {shownProjects.map((p) => (
+            <div class="wk-item">
+              <p class="wk-item-name">{p.name}</p>
+              <p class="wk-item-line">{p.tagline}</p>
+            </div>
+          ))}
+          <a class="wk-link" href="/projects">All projects<span class="wk-arrow" aria-hidden="true">→</span></a>
+        </div>
+      </div>
+
+      <!-- THE COW LIVES HERE NOW — "im thinking if it's better to move the cow to above", pointing at exactly
+           this empty band. It solves two things at once: the footer stops asking a 19-word strip to hold both the
+           IT seal and a pixel animal, and this slide stops ending in 480px of blank panel (measured: 422px of
+           content in a 900px slide). It is still the last thing before the footer, so it keeps its place as the
+           page's closing aside. -->
+      <div class="wk-cow">
+        <PlushCow size="mark" />
+      </div>
+
+    </div>
+  </div>
+
+  <!-- The footer, NESTED rather than a sibling. lib/deck.ts counts only the direct <section> children of <main>,
+       so nesting is what collapses the two stops into one — no change to the deck itself. It keeps its own dark
+       ground because it sits on the descent gradient below the tan panel, which is where the sky reaches
+       near-black: the page still ENDS in the dark, which is the whole point of the descent. -->
+  <Signature />
+
+<style>
+  .wk {
+    position: relative; z-index: 1;
+    width: 100vw; margin-left: calc(50% - 50vw);
+  }
+  .wk-paper {
+    --wk-bg: #c4b7a1;
+    --wk-edge: rgba(74, 66, 54, 0.26);
+    --wk-ink: #1f1b14;
+    --wk-ink-soft: #423b30;
+    --wk-ink-faint: #6a6153;
+    --wk-accent: #7c5522;
+    background: var(--wk-bg);
+    border-top: 1px solid var(--wk-edge);
+    border-bottom: 1px solid var(--wk-edge);
+    padding: clamp(52px, 7.4vh, 104px) 0;
+  }
+  :global(html[data-theme='dark']) .wk-paper {
+    --wk-bg: #14161a;
+    --wk-edge: rgba(184, 177, 161, 0.14);
+    --wk-ink: #dce1dc;
+    --wk-ink-soft: #a8b0a9;
+    --wk-ink-faint: #6d746e;
+    --wk-accent: #7fc9a0;
+  }
+  .wk-inner {
+    /* Clears the fixed Toc rail. The rail now carries an INDENTED tier ("Problem / Limits / Method" nested
+       under "The field"), so its right edge moved from x=129 to x=151 at 1700px and the old clamp left as
+       little as 5px of air — measured at 1440px on this slide. 168px min / 10.4vw keeps at least ~20px of
+       margin at every width the rail is shown (it collapses to dots below 1100px). Shared across the five
+       paper slides, so it is edited in all of them together or in none. */
+    padding-left: clamp(168px, 10.4vw, 200px);
+    padding-right: clamp(20px, 2.4vw, 52px);
+    box-sizing: border-box;
+  }
+  @media (max-width: 1099px) { .wk-inner { padding-left: clamp(28px, 6vw, 80px); } }
+
+  /* BIGGER THROUGHOUT, on the owner's note ("the work is okay. fonts can be bigger"). The slide had the
+     most vertical room of the three — it measured 501px of a 1050px screen — so the type was small for no
+     reason. It still stays under the two slides before it in hierarchy, because this one points rather
+     than argues. */
+  .wk-title {
+    font-family: var(--font-display); font-weight: 300;
+    font-size: clamp(28px, 2.6vw, 42px); line-height: 1.22;
+    color: var(--wk-ink); margin: 0; letter-spacing: -0.008em;
+  }
+
+  .wk-cols {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 clamp(26px, 3vw, 60px);
+    margin: clamp(28px, 3.8vh, 52px) 0 0;
+  }
+  .wk-col + .wk-col { border-left: 1px solid var(--wk-edge); padding-left: clamp(26px, 3vw, 60px); }
+  @media (max-width: 980px) {
+    .wk-cols { grid-template-columns: 1fr; gap: 4vh 0; }
+    .wk-col + .wk-col { border-left: 0; padding-left: 0; padding-top: 4vh; border-top: 1px solid var(--wk-edge); }
+  }
+
+  .wk-col-head { display: flex; align-items: baseline; gap: 10px; }
+  .wk-col-kicker {
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--wk-accent); margin: 0 0 20px;
+  }
+  .wk-col-head .wk-col-kicker { margin-bottom: 20px; }
+  .wk-tag {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--wk-ink-faint);
+    border: 1px solid var(--wk-edge); border-radius: 2px; padding: 3px 7px;
+  }
+
+  .wk-item { margin: 0 0 clamp(18px, 2.2vh, 26px); }
+  .wk-item-name {
+    /* ACCENT FACE: these are the sub-headlines the owner asked to give some variety to — the paper and project
+       names sitting under each mono column label. Fraunces earns its keep at this size. */
+    font-family: var(--font-accent); font-weight: 500; font-size: clamp(17px, 1.35vw, 20px);
+    line-height: 1.28; color: var(--wk-ink); margin: 0;
+  }
+  .wk-item-line {
+    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.58; color: var(--wk-ink-faint);
+    margin: 6px 0 0; max-width: 40ch;
+  }
+
+  /* THE NUMBERS. Display face for the figure, mono for what it is measured against — the same pairing the
+     shipped card used, so the homepage reads as continuous with what is live rather than as a different site.
+     Two across at this column width (~350px at 1440), stacking below where that stops fitting. */
+  .wk-stats {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(10px, 1.4vw, 22px);
+    margin: clamp(12px, 1.7vh, 20px) 0 0;
+  }
+  .wk-stat-value {
+    font-family: var(--font-display); font-weight: 400;
+    font-size: clamp(21px, 1.9vw, 29px); line-height: 1; color: var(--wk-ink); margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .wk-stat-label {
+    font-family: var(--font-mono); font-size: clamp(9px, 0.68vw, 10.5px); line-height: 1.4;
+    letter-spacing: 0.02em; color: var(--wk-ink-faint); margin: 6px 0 0;
+  }
+  @media (max-width: 1180px) {
+    .wk-stats { grid-template-columns: 1fr; gap: 12px; }
+  }
+
+  .wk-promise {
+    /* An italic editorial line, which is where a characterful serif reads as voice rather than as mannerism. */
+    font-family: var(--font-accent); font-style: italic;
+    font-size: clamp(17px, 1.4vw, 21px); line-height: 1.45;
+    color: var(--wk-ink); margin: 0; max-width: 34ch;
+  }
+  .wk-topics { list-style: none; margin: clamp(16px, 2vh, 22px) 0 0; padding: 0; display: grid; gap: 9px; }
+  .wk-topics li {
+    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.55; color: var(--wk-ink-soft);
+    padding-left: 16px; position: relative; max-width: 40ch;
+  }
+  .wk-topics li::before {
+    content: ""; position: absolute; left: 0; top: 0.62em;
+    width: 7px; height: 1px; background: var(--wk-accent); opacity: 0.7;
+  }
+
+  /* RIGHT EDGE, NOT CENTRED — the owner picked this from six real renders. Centring was the version he called
+     "off … there by mistake", and the reason is structural: a three-column grid has no centre line, so a centred
+     mark lands in the gutter between the first two columns and aligns to nothing. Every other element on this
+     panel sits on the grid. Flush right puts it on the same edge the grid itself ends on, and at `mark` size it
+     reads as a margin note rather than a fourth column.
+     Right-aligned also makes the bubble's growth free: it expands leftward into empty panel while the cow stays
+     anchored, so pressing it never moves anything else. */
+  .wk-cow {
+    display: flex; justify-content: flex-end;
+    margin: clamp(34px, 6vh, 84px) 0 0;
+  }
+
+  .wk-link {
+    display: inline-flex; align-items: baseline; gap: 8px;
+    margin: clamp(8px, 1.2vh, 14px) 0 0;
+    font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.12em;
+    text-transform: uppercase; text-decoration: none;
+    color: var(--wk-accent);
+    border-bottom: 1px solid currentColor; padding-bottom: 3px;
+  }
+  .wk-arrow { transition: transform .28s cubic-bezier(.2,.7,.3,1); }
+  @media (hover: hover) { .wk-link:hover .wk-arrow { transform: translateX(4px); } }
+  .wk-link:focus-visible { outline: 2px solid var(--wk-accent); outline-offset: 4px; }
+</style>

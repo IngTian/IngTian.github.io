@@ -25,8 +25,19 @@ pill, rendered as build-time MathML. When in doubt, remove rather than add.
 - **Astro 6** (static output) + **React 19** (exactly ONE island — the terminal)
   + **Tailwind v4** (`@tailwindcss/vite`; tokens via `@theme` in
   `src/styles/global.css`) + TypeScript (strict).
-- `astro:fonts` self-hosts **Fraunces** (display, uses the SOFT axis), **Inter**
-  (body), **JetBrains Mono** (mono/terminal). No CJK fonts.
+- **Type: four roles, three faces.** `--font-display` is **Georgia** (a system
+  serif, no download); `--font-body` is **Inter**; `--font-mono` is **JetBrains
+  Mono**; `--font-accent` is **Fraunces**, used only on sub-headlines and italic
+  editorial lines. No CJK fonts.
+  - Georgia is deliberate, not a leftover. Fraunces was the display face and the
+    owner rejected it on sight — "prod's font is better, the current font is kind
+    of weird" — after a long-standing bug meant no webfont had EVER rendered and
+    the whole design had been judged in Georgia. Keep Georgia for structure.
+  - `astro:fonts` self-hosts the three webfonts under its own `--ff-*` variables.
+    Never point `cssVariable` at `--font-display`/`-body`/`-mono`: those are the
+    site's role tokens, and the collision is what stopped every webfont from
+    loading. All three are preloaded — removing either Fraunces' or Inter's
+    preload measured a worse FCP (see BaseLayout's note).
 - `astro:assets` optimizes gallery images (responsive `widths`, webp/avif).
 - `site: 'https://ingtian.github.io'`, no `base` (user site at root).
 

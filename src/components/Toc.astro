@@ -6,22 +6,63 @@
 //
 // Each stop carries a `zone` (light|dark) so the label color adapts to the
 // gradient sky beneath it — dark ink on the pale top, paper on the dark bottom.
-const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
-  { label: 'About', href: '#heights',   zone: 'light' },
-  { label: 'Work',  href: '#mountains', zone: 'light' },
-  { label: 'Ask',   href: '#ground',    zone: 'dark'  },
-  { label: 'Links', href: '#signature', zone: 'dark'  },
-];
+//
+// The rail is FIXED, so a per-stop zone is only half the story: when the opaque story panel fills the
+// viewport, EVERY visible label sits over paper, not just the story's own. The script below therefore
+// also sets an .over-paper class on the rail by testing the panel's box against the rail's own box,
+// which flips all the labels to dark ink for as long as the panel is behind them. Without it the
+// three dark-sky labels rendered light-on-light and effectively vanished.
+// 'Work' pointed at #mountains, which no longer exists on the homepage — the résumé section was
+// deleted (see index.astro). A rail stop whose target is missing is dead: the scrollspy silently drops
+// it, but it still renders as a clickable link that goes nowhere. Removed rather than repointed.
+// 'Ask' pointed at #ground — the terminal — which is deleted (see index.astro), and 'Work' before it
+// pointed at #mountains, also deleted. Both are removed rather than repointed: a rail stop whose target
+// is missing still renders as a clickable link that goes nowhere.
+// ORDER FOLLOWS THE PAGE, and the page now answers "what do I do" before "how I got here" — so Story moved
+// below the explainer. A rail whose order disagrees with the document is worse than no rail: the scrollspy
+// sorts by measured position, so a mismatched list would light stops out of sequence.
+//
+// NESTED, and the labels are the sections' own subjects. The owner: "the ToC still says choices. i think this
+// is more a 'the problem' section. similarly that An OR Quant slide deserves a ToC Tag as well… for the
+// problem, the constraint, stuff, you can maybe learn from research's nested ToC. this way it's clearer on the
+// top level."
+//
+// The tree lives in lib/pageStops (homeStops), the same module the /research, /projects and /experience rails
+// read — one place that knows what a rail carries, and unit-tested. Zones stay HERE on the top-level stops
+// because they are a property of the sky behind a stop, not of the page's structure.
+import { homeStops, flattenStops } from '../lib/pageStops';
+
+const stops = homeStops();
+// Children inherit their parent's zone: they are slides inside the same stretch of sky, and a child with a
+// mismatched zone would render light-on-light for exactly as long as its parent read correctly.
+const zoneOf = new Map<string, 'light' | 'dark'>();
+for (const s of stops) {
+  zoneOf.set(s.target, s.zone);
+  for (const c of s.children ?? []) zoneOf.set(c.target, s.zone);
+}
 ---
 <nav class="toc" aria-label="Sections" data-toc>
   <ul>
     {stops.map((s) => (
       <li>
-        <a href={s.href} data-zone={s.zone} aria-label={s.label}>
+        <a href={`#${s.target}`} data-zone={s.zone} aria-label={s.label}>
           <span class="rule" aria-hidden="true"></span>
           <span class="dot" aria-hidden="true"></span>
           <span class="label">{s.label}</span>
         </a>
+        {s.children && s.children.length > 0 && (
+          <ul class="sub">
+            {s.children.map((c) => (
+              <li>
+                <a href={`#${c.target}`} data-zone={zoneOf.get(c.target)} aria-label={c.label}>
+                  <span class="rule" aria-hidden="true"></span>
+                  <span class="dot" aria-hidden="true"></span>
+                  <span class="label">{c.label}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
       </li>
     ))}
   </ul>
@@ -49,6 +90,22 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
   .toc.toc--visible { opacity: 1; visibility: visible; transition: opacity 0.6s ease, visibility 0s; }
 
   .toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+  /* THE NESTED TIER. A group reads as a group: tighter gaps, one indent step, and a hairline spine so the
+     three children visibly belong to the field above them. Indent is small on purpose — the rail sits in a
+     ~34px margin and a deep step would push the labels into the slide. */
+  .toc .sub {
+    gap: 9px; margin-top: 9px; padding-left: 9px;
+    border-left: 1px solid currentColor;
+    /* The spine must be quieter than the text it groups, or it becomes the loudest thing in the margin. */
+    opacity: 1;
+  }
+  .toc .sub > li > a { opacity: 0.34; }
+
+  /* The frosted pad behind the rail is deleted on the owner's instruction. It was added when the drawing
+     spanned the full slide and its contours ran under the rail; the graph is now indented into its own
+     column, so the rail sits on clean paper and the pad was solving a problem that no longer exists —
+     it only read as a floating chip. The .over-paper INK adaptation below stays: that is what keeps the
+     labels legible against the panel, and it is still needed. */
 
   .toc a {
     pointer-events: auto;
@@ -56,6 +113,15 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
     align-items: center;
     gap: 10px;
     text-decoration: none;
+    /* A REAL TOUCH TARGET. The link was only as tall as its 11px text, and once the rail grew to six
+       stops the 14px gap put them under the 24px minimum — Lighthouse a11y went 100 -> 96 on
+       target-size. The vertical padding makes each hit area clear that floor while the negative margin
+       keeps the labels in exactly the same optical position, so the rail still looks like a whisper.
+       Measured, not guessed: 6px of padding gave exactly 23px — one pixel short, and still a fail. */
+    padding: 8px 0;
+    margin: -8px 0;
+    min-height: 26px;
+    box-sizing: border-box;
     font-family: var(--font-mono);
     font-size: 11px;
     letter-spacing: 0.16em;
@@ -74,18 +140,62 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
   .toc a[data-zone="dark"]  { color: var(--ink-5); }
   .toc a { opacity: 0.4; }
 
-  /* active state — full opacity ink/paper + extended rule */
-  .toc a.is-active { opacity: 1; }
+  /* Child rows are a step down in size and tracking — hierarchy by WEIGHT, which is what the /research rail
+     learned: a thin margin cannot afford to carry hierarchy by indent alone. */
+  .toc .sub a { font-size: 10px; letter-spacing: 0.08em; gap: 7px; }
+
+  /* ── STATE BEATS TIER. Written with :where() on the tier part, which contributes ZERO specificity, so a
+     state class always wins. This is the exact bug the /research rail hit: plainly-written `.toc a.is-active`
+     (0,4,1) loses to `.toc .sub a` (0,5,1), and the active indicator then never appears on any nested row —
+     which here would be every one of the three explainer slides. */
+  .toc a.is-active,
+  .toc :where(.sub) a.is-active { opacity: 1; }
   .toc a[data-zone="light"].is-active { color: var(--ink-1); }
   .toc a[data-zone="dark"].is-active  { color: var(--paper); }
-  .toc a.is-active .rule { width: 18px; }
+  .toc a.is-active .rule,
+  .toc :where(.sub) a.is-active .rule { width: 18px; }
 
-  /* hover affordance for the dimmed ones */
+  /* THE PARENT OF THE ACTIVE CHILD is lit, but quieter than the child — so you can see which part of the
+     page you are inside without it competing with the slide you are actually on. */
+  .toc a.is-ancestor,
+  .toc :where(.sub) a.is-ancestor { opacity: 0.72; }
+  .toc a[data-zone="light"].is-ancestor { color: var(--ink-2); }
+  .toc a.is-ancestor .rule { width: 10px; }
+
+  /* hover affordance for the dimmed ones. The :not() guards stop a hover from DIMMING the active row —
+     these rules come later in the sheet, so without them pointing at the current stop would drop it from
+     1.0 to 0.85. */
   @media (hover: hover) {
-    .toc a:hover { opacity: 0.85; }
+    .toc a:not(.is-active):not(.is-ancestor):hover { opacity: 0.85; }
+    .toc :where(.sub) a:not(.is-active):not(.is-ancestor):hover { opacity: 0.68; }
   }
 
-  /* Mobile: dots only, no labels, tighter — a minimal progress cue */
+  /* ── OVER THE PAPER SLIDE. Set by the script whenever the story panel is behind the rail. The
+     panel is opaque and inverts between themes — light paper in light, near-black slate in dark — so
+     the rail's ink inverts with it. This overrides the per-stop zone for every label at once, which
+     is the point: a fixed rail cannot use its stops' page positions to know what is behind it. */
+  .toc.over-paper a { color: #2a251c; }
+  .toc.over-paper a.is-active { color: #12100b; }
+  :global(html[data-theme='dark']) .toc.over-paper a { color: #b9c0b9; }
+  :global(html[data-theme='dark']) .toc.over-paper a.is-active { color: #eef2ee; }
+
+  /* THE LABELS NEED A MARGIN TO LIVE IN. The slide papers reserve a wide left gutter for this rail only in
+     their two-column layout (min-width: 1101px); below that they reclaim it and pad to just 28-80px, so the
+     labelled rail lands ON the body text. Measured at 900px: "ABOUT / CHOICE / RULES" printed across the
+     defining slide's beats. Dots carry the same progress information in a width that always fits. */
+  @media (max-width: 1100px) {
+    .toc .rule, .toc .label { display: none; }
+    .toc .dot { display: block; }
+    .toc a.is-active .dot,
+    .toc :where(.sub) a.is-active .dot { opacity: 1; transform: scale(1.5); }
+    /* As dots there is no room for a tier: the spine and indent would read as a stray mark, and a smaller
+       child dot would look like a rendering fault rather than a hierarchy. Flatten to one column of dots. */
+    .toc .sub { padding-left: 0; border-left: 0; margin-top: 14px; gap: 14px; }
+    .toc .sub > li > a { opacity: 0.4; }
+    .toc .sub .dot { width: 4px; height: 4px; }
+  }
+
+  /* Mobile: tighter still */
   @media (max-width: 640px) {
     .toc { left: 12px; }
     .toc ul { gap: 16px; }
@@ -123,13 +233,49 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
     const stops = links
       .map((a) => ({ a, el: document.getElementById(a.getAttribute('href')?.slice(1) ?? '') }))
       .filter((s): s is { a: HTMLAnchorElement; el: HTMLElement } => !!s.el);
+
+    // Each link's ancestor links, so activating a nested stop can also light its parent. Same shape as the
+    // /research rail: walk up the <li> chain and collect the direct child <a> of each enclosing <li>.
+    const ancestorsOf = new Map<HTMLAnchorElement, HTMLAnchorElement[]>();
+    for (const { a } of stops) {
+      const chain: HTMLAnchorElement[] = [];
+      let li = a.closest('li')?.parentElement?.closest('li') ?? null;
+      while (li) {
+        const parentLink = li.querySelector<HTMLAnchorElement>(':scope > a');
+        if (parentLink) chain.push(parentLink);
+        li = li.parentElement?.closest('li') ?? null;
+      }
+      ancestorsOf.set(a, chain);
+    }
     const hero = document.getElementById('heights');
+    // The opaque paper slides. The rail is fixed, so its ink has to follow whatever is actually behind
+    // it rather than the stop's own position in the page.
+    //
+    // ALL of them, not just the first: the page now has three paper panels in a row (the career story,
+    // the research question, the writing/projects slide). Testing only #story meant the rail reverted to
+    // light sky ink over the other two, where it is nearly invisible against the panel.
+    // The opaque LIGHT panels. .so-paper is deliberately absent: the Solve slide is dark in both themes, so the
+    // rail wants its normal light-on-dark ink there rather than the dark-on-paper override.
+    const paperPanels = Array.from(
+      document.querySelectorAll<HTMLElement>('.story-paper, .ch-paper, .ru-paper, .wk-paper'),
+    );
 
     function update() {
       const vh = window.innerHeight;
       // show the rail only after we've scrolled past most of the hero
       const heroPast = !hero || hero.getBoundingClientRect().bottom < vh * 0.5;
       toc.classList.toggle('toc--visible', heroPast);
+
+      // Is ANY paper panel behind the rail right now? Compare the rail's own vertical box against each
+      // panel's, so this stays correct at any viewport height and with the rail centred on 50%.
+      if (paperPanels.length) {
+        const r = toc.getBoundingClientRect();
+        const onPaper = paperPanels.some((el) => {
+          const p = el.getBoundingClientRect();
+          return p.top < r.bottom && p.bottom > r.top;
+        });
+        toc.classList.toggle('over-paper', onPaper);
+      }
 
       // scrollspy: shared pure rule (see lib/scrollspy.ts) — active = the last
       // stop whose top crossed the reference line, with a page-bottom guard so
@@ -141,12 +287,23 @@ const stops: { label: string; href: string; zone: 'light' | 'dark' }[] = [
         document.documentElement.scrollHeight,
       );
 
+      // The active leaf, then its ancestors — a parent is never BOTH, or a nested active stop's parent would
+      // render at ancestor weight and the leaf's own row would be indistinguishable from it.
+      const lit = new Set<HTMLAnchorElement>();
       stops.forEach((s, i) => {
         const on = heroPast && i === activeIdx;
         s.a.classList.toggle('is-active', on);
-        if (on) s.a.setAttribute('aria-current', 'true');
-        else s.a.removeAttribute('aria-current');
+        if (on) {
+          s.a.setAttribute('aria-current', 'true');
+          lit.add(s.a);
+          for (const p of ancestorsOf.get(s.a) ?? []) lit.add(p);
+        } else {
+          s.a.removeAttribute('aria-current');
+        }
       });
+      for (const { a } of stops) {
+        a.classList.toggle('is-ancestor', lit.has(a) && !a.classList.contains('is-active'));
+      }
     }
 
     let ticking = false;

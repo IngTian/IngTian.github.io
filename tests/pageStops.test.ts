@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   researchStops, projectStops, paperSectionId, paperAnchorId, projectSectionId,
+  experienceStops, experienceSectionId, railLabel, homeStops,
   flattenStops, type Stop,
 } from '../src/lib/pageStops';
-import type { Publication, Project } from '../src/data/profile';
-import { publications, researchInterests, projects } from '../src/data/profile';
+import type { Publication, Project, TimelineEntry } from '../src/data/profile';
+import { publications, researchInterests, projects, timeline } from '../src/data/profile';
 
 // A minimal featured paper carrying all three section-bearing fields.
 function paper(over: Partial<Publication> = {}): Publication {
@@ -137,6 +138,91 @@ describe('projectStops', () => {
   });
 });
 
+describe('experienceStops', () => {
+  const entry = (over: Partial<TimelineEntry> = {}): TimelineEntry => ({
+    period: '2020', title: 'Role · Somewhere', detail: 'did things', kind: 'work', ...over,
+  });
+
+  it('puts Education before Roles', () => {
+    // The site's identity hierarchy is load-bearing: the incoming PhD must not sit below
+    // nine engineering jobs. Education leading is a requirement, not a preference.
+    const stops = experienceStops([
+      entry({ title: 'Job · TikTok' }),
+      entry({ title: 'PhD · Toronto', kind: 'education' }),
+    ]);
+    expect(stops.map((s) => s.label)).toEqual(['Education', 'Roles']);
+  });
+
+  it('nests each entry under its group', () => {
+    const stops = experienceStops([
+      entry({ title: 'A · Alpha' }),
+      entry({ title: 'B · Beta', kind: 'education' }),
+      entry({ title: 'C · Gamma' }),
+    ]);
+    const edu = stops.find((s) => s.label === 'Education')!;
+    const work = stops.find((s) => s.label === 'Roles')!;
+    expect(edu.children?.map((c) => c.label)).toEqual(['Beta']);
+    expect(work.children?.map((c) => c.label)).toEqual(['Alpha', 'Gamma']);
+  });
+
+  it('keeps each stop pointing at its ORIGINAL index, not its position in the group', () => {
+    // The page renders ids from the unfiltered array, so grouping must not renumber. This is
+    // the /research bug in a new costume: a rail stop pointing at an id nobody emitted.
+    const stops = experienceStops([
+      entry({ title: 'A · Alpha' }),                        // index 0 -> x-0
+      entry({ title: 'B · Beta', kind: 'education' }),      // index 1 -> x-1
+      entry({ title: 'C · Gamma' }),                        // index 2 -> x-2
+    ]);
+    const edu = stops.find((s) => s.label === 'Education')!;
+    const work = stops.find((s) => s.label === 'Roles')!;
+    expect(edu.children?.map((c) => c.target)).toEqual(['x-1']);
+    expect(work.children?.map((c) => c.target)).toEqual(['x-0', 'x-2']);
+  });
+
+  it('omits a group that has no entries', () => {
+    const stops = experienceStops([entry()]);
+    expect(stops.map((s) => s.label)).toEqual(['Roles']);
+  });
+
+  it('returns nothing for an empty timeline', () => {
+    expect(experienceStops([])).toEqual([]);
+  });
+
+  it('emits a unique target for every stop', () => {
+    const all = targets(experienceStops(timeline));
+    expect(new Set(all).size).toBe(all.length);
+  });
+});
+
+describe('railLabel', () => {
+  it('keeps the institution, not the job title', () => {
+    // A thin margin cannot hold "Senior Software Engineer · TikTok"; the institution is the
+    // part a reader scans for.
+    expect(railLabel({ period: '', title: 'Senior Software Engineer · TikTok', detail: '', kind: 'work' }))
+      .toBe('TikTok');
+  });
+
+  it('falls back to the whole title when there is no separator', () => {
+    expect(railLabel({ period: '', title: 'Independent', detail: '', kind: 'work' }))
+      .toBe('Independent');
+  });
+
+  it('truncates anything too long for the rail', () => {
+    const label = railLabel({
+      period: '', kind: 'education', detail: '',
+      title: 'Incoming PhD, Operations Research · University of Toronto and Also Somewhere Else',
+    });
+    expect(label.length).toBeLessThanOrEqual(24);
+    expect(label.endsWith('…')).toBe(true);
+  });
+
+  it('never returns an empty label for the real timeline', () => {
+    for (const t of timeline) {
+      expect(railLabel(t).trim().length, t.title).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe('flattenStops', () => {
   it('walks parents before children, depth-first (document order)', () => {
     const tree: Stop[] = [
@@ -167,5 +253,72 @@ describe('the REAL site data', () => {
 
   it('gives /projects a stop per project', () => {
     expect(projectStops(projects)).toHaveLength(projects.length);
+  });
+});
+
+// ── THE HOMEPAGE RAIL ─────────────────────────────────────────────────────────────────────────────────
+// The rail is the only wayfinding on a page with no headings above the fold, and a stop pointing at a
+// missing id renders as a link that goes nowhere — the exact bug that removed the old 'Work' and 'Ask'
+// stops. These tests pin the SHAPE (nested, so the top level reads as structure) and the CONTRACT (every
+// target exists in index.astro's section list).
+describe('homeStops', () => {
+  const stops = homeStops();
+  const flat = flattenStops(stops);
+
+  // Section ids actually rendered by src/pages/index.astro, in document order.
+  // 'work' and 'signature' became ONE section, #appendix: they were separate deck stops, which left 161px of
+  // empty panel below the work and made the final stop a 193px footer strip. The footer is now nested inside the
+  // appendix, so it is not a top-level section and the deck does not stop on it. This list is the guard that
+  // caught the rename — it is the only thing tying the rail's targets to the page's real ids.
+  const RENDERED = ['heights', 'interlude', 'choice', 'rules', 'solve', 'story', 'appendix'];
+
+  it('points every stop at a section the homepage renders', () => {
+    for (const s of flat) {
+      expect(RENDERED, `${s.label} -> #${s.target}`).toContain(s.target);
+    }
+  });
+
+  it('has no duplicate targets or labels', () => {
+    const targets = flat.map((s) => s.target);
+    expect(new Set(targets).size).toBe(targets.length);
+    const labels = flat.map((s) => s.label);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  // The owner asked for the field slide to have a stop at all, and for the explainer slides to sit under it
+  // so the top level reads as structure rather than as five unrelated words.
+  it('nests the three explainer slides under the field that names them', () => {
+    const field = stops.find((s) => s.target === 'interlude');
+    expect(field, 'the field slide must have its own stop').toBeDefined();
+    expect(field!.children?.map((c) => c.target)).toEqual(['choice', 'rules', 'solve']);
+  });
+
+  it('keeps the top level short — structure, not a list of every slide', () => {
+    expect(stops.length).toBeLessThanOrEqual(5);
+  });
+
+  it('no longer calls the problem slide "Choice"', () => {
+    const problem = flat.find((s) => s.target === 'choice');
+    expect(problem!.label.toLowerCase()).not.toBe('choice');
+  });
+
+  // TREE ORDER MUST MATCH DOCUMENT ORDER. The scrollspy walks stops as rendered and marks the last one whose
+  // top crossed the reference line; a rail whose order disagrees with the page lights stops out of sequence.
+  it('lists stops in the order the page renders them', () => {
+    const positions = flat.map((s) => RENDERED.indexOf(s.target));
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  });
+
+  // A thin left margin is the constraint that shortened these labels: at "The problem" / "Constraints" the
+  // indented tier measured past the slide's text edge.
+  it('keeps rail labels short enough for an 11px mono margin', () => {
+    for (const s of stops) expect(s.label.length, s.label).toBeLessThanOrEqual(11);
+    for (const c of stops.flatMap((s) => s.children ?? [])) {
+      expect(c.label.length, c.label).toBeLessThanOrEqual(8);
+    }
+  });
+
+  it('zones every top-level stop, since the label colour follows the sky behind it', () => {
+    for (const s of stops) expect(['light', 'dark']).toContain(s.zone);
   });
 });

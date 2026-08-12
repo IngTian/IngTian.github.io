@@ -66,7 +66,14 @@ const { stops, id, label = 'On this page' } = Astro.props;
     top: 50%;
     transform: translateY(-50%);
     z-index: 30;
-    max-width: 190px;
+    /* 200px, not 190px, and the 10px is load-bearing: at 190px the longest label in the data — "University of
+       Toronto", the PhD institution — needed 151px against a 148px box and rendered as "UNIVERSITY OF TORON…".
+       Only the ACTIVE row truncated, because .rule animates from 0 to 20px on activation and takes that width
+       out of the label beside it, so the defect appeared only once a reader had scrolled to that stop.
+       There is room: measured at 1180px, the narrowest width where the rail is shown at all, its right edge sits
+       at x=218 and the nearest content starts at x=401 — 183px of clearance. Widening is preferable to tightening
+       the label's tracking, which would have changed the rail's type everywhere to fix one string. */
+    max-width: 200px;
   }
   .side-rail ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
   /* Nested lists breathe less than top-level ones, so a group reads as a group. */
@@ -87,7 +94,11 @@ const { stops, id, label = 'On this page' } = Astro.props;
      bought hierarchy that was already there at the cost of readability. */
   .side-rail .sub a { font-size: 10px; letter-spacing: 0.12em; opacity: 0.45; }
   .side-rail .rule { width: 0; height: 1px; background: currentColor; opacity: 0.55; transition: width 0.4s ease; flex: none; }
-  .side-rail .label { min-width: 0; }
+  /* ONE LINE PER ROW. Measured with a real long title in the data: a truncated 22-char label still wrapped to
+     two lines in a 190px rail, which broke the even vertical rhythm and pushed the neighbouring rows
+     off-centre. The ellipsis is the rail's own, so a label that still cannot fit degrades to a clean cut
+     rather than to a second line. */
+  .side-rail .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* ── STATE beats TIER, and state beats hover. ──
      These are written with :where() on the tier part so the STATE selectors win
@@ -187,7 +198,21 @@ const { stops, id, label = 'On this page' } = Astro.props;
       const vh = window.innerHeight;
       const bandTop = vh * 0.10;
       const bandBottom = vh * 0.62;
-      const measured = stops.map((s, treeIndex) => {
+
+      // COLLAPSED CONTENT: a stop whose target is not rendered must not appear in the rail.
+      // /research collapses each paper behind a card, so "The idea / Method / Results" point at
+      // elements inside a `hidden` panel. getBoundingClientRect() on those returns an all-zero box,
+      // which is not merely inert — it sorts to the top and can win the fallback rule, lighting a
+      // section the reader cannot see. Hiding the row is also the honest UI: the rail should offer
+      // what the page is currently showing.
+      for (const s of stops) {
+        const live = s.el.getClientRects().length > 0;
+        s.a.closest('li')?.toggleAttribute('hidden', !live);
+      }
+      const visible = stops.filter((s) => s.el.getClientRects().length > 0);
+      if (!visible.length) return;
+
+      const measured = visible.map((s, treeIndex) => {
         const r = s.el.getBoundingClientRect();
         return {
           ...s, treeIndex, top: r.top,

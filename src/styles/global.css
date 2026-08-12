@@ -15,9 +15,36 @@
   --color-ochre: var(--ochre);
   --color-indigo: var(--indigo);
   --color-seal: var(--seal);
-  --font-display: 'Fraunces', Georgia, serif;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* Text sitting ON the accent, as a utility. tokens.css has defined --on-accent all along and names the CV
+     button as the reason it exists, but the footer never used it: it set text-ink-1, which rides the ink ramp,
+     so in dark theme the button painted near-white #dce1dc on phosphor green #66c28c — measured at 1.64:1,
+     against a 4.5:1 requirement. Exposing it here means the fix is a utility swap rather than a hand-written
+     override, and any future accent chip can reach it the same way. */
+  --color-on-accent: var(--on-accent);
+  /* THE TYPE ROLES, built from astro:fonts' own --ff-* variables and declared in exactly ONE place.
+     They used to be literal stacks written out here AND again in tokens.css, and that duplication is what hid
+     a total failure: whichever copy came last won, and both named "Fraunces" — a family with no @font-face rule
+     anywhere, because astro:fonts registers its faces under a hashed name. Nothing self-hosted rendered.
+     No tail after the var(): astro:fonts already builds the whole stack, ending in the generic family, from the
+     per-family `fallbacks` in astro.config.mjs. Appending our own repeated it — the computed value came out as
+     "…, serif, Georgia, 'Times New Roman', serif" — so the var()'s DEFAULT carries the safety instead, and it
+     only applies if astro:fonts stops emitting the variable at all. */
+  /* ── DISPLAY IS GEORGIA, NOT FRAUNCES, on the owner's call after seeing Fraunces render for the first time:
+     "i think prod's font is better. the current font is kind of weird."
+     Worth recording precisely what he was comparing, because it is not what it looks like. The live site has
+     never loaded a webfont — that was the bug fixed a few commits ago — so "prod's font" IS Georgia, and the
+     months he spent judging this design were all in Georgia. Fraunces is a high-contrast display serif with
+     deliberately wonky curves; against a calm workhorse serif it reads as mannered at headline size. He is
+     choosing the one he has actually been reading, which is the right basis for the choice.
+     Consequence worth having: no display webfont in the critical path, so Fraunces stops being preloaded and
+     the FCP cost of the font fix largely goes back. */
+  --font-display: Georgia, 'Times New Roman', 'Nimbus Roman', serif;
+  --font-body: var(--ff-inter, system-ui, sans-serif);
+  --font-mono: var(--ff-jetbrains, ui-monospace, monospace);
+  /* FRAUNCES KEPT, AS AN ACCENT — "but maybe you can use it in some sub headlines to add some varieties." So it
+     stops being the site's voice and becomes a second one, used on sub-headlines and the italic editorial lines
+     where a characterful serif is an asset rather than a distraction. Structure stays Georgia. */
+  --font-accent: var(--ff-fraunces, Georgia, serif);
 }
 
 /* overflow-x:hidden guards against the .descent::before/::after atmosphere
@@ -44,6 +71,130 @@ body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body)
      (light dawn→dusk, or the night-descent / terminal variants). */
   background: var(--descent-grad);
 }
+
+/* ============================================================
+   THE SCROLLABLE DECK — "like a PPT, one scroll guides you to the
+   next slide; it's not a free scroll."
+
+   The descent stays one continuous sky; what changes is that the
+   scroll now RESTS at slide boundaries instead of anywhere.
+
+   CSS scroll-snap was tried FIRST and MEASURED, because it is the
+   cheap answer with no JS. It does not work at this page's
+   proportions, and the numbers are worth keeping so nobody
+   "simplifies" the deck back into it:
+
+     slide gaps at 1700x1050:  1134px, 819px, 2279px, 2346px, 581px
+     one wheel gesture:        ~320px
+
+   Every gap is 1.8x-7.3x a single scroll, so with `y mandatory` one
+   gesture proposes a destination ~320px away and the nearest snap
+   position to it is the slide it just left — the browser snaps back
+   and the page does not move. Measured: stuck at y=84 through eight
+   gestures, and through a 12-event burst shaped like a trackpad
+   flick. `proximity`, `scroll-snap-stop: always`, and shrinking the
+   hero to exactly 100vh all produced identical stuck walks; only
+   gestures of 640px+ ever advanced.
+
+   The deck is therefore driven explicitly — see lib/deck.ts (pure,
+   unit-tested: where the stops are) and Deck.astro (one gesture =
+   one stop).
+
+   BREATHING AIR above each stop is a --deck-lead custom property on
+   the slide, read by the controller. It was `scroll-margin-top`
+   here, which was WRONG and silently did nothing: scroll-margin is
+   only honoured by scrollIntoView(), and the deck moves with
+   window.scrollTo(). The rule read correctly, applied never, and
+   the paper panel's title came to rest hard against the browser
+   chrome. A CSS property that only some scroll APIs respect is a
+   trap; the offset now lives where the scrolling happens.
+   ============================================================ */
+
+/* ============================================================
+   EVERY SLIDE OWNS THE SCREEN.
+
+   Measured at 1700x1050 before this rule, the shortfall per slide
+   was: choice 448px, work 477px, rules 378px, interlude 231px,
+   solve 147px. That shortfall is not empty space — it is exactly
+   how much of the NEXT slide is visible while the deck rests on
+   this one, which is why the Solve headline appeared at the foot
+   of the Rules slide. A deck whose slides each show a strip of the
+   following slide is not a deck; it is a scroll that pauses.
+
+   min-height rather than height: two slides (the hero at 1134px
+   and the career story at 1282px) are legitimately TALLER than a
+   screen, and lib/deck.ts already pages through those. Forcing a
+   fixed height would either crop them or reintroduce the overflow
+   this fixes.
+
+   The flex centring is what makes it look deliberate rather than
+   padded: a 600px slide in a 1050px frame sits in the middle of
+   its own screen instead of clinging to the top with 450px of
+   dead air under it. The paper panels stay full-bleed because
+   they are the flex ITEM, so the ground still reaches both edges.
+   ============================================================ */
+/* EXCLUDES THE SIGNATURE rather than overriding it afterwards, and that distinction was a real bug. The footer
+   is not a slide — it is a strip — and it used to be exempted below with `display: block`, which silently beat
+   its own Tailwind `flex justify-between items-end` (an ID selector outranks a utility class). So on the
+   homepage, and ONLY on the homepage, the footer laid out as three stacked blocks and the IT seal rendered at
+   the far LEFT instead of the bottom right. The owner reported it twice as the seal "drifting"; both of my
+   earlier attempts edited the markup, which could not have worked, because the markup was never the problem.
+   Excluding it here means the utilities in Signature.astro simply apply, and there is nothing left to override.
+   THE EXCLUSION IS GONE because the footer is no longer a top-level section: it is nested inside #appendix (see
+   sections/Work.astro), so this selector cannot reach it and there is nothing to exempt. Keeping a :not() for an
+   element that can never match would be a false clue about the layout. */
+.is-slides > section {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+/* ── THE NAV MUST NOT LAND ON A HEADLINE, which on phones it did — on every slide.
+   The corner nav is a fixed capsule at the top; the deck rests with a slide's top at the viewport top; and a
+   paper panel puts its kicker and headline in the first ~90px. So at rest, on a phone, the capsule sat across
+   the headline of each explainer slide. Measured at 390x844 resting on each stop, covered widths:
+   "What is multi-period portfolio optimization?" 228px · "Now imagine it is not your money." 341px ·
+   "Still an open problem." 212px · "The work" 123px — plus every kicker ("1 / 3", "2 / 3 · the difficulty").
+   Not transient: these are the positions the deck comes to REST at, so the headline was permanently obscured.
+
+   THE FIX IS THE PANEL'S OWN PADDING, NOT --deck-lead. A lead was the obvious lever and it is the wrong one:
+   it lifts the deck's resting position ABOVE the slide, so a full-bleed opaque panel gets a strip of sky above
+   it and reads as a card that has slipped down — Story.astro measured exactly that (paper at 1953, deck resting
+   at 1893, 60px of sky) and documents why it carries no lead, naming the panel's padding-top as the right home
+   for this air. Padding keeps the paper flush to the top of the screen and moves only the content inside it.
+
+   78px clears the wrapped two-row capsule on phones (12px offset + ~54px tall) and the single-row capsule in
+   landscape (17px + ~44px). These selectors are (0,2,1) against Astro's scoped `.ch-paper[data-astro-cid-…]` at
+   (0,2,0), so the longhand wins over each panel's own `padding` shorthand — which is also why the first attempt
+   at this, a plain `.is-slides > section` rule, silently lost and changed nothing. */
+@media (max-width: 1100px), (max-height: 620px) {
+  .is-slides > section > .story-paper,
+  .is-slides > section > .ch-paper,
+  .is-slides > section > .ru-paper,
+  .is-slides > section > .so-paper,
+  .is-slides > section > .wk-paper { padding-top: 78px; }
+  /* The footer no longer needs its own clearance rule. It used to be a stop of its own, so the deck rested with
+     its first row at the top of the screen and the capsule sat across "Download CV ↓" — 95px of it at 320px, a
+     band where a tap would have hit the nav instead of the link. Nested inside #appendix it is never at the top
+     of the viewport at rest, and the appendix's own panel padding above covers the case. */
+}
+
+/* The panel inside a slide must be able to fill it, or the centring above just
+   moves a short panel down the screen and leaves sky above and below it. */
+.is-slides > section > .story-paper,
+.is-slides > section > .ch-paper,
+.is-slides > section > .ru-paper,
+.is-slides > section > .so-paper,
+.is-slides > section > .wk-paper {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+/* The nested footer must NOT stretch. It is the last flex item in #appendix, and a stretched footer would put its
+   links in the middle of a tall band instead of at the foot of the page. `flex: none` keeps it at its own height
+   and lets the tan panel above it take the slack. */
+.is-slides > section > #signature { flex: none; }
 
 /* ── Atmosphere, upper sky (heights → interlude). Normal blend: these are warm
    LIGHT washes + a soft horizon haze that read on the pale paper. Localized to

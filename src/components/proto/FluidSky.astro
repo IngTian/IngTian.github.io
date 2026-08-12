@@ -16,12 +16,21 @@
 // Perf: viewport-sized (scroll is a uniform), 0.5x internal resolution, ~30fps
 // idle / full rate while scrolling, paused on tab-hide, skipped under 640px.
 interface Props {
+  /**
+   * Where in the pattern the page STARTS, in viewport widths.
+   *
+   * The fluid is sampled from scroll position (uYOffset = scrollY / vw), so at the top of a page you always see
+   * the very top of the pattern. The owner, on the reading pages: "what i liked is actually lower." This lets a
+   * page begin further down the field, so the region he liked is what sits behind the glass cards — without
+   * touching the shader or the legibility gates.
+   */
+  yStart?: number;
   strength?: 0 | 1 | 2 | 3 | 4;
   mode?: 'background' | 'contained';
   /** 'descent' (paper text, dawn→ground) | 'reading' (dark ink, luminous) */
   variant?: 'descent' | 'reading';
 }
-const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
+const { strength = 4, mode = 'background', variant = 'descent', yStart = 0 } = Astro.props;
 ---
 <canvas
   class:list={['fluid-sky', mode === 'contained' ? 'is-contained' : 'is-background']}
@@ -30,6 +39,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
   data-strength={String(strength)}
   data-mode={mode}
   data-variant={variant}
+  data-ystart={String(yStart)}
 ></canvas>
 
 <style>
@@ -131,6 +141,8 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
     const variant = (cvs.dataset.variant ?? 'descent') as SkyVariant;
+    // Constant head-start into the pattern, in viewport widths. See the yStart prop.
+    const yStart = Number(cvs.dataset.ystart ?? '0') || 0;
     let rampTheme: Theme | '' = '';
     function uploadRamp(force = false): void {
       const theme: Theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
@@ -200,7 +212,7 @@ const { strength = 4, mode = 'background', variant = 'descent' } = Astro.props;
         gl!.uniform1f(U.uDepth0, 0.0);
         gl!.uniform1f(U.uDepthSpan, 1.0);
       } else {
-        gl!.uniform1f(U.uYOffset, window.scrollY / vw);
+        gl!.uniform1f(U.uYOffset, window.scrollY / vw + yStart);
         gl!.uniform1f(U.uYSpan, vh / vw);
         gl!.uniform1f(U.uDepth0, window.scrollY / docH);
         gl!.uniform1f(U.uDepthSpan, vh / docH);

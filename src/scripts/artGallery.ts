@@ -139,6 +139,33 @@ function updateToc() {
     document.documentElement.scrollHeight,
   );
   stops.forEach((s, i) => s.a.classList.toggle('is-active', i === idx));
+  updateTocZone();
+}
+
+// ── THE RAIL'S INK HAS TO FOLLOW THE SKY, and until now it did not.
+//
+// /art rides the whole descent — luminous paper at the top to near-black at the ground — and this rail is
+// position: fixed at top: 50%, so the gradient behind it changes completely while its colour did not. The ink
+// was --ink-3 with --ink-1 for the active row, both dark. Measured at 50% scroll: the ACTIVE label computed
+// rgb(22,20,15) against a background of rgb(22,20,15) — a contrast ratio of 1.0, i.e. the section you are
+// actually in was invisible — and the inactive one 2.46:1 against a 4.5:1 requirement. True at 1440 and at
+// 3440, so it was never an ultrawide quirk.
+//
+// CornerNav already solves this for itself with a data-zone flipped off the descent fraction, but its zone
+// cannot be borrowed: it probes at the TOP of the viewport and this rail sits at the MIDDLE, so the rail must
+// go dark earlier. What CAN be shared is the listener — this runs inside the scrollspy's existing rAF-throttled
+// handler rather than adding a second scroll listener, which is how the same fix stays one mechanism.
+const tocEl = document.getElementById('art-toc');
+const descentEl = document.querySelector<HTMLElement>('.descent');
+// Matches CornerNav's threshold, so the two marks change register together rather than a screen apart.
+const DARK_FROM = 0.42;
+function updateTocZone() {
+  if (!tocEl || !descentEl) return;
+  const h = descentEl.offsetHeight;
+  if (!h) return;
+  const r = tocEl.getBoundingClientRect();
+  const frac = (window.scrollY + (r.top + r.bottom) / 2) / h;
+  tocEl.dataset.zone = frac > DARK_FROM ? 'dark' : 'light';
 }
 
 let ticking = false;

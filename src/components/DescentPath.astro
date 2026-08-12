@@ -1,0 +1,744 @@
+---
+// src/components/DescentPath.astro
+// THE CAREER AS A DESCENT — one named trajectory on the site's own loss field, in 2D or 3D, with
+// the trail drawn as it was walked.
+//
+// The owner's framing: "I'm almost running a gradient descent on my own while finding that we are
+// at a LOCAL MIN in the SDE — that's why we adapted and intended to find the GLOBAL MIN." And the
+// correction that matters most: "I have no idea where the global min is. Maybe a future quant
+// researcher." So the deepest point is drawn as an UNKNOWN and the trail stops short of it.
+//
+// WHY THIS IS NOT THE HERO AGAIN. A reviewer flagged that contouring terrain.ts's field() is the
+// hero's object with different hatching, and that is a fair charge against a REPLACEMENT for the
+// hero. Here the field is deliberately the same field, because the point is that this is the same
+// landscape the whole site is about — but the hero shows an anonymous surface with anonymous
+// walkers, and this shows ONE trajectory, named, with its barrier called out. Same field,
+// different subject. The caption says so rather than pretending the surface is new.
+//
+// No React island (the terminal is deleted). Vanilla script, re-inits on astro:page-load with teardown,
+// matching TerrainHero / Toc. Canvas is decoration; the waypoints are a real <ol> so the content works
+// with JS off and for a screen reader.
+//
+// NO MEASUREMENTS IN THE COPY. The lede used to quote the climb's height and the readout its "reach".
+// Both were true numbers about an INVENTED surface, which beside real job titles read as quantified
+// claims about a career. trajectoryFacts() is still used inside the drawing (it locates the basins), but
+// nothing it returns is printed as text any more.
+import { WAYPOINTS } from '../lib/trajectory';
+---
+<section id="descent-path" class="dp" aria-labelledby="dp-heading">
+  <header class="dp-head">
+    <h2 id="dp-heading">A descent, with one climb</h2>
+    <!-- SHORT, and no number. The lede used to state the climb's height as a figure — but the height is
+         a real measurement of an INVENTED surface, so quoting it next to a career reads as a claim about
+         the career, which it is not. The owner: "you don't need the numbers, the numbers are made up."
+         What is left is the only thing the picture needs said out loud. -->
+    <p class="dp-lede">
+      Years in engineering, and a pivot to quantitative research.
+    </p>
+
+    <!-- 3D was offered as a comparison and lost: the relief view measured 2.0% ink against the
+         plan view's 3.4% because the surface itself was never rendered, so it read as a 2D curve on
+         a distorted grid. The owner chose plan, so the control is gone rather than left as a
+         half-good option. descentPath.ts keeps the projection parameter, which costs nothing. -->
+    <div class="dp-controls">
+      <button type="button" class="dp-btn dp-replay" data-replay>replay the walk</button>
+    </div>
+
+    <!-- A live readout, so the reveal reads as a WALK with a state rather than a fade-in. It also
+         states the discovery moment, which is the point of the whole device. -->
+    <p class="dp-readout" data-readout aria-live="polite"></p>
+  </header>
+
+  <div class="dp-stage" data-dp-stage>
+    <canvas class="dp-canvas" data-dp-canvas aria-hidden="true"></canvas>
+
+    <!-- THE CODA, MOVED HERE, and this is a reachability fix rather than a layout preference.
+         It used to close the editorial column, where the deck made it unreadable: the story section is
+         taller than one screen, so the gesture that would scroll to the coda advanced to the next slide
+         instead. The owner: "totally unreacheable with normal scroll… a simple strategy is to put this
+         phrase here [the graph's empty lower-right], after the Quantitative Researcher is shown, animated."
+         So it lives in the drawing's empty quadrant and fades in once the walk has actually discovered the
+         deeper basin — the line only makes sense after that. HTML rather than canvas text, so the display
+         italic renders properly and a screen reader can read it. -->
+    <p class="dp-coda" data-dp-coda>
+      The deepest point on that surface is not marked, because I do not know where it is. What I know is the
+      direction, and that the descent is still running.
+    </p>
+    <p class="dp-fallback" data-dp-fallback>
+      A contour map of a non-convex loss surface with a career path crossing a ridge between two
+      basins. The list below carries the same information.
+    </p>
+  </div>
+
+  <!-- The accessible path. Visually hidden because the graph's own labels already name every stop —
+       a repeated list on screen said the same thing twice and pulled the section back toward the
+       resume format this whole piece exists to avoid. Screen readers and no-JS still get everything,
+       in order. -->
+  <ol class="dp-stops sr-only">
+    {WAYPOINTS.map((w) => (
+      <li>
+        <span>{w.period}</span> — <strong>{w.label}</strong>. {w.learned}
+      </li>
+    ))}
+  </ol>
+
+  <!-- The "deepest point is not marked" footnote is deleted on the owner's instruction. The idea it
+       carried survives where it belongs: the graph draws the deeper basin unlabelled (see
+       unknownAttractor), and the editorial's closing line says it in the writing's own voice. Saying it
+       three times in one section was two too many. -->
+</section>
+
+<style>
+  /* ── INK IS CONTEXTUAL, and this is what makes the piece portable onto the paper panel.
+     Both the CSS and the CANVAS read these --dp-* tokens instead of the global ink ramp. The
+     defaults below are the sky values (light ink on a dark descent); when this section renders
+     inside .story-paper, that panel redefines them to dark-on-paper. Without the indirection the
+     labels drew in --paper — a near-white — directly onto light paper, i.e. invisible. */
+  .dp {
+    position: relative; padding: 12vh 0 8vh;
+    --dp-strong: var(--paper);
+    --dp-body: var(--ink-3);
+    --dp-quiet: var(--ink-4);
+    --dp-line: var(--ink-5);
+    --dp-line-soft: var(--ink-4);
+    --dp-accent: var(--ochre);
+    --dp-alert: var(--seal);
+  }
+  .dp-head { max-width: 70ch; }
+  .dp-head h2 {
+    font-family: var(--font-display); font-size: clamp(26px, 3vw, 38px); font-weight: 300;
+    color: var(--dp-strong); margin: 0;
+  }
+  /* On the paper panel the graph shares the section with the writing, so its title is scaled to sit
+     BESIDE "Why the climb" as a peer rather than out-shouting it, and kept to one line. */
+  :global(.story-paper) .dp-head h2 { font-size: clamp(25px, 2.2vw, 40px); text-wrap: balance; }
+  :global(.story-paper) .dp-lede { max-width: 44ch; }
+  .dp-lede {
+    font-size: 15.5px; line-height: 1.75; color: var(--dp-body); margin: 14px 0 0;
+  }
+  .dp-lede strong { color: var(--dp-accent); font-weight: 400; }
+
+  .dp-readout {
+    margin: 14px 0 0; min-height: 1.5em;
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; color: var(--dp-quiet);
+  }
+  .dp-readout b { color: var(--dp-accent); font-weight: 400; }
+  .dp-readout i { color: var(--dp-alert); font-style: normal; }
+
+  .dp-controls { display: flex; gap: 8px; margin: 22px 0 0; }
+  .dp-btn {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; padding: 7px 14px; cursor: pointer;
+    background: transparent; color: var(--dp-quiet);
+    border: 1px solid currentColor; border-radius: 2px; opacity: 0.75;
+  }
+  .dp-btn:hover { color: var(--dp-strong); opacity: 1; }
+  .dp-btn:focus-visible { outline: 1px solid var(--dp-accent); outline-offset: 2px; }
+
+
+  .dp-stage {
+    position: relative; margin: 3vh 0 0; width: 100%; aspect-ratio: 16 / 9;
+    transition: opacity .18s ease;
+  }
+  /* ── ON THE PAPER PANEL: the graph owns the whole slide, and the header OVERLAYS it.
+     The measurement that forced this layout. The drawing must keep the field's true aspect or the
+     contour rings render as flattened ovals — the world box is 4.61 x 3.64, aspect 1.27, and the field
+     is only 5.2 units wide so it cannot be widened to suit a letterbox frame. With the header stacked
+     ABOVE the stage, the stage got 62vh; at aspect 1.27 that allowed a drawing just 674px wide inside a
+     1612px panel — 658px of width thrown away, and the picture came out SMALLER than before. Height is
+     the binding constraint, so the fix is to stop spending height on stacked text.
+     The header now sits over the drawing's empty upper-left (the field's content runs lower-right, so
+     nothing is covered), and the stage takes the full slide: ~1043px of drawing, close to double. */
+  :global(.story-paper) .dp { display: grid; }
+  :global(.story-paper) .dp-stage {
+    aspect-ratio: auto;
+    /* Sized to the viewport, not a ratio: the graph is sticky in a column beside the writing, so it must
+       fit one screen with its overlaid header. The strip that used to be reserved for the "why the
+       climb" cue is reclaimed — that cue is gone, since the writing is now beside the graph rather
+       than on a slide below it. */
+    height: min(80vh, 88vw);
+    margin: 0;
+  }
+  :global(.story-paper) .dp-head {
+    position: absolute;
+    top: 0; left: 0;
+    /* Wide enough to keep "A descent, with one climb" on one line — at 42% it wrapped after "one",
+       which reads as a broken heading rather than a deliberate two-line title. The overlay sits on the
+       drawing's empty upper-left, so a wider box costs nothing. */
+    max-width: min(52ch, 58%);
+    z-index: 2;
+    pointer-events: none;      /* the drawing is not interactive, but never block it either */
+  }
+  :global(.story-paper) .dp-head .dp-btn { pointer-events: auto; }
+  /* The footnote tucks into the bottom-left corner, over the same empty region. */
+  :global(.story-paper) .dp-foot {
+    position: absolute;
+    bottom: 0; left: 0;
+    margin: 0;
+    max-width: 52ch;
+  }
+  /* Narrow screens keep the stacked flow: there is no empty corner to overlay into. */
+  @media (max-width: 1000px) {
+    :global(.story-paper) .dp-head,
+    :global(.story-paper) .dp-foot { position: static; max-width: 70ch; }
+    :global(.story-paper) .dp-stage { height: min(56vh, 90vw); margin: 3vh 0 0; }
+    :global(.story-paper) .dp-foot { margin: 3vh 0 0; }
+  }
+  .dp-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* THE CODA, in the drawing's empty lower-right. Positioned as a fraction of the stage so it tracks the
+     canvas at any size, and capped by measure so it stays a readable block rather than a wide banner.
+     Hidden until the walk discovers the deeper basin — the script adds .is-shown. */
+  .dp-coda {
+    position: absolute;
+    right: 3%;
+    bottom: 6%;
+    max-width: min(46ch, 42%);
+    margin: 0;
+    font-family: var(--font-display); font-style: italic;
+    font-size: clamp(14px, 1.15vw, 18px); line-height: 1.55;
+    color: var(--dp-body);
+    text-align: right;
+    opacity: 0;
+    z-index: 2;
+  }
+  /* Motion is opacity/transform only, per the project's rule. The no-motion state is simply the finished
+     one: visible, because a coda that never appears is worse than one that appears without a fade. */
+  @media (prefers-reduced-motion: no-preference) {
+    .dp-coda { transform: translate3d(0, 8px, 0); transition: opacity .9s ease, transform .9s cubic-bezier(.2,.7,.3,1); }
+  }
+  .dp-coda.is-shown { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .dp-coda { opacity: 1; }
+  }
+  /* Narrow screens: the drawing gives way to the ordered list, so the coda returns to normal flow.
+     720px, NOT 1000px — and the mismatch was a real collision. The sentence above states the condition
+     correctly ("the drawing gives way"), but the drawing gives way at 720px, so between 721px and 1000px the
+     canvas was still drawing AND the coda had already returned to flow INSIDE the stage, landing on top of the
+     graph. Measured at 844x390: stage y 256..474, coda static at y 267..311 — inside the drawing, with the
+     italic coda and the node label "B.Eng · McGill" interpenetrating at x≈420-476. Two breakpoints that mean
+     the same thing have to be the same number. */
+  @media (max-width: 720px) {
+    .dp-coda {
+      position: static; max-width: 60ch; text-align: left; opacity: 1; transform: none;
+      margin: 3vh 0 0;
+    }
+  }
+  /* The fallback text sits under the canvas and is revealed only when the canvas cannot draw, so
+     the no-JS state is informative rather than an empty box. */
+  .dp-fallback {
+    position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+    margin: 0; padding: 0 12%; font-size: 14px; line-height: 1.7; color: var(--dp-quiet);
+  }
+  .dp-stage.is-live .dp-fallback { display: none; }
+
+
+  .dp-foot {
+    margin: 4vh 0 0; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.04em;
+    color: var(--dp-line); max-width: 64ch;
+  }
+
+  /* Narrow screens: the graph's in-frame labels collide below ~720px, so the canvas gives way to the
+     ordered list, which stops being visually hidden and becomes the content.
+     `clip-path: none` IS THE WHOLE FIX, and without it this entire fallback painted nothing. The rule reset
+     `clip`, the LEGACY property — but Tailwind v4's `sr-only` hides with `clip-path: inset(50%)`, which was never
+     reset, so on every phone the list was laid out and invisible at the same time. Measured at 320x568:
+     .dp-stage display none, .dp-stops display grid with 8 items, position static, visibility visible, opacity 1,
+     height 573px, clip-path inset(50%). The result was the career graph gone AND its replacement unpaintable —
+     573px of blank panel where the site's showpiece should be, on every phone, in both themes.
+     Undoing a visually-hidden helper means undoing EVERY property it sets, and the two clip properties are not
+     the same property. */
+  @media (max-width: 720px) {
+    .dp-stage { display: none; }
+    .dp-stops.sr-only {
+      position: static; width: auto; height: auto; margin: 3vh 0 0; padding: 0;
+      overflow: visible; clip: auto; clip-path: none; white-space: normal;
+      list-style: none; display: grid; gap: 14px;
+    }
+    .dp-stops li { font-size: 13.5px; line-height: 1.6; color: var(--dp-body); }
+    .dp-stops strong { color: var(--dp-strong); font-weight: 400; }
+  }
+
+  /* ON THE PAPER PANEL: dark ink, and no top padding — the panel already opens with 9vh, and the
+     section's own 12vh on top of it left the title floating. */
+  :global(.story-paper) .dp {
+    /* No vertical padding here: the panel already opens with its own, and the stage is sized to the
+       viewport. `position: relative` makes this the containing block for the overlaid header/footnote. */
+    position: relative;
+    padding: 0;
+    --dp-strong: var(--story-ink);
+    --dp-body: var(--story-ink-soft);
+    --dp-quiet: var(--story-ink-faint);
+    --dp-line: var(--story-line);
+    --dp-line-soft: var(--story-line-soft);
+    --dp-accent: var(--story-accent);
+    /* The seal red is the brand mark in both themes and reads correctly on paper, so the climb keeps
+       it rather than being recoloured. */
+    --dp-alert: var(--seal);
+  }
+</style>
+
+<script>
+  import {
+    project, contours, contourLevels, trail, climbSpan, unknownAttractor, storyBounds,
+    type Projection, type View,
+  } from '../lib/descentPath';
+  import { WAYPOINTS, trajectoryFacts, DEEP_SIDE_LABEL } from '../lib/trajectory';
+  import { knownnessFn, knowledgeRadius } from '../lib/knowledge';
+  import { prefersReducedMotion } from '../lib/motion';
+
+  const teardowns: Array<() => void> = [];
+
+  function initAll(): void {
+    while (teardowns.length) teardowns.pop()!();
+    document.querySelectorAll<HTMLElement>('[data-dp-stage]').forEach((stage) => {
+      const t = init(stage);
+      if (t) teardowns.push(t);
+    });
+  }
+
+  function init(stage: HTMLElement): (() => void) | null {
+    const canvas = stage.querySelector<HTMLCanvasElement>('[data-dp-canvas]');
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return null;
+    const section = stage.closest('#descent-path') as HTMLElement;
+    const replay = section.querySelector<HTMLButtonElement>('[data-replay]');
+    const readout = section.querySelector<HTMLElement>('[data-readout]');
+    const coda = section.querySelector<HTMLElement>('[data-dp-coda]');
+
+    const projection: Projection = '2d';   // plan only; see the note in the markup above
+    let reveal = 0;                 // 0..1, how much of the trail is drawn
+    let raf = 0;
+    let W = 0, H = 0, dpr = 1;
+
+    // Geometry is computed ONCE per projection, not per frame: contours are the expensive part and
+    // they do not change as the trail animates.
+    const pts = trail();
+    const span = climbSpan(pts);
+    // HOISTED, and this is load-bearing for the animation, not a micro-optimisation. Both facts and
+    // the attractor come from trajectoryFacts(), which runs four 3000-step gradient descents. Calling
+    // it inside draw() cost ~1.8s per frame and produced a 0.6fps slideshow.
+    const facts = trajectoryFacts();
+    const attractor = unknownAttractor();
+    const levels = contourLevels(11);
+    const contourCache = new Map<string, [number, number][][]>();
+    const contoursFor = (lv: number) => {
+      const key = lv.toFixed(4);
+      let c = contourCache.get(key);
+      if (!c) { c = contours(lv, 150); contourCache.set(key, c); }
+      return c;
+    };
+
+    // PALETTE CACHE. tok() called getComputedStyle() and it ran SIX TIMES PER DRAW — six forced
+    // style recalculations per animation frame. Measured before this fix: 0.6 fps, mean 1758ms per
+    // frame, which is precisely the "step function, like a powerpoint" symptom. The canvas work
+    // itself was never the problem: only ~270 draw calls per frame, and the pure maths costs 10ms.
+    // Read the tokens once and invalidate only when the theme attribute changes.
+    // Read from the SECTION, not the document root, and read the --dp-* tokens rather than the global
+    // ink ramp. The section inherits sky ink by default and dark-on-paper ink when it renders inside
+    // .story-paper, so the same canvas code draws correctly on either ground. Reading the root would
+    // always return the light sky inks — invisible on light paper.
+    type Pal = Record<string, string>;
+    let palCache: Pal | null = null;
+    const readPalette = (): Pal => {
+      const cs = getComputedStyle(section);
+      const get = (n: string, fb: string) => cs.getPropertyValue(n).trim() || fb;
+      return {
+        ink5: get('--dp-line', '#b8b1a1'),
+        ink4: get('--dp-line-soft', '#8c8576'),
+        ink3: get('--dp-body', '#5a544a'),
+        paper: get('--dp-strong', '#efe9dd'),
+        ochre: get('--dp-accent', '#c8a36a'),
+        seal: get('--dp-alert', '#b23a2e'),
+      };
+    };
+    const palette = (): Pal => (palCache ??= readPalette());
+
+    function size(): void {
+      const r = canvas.getBoundingClientRect();
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      W = Math.max(1, Math.round(r.width));
+      H = Math.max(1, Math.round(r.height));
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+    }
+
+    function view(): View {
+      // Generous right padding: labels sit to the RIGHT of their points, and the original render
+      // clipped them off the frame. The other three are small — every px of padding is px the drawing
+      // does not get, and at the paper panel's size the drawing is the point. Scaled to the frame so a
+      // small canvas is not swallowed by a fixed gutter.
+      const gutter = Math.max(120, Math.min(230, W * 0.135));
+      const pad = { l: 34, r: gutter, t: 30, b: 40 };
+
+      // KEEP THE FIELD'S ASPECT. project() maps the world box onto the padded inner box
+      // independently in x and y, so a wide frame stretches the surface horizontally: the world is
+      // 4.61 x 3.64 (aspect 1.27), and at full panel width the inner box is aspect ~2.35 — the
+      // contour rings would be drawn as flattened ovals and the two basins would read as smears.
+      // Widen the padding on whichever axis has surplus so the DRAWN box matches the world's ratio.
+      // The surplus goes mostly to the right, where the labels live.
+      //
+      // Derived from the real bounds (memoised, so this is free) rather than hardcoded: the bounds come
+      // from the waypoints, and a future edit to the career path would silently re-introduce the
+      // stretch if this were a literal.
+      const wb = storyBounds();
+      const worldAspect = (wb.x1 - wb.x0) / (wb.y1 - wb.y0);
+      const iw = W - pad.l - pad.r;
+      const ih = H - pad.t - pad.b;
+      if (iw > 0 && ih > 0) {
+        const boxAspect = iw / ih;
+        if (boxAspect > worldAspect) {
+          // Too wide: give the extra width back as padding.
+          const want = ih * worldAspect;
+          const extra = iw - want;
+          pad.l += extra * 0.34;
+          pad.r += extra * 0.66;
+        } else {
+          // Too tall: give the extra height back, biased to the bottom where the footnote sits.
+          const want = iw / worldAspect;
+          const extra = ih - want;
+          pad.t += extra * 0.42;
+          pad.b += extra * 0.58;
+        }
+      }
+      return { w: W, h: H, projection, pad };
+    }
+
+    /** How much experience the walker has at the current reveal, as a CONTINUOUS quantity.
+     *
+     *  Was Math.floor(...) + 1, which quantised knowledge into seven discrete jumps: nothing changed
+     *  for ~740ms and then the whole surface lurched. That is exactly the "too extreme, almost seems
+     *  stuck" the owner reported — a quantisation artefact, not a duration problem. knownAfter()
+     *  accepts a fractional value and eases the newest disc in from zero. */
+    function experience(): number {
+      return reveal * (WAYPOINTS.length - 1) + 1;
+    }
+
+    /** Position on the spline at parameter t — the walker's own location, used to advance the
+     *  knowledge frontier continuously rather than in per-stop instalments. */
+    function pathAt(t: number): { x: number; y: number } {
+      const idx = Math.min(pts.length - 1, Math.max(0, Math.round(t * (pts.length - 1))));
+      const p = pts[idx];
+      return { x: p.x, y: p.y };
+    }
+
+    /** How well a world point is understood right now. Driven by where the walker HAS BEEN along the
+     *  curve, so the left half of the field fades in smoothly as the descent proceeds.
+     *
+     *  The frontier is built ONCE PER FRAME (see refreshKnown) rather than per point: rebuilding it
+     *  per call cost ~290,000 disc constructions per frame and pinned the animation at 0.6fps. */
+    let knownAt: (x: number, y: number) => number = () => 0;
+    function refreshKnown(): void { knownAt = knownnessFn(reveal, pathAt); }
+    function known(x: number, y: number): number { return knownAt(x, y); }
+
+    function draw(): void {
+      refreshKnown();
+      const v = view();
+      const { ink5, ink4, ink3, paper, ochre, seal } = palette();
+
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, W, H);
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+
+      // ── Contours as DOTS, not polylines. This is the style from the original sketch, copied
+      // rather than re-invented: each grid crossing is drawn as a 1px stub with a round linecap, so
+      // it renders as a dot. It reads as a survey plot and it is kin to the hero's dot field without
+      // repeating the hero's object.
+      ctx.lineCap = 'round';
+      levels.forEach((lv, i) => {
+        const runs = contoursFor(lv);
+        const deep = 1 - i / (levels.length - 1);          // 1 at the deepest level
+        ctx.strokeStyle = ink5;
+        ctx.lineWidth = 1.7 + deep * 1.3;
+        for (const run of runs) {
+          // Sample along the run so the dots have air between them; a dot per point would fuse back
+          // into a line at this contour resolution.
+          for (let k = 0; k < run.length; k += 2) {
+            const p = run[k];
+            const kn = known(p[0], p[1]);
+            if (kn <= 0.02) continue;
+            const [sx, sy] = project(p[0], p[1], v);
+            ctx.globalAlpha = (0.30 + deep * 0.50) * Math.min(1, kn * 1.6);
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx + 0.5, sy);
+            ctx.stroke();
+          }
+        }
+      });
+      ctx.globalAlpha = 1;
+
+      // ── Basin wash. Fills only CLOSED contour loops, which is the fix for the rectangular
+      // patches that appeared around both minima: a contour run clipped by the frame edge is an open
+      // polyline, and closePath() on it draws a chord straight across the frame, filling a slab. A
+      // real bowl is a loop whose last point returns to its first.
+      const washLevels = levels.slice(0, 5);
+      washLevels.forEach((lv, i) => {
+        const runs = contoursFor(lv);
+        ctx.fillStyle = ochre;
+        ctx.globalAlpha = 0.034 - i * 0.005;
+        for (const run of runs) {
+          if (run.length < 12) continue;
+          const a = run[0], z = run[run.length - 1];
+          const closed = Math.hypot(a[0] - z[0], a[1] - z[1]) < 0.08;
+          if (!closed) continue;
+          const mid = run[Math.floor(run.length / 2)];
+          const kn = known(mid[0], mid[1]);
+          if (kn <= 0.05) continue;
+          // Fade the wash in with knowledge too, so a basin does not appear at full strength the
+          // instant its centre is learned.
+          ctx.globalAlpha = (0.034 - i * 0.005) * Math.min(1, kn * 1.6);
+          ctx.beginPath();
+          run.forEach((p, k) => {
+            const [sx, sy] = project(p[0], p[1], v);
+            if (k === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+          });
+          ctx.closePath();
+          ctx.fill();
+        }
+      });
+      ctx.globalAlpha = 1;
+
+      // ── NO KNOWLEDGE CIRCLES. Two earlier versions drew the horizon explicitly: first as radial
+      // gradient fills (which flooded the frame, 3.4% -> 57.6% ink) and then as boundary hairlines
+      // (which drew circles straight across both basins and fought the shapes they were meant to
+      // reveal). The horizon does not need its own marks: masking the contours by knowledge already
+      // shows exactly how far understanding reaches, and it shows it in the field's own language.
+
+      // ── The deeper basin. HELD BACK until experience actually reaches it: measured, it is
+      // invisible for seven of eight stops and discovered at the last, missing by 0.01 at the stop
+      // before. Drawing it earlier would give away an ending the walker had not yet earned.
+      const att = attractor;
+      const discovered = known(att.x, att.y) > 0.02;
+      const [ax, ay] = project(att.x, att.y, v);
+      if (!discovered) {
+        // Not yet known: nothing is drawn here at all. The absence IS the point.
+      } else {
+      for (let r = 34; r > 0; r -= 8) {
+        ctx.beginPath();
+        ctx.arc(ax, ay, r, 0, Math.PI * 2);
+        ctx.strokeStyle = ink4;
+        ctx.globalAlpha = 0.06 + (34 - r) / 34 * 0.10;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.setLineDash([2, 5]);
+      ctx.beginPath();
+      ctx.arc(ax, ay, 9, 0, Math.PI * 2);
+      ctx.strokeStyle = ink4;
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // The deeper side, NAMED. Not "the global minimum" — the direction the descent runs in.
+      label(ctx, ax + 22, ay + 30, DEEP_SIDE_LABEL, 15, ochre);
+      label(ctx, ax + 22, ay + 51, 'deeper still — unknown', 12, ink5);
+      }
+
+      // ── The local basin, named, because being stuck there is the point.
+      const [lx, ly] = project(facts.localBasin.x, facts.localBasin.y, v);
+      ctx.beginPath();
+      ctx.arc(lx, ly, 5, 0, Math.PI * 2);
+      ctx.fillStyle = ochre;
+      ctx.globalAlpha = 0.55;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // ── The trail, revealed to `reveal`. Ochre descending, SEAL climbing — the one saturated
+      // colour on the site, spent on the one moment that matters.
+      const shown = pts.filter((p) => p.t <= reveal);
+      if (shown.length > 1) {
+        for (let i = 1; i < shown.length; i++) {
+          const a = shown[i - 1], b = shown[i];
+          const [x1, y1] = project(a.x, a.y, v);
+          const [x2, y2] = project(b.x, b.y, v);
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.strokeStyle = b.climbing ? seal : ochre;
+          ctx.lineWidth = b.climbing ? 3.4 : 2.1;
+          ctx.globalAlpha = b.climbing ? 1 : 0.9;
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        // The walker's head: a small mark at the leading edge, so an in-progress reveal reads as
+        // something moving rather than a line being wiped in.
+        const head = shown[shown.length - 1];
+        const [hx, hy] = project(head.x, head.y, v);
+        ctx.beginPath();
+        ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = paper;
+        ctx.fill();
+      }
+
+      // ── Waypoints, only those the trail has reached.
+      WAYPOINTS.forEach((wp, i) => {
+        const arrival = i / (WAYPOINTS.length - 1);
+        if (arrival > reveal + 1e-6) return;
+        const [px, py] = project(wp.x, wp.y, v);
+        const isBasin = wp.phase === 'basin';
+        ctx.beginPath();
+        ctx.arc(px, py, isBasin ? 6 : 4, 0, Math.PI * 2);
+        ctx.fillStyle = isBasin ? ochre : paper;
+        ctx.fill();
+        // The final waypoint sits near the attractor, so its label collided with the deep-side name.
+        // Put the last one above its dot and leave the rest to the right.
+        const isLast = i === WAYPOINTS.length - 1;
+        if (isLast) label(ctx, px - 6, py - 14, wp.label, 15, paper);
+        else label(ctx, px + 14, py + 5, wp.label, 15, ink3);
+      });
+
+      // ── The climb, called out once, where it happens.
+      if (span && reveal >= span.t1) {
+        const mid = pts.find((p) => p.t >= (span.t0 + span.t1) / 2)!;
+        const [mx, my] = project(mid.x, mid.y, v);
+        ctx.strokeStyle = seal;
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(mx, my);
+        ctx.lineTo(mx - 54, my - 38);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        // Named, not measured. It used to read "climb +1.26" — a true height on an invented surface,
+        // which beside a real career reads as a quantified claim about the career. The red stretch
+        // already shows WHERE the climb is; the word says what it is.
+        label(ctx, mx - 58, my - 44, 'the climb', 13, seal, 'end');
+      }
+
+      ctx.restore();
+    }
+
+    /** Labels in the sketch's own idiom: 15px mono with real letter-spacing. Canvas has no
+     *  letter-spacing property everywhere, so the glyphs are spaced by hand — that tracking is most
+     *  of why the sketch's type reads better than plain fillText at 12.5px. */
+    function label(
+      c: CanvasRenderingContext2D, x: number, y: number, text: string,
+      size = 15, fill: string, align: CanvasTextAlign = 'left', track = 0.9,
+    ): void {
+      c.font = `${size}px "JetBrains Mono", ui-monospace, monospace`;
+      c.fillStyle = fill;
+      const chars = [...text];
+      const widths = chars.map((ch) => c.measureText(ch).width + track);
+      const total = widths.reduce((a, b) => a + b, 0) - track;
+      let cx = align === 'end' ? x - total : align === 'center' ? x - total / 2 : x;
+      for (let i = 0; i < chars.length; i++) {
+        c.fillText(chars[i], cx, y);
+        cx += widths[i];
+      }
+    }
+
+    // ── Reveal animation. Slow enough to read, and it is the only motion here.
+    const reduce = prefersReducedMotion();
+    function animate(): void {
+      cancelAnimationFrame(raf);
+      if (reduce) { reveal = 1; draw(); return; }
+      // Drive the reveal from ELAPSED TIME, not from an accumulated per-frame delta.
+      //
+      // The accumulator version ran ~5x too slow and looked frozen. Measured: 3 of 8 stops after
+      // 4s, i.e. ~11s for the whole path against an intended 2s. The cause is that dt was clamped
+      // to 0.05 as a safety rail, but the clamp was BINDING on most frames, so each frame
+      // contributed at most 0.05 * rate regardless of real time. Elapsed time cannot drift.
+      // 1150ms for eight stops read as "the whole path just appeared" — the eye cannot follow ~140ms
+      // per leg. This is a WALK: it has to be slow enough to see one stop arrive after another, and
+      // now the surface is being discovered as it goes, so the pacing carries information rather
+      // than just decoration.
+      const DURATION_MS = 6400;
+      const t0 = performance.now();
+      reveal = 0;
+      // Smootherstep: zero velocity AND zero acceleration at both ends, so the walk starts without a
+      // jolt and settles into the discovery instead of stopping dead. A linear ramp made the finish
+      // feel abrupt even at the right duration.
+      const ease = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
+      const step = (now: number) => {
+        const raw = Math.min(1, (now - t0) / DURATION_MS);
+        reveal = ease(raw);
+        markStops();
+        draw();
+        if (raw < 1) raf = requestAnimationFrame(step);
+      };
+      raf = requestAnimationFrame(step);
+    }
+
+    /** Light up the stop cards as the trail reaches them, so the graph and the list are one thing. */
+    function markStops(): void {
+      // The visible stop cards are gone (the graph labels them), so this only drives the readout now.
+      if (!readout) return;
+      // Experience is continuous now, so the READOUT has to round it — an earlier build printed
+      // "stop 1.0000000994998548/8" straight from the float.
+      const k = experience();
+      const kShown = Math.min(WAYPOINTS.length, Math.round(k));
+      const att = attractor;
+      const found = known(att.x, att.y) > 0.02;
+      // "reach" is dropped: it was knowledgeRadius(), a true number about a made-up surface, and printing
+      // it beside real job titles invited it to be read as a fact about the career. The stop counter
+      // stays — those ARE the real waypoints — and so does the discovery line, which is the point of the
+      // whole device and is a statement rather than a measurement.
+      readout.innerHTML = found
+        ? `stop <b>${kShown}/${WAYPOINTS.length}</b> · ` +
+          `<i>a deeper basin is now visible</i> — it was there the whole time`
+        : `stop <b>${kShown}/${WAYPOINTS.length}</b> · nothing deeper is visible from here`;
+
+      // THE CODA APPEARS ON DISCOVERY, not on a timer: the line is about not knowing where the deepest
+      // point is, so it only means anything once the walk can see there IS a deeper side. Toggled rather
+      // than set once, so a replay resets it honestly.
+      coda?.classList.toggle('is-shown', found);
+    }
+
+    const onReplay = () => animate();
+    replay?.addEventListener('click', onReplay);
+
+    let resizeT = 0;
+    const onResize = () => {
+      window.clearTimeout(resizeT);
+      resizeT = window.setTimeout(() => { size(); draw(); }, 140);
+    };
+    window.addEventListener('resize', onResize);
+
+    const mo = new MutationObserver(() => { palCache = null; draw(); });
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+    // Start when it is on screen, so the reveal is seen rather than missed.
+    //
+    // rootMargin was '-15% 0px', which shrinks the trigger box — and an INSTANT scroll (or a deep
+    // link, or a reload already scrolled down) can land the element inside the viewport without
+    // ever crossing that shrunken boundary, so the observer never fires and the trail sits frozen
+    // one leg in. Measured: 7 of 8 stops stayed dimmed. Now: no negative margin, plus a direct
+    // visibility check at init for the case where it is ALREADY on screen before the observer runs.
+    // THRESHOLD 0.55, not 0.25, because the deck arrives here deliberately. At 0.25 the walk began
+    // while the smooth scroll was still travelling, so roughly the first quarter of the 6.4s reveal
+    // played off-screen and the slide came to rest showing "stop 1/8" — the reader lands on a graph
+    // that looks half-drawn instead of watching it draw. Requiring most of the stage to be on screen
+    // means the walk starts once the slide has actually arrived. Free scrolling still triggers it
+    // comfortably before the graph is centred.
+    let started = false;
+    const begin = () => { if (!started) { started = true; animate(); } };
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) begin();
+    }, { threshold: 0.55 });
+    io.observe(stage);
+    // Already visible on load? The observer would fire, but not until the next frame — and if the
+    // page was restored mid-scroll it may not fire at all. Check directly, using the same "mostly on
+    // screen" test as the observer so a reload does not start the walk from a half-visible stage.
+    const r0 = stage.getBoundingClientRect();
+    const shown = Math.min(r0.bottom, window.innerHeight) - Math.max(r0.top, 0);
+    if (r0.height > 0 && shown / r0.height >= 0.55) begin();
+
+    size();
+    stage.classList.add('is-live');
+    markStops();
+    draw();                       // a finished static frame immediately
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(resizeT);
+      window.removeEventListener('resize', onResize);
+      io.disconnect();
+      mo.disconnect();
+      replay?.removeEventListener('click', onReplay);
+    };
+  }
+
+  document.addEventListener('astro:page-load', initAll);
+</script>

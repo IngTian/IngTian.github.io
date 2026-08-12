@@ -13,7 +13,10 @@
 // point at an id the page didn't emit, because there is only one place that
 // spells it.
 
-import type { Publication, Project } from '../data/profile';
+import type { Publication, Project, TimelineEntry } from '../data/profile';
+import {
+  type WritingKind, sorted as sortedEntries, kindSectionId, entrySectionId,
+} from '../data/writing';
 import { mathFor } from './paperMath';
 
 export interface Stop {
@@ -124,6 +127,115 @@ export function projectSectionId(index: number): string {
  */
 export function projectStops(projects: readonly Project[]): Stop[] {
   return projects.map((p, i) => ({ label: p.name, target: projectSectionId(i) }));
+}
+
+/** Experience section id — one speller, same reason as paperSectionId. */
+export function experienceSectionId(index: number): string {
+  return `x-${index}`;
+}
+
+/**
+ * The /experience rail: two groups, roles and education, each with its entries nested.
+ *
+ * Grouped rather than flat (unlike /projects) because the timeline mixes two KINDS and the
+ * site's identity hierarchy is load-bearing — education carries the incoming PhD, which
+ * must not be buried among nine jobs. The rail's two parents point at their group headings;
+ * the leaves point at individual entries.
+ */
+export function experienceStops(timeline: readonly TimelineEntry[]): Stop[] {
+  const group = (kind: TimelineEntry['kind']) =>
+    timeline
+      .map((t, i) => ({ t, i }))
+      .filter(({ t }) => t.kind === kind)
+      .map(({ t, i }) => ({ label: railLabel(t), target: experienceSectionId(i) }));
+
+  const stops: Stop[] = [];
+  const education = group('education');
+  const work = group('work');
+  // Education first, so the incoming PhD is the first thing the rail offers.
+  if (education.length) stops.push({ label: 'Education', target: 'x-education', children: education });
+  if (work.length) stops.push({ label: 'Roles', target: 'x-roles', children: work });
+  return stops;
+}
+
+/** A rail label short enough to fit a thin margin: the institution, not the whole title.
+ *  Titles read "Senior Software Engineer · TikTok"; the rail wants "TikTok". */
+export function railLabel(entry: TimelineEntry): string {
+  const parts = entry.title.split('·').map((s) => s.trim());
+  const tail = parts.length > 1 ? parts[parts.length - 1] : parts[0];
+  return tail.length > 24 ? `${tail.slice(0, 23)}…` : tail;
+}
+
+/**
+ * The /writing rail: one group per KIND, its pieces nested underneath.
+ *
+ * Same shape as /experience — a page that mixes kinds gets a group per kind — and for the same reason: the
+ * distinction between a research note and an essay is the page's whole organising idea, so the rail should
+ * carry it rather than flatten it.
+ *
+ * An EMPTY kind still gets its stop, because the page still renders its heading and its "nothing here yet"
+ * line. This is the one place the rule differs from /research, where a paper with no renderable section is
+ * dropped: there, a stop with no section would point at nothing; here the section genuinely exists.
+ */
+export function writingStops(kinds: readonly WritingKind[]): Stop[] {
+  return kinds.map((k) => {
+    const children = sortedEntries(k).map((e) => ({
+      // 18, not 22: measured with a real title, a 22-character label still wrapped to two lines in the rail's
+      // 190px box. SideRail also clips with an ellipsis as a backstop, but the tree should hand it something
+      // that fits rather than relying on the fallback.
+      label: e.title.length > 18 ? `${e.title.slice(0, 17)}…` : e.title,
+      target: entrySectionId(k.key, e.slug),
+    }));
+    return children.length
+      ? { label: k.railLabel, target: kindSectionId(k.key), children }
+      : { label: k.railLabel, target: kindSectionId(k.key) };
+  });
+}
+
+/**
+ * THE HOMEPAGE RAIL, nested — the deck's three explainer slides live under the field that names them.
+ *
+ * The owner: "the ToC still says choices. i think this is more a 'the problem' section. similarly that An OR
+ * Quant slide deserves a ToC Tag as well… for the problem, the constraint, stuff, you can maybe learn from
+ * research's nested ToC. this way it's clearer on the top level."
+ *
+ * Both halves are right, and the flat rail was hiding the page's actual shape. "Choice" was a label for a file
+ * name, not for a slide: that slide asks what multi-period portfolio optimization IS, which is the problem
+ * statement. And the field slide — the one that says "An OR quant in multi-period portfolio optimization" —
+ * had no stop at all, so the rail skipped straight from About to a slide about constraints.
+ *
+ * Nesting fixes the top level. An optimisation problem is an objective, a feasible set, and a way to search
+ * it — which is exactly what the three slides are, in order. Read as a tree the rail now says: here is the
+ * field, and here are the three things it consists of. Flat, it said five unrelated words.
+ *
+ * The three children keep the mathematical names rather than the slide names, because those are the words a
+ * reader will meet again everywhere else in the field.
+ */
+export function homeStops(): (Stop & { zone: 'light' | 'dark' })[] {
+  return [
+    { label: 'About', target: 'heights', zone: 'light' },
+    {
+      label: 'The field',
+      target: 'interlude',
+      zone: 'light',
+      // SHORT labels, like /research's "The idea / Method / Results". Measured: with "The problem" and
+      // "Constraints" the indented tier's right edge reached x=151 while the slide headline starts at 143
+      // (at 1440px) — the rail printed over the words. A rail label is a bookmark, not a sentence.
+      children: [
+        { label: 'Problem', target: 'choice' },
+        { label: 'Limits', target: 'rules' },
+        // 'Method' claimed a method exists. The slide says the opposite — the problem is open and what it
+        // names are directions of attack — so the rail must not promise a solution the section withdraws.
+        { label: 'Open', target: 'solve' },
+      ],
+    },
+    { label: 'The climb', target: 'story', zone: 'light' },
+    // ONE STOP, NOT TWO. 'The work' and 'Links' were separate sections and so separate deck stops, which left
+    // 161px of empty panel below the work and made the last stop a 193px footer strip. They are one section now
+    // (see sections/Work.astro), so the rail names it once. 'light' because the stop begins on the tan panel;
+    // the footer inside it is where the descent reaches its dark ground.
+    { label: 'Appendix', target: 'appendix', zone: 'light' },
+  ];
 }
 
 /** Flatten a stop tree depth-first (parent before its children).

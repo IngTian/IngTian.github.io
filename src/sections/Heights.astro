@@ -27,12 +27,127 @@ for (const phrase of bio.strong) {
     </h1>
     <p class="font-display italic text-ink-3 mt-5 text-[clamp(15px,2.2vw,21px)]">{roles}</p>
     <p class="font-mono uppercase tracking-[0.22em] text-ink-3/90 mt-2.5 text-[11px]">{phd} &nbsp;·&nbsp; {rolesSub}</p>
+
+    <!-- THE TAGLINE, directly under the role line. The owner: "maybe put A researcher by day tag line
+         underneath the Quant Researcher · Portfolio Optimization."
+         It now reads as the third beat of one introduction — who I am, what I work on, how I spend the day —
+         instead of a line floating in the opposite corner. It is still two real LINKS, but they are no longer
+         load-bearing navigation: the corner nav carries the page set at all times, so per the owner "the click
+         stays an easter egg". That is what the marker-wash and underline affordances below are for — a reward
+         for the curious rather than the only door in. -->
+    <p class="hero-doors-line font-display italic text-ink-3 leading-[1.5] mt-4 text-[clamp(13.5px,1.35vw,17px)]">
+      <a class="research-link" href="/research">A researcher by day</a>, <a class="art-link" href="/art">an artist by night</a>,<br />
+      and a mathematician at heart.
+    </p>
   </div>
 
   <div class="scroll-cue absolute bottom-8 left-1/2 -translate-x-1/2 font-mono text-ink-4 text-[11px] tracking-[0.2em]">scroll</div>
 </section>
 
 <style>
+  /* ── THE DOORWAY AFFORDANCES, moved here with the links themselves. Both are real navigation and each
+     announces itself differently: an ochre marker wash sweeps behind "researcher by day", an underline
+     draws under "artist by night". Transform-only, and the reduced-motion state shows them statically so
+     the affordance is never lost. */
+  /* Quiet doorway: ink text with an underline that draws in from the left on
+     hover/focus. No color shift (the seal stays reserved for the seal mark). */
+  .art-link {
+    color: inherit;
+    text-decoration: none;
+    position: relative;
+    white-space: nowrap;
+  }
+  .art-link::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -0.06em;
+    width: 100%;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.7;
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .art-link:hover::after,
+  .art-link:focus-visible::after { transform: scaleX(1); }
+  /* keyboard focus stays visible even where transitions are reduced */
+  .art-link:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; border-radius: 2px; }
+  /* reduced motion / no animation-timeline: show the underline statically so
+     the affordance is never lost, just without the draw-in sweep */
+  @media (prefers-reduced-motion: reduce) {
+    .art-link::after { transition: none; }
+    .art-link:hover::after, .art-link:focus-visible::after { transform: scaleX(1); }
+  }
+
+  /* The "day" doorway → /research. A DIFFERENT affordance from the artist
+     underline: a soft ochre highlighter wash sweeps in BEHIND the words on
+     hover/focus (like a marker stroke), then the text rides on top. Transform-
+     only; the seal red stays reserved. */
+  .research-link {
+    color: inherit;
+    text-decoration: none;
+    position: relative;
+    white-space: nowrap;
+    isolation: isolate; /* keep the wash's z-index local to this link */
+  }
+  .research-link::before {
+    content: "";
+    position: absolute;
+    left: -0.12em;
+    right: -0.12em;
+    bottom: 0.02em;
+    height: 0.62em;        /* a marker stripe over the lower part of the text */
+    background: var(--ochre);
+    opacity: 0.34;
+    border-radius: 1px;
+    z-index: -1;
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.42s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .research-link:hover::before,
+  .research-link:focus-visible::before { transform: scaleX(1); }
+  .research-link:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; border-radius: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    .research-link::before { transition: none; }
+    .research-link:hover::before, .research-link:focus-visible::before { transform: scaleX(1); }
+  }
+
+  /* ── A ONE-TIME HINT that the two phrases are doors.
+     Both already have hover affordances — an ochre marker wash on "day", an underline draw on
+     "night" — but neither ANNOUNCES itself, so a visitor who never hovers never learns they are
+     links. This plays each affordance once, in sequence, shortly after the line scrolls in, and then
+     leaves them alone: an invitation rather than an animation. Transform-only, and it never runs
+     under reduced motion (where both affordances are already shown statically). */
+  @media (prefers-reduced-motion: no-preference) {
+    .research-link::before {
+      animation: hint-wash 3.2s cubic-bezier(0.2, 0.7, 0.2, 1) 1.1s 1 both;
+    }
+    .art-link::after {
+      animation: hint-underline 3.2s cubic-bezier(0.2, 0.7, 0.2, 1) 2.0s 1 both;
+    }
+    /* Hover must win over the hint at any point, including mid-play. */
+    .research-link:hover::before, .research-link:focus-visible::before,
+    .art-link:hover::after, .art-link:focus-visible::after { animation: none; }
+
+    @keyframes hint-wash {
+      0%   { transform: scaleX(0); }
+      22%  { transform: scaleX(1); }
+      62%  { transform: scaleX(1); }
+      100% { transform: scaleX(0); }
+    }
+    @keyframes hint-underline {
+      0%   { transform: scaleX(0); }
+      22%  { transform: scaleX(1); }
+      62%  { transform: scaleX(1); }
+      100% { transform: scaleX(0); }
+    }
+  }
+
+  /* The quant line: same voice as the tagline, a step down in size and weight. Generous space above
+     so it reads as a second beat rather than a subtitle glued to the line. */
   /* TerrainHero is position:absolute inset:0 z-0; keep text above it. */
   #heights .hero-rise, #heights .hero-bio { position: absolute; z-index: 2; }
   .hero-legibility {
@@ -61,13 +176,40 @@ for (const phrase of bio.strong) {
      (bio under the name), never re-centered. Static flow replaces the absolute
      positioning below the sm breakpoint. */
   @media (max-width: 640px) {
-    #heights { display: flex; flex-direction: column; justify-content: flex-end; gap: 1.75rem; padding-bottom: 16vh; }
+    /* padding-top CLEARS THE CORNER NAV, and without it the site's own name was unreadable. This column is
+       justify-content: flex-end, so when its content is taller than min-height the overflow goes out of the TOP
+       — and on a small phone it does. Measured at 320x568: the h1 sat at y=32..90 while the nav capsule, wrapped
+       to two rows, occupies y=12..80, so 48 of the name's 58px were behind it and "Ing Tian" was legible only
+       from the g's descender. Dark theme identical.
+       Padding rather than switching to flex-start: it fixes BOTH cases. When the content overflows, the box grows
+       and the name starts below the padding; when it fits, flex-end still parks the block at the foot of the
+       screen, which is the hero's intended composition. */
+    #heights { display: flex; flex-direction: column; justify-content: flex-end; gap: 1.75rem; padding-top: 96px; padding-bottom: 16vh; }
     #heights .hero-bio,
     #heights .hero-rise { position: static; inset: auto; max-width: 100%; text-align: left; right: auto; }
     #heights .hero-bio { order: 2; }
     #heights .hero-rise { order: 1; }
-    #heights .hero-legibility { display: none; }
-    #heights .terrain-canvas { opacity: 0.5; }
+    /* A WASH TUNED TO THE STACKED HERO, rather than none at all. The desktop halos are placed for the desktop
+       composition — one at 22% 74% for a name at bottom-left, one top-right for the bio — and mean nothing once
+       the hero becomes a single column, which is why they were switched off here. But switching them off left the
+       terrain as the only thing between the dots and the type, and the review found the 11px mono identity line
+       ("INCOMING PHD · UNIVERSITY OF TORONTO · FULL-STACK SDE / MLE") largely obliterated by the dense dot
+       cluster that runs straight through it. That line carries the incoming PhD, which the site's hierarchy
+       treats as load-bearing, so it cannot be atmosphere's to lose.
+       Lowering the canvas alone was not enough — measured at 0.32 the line was still broken up — so this is a
+       vertical band of paper across the middle, where every piece of hero text sits, fading out top and bottom so
+       the terrain still reads as terrain above and below it. */
+    #heights .hero-legibility {
+      display: block;
+      background: linear-gradient(
+        180deg,
+        transparent 0%,
+        color-mix(in oklab, var(--paper) 62%, transparent) 14%,
+        color-mix(in oklab, var(--paper) 62%, transparent) 82%,
+        transparent 100%
+      );
+    }
+    #heights .terrain-canvas { opacity: 0.4; }
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -77,6 +219,15 @@ for (const phrase of bio.strong) {
       from { opacity: 0; transform: translate3d(0, 16px, 0); }
       to   { opacity: 1; transform: translate3d(0, 0, 0); }
     }
+
+    /* THE TAGLINE ARRIVES LAST, on its own beat. On the tagline slide it rose in on a staggered scroll
+       range; folded into the name block it inherited that block's single fade and stopped reading as a
+       separate thought — the owner noticed it as a dropped animation, and it was. This restores the beat:
+       the name and role line land, then the tagline follows a third of a second later, which is also when
+       the marker-wash hint begins (1.1s) so the arrival and the invitation are one gesture.
+       It animates its OWN opacity, so it must not fight the parent's: .hero-rise finishes at opacity 1, and
+       this starts after it. */
+    .hero-doors-line { animation: hero-rise 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.62s both; }
     .scroll-cue { animation: cue-bob 2.6s ease-in-out 1.4s infinite; }
     @keyframes cue-bob {
       0%, 100% { opacity: 0.5; transform: translate(-50%, 0); }

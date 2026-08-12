@@ -1,0 +1,969 @@
+---
+// src/sections/Rules.astro
+// SLIDE 2 OF 3 — HOW HARD THIS ACTUALLY IS.
+//
+// The owner's redirect, and it replaced the whole slide: "a graph is not illustrative here. the constraints are
+// complex and internally connected… essentially this slide just needs to present how complex the situation is.
+// that's the whole point. the first slide let people understand what it is, the second one introduce the immense
+// complexity."
+//
+// So this slide is not a geometry lesson. It is the difficulty, in the four beats the owner named:
+//   1. imagine you run $1bn+ — your picks are constrained and your slippage is now MEASURABLE
+//   2. name a few of the constraints
+//   3. draw the futures those names might take — thousands of them
+//   4. so: account for a stochastic future, obey every rule, and optimise. All at once.
+//
+// WHAT WENT, AND WHY. Two earlier drawings lived here: a convex feasible polygon (lib/feasible) and a lattice of
+// decision sequences (lib/pathspace). Both are real, exact and unit-tested — and both answer "what is the
+// feasible set", a question a reader who has never been told no does not have. Worse, both SHRINK something,
+// which reads as tidying up. The point is the opposite: the problem gets bigger the closer you look. Both
+// modules stay in the tree, unreferenced and still fully tested, so nothing verified was thrown away and either
+// can return if a later slide wants it.
+//
+// The four constraint categories below have been sitting in data/desk.ts unused since they were written, each
+// with a real reason attached. They are the answer to beat two, and they finally get shown.
+//
+// Numbers: cited or computed, never invented. Impact is square-root, calibrated to the published anchor that one
+// day's volume moves the price about one daily sigma. The fund's figures come from data/desk.ts. The
+// trajectories are a seeded walk — identical on every build, because a fan that shimmered would undercut a slide
+// whose whole claim is that this scale is real. Arithmetic in lib/complexity.ts (30 tests).
+import { CONSTRAINTS, FUND } from '../data/desk';
+import { RULE_GLYPHS, RULE_TAGS, type RuleGlyphKey } from '../data/ruleGlyphs';
+import { BELLMAN_EQUATIONS } from '../lib/equations';
+import { humanCount } from '../lib/problemSize';
+import {
+  sizeLadder, trajectories, trajBounds, trajPoints,
+  decisionVariables, scenarioLeaves, magnitude, TRAJ_COUNT, TRAJ_WEEKS,
+  rulePairs, conflictWeb, rulePoint,
+} from '../lib/complexity';
+
+const ladder = sizeLadder();
+// The rung beat one QUOTES. It must be the same rung the headline names, because the reader sees the sentence
+// and the bar chart at the same time — an earlier draft said "a billion dollars" while quoting the $10bn row's
+// 6.7% and $13m, which is the kind of mismatch a careful reader catches immediately.
+const quoted = ladder.find((r) => r.aum === 1_000_000_000) ?? ladder[ladder.length - 1];
+const big = ladder[ladder.length - 1];
+const you = ladder[0];
+
+// One category per group, so beat two names KINDS of rule rather than four examples of one kind — the owner
+// asked for "a few", and four kinds is the more informative reading.
+const groups = ['Mandate', 'Regulatory', 'Liquidity', 'Operational'];
+const named = groups
+  .map((g) => CONSTRAINTS.find((c) => c.group === g))
+  .filter((c): c is (typeof CONSTRAINTS)[number] => !!c);
+
+const paths = trajectories();
+const bounds = trajBounds(paths);
+const W = 560, H = 300;
+const box = { x: 0, y: 10, w: W, h: H - 20 };
+const baseY = box.y + (1 - (100 - bounds.lo) / (bounds.hi - bounds.lo)) * box.h;
+
+// Beat four's arithmetic. Deliberately crude, and the caption says so: nobody models the future with a 3-way
+// tree, so it is an honest lower bound on "how many futures are there".
+const vars = decisionVariables(FUND.tickers, FUND.periods);
+const leafExp = magnitude(scenarioLeaves(3, FUND.periods));
+
+// Three threads picked out in ink over the fan, so a reader sees that each line is one name's possible future
+// rather than an abstract wash. Fixed indices, so the choice is deterministic like everything else here.
+const HIGHLIGHT = [7, 41, 88];
+
+// Pixel cell size for the rule marks. 3px on an 11x11 grid gives a 33px mark, which sits with 14px type without
+// dominating it — the same scale the defining slide uses for its ticker glyphs.
+const RULE_CELL = 3;
+
+// ── BEAT 4: THE CONFLICT WEB. The owner asked how to exemplify the magnitude, and the answer turned out to be
+// "not with a bigger number". Probing five framings first: 10^11 futures is a hundred million times FEWER than
+// grains of sand, and brute-forceable in 282 seconds at a billion checks a second — quoting it undermines the
+// claim rather than making it. What no tally can show is that the rules INTERLOCK, and that is the property
+// that actually makes the problem hard.
+// So beat four draws the web: rules around a circle, a chord wherever satisfying one can breach another. 28
+// nodes and ~50 chords, because at that density it reads as tangled rather than as a solid disc — and the
+// caption scales it to the real 2,000 rules and their two million pairs.
+const WEB_N = 28;
+const WEB = conflictWeb(WEB_N);
+const WEB_R = 118;
+const WEB_CX = 150, WEB_CY = 150;
+const pairsAll = rulePairs(FUND.constraints);
+const webPt = (i: number) => rulePoint(i, WEB_N, WEB_CX, WEB_CY, WEB_R);
+
+// ── THE CURSE OF DIMENSIONALITY, typeset. The owner: "it's time to use math equations to show how bellman
+// blows up for such horribly complex problems. the curse of dimensionality and the dimension scales
+// exponentially."
+//
+// This is the one place on the slide where an equation IS the argument. The recursion says exactly where the
+// blowup comes from — the max runs over a set whose size is exponential in the number of names — which no
+// amount of prose says as compactly.
+//
+// The numbers are computed, not typed, so the sentence beside the equation cannot drift from it. m = 10 levels
+// per asset is deliberately crude and the caption says so; even at that coarseness the arithmetic is brutal.
+const DP_LEVELS = 10;
+/** Decimal exponent of m^N — the size of the state table, per period. */
+const dpStateExp = Math.round(FUND.tickers * Math.log10(DP_LEVELS));
+/** How many assets it takes to exceed the atoms in the observable universe (10^80). */
+const ATOMS_EXP = 80;
+const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
+---
+<section id="rules" class="ru" aria-labelledby="ru-heading">
+  <div class="ru-paper">
+    <div class="ru-inner">
+      <p class="ru-kicker">2 / 3 · the difficulty</p>
+
+      <!-- ══ TURNED AXIS. The owner: "now this slide is essentially the same format as the previous one, which
+           might seem to be a repetition. is there anyway we can wrap the second slide in a new format while
+           keeping the contents?"
+           Correct, and the honest fix is to change the DIRECTION the slide reads rather than to invent a new
+           gimmick. Slide one reads across — words in a column, figure beside them. This one reads DOWN: the
+           drawing spans the full width, and the four beats sit beneath it as a horizontal band of stations.
+           Same content, same interaction, but the eye travels the other way and the pair stops feeling like one
+           template used twice.
+           It also buys the room the larger type needed. The figure goes from 56% of the width to all of it, so
+           it can be shorter and still be a bigger drawing, and the beats get a whole band instead of a narrow
+           column. Budgeted at every viewport before it was built: the figure still gets 381px at 1366x768. ══ -->
+      <div class="ru-flow">
+        <h2 id="ru-heading" class="ru-head">Now imagine it is not your money.</h2>
+
+        <figure class="ru-fig">
+          <!-- ONE FIGURE, FOUR STATES. The drawing answers whichever beat is live: the cost ladder, the rule
+               categories, the fan of futures, then everything at once. Sharing one box is what lets the slide
+               hold four ideas on a single screen — it owns exactly 100vh and has no room for four figures. -->
+          <p class="ru-fig-head">
+            <span class="ru-panel" data-head="0">The same decision, at four sizes</span>
+            <span class="ru-panel" data-head="1">Four kinds of rule, all binding at once</span>
+            <span class="ru-panel" data-head="2">{TRAJ_COUNT} possible outcomes — for one holding</span>
+            <span class="ru-panel" data-head="3">Interlocking rules, and a table that cannot be filled</span>
+          </p>
+
+          <div class="ru-stagebox">
+            <!-- ── BEAT 1: THE COST LADDER. Bars are log-scaled and the note says so: the span is six orders of
+                 magnitude, and on a linear axis three of the four bars would be invisible. -->
+            <div class="ru-panel ru-ladder" data-panel="0">
+              <ul class="ru-rungs">
+                {ladder.map((r) => {
+                  const hiL = Math.log10(Math.max(big.cost, 10));
+                  // NOTE: written as `r.cost > 1 ? ... : ...` rather than `r.cost <= 1`. Astro's template
+                  // compiler reads `<=` inside a JSX expression as `<` opening a fragment and fails with
+                  // "Unable to assign attributes when using <> Fragment shorthand syntax".
+                  const w = r.cost > 1 ? Math.max(1.5, (Math.log10(r.cost) / hiL) * 100) : 1.5;
+                  return (
+                    <li>
+                      <span class="ru-rung-label">{r.label}</span>
+                      <span class="ru-rung-aum">
+                        {r.aum >= 1e9 ? `$${(r.aum / 1e9).toFixed(0)}bn` : r.aum >= 1e6 ? `$${(r.aum / 1e6).toFixed(0)}m` : `$${r.aum.toLocaleString()}`}
+                      </span>
+                      <span class="ru-rung-track"><span class="ru-rung-bar" style={`width:${w.toFixed(1)}%`}></span></span>
+                      <span class="ru-rung-cost">
+                        {r.cost < 1 ? '—' : r.cost < 1e6 ? `$${Math.round(r.cost).toLocaleString()}` : `$${(r.cost / 1e6).toFixed(1)}m`}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p class="ru-note">
+                Cost of moving a fifth of the book at once. Price impact grows as the square root of your
+                share of the day's volume, so the DOLLAR cost grows as <strong>m<sup>1.5</sup></strong> — ten
+                times the size is thirty times the cost. Bars are log-scaled: the span is
+                <strong>{magnitude(big.cost)}</strong> orders of magnitude, so a linear axis would draw one bar
+                and three slivers.
+              </p>
+            </div>
+
+            <!-- ── BEAT 2: THE RULE CATEGORIES, each with the reason it exists. Four KINDS, not four examples,
+                 and every one of them is a real category with a real cause. -->
+            <div class="ru-panel ru-rules" data-panel="1">
+              <!-- A PIXEL MARK PER CATEGORY. The owner: "maybe you can now have some pixel arts with SEC, GOV,
+                   FED, etc. just to illustrate the ideas of regulations" — the panel's right half was empty and
+                   four bare paragraphs is the one beat with nothing to look at.
+                   Abstract marks, not agency seals: a document, a facade, a balance, a ledger. Reproducing the
+                   SEC's eagle would be a trademark problem and would read as costume; what a reader needs is
+                   "an authority wrote this down", which a generic facade says without borrowing anyone's
+                   identity. Compiled from character matrices in data/ruleGlyphs.ts, so they are data. -->
+              <ul class="ru-cats">
+                {named.map((c) => {
+                  const g = RULE_GLYPHS[c.group as RuleGlyphKey];
+                  return (
+                    <li>
+                      <span class="ru-cat-mark" aria-hidden="true">
+                        {g && (
+                          <svg class="ru-glyph" viewBox={`0 0 ${g.w * RULE_CELL} ${g.h * RULE_CELL}`}
+                               width={g.w * RULE_CELL} height={g.h * RULE_CELL} shape-rendering="crispEdges">
+                            {g.cells.map((cell) => (
+                              <rect x={cell.x * RULE_CELL} y={cell.y * RULE_CELL}
+                                    width={RULE_CELL} height={RULE_CELL} />
+                            ))}
+                          </svg>
+                        )}
+                        <span class="ru-cat-tag">{RULE_TAGS[c.group as RuleGlyphKey]}</span>
+                      </span>
+                      <span class="ru-cat-text">
+                        <span class="ru-cat">{c.group}</span>
+                        <span class="ru-cat-rule">{c.rule}</span>
+                        <span class="ru-cat-why">{c.why}</span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            <!-- ── BEAT 3: THE FAN. Every trajectory drawn once, three picked out in ink.
+                 MEASURED: rasterised into this exact 560x300 box, 120 paths ink about 20% of it — plural enough
+                 that the eye stops counting, sparse enough that one thread can still be followed. This is the
+                 fix for the mistake the earlier path lattice made, where 625 lines at 0.11 opacity accumulated
+                 into a solid plaid: free trajectories overlap far less than paths through a shared grid. -->
+            <div class="ru-panel ru-fan" data-panel="2">
+              <svg class="ru-fanchart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img"
+                   aria-label={`${TRAJ_COUNT} possible one-year paths for a single holding, spreading from one starting value to a wide range of outcomes.`}>
+                <line class="ru-base" x1="0" y1={baseY} x2={W} y2={baseY} />
+                {/* The fan is emitted ONCE, here, and beat four references it with <use>. Drawing it twice cost
+                    240 polylines of ~53 points each and pushed LCP to 2.7s (Lighthouse perf 96 -> 95) for a
+                    picture the reader never sees twice at once. */}
+                <g id="ru-fan-paths">
+                  {paths.map((p, i) => (
+                    <polyline class:list={['ru-traj', HIGHLIGHT.includes(i) && 'ru-traj--lit']}
+                              points={trajPoints(p, bounds, box)} />
+                  ))}
+                </g>
+              </svg>
+              <p class="ru-note">
+                One holding, {TRAJ_WEEKS} weeks, {TRAJ_COUNT} of the outcomes it could reach. Three drawn in ink
+                so the individual threads are visible; the dotted line is where you started.
+              </p>
+            </div>
+
+            <!-- ── BEAT 4: the same fan, ghosted, with the scale of the question laid over it — because "all of
+                 it at once" should look like all of it at once rather than like a new subject. -->
+            <!-- ── BEAT 4: THE CONFLICT WEB, beside the tally rather than a bigger number.
+                 The drawing is the argument: rules on a circle, a chord wherever one can breach another. A list
+                 of 2,000 rules sounds like 2,000 things to check; the web shows it is really two million PAIRS,
+                 any of which can put you in breach while you fix something else. -->
+            <div class="ru-panel ru-all" data-panel="3">
+              <div class="ru-webwrap">
+                <svg class="ru-web" viewBox="0 0 300 300" role="img"
+                     aria-label={`A web of ${WEB_N} rules drawn on a circle with ${WEB.length} lines between those that can conflict, standing for ${humanCount(FUND.constraints)} real rules and their ${pairsAll.toLocaleString()} interacting pairs.`}>
+                  {WEB.map(([a, b]) => {
+                    const [x1, y1] = webPt(a);
+                    const [x2, y2] = webPt(b);
+                    // Quadratic through the centre: a straight chord bundle reads as a star, whereas curves
+                    // pulled toward the middle read as a tangle, which is the honest impression.
+                    return (
+                      <path class="ru-chord"
+                            d={`M ${x1.toFixed(1)} ${y1.toFixed(1)} Q ${WEB_CX} ${WEB_CY} ${x2.toFixed(1)} ${y2.toFixed(1)}`} />
+                    );
+                  })}
+                  {Array.from({ length: WEB_N }, (_, i) => {
+                    const [x, y] = webPt(i);
+                    return <circle class="ru-webnode" cx={x.toFixed(1)} cy={y.toFixed(1)} r="3" />;
+                  })}
+                </svg>
+                <!-- THE MATHEMATICS, in the panel's right half — which was empty, and is the one place on this
+                     slide where an equation is the subject rather than an ornament. Baked to MathML at build
+                     time through the same KaTeX path as the terrain pill and the paper showcase, so the client
+                     ships no KaTeX runtime. A first instinct would be to set this as styled text; the factor
+                     fan's notes record why that was rejected there — hand-built maths reads as "monospace
+                     pretending to be mathematics". -->
+                <div class="ru-math">
+                  <p class="ru-math-lead">
+                    Solve it the exact way — dynamic programming, working backward from the horizon:
+                  </p>
+                  <div class="ru-eq" set:html={BELLMAN_EQUATIONS.recursion} />
+                  <p class="ru-math-mid">
+                    The <em>max</em> is the problem. It runs over every legal holding, so the table you would
+                    have to fill has one entry per state:
+                  </p>
+                  <div class="ru-eq" set:html={BELLMAN_EQUATIONS.curse} />
+                  <p class="ru-math-punch">
+                    At just <strong>{DP_LEVELS}</strong> levels per name, you pass the atoms in the observable
+                    universe at <strong>{dpUniverseAt}</strong> names. A real book holds
+                    <strong>{humanCount(FUND.tickers)}</strong> — a table of
+                    <strong>10<sup>{dpStateExp.toLocaleString()}</sup></strong> states, every month.
+                  </p>
+                  <p class="ru-math-foot">
+                    So nobody fills it. You approximate <em>V</em> instead — and choosing how is the research.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <figcaption class="ru-cap">
+            <span class="ru-panel" data-head="0">
+              Square-root impact, calibrated so that trading a full day's volume moves the price by one daily
+              standard deviation — the published rule of thumb. Volumes are a mega-cap's: the friendliest case
+              there is.
+            </span>
+            <span class="ru-panel" data-head="1">
+              Every category is real and every reason is the actual reason. The thresholds are typical rather
+              than any one fund's, and a real mandate runs to hundreds of pages.
+            </span>
+            <span class="ru-panel" data-head="2">
+              Illustrative paths from a fixed seed — identical on every build. A real book's names also move
+              TOGETHER, which no single fan can show, and their correlation rises exactly when you need it not
+              to.
+            </span>
+            <span class="ru-panel" data-head="3">
+              {WEB_N} rules standing for {humanCount(FUND.constraints)}; {DP_LEVELS} levels per name is a
+              deliberately crude discretisation, and the blowup is exponential in N regardless of it.
+            </span>
+          </figcaption>
+        </figure>
+
+        <!-- THE FOUR BEATS, now a horizontal band. Each is still a real button with the same freeze-on-click
+             behaviour; only the direction changed. -->
+        <ol class="ru-beats">
+            <li>
+              <button class="ru-beat" type="button" data-beat="0" aria-pressed="true">
+                <span class="ru-beat-title">
+                  <span class="ru-beat-n">1</span>
+                  <span class="ru-beat-head">You run a billion dollars.</span>
+                </span>
+                  <span class="ru-beat-body">
+                    Move a fifth of it and you are <strong>{(quoted.participation * 100).toFixed(1)}%</strong>
+                    of everything that trades that day, in the most liquid stock there is — the price moves away
+                    from you before you are done, and <strong>${Math.round(quoted.cost).toLocaleString()}</strong>
+                    is gone on one decision. With {you.label} the same trade costs nothing, which is why you have
+                    never had to think about it.
+                  </span>
+              </button>
+            </li>
+            <li>
+              <button class="ru-beat" type="button" data-beat="1" aria-pressed="false">
+                <span class="ru-beat-title">
+                  <span class="ru-beat-n">2</span>
+                  <span class="ru-beat-head">And you are not allowed to do most of it.</span>
+                </span>
+                  <span class="ru-beat-body">
+                    Four kinds of rule, of the <strong>{humanCount(FUND.constraints)}+</strong> a real mandate
+                    carries. They are not a checklist — they refer to each other, so obeying one can breach
+                    another.
+                  </span>
+              </button>
+            </li>
+            <li>
+              <button class="ru-beat" type="button" data-beat="2" aria-pressed="false">
+                <span class="ru-beat-title">
+                  <span class="ru-beat-n">3</span>
+                  <span class="ru-beat-head">Nobody knows what any of it will do.</span>
+                </span>
+                  <span class="ru-beat-body">
+                    {TRAJ_COUNT} possible outcomes for <em>one</em> holding, over one year. A real book holds
+                    <strong>{humanCount(FUND.tickers)}</strong> names, each with its own fan — and they move
+                    together in ways that change exactly when it matters.
+                  </span>
+              </button>
+            </li>
+            <li>
+              <button class="ru-beat" type="button" data-beat="3" aria-pressed="false">
+                <span class="ru-beat-title">
+                  <span class="ru-beat-n">4</span>
+                  <span class="ru-beat-head">Now choose. Every month. For all of it.</span>
+                </span>
+                  <span class="ru-beat-body">
+                    The rules are not a list but a web — <strong>{(pairsAll / 1e6).toFixed(1)}M</strong> pairs
+                    that can fight each other. And solving it exactly means a table of
+                    <strong>10<sup>{dpStateExp.toLocaleString()}</sup></strong> states, every month. You run out
+                    of universe at <strong>{dpUniverseAt}</strong> names.
+                  </span>
+              </button>
+            </li>
+          </ol>
+
+        <p class="ru-scale">
+          That is the job. Not picking a winner — choosing a whole sequence of positions that stays legal and
+          stays affordable, whichever of those futures actually arrives.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<style>
+  .ru { position: relative; z-index: 1; width: 100vw; margin-left: calc(50% - 50vw); }
+  .ru-paper {
+    --r-bg: #c4b7a1; --r-edge: rgba(74,66,54,0.26); --r-ink: #1f1b14;
+    --r-soft: #423b30; --r-faint: #6a6153; --r-accent: #7c5522;
+    background: var(--r-bg);
+    border-top: 1px solid var(--r-edge); border-bottom: 1px solid var(--r-edge);
+    padding: clamp(30px, 4vh, 62px) 0;
+  }
+  :global(html[data-theme='dark']) .ru-paper {
+    --r-bg: #14161a; --r-edge: rgba(184,177,161,0.14); --r-ink: #dce1dc;
+    --r-soft: #a8b0a9; --r-faint: #6d746e; --r-accent: #7fc9a0;
+  }
+  .ru-inner {
+    /* Clears the fixed Toc rail, whose right edge sits at x=151 once it carries its indented tier. Shared
+       across the five paper slides, so it is edited in all of them together or in none. */
+    padding-left: clamp(168px, 10.4vw, 200px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
+  }
+  @media (max-width: 1100px) { .ru-inner { padding-left: clamp(28px, 6vw, 80px); } }
+
+  .ru-kicker {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--r-accent); margin: 0 0 12px;
+  }
+
+  /* ── THE TURNED AXIS. A vertical flow instead of two columns: headline, then the drawing across the whole
+     width, then the four beats as a horizontal band, then the closing line. The slide reads DOWN where slide
+     one reads ACROSS, which is what stops the pair feeling like one template used twice.
+     Budgeted before it was built, at every viewport: content height minus kicker, headline, gaps, band and
+     closing line leaves the figure 381px at the tightest (1366x768) and 640px at 1700x1050. */
+  .ru-flow {
+    display: grid; grid-template-rows: auto auto auto auto;
+    gap: clamp(10px, 1.6vh, 22px) 0;
+    align-content: center;
+    min-height: 0;
+  }
+  .ru-fig { margin: 0; min-width: 0; }
+  /* The head no longer shares a row with the figure, so it can run wider than 26ch. */
+  .ru-head { max-width: 34ch; }
+
+  .ru-head {
+    font-family: var(--font-display); font-weight: 300;
+    font-size: clamp(24px, 2.4vw, 38px); line-height: 1.16;
+    color: var(--r-ink); margin: 0; max-width: 26ch; letter-spacing: -0.012em;
+  }
+
+  /* ── THE FOUR BEATS. Buttons, like the defining slide's, so a reader can go back to a number. */
+  /* FOUR STATIONS ACROSS, not four rows down. Equal columns so the band reads as a sequence of stops rather
+     than as a list, and the active one is marked along its TOP edge — a horizontal rule for a horizontal band,
+     where slide one uses a vertical rule for its vertical list. */
+  .ru-beats {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0 clamp(14px, 1.8vw, 30px);
+    border-top: 1px solid var(--r-edge);
+  }
+  .ru-beats > li { display: flex; min-width: 0; }
+  .ru-beat {
+    display: grid; grid-template-rows: auto auto; gap: 6px 0;
+    align-content: start; width: 100%; text-align: left; margin: 0;
+    background: none; border: 0; font: inherit; color: inherit;
+    padding: clamp(10px, 1.4vh, 16px) 0 0;
+    /* Reserved at all times, so switching beats never reflows the band. */
+    border-top: 2px solid transparent;
+    margin-top: -1px;              /* sit the marker ON the band's hairline */
+    opacity: 1;
+    -webkit-appearance: none; appearance: none;
+  }
+  /* html.complex-js is added by the script before it starts stepping, so the dimming and the pointer affordance
+     only appear where the sequence can actually run. Default = every beat legible, which is the no-JS state. */
+  :global(html.complex-js) .ru-beat { cursor: pointer; opacity: 0.4; }
+  :global(html.complex-js) .ru-beat.is-on { opacity: 1; border-top-color: var(--r-accent); }
+  @media (hover: hover) {
+    :global(html.complex-js) .ru-beat:not(.is-on):hover { opacity: 0.7; }
+  }
+  .ru-beat:focus-visible { outline: 2px solid var(--r-accent); outline-offset: 2px; opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    .ru-beat { transition: opacity .45s ease, border-color .4s ease; }
+  }
+  /* The number sits inline with the head in a band this narrow — a 17px circle above three lines of text would
+     waste a whole row of the column's height. */
+  .ru-beat-title { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
+
+  .ru-beat-n {
+    flex: none;
+    font-family: var(--font-mono); font-size: 9.5px; color: var(--r-accent);
+    border: 1px solid currentColor; border-radius: 50%;
+    width: 18px; height: 18px; display: grid; place-items: center;
+  }
+  .ru-beat-say { display: block; min-width: 0; }
+  .ru-beat-head {
+    /* Floor 16px: measured at 1366x768 this rendered 13.4px, barely above its own body copy. */
+    display: block; font-size: clamp(16px, 1.18vw, 19px); line-height: 1.3; color: var(--r-ink);
+  }
+  /* THE BULLET POINTS, and the owner's actual complaint: "the text is a little bit small, especially the
+     bullet points." Measured before this pass: 13px at 1700x1050 and 11.2px at 1366x768 — below caption size
+     for the slide's main reading text, because the vw term was collapsing it. The FLOOR is what rose.
+     --r-soft rather than --r-faint too: this is body copy, not an aside. No max-width — each band column is
+     its own measure now. */
+  .ru-beat-body {
+    display: block; font-size: clamp(14px, 1.02vw, 16px); line-height: 1.55; color: var(--r-soft);
+    margin-top: 0; max-width: none;
+  }
+  .ru-beat-body strong {
+    font-family: var(--font-mono); font-weight: 400; color: var(--r-accent); font-variant-numeric: tabular-nums;
+  }
+  .ru-beat-body sup { font-size: 0.7em; }
+
+  /* THE CONCLUSION, under the whole band rather than under its first column. Measured: with a 52ch measure and
+     a left-aligned rule it sat beneath beat one and read as that beat's footnote instead of as the slide's
+     closing sentence. Centred and wider, with no rule of its own — the band above already has one. */
+  .ru-scale {
+    font-size: clamp(15px, 1.12vw, 17.5px); line-height: 1.62; color: var(--r-soft);
+    margin: 0 auto; max-width: 78ch; text-align: center;
+    padding-top: clamp(8px, 1.2vh, 14px); border-top: 0;
+  }
+
+  .ru-fig-head {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--r-faint); margin: 0 0 10px; display: grid;
+  }
+  .ru-fig-head > .ru-panel { grid-area: 1 / 1; }
+
+  /* ── ONE BOX, FOUR PANELS, absolutely positioned inside a fixed-height stage so switching beats never
+     reflows the column — the same arrangement the defining slide uses, and for the same reason. */
+  /* FULL WIDTH now, so the stage can be SHORTER than it was at 56% and still be a bigger drawing. */
+  /* The stage sets the fan's height, and the fan now spans the full width — so it needs MORE height, not the
+     same. Measured: at 34vh the drawing rendered 296px against a 1652px width (5:1) because the note beneath it
+     shares the box. 40vh gives it back the room that keeps the cone legible now that nothing caps its width. */
+  /* The stage must stay TALLER than the fan's own ceiling: it holds the drawing AND the note beneath it. At a
+     450px stage against a 460px fan the panel outgrew the box by 10px at 2560x1400. */
+  .ru-stagebox { position: relative; width: 100%; min-height: clamp(250px, 38vh, 540px); }
+  .ru-panel { opacity: 0; pointer-events: none; }
+  .ru-panel.is-on { opacity: 1; pointer-events: auto; }
+  .ru-stagebox > .ru-panel { position: absolute; inset: 0; }
+  @media (prefers-reduced-motion: no-preference) {
+    .ru-panel { transition: opacity .5s ease; }
+  }
+  /* No JS: show the FIRST beat, which is the slide's opening claim. The four beats read as text regardless. */
+  .ru-panel[data-panel='0'], .ru-panel[data-head='0'] { opacity: 1; }
+  :global(html.complex-js) .ru-panel[data-panel='0'],
+  :global(html.complex-js) .ru-panel[data-head='0'] { opacity: 0; }
+  :global(html.complex-js) .ru-panel.is-on { opacity: 1; }
+
+  /* ── BEAT 1: the cost ladder. */
+  .ru-ladder { display: flex; flex-direction: column; justify-content: center; }
+  .ru-rungs { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(12px, 2vh, 22px); }
+  /* FOUR CELLS ON TWO LINES, and the numbers share the second one. At the old 56% width the label and the AUM
+     had to stack above the bar; across the full width they sit on one line with the bar beneath, so the two
+     right-hand figures stop reading as a second column of labels. */
+  .ru-rungs li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 7ch 9ch;
+    gap: 4px clamp(10px, 1.4vw, 20px);
+    align-items: baseline;
+  }
+  .ru-rung-track { grid-column: 1 / -1; }
+  .ru-rung-cost { grid-column: 3 / 4; grid-row: 1; }
+  .ru-rung-aum { grid-column: 2 / 3; grid-row: 1; }
+  .ru-rung-label { font-size: clamp(14px, 1.02vw, 16px); color: var(--r-ink); }
+  .ru-rung-aum {
+    font-family: var(--font-mono); font-size: 12px; color: var(--r-faint); text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .ru-rung-track {
+    height: 9px; background: color-mix(in srgb, var(--r-ink) 8%, transparent);
+    border-radius: 1px; overflow: hidden;
+  }
+  .ru-rung-bar { display: block; height: 100%; background: var(--r-accent); opacity: 0.75; }
+  .ru-rung-cost {
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--r-accent);
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+
+  /* ── BEAT 2: the rule categories. */
+  .ru-rules { display: flex; flex-direction: column; justify-content: center; }
+  /* TWO COLUMNS PER RULE: the pixel mark, then the words. The marks give the panel's right half something to
+     hold, and they also let a reader scan the four KINDS by shape before reading a word of it. */
+  /* TWO ACROSS, TWO DOWN. The owner's complaint was that this panel's right half was empty, and adding a mark
+     to each row did not fix that — four rules stacked in one column leave half the slide blank however nicely
+     they are set. A 2x2 grid uses the width the turned axis gave us. */
+  .ru-cats {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(10px, 1.6vh, 20px) clamp(24px, 3vw, 60px);
+    align-content: center;
+  }
+  .ru-cats li {
+    display: grid; grid-template-columns: 46px minmax(0, 1fr);
+    gap: 0 clamp(14px, 1.6vw, 26px); align-items: start;
+  }
+  .ru-cat-mark { display: grid; justify-items: center; gap: 4px; }
+  .ru-glyph { display: block; }
+  .ru-glyph rect { fill: var(--r-accent); opacity: 0.85; }
+  .ru-cat-tag {
+    font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.12em;
+    color: var(--r-faint);
+  }
+  .ru-cat-text { display: grid; gap: 2px; min-width: 0; }
+  .ru-cat {
+    font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--r-accent);
+  }
+  .ru-cat-rule { font-size: clamp(14px, 1.02vw, 16px); line-height: 1.38; color: var(--r-ink); }
+  .ru-cat-why { font-size: clamp(12.5px, 0.9vw, 14px); line-height: 1.5; color: var(--r-faint); max-width: 60ch; }
+
+  /* ── BEATS 3 AND 4: the fan of futures. */
+  .ru-fan { display: flex; flex-direction: column; justify-content: center; }
+  /* FULL WIDTH, edge to edge with the beat band below it. The owner: "extend the graph all the way to the right
+     edge, aligned with the divider line right edge down below. it's now like cutoff."
+     Exactly right, and measured: the 1100px cap left the fan stopping 287px short of the band's divider at
+     1920 and 191px short at 1700, which reads as a crop rather than as a drawing that happens to be narrower.
+     An object that ends before the rule beneath it looks broken however deliberate the number was.
+     The cap existed because stretching the fan to full width flattened its cone — so the fix is not to remove
+     the cap alone but to give the drawing back its HEIGHT at the same time, keeping the aspect near 3.5:1
+     where the spread still reads. The stage grows to match, and the short-screen rules below hold the floor. */
+  .ru-fanchart {
+    width: 100%; margin: 0; display: block;
+    /* Measured, and I tried the clever version first: min(34vh, 17vw) to make the aspect track the width. It
+       made things WORSE at the sizes that matter — min() takes the smaller value, so 17vw undercut 34vh and
+       1700x1050 went from 4.39:1 to 5.13:1. Plain vh is better here because the stage's own height is what
+       actually binds, and the aspect only degrades on screens wide enough that the fan is huge anyway. */
+    height: clamp(210px, 34vh, 460px);
+  }
+  .ru-traj {
+    fill: none; stroke: var(--r-faint); stroke-width: 1; vector-effect: non-scaling-stroke;
+    opacity: 0.22; stroke-linejoin: round;
+  }
+
+  /* ── THE PATHS DRAW THEMSELVES, left to right. The owner: "can you animate the paths from beginning to the
+     end? it gives a sense of evolution of paths and time." Right — a fan that simply appears is a picture of
+     uncertainty, and a fan that GROWS is a picture of time passing, which is what the beat is about.
+     stroke-dashoffset, not transform: this is how SVG line-drawing works, there is no transform or opacity
+     equivalent that reads as "advancing through the year", and dashoffset repaints only the stroke it belongs
+     to. The stroke length is set per element by the script, because each trajectory has its own length.
+     Staggered by index so the fan opens as a spray rather than as one sweeping wall. */
+  @media (prefers-reduced-motion: no-preference) {
+    .ru-fan.is-on .ru-traj {
+      /* TWO values, not one. `stroke-dasharray: L` means "L on, L off, repeating", so the pattern tiles and the
+         line appeared to draw from BOTH ends at once with a gap in the middle — visible in the capture. Naming
+         the gap explicitly (L on, L off, once) is what makes it a single dash that slides. */
+      stroke-dasharray: var(--len) var(--len);
+      stroke-dashoffset: var(--len);
+      animation: ru-draw 1.9s cubic-bezier(0.33, 0.9, 0.35, 1) forwards;
+      animation-delay: calc(var(--i) * 9ms);
+    }
+    @keyframes ru-draw { to { stroke-dashoffset: 0; } }
+  }
+  /* Reduced motion, and the state before the beat is live: the finished line. Never a blank chart. */
+  .ru-traj { stroke-dashoffset: 0; }
+  /* Three threads in ink, so a reader sees that each line is one name's possible future. */
+  .ru-traj--lit { stroke: var(--r-accent); opacity: 0.9; stroke-width: 1.8; }
+  .ru-base {
+    stroke: var(--r-faint); stroke-width: 1; stroke-dasharray: 3 5;
+    vector-effect: non-scaling-stroke; opacity: 0.5;
+  }
+  /* THE GHOST. <use> clones the referenced group, and the clone's own classes come with it — so the three
+     accent-lit threads arrived at full strength and the tally sat on a fan louder than itself. Fading the
+     <use> element as a whole is what actually ghosts it, since the clone's internal opacities multiply by it. */
+  .ru-fanchart--ghost { opacity: 0.42; }
+  .ru-fanchart--ghost .ru-traj { opacity: 0.1; }
+  .ru-fanchart--ghost .ru-traj--lit { stroke: var(--r-faint); stroke-width: 1; opacity: 0.14; }
+
+  /* ── BEAT 4: the conflict web beside its tally. Two columns rather than a tally floating over a ghosted fan —
+     the web IS the argument now, so it gets its own space instead of being a backdrop. */
+  .ru-all { display: grid; align-items: center; }
+  /* The web on the left, the mathematics on the right. The web is the "many interlocking rules" half and the
+     equation is the "and you cannot solve it exactly" half — two different reasons the problem is hard, which
+     is why they sit side by side rather than one under the other. */
+  .ru-webwrap {
+    display: grid; grid-template-columns: auto minmax(0, 1.25fr);
+    gap: 0 clamp(24px, 3.4vw, 64px); align-items: center;
+  }
+  .ru-web { display: block; height: clamp(190px, 33vh, 380px); width: auto; }
+
+  /* ── THE MATHEMATICS. Baked MathML, so the only styling needed is size and colour — the typesetting is
+     already correct, which is the whole reason for going through KaTeX rather than hand-setting spans. */
+  .ru-math { display: grid; gap: clamp(5px, 0.9vh, 12px); min-width: 0; }
+  .ru-math-lead, .ru-math-mid {
+    font-size: clamp(13.5px, 1.05vw, 16px); line-height: 1.5; color: var(--r-faint); margin: 0;
+  }
+  .ru-eq {
+    color: var(--r-ink);
+    /* MathML inherits font-size, and KaTeX's display mode already sizes the operators — so one declaration
+       controls the whole expression. Slightly larger than body copy: this is the subject, not an aside. */
+    /* The equation is the subject of this panel, so it is set well above body copy — measured at 16.5px it read
+       as a footnote beside the drawing it is supposed to anchor. */
+    font-size: clamp(15px, 1.45vw, 23px);
+    overflow-x: auto; overflow-y: hidden;
+  }
+  .ru-eq :global(math) { display: block; margin: 0 auto; }
+  .ru-math-punch {
+    font-size: clamp(14px, 1.12vw, 17.5px); line-height: 1.55; color: var(--r-soft); margin: 0;
+  }
+  .ru-math-punch strong {
+    font-family: var(--font-mono); font-weight: 400; color: var(--r-accent); font-variant-numeric: tabular-nums;
+  }
+  .ru-math-punch sup { font-size: 0.72em; }
+  .ru-math-foot {
+    font-size: clamp(13px, 1vw, 15.5px); line-height: 1.5; color: var(--r-faint); margin: 0;
+    padding-top: clamp(3px, 0.6vh, 7px); border-top: 1px solid var(--r-edge);
+  }
+  /* The chords carry the meaning, so they are the only confident marks. Curved through the centre: straight
+     chords read as a star burst, curves read as a tangle, and a tangle is the honest impression. */
+  .ru-chord {
+    fill: none; stroke: var(--r-accent); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.42;
+  }
+  .ru-webnode { fill: var(--r-faint); opacity: 0.8; }
+  .ru-tally {
+    list-style: none; margin: 0; padding: 0; align-self: center;
+    display: grid; gap: clamp(5px, 0.9vh, 10px);
+  }
+  .ru-tally li {
+    display: grid; grid-template-columns: 7ch minmax(0, 1fr); gap: 0 clamp(10px, 1.2vw, 16px);
+    align-items: baseline;
+  }
+  .ru-tally-n {
+    font-family: var(--font-mono); font-size: clamp(13px, 1.1vw, 16px); color: var(--r-accent);
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .ru-tally-n sup { font-size: 0.68em; }
+  .ru-tally-l { font-size: clamp(13.5px, 1vw, 15.5px); line-height: 1.45; color: var(--r-soft); }
+  .ru-tally--big .ru-tally-n { font-size: clamp(16px, 1.5vw, 22px); color: var(--r-ink); }
+
+  .ru-note {
+    /* 9px is not a readable size for a sentence that qualifies the drawing above it. */
+    font-family: var(--font-mono); font-size: 10.5px; line-height: 1.55; letter-spacing: 0.04em;
+    color: var(--r-faint); margin: clamp(8px, 1.2vh, 14px) 0 0; max-width: 60ch;
+  }
+
+  .ru-cap {
+    font-size: 12px; line-height: 1.55; color: var(--r-faint);
+    margin: clamp(6px, 1vh, 12px) 0 0; max-width: 82ch; display: grid;
+  }
+  .ru-cap > .ru-panel { grid-area: 1 / 1; }
+  .ru-cap sup { font-size: 0.72em; }
+
+  /* ── RESPONSIVE, at the END of the sheet on purpose: every declaration here overrides one of the same
+     specificity above, so source order is the whole mechanism. */
+  @media (max-height: 860px) {
+    /* Measured: on a short screen the two TALLEST panels set the shared stagebox — the four rule categories with
+       their reasons, and the four ladder rungs now that each takes two lines. Both close up here rather than the
+       box growing, because a taller box pushes the whole slide past the screen. The fan has already given up
+       height twice and is at its floor. */
+    /* THE CIRCLE AND THE EQUATION, held to what a short screen has. The owner asked for all three bigger, and on
+       a tall screen there was a third of a panel spare — but at 768px tall the box is only 246px, and 33vh of web
+       is 253px on its own. Measured: the web overflowed by 7px at 1366x768 and 8px at 1280x800, so here it is
+       sized off the box rather than the viewport, and the equation steps down with it. */
+    .ru-web { height: clamp(170px, 27vh, 230px); }
+    .ru-eq { font-size: clamp(14.5px, 1.32vw, 19px); }
+    .ru-math-lead, .ru-math-mid { font-size: clamp(12.5px, 0.98vw, 14.5px); }
+    .ru-math-punch { font-size: clamp(13px, 1.05vw, 15.5px); }
+    .ru-math-foot { font-size: clamp(12px, 0.94vw, 14px); }
+
+    /* Measured at 1366x768: the ladder panel needed 253px against a 246px box — the note beneath it plus four
+       two-line rungs. The note's own line-height is the cheapest 7px on the panel. */
+    .ru-rungs { gap: clamp(5px, 0.9vh, 11px); }
+    .ru-rung-track { height: 6px; }
+    .ru-rung-label, .ru-rung-cost, .ru-rung-aum { font-size: 13px; }
+    .ru-note { line-height: 1.42; margin-top: 6px; }
+    /* Measured at 1366x768: the categories panel needed 257px against a 246px box — exactly the four `why`
+       lines. Widening their measure is what fixes it, because at full slide width each reason fits on one line
+       instead of wrapping to two. */
+    .ru-cats { gap: clamp(5px, 0.9vh, 11px); }
+    .ru-cat-rule { font-size: 13.5px; line-height: 1.34; }
+    .ru-cat-why { font-size: 12px; line-height: 1.42; max-width: 100ch; }
+    .ru-head { font-size: clamp(22px, 2vw, 30px); }
+    .ru-beats { gap: 2px; margin-top: clamp(12px, 1.8vh, 20px); }
+    .ru-beat { padding-top: 4px; padding-bottom: 5px; }
+    .ru-beat-head { font-size: clamp(15px, 1.1vw, 17px); }
+    .ru-beat-body { font-size: clamp(13.5px, 0.95vw, 15px); line-height: 1.5; }
+    .ru-stagebox { min-height: clamp(230px, 32vh, 320px); }
+    /* Measured at 1366x768: the fan spans 1165px, so a 21vh height gave 161px — a 7.2:1 letterbox, flatter than
+       the one the old width cap existed to prevent. The FLOOR is what matters on a short screen, because 21vh of
+       768 is small; 200px brings it to about 5.8:1, which still reads as a cone. */
+    .ru-fanchart { height: clamp(200px, 26vh, 260px); }
+    .ru-scale { font-size: 14px; line-height: 1.55; }
+    .ru-rungs { gap: clamp(9px, 1.4vh, 16px); }
+  }
+
+  @media (max-width: 1040px) {
+    /* One column of rules again: at this width two columns of rule-plus-reason wrap to four lines each. */
+    .ru-cats { grid-template-columns: minmax(0, 1fr); }
+    /* Measured: stacking the web above the maths made beat four need ~380px against a ~300px box — the two
+       halves' heights simply add. So on a narrow screen the WEB steps aside and the equation keeps the panel.
+       That is the right priority: the web restates "the rules interlock", which beat two already showed, while
+       the equation is the only place the exponential blowup is stated at all. The web's own figure survives in
+       the beat's copy and in the caption, so nothing measured is lost. */
+    .ru-webwrap { grid-template-columns: minmax(0, 1fr); gap: 0; }
+    .ru-web { display: none; }
+    .ru-split { grid-template-columns: 1fr; gap: 3vh 0; }
+    .ru-fig { padding-top: 3vh; border-top: 1px solid var(--r-edge); }
+    .ru-paper { padding-top: clamp(14px, 2vh, 24px); padding-bottom: clamp(14px, 2vh, 24px); }
+    .ru-head { font-size: clamp(22px, 3.4vw, 30px); }
+    .ru-beats { gap: 1px; }
+    .ru-beat { padding-top: 4px; padding-bottom: 4px; }
+    .ru-beat-body { font-size: clamp(13.5px, 1.6vw, 15px); line-height: 1.5; }
+    /* THE FLOOR IS 256px, NOT 220px, AND THAT IS AN OVERLAP FIX. The beat panels are absolutely positioned to
+       fill this box, so when a panel's content is taller than the box it does not push anything — it prints
+       straight over .ru-cap, which sits after the stagebox in flow. Measured, .ru-note's bottom past .ru-cap's
+       top: 31.8px at 320x700, 8.3px at 390x844, and 7.6px at 1024x768 — so this was overlapping body text on a
+       small laptop too, not only on phones. 256px clears the worst of the three with room to spare. */
+    .ru-stagebox { min-height: clamp(256px, 30vh, 300px); }
+    .ru-fanchart { height: clamp(140px, 19vh, 210px); }
+    .ru-scale { font-size: 14px; line-height: 1.55; padding-top: 8px; }
+    .ru-note, .ru-cap { font-size: 11px; line-height: 1.5; }
+    .ru-rungs { gap: clamp(8px, 1.2vh, 14px); }
+    .ru-cats { gap: clamp(7px, 1vh, 12px); }
+  }
+
+  /* ── PHONES: THE BEAT BAND GOES 2x2. Four columns is right on a desktop and nonsense on a phone: measured,
+     each beat was 84.75px wide at 390px and 67.25px at 320px, which is about ten characters per line for a body
+     that has to be read to be chosen. Two columns give roughly 175px at 390px. It costs one row of height on a
+     slide already taller than a phone screen, which the deck pages through by design — an unreadable selector
+     costs more. */
+  @media (max-width: 700px) {
+    .ru-beats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: clamp(6px, 1.2vh, 12px); }
+    /* More floor again, twice measured: the note wraps to more lines the narrower it gets, so 256px still left
+       it printing 13.8px over .ru-cap at 320x700 and 272px still left 5.8px. 288px clears the worst of the four
+       notes at both phone widths with a few pixels to spare. */
+    .ru-stagebox { min-height: clamp(288px, 30vh, 310px); }
+  }
+
+  /* ONE COLUMN ON THE SMALLEST PHONES. Two columns fixed the four-across case but not this one: at 320px each
+     column is 135.5px, which the review measured as roughly seventeen characters a line printing as a sixteen-line
+     sliver. A beat is a paragraph you have to read before you can choose it, so below 430px it takes the full
+     width.
+     PLACED AFTER THE 700px BLOCK ON PURPOSE. Both queries match at 320px, so at equal specificity the later one
+     wins — written above, this rule silently lost and the band stayed two columns. The same source-order trap
+     that has bitten the Toc, the Story figure and this file already. */
+  @media (max-width: 430px) {
+    .ru-beats { grid-template-columns: minmax(0, 1fr); }
+  }
+</style>
+
+<script>
+  // THE FOUR BEATS, in order, and the reader can take the wheel.
+  //
+  // PROGRESSIVE ENHANCEMENT in the only safe direction: the CSS default is beat one shown with all four beats
+  // legible as text, and html.complex-js — added only once the sequence is about to run — is what switches on
+  // the dimming and the stepping. So JavaScript switched off entirely leaves a readable slide rather than an
+  // empty one, which is the failure mode the inverse-guard pattern used to have.
+  //
+  // ADDED INSIDE initComplex, NOT AT MODULE SCOPE, for the reason spelled out at the same point in
+  // Choice.astro: Astro's ClientRouter swaps <html> and its class list on every in-site navigation, while this
+  // bundled module runs once — so the class did not survive the reader's first trip to another page and back.
+  function initComplex(): (() => void) | null {
+    const section = document.querySelector<HTMLElement>('#rules');
+    if (!section) return null;
+    const beats = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-beat]'));
+    const panels = Array.from(section.querySelectorAll<HTMLElement>('[data-panel]'));
+    const heads = Array.from(section.querySelectorAll<HTMLElement>('[data-head]'));
+    // Nothing to step — hand the slide back to its CSS default, before the class is added rather than after.
+    if (!beats.length || panels.length !== beats.length) return null;
+    document.documentElement.classList.add('complex-js');
+
+    // EACH PATH'S OWN LENGTH, measured once and written to a CSS variable, so the draw animation can dash it.
+    //
+    // AND MEASURED IN THE RIGHT UNITS, which took a debugging pass. getTotalLength() returns USER units — the
+    // viewBox's coordinate system — but `vector-effect: non-scaling-stroke` makes the dash pattern resolve in
+    // SCREEN pixels. The fan is drawn with preserveAspectRatio="none", so the two differ by a lot: measured, the
+    // viewBox is 560 wide rendered at 1482, a 2.65x x-scale against 1.13x in y. Feeding a user-unit length to a
+    // screen-pixel dash left every line about 60% short, so the fan finished with a permanent gap in it — the
+    // animation looked like it was drawing from both ends and stopping.
+    //
+    // The honest fix is to measure the path in the space the dash lives in: walk the points and sum the segment
+    // lengths after applying the element's own x and y scale.
+    const measurePaths = () => {
+      const svg = section.querySelector<SVGSVGElement>('.ru-fanchart');
+      const vb = svg?.viewBox?.baseVal;
+      const rect = svg?.getBoundingClientRect();
+      const sx = vb && rect && vb.width ? rect.width / vb.width : 1;
+      const sy = vb && rect && vb.height ? rect.height / vb.height : 1;
+
+      for (const [i, el] of Array.from(section.querySelectorAll<SVGPolylineElement>('.ru-traj')).entries()) {
+        let len = 0;
+        const raw = el.getAttribute('points');
+        if (raw) {
+          const nums = raw.trim().split(/[\s,]+/).map(Number);
+          for (let k = 2; k + 1 < nums.length; k += 2) {
+            const dx = (nums[k] - nums[k - 2]) * sx;
+            const dy = (nums[k + 1] - nums[k - 1]) * sy;
+            len += Math.hypot(dx, dy);
+          }
+        }
+        // Fall back to the user-unit length rather than to nothing: a slightly-off dash still animates, whereas
+        // an unset --len leaves the line solid (which is also acceptable, just not animated).
+        if (!(len > 0)) {
+          try { len = typeof el.getTotalLength === 'function' ? el.getTotalLength() : 0; } catch { len = 0; }
+        }
+        if (len > 0) el.style.setProperty('--len', String(Math.ceil(len)));
+        el.style.setProperty('--i', String(i));
+      }
+    };
+    measurePaths();
+    // The box is responsive, so a resize changes every path's length. Re-measure, throttled to a frame.
+    let resizeTick = 0;
+    const onResize = () => {
+      if (resizeTick) return;
+      resizeTick = requestAnimationFrame(() => { resizeTick = 0; measurePaths(); });
+    };
+    window.addEventListener('resize', onResize, { passive: true });
+
+    const show = (i: number) => {
+      beats.forEach((b, k) => {
+        b.classList.toggle('is-on', k === i);
+        b.setAttribute('aria-pressed', String(k === i));
+      });
+      panels.forEach((p, k) => p.classList.toggle('is-on', k === i));
+      // TWO elements share each head index — the figure's heading and the caption — so match on the attribute
+      // VALUE rather than on position in the list.
+      heads.forEach((h) => h.classList.toggle('is-on', Number(h.dataset.head) === i));
+    };
+
+    let step = 0;
+    let timer = 0;
+    // FROZEN ONCE CLICKED, and it stays frozen — the same rule as the two neighbouring slides. These beats carry
+    // numbers a reader will want to sit with, and a timer that resumed would pull the slide away mid-thought.
+    let frozen = false;
+    const stop = () => { window.clearTimeout(timer); timer = 0; };
+
+    const freeze = (i: number) => {
+      frozen = true;
+      stop();
+      section.dataset.frozen = 'true';
+      step = i;
+      show(i);
+    };
+
+    const pick = (e: Event) => {
+      const i = beats.indexOf(e.currentTarget as HTMLButtonElement);
+      if (i >= 0) freeze(i);
+    };
+    for (const b of beats) b.addEventListener('click', pick);
+
+    // Arrow keys walk the group, so a keyboard reader need not tab through four buttons to reach the last beat.
+    const onKey = (e: KeyboardEvent) => {
+      const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1
+        : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+      if (!dir) return;
+      e.preventDefault();
+      freeze((step + dir + beats.length) % beats.length);
+      beats[step].focus();
+    };
+    for (const b of beats) b.addEventListener('keydown', onKey);
+
+    show(0);
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      // Finished state: the LAST beat, which is the one the slide's argument rests on. The buttons still work,
+      // so a reduced-motion reader gets the same control without anything moving on its own.
+      step = beats.length - 1;
+      show(step);
+      return () => {
+        if (resizeTick) cancelAnimationFrame(resizeTick);
+        window.removeEventListener('resize', onResize);
+        for (const b of beats) { b.removeEventListener('click', pick); b.removeEventListener('keydown', onKey); }
+      };
+    }
+
+    const advance = () => {
+      step = (step + 1) % beats.length;
+      show(step);
+      // Hold longest on the last beat: it is the slide's whole point and it carries the most to read.
+      timer = window.setTimeout(advance, step === beats.length - 1 ? 6400 : 4600);
+    };
+
+    const io = new IntersectionObserver((entries) => {
+      const visible = entries.some((e) => e.isIntersecting);
+      if (frozen) return;                        // a reader's choice outranks the observer
+      if (visible && !timer) timer = window.setTimeout(advance, 4200);
+      else if (!visible) stop();
+    }, { threshold: 0.3 });
+    io.observe(section);
+
+    return () => {
+      stop();
+      io.disconnect();
+      if (resizeTick) cancelAnimationFrame(resizeTick);
+      window.removeEventListener('resize', onResize);
+      for (const b of beats) { b.removeEventListener('click', pick); b.removeEventListener('keydown', onKey); }
+    };
+  }
+
+  let teardown: (() => void) | null = null;
+  document.addEventListener('astro:page-load', () => {
+    teardown?.();
+    teardown = initComplex();
+  });
+</script>

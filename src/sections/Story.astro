@@ -1,0 +1,279 @@
+---
+// src/sections/Story.astro
+// THE EDITORIAL that explains the descent graph, in two columns on a paper ground.
+//
+// The owner's brief: "after the descent line, a section explaining ourselves, incl. why we transition
+// into quants… the section explains the graph literally. You maybe even can get creative, try 2
+// columns etc." And the register: the earlier "forty-two sentences" sketch read like a good journal
+// spread, but its CONTENT was photograph notes — "after all we are not an artist". So this keeps that
+// typographic register and puts the actual subject in it.
+//
+// WHY A PAPER GROUND. The rest of the homepage is a sky you descend through. This section is the one
+// place that stops and talks, so it gets a different surface: an editorial paper panel, full-bleed,
+// with the sky visible above and below it. That is also the elegant thing the owner picked out about
+// the light theme, and the panel colour is chosen per theme rather than shared.
+//
+// Every number here is COMPUTED at build time from the same field the graph draws, so the prose and
+// the picture cannot drift apart. Nothing is hand-typed.
+//
+// THE PANEL NOW WRAPS THE GRAPH TOO. The owner: "in the descent one climb section, you might want to
+// completely turn off the fluid background and use the paper editorial background." That is one
+// slide — the picture and the words that read it — so it is one surface, and DescentPath renders as
+// a <slot> inside this panel rather than as a sibling floating on the sky. Turning the fluid off
+// behind it is done by the panel being opaque, not by touching the fluid layer: the sky keeps
+// running above and below, and this slide simply sits on paper.
+// The figure row is deleted (see below), so the measurement imports go with it — curvature(),
+// discoveryOf() and trajectoryFacts() were only ever called here to fill those three numbers. The
+// modules stay: lib/sensitivity and lib/knowledge are what the GRAPH is drawn from, and they keep their
+// own specs.
+import { STORY } from '../data/story';
+---
+<section id="story" class="story" aria-labelledby="story-heading">
+  <div class="story-paper">
+    <!-- ONE SECTION, TWO COLUMNS. The owner: "I'm thinking about if it's more natural to merge A
+         descent with one climb with Why the climb. After all they are all describing my career path.
+         There is also a huge right panel unused here."
+         Both are right. They were two stacked slides describing one subject, and at a wide viewport the
+         graph left 586px — 29.3% of the window — genuinely empty on the right, because the field's
+         aspect (1.27) cannot stretch to fill a letterbox frame and the surplus became padding.
+         So the prose moves INTO that space: graph left, writing right, one section. The graph is
+         STICKY, so it stays visible while its explanation scrolls past — the whole point of merging is
+         that you can read the claim and check the picture at the same time. -->
+    <div class="story-split">
+      <!-- The graph, on the same paper. Passed in as a slot so this component owns the surface and the
+           ink tokens, and DescentPath stays a self-contained piece that inherits them. -->
+      <div class="story-figure-slot"><slot /></div>
+
+      <div class="story-inner">
+        <h2 id="story-heading" class="story-title">Why the climb</h2>
+
+        <div class="story-cols">
+          {STORY.map((col) => (
+            <div class="story-col">
+              <p class="story-kicker">{col.kicker}</p>
+              <p class="story-lead">{col.lead}</p>
+              {col.body.map((para) => <p class="story-body">{para}</p>)}
+            </div>
+          ))}
+        </div>
+
+        <!-- THE FIGURES ARE GONE. They were computed at build time rather than typed, but computed from
+             the HERO'S INVENTED FIELD — so "260x feedback ratio" was an exact measurement of a fiction,
+             printed where a reader would take it as a fact about a career. A true number about a made-up
+             surface is worse than no number, because it borrows the authority of measurement.
+
+             THE CODA MOVED INTO THE GRAPH (see DescentPath), because this column is taller than one screen:
+             the deck gesture that should scroll down to its last line advances to the next slide instead, so
+             anything at the foot of this column is unreadable by normal scrolling.
+
+             The replacement tail line I put here had EXACTLY THE SAME BUG — same column, same fold, same
+             unreachable position — so it is deleted rather than restyled. The section now ends with its last
+             body paragraph, and the coda in the drawing is the closing line. Nothing goes at the bottom of
+             this column again. -->
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* Full-bleed, so the paper panel is a surface the page passes through rather than a card sitting
+     on the sky. No vertical padding: the panel itself must reach the section's edges, or a band of
+     sky shows above and below it and the "turn the fluid off here" reads as a floating card.
+     z-index lifts it over the SkyWash and .descent::after washes (both z-index:-1), so the fluid is
+     completely hidden behind this slide rather than tinting the paper. */
+  .story {
+    position: relative;
+    z-index: 1;
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    /* NO LEAD ON THIS SECTION. The lead lifts the deck's resting position ABOVE the element, which for a
+       full-bleed opaque panel means a strip of sky shows above the paper — measured: paper starts at
+       1953, the deck rested at 1893, so 60px of the descent sky sat above the panel edge and the slide
+       read as a card that had slipped down.
+       The air the title needs is the panel's own padding-top instead, which is inside the paper. */
+  }
+
+  /* THE PAPER GROUND. Two different colours by theme rather than one shared value:
+     - light: a warm bone/oat that reads as printed stock against the luminous sky, NOT the same
+       --paper as the text colour (which would vanish);
+     - dark: a cool near-black slate a shade above --bg, so the panel is felt rather than seen. */
+  .story-paper {
+    /* DARKER THAN THE FIRST DRAFT, and this was measured rather than eyeballed. The owner: "in the
+       light theme it might be better to have a darker background for the two bottom tabs, because when
+       you pass the tagline the fluid is already mildly warm-dark, so getting back to full light is a
+       sharp contrast."
+       Sampled at the seam, light theme: the sky just above reads rgb(115,115,123), luminance 0.173,
+       while the old #efe7d8 panel was 0.805 — a 4.5x jump at the boundary, which is exactly the snap
+       back to full light he describes. This tone (0.482) more than halves it to 2.4x while keeping the
+       ink at 8.7:1, far above the 4.5:1 floor. A toned printing stock rather than bright paper. */
+    --story-bg: #c4b7a1;
+    --story-edge: rgba(74, 66, 54, 0.26);
+    --story-ink: #1f1b14;
+    --story-ink-soft: #423b30;
+    --story-ink-faint: #6a6153;
+    --story-accent: #7c5522;
+    /* The graph's own ink, dark-on-paper. The canvas reads these (see DescentPath) because its
+       default tokens — --paper, --ink-3..5 — are LIGHT inks chosen for the dark sky, and on a light
+       paper ground they render invisible. Same reason the panel can't reuse --paper as a background. */
+    /* Darker than before to hold up on the toned ground: the old values were chosen against a near-white
+       panel, and a 0.72-alpha mid-grey on 0.48 luminance stock loses the faint contour dots. */
+    --story-line: rgba(46, 40, 31, 0.8);
+    --story-line-soft: rgba(72, 64, 52, 0.7);
+
+    background: var(--story-bg);
+    border-top: 1px solid var(--story-edge);
+    border-bottom: 1px solid var(--story-edge);
+    padding: 9vh 0;
+  }
+  :global(html[data-theme='dark']) .story-paper {
+    --story-bg: #14161a;
+    --story-edge: rgba(184, 177, 161, 0.14);
+    --story-ink: #dce1dc;
+    --story-ink-soft: #a8b0a9;
+    --story-ink-faint: #6d746e;
+    --story-accent: #7fc9a0;
+    --story-line: rgba(214, 220, 214, 0.66);
+    --story-line-soft: rgba(160, 168, 161, 0.5);
+  }
+
+  /* ── THE SPLIT: graph left, writing right, in one section.
+     64% to the graph, measured rather than guessed: at 2000px that gives the drawing 1091px, slightly
+     WIDER than the 1004px it occupied when it had the whole slide (the surplus was padding the aspect
+     guard could not use), while leaving the prose a real 720px panel. */
+  .story-split {
+    display: grid;
+    grid-template-columns: 64fr 36fr;
+    gap: 0 clamp(28px, 3vw, 64px);
+    align-items: start;
+    /* Clears the fixed Toc rail, which spans x=34..129 at 1700px — the previous clamp resolved to 128px
+       and the rail's labels sat on the graph's own header. Shared with the other paper slides. */
+    /* Clears the fixed Toc rail. The rail now carries an INDENTED tier ("Problem / Limits / Method" nested
+       under "The field"), so its right edge moved from x=129 to x=151 at 1700px and the old clamp left as
+       little as 5px of air — measured at 1440px on this slide. 168px min / 10.4vw keeps at least ~20px of
+       margin at every width the rail is shown (it collapses to dots below 1100px). Shared across the five
+       paper slides, so it is edited in all of them together or in none. */
+    padding-left: clamp(168px, 10.4vw, 200px);
+    padding-right: clamp(20px, 2.4vw, 52px);
+    box-sizing: border-box;
+  }
+  @media (max-width: 1099px) {
+    .story-split { padding-left: clamp(28px, 6vw, 80px); }
+  }
+
+  .story-inner { width: 100%; margin: 0; max-width: none; }
+
+  /* Below the split's comfortable width the two columns stack: a 36% prose column becomes unreadable
+     long before the graph stops being legible, and the graph's in-frame labels need room. */
+  @media (max-width: 1180px) {
+    .story-split { grid-template-columns: 1fr; gap: 8vh 0; }
+  }
+
+  /* STICKY, so the drawing stays beside its explanation while the prose scrolls. That is the argument
+     for merging in the first place: the reader can check each claim against the picture without
+     scrolling back to it. Sticky is bounded by its parent, so the graph releases by itself at the end
+     of the writing — no JS, no scroll listener.
+     No --deck-lead here: the slot is no longer a deck stop (the deck's slides are top-level sections),
+     and leaving one would inherit down and re-open the sky gap above the panel. */
+  .story-figure-slot {
+    position: sticky;
+    top: clamp(40px, 6vh, 80px);
+    width: 100%;
+    box-sizing: border-box;
+  }
+  /* ── AND IT STOPS STICKING ONCE THE SPLIT STACKS. Sticky is what keeps the graph beside its explanation, and
+     that only means anything while there IS a column beside it. Stacked, the figure sits ABOVE the prose, so
+     pinning it makes it ride down OVER the writing: measured at 390x844, a 744px-tall figure pinned at
+     top: 50.6px, printing its heading and replay button across the paragraphs at two of the three phone deck
+     stops. The rule was written for the two-column layout and was never bounded to it.
+     PLACED AFTER THE BASE RULE ON PURPOSE. My first attempt put this inside the max-width: 1180px block above,
+     which sits BEFORE this declaration — same specificity, so source order won and the override did nothing
+     (measured: still position: sticky at 320 and 390). The same trap this file's own notes describe for the
+     Toc, and it is silent every time. */
+  @media (max-width: 1180px) {
+    .story-figure-slot { position: static; top: auto; }
+  }
+  /* The horizontal insets live on .story-split now, so both columns share one left edge and the rail is
+     cleared once rather than per-column. */
+
+  /* The "why the climb" cue is GONE — it existed because the writing was a separate slide below the
+     graph, and an unmarked bottom edge read as the end of the page. The writing is now beside the graph
+     in the same section, so there is nothing below to announce. */
+
+  .story-title {
+    font-family: var(--font-display); font-weight: 300;
+    font-size: clamp(28px, 2.4vw, 42px);
+    color: var(--story-ink); margin: 0 0 clamp(24px, 3.4vh, 46px);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  /* ONE COLUMN NOW, not two. The piece is still a comparison — where I was against where the signal
+     was — but in a 36%-wide panel two sub-columns would be ~330px each, far under a readable measure.
+     The pairing is carried by the two kickers and a rule between the blocks instead of by side-by-side
+     geometry: same contrast, read top-to-bottom. */
+  .story-cols { display: grid; grid-template-columns: 1fr; gap: 0; }
+  .story-col + .story-col {
+    border-top: 1px solid var(--story-edge);
+    margin-top: clamp(24px, 3vh, 40px);
+    padding-top: clamp(24px, 3vh, 40px);
+  }
+  /* Stacked (narrow) layout: the prose has the full width back, so the two blocks can sit side by side
+     again — which is where the comparison reads best. */
+  @media (max-width: 1180px) and (min-width: 861px) {
+    .story-cols { grid-template-columns: 1fr 1fr; gap: 0 clamp(32px, 5vw, 88px); }
+    .story-col + .story-col {
+      border-top: 0; margin-top: 0; padding-top: 0;
+      border-left: 1px solid var(--story-edge);
+      padding-left: clamp(32px, 5vw, 88px);
+    }
+  }
+
+  .story-kicker {
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.24em;
+    text-transform: uppercase; color: var(--story-accent); margin: 0 0 18px;
+  }
+  /* ── TYPE in the proto-sketches register, which is the style the owner preferred: that sketch pulled
+     its focal sentences out at 34px on a 44px line (lib/sketches/batch1.ts — the "forty-two sentences"
+     frame, the only one that measured as not reading empty).
+     Sized in ch/rem terms against the PROSE COLUMN rather than the viewport, because the column is now
+     36% of the window: a 2.3vw lead measured 46px at 2000px wide and would have been ~4 words per line
+     in a 720px panel. cqw units would be ideal but container queries would need a container declared on
+     an element the deck also measures, so this stays on a viewport clamp with a tighter cap. */
+  .story-lead {
+    font-family: var(--font-display); font-size: clamp(21px, 1.7vw, 30px);
+    line-height: 1.34; color: var(--story-ink); margin: 0 0 22px;
+    text-wrap: balance;
+  }
+  .story-body {
+    font-size: clamp(15px, 0.95vw, 17px); line-height: 1.74; color: var(--story-ink-soft);
+    margin: 0 0 16px; max-width: 46ch;
+  }
+  .story-body:last-child { margin-bottom: 0; }
+
+  /* The figures: measured readings, mono, so they read as instrument output rather than pull-quotes.
+     Three across needed ~1300px; in the 720px prose panel they wrap to a responsive grid instead of
+     being crushed to 220px each. */
+  .story-figures {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: clamp(20px, 2.4vh, 32px) clamp(20px, 2vw, 40px);
+    margin: clamp(28px, 4vh, 52px) 0 0; padding-top: clamp(22px, 3vh, 40px);
+    border-top: 1px solid var(--story-edge);
+  }
+  .story-figure dt {
+    font-family: var(--font-mono); font-size: clamp(26px, 3vw, 40px);
+    color: var(--story-accent); line-height: 1;
+  }
+  .story-figure dd {
+    margin: 14px 0 0; font-size: 14px; line-height: 1.6; color: var(--story-ink-faint);
+  }
+  .story-figure-label {
+    display: block; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--story-ink-soft); margin-bottom: 7px;
+  }
+  @media (max-width: 700px) {
+    .story-figures { grid-template-columns: 1fr; gap: 4vh 0; }
+  }
+
+  /* (.story-tail is gone with the element — see the markup comment. Anything placed at the foot of this
+     column is unreachable in the deck, so the rule is deleted rather than left for someone to reuse.) */
+</style>

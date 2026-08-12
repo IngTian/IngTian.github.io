@@ -1,5 +1,8 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { PAGES } from '../data/nav';
+import PlushCow from '../components/PlushCow.astro';
+import { COW_LINES_404 } from '../data/cowGlyph';
 import FluidSky from '../components/proto/FluidSky.astro';
 import SkyWash from '../components/SkyWash.astro';
 ---
@@ -17,11 +20,25 @@ import SkyWash from '../components/SkyWash.astro';
       <p class="nf-code">404</p>
       <h1 class="nf-title">You've descended past the edge of the map.</h1>
       <p class="nf-sub">There's no page here — but the path back is just a step up.</p>
+
+      <!-- A COW ON THE 404. The owner asked for one, and a lost reader is exactly who could use the company.
+           It goes above the links rather than below them, so the way out is still the last thing read. -->
+      <div class="nf-cow">
+        <PlushCow
+          size="large"
+          lines={COW_LINES_404}
+          label="A cow, keeping you company on a page that does not exist. Press it."
+        />
+      </div>
       <nav class="nf-links">
         <a class="nf-primary" href="/">← back to the descent</a>
-        <a class="nf-link" href="/research">Research</a>
-        <a class="nf-link" href="/projects">Projects</a>
-        <a class="nf-link" href="/art">Art</a>
+        {/* DRIVEN BY data/nav.ts, not hand-listed. This block had gone stale twice over: it was missing
+            /experience (added months ago) and /writing (added with it), so the one page whose entire job is to
+            offer a way out was offering an out-of-date subset of the site. A list that has to be edited in two
+            places gets edited in one. */}
+        <span class="nf-pages">
+          {PAGES.map((pg) => <a class="nf-link" href={pg.href}>{pg.label}</a>)}
+        </span>
       </nav>
     </section>
   </main>
@@ -34,7 +51,13 @@ import SkyWash from '../components/SkyWash.astro';
   .nf-title { font-family: var(--font-display); font-weight: 500; font-size: clamp(28px, 4.4vw, 44px);
     line-height: 1.16; letter-spacing: -0.01em; color: var(--ink-1); margin-top: 20px; font-variation-settings: 'SOFT' 50; }
   .nf-sub { font-size: 15px; line-height: 1.7; color: var(--ink-3); margin-top: 18px; }
-  .nf-links { margin-top: 40px; display: flex; gap: 14px; justify-content: center; align-items: center; flex-wrap: wrap; }
+  /* The primary button on its own row, the five page links centred beneath it. As one wrapping flex row the
+     fifth link ("Art") broke onto a line by itself and read as an orphan — a stack of two intentional rows is
+     better than one row that wraps at an accidental place, and it no longer changes shape as pages are added. */
+  .nf-cow { margin: clamp(18px, 3vh, 36px) 0 clamp(4px, 1vh, 12px); }
+
+  .nf-links { margin-top: 40px; display: flex; flex-direction: column; gap: 20px; align-items: center; }
+  .nf-pages { display: flex; gap: 16px; justify-content: center; align-items: baseline; flex-wrap: wrap; }
   .nf-primary { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.04em; text-decoration: none;
     color: var(--ink-1); border: 1px solid var(--ink-4); border-radius: 999px; padding: 9px 20px; transition: border-color 0.3s, color 0.3s; }
   .nf-primary:hover { border-color: var(--seal); color: var(--seal); }

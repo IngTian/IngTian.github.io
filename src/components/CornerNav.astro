@@ -14,7 +14,18 @@
 // Hrefs come from profile.ts (the single source of résumé facts); the icons
 // live here (presentation, not content). Built so the deferred light/dark
 // theme toggle drops in as one more item with no restructuring.
+//
+// IT ALSO CARRIES THE SITE'S PAGE SET NOW. The owner: "it might be wiser to add navigations directly on the
+// top right hovering bar, so it's always visible. the click stays an easter egg." Before this the only way to
+// reach /research or /art was the hero tagline — two words in an italic line that a visitor had to guess were
+// links. Real navigation cannot depend on a discovery, so the pages sit here, always visible, and the tagline
+// keeps its quiet marker-wash affordances as the easter egg it was meant to be.
+//
+// Pages are TEXT (they are destinations, and a label is what makes them scannable); the contact marks drop to
+// ICON-ONLY above mobile, because eight text items in one capsule would run past a third of the viewport —
+// measured at 1700px before the change. Contact is recognisable by glyph; a page is not.
 import { links } from '../data/profile';
+import { PAGES } from '../data/nav';
 
 interface Props {
   /** 'scroll' = flip text color by the descent fraction behind the nav (home,
@@ -23,6 +34,9 @@ interface Props {
   navZone?: 'scroll' | 'light';
 }
 const { navZone = 'scroll' } = Astro.props;
+
+// The current route, normalised without a trailing slash, so aria-current marks the page you are on.
+const current = Astro.url.pathname.replace(/\/+$/, '') || '/';
 
 // Resolve hrefs from the profile links by label — keeps URLs in one place.
 const href = (label: string) => links.find((l) => l.label === label)?.href ?? '#';
@@ -51,11 +65,23 @@ const items: Item[] = [
   },
 ];
 ---
-<nav class="cnav" aria-label="Contact and profiles" data-cnav data-nav-mode={navZone}>
+<nav class="cnav" aria-label="Site navigation, contact and profiles" data-cnav data-nav-mode={navZone}>
   <ul>
+    {/* THE PAGES, first and in words — this is the part a visitor needs and must not have to hunt for.
+        aria-current marks the page you are on, so the nav answers "where am I" as well as "where can I go". */}
+    {PAGES.map((p) => (
+      <li>
+        <a class="page" href={p.href} {...(current === p.href ? { 'aria-current': 'page' } : {})}>
+          <span class="pill" aria-hidden="true"></span>
+          <span class="content"><span class="page-label">{p.label}</span></span>
+        </a>
+      </li>
+    ))}
+    <li class="sep" aria-hidden="true"></li>
     {items.map((it) => (
       <li>
         <a
+          class="mark"
           href={it.href}
           data-key={it.key}
           aria-label={it.label}
@@ -168,6 +194,40 @@ const items: Item[] = [
   .cnav .content { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; }
   .cnav .ic { flex: none; display: block; }
 
+  /* ── PAGES vs MARKS. The pages are the navigation and read as words; the contact marks are recognisable
+     glyphs, so by default they carry only their icon and the capsule stays a capsule. The label is still in
+     the DOM (visually hidden, not display:none) so screen readers and the accessible name are unaffected. ── */
+  .cnav .page .page-label { display: inline-block; }
+  .cnav .mark .label {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  .cnav .mark .content { gap: 0; }
+  .cnav .mark { padding: 9px 11px; }
+
+  /* ── VERY WIDE SCREENS GET THE WORDS TOO. The owner: "can you adaptively show the texts for
+     github/email/resume/linkedin as well? i have a large monitor."
+     The threshold is measured, not guessed. With all nine items labelled the capsule is 883px, which is:
+       46% of 1920   ·   40% of 2200   ·   34.5% of 2560   ·   23% of 3840
+     At 1920 it has stopped being a corner affordance and reads as a header bar, so the labels appear from
+     2200px up — where the capsule is at most two fifths of the screen and there is still more empty space to
+     its left than capsule. Below that the icons carry the meaning, and every mark is also in the footer.
+     `unset` rather than re-declaring each property: the hidden state is a clip-path trick with four
+     interacting declarations, and undoing them one by one is how one gets left behind. */
+  @media (min-width: 2200px) {
+    .cnav .mark .label {
+      position: unset; width: unset; height: unset; overflow: unset; clip-path: unset;
+    }
+    .cnav .mark .content { gap: 7px; }
+    .cnav .mark { padding: 9px 14px; }
+  }
+
+  /* THE PAGE YOU ARE ON, marked without colour alone: a hairline under the label, in the accent. Colour alone
+     would fail for a reader who cannot see it, and the bloom pill is already spoken for by hover. */
+  .cnav a[aria-current='page'] .page-label {
+    box-shadow: inset 0 -1px 0 0 var(--ochre);
+  }
+  .cnav a[aria-current='page'] { font-weight: 500; }
+
   /* sun/moon swap: show the glyph for the ACTION (moon = go dark in light
      theme; sun = go light in dark theme). Default (light) shows moon. */
   .cnav .toggle .ic-sun { display: none; }
@@ -208,12 +268,36 @@ const items: Item[] = [
     100% { transform: translateY(0); }
   }
 
-  /* Mobile: icons only, tighter capsule — labels would crowd the top edge */
+  /* Narrow: the page WORDS are what must survive (they are the navigation), so the contact marks go first —
+     every one of them is still reachable from the Signature section at the foot of the page.
+     The threshold is 1200px, not 1000: with five pages the full capsule measures 664px, which is 65% of a
+     1024px viewport and 52% of a 1280px one. A nav is a corner affordance, and at two thirds of the width it
+     has stopped being one. Dropping the marks brings it to 512px (50% at 1024). */
+  /* BOTH separators go with the icons, not just the first. Hiding the icon links but keeping the rule on each
+     side of them left a stray double divider with an empty slot between them: measured at 768px, rules at x=646
+     and x=663 with 14px of blank pill between, then the toggle at x=683. It read as a missing button.
+     (A later ≤640px rule also hid .sep, which is why this only showed between 641px and 1199px.) */
+  @media (max-width: 1199px) {
+    .cnav .mark, .cnav .sep { display: none; }
+  }
+
+  /* Mobile: tighter capsule, and the pages shrink rather than disappear — a phone visitor with no nav at all
+     would be stranded on whichever page they landed on. */
   @media (max-width: 640px) {
-    .cnav { top: 12px; right: 14px; }
-    .cnav ul { padding: 3px; }
-    .cnav a, .cnav .toggle { padding: 9px 10px; }
-    .cnav .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .cnav { top: 12px; right: 14px; left: 14px; }
+    /* WRAPS, and that is a bug fix. The capsule was one non-wrapping flex row with justify-content: flex-end,
+       so once its contents outgrew the phone the overflow escaped to the LEFT, off the side of the screen —
+       measured on /research at 390px, "Research" sat at x -32..41 and read as "earch"; at 320px it was gone
+       entirely (-102..-29) and "Writing" was clipped too. The first destination in the nav was unreachable on
+       every inner route, which is the opposite of the comment above this block.
+       Wrapping keeps every destination on screen. The radius comes down to match, because a 999px pill drawn
+       around two rows reads as a lozenge with the end links pushed into its curve. */
+    .cnav ul {
+      padding: 3px; justify-content: flex-end;
+      flex-wrap: wrap; row-gap: 1px; border-radius: 16px;
+    }
+    .cnav a, .cnav .toggle { padding: 8px 9px; }
+    .cnav .page { font-size: 11px; letter-spacing: 0.02em; }
     .cnav .content { gap: 0; }
   }
 

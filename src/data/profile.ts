@@ -203,6 +203,7 @@ export const projects: Project[] = [
 export const links: { label: string; href: string; primary?: boolean }[] = [
   { label: 'Download CV', href: '/cv.pdf', primary: true },
   { label: 'Research', href: '/research' },
+  { label: 'Experience', href: '/experience' },
   { label: 'Projects', href: '/projects' },
   { label: 'Art', href: '/art' },
   { label: 'Email', href: 'mailto:zeying.tian@mail.mcgill.ca' },

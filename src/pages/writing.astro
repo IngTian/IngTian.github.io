@@ -1,0 +1,211 @@
+---
+// /writing — essays, research notes and explainers.
+//
+// The owner: "you might want pages that is expandable to contain research projects, we will have writings and
+// more in the future." A separate route from /research, on their choice: a paper and a post are different
+// objects with different contracts, and filing them together lets informal writing borrow the paper's
+// authority. /research stays papers-only.
+//
+// EXPANDABLE BY CONSTRUCTION. The page renders whatever KINDS data/writing.ts declares, and each kind renders
+// whatever entries it holds — so a fourth kind (talks, teaching, a reading log) is a data edit, and the first
+// essay is a data edit. There is nothing to lay out again.
+//
+// Composition is deliberately IDENTICAL to /projects: same left margin, same reading measure, same rail, same
+// reading gradient. Three reading pages that each guessed their own margins would read as three sites.
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PlushCow from '../components/PlushCow.astro';
+import FluidSky from '../components/proto/FluidSky.astro';
+import SkyWash from '../components/SkyWash.astro';
+import SideRail from '../components/SideRail.astro';
+import { KINDS, sorted, totalEntries, kindSectionId, entrySectionId } from '../data/writing';
+import { COW_LINES_WRITING } from '../data/cowGlyph';
+import { writingStops } from '../lib/pageStops';
+
+const stops = writingStops(KINDS);
+const total = totalEntries(KINDS);
+
+// Long-form dates, computed from the ISO string rather than typed twice.
+const longDate = (iso: string) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
+    year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+  });
+---
+<BaseLayout
+  title="Writing — Ing Tian"
+  description="Essays, research notes and explainers by Ing Tian (Zeying Tian) on multi-period portfolio optimization, quantitative finance, and the engineering underneath it."
+  veilLine="a thinker in the margins"
+  veilOnLoad={true}
+  navZone="light"
+>
+  <main class="writing descent is-fluid">
+    <FluidSky strength={3} variant="reading" />
+    <SkyWash />
+
+    {/* NO RAIL WHEN THERE IS NOTHING TO POINT AT. The kind sections only render once something is published,
+        so rendering the rail unconditionally would leave a column of anchors pointing at ids that do not
+        exist. */}
+    {total > 0 && <SideRail stops={stops} id="writing-toc" />}
+
+    <div class="writing-block">
+      <header class="writing-head">
+        <a class="back" href="/">← back</a>
+        <h1>Writing</h1>
+        <p class="lede">
+          Notes and essays on multi-period portfolio optimization and the engineering underneath it. The papers
+          live on <a class="inline-link" href="/research">research</a>; this is the thinking around them —
+          shorter, less formal, and revisable.
+        </p>
+        {total === 0 && (
+          /* THE HONEST OPENING. One line, and then a cow. */
+          <p class="state">
+            <span class="state-mark" aria-hidden="true"></span>
+            Nothing published yet.
+          </p>
+        )}
+      </header>
+
+      {/* ── EMPTY: A COW, NOT A SCAFFOLD.
+          The owner: "instead of scaffolding something that doesn't exist yet, let's just put that big cow
+          there." Right — three sections each promising what will one day fill them is three apologies and no
+          content, and it makes the page look abandoned rather than early. A cow holding the space is honest
+          about there being nothing here, and better company.
+          The structure is not lost: the moment data/writing.ts holds one entry, the kind sections below render
+          exactly as before and the cow steps aside. Nothing to lay out again. */}
+      {total === 0 && (
+        <div class="writing-cow">
+          <PlushCow
+            size="large"
+            lines={COW_LINES_WRITING}
+            label="A cow, holding the space until something is written here. Press it."
+          />
+        </div>
+      )}
+
+      <div class="kind-list" hidden={total === 0}>
+        {KINDS.map((kind) => (
+          <section class="kind" id={kindSectionId(kind.key)} aria-labelledby={`${kindSectionId(kind.key)}-h`}>
+            <header class="kind-head">
+              <h2 id={`${kindSectionId(kind.key)}-h`} class="kind-title">{kind.label}</h2>
+              <p class="kind-gloss">{kind.gloss}</p>
+            </header>
+
+            {kind.entries.length === 0 ? (
+              /* A kind names WHAT is coming rather than saying "coming soon": a specific plan reads as a plan,
+                 a generic promise reads as filler. Copy lives in data/writing.ts with the kind. */
+              <p class="kind-empty">{kind.empty}</p>
+            ) : (
+              <ol class="piece-list">
+                {sorted(kind).map((e) => (
+                  <li class="piece" id={entrySectionId(kind.key, e.slug)}>
+                    <p class="piece-meta">
+                      <time datetime={e.date}>{longDate(e.date)}</time>
+                      {e.minutes && <span class="piece-mins">{e.minutes} min</span>}
+                    </p>
+                    <h3 class="piece-title">
+                      {/* Unpublished pieces render as plain text, never as a link to nowhere. */}
+                      {e.href ? <a href={e.href}>{e.title}</a> : e.title}
+                    </h3>
+                    <p class="piece-blurb">{e.blurb}</p>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        ))}
+      </div>
+
+      <footer class="writing-foot"><a class="back" href="/">← back to the descent</a></footer>
+    </div>
+  </main>
+</BaseLayout>
+
+<style>
+  .writing { position: relative; z-index: 0; min-height: 100vh; }
+
+  /* Shared reading gradient — the same token /research and /projects use, so the three reading pages stay one
+     system rather than three guesses. */
+  .writing.descent { background: var(--reading-grad); }
+
+  .writing-cow { margin: clamp(10px, 2vh, 26px) 0 clamp(20px, 4vh, 48px); }
+
+  .writing-block {
+    width: min(64%, 860px);
+    margin-left: 34%;
+    margin-right: clamp(24px, 4vw, 90px);
+    box-sizing: border-box;
+  }
+
+  .writing-head { padding: 14vh 0 5vh; }
+  .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
+  .back:hover { color: var(--seal); }
+  .writing h1 {
+    font-family: var(--font-display); font-weight: 500; font-size: clamp(38px, 5vw, 58px);
+    line-height: 1.04; letter-spacing: -0.01em; font-variation-settings: 'SOFT' 60; margin-top: 16px; color: var(--ink-1);
+  }
+  .lede { font-size: 14px; color: var(--ink-3); margin-top: 16px; line-height: 1.7; max-width: 54ch; }
+  .inline-link { color: var(--ink-2); text-decoration: none; box-shadow: inset 0 -1px 0 0 var(--ochre); }
+  .inline-link:hover { color: var(--ink-1); }
+
+  /* The page-state line. An ochre tick rather than an icon: the site has no icon language on reading pages,
+     and a bare sentence at this size reads as body copy rather than as status. */
+  .state {
+    display: flex; align-items: baseline; gap: 9px;
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.02em; line-height: 1.6;
+    color: var(--ink-3); margin-top: 26px; max-width: 56ch;
+  }
+  .state-mark {
+    flex: none; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--ochre); transform: translateY(-2px);
+  }
+
+  .kind-list { display: grid; gap: clamp(38px, 6vh, 68px); }
+  /* Offset so a jumped-to section is not glued to the viewport's top edge. */
+  .kind { scroll-margin-top: 12vh; }
+  .kind-head { border-top: 1px solid var(--ink-5); padding-top: 18px; }
+  .kind-title {
+    font-family: var(--font-display); font-weight: 500; font-size: clamp(21px, 2.4vw, 29px);
+    line-height: 1.15; letter-spacing: -0.01em; color: var(--ink-1); margin: 0;
+  }
+  .kind-gloss { font-size: 13.5px; line-height: 1.65; color: var(--ink-3); margin: 10px 0 0; max-width: 58ch; }
+
+  /* The empty state is DESIGNED, per the project's rule that loading and empty states are never left default.
+     Italic display type at reading size, indented behind a hairline — it reads as an author's note about what
+     is coming, which is what it is. */
+  .kind-empty {
+    font-family: var(--font-display); font-style: italic;
+    font-size: 14.5px; line-height: 1.7; color: var(--ink-3);
+    margin: 18px 0 0; padding-left: 16px; border-left: 1px solid var(--ochre);
+    max-width: 56ch;
+  }
+
+  .piece-list { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 26px; }
+  .piece { scroll-margin-top: 12vh; }
+  .piece-meta {
+    display: flex; gap: 12px; align-items: baseline;
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-4); margin: 0 0 6px;
+  }
+  .piece-mins::before { content: '·'; margin-right: 12px; }
+  .piece-title {
+    font-family: var(--font-display); font-weight: 500; font-size: clamp(17px, 1.7vw, 21px);
+    line-height: 1.25; color: var(--ink-1); margin: 0;
+  }
+  .piece-title a { color: inherit; text-decoration: none; box-shadow: inset 0 -1px 0 0 var(--ochre); }
+  .piece-title a:hover { color: var(--ink-2); }
+  .piece-blurb { font-size: 13.5px; line-height: 1.7; color: var(--ink-3); margin: 8px 0 0; max-width: 58ch; }
+
+  .writing-foot { padding: 10vh 0 16vh; }
+
+  /* Narrow: the rail hides itself at the same 1100px breakpoint SideRail uses, so the column re-centers at the
+     reading measure rather than keeping a margin for a rail that is gone. */
+  @media (max-width: 1100px) {
+    .writing-cow { margin: clamp(10px, 2vh, 26px) 0 clamp(20px, 4vh, 48px); }
+
+  .writing-block { width: auto; margin: 0 auto; padding: 0 24px; max-width: 760px; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .kind { animation: writing-in 0.7s ease both; }
+    @keyframes writing-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  }
+</style>

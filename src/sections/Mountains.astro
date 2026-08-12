@@ -37,10 +37,12 @@ const elsewhere = timeline.filter((e) => !flagTitles.has(e.title));
        inset is viewport-relative via clamp() — scales with screen size and honours
        browser zoom — not a fixed device pixel. Mobile keeps full width (no rail). -->
   <div class="mtn relative z-10 max-w-[920px] mx-auto">
-    <p class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/55">The story so far</p>
-    <h2 class="font-display italic text-[26px] sm:text-[30px] text-paper mt-3 leading-snug">
-      A quant who reasons in structure,<br />an engineer who makes the math run.
-    </h2>
+    <!-- The "A quant who reasons in structure" line MOVED UP to the Interlude, directly under the
+         tagline, where the owner asked for it. Once the descent graph and the story panel landed
+         above this section it sat three screens below the fold — still in the HTML, gone from the
+         read. The kicker stays: this section still needs its own label, and by the time a reader
+         arrives the identity claim has already been made and evidenced. -->
+    <p class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/55">The record</p>
 
     <!-- Research interests — teaser; full themed list lives on /research -->
     <h3 class="font-mono text-[11px] tracking-[0.24em] uppercase text-paper/45 mt-14 mb-3">
