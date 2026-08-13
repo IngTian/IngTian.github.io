@@ -1,0 +1,202 @@
+---
+// PHONE-ONLY: the three explainer slides collapse to their headline.
+//
+// WHY THIS IS A RUNTIME TRANSFORM AND NOT MARKUP. The disclosure could be authored in the .astro files, and
+// that is the obvious way — but then three `button[aria-expanded]` controls exist on DESKTOP too, in its tab
+// order and its accessibility tree, doing nothing. That is a real regression and an invisible one: no
+// screenshot shows it. Building the disclosure in JS below the phone breakpoint means the HTML Astro emits is
+// byte-for-byte what desktop ships today, so desktop is unchanged rather than merely looking unchanged.
+//
+// WHAT IT COSTS: a phone with JavaScript off gets today's long scroll. That is the current experience, not a
+// new failure, but it does make this an enhancement layer rather than a guarantee.
+//
+// IT MOVES NODES, IT NEVER WRITES TEXT — and that is load-bearing for search, not just tidiness. Since
+// mobile-first indexing, Google reads the PHONE rendering, and its guidance is explicit that content requiring
+// a tap to load is not indexed ("Don't lazy-load primary content upon user interaction") while content merely
+// collapsed into an accordion is fine and is the recommended way to save space. Rendering these bodies on tap
+// would therefore have quietly cost the 1,606 words the three explainers carry. Everything here is
+// appendChild of existing nodes: identity, listeners and the beat-steppers' element references all survive.
+---
+<script>
+  import { isPhone, PHONE_MAX_WIDTH } from '../lib/viewport';
+
+  /**
+   * The slides that collapse, in reading order.
+   *
+   * #story earns its place by measurement rather than by symmetry: on an iPhone 14 it is 3.07 screens, made of
+   * a 1.11-screen career list and 1.67 screens of "Why the climb" prose. Its h2 sits INSIDE .story-inner,
+   * after the graph's slot, so the generic transform collapses exactly the prose and leaves the career stops
+   * (McGill → Ericsson → Amazon → TikTok → EA → Toronto) on screen. That is the right half to keep: those
+   * labels are what someone searching by employer matches, and on a phone DescentPath already degrades from a
+   * canvas to that text list, so the graph is not being "hidden" here — it is already words.
+   */
+  const SECTIONS = ['#choice', '#rules', '#solve', '#story'];
+
+  type Undo = () => void;
+
+  function collapseOne(section: HTMLElement, index: number): Undo | null {
+    // The panel is the section's single full-bleed child; its own first child holds the column.
+    const panel = section.firstElementChild as HTMLElement | null;
+    const inner = panel?.firstElementChild as HTMLElement | null;
+    // THE SECTION'S OWN HEADING, via the aria-labelledby it already declares — not `querySelector('h2[id]')`.
+    // That shortcut returns the FIRST such heading in the subtree, which on #story is DescentPath's
+    // "A descent, with one climb" nested inside the figure slot. The transform then collapsed from there and
+    // swallowed the career list as well as the prose: measured 0.30 screens instead of 1.3, with the employer
+    // names one tap away rather than on screen. aria-labelledby is unambiguous and is already the contract
+    // these sections publish about which heading is theirs.
+    const labelledBy = section.getAttribute('aria-labelledby');
+    const heading = labelledBy ? document.getElementById(labelledBy) : null;
+    if (!panel || !inner || !heading) return null;
+    if (heading.querySelector('[data-phone-toggle]')) return null;   // already transformed
+
+    const undos: Undo[] = [];
+
+    // ── 1. The body: everything that follows the heading, AT EVERY LEVEL up to the column.
+    // The three slides nest their heading at three different depths — Choice's h2 is a direct child of the
+    // column, Rules' sits inside .ru-flow, Solve's inside .so-split > .so-say — so "the nodes after the
+    // heading" is not one sibling list. Walking up and taking each level's following siblings is what makes
+    // one implementation fit all three without hardcoding any of their structures.
+    const panelIds: string[] = [];
+    let level: HTMLElement = heading;
+    let group = 0;
+    while (level !== inner && level.parentElement) {
+      const parent: HTMLElement = level.parentElement;
+      const after: ChildNode[] = [];
+      for (let n = level.nextSibling; n; n = n.nextSibling) after.push(n);
+      if (after.length) {
+        const box = document.createElement('div');
+        box.setAttribute('data-phone-body', '');
+        box.id = `phone-body-${index}-${group++}`;
+        panelIds.push(box.id);
+        parent.insertBefore(box, level.nextSibling);
+        after.forEach((n) => box.appendChild(n));
+        undos.push(() => {
+          while (box.firstChild) parent.insertBefore(box.firstChild, box);
+          box.remove();
+        });
+      }
+      level = parent;
+    }
+    if (!panelIds.length) return null;
+
+    // ── 2. The control: a button INSIDE the heading — the ARIA accordion pattern. Not a button wrapping the
+    // heading (a <button> may only contain phrasing content, which an <h2> is not), and not a separate line of
+    // text repeating the headline, which would duplicate a heading in the indexed rendering. The heading keeps
+    // its id, its text and its place in the document outline; the button simply becomes the thing you press.
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('data-phone-toggle', '');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-controls', panelIds.join(' '));
+    const moved: ChildNode[] = [];
+    while (heading.firstChild) { moved.push(heading.firstChild); btn.appendChild(heading.firstChild); }
+    heading.appendChild(btn);
+    undos.push(() => {
+      moved.forEach((n) => heading.appendChild(n));
+      btn.remove();
+    });
+
+    section.setAttribute('data-phone-collapsible', '');
+    undos.push(() => section.removeAttribute('data-phone-collapsible'));
+
+    function setOpen(open: boolean): void {
+      section.toggleAttribute('data-phone-open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    setOpen(false);
+    const onClick = () => setOpen(btn.getAttribute('aria-expanded') !== 'true');
+    btn.addEventListener('click', onClick);
+    undos.push(() => {
+      btn.removeEventListener('click', onClick);
+      section.removeAttribute('data-phone-open');
+    });
+
+    return () => undos.reverse().forEach((u) => u());
+  }
+
+  let undoAll: Undo | null = null;
+
+  function apply(): void {
+    undoAll?.();
+    undoAll = null;
+    if (!isPhone()) return;
+    const undos = SECTIONS.map((sel, i) => {
+      const el = document.querySelector<HTMLElement>(sel);
+      return el ? collapseOne(el, i) : null;
+    }).filter((u): u is Undo => !!u);
+    if (undos.length) undoAll = () => undos.forEach((u) => u());
+  }
+
+  document.addEventListener('astro:page-load', apply);
+
+  // Re-decide when the breakpoint is crossed, and UNDO cleanly when leaving phone width — a rotated phone or a
+  // resized window must not be left with a half-transformed DOM. Same reasoning as the deck's gate.
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    window.matchMedia(`(max-width: ${PHONE_MAX_WIDTH}px)`).addEventListener('change', apply);
+  }
+</script>
+
+<style is:global>
+  /* Global, not scoped: these elements are created at runtime, so Astro's scoped data attribute is not on
+     them. Everything here is inside the phone breakpoint, so desktop cannot be reached by it. */
+  @media (max-width: 640px) {
+    [data-phone-collapsible] [data-phone-body] { display: none; }
+    [data-phone-collapsible][data-phone-open] [data-phone-body] { display: revert; }
+
+    /* The heading becomes the tap target. The button inherits the heading's type so the slide still opens with
+       its own headline rather than with a control that looks bolted on. */
+    [data-phone-collapsible] h2 > [data-phone-toggle] {
+      appearance: none;
+      -webkit-appearance: none;
+      background: none;
+      border: 0;
+      margin: 0;
+      padding: 10px 0;
+      font: inherit;
+      color: inherit;
+      letter-spacing: inherit;
+      text-align: left;
+      width: 100%;
+      display: flex;
+      align-items: baseline;
+      gap: 0.5em;
+      cursor: pointer;
+    }
+    /* A chevron, drawn in CSS so there is no glyph to translate and nothing to download. Rotates on open —
+       transform only, per the project's motion rule. */
+    [data-phone-collapsible] h2 > [data-phone-toggle]::after {
+      content: '';
+      flex: none;
+      margin-left: auto;
+      width: 0.42em;
+      height: 0.42em;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      opacity: 0.55;
+      transform: rotate(45deg);
+      transform-origin: center;
+      align-self: center;
+    }
+    [data-phone-collapsible][data-phone-open] h2 > [data-phone-toggle]::after {
+      transform: rotate(-135deg);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      [data-phone-collapsible] h2 > [data-phone-toggle]::after { transition: transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1); }
+    }
+    [data-phone-collapsible] h2 > [data-phone-toggle]:focus-visible {
+      outline: 2px solid var(--ochre);
+      outline-offset: 3px;
+      border-radius: 3px;
+    }
+
+    /* WITHOUT THIS THE COLLAPSE ACHIEVES NOTHING. global.css gives every slide `min-height: 100vh` so that it
+       "owns the screen" — a rule that exists FOR THE DECK. With the deck off on phones a collapsed explainer
+       would still reserve a full screen and the page would not get shorter at all. The hero and the interlude
+       keep theirs: the hero is a composition that wants the screen, and the tagline's whole point is landing
+       alone in the sky. */
+    .is-slides > section#choice,
+    .is-slides > section#rules,
+    .is-slides > section#solve,
+    .is-slides > section#story { min-height: 0; }
+  }
+</style>
