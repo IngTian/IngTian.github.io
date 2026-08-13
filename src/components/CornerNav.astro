@@ -66,7 +66,27 @@ const items: Item[] = [
 ];
 ---
 <nav class="cnav" aria-label="Site navigation, contact and profiles" data-cnav data-nav-mode={navZone}>
-  <ul>
+  {/* PHONE MENU BUTTON — only rendered visible in nav variant 3 (see the mobile block in <style>). It is a
+      real <button> with aria-expanded/aria-controls so the disclosure is announced; in variants 1 and 2 it is
+      display:none and therefore out of the tab order and the a11y tree entirely. */}
+  <button
+    type="button"
+    class="navmenu"
+    data-nav-menu
+    aria-label="Open navigation menu"
+    aria-expanded="false"
+    aria-controls="cnav-list"
+  >
+    <span class="pill" aria-hidden="true"></span>
+    <span class="content">
+      <svg class="ic" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+        <g stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+          <path d="M2.4 4.2h11.2M2.4 8h11.2M2.4 11.8h11.2"/>
+        </g>
+      </svg>
+    </span>
+  </button>
+  <ul id="cnav-list">
     {/* THE PAGES, first and in words — this is the part a visitor needs and must not have to hunt for.
         aria-current marks the page you are on, so the nav answers "where am I" as well as "where can I go". */}
     {PAGES.map((p) => (
@@ -79,7 +99,7 @@ const items: Item[] = [
     ))}
     <li class="sep" aria-hidden="true"></li>
     {items.map((it) => (
-      <li>
+      <li class="mark-li">
         <a
           class="mark"
           href={it.href}
@@ -119,6 +139,53 @@ const items: Item[] = [
     </li>
   </ul>
 </nav>
+
+{/* ── TEMPORARY JUDGING SWITCHER. Three mobile nav forms, flipped live, because a 68px capsule at 320px is
+    exactly the kind of small visual detail that cannot be judged from a screenshot — it has to be seen on the
+    device, at the real size, under a real thumb. Pinned bottom-centre so it never sits near the nav it is
+    switching. Comes out of the tree the moment a form is chosen. ── */}
+<div class="navpick" data-navpick-bar aria-label="Mobile nav form (temporary)">
+  <span class="navpick-label">nav</span>
+  <button type="button" data-nav-pick="1" aria-pressed="false">1 hug</button>
+  <button type="button" data-nav-pick="2" aria-pressed="false">2 bar</button>
+  <button type="button" data-nav-pick="3" aria-pressed="false">3 menu</button>
+</div>
+
+<style>
+  .navpick {
+    position: fixed;
+    z-index: 60;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px;
+    border-radius: 999px;
+    background: rgba(22, 20, 15, 0.72);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .navpick-label { color: rgba(244, 239, 228, 0.5); padding: 0 2px; }
+  .navpick button {
+    font: inherit;
+    color: rgba(244, 239, 228, 0.75);
+    background: none;
+    border: 0;
+    border-radius: 999px;
+    padding: 6px 9px;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .navpick button[aria-pressed='true'] {
+    background: var(--ochre);
+    color: var(--on-accent);
+  }
+</style>
 
 <style>
   .cnav {
@@ -186,6 +253,39 @@ const items: Item[] = [
   }
   .cnav .toggle { background: none; border: 0; cursor: pointer; -webkit-appearance: none; appearance: none; padding: 9px 12px; }
   .cnav[data-zone="dark"] a, .cnav[data-zone="dark"] .toggle { color: var(--paper); }
+
+  /* ── The phone menu button (variant 3 only). Self-contained rather than folded into the shared item base,
+     so it carries its own frost: when the list is closed this button IS the whole nav, with no <ul> behind it
+     to provide the glass. display:none by default keeps it out of the tab order and the a11y tree everywhere
+     except the variant that uses it. ── */
+  .cnav .navmenu {
+    display: none;
+    position: relative;
+    place-items: center;
+    background: rgba(244, 239, 228, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 2px 10px rgba(22, 20, 15, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    -webkit-backdrop-filter: blur(14px) saturate(1.15);
+    backdrop-filter: blur(14px) saturate(1.15);
+    border-radius: 999px;
+    padding: 10px 11px;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    color: var(--ink-1);
+    isolation: isolate;
+  }
+  .cnav[data-zone="dark"] .navmenu {
+    background: rgba(22, 20, 15, 0.42);
+    border-color: rgba(184, 177, 161, 0.22);
+    color: var(--paper);
+  }
+  :global(html[data-theme='dark']) .cnav .navmenu {
+    background: rgba(12, 12, 16, 0.5);
+    border-color: rgba(184, 177, 161, 0.18);
+    color: var(--ink-1);
+  }
+  .cnav .navmenu:focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; }
 
   /* thin separator before the toggle — sets the utility control apart */
   .cnav .sep { width: 1px; align-self: stretch; margin: 4px 3px; background: currentColor; opacity: 0.18; }
@@ -277,28 +377,79 @@ const items: Item[] = [
      side of them left a stray double divider with an empty slot between them: measured at 768px, rules at x=646
      and x=663 with 14px of blank pill between, then the toggle at x=683. It read as a missing button.
      (A later ≤640px rule also hid .sep, which is why this only showed between 641px and 1199px.) */
+  /* HIDE THE <li>, NOT JUST THE <a> INSIDE IT. `.mark` is the link; its list-item wrapper is a separate
+     element, so hiding only the link left four EMPTY list items still laid out in the capsule. In the flex
+     row that cost 8px of stray gap (invisible, so it went unnoticed for a long time). In a grid it is not
+     invisible at all: the empty items claim four cells, which pushed the theme toggle onto a row of its own
+     and made the capsule 97px tall instead of 61px. Hiding the wrapper removes the items from layout in
+     every form. */
   @media (max-width: 1199px) {
-    .cnav .mark, .cnav .sep { display: none; }
+    .cnav .mark, .cnav .sep, .cnav .mark-li { display: none; }
   }
 
   /* Mobile: tighter capsule, and the pages shrink rather than disappear — a phone visitor with no nav at all
      would be stranded on whichever page they landed on. */
   @media (max-width: 640px) {
-    .cnav { top: 12px; right: 14px; left: 14px; }
-    /* WRAPS, and that is a bug fix. The capsule was one non-wrapping flex row with justify-content: flex-end,
-       so once its contents outgrew the phone the overflow escaped to the LEFT, off the side of the screen —
-       measured on /research at 390px, "Research" sat at x -32..41 and read as "earch"; at 320px it was gone
-       entirely (-102..-29) and "Writing" was clipped too. The first destination in the nav was unreachable on
-       every inner route, which is the opposite of the comment above this block.
-       Wrapping keeps every destination on screen. The radius comes down to match, because a 999px pill drawn
-       around two rows reads as a lozenge with the end links pushed into its curve. */
-    .cnav ul {
-      padding: 3px; justify-content: flex-end;
-      flex-wrap: wrap; row-gap: 1px; border-radius: 16px;
-    }
+    /* ── Shared phone basics, common to all three variants. ──
+       WHY THERE ARE THREE. The previous single rule pinned BOTH left:14px and right:14px, which stops this
+       being a corner nav at all — the capsule stretches to the full screen — and then justify-content:flex-end
+       packed the items against the right edge of that full-width bar while flex-wrap pushed the overflow onto
+       a second row. Measured in WebKit at 320px: capsule 292x68 = 91% of the screen, 73px of DEAD pill on the
+       left, and the theme toggle stranded alone on row two. The owner's word for it was "exploded".
+       The rule it replaced was itself a real fix (without left:14px the contents overflowed LEFTWARD off the
+       screen: "Research" rendered as "earch" at 390px and was entirely gone at 320px), so this is not a
+       revert. The arithmetic underneath is that five labels plus a toggle CANNOT fit one row at 320px at any
+       font size this design would accept, so the form has to change: hug, distribute, or hide behind a menu.
+       Those are variants 1, 2 and 3. Which one ships is the owner's call, judged on a real iPhone. */
+    .cnav { top: 12px; right: 14px; }
     .cnav a, .cnav .toggle { padding: 8px 9px; }
     .cnav .page { font-size: 11px; letter-spacing: 0.02em; }
     .cnav .content { gap: 0; }
+
+    /* ── VARIANT 1 — hug the content, two tidy rows, still a corner nav.
+       A 3-column GRID rather than a wrapped flex row, because wrapping is what produced the dead space:
+       shrink-to-fit on a fixed element resolves to the available width, so the box was full-width no matter
+       what, and flex-end then left the slack on the left. A grid of `auto` columns is exactly as wide as its
+       widest three labels, so the box hugs and the rows balance 3 + 3 by construction. */
+    :global(html[data-nav-variant='1']) .cnav ul {
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      gap: 1px 0;
+      justify-items: stretch;
+      padding: 3px;
+      border-radius: 16px;
+    }
+
+    /* ── VARIANT 2 — a deliberate full-width bar: one row, evenly distributed, toggle at the end.
+       Tight by arithmetic, not by taste: at 320px this fits with roughly 10px to spare, so renaming any label
+       to something longer will break it. That fragility is the trade and it is why this is not my pick. */
+    :global(html[data-nav-variant='2']) .cnav { left: 14px; }
+    :global(html[data-nav-variant='2']) .cnav ul {
+      flex-wrap: nowrap;
+      justify-content: space-between;
+      padding: 2px 5px;
+      border-radius: 999px;
+    }
+    :global(html[data-nav-variant='2']) .cnav a,
+    :global(html[data-nav-variant='2']) .cnav .toggle { padding: 7px 2px; }
+    :global(html[data-nav-variant='2']) .cnav .page { font-size: 10px; letter-spacing: 0; }
+
+    /* ── VARIANT 3 — one small mark at rest, destinations on demand.
+       The only form that is not fighting for room, and the only one that scales if a sixth page is ever added. */
+    :global(html[data-nav-variant='3']) .cnav .navmenu { display: grid; }
+    :global(html[data-nav-variant='3']) .cnav ul {
+      display: none;
+      flex-direction: column;
+      align-items: stretch;
+      padding: 4px;
+      border-radius: 14px;
+      min-width: 148px;
+    }
+    :global(html[data-nav-variant='3'][data-nav-open]) .cnav ul { display: flex; }
+    :global(html[data-nav-variant='3'][data-nav-open]) .cnav .navmenu { display: none; }
+    :global(html[data-nav-variant='3']) .cnav .page { font-size: 13px; }
+    :global(html[data-nav-variant='3']) .cnav a,
+    :global(html[data-nav-variant='3']) .cnav .toggle { padding: 9px 11px; }
   }
 
   /* Reduced motion: no bloom scale / nudge — the pill still appears (instant)
@@ -437,18 +588,79 @@ const items: Item[] = [
     }
     toggle?.addEventListener('click', onToggle);
 
+    // ── PHONE MENU (variant 3). The button and the list are one disclosure: opening swaps the ☰ for the list,
+    // so the two are never on screen together and the capsule never grows a second row.
+    const menu = nav.querySelector<HTMLButtonElement>('[data-nav-menu]');
+    function setOpen(open: boolean): void {
+      const root = document.documentElement;
+      if (open) root.setAttribute('data-nav-open', '');
+      else root.removeAttribute('data-nav-open');
+      menu?.setAttribute('aria-expanded', open ? 'true' : 'false');
+      // Move focus INTO the list when opening so a keyboard or VoiceOver user lands on the first destination
+      // instead of on a button that just vanished.
+      if (open) nav.querySelector<HTMLAnchorElement>('ul a')?.focus();
+    }
+    function onMenu(): void {
+      setOpen(!document.documentElement.hasAttribute('data-nav-open'));
+    }
+    // Dismiss on an outside tap or Escape — an open sheet with no way out is a trap on a phone.
+    function onDocPointer(e: Event): void {
+      if (!document.documentElement.hasAttribute('data-nav-open')) return;
+      if (e.target instanceof Node && nav.contains(e.target)) return;
+      setOpen(false);
+    }
+    function onDocKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape' && document.documentElement.hasAttribute('data-nav-open')) {
+        setOpen(false);
+        menu?.focus();
+      }
+    }
+    menu?.addEventListener('click', onMenu);
+    document.addEventListener('pointerdown', onDocPointer);
+    document.addEventListener('keydown', onDocKey);
+
     teardown = () => {
       if (onScroll) {
         window.removeEventListener('scroll', onScroll);
         window.removeEventListener('resize', onScroll);
       }
       toggle?.removeEventListener('click', onToggle);
+      menu?.removeEventListener('click', onMenu);
+      document.removeEventListener('pointerdown', onDocPointer);
+      document.removeEventListener('keydown', onDocKey);
+      document.documentElement.removeAttribute('data-nav-open');
     };
+  }
+
+  // ── TEMPORARY: which mobile nav form is on show. Resolved from ?nav=1|2|3, remembered in localStorage so a
+  // tap-through to another page keeps the form you are judging, and defaulting to 1. THIS WHOLE BLOCK, the
+  // picker markup, and two of the three variants come out once the owner picks one.
+  function applyVariant(): void {
+    const url = new URL(window.location.href);
+    const q = url.searchParams.get('nav');
+    let v = q && /^[123]$/.test(q) ? q : null;
+    if (!v) {
+      try { v = window.localStorage.getItem('navVariant'); } catch { v = null; }
+    }
+    if (!v || !/^[123]$/.test(v)) v = '1';
+    document.documentElement.setAttribute('data-nav-variant', v);
+    try { window.localStorage.setItem('navVariant', v); } catch { /* private mode */ }
+    document.querySelectorAll<HTMLButtonElement>('[data-nav-pick]').forEach((b) => {
+      b.setAttribute('aria-pressed', b.dataset.navPick === v ? 'true' : 'false');
+    });
   }
 
   document.addEventListener('astro:page-load', () => {
     teardown?.();
     teardown = null;
+    applyVariant();
     initCornerNav();
+    document.querySelectorAll<HTMLButtonElement>('[data-nav-pick]').forEach((b) => {
+      b.addEventListener('click', () => {
+        try { window.localStorage.setItem('navVariant', b.dataset.navPick || '1'); } catch { /* ignore */ }
+        document.documentElement.removeAttribute('data-nav-open');
+        applyVariant();
+      });
+    });
   });
 </script>
