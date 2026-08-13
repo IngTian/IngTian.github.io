@@ -140,53 +140,6 @@ const items: Item[] = [
   </ul>
 </nav>
 
-{/* ── TEMPORARY JUDGING SWITCHER. Three mobile nav forms, flipped live, because a 68px capsule at 320px is
-    exactly the kind of small visual detail that cannot be judged from a screenshot — it has to be seen on the
-    device, at the real size, under a real thumb. Pinned bottom-centre so it never sits near the nav it is
-    switching. Comes out of the tree the moment a form is chosen. ── */}
-<div class="navpick" data-navpick-bar aria-label="Mobile nav form (temporary)">
-  <span class="navpick-label">nav</span>
-  <button type="button" data-nav-pick="1" aria-pressed="false">1 hug</button>
-  <button type="button" data-nav-pick="2" aria-pressed="false">2 bar</button>
-  <button type="button" data-nav-pick="3" aria-pressed="false">3 menu</button>
-</div>
-
-<style>
-  .navpick {
-    position: fixed;
-    z-index: 60;
-    bottom: max(10px, env(safe-area-inset-bottom));
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 6px;
-    border-radius: 999px;
-    background: rgba(22, 20, 15, 0.72);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-    font-family: var(--font-mono);
-    font-size: 11px;
-  }
-  .navpick-label { color: rgba(244, 239, 228, 0.5); padding: 0 2px; }
-  .navpick button {
-    font: inherit;
-    color: rgba(244, 239, 228, 0.75);
-    background: none;
-    border: 0;
-    border-radius: 999px;
-    padding: 6px 9px;
-    cursor: pointer;
-    -webkit-appearance: none;
-    appearance: none;
-  }
-  .navpick button[aria-pressed='true'] {
-    background: var(--ochre);
-    color: var(--on-accent);
-  }
-</style>
-
 <style>
   .cnav {
     position: fixed;
@@ -389,55 +342,25 @@ const items: Item[] = [
 
   /* Mobile: tighter capsule, and the pages shrink rather than disappear — a phone visitor with no nav at all
      would be stranded on whichever page they landed on. */
+  /* ── ON A PHONE THE NAV IS ONE MARK, AND THE DESTINATIONS ARE A TAP AWAY. ──
+     The capsule that works on a desktop cannot work here, and the reason is arithmetic rather than taste: five
+     labels plus a theme toggle DO NOT FIT one row at 320px at any font size this design would accept. Every
+     attempt to make them fit deformed the nav instead.
+       · one non-wrapping row  → the contents overflowed LEFTWARD off the screen. "Research" rendered as
+         "earch" at 390px and was entirely gone at 320px, so the first destination was unreachable.
+       · pin both edges + wrap → stops it being a corner nav at all: the capsule stretched across the screen
+         (292x68 = 91% of a 320px viewport), justify-content:flex-end left 73px of DEAD pill on the left, and
+         the toggle was stranded alone on a second row. The owner's word was "exploded".
+       · full-width bar, one row, 10px type → fits with ~10px to spare, i.e. renaming any label breaks it.
+     A disclosure has none of these problems: at rest it is a 40x38 mark (13% of a 320px screen against the
+     old 91%), and it is the only form that still works if a sixth page is ever added.
+     The button and the list are mutually exclusive — opening swaps one for the other — so the capsule can
+     never grow a second row, which is the failure every other form kept finding. */
   @media (max-width: 640px) {
-    /* ── Shared phone basics, common to all three variants. ──
-       WHY THERE ARE THREE. The previous single rule pinned BOTH left:14px and right:14px, which stops this
-       being a corner nav at all — the capsule stretches to the full screen — and then justify-content:flex-end
-       packed the items against the right edge of that full-width bar while flex-wrap pushed the overflow onto
-       a second row. Measured in WebKit at 320px: capsule 292x68 = 91% of the screen, 73px of DEAD pill on the
-       left, and the theme toggle stranded alone on row two. The owner's word for it was "exploded".
-       The rule it replaced was itself a real fix (without left:14px the contents overflowed LEFTWARD off the
-       screen: "Research" rendered as "earch" at 390px and was entirely gone at 320px), so this is not a
-       revert. The arithmetic underneath is that five labels plus a toggle CANNOT fit one row at 320px at any
-       font size this design would accept, so the form has to change: hug, distribute, or hide behind a menu.
-       Those are variants 1, 2 and 3. Which one ships is the owner's call, judged on a real iPhone. */
     .cnav { top: 12px; right: 14px; }
-    .cnav a, .cnav .toggle { padding: 8px 9px; }
-    .cnav .page { font-size: 11px; letter-spacing: 0.02em; }
     .cnav .content { gap: 0; }
-
-    /* ── VARIANT 1 — hug the content, two tidy rows, still a corner nav.
-       A 3-column GRID rather than a wrapped flex row, because wrapping is what produced the dead space:
-       shrink-to-fit on a fixed element resolves to the available width, so the box was full-width no matter
-       what, and flex-end then left the slack on the left. A grid of `auto` columns is exactly as wide as its
-       widest three labels, so the box hugs and the rows balance 3 + 3 by construction. */
-    :global(html[data-nav-variant='1']) .cnav ul {
-      display: grid;
-      grid-template-columns: repeat(3, auto);
-      gap: 1px 0;
-      justify-items: stretch;
-      padding: 3px;
-      border-radius: 16px;
-    }
-
-    /* ── VARIANT 2 — a deliberate full-width bar: one row, evenly distributed, toggle at the end.
-       Tight by arithmetic, not by taste: at 320px this fits with roughly 10px to spare, so renaming any label
-       to something longer will break it. That fragility is the trade and it is why this is not my pick. */
-    :global(html[data-nav-variant='2']) .cnav { left: 14px; }
-    :global(html[data-nav-variant='2']) .cnav ul {
-      flex-wrap: nowrap;
-      justify-content: space-between;
-      padding: 2px 5px;
-      border-radius: 999px;
-    }
-    :global(html[data-nav-variant='2']) .cnav a,
-    :global(html[data-nav-variant='2']) .cnav .toggle { padding: 7px 2px; }
-    :global(html[data-nav-variant='2']) .cnav .page { font-size: 10px; letter-spacing: 0; }
-
-    /* ── VARIANT 3 — one small mark at rest, destinations on demand.
-       The only form that is not fighting for room, and the only one that scales if a sixth page is ever added. */
-    :global(html[data-nav-variant='3']) .cnav .navmenu { display: grid; }
-    :global(html[data-nav-variant='3']) .cnav ul {
+    .cnav .navmenu { display: grid; }
+    .cnav ul {
       display: none;
       flex-direction: column;
       align-items: stretch;
@@ -445,11 +368,16 @@ const items: Item[] = [
       border-radius: 14px;
       min-width: 148px;
     }
-    :global(html[data-nav-variant='3'][data-nav-open]) .cnav ul { display: flex; }
-    :global(html[data-nav-variant='3'][data-nav-open]) .cnav .navmenu { display: none; }
-    :global(html[data-nav-variant='3']) .cnav .page { font-size: 13px; }
-    :global(html[data-nav-variant='3']) .cnav a,
-    :global(html[data-nav-variant='3']) .cnav .toggle { padding: 9px 11px; }
+    /* Open state lives on <html> rather than on the nav, so the page can respond to it too (a future scrim
+       would hang off the same attribute) and so the script has one place to look. */
+    :global(html[data-nav-open]) .cnav ul { display: flex; }
+    :global(html[data-nav-open]) .cnav .navmenu { display: none; }
+    /* SIZED TO APPLE'S 44pt MINIMUM, not to the desktop capsule's proportions. These rows are now the ONLY way
+       to navigate on a phone, so a cramped target here is not a cosmetic problem. Measured, not guessed: 9px of
+       vertical padding gave 31px rows and 14px gave 41px — both under the guideline. 16px on a 13px line
+       measures 45px, which clears it. */
+    .cnav .page { font-size: 13px; }
+    .cnav a, .cnav .toggle { padding: 16px 13px; }
   }
 
   /* Reduced motion: no bloom scale / nudge — the pill still appears (instant)
@@ -632,35 +560,9 @@ const items: Item[] = [
     };
   }
 
-  // ── TEMPORARY: which mobile nav form is on show. Resolved from ?nav=1|2|3, remembered in localStorage so a
-  // tap-through to another page keeps the form you are judging, and defaulting to 1. THIS WHOLE BLOCK, the
-  // picker markup, and two of the three variants come out once the owner picks one.
-  function applyVariant(): void {
-    const url = new URL(window.location.href);
-    const q = url.searchParams.get('nav');
-    let v = q && /^[123]$/.test(q) ? q : null;
-    if (!v) {
-      try { v = window.localStorage.getItem('navVariant'); } catch { v = null; }
-    }
-    if (!v || !/^[123]$/.test(v)) v = '1';
-    document.documentElement.setAttribute('data-nav-variant', v);
-    try { window.localStorage.setItem('navVariant', v); } catch { /* private mode */ }
-    document.querySelectorAll<HTMLButtonElement>('[data-nav-pick]').forEach((b) => {
-      b.setAttribute('aria-pressed', b.dataset.navPick === v ? 'true' : 'false');
-    });
-  }
-
   document.addEventListener('astro:page-load', () => {
     teardown?.();
     teardown = null;
-    applyVariant();
     initCornerNav();
-    document.querySelectorAll<HTMLButtonElement>('[data-nav-pick]').forEach((b) => {
-      b.addEventListener('click', () => {
-        try { window.localStorage.setItem('navVariant', b.dataset.navPick || '1'); } catch { /* ignore */ }
-        document.documentElement.removeAttribute('data-nav-open');
-        applyVariant();
-      });
-    });
   });
 </script>
