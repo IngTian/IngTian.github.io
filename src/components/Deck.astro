@@ -26,6 +26,7 @@
 <script>
   import { deckStops, nextStop, type DeckSlide } from '../lib/deck';
   import { prefersReducedMotion } from '../lib/motion';
+  import { isPhone, PHONE_MAX_WIDTH } from '../lib/viewport';
 
   function initDeck(): (() => void) | null {
     const main = document.querySelector<HTMLElement>('main.is-slides');
@@ -33,6 +34,28 @@
     // The motion gate is the project's single source of truth. A deck is involuntary movement; a
     // reader who asked for less motion gets the plain scroll.
     if (prefersReducedMotion()) return null;
+
+    // ── THE DECK DOES NOT ENGAGE ON A PHONE. Its contract is "one gesture, one slide, and every slide owns
+    // the screen", and on a phone that contract is simply false: measured in real WebKit, 5 of the 7 slides
+    // are TALLER than the viewport — rules 1.84 screens, story 3.07 on an iPhone 14; 2.5 and 4.2 on an SE.
+    // A deck whose slides do not fit cannot rest at slide boundaries, so it rests INSIDE them, and every
+    // symptom the owner reported follows from that:
+    //   · body text resting under the fixed nav at 7 of 15 stops (11 of 19 on an SE). The panels' 78px of
+    //     padding only clears the nav when a slide's TOP is at the viewport top — true at the 8 slide-opening
+    //     stops, false at every interior one, which is exactly the split the measurements show.
+    //   · one swipe scrolled twice. The touch listeners below are { passive: true } and therefore CANNOT
+    //     preventDefault — confirmed in WebKit, where a passive preventDefault() left defaultPrevented false
+    //     and touch-action computed to `auto` on html, body and main. So iOS runs its own momentum scroll
+    //     while go() runs a smooth scrollTo to a stop, and the two fight.
+    //   · a light flick going nowhere. Under the 44px SWIPE threshold go() is never called, so the native
+    //     scroll simply stands and nothing re-snaps: a 30px flick rested 30px off-stop on an iPhone 14 and
+    //     95px off on an SE, still there 4 seconds later.
+    //   · one swipe advancing two stops, skipping a screen of an explainer.
+    // Turning the deck off removes all four at once, and it removes them by deleting behaviour rather than
+    // adding compensation. The phone then gets the ordinary free scroll — which is not a degraded state but
+    // the same finished one that reduced-motion readers already get, and the same one this file has always
+    // documented as such.
+    if (isPhone()) return null;
 
     // Slide elements: the top-level sections, full stop.
     //
@@ -237,8 +260,22 @@
   // for vanilla scripts (see TerrainHero / Toc). Without the teardown the listeners would stack up and
   // one gesture would advance several slides after a couple of navigations.
   let deckTeardown: (() => void) | null = null;
-  document.addEventListener('astro:page-load', () => {
+  function reinit(): void {
     deckTeardown?.();
     deckTeardown = initDeck();
-  });
+  }
+  document.addEventListener('astro:page-load', reinit);
+
+  // RE-DECIDE WHEN THE BREAKPOINT IS CROSSED, not only on navigation. Without this the phone gate would be
+  // sampled once per page load and then be wrong for the rest of the visit in both directions: a phone
+  // rotated to landscape (844px wide) would stay deck-less until it navigated, and a desktop window dragged
+  // below 640px would keep a deck driving a layout that has become the phone one. Rotation is the case that
+  // matters — it is one gesture, not an unusual thing to do.
+  //
+  // A matchMedia change listener rather than a resize handler: it fires only on the transition that actually
+  // changes the answer, so there is nothing to debounce. The deck's own resize handling (measure(), inside
+  // initDeck) still deals with size changes that do NOT cross the boundary.
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    window.matchMedia(`(max-width: ${PHONE_MAX_WIDTH}px)`).addEventListener('change', reinit);
+  }
 </script>
