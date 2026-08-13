@@ -175,7 +175,16 @@ for (const phrase of bio.strong) {
   /* Mobile: a diagonal can't hold — collapse to a single LEFT-aligned stack
      (bio under the name), never re-centered. Static flow replaces the absolute
      positioning below the sm breakpoint. */
-  @media (max-width: 640px) {
+  /* THE SHORT-VIEWPORT CASE IS A PHONE TOO — it is the same phone, turned sideways. The stack below is keyed
+     on width alone, so a landscape iPhone (844x390, 932x430) fell through it and got the DESKTOP hero: two
+     absolutely-positioned blocks placed for a tall screen, on a viewport 390px tall. The bio then printed
+     straight across the "Ing Tian" wordmark — the one case on the site where the owner's word "scrambled" was
+     literally true, rather than a frosted overlap.
+     Height is the right test rather than `orientation: landscape`: what breaks the diagonal composition is
+     not being wider than tall, it is not having the vertical room for a name above a bio. A short desktop
+     window has the same problem and now gets the same answer. 520px is the measured floor — the desktop hero
+     needs roughly that much to place both blocks without them meeting. */
+  @media (max-width: 640px), (max-height: 520px) {
     /* padding-top CLEARS THE CORNER NAV, and without it the site's own name was unreadable. This column is
        justify-content: flex-end, so when its content is taller than min-height the overflow goes out of the TOP
        — and on a small phone it does. Measured at 320x568: the h1 sat at y=32..90 while the nav capsule, wrapped

@@ -63,6 +63,25 @@ import SkyWash from '../components/SkyWash.astro';
     color: var(--ink-1); border: 1px solid var(--ink-4); border-radius: 999px; padding: 9px 20px; transition: border-color 0.3s, color 0.3s; }
   .nf-primary:hover { border-color: var(--seal); color: var(--seal); }
 
+  /* ── PHONE: CLEAR THE NAV, AND NEVER OVERFLOW UPWARDS. ──
+     Two things combined to make the headline's first line permanently unreadable on a phone. `place-items:
+     center` centres the block, so when the content is TALLER than the viewport it overflows equally in both
+     directions — and the top direction is unreachable, because no scroll position exists above 0. On an
+     iPhone 14 the content wants 679px in a 664px viewport, so the first line sat above the fold, under the
+     nav, with no way to bring it down. PR #49 had removed the phantom 120vh of scroll that was accidentally
+     serving as the escape hatch, which is what turned an ugly overlap into an unreachable line.
+     Padding fixes both at once: it guarantees clearance below the nav mark (12px offset + 38px tall + air),
+     and because .notfound uses min-height rather than height, the box GROWS when the content plus padding
+     exceeds the screen instead of centring the overflow off the top edge. The page then scrolls normally to
+     reveal everything — while still having zero PHANTOM overflow, which is the property PR #49 established
+     and which a test now guards. */
+  @media (max-width: 640px) {
+    /* Top padding only. A bottom pad would be scrollable space below the last line, and PR #49 established
+       that this page has none of that — measured, it turned 11px of designed air into 39px. The nf-links
+       margin already provides the air at the foot. */
+    .notfound { padding-top: 62px; align-content: center; }
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .nf-inner { animation: nf-in 0.8s ease both; }
     @keyframes nf-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }

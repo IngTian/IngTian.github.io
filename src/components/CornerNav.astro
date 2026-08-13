@@ -432,7 +432,60 @@ const items: Item[] = [
     } else {
       // document-y behind the nav's vertical center (fixed near the top edge)
       const probe = () => (nav.getBoundingClientRect().top + nav.getBoundingClientRect().bottom) / 2;
+
+      /**
+       * Relative luminance of the first OPAQUE thing actually painted behind the nav, or null if the sky is
+       * showing through.
+       *
+       * WHY THIS EXISTS. The gradient fraction below is a proxy for "what colour is behind the nav", and the
+       * proxy is wrong wherever an opaque panel is drawn ON TOP of the sky — which is most of this page. The
+       * explainer slides and the story/appendix panels are full-bleed paper. Measured consequence in the
+       * LIGHT theme: from 57% of the document down, the nav flipped to its dark glass while the thing behind
+       * it was still opaque light paper, so it read as an alien dark slab and its labels fell to 3.98:1 —
+       * under AA, on the site's only navigation.
+       * Sampling the real backdrop makes the answer correct by construction instead of by tuning a number,
+       * and it keeps working when panels move or new ones are added. elementsFromPoint (plural) is used
+       * because the nav itself is the topmost thing at that point; its own subtree is skipped.
+       */
+      const backdropLuminance = (): number | null => {
+        const nr = nav.getBoundingClientRect();
+        const y = (nr.top + nr.bottom) / 2;
+        const vw = window.innerWidth;
+        // GEOMETRY, NOT HIT-TESTING. document.elementsFromPoint looked like the obvious tool and is the wrong
+        // one: it SKIPS every element with pointer-events: none, which is precisely what all of this site's
+        // decorative sky layers are (the fluid-sky canvas, the atmosphere washes, the hero legibility band).
+        // On the homepage — main.descent.is-fluid, where the sky is PAINTED BY A CANVAS and .descent's own
+        // background-color is the opaque dark base — hit-testing therefore walked straight past the visible
+        // dawn sky and reported `rgb(22,20,15)`, flipping the light theme's nav to dark glass over its own
+        // pale hero. Measured 3.09:1 at 10% of scroll on desktop: a regression I introduced while fixing the
+        // phone, and the reason this function now asks a different question.
+        // The question it asks: is a FULL-BLEED OPAQUE PANEL covering the nav's line right now? Those are the
+        // only things that hide the sky, they are always `main > section > <block>`, and their boxes are
+        // ordinary geometry that no pointer-events value can hide. Anything else means the sky is what shows,
+        // and the descent-fraction proxy below is the right model for a sky whose colour varies with depth.
+        for (const el of document.querySelectorAll<HTMLElement>('main > section > *')) {
+          const r = el.getBoundingClientRect();
+          if (r.top > y || r.bottom < y) continue;          // not on the nav's line
+          if (r.width < vw * 0.6) continue;                 // not full-bleed: a card, not a panel
+          const parts = /rgba?\(([^)]+)\)/.exec(getComputedStyle(el).backgroundColor);
+          if (!parts) continue;
+          const [cr, cg, cb, ca = 1] = parts[1].split(',').map((s) => parseFloat(s));
+          if (!(ca >= 0.9)) continue;                       // translucent: the sky still reads through
+          const lin = (c: number) => { const v = c / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+          return 0.2126 * lin(cr) + 0.7152 * lin(cg) + 0.0722 * lin(cb);
+        }
+        return null;
+      };
+
       const update = () => {
+        // An opaque backdrop answers the question directly; the gradient fraction is only the fallback for
+        // when the sky itself is what shows through. 0.35 sits between the paper tones (~0.85) and the dusk/
+        // ink ones (~0.02-0.2), so mid-grey dusk still chooses paper text as it did before.
+        const lumBehind = backdropLuminance();
+        if (lumBehind !== null) {
+          nav.dataset.zone = lumBehind > 0.35 ? 'light' : 'dark';
+          return;
+        }
         const h = descent.offsetHeight;
         if (!h) return;
         const frac = (window.scrollY + probe()) / h;
