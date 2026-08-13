@@ -316,4 +316,7 @@ const { strength = 4, mode = 'background', variant = 'descent', yStart = 0 } = A
   }
 
   document.addEventListener('astro:page-load', initAll);
+  // Repaint on a theme flip: this one recompiles its shader, which is exactly why it should happen for THIS event
+  // and not for every re-init the page might trigger. See TerrainHero for the measurement.
+  document.addEventListener('theme:change', initAll);
 </script>

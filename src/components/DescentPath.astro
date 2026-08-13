@@ -741,4 +741,6 @@ import { WAYPOINTS } from '../lib/trajectory';
   }
 
   document.addEventListener('astro:page-load', initAll);
+  // Repaint on a theme flip without re-initialising the rest of the page — see TerrainHero for the measurement.
+  document.addEventListener('theme:change', initAll);
 </script>

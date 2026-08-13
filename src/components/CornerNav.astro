@@ -386,13 +386,32 @@ const items: Item[] = [
 
     // The actual flip: swap the attribute, persist, sync a11y, and repaint the
     // canvas-based / page-load-driven pieces (terrain) for the new palette.
+    // THE ATTRIBUTE FLIP ONLY. Everything here must be cheap, because this runs as a View Transition's DOM-update
+    // callback and the browser holds the page frozen until it returns.
+    //
+    // It used to also dispatch astro:page-load from inside here, which re-initialises EVERY vanilla script on the
+    // page — the deck's full slide re-measure, three beat steppers, the Toc, the cow, and the terrain canvas
+    // repaint — all inside that frozen window. Measured at 6x CPU throttle: 4 long tasks with the worst at 383ms,
+    // by far the largest single stall anywhere on the site. That is the "slowish" the owner felt.
     function flipTheme() {
       const dark = document.documentElement.dataset.theme === 'dark';
       if (dark) { delete document.documentElement.dataset.theme; }
       else { document.documentElement.dataset.theme = 'dark'; }
       try { localStorage.setItem('theme', dark ? 'light' : 'dark'); } catch (e) {}
       syncToggle();
-      document.dispatchEvent(new Event('astro:page-load'));
+    }
+
+    // The expensive half, deliberately OUTSIDE the transition. The JS-painted surfaces (terrain, descent graph,
+    // fluid sky) read their palette off data-theme once per init, so they still need a re-init to repaint — it
+    // just must not happen while the page is held. The trade is that a canvas settles into its new palette a beat
+    // after the crossfade rather than during it, which is far cheaper than a third of a second of frozen page.
+    function repaintForTheme() {
+      // A DEDICATED EVENT, not astro:page-load. Fifteen scripts listen for page-load and only three paint from JS
+      // and read the palette (TerrainHero, DescentPath, FluidSky) — the rest re-measure the deck's seven slides,
+      // rebuild the Toc's observers, restart three beat steppers and re-wire the cow, none of which a colour change
+      // affects. Isolated by measurement: 357ms of long task on the homepage against 55ms on /404, and unchanged
+      // when the View Transition was disabled, so the cost was always this re-init and never the transition.
+      document.dispatchEvent(new Event('theme:change'));
     }
 
     function onToggle() {
@@ -405,9 +424,15 @@ const items: Item[] = [
       if (startVT && !prefersReducedMotion()) {
         document.documentElement.classList.add('theme-vt');
         const t = startVT(flipTheme);
-        t.finished.finally(() => document.documentElement.classList.remove('theme-vt'));
+        t.finished.finally(() => {
+          document.documentElement.classList.remove('theme-vt');
+          // After the crossfade, never inside it. requestAnimationFrame so the repaint starts on a fresh frame
+          // rather than tacked onto the one that just finished animating.
+          requestAnimationFrame(repaintForTheme);
+        });
       } else {
         flipTheme();
+        requestAnimationFrame(repaintForTheme);
       }
     }
     toggle?.addEventListener('click', onToggle);

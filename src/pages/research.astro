@@ -112,7 +112,9 @@ const stops = researchStops(publications, researchInterests);
                 <section class="block" id={paperSectionId(i, 'idea')}>
                   <h3>The idea</h3>
                   <p>{p.idea}</p>
-                  {p.takeaway && <p class="takeaway">{p.takeaway}</p>}
+                  {/* The takeaway is NOT repeated here any more. It renders once, on the card, and stays there
+                      whether the card is open or shut — see .card-takeaway. This copy existed only because the
+                      card's was hidden on expand, and hiding it was the thing making the fold feel wrong. */}
                 </section>
               )}
 
@@ -333,11 +335,15 @@ const stops = researchStops(publications, researchInterests);
   }
   .byline { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--ink-4); letter-spacing: 0.02em; margin-top: 14px; }
 
-  /* The collapsed card's summary — the one-line thesis and one number, so the card is a real
-     preview rather than a title you must open to evaluate. */
+  /* The card's summary — the one-line thesis and one number, so the card is a real preview rather than a title
+     you must open to evaluate. It is no longer "the COLLAPSED card's summary": it is present in both states now,
+     which is what keeps the card from changing size when a paper opens.
+     It takes the ACCENT face, inheriting that from the in-panel copy this replaces. That copy was the only use of
+     Fraunces on /research, and the page preloads Fraunces — so moving the accent here keeps the preload earning
+     its bytes instead of downloading a face nothing on the page uses. */
   .card-takeaway {
     display: block;
-    font-family: var(--font-display); font-style: italic;
+    font-family: var(--font-accent); font-style: italic;
     font-size: clamp(16px, 1.5vw, 19px); line-height: 1.55;
     color: var(--ink-2); margin-top: 20px; max-width: 54ch;
   }
@@ -362,8 +368,26 @@ const stops = researchStops(publications, researchInterests);
     transition: transform .32s cubic-bezier(.2,.7,.3,1);
   }
   .paper-card[aria-expanded='true'] .card-chevron { transform: rotate(225deg) translateY(-1px); }
-  /* Once open, the cue reads as the reverse action and the summary is redundant with the detail. */
-  .paper-card[aria-expanded='true'] .card-takeaway { display: none; }
+  /* Once open, the cue reads as the reverse action and the summary is redundant with the detail — but it has to
+     LEAVE smoothly, and `display: none` is what made the fold feel wrong however well the panel itself animated.
+     The owner: "the collapse/expand animation is not smooth for the research card." Measured frame by frame on
+     open: the document went 1656 -> 1636 -> 1882 -> 2173 -> … so the page jerked 20px BACKWARDS on the first
+     frame and then grew. That dip is exactly this line vanishing in one frame while the panel below it was still
+     at 56px — two movements in opposite directions at the same moment, which reads as a stutter at the start of
+     every expansion.
+     Collapsing it over the same duration and easing as the panel makes the motion monotonic: one thing shrinks
+     while a much larger thing grows, and the net travel is always downward. */
+  /* NOTHING HIDES IT ANY MORE — the owner's call, and it is the simplification the fold needed:
+     "i think it might be improved if you dont hide Allocation that learns instead of assuming stuff on expansion.
+     so let's hold the card not move."
+     Right on both counts. The card now keeps exactly its own size whether open or shut, so opening a paper moves
+     ONE box — the panel below it — and nothing above the panel shifts at all. It also removes a second animating
+     element from every frame of the fold.
+     Two earlier versions of this were worse. `display: none` dropped the line in a single frame, which measured as
+     a 20px jerk BACKWARDS in the document height at the exact moment the panel started growing. Collapsing it
+     smoothly fixed the jerk but still meant two boxes animating in opposite directions for 400ms.
+     The reason it was ever hidden was duplication: the same sentence rendered again inside "The idea". That copy
+     is deleted instead, so the thesis appears exactly once, in the one place that is visible in both states. */
 
   /* two columns: LEFT (idea + formal math) is wider so equations show in full;
      RIGHT (results) is the narrower numeric column. */
@@ -405,6 +429,14 @@ const stops = researchStops(publications, researchInterests);
   .paper-body {
     --fold-ease: cubic-bezier(0.4, 0.02, 0.2, 1);
     overflow: hidden;
+    /* contain tells the browser this panel's insides cannot affect layout or paint outside its box, so growing it
+       need not re-examine or repaint its ancestors. It is a free win on an accordion — the panel is already an
+       overflow: hidden clipper, so `contain` promises nothing that was not already true.
+       Honest limit: this is NOT a measured fix for the choppiness the owner reports. Three instruments failed to
+       see that at all (rAF cadence reports vsync; a screencast probe reported ~95fps even at 20x CPU throttle,
+       which is impossible), and the main-thread cost measures cheap: 36ms of style and 25ms of layout across the
+       whole 400ms animation at 6x throttle. So this is applied because it is correct, not because it is the cure. */
+    contain: layout paint;
     max-height: 0;
     margin-top: 0;
   }
@@ -454,8 +486,8 @@ const stops = researchStops(publications, researchInterests);
     color: var(--ink-4); margin-bottom: 14px; }
   .block > p { font-size: 16px; line-height: 1.72; color: var(--ink-2); }
 
-  .takeaway { font-family: var(--font-accent); font-style: italic; font-size: clamp(19px, 2.4vw, 24px);
-    line-height: 1.4; color: var(--ink-1); margin-top: 4vh; padding-left: 20px; border-left: 2px solid var(--ochre); }
+  /* (.takeaway is gone with the in-panel duplicate it styled — the thesis renders once, on the card. Deleted
+     rather than left as unreachable CSS.) */
 
   /* formal-method equations — full size to match the body type, never folded */
   .math .eq { margin: 0 0 30px; }
