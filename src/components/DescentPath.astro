@@ -280,24 +280,10 @@ import { WAYPOINTS } from '../lib/trajectory';
       flex-direction: column;
       gap: 12px;
     }
-    /* ── AND THE BOX IS THE WORLD'S OWN SHAPE, so there is no surplus left to letterbox.
-       The drawing has to keep the field's aspect or the contour rings render as ovals (see view()), which
-       means a frame of any other shape spends the difference on empty paper. Measured at 342x305: the guard
-       padded 45px of height away and the picture filled 74% of the box vertically and 86% horizontally —
-       the "large empty margins" in the owner's photograph. Giving the canvas the world's ratio removes that
-       surplus rather than merely centring it: the drawn box goes from 292x230 to 317x250 inside a box 36px
-       SHORTER than before, so the picture gets bigger while the section gets shorter.
-       THE RATIO IS A MIRROR OF storyBounds() (4.614 x 3.637 = 1.2688), NOT a second source of truth. view()
-       still derives the real aspect from the bounds and still pads out any mismatch, so if a future waypoint
-       moves the bounds this box is a little wrong-shaped for one release — never distorted.
-       max-height is the landscape guard: at 640x360 the ratio alone would ask for 458px of height in a 360px
-       viewport. Where it binds, view() letterboxes exactly as it does on a desktop. */
     .dp-canvas {
       position: static;
       width: 100%;
-      height: auto;
-      aspect-ratio: 4.614 / 3.637;
-      max-height: 62vh;
+      height: min(46vh, 88vw);
     }
     .dp-coda {
       position: static;
@@ -334,7 +320,6 @@ import { WAYPOINTS } from '../lib/trajectory';
   import { WAYPOINTS, trajectoryFacts, DEEP_SIDE_LABEL } from '../lib/trajectory';
   import { knownnessFn, knowledgeRadius } from '../lib/knowledge';
   import { prefersReducedMotion } from '../lib/motion';
-  import { isPhone } from '../lib/viewport';
 
   const teardowns: Array<() => void> = [];
 
@@ -413,8 +398,8 @@ import { WAYPOINTS } from '../lib/trajectory';
     }
 
     /**
-     * At or below this CSS width — or on a phone at any width, see isCompact — the graph draws as a PICTURE:
-     * the surface, the path and the points, with none of the in-frame type.
+     * Below this CSS width the graph draws as a PICTURE: the surface, the path and the points, with none of
+     * the in-frame type.
      *
      * The owner, choosing between the drawing and the text list it used to fall back to: "for the descent,
      * that graph is better than a timeline of careers." The labels were the only real obstacle — they collide
@@ -426,40 +411,17 @@ import { WAYPOINTS } from '../lib/trajectory';
      * also what keeps the employer names indexable on the phone rendering.
      */
     const COMPACT_MAX_W = 560;
-    /** True when the drawing must render as a picture with no in-frame type.
-     *
-     *  `isPhone()` is ORed in rather than trusting the width alone, because the width is only a proxy and it
-     *  breaks at the top of the phone range: at a 640px viewport the canvas measures 582px — over
-     *  COMPACT_MAX_W — so the labels came back on the one viewport the phone stylesheet had already reshaped
-     *  for a label-free picture, and in landscape (640x360) they came back into a 283px-wide drawing. The
-     *  decision "no in-frame type on a phone" belongs to the same breakpoint every other phone decision uses,
-     *  so it asks lib/viewport the same question the deck and the collapse ask. The width test stays for the
-     *  narrow-window-on-a-desktop case, which is not a phone but is still too small for type. */
-    const isCompact = (): boolean => isPhone() || W < COMPACT_MAX_W;
+    const isCompact = (): boolean => W < COMPACT_MAX_W;
 
     function view(): View {
       // Generous right padding: labels sit to the RIGHT of their points, and the original render
       // clipped them off the frame. The other three are small — every px of padding is px the drawing
       // does not get, and at the paper panel's size the drawing is the point. Scaled to the frame so a
       // small canvas is not swallowed by a fixed gutter.
-      //
-      // ── ON A PHONE THE FRAME HAS NO GUTTERS AT ALL, AND THE SURPLUS IS SPLIT EVENLY.
-      // Both halves of that are corrections to a measured off-centre render. The desktop pad is
-      // asymmetric by design — 34 left against a 120-230px right gutter for the labels, and the aspect
-      // surplus below is dealt 34/66 and 42/58 for the same reason — and every one of those biases is
-      // about type that a phone does not draw. Measured at 342x305 (iPhone 14, dark): the drawn box ran
-      // x 34..326 in a 342px frame, so 34px of slack on the left against 16px on the right, and it filled
-      // only 86% of the width and 74% of the height. That is the "pushed right with empty margins" in the
-      // owner's photograph, and it is arithmetic rather than taste: a 34/16 pad IS a 9px right shift.
-      // With no type in the frame the only padding the picture needs is enough that a contour ring at the
-      // world box's edge is not sheared by the canvas edge — 10px, and the attractor's 34px halo at
-      // x≈48 clears it.
-      const compact = isCompact();
-      const EDGE = 10;
-      const gutter = Math.max(120, Math.min(230, W * 0.135));
-      const pad = compact
-        ? { l: EDGE, r: EDGE, t: EDGE, b: EDGE }
-        : { l: 34, r: gutter, t: 30, b: 40 };
+      // On a phone there are no in-frame labels to make room for, so the gutter that existed to hold them
+      // becomes drawing area instead of empty paper.
+      const gutter = isCompact() ? 16 : Math.max(120, Math.min(230, W * 0.135));
+      const pad = { l: 34, r: gutter, t: 30, b: 40 };
 
       // KEEP THE FIELD'S ASPECT. project() maps the world box onto the padded inner box
       // independently in x and y, so a wide frame stretches the surface horizontally: the world is
@@ -477,22 +439,18 @@ import { WAYPOINTS } from '../lib/trajectory';
       const ih = H - pad.t - pad.b;
       if (iw > 0 && ih > 0) {
         const boxAspect = iw / ih;
-        // Where the surplus goes. On a desktop it is dealt to the side that holds type; on a phone there is
-        // no type, so an even split is what puts the drawing in the middle of its frame.
         if (boxAspect > worldAspect) {
           // Too wide: give the extra width back as padding.
           const want = ih * worldAspect;
           const extra = iw - want;
-          const left = compact ? 0.5 : 0.34;
-          pad.l += extra * left;
-          pad.r += extra * (1 - left);
+          pad.l += extra * 0.34;
+          pad.r += extra * 0.66;
         } else {
           // Too tall: give the extra height back, biased to the bottom where the footnote sits.
           const want = iw / worldAspect;
           const extra = ih - want;
-          const top = compact ? 0.5 : 0.42;
-          pad.t += extra * top;
-          pad.b += extra * (1 - top);
+          pad.t += extra * 0.42;
+          pad.b += extra * 0.58;
         }
       }
       return { w: W, h: H, projection, pad };
@@ -528,7 +486,6 @@ import { WAYPOINTS } from '../lib/trajectory';
     function draw(): void {
       refreshKnown();
       const v = view();
-      const compact = isCompact();
       const { ink5, ink4, ink3, paper, ochre, seal } = palette();
 
       ctx.save();
@@ -542,30 +499,20 @@ import { WAYPOINTS } from '../lib/trajectory';
       // it renders as a dot. It reads as a survey plot and it is kin to the hero's dot field without
       // repeating the hero's object.
       ctx.lineCap = 'round';
-      // ── THE DOTS ARE HEAVIER AND SPARSER ON A PHONE, and both halves of that are one adjustment.
-      // The dot pitch is fixed in WORLD units (the contour resolution), so shrinking the drawing shrinks
-      // the gaps too: measured, one sampling step is 5.3px of screen on the paper panel's 799px drawing
-      // and 2.2px on a phone's 317px one. Keeping the desktop's every-2nd-point sampling therefore packs
-      // dots 4.3px apart, and at 2px wide against a near-black ground they read as dust rather than as
-      // rings — the owner's "the contour surface is faint at that size". Taking every third point restores
-      // ~6.5px of pitch, which is the room to draw each dot half again as wide and a third more opaque.
-      // Same ink, same idiom, resolved for the size it is actually being seen at.
-      const step = compact ? 3 : 2;
       levels.forEach((lv, i) => {
         const runs = contoursFor(lv);
         const deep = 1 - i / (levels.length - 1);          // 1 at the deepest level
         ctx.strokeStyle = ink5;
-        ctx.lineWidth = compact ? 2.6 + deep * 1.7 : 1.7 + deep * 1.3;
+        ctx.lineWidth = 1.7 + deep * 1.3;
         for (const run of runs) {
           // Sample along the run so the dots have air between them; a dot per point would fuse back
           // into a line at this contour resolution.
-          for (let k = 0; k < run.length; k += step) {
+          for (let k = 0; k < run.length; k += 2) {
             const p = run[k];
             const kn = known(p[0], p[1]);
             if (kn <= 0.02) continue;
             const [sx, sy] = project(p[0], p[1], v);
-            const weight = compact ? 0.46 + deep * 0.44 : 0.30 + deep * 0.50;
-            ctx.globalAlpha = Math.min(1, weight * Math.min(1, kn * 1.6));
+            ctx.globalAlpha = (0.30 + deep * 0.50) * Math.min(1, kn * 1.6);
             ctx.beginPath();
             ctx.moveTo(sx, sy);
             ctx.lineTo(sx + 0.5, sy);
@@ -579,16 +526,11 @@ import { WAYPOINTS } from '../lib/trajectory';
       // patches that appeared around both minima: a contour run clipped by the frame edge is an open
       // polyline, and closePath() on it draws a chord straight across the frame, filling a slab. A
       // real bowl is a loop whose last point returns to its first.
-      // A LITTLE STRONGER ON A PHONE. The wash exists to give each bowl some body, and 3.4% alpha over a
-      // 250px-tall drawing is below the point where the eye reads a fill at all — it was tuned against a
-      // 630px one. 2.2x keeps it a wash (7.5% at the deepest level, still under a tenth) while making the
-      // two basins read as basins rather than as two knots of dots.
       const washLevels = levels.slice(0, 5);
-      const washScale = compact ? 2.2 : 1;
       washLevels.forEach((lv, i) => {
         const runs = contoursFor(lv);
         ctx.fillStyle = ochre;
-        ctx.globalAlpha = (0.034 - i * 0.005) * washScale;
+        ctx.globalAlpha = 0.034 - i * 0.005;
         for (const run of runs) {
           if (run.length < 12) continue;
           const a = run[0], z = run[run.length - 1];
@@ -599,7 +541,7 @@ import { WAYPOINTS } from '../lib/trajectory';
           if (kn <= 0.05) continue;
           // Fade the wash in with knowledge too, so a basin does not appear at full strength the
           // instant its centre is learned.
-          ctx.globalAlpha = (0.034 - i * 0.005) * washScale * Math.min(1, kn * 1.6);
+          ctx.globalAlpha = (0.034 - i * 0.005) * Math.min(1, kn * 1.6);
           ctx.beginPath();
           run.forEach((p, k) => {
             const [sx, sy] = project(p[0], p[1], v);
@@ -643,7 +585,7 @@ import { WAYPOINTS } from '../lib/trajectory';
       ctx.stroke();
       ctx.setLineDash([]);
       // The deeper side, NAMED. Not "the global minimum" — the direction the descent runs in.
-      if (!compact) {
+      if (!isCompact()) {
         label(ctx, ax + 22, ay + 30, DEEP_SIDE_LABEL, 15, ochre);
         label(ctx, ax + 22, ay + 51, 'deeper still — unknown', 12, ink5);
       }
@@ -698,7 +640,7 @@ import { WAYPOINTS } from '../lib/trajectory';
         // The final waypoint sits near the attractor, so its label collided with the deep-side name.
         // Put the last one above its dot and leave the rest to the right.
         const isLast = i === WAYPOINTS.length - 1;
-        if (compact) {
+        if (isCompact()) {
           /* no in-frame type on a phone — see COMPACT_MAX_W */
         } else if (isLast) label(ctx, px - 6, py - 14, wp.label, 15, paper);
         else label(ctx, px + 14, py + 5, wp.label, 15, ink3);
@@ -718,7 +660,7 @@ import { WAYPOINTS } from '../lib/trajectory';
         // Named, not measured. It used to read "climb +1.26" — a true height on an invented surface,
         // which beside a real career reads as a quantified claim about the career. The red stretch
         // already shows WHERE the climb is; the word says what it is.
-        if (!compact) label(ctx, mx - 58, my - 44, 'the climb', 13, seal, 'end');
+        if (!isCompact()) label(ctx, mx - 58, my - 44, 'the climb', 13, seal, 'end');
       }
 
       ctx.restore();

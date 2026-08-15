@@ -136,14 +136,7 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
           <div class="ru-stagebox">
             <!-- ── BEAT 1: THE COST LADDER. Bars are log-scaled and the note says so: the span is six orders of
                  magnitude, and on a linear axis three of the four bars would be invisible. -->
-            <!-- data-phone-keep — THE ONE GRAPHIC A PHONE GETS. See PhoneCollapse.astro: below 640px everything
-                 after the headline goes behind a disclosure, and the element marked here is lifted back out and
-                 parked under the headline so the slide reads "kicker + headline + one drawing". This panel is the
-                 right one of the four: it is the only state whose meaning survives without the beat prose beside
-                 it (four labelled bars and four dollar figures ARE the sentence), and it is the one the owner
-                 photographed rendering legibly on the real phone. The attribute is inert on desktop — nothing
-                 selects it there — so desktop renders byte-for-byte what it rendered before. -->
-            <div class="ru-panel ru-ladder" data-panel="0" data-phone-keep>
+            <div class="ru-panel ru-ladder" data-panel="0">
               <ul class="ru-rungs">
                 {ladder.map((r) => {
                   const hiL = Math.log10(Math.max(big.cost, 10));
@@ -816,66 +809,6 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
      that has bitten the Toc, the Story figure and this file already. */
   @media (max-width: 430px) {
     .ru-beats { grid-template-columns: minmax(0, 1fr); }
-  }
-
-  /* ══ PHONES (<= 640px, the breakpoint lib/viewport.ts owns): NOTHING IS STACKED, SO NOTHING CAN COLLIDE.
-     The owner, reviewing on a real iPhone: "there are way too many texts… probably a good iphone experience is
-     very straight forward, heavily visual over texts. a headline + illustrative graph will do the trick."
-     He also photographed two overlaps on this slide, and they are the same bug twice. This figure is FOUR panels
-     and FOUR captions absolutely positioned in one box, revealed one at a time — an arrangement that only works
-     while exactly one of them is painting and while every panel fits the box. On a phone neither holds: measured
-     in real WebKit at 390x664, beat two overlapped in four places — "FOUR KINDS OF RULE, ALL BINDING AT ONCE"
-     printed 45.2x11.2px through the "MANDATE" label and its IPS glyph, and the categories panel outgrew the
-     288px stage so "A trade you cannot settle or borrow…" printed 278x13px across "Every category is real…".
-     Raising the stage floor is what the last two passes did, and it is the wrong move: each fix bought a few
-     pixels at one width and the next width took them back.
-     So the whole mechanism goes below 640px instead of being tuned. One panel, in normal flow, sized by its own
-     content: an overlap becomes unrepresentable rather than merely absent at the widths tested. Every rule here
-     also fires with JavaScript off, where the CSS default is the same panel 0 — a phone with no JS gets the
-     ladder in place inside the figure, in reading order, rather than a blank box. ══ */
-  @media (max-width: 640px) {
-    /* THREE OF THE FOUR STATES LEAVE ALTOGETHER — display, not opacity, so they cannot paint at all, mid-
-       transition or otherwise. This is what kills both of the photographed overlaps: the three captions that
-       were sharing one grid cell and the three panels that were sharing one overlay box stop existing here.
-       WHAT THAT COSTS, stated plainly: a phone does not see the rule categories, the fan of futures or the
-       Bellman blowup — three drawings and their figures, still in the HTML but not on the screen. That is the
-       owner's trade, made on a real iPhone with all four of them in front of him ("way too many texts"), and it
-       is the same trade the two neighbouring slides are making. Desktop keeps all four. */
-    .ru-panel[data-panel='1'], .ru-panel[data-panel='2'], .ru-panel[data-panel='3'],
-    .ru-panel[data-head='1'], .ru-panel[data-head='2'], .ru-panel[data-head='3'] { display: none; }
-
-    /* AND THE METHODOLOGY NOTE GOES WITH THEM. It survived the first pass because it is not one of the stacked
-       panels — it sits after the ladder as its own paragraph — but it is 62 words of mono explaining square-root
-       price impact and log-scaled bars, which is exactly the prose the phone shape exists to remove. The kept
-       graphic states the point on its own: four sizes, four costs, and the numbers are on the bars. */
-    .ru-note { display: none; }
-
-    /* THE STAGE STOPS BEING A STAGE. Its two jobs — reserve a fixed height, and hold the panels on top of each
-       other — are both jobs of the stepper, and the stepper is gone. `min-height: 0` overrides the 288px floor
-       the 700px block sets (later in source at equal specificity, which is the whole mechanism here), so the box
-       is exactly as tall as the one panel left in it, and the caption beneath it can no longer be printed on. */
-    .ru-stagebox { position: static; min-height: 0; }
-    .ru-stagebox > .ru-panel { position: static; inset: auto; }
-
-    /* PANEL 0 IS ON, WHATEVER THE STEPPER THINKS. The script still runs and still cycles its classes — the band
-       it drives is hidden, so this is the one place that has to disagree with it, and it must outrank
-       `html.complex-js .ru-panel[data-panel='0'] { opacity: 0 }` above. Same specificity, later source: the
-       trap this file has already been bitten by twice.
-       Written for BOTH data-head='0' spans on purpose — the figure's own label and its caption — so the open
-       disclosure reads as graph, then title, then method note. pointer-events back to auto because the ladder is
-       now content a reader can select, not a slide state. */
-    :global(html.complex-js) .ru-panel[data-panel='0'],
-    :global(html.complex-js) .ru-panel[data-head='0'] { opacity: 1; pointer-events: auto; }
-
-    /* THE BEAT BAND GOES. Four paragraphs of prose whose only job is to be a selector for a stepper that no
-       longer steps — 1,000+ characters, and the bulk of the "way too many texts" the owner was looking at. What
-       brackets it stays: the drawing above, and the closing "that is the job" sentence below. */
-    .ru-beats { display: none; }
-
-    /* The lifted graphic sits between the headline and the disclosure, and on desktop what separates it from the
-       headline is .ru-fig's own hairline — which stays behind in the collapsed body. 14px of air instead, so the
-       bars do not start immediately under the tap target. */
-    .ru-ladder[data-phone-kept] { margin-top: 14px; }
   }
 </style>
 

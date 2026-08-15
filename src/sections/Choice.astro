@@ -128,13 +128,7 @@ const allBeats = [...BEATS, BEAT4];
 
       <div class="ch-stage">
         <!-- BEAT 1: the portfolio, as one bar of money divided four ways. -->
-        <!-- data-phone-keep — THE ONE PICTURE THIS SLIDE KEEPS ON A PHONE. PhoneCollapse lifts exactly this
-             element out of the collapsed body and parks it under the headline, so the phone shape is "the
-             question + $100 split four ways" and every other word is one tap away. It is the right one of the
-             four: it is the only panel whose whole meaning is a drawing (the other three are a table of
-             alternatives, a column of months and a five-curve chart, all of which need width to read), and it
-             is the beat the definition starts from. Exactly ONE element may carry this here. -->
-        <figure class="ch-panel" data-panel="0" data-phone-keep>
+        <figure class="ch-panel" data-panel="0">
           <p class="ch-panel-head">$100, split four ways</p>
           <div class="ch-bar ch-bar--big" role="img"
                aria-label={HOLDINGS.map((h) => `${h.weight} dollars in ${h.plain}`).join(', ')}>
@@ -670,70 +664,6 @@ const allBeats = [...BEATS, BEAT4];
     }
     /* The stage no longer needs the vertical gap that separated it from stacked beats. */
     .ch-stage { margin-top: 0; }
-  }
-
-  /* ── PHONES (≤640px): THE HEADLINE AND ONE PICTURE. ──────────────────────────────────────────────────────
-     The owner, reading this on an iPhone: "there are way too many texts… probably a good iphone experience is
-     very straight forward, heavily visual over texts. a headline + illustrative graph will do the trick."
-     So on a phone this slide is: the kicker, the question, the money bar — and everything else behind the
-     disclosure PhoneCollapse builds from the heading.
-
-     IT ALSO KILLS A REAL BUG, not just a wall of text. Four panels share one fixed-height stage as
-     `position: absolute; inset: 0` overlays, and on a phone their prose is far taller than the stage: measured
-     in WebKit at 390x664, beat 4's verdict overflowed the 300px stage and printed on top of the "Illustrative:
-     the names are real…" disclaimer — 12 overlapping text runs, in both themes. Nothing is stacked here any
-     more, so the whole class of overlap is gone rather than nudged.
-
-     LAST IN THE FILE ON PURPOSE. Every rule below overrides one above it, several of them written with an id
-     selector because the rules they override are `html.define-js .ch-panel(.is-on)` — Astro compiles the
-     scoped `.ch-panel` to a real `[data-astro-cid-…]` attribute selector, so a class-only override LOSES to
-     those and would silently do nothing. `#choice` wins outright, which is also what stops the stepper (which
-     keeps ticking behind the collapse) from fading the kept picture out from under the reader. ─────────── */
-  @media (max-width: 640px) {
-    /* 1. THE KEPT PICTURE, AS A BLOCK IN NORMAL FLOW. PhoneCollapse moves this figure to sit directly after the
-       h2, i.e. out of .ch-stage — where `position: absolute; inset: 0` would resolve against `.ch` (the one
-       positioned ancestor) and paint the bar across the whole section. Static, opaque, and pinned that way
-       against the stepper's class toggling. */
-    #choice .ch-panel[data-panel='0'] {
-      position: static; opacity: 1; pointer-events: auto;
-    }
-    /* Its own footnote is beat prose, and the closed slide is meant to be a picture rather than a paragraph.
-       Beat 1's answer says the same sentence and the disclosure carries it. */
-    #choice .ch-panel[data-panel='0'] .ch-panel-foot { display: none; }
-    /* The bar is now THE illustration rather than one of four, and it has a whole phone width to itself —
-       4.4vh of a 664px screen floored at 34px reads as a rule, not as a hundred dollars. */
-    #choice .ch-bar--big { height: 46px; }
-
-    /* 2. THE OTHER THREE PANELS GO. They are the stack, and they are what overlapped. They also do not survive
-       the width: a table of alternatives, five months of bars and a five-curve PnL chart at 342px are three
-       smudges, whereas the money bar is exactly as legible as it is on a desktop. */
-    #choice .ch-panel[data-panel='1'],
-    #choice .ch-panel[data-panel='2'],
-    #choice .ch-panel[data-panel='3'] { display: none; }
-    /* With its one surviving panel lifted out, the stage is an empty box — it must stop reserving the 300px it
-       was given to hold overlays, or the open disclosure has a hole in it. The margin stays (small) rather than
-       going to zero: with JavaScript off nothing is lifted, the figure is still IN the stage, and at margin 0
-       the "$100, split four ways" label butted straight against the paragraph above it — measured on a
-       script-disabled load. Fourteen pixels of empty box is the price, and it lands where the disclaimer's own
-       margin already is. */
-    #choice .ch-stage { min-height: 0; margin-top: 14px; }
-
-    /* 3. NO STEPPER. Four buttons that walk four panels are meaningless when one panel remains, so the list
-       stops being a control and reads as what it is: four questions with one answer each — the definition
-       itself. That prose stays IN the disclosure rather than being hidden outright, because #choice is the one
-       explainer whose entire text lives inside these buttons (Rules and Solve both carry paragraphs outside
-       theirs); hide the list and opening the slide would reveal nothing but the italic disclaimer, which makes
-       the chevron a lie. pointer-events: none is the "not a stepper" half: nothing to tap, nothing dims, and no
-       accent rule follows the timer. */
-    #choice .ch-beats { gap: 18px; }
-    #choice .ch-beat {
-      opacity: 1; pointer-events: none; cursor: default;
-      max-width: none; padding: 0; border-left-color: transparent;
-    }
-    /* Read as prose, at a phone's reading size: the 1100px rules floor .ch-say at 12px, which was a caption
-       size for a column of desktop bullet points and is too small for the only text on the slide. */
-    #choice .ch-ask { font-size: 17.5px; margin-bottom: 4px; }
-    #choice .ch-say { font-size: 14.5px; line-height: 1.6; }
   }
 </style>
 

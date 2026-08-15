@@ -1,13 +1,5 @@
 ---
-// PHONE-ONLY: the explainer slides, the career prose and the appendix collapse to their headline.
-//
-// `data-phone-keep` — THE ONE THING A SECTION SAYS TO THIS FILE. The owner's phone shape is "a headline + an
-// illustrative graph", not a headline alone: "probably a good iphone experience is very straight forward,
-// heavily visual over texts". A section expresses that by marking ONE element `data-phone-keep`; the transform
-// lifts exactly that element out of the collapsed body and parks it under the heading, so it is on screen while
-// everything else is behind the tap. Marking nothing is still valid and still means "headline only" (#story,
-// whose career list is already outside the collapsed region, does that). Nothing else about a section's markup
-// changes, which is what lets each slide keep its desktop rendering byte-for-byte.
+// PHONE-ONLY: the three explainer slides collapse to their headline.
 //
 // WHY THIS IS A RUNTIME TRANSFORM AND NOT MARKUP. The disclosure could be authored in the .astro files, and
 // that is the obvious way — but then three `button[aria-expanded]` controls exist on DESKTOP too, in its tab
@@ -24,31 +16,12 @@
 // collapsed into an accordion is fine and is the recommended way to save space. Rendering these bodies on tap
 // would therefore have quietly cost the 1,606 words the three explainers carry. Everything here is
 // appendChild of existing nodes: identity, listeners and the beat-steppers' element references all survive.
-// The same rule governs the kept graphic below: it is LIFTED out of the collapsed body, not re-rendered.
 ---
 <script>
   import { isPhone, PHONE_MAX_WIDTH } from '../lib/viewport';
 
-  type Slide = {
-    /** The section, as an id selector. */
-    readonly sel: string;
-    /**
-     * FALLBACK KEEP SELECTOR, used only when the section marks nothing itself.
-     *
-     * The contract is that a section marks the one element that must stay visible with `data-phone-keep`, in
-     * its own markup, where the person editing the slide can see it. #appendix is the exception on purpose:
-     * what must survive there is not a figure the section chose to publish but two figures buried three levels
-     * inside its first column (the paper's compounded-wealth and Sharpe numbers) plus the cow, and the reason
-     * they survive is a phone decision, not an appendix decision. Naming them from here keeps Work.astro
-     * exactly as desktop ships it. It is a coupling to that section's class names and it is written down as
-     * one: if `.wk-stats` or `.wk-cow` is renamed, this string moves with it, and the measurement that catches
-     * a silent break is "collapsed #appendix still shows two numbers and the cow".
-     */
-    readonly keep?: string;
-  };
-
   /**
-   * The sections that collapse, in reading order.
+   * The slides that collapse, in reading order.
    *
    * #story earns its place by measurement rather than by symmetry: on an iPhone 14 it is 3.07 screens, made of
    * a 1.11-screen career list and 1.67 screens of "Why the climb" prose. Its h2 sits INSIDE .story-inner,
@@ -57,25 +30,11 @@
    * labels are what someone searching by employer matches, and on a phone DescentPath already degrades from a
    * canvas to that text list, so the graph is not being "hidden" here — it is already words.
    */
-  const SECTIONS: readonly Slide[] = [
-    { sel: '#choice' },
-    { sel: '#rules' },
-    { sel: '#solve' },
-    { sel: '#story' },
-    /**
-     * #appendix collapses too, and it is the biggest win of the five: 2.71 screens on an iPhone 14, all of it
-     * three columns of titles, venues and taglines that are one tap away on the pages they link to anyway.
-     * What may NOT go behind the tap is the reference matter the owner named — the two headline numbers, the
-     * cow, and the footer. The footer is already outside the collapsed region (it is nested AFTER the tan
-     * panel, so the walk below never reaches it); the numbers and the cow are inside it, measured, hence the
-     * keep selector.
-     */
-    { sel: '#appendix', keep: '.wk-stats, .wk-cow' },
-  ];
+  const SECTIONS = ['#choice', '#rules', '#solve', '#story'];
 
   type Undo = () => void;
 
-  function collapseOne(section: HTMLElement, index: number, keepFallback?: string): Undo | null {
+  function collapseOne(section: HTMLElement, index: number): Undo | null {
     // The panel is the section's single full-bleed child; its own first child holds the column.
     const panel = section.firstElementChild as HTMLElement | null;
     const inner = panel?.firstElementChild as HTMLElement | null;
@@ -88,7 +47,7 @@
     const labelledBy = section.getAttribute('aria-labelledby');
     const heading = labelledBy ? document.getElementById(labelledBy) : null;
     if (!panel || !inner || !heading) return null;
-    if (section.hasAttribute('data-phone-collapsible')) return null;   // already transformed
+    if (heading.querySelector('[data-phone-toggle]')) return null;   // already transformed
 
     const undos: Undo[] = [];
 
@@ -98,7 +57,6 @@
     // heading" is not one sibling list. Walking up and taking each level's following siblings is what makes
     // one implementation fit all three without hardcoding any of their structures.
     const panelIds: string[] = [];
-    const boxes: HTMLElement[] = [];
     let level: HTMLElement = heading;
     let group = 0;
     while (level !== inner && level.parentElement) {
@@ -110,7 +68,6 @@
         box.setAttribute('data-phone-body', '');
         box.id = `phone-body-${index}-${group++}`;
         panelIds.push(box.id);
-        boxes.push(box);
         parent.insertBefore(box, level.nextSibling);
         after.forEach((n) => box.appendChild(n));
         undos.push(() => {
@@ -122,67 +79,37 @@
     }
     if (!panelIds.length) return null;
 
-    // ── 2. THE KEPT ELEMENT — this is what makes the phone shape "kicker + headline + ONE graphic" instead of
-    // "kicker + headline". A section marks one element `data-phone-keep`; the walk above has just swept it into
-    // a body wrapper along with everything else, so here it is LIFTED back out and placed directly after the
-    // heading, where it stays on screen while the section is closed.
-    //
-    // MOVED, NOT COPIED, and not re-created: `insertBefore` of the existing node keeps its identity, so the
-    // slide's own script still steers the element that is on screen — clone it instead and every stepper,
-    // observer and canvas context resolved at init would be driving the copy that got thrown away. Its
-    // listeners survive, and — the search argument again — the words inside it are in the closed rendering
-    // rather than behind a tap.
-    //
-    // MORE THAN ONE IS ALLOWED even though the slides use exactly one, because #appendix needs two disjoint
-    // survivors (the numbers and the cow). They are inserted in document order after the heading, so "two
-    // numbers, then the cow" reads down the page the way it does on desktop.
-    const declared = Array.from(section.querySelectorAll<HTMLElement>('[data-phone-keep]'));
-    // The section's own markup always wins; the fallback selector is only consulted when it says nothing, so
-    // #appendix can start marking its own survivors later and this file needs no edit for it.
-    const wanted = declared.length === 0 && keepFallback
-      ? Array.from(section.querySelectorAll<HTMLElement>(keepFallback))
-      : declared;
-    // Only lift what the collapse actually swallowed — an element already outside the body (the appendix's
-    // nested footer, say) is visible where it is, and moving it would reorder the page for no reason. And drop
-    // anything nested inside another keeper, so a marked child cannot be torn out of a marked parent.
-    const keepers = wanted.filter(
-      (el) => boxes.some((b) => b.contains(el)) && !wanted.some((other) => other !== el && other.contains(el)),
-    );
-    let anchor: ChildNode = heading;
-    for (const el of keepers) {
-      const from = el.parentElement;
-      const dest = anchor.parentNode;
-      if (!from || !dest) continue;
-      const back = el.nextSibling;                  // exact original position, for the teardown
-      dest.insertBefore(el, anchor.nextSibling);
-      el.setAttribute('data-phone-kept', '');
-      anchor = el;
-      // Runs BEFORE the body wrappers are unwrapped (undos are played in reverse), so `from` is still in the
-      // document at its original place and `back` is still its child — the node lands exactly where it started.
-      // Keepers restore in reverse too, which matters when one was the other's next sibling.
-      undos.push(() => {
-        el.removeAttribute('data-phone-kept');
-        from.insertBefore(el, back);
-      });
-    }
+    // ── 2. The control: a button INSIDE the heading — the ARIA accordion pattern. Not a button wrapping the
+    // heading (a <button> may only contain phrasing content, which an <h2> is not), and not a separate line of
+    // text repeating the headline, which would duplicate a heading in the indexed rendering. The heading keeps
+    // its id, its text and its place in the document outline; the button simply becomes the thing you press.
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('data-phone-toggle', '');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-controls', panelIds.join(' '));
+    const moved: ChildNode[] = [];
+    while (heading.firstChild) { moved.push(heading.firstChild); btn.appendChild(heading.firstChild); }
+    heading.appendChild(btn);
+    undos.push(() => {
+      moved.forEach((n) => heading.appendChild(n));
+      btn.remove();
+    });
 
-    // ── 3. NO CONTROL. There is nothing to press, and that is the point.
-    //
-    // This was an accordion — a button inside each h2, ARIA pattern and all — and the owner removed it: "i guess
-    // you dont even need that read the full explanation." They are right, and it is a simplification rather than
-    // a compromise. A phone visitor was never going to tap through 1,600 words of explainer prose on a 390px
-    // screen; the affordance was there to reassure ME that nothing had been taken away. What it actually added
-    // was a control, a state, a chevron and an aria contract, all in service of a path nobody walks.
-    // So the phone view is one-way: kicker, headline, one graphic. The prose stays in the DOM, hidden — which is
-    // what keeps the round trip exact when the viewport leaves phone width, and what leaves the desktop markup
-    // untouched.
-    //
-    // THE HONEST COST, recorded once: with no way to reveal it, that prose is not RENDERED on a phone, and since
-    // mobile-first indexing reads the phone rendering, those words likely stop counting toward what the homepage
-    // ranks for. Bounded — /research, /writing and /experience carry the substantive terms on their own pages,
-    // and nobody searches for an explainer — and the owner chose the reading experience knowingly, twice.
     section.setAttribute('data-phone-collapsible', '');
     undos.push(() => section.removeAttribute('data-phone-collapsible'));
+
+    function setOpen(open: boolean): void {
+      section.toggleAttribute('data-phone-open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    setOpen(false);
+    const onClick = () => setOpen(btn.getAttribute('aria-expanded') !== 'true');
+    btn.addEventListener('click', onClick);
+    undos.push(() => {
+      btn.removeEventListener('click', onClick);
+      section.removeAttribute('data-phone-open');
+    });
 
     return () => undos.reverse().forEach((u) => u());
   }
@@ -193,9 +120,9 @@
     undoAll?.();
     undoAll = null;
     if (!isPhone()) return;
-    const undos = SECTIONS.map((slide, i) => {
-      const el = document.querySelector<HTMLElement>(slide.sel);
-      return el ? collapseOne(el, i, slide.keep) : null;
+    const undos = SECTIONS.map((sel, i) => {
+      const el = document.querySelector<HTMLElement>(sel);
+      return el ? collapseOne(el, i) : null;
     }).filter((u): u is Undo => !!u);
     if (undos.length) undoAll = () => undos.forEach((u) => u());
   }
@@ -213,23 +140,60 @@
   /* Global, not scoped: these elements are created at runtime, so Astro's scoped data attribute is not on
      them. Everything here is inside the phone breakpoint, so desktop cannot be reached by it. */
   @media (max-width: 640px) {
-    /* One rule, and no second state. The prose is hidden and stays hidden: there is no toggle, so there is no
-       [data-phone-open], no chevron, no focus ring and no aria contract to keep honest. The button, its ::after
-       chevron, its rotation and its reduced-motion transition were all deleted with the control they served —
-       dead CSS for an element that can no longer exist is a false clue about how the page works. */
     [data-phone-collapsible] [data-phone-body] { display: none; }
+    [data-phone-collapsible][data-phone-open] [data-phone-body] { display: revert; }
+
+    /* The heading becomes the tap target. The button inherits the heading's type so the slide still opens with
+       its own headline rather than with a control that looks bolted on. */
+    [data-phone-collapsible] h2 > [data-phone-toggle] {
+      appearance: none;
+      -webkit-appearance: none;
+      background: none;
+      border: 0;
+      margin: 0;
+      padding: 10px 0;
+      font: inherit;
+      color: inherit;
+      letter-spacing: inherit;
+      text-align: left;
+      width: 100%;
+      display: flex;
+      align-items: baseline;
+      gap: 0.5em;
+      cursor: pointer;
+    }
+    /* A chevron, drawn in CSS so there is no glyph to translate and nothing to download. Rotates on open —
+       transform only, per the project's motion rule. */
+    [data-phone-collapsible] h2 > [data-phone-toggle]::after {
+      content: '';
+      flex: none;
+      margin-left: auto;
+      width: 0.42em;
+      height: 0.42em;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      opacity: 0.55;
+      transform: rotate(45deg);
+      transform-origin: center;
+      align-self: center;
+    }
+    [data-phone-collapsible][data-phone-open] h2 > [data-phone-toggle]::after {
+      transform: rotate(-135deg);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      [data-phone-collapsible] h2 > [data-phone-toggle]::after { transition: transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1); }
+    }
+    [data-phone-collapsible] h2 > [data-phone-toggle]:focus-visible {
+      outline: 2px solid var(--ochre);
+      outline-offset: 3px;
+      border-radius: 3px;
+    }
 
     /* WITHOUT THIS THE COLLAPSE ACHIEVES NOTHING. global.css gives every slide `min-height: 100vh` so that it
        "owns the screen" — a rule that exists FOR THE DECK. With the deck off on phones a collapsed explainer
        would still reserve a full screen and the page would not get shorter at all. The hero and the interlude
        keep theirs: the hero is a composition that wants the screen, and the tagline's whole point is landing
-       alone in the sky.
-       #APPENDIX IS DELIBERATELY NOT IN THIS LIST, by measurement rather than by principle: collapsed it is
-       876px of an iPhone 14's 664 (541px of tan panel + a 335px footer), so 100vh is not what is setting its
-       height and zeroing it would change nothing. The tallest phone tested, 430x932, lands at 932 against 933px
-       of content — still not binding. It also holds the footer, and the footer is the one thing on the page
-       that has earned reaching the bottom of the screen. If a future edit makes the appendix short enough for
-       100vh to start padding it, add it here and re-measure `airBelowCow`. */
+       alone in the sky. */
     .is-slides > section#choice,
     .is-slides > section#rules,
     .is-slides > section#solve,
