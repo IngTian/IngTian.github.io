@@ -25,7 +25,6 @@
 //
 // Arithmetic in lib/split.ts (20 tests, including the assertion that the three alternatives give three
 // DIFFERENT outcomes — if they did not, "optimising is choosing" would be an empty claim).
-import PhoneExplainerCard from '../components/PhoneExplainerCard.astro';
 import { TICKER_GLYPHS, type TickerGlyphKey } from '../data/tickerGlyphs';
 import { BEATS, HOLDINGS, SPLITS, EVENT, DEFINE_DISCLAIMER, POLICIES, BEAT4 } from '../data/define';
 import { afterEvent, changePct, segments } from '../lib/split';
@@ -295,14 +294,6 @@ const allBeats = [...BEATS, BEAT4];
       <p class="ch-cap">{DEFINE_DISCLAIMER}</p>
     </div>
   </div>
-  {/* PHONE ONLY, AND IT EMITS NO MARKUP. Below 640px this frames the `data-phone-keep` figure above as a link
-      to /research: the collapsed slide was a kicker, a headline and a picture that went nowhere. The frame is
-      defined once in that component and all three explainers render it, so the phone page has one repeating card
-      instead of three bespoke ones. Desktop is untouched — the component's whole output is a hoisted script and
-      a stylesheet gated inside the phone breakpoint, so the rendered HTML gains no node at any width.
-      Written as a JSX comment rather than an HTML one deliberately: `<!-- … -->` in an Astro template is passed
-      through to the output and would be three Comment nodes of desktop delta. This one is stripped. */}
-  <PhoneExplainerCard />
 </section>
 
 <style>
@@ -741,43 +732,8 @@ const allBeats = [...BEATS, BEAT4];
     }
     /* Read as prose, at a phone's reading size: the 1100px rules floor .ch-say at 12px, which was a caption
        size for a column of desktop bullet points and is too small for the only text on the slide. */
-    /* ON THE SCALE, like everything else here — 22 for the question, 16 for its answer. These two only ever
-       paint on a phone with JavaScript off (the disclosure hides them otherwise), and a size that can render
-       has to be a size the page allows. */
-    #choice .ch-ask { font-size: var(--ph-section, 22px); margin-bottom: 4px; }
-    #choice .ch-say { font-size: var(--ph-body, 16px); line-height: 1.6; }
-
-    /* ── 4. THE TYPE SCALE. Five sizes on the whole phone page — 11px mono kicker, 16px body, 22px section,
-       28px headline, 36px name — and this slide had SIX of them by itself: 9.5, 10.5, 11.5, 12.5, 13.5 and 24,
-       with 19 of its 28 visible words under 13px. Measured against 17 hand-picked portfolios in real WebKit at
-       390x664, that is the actual reason the owner read the phone page as "way too many texts" four times over:
-       he is at 42 words per screen against a ~56 median, but at 21 distinct sizes against a set where all six
-       type-led sites sit at 16-17px with ZERO variance (Chimero renders 1 size, Codrops 2, Pentagram 3).
-       Nothing here shrinks to fit; every run goes UP onto a token. The tokens live in global.css inside the same
-       breakpoint, and the fallbacks are not decoration — a `var()` that fails to substitute takes the whole
-       declaration down to the INHERITED size, which is a silent regression rather than a visible one. */
-    .ch-kicker { font-size: var(--ph-kicker, 11px); }
-    /* The question the slide answers, and the only thing on it besides the picture: 24 -> 28. The bottom margin
-       goes to zero because the card frame below supplies the gap, so all three explainers sit their picture the
-       same distance under their headline. */
-    .ch-head { font-size: var(--ph-head, 28px); margin-bottom: 0; }
-    /* The picture's own label, a mono line: 11.5 -> 11, the one size allowed under 13. */
-    .ch-panel-head { font-size: var(--ph-kicker, 11px); }
-    /* THE LEGEND, which is where the small print was. "$40" and "a chipmaker" are the sentence the drawing is
-       making — a hundred dollars, split four ways — so they are body copy, not captions: 13.5 and 12.5 -> 16.
-       The ticker stays a mono label at 11: it is the pixel glyph's caption, and a reader who wants the name has
-       it in plain words beside it. */
-    .ch-money, .ch-what { font-size: var(--ph-body, 16px); }
-    .ch-tick { font-size: var(--ph-kicker, 11px); }
-    /* At 16px the four legend rows need the vertical room a 12.5px row did not. */
-    .ch-legend { gap: 10px clamp(16px, 2vw, 32px); }
-
-    /* ── 5. THE FRAME'S PALETTE. components/PhoneExplainerCard.astro draws one card around the kept picture on
-       all three explainers; these two properties are how this slide tells it what colour it is. They inherit,
-       so the dark theme's override of --c-edge / --c-accent above carries into the frame with no second rule. */
-    .ch-paper {
-      --phc-edge: var(--c-edge); --phc-accent: var(--c-accent);
-    }
+    #choice .ch-ask { font-size: 17.5px; margin-bottom: 4px; }
+    #choice .ch-say { font-size: 14.5px; line-height: 1.6; }
   }
 </style>
 
