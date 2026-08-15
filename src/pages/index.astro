@@ -13,7 +13,6 @@ import Rules from '../sections/Rules.astro';
 import Solve from '../sections/Solve.astro';
 import Appendix from '../sections/Work.astro';
 import Deck from '../components/Deck.astro';
-import PhoneCollapse from '../components/PhoneCollapse.astro';
 ---
 
 <BaseLayout veilLine="a researcher by day" veilOnLoad={false}>
@@ -63,10 +62,6 @@ import PhoneCollapse from '../components/PhoneCollapse.astro';
   <Toc />
   <Grain />
   <!-- One gesture = one slide. Behaviour lives in lib/deck.ts (pure, tested); this only attaches the
-       listeners, and only on the homepage — the reading pages stay free-scrolling. Does NOT engage on a
-       phone, where a slide is 2-4 screens tall and the one-gesture-one-slide contract cannot hold. -->
+       listeners, and only on the homepage — the reading pages stay free-scrolling. -->
   <Deck />
-  <!-- Phone only: the three explainer slides collapse to their headlines, taking the homepage from 12.6
-       screens to about 4 on an iPhone 14 without removing a word. Desktop never runs it. -->
-  <PhoneCollapse />
 </BaseLayout>
