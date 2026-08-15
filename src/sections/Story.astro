@@ -27,6 +27,15 @@
 // modules stay: lib/sensitivity and lib/knowledge are what the GRAPH is drawn from, and they keep their
 // own specs.
 import { STORY } from '../data/story';
+
+// The section's headline, hoisted out of the markup so the phone rule below can be stated against it rather
+// than against a column index: the ONE sentence a phone keeps is the lead of the column this headline is asking
+// about, which is the column whose kicker is the same words. Positional ("the second one") would go quietly
+// wrong the day data/story.ts reorders. If no kicker matches, the first column's lead is kept — a headline with
+// a sentence under it in the wrong order is a style problem; a headline with nothing under it is the bug being
+// fixed here.
+const HEADING = 'Why the climb';
+const keepIndex = Math.max(0, STORY.findIndex((col) => col.kicker === HEADING));
 ---
 <section id="story" class="story" aria-labelledby="story-heading">
   <div class="story-paper">
@@ -45,13 +54,31 @@ import { STORY } from '../data/story';
       <div class="story-figure-slot"><slot /></div>
 
       <div class="story-inner">
-        <h2 id="story-heading" class="story-title">Why the climb</h2>
+        <h2 id="story-heading" class="story-title">{HEADING}</h2>
 
         <div class="story-cols">
-          {STORY.map((col) => (
+          {STORY.map((col, i) => (
             <div class="story-col">
               <p class="story-kicker">{col.kicker}</p>
-              <p class="story-lead">{col.lead}</p>
+              <!-- data-phone-keep ON THE LEAD OF THE COLUMN THIS HEADLINE ASKS ABOUT (see keepIndex above) —
+                   THE ONE SENTENCE A PHONE GETS, and it is a bug
+                   fix rather than a flourish. Below 640px components/PhoneCollapse.astro puts everything after
+                   this section's h2 behind the breakpoint, and #story marked nothing: "Why the climb" rendered
+                   with NOTHING under it, 180px of headline and empty paper between the graph and the appendix —
+                   a section headline that promises content and delivers none. Measured on an iPhone 14: 53px of
+                   grid gap, a 42px headline box, then 85px of void.
+                   The alternative was to drop the heading on a phone, which is 129px shorter. This keeps it,
+                   for three reasons. (1) The promise gets KEPT instead of deleted — and length is not the axis
+                   in trouble: at 5.93 screens this page is already 34% below the 15-site median of ~9.0, while
+                   what the survey actually flagged was type size and nothing to tap. (2) The answer cannot
+                   drift from the question: this is the lead of the column whose kicker IS "Why the climb", so
+                   editing data/story.ts moves both together — a hand-copied line here would be a second source
+                   of truth for one sentence. (3) It is the one thing on the phone homepage that says why the
+                   career turned; /experience and /research do not carry it, and the graph's own closing line
+                   ("the deepest point is not marked") is a statement about the surface, not a reason.
+                   NOT the coda, which was the other candidate: it already renders on a phone inside the drawing
+                   (see DescentPath), so keeping it here would print the same sentence twice on one screen. -->
+              <p class="story-lead" data-phone-keep={i === keepIndex ? '' : undefined}>{col.lead}</p>
               {col.body.map((para) => <p class="story-body">{para}</p>)}
             </div>
           ))}
@@ -276,4 +303,42 @@ import { STORY } from '../data/story';
 
   /* (.story-tail is gone with the element — see the markup comment. Anything placed at the foot of this
      column is unreachable in the deck, so the rule is deleted rather than left for someone to reuse.) */
+
+  /* ══ PHONE ONLY (≤640px), and placed LAST on purpose: every rule here overrides a declaration above it at
+     equal-or-lower specificity, and in this codebase an override written above its target silently does nothing
+     (the note on .story-figure-slot is the same trap, measured).
+     ── THE FIVE-SIZE SCALE. Surveyed against 17 hand-picked portfolios in real WebKit at 390x664, the type here
+     read as small print: this site renders 21 distinct sizes where the six type-led sites in the set run 16–17px
+     body with ZERO variance. The tokens come from global.css inside this same breakpoint (--ph-kicker 11 /
+     --ph-body 16 / --ph-section 22 / --ph-head 28); the literal fallbacks are deliberate — a custom property
+     that fails to substitute invalidates the declaration at computed-value time, and font-size then falls back
+     to the INHERITED size, silently.
+     Only the headline and the kept lead are visible on a phone with JavaScript on; the rest is the rendering a
+     phone gets with it OFF, held to the same scale rather than left at three more sizes. */
+  @media (max-width: 640px) {
+    .story-title { font-size: var(--ph-head, 28px); }
+    .story-lead { font-size: var(--ph-section, 22px); }   /* 21 → 22 */
+    .story-body { font-size: var(--ph-body, 16px); }      /* 15 → 16, the field norm and the floor */
+    .story-kicker { font-size: var(--ph-kicker, 11px); }  /* 11.5 → 11 */
+
+    /* ── AND THE AIR AROUND THEM, so keeping a sentence costs almost nothing. The vh-based air was written for a
+       1000px-tall desktop panel holding two columns: at 664px it still reserved 60px of paper below the writing
+       and a 53px grid gap for a section whose phone rendering is a picture and two lines. Flat px rather than vh
+       because this panel's content no longer scales with the viewport once it is collapsed — 9vh was 84px of
+       empty paper on the tallest phone tested (430x932) and 60 on the shortest.
+       PADDING-BOTTOM ONLY, and that is a measured fact rather than a preference: the TOP is not this file's to
+       set on a phone. global.css owns it through `.is-slides > section > .story-paper { padding-top: 22px }`,
+       which is (0,2,1) against this rule's scoped (0,2,0) — verified with getComputedStyle (22px, not the 34
+       a `padding: 34px 0` shorthand here would claim). Writing the top anyway would be a declaration that loses
+       silently, i.e. a false clue about what sets this panel's air. */
+    .story-paper { padding-bottom: 34px; }
+    .story-split { gap: 26px 0; }
+    .story-title { margin-bottom: 14px; }
+
+    /* The lifted lead is the last visible thing in the column, so its 22px bottom margin would be void again —
+       exactly the 85px tail this change exists to close. `[data-phone-kept]` is set by PhoneCollapse on the
+       element it moved, which is the only signal that says "this one is on screen"; the attribute makes it
+       (0,3,0) and it wins on source order too. */
+    .story-lead[data-phone-kept] { margin-bottom: 0; }
+  }
 </style>

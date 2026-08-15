@@ -1,0 +1,192 @@
+---
+// PHONE-ONLY: the one card frame the three explainer slides share, and the destination they were missing.
+//
+// WHY THIS EXISTS. Measured against 17 hand-picked portfolios in real WebKit at 390x664, the phone homepage's
+// two real outliers were type size and NOTHING TO TAP: only 2 of 8 links were on the first screen and both were
+// camouflaged inside a sentence, while the other 6 sat at 93% page depth. The comparison set has exactly two
+// working phone patterns and no third — an INDEX (leerob 13-of-15 links on screen one, Boyd's homepage IS 15
+// links, Chimero's IS a 6-item menu) or CHUNKED CARDS WHERE EVERY CARD IS A LINK OUT (brittanychiang, colah,
+// pentagram: a 244px image in a 312px card, 17 words, every card a link). The three explainers were neither:
+// each was a kicker, a headline and one static graphic that linked NOWHERE.
+//
+// So each collapsed explainer becomes a card that goes to /research — the page those three slides are an
+// argument for. The graphic each slide already publishes as `data-phone-keep` becomes the tappable surface.
+//
+// ONE FRAME FOR ALL THREE, which is the other half of the survey: colah ships 37 instances of one card and
+// Pentagram 56, against this site's six single-appearance compositions. The frame is defined once, here, so the
+// phone page has one repeating unit rather than three bespoke compositions — and so a change to the unit is one
+// edit rather than three that drift.
+//
+// WHY A RUNTIME TRANSFORM RATHER THAN MARKUP, the same argument PhoneCollapse.astro makes and for the same
+// reason: authored in the three .astro files, three `<a href="/research">` would exist on DESKTOP too, in its
+// tab order and its accessibility tree, wrapping figures that already have their own desktop treatment. That is
+// a real regression and an invisible one — no screenshot shows it. Built below the breakpoint, the HTML Astro
+// emits is byte-for-byte what desktop ships today.
+//
+// IT MOVES NODES, IT NEVER WRITES CONTENT. The graphic is `appendChild`ed into the frame, so its identity,
+// its listeners and the slide stepper's element references all survive — and its words stay in the phone
+// rendering, which is what mobile-first indexing reads. The only text this file creates is the call to action.
+//
+// WHO ELSE DRAWS THIS FRAME. `.ph-card` / `.ph-card-cta` / `.ph-card-arrow` are declared once, below, and
+// PhoneCollapse.astro reuses them for the other sections it keeps a figure in — it frames a keeper that names a
+// destination in its own markup. So the phone page shows four instances of ONE unit, which was the point.
+// THE BUILDERS ARE SEPARATE ON PURPOSE, and it is worth writing down which difference pays for that: these
+// three cards take their accessible name from the slide's own <h2> ("Read the research: Still an open
+// problem."), because their content is a drawing — Solve's keeper is a bare wireframe whose only text is a
+// 30-word figure description, and letting a link name itself from that reads it all out before the promise.
+// The sections whose keeper is already words can name themselves from their content and need no label. The
+// second reason is narrower: an attribute-driven frame needs two attributes in the section's markup, and these
+// three slides are the ones under a hard "desktop emits not one extra node" constraint.
+---
+<script>
+  import { isPhone, PHONE_MAX_WIDTH } from '../lib/viewport';
+
+  /** Every explainer points at the same page: /research is what the three slides are an argument for. */
+  const HREF = '/research';
+  /** The site's own link idiom, verbatim from Work.astro's `.wk-link`, so this reads as the same doorway. */
+  const CTA = 'Read the research';
+  const SLIDES = ['#choice', '#rules', '#solve'] as const;
+
+  const CARD_CLASS = 'ph-card';
+
+  /** Put a framed graphic back where it was found and drop the frame. */
+  function unwrap(card: HTMLElement): void {
+    const parent = card.parentElement;
+    if (!parent) return;
+    for (const child of Array.from(card.childNodes)) {
+      if (child instanceof HTMLElement && child.classList.contains('ph-card-cta')) continue;
+      parent.insertBefore(child, card);
+    }
+    card.remove();
+  }
+
+  /**
+   * Frame one slide's kept graphic as a link.
+   *
+   * IDEMPOTENT AND ORDER-INDEPENDENT ON PURPOSE. This runs a frame LATE (see the rAF below) because
+   * PhoneCollapse lifts `[data-phone-keep]` out of the collapsed body on the same `astro:page-load` event, and
+   * the relative order of two hoisted module listeners is a bundling detail, not a contract. So the rule here is
+   * "wrap the graphic wherever it now is", plus the self-heal on the line marked below: a frame that no longer
+   * contains the graphic (because a lift pulled it out afterwards) is removed rather than left as an empty box
+   * in the DOM.
+   */
+  function frame(section: HTMLElement): void {
+    const pic = section.querySelector<HTMLElement>('[data-phone-keep]');
+    if (!pic) return;
+    // Self-heal: any frame that lost its picture is stale, whatever the reason.
+    for (const stale of Array.from(section.querySelectorAll<HTMLElement>(`.${CARD_CLASS}`))) {
+      if (!stale.contains(pic)) unwrap(stale);
+    }
+    const parent = pic.parentElement;
+    if (!parent) return;
+    if (parent.classList.contains(CARD_CLASS)) return;             // already framed
+
+    const card = document.createElement('a');
+    card.className = CARD_CLASS;
+    card.href = HREF;
+
+    // THE ACCESSIBLE NAME IS BUILT FROM THE SLIDE'S OWN HEADING, not typed here — so three cards to the same
+    // page announce as three different links ("Read the research: Still an open problem.") and the label can
+    // never drift from the headline above it. The heading is read through `aria-labelledby`, which is the
+    // contract these sections already publish about which heading is theirs; `querySelector('h2')` would find
+    // whichever h2 is first in the subtree. The visible CTA is a substring of the label, which is what WCAG
+    // 2.5.3 (label in name) asks for.
+    const labelledBy = section.getAttribute('aria-labelledby');
+    const heading = labelledBy ? document.getElementById(labelledBy) : null;
+    const title = (heading?.textContent ?? '').replace(/\s+/g, ' ').trim();
+    card.setAttribute('aria-label', title ? `${CTA}: ${title}` : CTA);
+
+    parent.insertBefore(card, pic);
+    card.appendChild(pic);
+
+    const cta = document.createElement('span');
+    cta.className = 'ph-card-cta';
+    cta.textContent = CTA;
+    // The glyph is decoration; the label already says where this goes. Same treatment as `.wk-arrow`.
+    const arrow = document.createElement('span');
+    arrow.className = 'ph-card-arrow';
+    arrow.setAttribute('aria-hidden', 'true');
+    arrow.textContent = '→';
+    cta.appendChild(arrow);
+    card.appendChild(cta);
+  }
+
+  function apply(): void {
+    const phone = isPhone();
+    for (const sel of SLIDES) {
+      const section = document.querySelector<HTMLElement>(sel);
+      if (!section) continue;
+      if (phone) frame(section);
+      else for (const card of Array.from(section.querySelectorAll<HTMLElement>(`.${CARD_CLASS}`))) unwrap(card);
+    }
+  }
+
+  // ONE FRAME LATER THAN PAGE-LOAD. PhoneCollapse moves the graphic synchronously inside its own
+  // `astro:page-load` listener; a `requestAnimationFrame` lands after the whole dispatch whichever listener was
+  // registered first, so the graphic has stopped moving before it is framed. (A microtask would NOT do: the
+  // microtask queue is drained between listener callbacks.)
+  const later = () => requestAnimationFrame(apply);
+
+  document.addEventListener('astro:page-load', later);
+
+  // Rotating a phone into landscape can cross the breakpoint, and leaving phone width must return the DOM to
+  // what desktop ships — same contract as PhoneCollapse's own gate.
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    window.matchMedia(`(max-width: ${PHONE_MAX_WIDTH}px)`).addEventListener('change', later);
+  }
+</script>
+
+<style is:global>
+  /* Global, not scoped: the frame is created at runtime, so Astro's scoped `[data-astro-cid-…]` attribute is
+     not on it and a scoped selector could never match. Everything is inside the phone breakpoint, so desktop
+     cannot be reached by any of it.
+
+     THE SLIDE TALKS TO THIS FRAME THROUGH THREE CUSTOM PROPERTIES, declared on its own paper inside its own
+     phone block — `--phc-edge`, `--phc-accent` and `--phc-gap`. Custom properties inherit, so the frame picks
+     up the paper's palette (and its dark-theme override) for free, and each slide's contribution stays visible
+     in the file a person would edit. Nothing here reaches into a section's class names, which is the coupling
+     PhoneCollapse had to accept for #appendix and this file does not.
+
+     A HAIRLINE AND NOTHING ELSE, and the reason is contrast rather than taste. The first version tinted the
+     card `color-mix(in srgb, var(--ink) 3%, transparent)` to give it a surface; computed, that moves the
+     accent-on-paper ratio the site already ships from 3.34:1 to 3.20:1 in light — and in dark the tint
+     lightens the card, so it costs there too. Every accent run inside the frame (this call to action, and
+     Rules' cost column) would have paid it. The border alone reads as a card in both themes; "when in doubt,
+     remove rather than add" happens to be the same answer. */
+  @media (max-width: 640px) {
+    .ph-card {
+      display: block;
+      margin: var(--phc-gap, 14px) 0 0;
+      padding: 13px 13px 0;
+      border: 1px solid var(--phc-edge, rgba(74, 66, 54, 0.26));
+      border-radius: 4px;
+      color: inherit;
+      text-decoration: none;
+      /* The picture is the tap target, so the frame must not hand the gesture to a text selection first. */
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* The card's footer row: the promise on the left, the glyph on the right, on the frame's own hairline —
+       one repeating unit across the three slides. 11px mono uppercase is the site's kicker size and the only
+       size the phone scale allows below 13px, so the card adds NO new font size to the page. */
+    .ph-card-cta {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+      margin-top: 13px; padding: 9px 0 10px;
+      border-top: 1px solid var(--phc-edge, rgba(74, 66, 54, 0.26));
+      font-family: var(--font-mono);
+      font-size: var(--ph-kicker, 11px);
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--phc-accent, #7c5522);
+    }
+
+    /* Pressed state, not a hover one: a phone has no hover, and `opacity` is the one property the site's
+       motion rule allows to animate alongside `transform`. */
+    .ph-card:active { opacity: 0.72; }
+    @media (prefers-reduced-motion: no-preference) {
+      .ph-card { transition: opacity 160ms ease; }
+    }
+    .ph-card:focus-visible {
+      outline: 2px solid var(--phc-accent, #7c5522); outline-offset: 4px;
+    }
+  }
+</style>

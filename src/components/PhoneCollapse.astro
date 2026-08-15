@@ -5,9 +5,18 @@
 // illustrative graph", not a headline alone: "probably a good iphone experience is very straight forward,
 // heavily visual over texts". A section expresses that by marking ONE element `data-phone-keep`; the transform
 // lifts exactly that element out of the collapsed body and parks it under the heading, so it is on screen while
-// everything else is behind the tap. Marking nothing is still valid and still means "headline only" (#story,
-// whose career list is already outside the collapsed region, does that). Nothing else about a section's markup
-// changes, which is what lets each slide keep its desktop rendering byte-for-byte.
+// everything else is behind the tap. Nothing else about a section's markup changes, which is what lets each
+// slide keep its desktop rendering byte-for-byte.
+//
+// A KEPT ELEMENT MAY ALSO NAME A DESTINATION — `data-phone-link` (+ `data-phone-cta` for the words), which wraps
+// it in the card frame from components/PhoneExplainerCard.astro. This is the second half of the same finding
+// that produced the collapse: measured against 17 hand-picked portfolios in real WebKit at 390x664, the phone
+// homepage's two real outliers were type size and NOTHING TO TAP — 2 of 8 links on the first screen, both
+// camouflaged inside a sentence, the other 6 at 93% page depth. The comparison set has exactly two working phone
+// patterns and no third: an index, or chunked cards where every card is a link out. A collapsed section that
+// shows one graphic linking nowhere is neither, so the graphic a section chose to keep is also the doorway it
+// offers. Marking a keeper without a link is still valid — the appendix's cow is one, because it is a thing you
+// PRESS, and wrapping that in a link that navigates is the one way to break it.
 //
 // WHY THIS IS A RUNTIME TRANSFORM AND NOT MARKUP. The disclosure could be authored in the .astro files, and
 // that is the obvious way — but then three `button[aria-expanded]` controls exist on DESKTOP too, in its tab
@@ -29,53 +38,87 @@
 <script>
   import { isPhone, PHONE_MAX_WIDTH } from '../lib/viewport';
 
-  type Slide = {
-    /** The section, as an id selector. */
-    readonly sel: string;
-    /**
-     * FALLBACK KEEP SELECTOR, used only when the section marks nothing itself.
-     *
-     * The contract is that a section marks the one element that must stay visible with `data-phone-keep`, in
-     * its own markup, where the person editing the slide can see it. #appendix is the exception on purpose:
-     * what must survive there is not a figure the section chose to publish but two figures buried three levels
-     * inside its first column (the paper's compounded-wealth and Sharpe numbers) plus the cow, and the reason
-     * they survive is a phone decision, not an appendix decision. Naming them from here keeps Work.astro
-     * exactly as desktop ships it. It is a coupling to that section's class names and it is written down as
-     * one: if `.wk-stats` or `.wk-cow` is renamed, this string moves with it, and the measurement that catches
-     * a silent break is "collapsed #appendix still shows two numbers and the cow".
-     */
-    readonly keep?: string;
-  };
-
   /**
-   * The sections that collapse, in reading order.
+   * The sections that collapse, in reading order. Nothing but ids: what survives inside each one is marked in
+   * that section's own markup, so this file couples to no section's class names.
    *
    * #story earns its place by measurement rather than by symmetry: on an iPhone 14 it is 3.07 screens, made of
    * a 1.11-screen career list and 1.67 screens of "Why the climb" prose. Its h2 sits INSIDE .story-inner,
-   * after the graph's slot, so the generic transform collapses exactly the prose and leaves the career stops
-   * (McGill → Ericsson → Amazon → TikTok → EA → Toronto) on screen. That is the right half to keep: those
-   * labels are what someone searching by employer matches, and on a phone DescentPath already degrades from a
-   * canvas to that text list, so the graph is not being "hidden" here — it is already words.
+   * after the graph's slot, so the generic transform collapses exactly the prose and leaves the graph on screen.
+   *
+   * #appendix is the biggest win of the five: 2.71 screens, all of it three columns of titles, venues and
+   * taglines that are one tap away on the pages they link to anyway. What may NOT go behind the tap is the
+   * reference matter the owner named — the two headline numbers, the cow, and the footer. The footer is already
+   * outside the collapsed region (it is nested AFTER the tan panel, so the walk below never reaches it); the
+   * numbers and the cow are inside it and mark themselves.
    */
-  const SECTIONS: readonly Slide[] = [
-    { sel: '#choice' },
-    { sel: '#rules' },
-    { sel: '#solve' },
-    { sel: '#story' },
-    /**
-     * #appendix collapses too, and it is the biggest win of the five: 2.71 screens on an iPhone 14, all of it
-     * three columns of titles, venues and taglines that are one tap away on the pages they link to anyway.
-     * What may NOT go behind the tap is the reference matter the owner named — the two headline numbers, the
-     * cow, and the footer. The footer is already outside the collapsed region (it is nested AFTER the tan
-     * panel, so the walk below never reaches it); the numbers and the cow are inside it, measured, hence the
-     * keep selector.
-     */
-    { sel: '#appendix', keep: '.wk-stats, .wk-cow' },
-  ];
+  const SECTIONS: readonly string[] = ['#choice', '#rules', '#solve', '#story', '#appendix'];
 
   type Undo = () => void;
 
-  function collapseOne(section: HTMLElement, index: number, keepFallback?: string): Undo | null {
+  /** The card frame, defined once in components/PhoneExplainerCard.astro — see wrapAsCard(). */
+  const CARD_CLASS = 'ph-card';
+
+  /**
+   * Wrap a kept element in the shared phone card frame, if it named a destination. Returns the frame, or null
+   * when the element is not a doorway.
+   *
+   * ONE FRAME FOR THE WHOLE PHONE PAGE, and that is the point rather than a convenience: the survey behind this
+   * work counted 37 instances of one card on colah's site and 56 on Pentagram's against this site's six
+   * single-appearance compositions. `.ph-card` / `.ph-card-cta` / `.ph-card-arrow` are defined once, in
+   * components/PhoneExplainerCard.astro's phone-only global block, which ships on the homepage because the three
+   * explainer slides render it. THE COUPLING IS EXACTLY THOSE THREE CLASS NAMES — nothing here states a border,
+   * a radius or a colour, and each section feeds the frame its palette through the inherited `--phc-*` custom
+   * properties from its own stylesheet. If the frame is ever renamed, this constant moves with it and the
+   * measurement that catches it is "the collapsed appendix's two numbers still sit in a bordered card".
+   *
+   * NO aria-label. The link's accessible name is its own content — the figures and then the call to action
+   * ("~120% wealth compounded · OOS ’20–’25 … Read the research"), which is informative, cannot drift from what
+   * is on screen, and satisfies label-in-name for free. The explainer cards need a label because a canvas has no
+   * text; this one has nothing but text.
+   */
+  function wrapAsCard(el: HTMLElement): HTMLElement | null {
+    const href = el.getAttribute('data-phone-link');
+    if (!href) return null;
+    const parent = el.parentElement;
+    if (!parent) return null;
+
+    const card = document.createElement('a');
+    card.className = CARD_CLASS;
+    card.href = href;
+    parent.insertBefore(card, el);
+    card.appendChild(el);
+
+    // The words are the SECTION'S, read off its markup — the only text this file has ever written is none, and
+    // that is worth keeping: a CTA typed here could contradict the link it sits on.
+    const label = el.getAttribute('data-phone-cta');
+    if (label) {
+      const cta = document.createElement('span');
+      cta.className = 'ph-card-cta';
+      cta.textContent = label;
+      // Decoration: the accessible name already says where this goes. Same treatment as `.wk-arrow`.
+      const arrow = document.createElement('span');
+      arrow.className = 'ph-card-arrow';
+      arrow.setAttribute('aria-hidden', 'true');
+      arrow.textContent = '→';
+      cta.appendChild(arrow);
+      card.appendChild(cta);
+    }
+    return card;
+  }
+
+  /** Put a framed element back where the frame stands and drop the frame (with the CTA it created). */
+  function unwrapCard(card: HTMLElement): void {
+    const parent = card.parentElement;
+    if (!parent) return;
+    for (const child of Array.from(card.childNodes)) {
+      if (child instanceof HTMLElement && child.classList.contains('ph-card-cta')) continue;
+      parent.insertBefore(child, card);
+    }
+    card.remove();
+  }
+
+  function collapseOne(section: HTMLElement, index: number): Undo | null {
     // The panel is the section's single full-bleed child; its own first child holds the column.
     const panel = section.firstElementChild as HTMLElement | null;
     const inner = panel?.firstElementChild as HTMLElement | null;
@@ -136,12 +179,7 @@
     // MORE THAN ONE IS ALLOWED even though the slides use exactly one, because #appendix needs two disjoint
     // survivors (the numbers and the cow). They are inserted in document order after the heading, so "two
     // numbers, then the cow" reads down the page the way it does on desktop.
-    const declared = Array.from(section.querySelectorAll<HTMLElement>('[data-phone-keep]'));
-    // The section's own markup always wins; the fallback selector is only consulted when it says nothing, so
-    // #appendix can start marking its own survivors later and this file needs no edit for it.
-    const wanted = declared.length === 0 && keepFallback
-      ? Array.from(section.querySelectorAll<HTMLElement>(keepFallback))
-      : declared;
+    const wanted = Array.from(section.querySelectorAll<HTMLElement>('[data-phone-keep]'));
     // Only lift what the collapse actually swallowed — an element already outside the body (the appendix's
     // nested footer, say) is visible where it is, and moving it would reorder the page for no reason. And drop
     // anything nested inside another keeper, so a marked child cannot be torn out of a marked parent.
@@ -156,7 +194,6 @@
       const back = el.nextSibling;                  // exact original position, for the teardown
       dest.insertBefore(el, anchor.nextSibling);
       el.setAttribute('data-phone-kept', '');
-      anchor = el;
       // Runs BEFORE the body wrappers are unwrapped (undos are played in reverse), so `from` is still in the
       // document at its original place and `back` is still its child — the node lands exactly where it started.
       // Keepers restore in reverse too, which matters when one was the other's next sibling.
@@ -164,6 +201,16 @@
         el.removeAttribute('data-phone-kept');
         from.insertBefore(el, back);
       });
+      const card = wrapAsCard(el);
+      // THE NEXT KEEPER ANCHORS ON THE CARD, NOT ON THE ELEMENT INSIDE IT. `anchor.nextSibling` is how the
+      // second keeper finds its place, and once the first one is wrapped its next sibling is the card's own
+      // call-to-action row — so anchoring on `el` would deal the cow INTO the numbers' card, between the
+      // figures and their link text.
+      anchor = card ?? el;
+      // Pushed AFTER the restore above so it plays BEFORE it: the frame is taken off while the element is still
+      // inside it, and the keeper then travels home from the frame's parent. In the other order the restore
+      // would pull the element out and leave an orphan <a> holding nothing but the CTA.
+      if (card) undos.push(() => unwrapCard(card));
     }
 
     // ── 3. NO CONTROL. There is nothing to press, and that is the point.
@@ -193,9 +240,9 @@
     undoAll?.();
     undoAll = null;
     if (!isPhone()) return;
-    const undos = SECTIONS.map((slide, i) => {
-      const el = document.querySelector<HTMLElement>(slide.sel);
-      return el ? collapseOne(el, i, slide.keep) : null;
+    const undos = SECTIONS.map((sel, i) => {
+      const el = document.querySelector<HTMLElement>(sel);
+      return el ? collapseOne(el, i) : null;
     }).filter((u): u is Undo => !!u);
     if (undos.length) undoAll = () => undos.forEach((u) => u());
   }

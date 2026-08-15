@@ -18,6 +18,7 @@
 //
 // Hand-rolled oblique projection rather than three.js — ships no bytes, and a parallel projection keeps
 // heights comparable across the lattice, which matters when the height IS the value being compared.
+import PhoneExplainerCard from '../components/PhoneExplainerCard.astro';
 import {
   LEVELS, PERIODS, WORLD, solve, route, candidates,
   project3, valueBounds,
@@ -160,6 +161,9 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
       <p class="so-close">{OPEN_CLOSE}</p>
     </div>
   </div>
+  {/* PHONE ONLY, AND IT EMITS NO MARKUP — see the note at the same place in Choice.astro. Below 640px it frames
+      the `data-phone-keep` lattice above as a link to /research, in the one card frame the three explainers share. */}
+  <PhoneExplainerCard />
 </section>
 
 <style>
@@ -493,6 +497,27 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
        in the details they label ("reinforcement learning", "Bayesian priors", "integer problem"), and the
        figure's caption stays: it is static, in flow, and it is what explains the drawing above. */
     .so-terms, .so-read { display: none; }
+
+    /* ── THE TYPE SCALE. Five sizes on the phone page — 11px mono kicker, 16px body, 22px section, 28px
+       headline, 36px name. This slide is the simplest of the three to bring onto it, because the kept graphic is
+       a wireframe with no text in it at all: the only visible runs are the kicker (10.5) and the headline (21),
+       and 7 of its 11 visible words were the sub-13px kicker. Measured against 17 portfolios in real WebKit at
+       390x664, that small print is the outlier the owner was reading as "way too many texts" — this page is
+       already at 42 words per screen against a ~56 median, but renders 21 distinct sizes against a set where
+       every type-led site sits at 16-17px with no variance.
+       The fallbacks are load-bearing: a `var()` that fails to substitute takes the declaration down to the
+       INHERITED size rather than to the rule above it. */
+    .so-kicker { font-size: var(--ph-kicker, 11px); }
+    /* "Still an open problem." — four words, and the payoff of the three-slide sequence: 21 -> 28. The bottom
+       margin goes to the card frame, so all three explainers sit their picture the same distance under their
+       headline. */
+    .so-head { font-size: var(--ph-head, 28px); margin-bottom: 0; }
+
+    /* ── THE FRAME'S PALETTE. components/PhoneExplainerCard.astro draws the shared card around the lattice;
+       these tell it what colour it is here, and they inherit the dark theme's override for free. */
+    .so-paper {
+      --phc-edge: var(--s-edge); --phc-accent: var(--s-accent);
+    }
   }
 
 </style>

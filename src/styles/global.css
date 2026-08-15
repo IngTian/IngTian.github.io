@@ -389,3 +389,139 @@ html[data-theme='dark'] .terminal-chrome { background: linear-gradient(180deg, r
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================
+   THE PHONE TYPE SCALE — FIVE SIZES, AND ONLY THESE.
+
+       11px mono kicker · 16px body · 22px section · 28px headline · 36px name
+
+   Nothing visible on a phone may render below 13px except the 11px mono
+   kickers. That is the whole rule.
+
+   WHY, because "delete more words" was tried four times and did not work.
+   Measured against 17 hand-picked portfolios in real WebKit at 390x664:
+   this site is already 5.93 screens (34% BELOW the 15-site median of ~9.0)
+   and 42 words per screen (below the ~56 median). Words were never the
+   problem. The type was. Measured on this page before this block:
+
+       21 distinct rendered font sizes among visible phone text
+       96 of 270 visible words (35.6%) under 13px
+       body prose at 13px, name at 64px — a 4.9x jump inside 480px of screen
+
+   The comparison set has no variance at all: all six type-led sites sit at
+   16-17px body. Chimero renders ONE size, Codrops 2, Pentagram 3, Awwwards
+   4. The 64px name has no analogue in seventeen sites (the ceiling is
+   brittanychiang at 36). "Too many texts" was 21 sizes and small print, not
+   250 words.
+
+   (Counting rule, so the number is reproducible: every text node with a
+   painted client rect, skipping display:none / visibility / opacity:0 chains
+   and sr-only 1px-clipped boxes, walked after a full scroll pass so the
+   reveal animations have fired.)
+
+   WHAT THIS BLOCK DOES AND DOES NOT DO — worth stating plainly, because the
+   headline count goes the WRONG WAY on its own and that is expected. This is
+   the foundation: the tokens, the inherited baseline, and the body floor. It
+   moves the hero bio (39 words, the largest block of prose on the phone) from
+   13px to 16px, which ADDS a 16px bucket while 13px is still held by
+   Rules' rung labels — so the distinct-size count reads 21 → 22 until the
+   sections collapse onto the five tokens. Every size still off the scale is
+   declared in a component's own scoped <style> (grep `font-size:` under
+   src/sections and src/components), which per the cascade note below is the
+   only place it CAN be fixed.
+
+   ── HOW THE CASCADE ACTUALLY RESOLVES HERE, measured, because it decides
+   what this file is even able to reach and both answers are surprising:
+
+     · Tailwind's utilities are emitted INSIDE `@layer utilities`. Layer
+       precedence is resolved BEFORE specificity, and unlayered author rules
+       outrank every layer — so a bare `p { font-size: … }` written here beats
+       `.text-[clamp(13px,1.25vw,15.5px)]` even though the utility has the
+       higher specificity. Verified in WebKit: injecting `p { font-size:16px }`
+       moved the hero bio 13px → 16px and the Interlude headline 27px → 16px.
+     · Astro component `<style>` rules are UNLAYERED and carry
+       [data-astro-cid-…], so `.ch-kicker` is (0,2,0) and its stylesheet loads
+       after this one. Nothing written here can reach them. In the same
+       injection: .ch-kicker held 10.5px, .dp-readout 12px, .wk-stat-label 9px.
+
+   So a section's own scoped styles always win, and this file must NOT try to
+   out-specify them — a global override of a per-section size would be action
+   at a distance that the next person editing that section could not see.
+   Per-section sizing belongs in the section.
+   ============================================================ */
+@media (max-width: 640px) {
+  /* ── THE SCALE, as tokens. One place to reference so no section has to
+     invent a number. Any visible phone text uses one of these five.
+
+     PHONE-ONLY BY DESIGN, WHICH IS A SHARP EDGE WORTH NAMING: these are
+     declared inside the phone query, so on desktop `var(--ph-body)` resolves
+     to nothing. A custom property that fails to substitute makes the whole
+     declaration invalid AT COMPUTED-VALUE TIME — font-size then falls back to
+     the INHERITED size rather than to the previous declaration, which is a
+     silent, hard-to-spot desktop regression. Only ever read these inside a
+     `@media (max-width: 640px)` block, or write the fallback:
+     `font-size: var(--ph-body, 16px)`. */
+  :root {
+    --ph-kicker: 11px;   /* mono kickers / labels — the ONLY size allowed under 13px */
+    --ph-body: 16px;     /* all prose. the field norm, and the floor */
+    --ph-section: 22px;  /* section heads */
+    --ph-head: 28px;     /* the headline of a slide */
+    --ph-name: 36px;     /* the name, once. was 64px */
+  }
+
+  /* ── The inherited baseline. It already computes to 16px on a phone today,
+     but only because it is falling through to the UA default — nothing in the
+     project states it. Stating it means the floor survives anyone setting
+     `html { font-size: … }` later (a common "fluid type" edit), and it gives
+     every element that declares no size of its own a 16px starting point
+     instead of a coincidence. */
+  body { font-size: var(--ph-body); }
+
+  /* ── THE BODY FLOOR. `.font-body` is the site's own role hook for prose, so
+     the floor rides the markup's existing statement of intent rather than a
+     guessed list of selectors — and it deliberately cannot touch display type,
+     because editorial lines carry `font-display` / `font-accent` and mono
+     kickers carry `font-mono`. That distinction is the reason this is safe: a
+     blanket `p` rule at this strength flattened the Interlude's 27px headline
+     to 16px in testing.
+
+     This one rule intentionally outranks the utility layer (see above), so it
+     lifts a `text-[clamp(13px,…)]` written in a section. Audited every
+     `.font-body` user across / /art /research /projects /404 in WebKit at
+     390px before writing it, and every one is BELOW the floor — Heights' hero
+     bio at 13px and Mountains' featured takeaway at 14px — so this can only
+     ever raise, never shrink. A section that needs a different size states it
+     in its own scoped `<style>`, which wins on specificity and source order.
+     If a `.font-body` element above 16px is ever added, this becomes a
+     shrink: re-audit rather than assuming. */
+  .font-body { font-size: var(--ph-body); }
+
+  /* ── The floor for generic prose that phones INHERIT — a paragraph that no
+     rule sizes at all, so it currently takes whatever its container happens to
+     say. Three deliberate choices, one of them learned the hard way:
+
+     `@layer base` makes this the weakest author rule on the page: Tailwind's
+     utilities (a later layer) beat it, and any component's scoped style beats
+     it. So it can only ever land where nothing else has an opinion, which is
+     exactly "generic prose", and no section can be stepped on by it.
+
+     `max(…, 1em)` makes it a floor rather than an assignment. In `font-size`,
+     `1em` resolves against the PARENT, so prose sitting inside a deliberately
+     larger container keeps the larger size and only sub-16px inheritance is
+     lifted. A flat 16px here would silently shrink a lede.
+
+     THE ELEMENT LIST IS THIS SHORT ON PURPOSE — it is `p` and `blockquote`,
+     the two elements that are prose BY DEFINITION. The first draft also had
+     li, dd, dt, td, th, figcaption, label, summary and output, and a phone A/B
+     across / /art /research /projects /404 caught it changing four elements it
+     had no business touching: the `<li>` rows of Choice's month axis
+     (`.ch-months li`, Choice.astro:496) went 9px → 16px, because that li is a
+     GRID ROW whose visible label is a classed span and whose own inherited
+     size is just the container's mono 9px. Semantic elements are only prose
+     when the author used them as prose; li/td/dt are structure, and in this
+     codebase they carry chart axes and stat figures. Widening this list needs
+     the same A/B, not an assumption. */
+  @layer base {
+    p, blockquote { font-size: max(var(--ph-body), 1em); }
+  }
+}

@@ -52,8 +52,31 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
                 {featured.arxivId && <> · arXiv:{featured.arxivId}</>}
               </p>
               <!-- Out-of-sample, against two baselines, both named — a number with nothing to compare it to is
-                   decoration. Full table on /research. -->
-              <div class="wk-stats">
+                   decoration. Full table on /research.
+
+                   THE THREE data-phone-* ATTRIBUTES ARE THIS SECTION'S PHONE CONTRACT, and they are inert on
+                   desktop — no rule matches them, no a11y meaning, the rendering is byte-identical.
+                     · data-phone-keep — components/PhoneCollapse.astro puts everything after the "Appendix"
+                       heading behind the phone breakpoint and lifts the marked elements back out, so these two
+                       numbers stay on screen while the three columns of titles and venues do not. They used to
+                       be named from inside PhoneCollapse by class selector (`.wk-stats, .wk-cow`), which was a
+                       documented coupling to this file's class names; the section says it itself now and that
+                       fallback is deleted.
+                     · data-phone-link + data-phone-cta — the numbers were the one thing on the collapsed phone
+                       page that LOOKED like a result and led nowhere. PhoneCollapse wraps the block in the same
+                       card frame the three explainer slides use, so the phone page has one repeating unit
+                       rather than a bespoke composition here.
+                   THE DESTINATION IS /research, NOT /projects: both figures are read off the featured PAPER
+                   (compounded is `featured.results[0]`, the Sharpe is its own metrics table), /research is where
+                   that table is printed in full, and it is the destination this column's own link already names.
+                   Sending a reader who taps an out-of-sample Sharpe to a list of side projects would be a
+                   promise the page does not keep. One string here changes it if that call is ever revisited. -->
+              <div
+                class="wk-stats"
+                data-phone-keep
+                data-phone-link="/research"
+                data-phone-cta="Read the research"
+              >
                 {compounded && (
                   <div class="wk-stat">
                     <p class="wk-stat-value">{compounded.value}</p>
@@ -108,7 +131,10 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
            IT seal and a pixel animal, and this slide stops ending in 480px of blank panel (measured: 422px of
            content in a 900px slide). It is still the last thing before the footer, so it keeps its place as the
            page's closing aside. -->
-      <div class="wk-cow">
+      <!-- data-phone-keep: the cow survives the collapse too (see PhoneCollapse). No data-phone-link — it is an
+           aside with its own press-to-speak behaviour, and wrapping a thing you press in a link that navigates
+           is the one way to break it. -->
+      <div class="wk-cow" data-phone-keep>
         <PlushCow size="mark" />
       </div>
 
@@ -263,4 +289,62 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
   .wk-arrow { transition: transform .28s cubic-bezier(.2,.7,.3,1); }
   @media (hover: hover) { .wk-link:hover .wk-arrow { transform: translateX(4px); } }
   .wk-link:focus-visible { outline: 2px solid var(--wk-accent); outline-offset: 4px; }
+
+  /* ══ PHONE ONLY (≤640px). Nothing below is reachable on a desktop, and every rule here is placed AFTER the
+     declaration it overrides — at equal specificity source order decides, and an override written above its
+     target in this codebase silently does nothing.
+     ── THE FIVE-SIZE SCALE. This slide held the worst type in a 17-portfolio survey measured in real WebKit at
+     390x664: a 9px mono stat label (`wealth compounded · OOS ’20–’25`) and a 10px tag, where all six type-led
+     sites in the set run 16–17px body with ZERO variance and this site renders 21 distinct sizes. The whole rule
+     is: nothing visible under 13px except an 11px mono kicker. The tokens are declared in global.css inside the
+     same breakpoint (--ph-kicker 11 / --ph-body 16 / --ph-section 22 / --ph-head 28 / --ph-name 36); the literal
+     fallbacks are not decoration — a custom property that fails to substitute invalidates the declaration at
+     computed-value time and font-size then falls back to the INHERITED size, which is a silent regression. */
+  @media (max-width: 640px) {
+    /* ── 78px OF EMPTY PAPER ABOVE "APPENDIX", and it is a leftover rather than a composition. global.css gives
+       every paper panel `padding-top: 78px` below 1100px to keep a headline out from under the old full-width
+       nav capsule, then takes it back to 22px on phones for the four OTHER panels — `.ch-paper, .ru-paper,
+       .so-paper, .story-paper` — because the phone nav is now a 40x38 mark in the top-right corner and the deck
+       does not engage on phones, so nothing parks a headline under it. This panel was simply not in that list,
+       which left it with 3.5x the top air of the slide directly above it, measured (78px vs 22px).
+       Same value as the other four, so the five paper panels agree. `.wk > .wk-paper` is (0,4,0) with Astro's
+       scoping against the global rule's (0,2,1) — checked with getComputedStyle rather than assumed. If
+       global.css ever adds `.wk-paper` to its own 22px list, delete this. */
+    .wk > .wk-paper { padding-top: 22px; }
+
+    /* Visible when the section is collapsed: the heading and the two numbers inside the card. */
+    .wk-title { font-size: var(--ph-head, 28px); }        /* was clamp() → already 28 here; on-token now */
+    .wk-stat-value { font-size: var(--ph-section, 22px); } /* 21 → 22 */
+    .wk-stat-label { font-size: var(--ph-kicker, 11px); }  /* 9 → 11. THE worst offender in the survey */
+
+    /* Behind the collapse with JavaScript on, and the whole slide with it off — which is the rendering a phone
+       gets in that case, so it is held to the same scale rather than left at four more sizes. */
+    .wk-col-kicker { font-size: var(--ph-kicker, 11px); } /* 11.5 → 11 */
+    .wk-tag { font-size: var(--ph-kicker, 11px); }        /* 10 → 11, the second offender */
+    .wk-item-name { font-size: var(--ph-section, 22px); } /* 17 → 22, and it stays clear of the 16px line under it */
+    .wk-item-line { font-size: var(--ph-body, 16px); }    /* 13.5 → 16, the field norm */
+    .wk-promise { font-size: var(--ph-section, 22px); }   /* 17 → 22 */
+    .wk-topics li { font-size: var(--ph-body, 16px); }    /* 13.5 → 16 */
+    /* An uppercase mono CTA is a kicker, and this is the same idiom (and now the same size) as the card frame's
+       own footer row — two sizes for one voice was part of the 21. */
+    .wk-link { font-size: var(--ph-kicker, 11px); }       /* 13 → 11 */
+
+    /* ── THE CARD FRAME'S PALETTE, and the only thing this file says to it. The frame is defined once, in
+       components/PhoneExplainerCard.astro, and the slide feeds it three of its four custom properties — the same
+       contract Choice / Rules / Solve use for the explainer cards. That is deliberately the entire coupling: no
+       rule there reaches into these class names, and this file states no border, radius or spacing of its own,
+       so the phone page has ONE card unit instead of a second one that drifts. --phc-fill stays unset (the
+       transparent default) because this panel is already a printed-stock ground and a fill inside it reads as a
+       second sheet of paper. */
+    .wk-paper {
+      --phc-edge: var(--wk-edge);
+      --phc-accent: var(--wk-accent);
+      --phc-gap: 18px;
+    }
+    /* The gap above the numbers is the CARD'S padding once they are inside one; their own top margin — which
+       exists to separate them from the paper title above on desktop — was stacking on it for 25px of inset
+       against 13px on the other three sides. `[data-phone-kept]` is set by PhoneCollapse on exactly the element
+       it moved, so this cannot fire on the desktop layout. */
+    .wk-stats[data-phone-kept] { margin-top: 0; }
+  }
 </style>

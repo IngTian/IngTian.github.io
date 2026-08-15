@@ -1,13 +1,42 @@
 ---
-import { name, roles, rolesSub, phd, bio } from '../data/profile';
+import { name, roles, rolesSub, phd, bio, links } from '../data/profile';
+import { PAGES } from '../data/nav';
 import TerrainHero from '../components/TerrainHero.astro';
 
 // Build the bio as HTML with the "strong" phrases wrapped in medium weight.
 // Plain string replace is safe here: content is static and trusted (our own data).
-let bioHtml = bio.text;
-for (const phrase of bio.strong) {
-  bioHtml = bioHtml.replace(phrase, `<strong class="font-medium text-ink-2">${phrase}</strong>`);
-}
+const strongify = (s: string) => {
+  let out = s;
+  for (const phrase of bio.strong) {
+    out = out.replace(phrase, `<strong class="font-medium text-ink-2">${phrase}</strong>`);
+  }
+  return out;
+};
+
+// THE BIO IS SPLIT AT ITS FIRST CLAUSE, and only so the PHONE can stop after it.
+// Measured against 17 portfolios at 390x664: no surveyed site puts a bio on screen one, and this one's
+// 37-word paragraph was 39 of the 73 words a phone visitor met before scrolling (karpathy's bio starts at
+// screen 4.1 of 16.2; joshwcomeau's is behind the hamburger). The remainder is not deleted — it is wrapped
+// in a span that goes sr-only inside the phone query, so mobile-first indexing still reads every word
+// (Google indexes visually-hidden responsive content; what it refuses is content that needs a tap to load)
+// and a screen reader on a phone still hears the whole paragraph.
+// THE SPAN IS LAYOUT-NEUTRAL ON DESKTOP, and that was verified rather than assumed: with the wrapper
+// stripped back out in the live page, the paragraph's six line rows keep the same top, height, left and right
+// to the pixel, in both themes, at 1440x900. An extra element boundary splits a line into two client rects
+// without moving any of it.
+// Split on the raw text BEFORE the strong-wrapping rather than on the built HTML: the wrapper is a tag with
+// an attribute, and searching a comma inside markup is the kind of thing that breaks the day someone adds a
+// class list with a comma in it. (A `strong` phrase that straddled the comma would simply not be emphasised —
+// neither of the two does, and both halves are wrapped independently.)
+const bioClauseEnd = bio.text.indexOf(',');
+const bioHtml =
+  bioClauseEnd < 0
+    ? strongify(bio.text)
+    : `${strongify(bio.text.slice(0, bioClauseEnd))}<span class="bio-rest">${strongify(bio.text.slice(bioClauseEnd))}</span>`;
+
+// THE PHONE INDEX — the site's own page set plus the CV, imported rather than retyped so a sixth page
+// appears here the day it appears in the nav. profile.ts owns the CV's URL for the same reason.
+const cvHref = links.find((l) => l.label === 'Download CV')?.href ?? '/cv.pdf';
 ---
 <section id="heights" class="relative min-h-[108vh] px-[7vw] pb-[12vh]">
   <TerrainHero />
@@ -40,6 +69,37 @@ for (const phrase of bio.strong) {
       and a mathematician at heart.
     </p>
   </div>
+
+  <!-- ── THE INDEX, ON SCREEN ONE. PHONE ONLY (display:none by default, switched on in the phone query). ──
+       Measured, not guessed: on an iPhone 14 the homepage put exactly TWO links on the first screen, and both
+       were camouflaged inside the tagline sentence ("A researcher by day" / "an artist by night"); the other
+       eight sat at a median depth of 93% — the foot of a 5.93-screen scroll. Meanwhile the corner nav, which
+       carries the real page set, collapses to a hamburger on a phone, so on the first screen there was
+       nothing to tap and nothing that even looked tappable. The two patterns that work on a phone are an
+       INDEX (leerob puts 13 of 15 links on screen one; Boyd's homepage IS 15 links and does not scroll;
+       Chimero's IS a six-item menu) or chunked cards that are each a link out. This is the index.
+       It does NOT replace the corner nav — that one is on every route and every scroll position. This is the
+       homepage's answer to "where can I go" at the moment the visitor first asks it.
+       Real markup rather than a JS enhancement, deliberately: the hamburger needs JavaScript to open, so a
+       phone with JS off has no navigation at all today. These six links work without it.
+       The tagline above keeps its two links as the easter egg the owner asked for ("the click stays an easter
+       egg") — they are no longer the only door. -->
+  <nav class="hero-index" aria-label="Site pages">
+    <ul>
+      {PAGES.map((p) => (
+        <li><a href={p.href}>{p.label}</a></li>
+      ))}
+      {/* The CV is the one destination that is not a page, and the one a recruiter is most likely to want.
+          Last in the row so the site's hierarchy still reads research-first, marked by an accent hairline and
+          the download glyph rather than by a filled button — a solid accent chip would be the loudest thing
+          in the hero, and the hero is a composition. */}
+      <li>
+        <a class="hx-cv" href={cvHref} target="_blank" rel="noopener noreferrer" aria-label="Download CV"
+          >CV<span class="hx-arrow" aria-hidden="true">↓</span></a
+        >
+      </li>
+    </ul>
+  </nav>
 
   <div class="scroll-cue absolute bottom-8 left-1/2 -translate-x-1/2 font-mono text-ink-4 text-[11px] tracking-[0.2em]">scroll</div>
 </section>
@@ -172,6 +232,13 @@ for (const phrase of bio.strong) {
       radial-gradient(34% 24% at 82% 22%, color-mix(in oklab, var(--bg) 46%, transparent), transparent 74%);
   }
 
+  /* THE PHONE INDEX IS OFF EVERYWHERE BY DEFAULT. This is the one new rule outside a phone query, and it has
+     to be: a phone-only element must be hidden by the rule that applies when no media query matches, so a
+     desktop renders nothing at all rather than relying on a query to take it away. display:none also keeps
+     the six links out of the desktop tab order and out of its accessibility tree, which is the part a
+     screenshot would never show. The phone query below turns it into a flex row. */
+  .hero-index { display: none; }
+
   /* Mobile: a diagonal can't hold — collapse to a single LEFT-aligned stack
      (bio under the name), never re-centered. Static flow replaces the absolute
      positioning below the sm breakpoint. */
@@ -242,6 +309,157 @@ for (const phrase of bio.strong) {
       );
     }
     #heights .terrain-canvas { opacity: 0.4; }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════════════════════════════════
+     THE PHONE HERO: FIVE TYPE SIZES, ONE INDEX, AND A BIO THAT STOPS AT ITS FIRST CLAUSE.
+
+     Width-only, and separate from the block above on purpose. That one is `(max-width: 640px), (max-height:
+     520px)` because a landscape phone breaks the diagonal composition the same way a portrait one does — but
+     `max-height: 520px` also matches a SHORT DESKTOP WINDOW, and the type scale and the index below are phone
+     decisions, not short-window decisions. Putting them here keeps a 1440x500 window byte-identical to
+     production, which is the standing rule for this round.
+     Written AFTER the block it overrides, because at equal specificity source order decides and getting that
+     backwards has silently cost this project several fixes.
+
+     WHY ANY OF THIS. Measured across 17 portfolios in real WebKit at 390x664: this hero was not too WORDY —
+     the page is 5.93 screens, a third below the 15-site median — it was too LOUD and too SMALL AT ONCE. A
+     64px name over a 13px tagline is a 4.9x jump inside 480px of screen, and 21 distinct font sizes render on
+     the page where Chimero uses one and Pentagram three. That contrast, not the word count, is what reads as
+     "way too many texts". The measured ceiling for a name in those 17 sites is 36px (brittanychiang 36,
+     tobiasahlin 34); every type-led site sets body at 16-17px with zero variance.
+     So the hero now uses exactly three of the five scale sizes plus the mono kicker:
+        36 name  ·  22 role  ·  16 prose  ·  11 mono kicker.
+     ══════════════════════════════════════════════════════════════════════════════════════════════════════ */
+  @media (max-width: 640px) {
+    /* THE NAME, AT THE MEASURED CEILING. A flat 36px rather than a re-clamped `clamp(36px, 12vw, …)`: 12vw is
+       46.8px at 390 and 51.6px at 430, so the min would never bind on the phones that matter, and the desktop
+       utility class stays untouched so its rendering cannot drift. Loses ~25px of height (57.6 → 32.4 at
+       line-height 0.9), which is most of what pays for the index row. */
+    #heights h1 { font-size: var(--ph-name); }
+    /* The role — the scale's section size, one step down from the name instead of four. Its own line-height,
+       because at 22px the inherited body leading opened a gap that read as a paragraph break.
+       `text-wrap: balance` is not a nicety here: at 22px the line wraps, and the greedy break put "Quant
+       Researcher · Portfolio" over a one-word "Optimization" (measured 282px + 130px at 390 and at 430).
+       Balanced it breaks at the "·" instead — 190px + 222px, the two halves of the title kept whole — at the
+       same two-line height of 52px. Older WebKits that do not support it simply keep the greedy break. */
+    #heights .hero-rise > p:first-of-type {
+      font-size: var(--ph-section);
+      line-height: 1.18;
+      text-wrap: balance;
+    }
+    /* The tagline, off 13.5px small print and onto the body size — it is the one editorial line on the page
+       and it was the smallest prose in the hero. */
+    #heights .hero-doors-line { font-size: var(--ph-body); }
+    /* (The 11px mono identity line is left exactly as it is: it is a kicker, and 11px mono is the one size
+       the phone scale allows below 13px.) */
+
+    /* THE BIO STOPS AFTER ITS FIRST CLAUSE — sr-only, not deleted. Tailwind's own sr-only pattern (1px box +
+       clip-path) rather than display:none, so the sentence stays in the accessibility tree and a phone screen
+       reader still hears the whole paragraph. Absolutely positioned, so it cannot affect the line box it came
+       out of; its containing block is #heights (position:relative), and at 1px square with the clip applied
+       it can never contribute overflow.
+       `:global()` IS LOAD-BEARING, and the first version of this rule did nothing without it: the span is
+       injected through `set:html`, so Astro never stamps it with the component's [data-astro-cid-…]
+       attribute, and a plainly-written `#heights .bio-rest` compiles to a selector that cannot match it.
+       Measured before the fix: the remainder still printed, and the bio still filled four lines at 390px. */
+    #heights .hero-bio :global(.bio-rest) {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    /* ── THE INDEX ROW ──
+       order: 3 puts it after the name block (1) and the bio clause (2), which is both the composition the
+       owner asked for — name, role, one line, then the doors — and the right ergonomics: it lands in the
+       bottom third of the screen, where a thumb already is. */
+    /* z-index: 2 IS NOT DECORATION — without it the row measured 2.17:1 and looked like a ghost.
+       #heights is `display: flex` here, so its children are FLEX ITEMS, and z-index applies to a flex item
+       even at position:static. That is how `.hero-rise` / `.hero-bio` keep their z-index:2 from the desktop
+       rule after the phone block resets them to static, and it is what lifts them above the terrain canvas
+       (positioned, z 0) and the paper legibility band (positioned, z 1) — both of which otherwise paint AFTER
+       in-flow content and therefore over it. A new flex item with z-index:auto lands underneath both: measured
+       in WebKit at 390px, the "Research" label's darkest rendered pixel was rgb(163,156,148) against
+       rgb(47,43,36) as declared, i.e. 2.17:1 where the bio one line above it was 11.21:1. With z-index:2 it
+       measures 11.2:1. Nothing about the declared colours was wrong; the paint order was. */
+    #heights .hero-index { display: block; order: 3; z-index: 2; }
+    #heights .hero-index ul {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    #heights .hero-index li { display: flex; }
+    /* 44px MINIMUM, which is Apple's guideline and the same floor the corner nav's phone rows were measured
+       to. min-height rather than vertical padding so a wrapped label can never shrink the target. */
+    #heights .hero-index a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid color-mix(in oklab, var(--ink-3) 34%, transparent);
+      /* Its own faint paper frost, so a label never has to compete with the terrain dots. It is not
+         redundant with the legibility band above: that band starts fading at 82% of the section, which at
+         390x664 is y=544, and the row runs y=462..558 — its second line sits in the fade. Measured with the
+         frost: 11.2:1 light, 14.5:1 dark. */
+      background: color-mix(in oklab, var(--paper) 58%, transparent);
+      color: var(--ink-2);
+      font-family: var(--font-body);
+      font-size: var(--ph-body);
+      line-height: 1;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: border-color 0.3s ease, background-color 0.3s ease, color 0.3s ease;
+      -webkit-tap-highlight-color: color-mix(in oklab, var(--ochre) 26%, transparent);
+    }
+    #heights .hero-index .hx-cv { border-color: color-mix(in oklab, var(--ochre) 62%, transparent); }
+    #heights .hero-index .hx-arrow { margin-left: 6px; opacity: 0.65; }
+    /* Touch feedback, and a real focus ring for keyboard/switch access. Colour only — nothing here animates
+       a filter or a layout property. */
+    #heights .hero-index a:active {
+      background: color-mix(in oklab, var(--ochre) 26%, var(--paper));
+      border-color: var(--ochre);
+      color: var(--ink-1);
+    }
+    #heights .hero-index a:focus-visible {
+      outline: 2px solid var(--ochre);
+      outline-offset: 2px;
+      color: var(--ink-1);
+    }
+
+    /* DARK THEME — and it must be written HERE, at this specificity and after the rules it overrides, for the
+       same reason the legibility band above carries #heights: `html[data-theme='dark'] .x` is (0,2,0) and
+       `#heights .x` is (1,1,0), so the ID wins and a theme override written the short way does nothing on a
+       phone. --paper is a LIGHT value in both themes (#efe9dd / #dfe3df), so the frost has to swap to --bg,
+       which is the dark one in both — the same swap the hero halo makes. */
+    :global(html[data-theme='dark']) #heights .hero-index a {
+      border-color: color-mix(in oklab, var(--ink-3) 46%, transparent);
+      background: color-mix(in oklab, var(--bg) 62%, transparent);
+      color: var(--ink-1);
+    }
+    :global(html[data-theme='dark']) #heights .hero-index .hx-cv {
+      border-color: color-mix(in oklab, var(--ochre) 55%, transparent);
+    }
+    :global(html[data-theme='dark']) #heights .hero-index a:active {
+      background: color-mix(in oklab, var(--ochre) 30%, var(--bg));
+      border-color: var(--ochre);
+    }
+
+    /* THE INDEX IS THE LAST BEAT — 0.85s, behind the tagline's 0.62s, so the arrival order matches the
+       reading order: name, bio clause, the one editorial line, then the doors. Reuses the hero's own
+       `hero-rise` keyframes (opacity + transform, nothing else), and under reduced motion the animation name
+       does not resolve, so the row is simply there at full opacity — verified in WebKit with
+       `reducedMotion: 'reduce'`: opacity 1, transform none, six 44px targets. */
+    @media (prefers-reduced-motion: no-preference) {
+      #heights .hero-index { animation: hero-rise 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.85s both; }
+    }
   }
 
   @media (prefers-reduced-motion: no-preference) {

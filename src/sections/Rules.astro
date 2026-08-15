@@ -27,6 +27,7 @@
 // day's volume moves the price about one daily sigma. The fund's figures come from data/desk.ts. The
 // trajectories are a seeded walk — identical on every build, because a fan that shimmered would undercut a slide
 // whose whole claim is that this scale is real. Arithmetic in lib/complexity.ts (30 tests).
+import PhoneExplainerCard from '../components/PhoneExplainerCard.astro';
 import { CONSTRAINTS, FUND } from '../data/desk';
 import { RULE_GLYPHS, RULE_TAGS, type RuleGlyphKey } from '../data/ruleGlyphs';
 import { BELLMAN_EQUATIONS } from '../lib/equations';
@@ -382,6 +383,9 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
 
     </div>
   </div>
+  {/* PHONE ONLY, AND IT EMITS NO MARKUP — see the note at the same place in Choice.astro. Below 640px it frames
+      the `data-phone-keep` ladder above as a link to /research, in the one card frame the three explainers share. */}
+  <PhoneExplainerCard />
 </section>
 
 <style>
@@ -873,9 +877,57 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     .ru-beats { display: none; }
 
     /* The lifted graphic sits between the headline and the disclosure, and on desktop what separates it from the
-       headline is .ru-fig's own hairline — which stays behind in the collapsed body. 14px of air instead, so the
-       bars do not start immediately under the tap target. */
-    .ru-ladder[data-phone-kept] { margin-top: 14px; }
+       headline is .ru-fig's own hairline — which stays behind in the collapsed body. */
+    /* THE FRAME OWNS THAT GAP NOW. The 14px used to be here because the bars started immediately under the
+       headline; the card frame the three explainers share carries its own margin, so this margin would double
+       it — and .ru-flow's own row-gap would triple it. Both go to zero, which is what makes the three slides'
+       headline-to-picture rhythm identical rather than 10.6px apart. Nothing else visible is a row of .ru-flow
+       on a phone: the figure, the beat band and the closing line are all inside the collapsed body. */
+    .ru-ladder[data-phone-kept] { margin-top: 0; }
+    .ru-flow { row-gap: 0; }
+
+    /* ── THE TYPE SCALE. Five sizes on the phone page — 11px mono kicker, 16px body, 22px section, 28px
+       headline, 36px name — and this slide rendered three of its own that were not on it: a 10.5px kicker, 13px
+       ladder rows and a 22px headline, with 6 of its 31 visible words under 13px. Measured against 17 portfolios
+       in real WebKit at 390x664, the type is the outlier that reads as "too many texts", not the word count:
+       this page runs 42 words per screen against a ~56 median while rendering 21 distinct sizes against a set
+       where the six type-led sites all sit at 16-17px with no variance at all.
+       Every run goes UP. The tokens are in global.css inside this same breakpoint; the fallbacks matter, because
+       a `var()` that fails to substitute drops the whole declaration to the INHERITED size. */
+    .ru-kicker { font-size: var(--ph-kicker, 11px); }
+    /* "Now imagine it is not your money." — the slide's whole claim, at the headline size: 22 -> 28. */
+    .ru-head { font-size: var(--ph-head, 28px); }
+    /* THE LADDER'S OWN ROWS, which are the kept picture's entire text. "a big fund", "$10bn" and "$13.0m" are
+       the sentence the bars are making, so all three are body copy at 16 rather than a 13px table. Measured at
+       390px with the tracks the nested rule below sets: the label column gets 171px of a 314px row against the
+       91px the longest label needs, so nothing wraps at any phone width down to 320. The bar itself gets 2px
+       back — at 16px type a 9px track read as the thinner thing. */
+    .ru-rung-label, .ru-rung-aum, .ru-rung-cost { font-size: var(--ph-body, 16px); }
+    .ru-rung-track { height: 11px; }
+    .ru-rungs { gap: 14px; }
+    /* THE SMALLEST PHONES PAY FOR THE BIGGER TYPE, so the two numeric columns give back the width they no longer
+       need. Measured at 320px with the desktop 7ch/9ch tracks: the label column collapsed to 68px and three of
+       the four labels wrapped ("your / savings"), which is what a 16px floor costs inside a 272px card.
+       EVERY NUMBER BELOW IS MEASURED at 16px, not estimated (1ch here is 9.77px, because `ch` on the row resolves
+       against the row's BODY font while the cells are set in the narrower mono): widest label "your savings" 91.0,
+       widest size "$5,000" 57.6 -> 6ch = 58.6, widest cost "$418,248" 76.8 -> 8ch = 78.1. In a 244px row that
+       leaves the label 95.3px against the 91.0 it needs.
+       6ch AND NOT 5ch, WHICH WAS THE FIRST TRY: at 5ch the cell is 48.8px and "$5,000" overflowed it by 9px. It
+       looked fine — the text is right-aligned, so it spilled LEFT into the gap and cleared the longest label by
+       9.2px — but that is a collision waiting for a longer label, and a cell should hold its own contents.
+       The two right-hand maxima are on different rows ($5,000 is row one, $418,248 is row three), so no row ever
+       shows the 6px gutter with two full cells beside it.
+       Nested inside the phone query so every change in this file stays under one breakpoint, and placed after the
+       tracks it narrows, which is the source-order rule this file has been bitten by twice. */
+    @media (max-width: 430px) {
+      .ru-rungs li { grid-template-columns: minmax(0, 1fr) 6ch 8ch; column-gap: 6px; }
+    }
+
+    /* ── THE FRAME'S PALETTE. components/PhoneExplainerCard.astro draws the shared card around the ladder; these
+       are how this slide tells it what colour it is, and they inherit the dark theme's own override for free. */
+    .ru-paper {
+      --phc-edge: var(--r-edge); --phc-accent: var(--r-accent);
+    }
   }
 </style>
 
