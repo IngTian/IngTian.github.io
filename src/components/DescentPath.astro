@@ -647,7 +647,12 @@ import { WAYPOINTS } from '../lib/trajectory';
       });
 
       // ── The climb, called out once, where it happens.
-      if (span && reveal >= span.t1) {
+      // THE LEADER LINE AND ITS LABEL LIVE OR DIE TOGETHER. Gating only the text left the phone drawing a red
+      // line out to a caption that was not there — the owner saw it immediately: "what is that red line
+      // shooting off in the middle?" A leader with nothing at the end of it is not a reduced annotation, it is
+      // a stray mark, and it is worse than either showing the label or drawing nothing.
+      // The red STRETCH of the path still shows where the climb is on a phone; only the callout goes.
+      if (span && reveal >= span.t1 && !isCompact()) {
         const mid = pts.find((p) => p.t >= (span.t0 + span.t1) / 2)!;
         const [mx, my] = project(mid.x, mid.y, v);
         ctx.strokeStyle = seal;
@@ -660,7 +665,7 @@ import { WAYPOINTS } from '../lib/trajectory';
         // Named, not measured. It used to read "climb +1.26" — a true height on an invented surface,
         // which beside a real career reads as a quantified claim about the career. The red stretch
         // already shows WHERE the climb is; the word says what it is.
-        if (!isCompact()) label(ctx, mx - 58, my - 44, 'the climb', 13, seal, 'end');
+        label(ctx, mx - 58, my - 44, 'the climb', 13, seal, 'end');
       }
 
       ctx.restore();
