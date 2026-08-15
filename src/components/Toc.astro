@@ -195,13 +195,18 @@ for (const s of stops) {
     .toc .sub .dot { width: 4px; height: 4px; }
   }
 
-  /* Mobile: tighter still */
+  /* ── PHONE: NO TOC AT ALL. ──
+     It used to be a column of dots pinned at left: 12px, and the owner's report of the explainer slides
+     "colliding" was largely this: the dots are painted ON the slides. That worked when the thing behind them
+     was the sky, but the explainers are full-bleed OPAQUE paper panels, so on a phone a row of foreign grey
+     circles sits on top of the panel's own left margin and reads as rendering debris rather than as a control.
+     It is also redundant now. The dots are a section scrollspy for a deck that no longer engages on phones,
+     and every destination they offered is in the corner nav's menu — which is a real, labelled, 45px-target
+     list rather than five 5px dots. Nothing is lost by removing it: the Toc is decorative and aria-hidden, so
+     no content and no landmark goes with it.
+     display: none rather than visibility/opacity, so it costs no paint and leaves no hit area. */
   @media (max-width: 640px) {
-    .toc { left: 12px; }
-    .toc ul { gap: 16px; }
-    .toc .rule, .toc .label { display: none; }
-    .toc .dot { display: block; }
-    .toc a.is-active .dot { opacity: 1; transform: scale(1.5); }
+    .toc { display: none; }
   }
 
   /* Reduced motion: no growth/fade transitions; the static (visible) state is

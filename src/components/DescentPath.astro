@@ -248,15 +248,49 @@ import { WAYPOINTS } from '../lib/trajectory';
      573px of blank panel where the site's showpiece should be, on every phone, in both themes.
      Undoing a visually-hidden helper means undoing EVERY property it sets, and the two clip properties are not
      the same property. */
-  @media (max-width: 720px) {
-    .dp-stage { display: none; }
-    .dp-stops.sr-only {
-      position: static; width: auto; height: auto; margin: 3vh 0 0; padding: 0;
-      overflow: visible; clip: auto; clip-path: none; white-space: normal;
-      list-style: none; display: grid; gap: 14px;
+  /* THE GRAPH STAYS THE GRAPH ON A PHONE. The owner, given the choice: "for the descent, that graph is better
+     than a timeline of careers."
+     The canvas used to give way here to the ordered list, on the grounds that the in-frame labels collide below
+     ~720px. True — but the labels were the only problem, and the drawing does not need them: the script now
+     omits all in-frame type under 560px (see COMPACT_MAX_W) and reclaims the 120-230px right gutter that only
+     existed to hold it, so the descent renders LARGER on a phone than a labelled version could.
+     The list goes back to being purely a screen-reader path, which is where it started. That also removes 228
+     words from the phone's visible text — the single largest visible block on the page after the collapse work,
+     and the owner's report was "still way too many texts".
+     WHAT MUST NOT COME BACK: the list is hidden by Tailwind's sr-only, which uses BOTH `clip` and
+     `clip-path: inset(50%)`. A previous fix un-hid it by resetting only the legacy `clip`, so it was laid out
+     and invisible at once — 573px of blank panel where the showpiece belongs. Nothing here un-hides it, so that
+     trap is gone with the rule that sprang it, but the lesson stands for any future fallback. */
+
+  /* ── AND THE STAGE BECOMES A REAL COLUMN, because "show the canvas again" alone rendered badly.
+     The stage is an overlay box: the canvas is position:absolute inset:0 and the coda is positioned into the
+     drawing's empty lower-right. That composition depends on there BEING an empty lower-right, which is a
+     desktop luxury. On a phone the narrow-screen rule turns the coda static, so it flowed at the TOP of the
+     stage and printed straight over the drawing, while the drawing itself — squeezed into a 342x351 box that
+     still had to hold the world's 1.27 aspect — came out as a few faint arcs in one corner.
+     So on a phone the stage stops being an overlay: the canvas is a block with its own height and the coda
+     follows underneath it. The drawing gets a square-ish box of its own, and the sentence that explains it is
+     read after it rather than across it. */
+  @media (max-width: 640px) {
+    :global(.story-paper) .dp-stage,
+    .dp-stage {
+      height: auto;
+      aspect-ratio: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
-    .dp-stops li { font-size: 13.5px; line-height: 1.6; color: var(--dp-body); }
-    .dp-stops strong { color: var(--dp-strong); font-weight: 400; }
+    .dp-canvas {
+      position: static;
+      width: 100%;
+      height: min(46vh, 88vw);
+    }
+    .dp-coda {
+      position: static;
+      right: auto;
+      bottom: auto;
+      max-width: none;
+    }
   }
 
   /* ON THE PAPER PANEL: dark ink, and no top padding — the panel already opens with 9vh, and the
@@ -363,12 +397,30 @@ import { WAYPOINTS } from '../lib/trajectory';
       canvas.height = Math.round(H * dpr);
     }
 
+    /**
+     * Below this CSS width the graph draws as a PICTURE: the surface, the path and the points, with none of
+     * the in-frame type.
+     *
+     * The owner, choosing between the drawing and the text list it used to fall back to: "for the descent,
+     * that graph is better than a timeline of careers." The labels were the only real obstacle — they collide
+     * under ~720px, which is why the canvas was switched off there — and they are also the reason the frame
+     * carried a 120-230px right gutter it does not otherwise need. Dropping them on a phone solves both at
+     * once: the collision cannot happen, and the drawing gets the gutter back, so the descent is rendered
+     * LARGER on a phone than a labelled version could have been.
+     * The names are not lost. The ordered list of stops stays in the DOM as a screen-reader path, which is
+     * also what keeps the employer names indexable on the phone rendering.
+     */
+    const COMPACT_MAX_W = 560;
+    const isCompact = (): boolean => W < COMPACT_MAX_W;
+
     function view(): View {
       // Generous right padding: labels sit to the RIGHT of their points, and the original render
       // clipped them off the frame. The other three are small — every px of padding is px the drawing
       // does not get, and at the paper panel's size the drawing is the point. Scaled to the frame so a
       // small canvas is not swallowed by a fixed gutter.
-      const gutter = Math.max(120, Math.min(230, W * 0.135));
+      // On a phone there are no in-frame labels to make room for, so the gutter that existed to hold them
+      // becomes drawing area instead of empty paper.
+      const gutter = isCompact() ? 16 : Math.max(120, Math.min(230, W * 0.135));
       const pad = { l: 34, r: gutter, t: 30, b: 40 };
 
       // KEEP THE FIELD'S ASPECT. project() maps the world box onto the padded inner box
@@ -533,8 +585,10 @@ import { WAYPOINTS } from '../lib/trajectory';
       ctx.stroke();
       ctx.setLineDash([]);
       // The deeper side, NAMED. Not "the global minimum" — the direction the descent runs in.
-      label(ctx, ax + 22, ay + 30, DEEP_SIDE_LABEL, 15, ochre);
-      label(ctx, ax + 22, ay + 51, 'deeper still — unknown', 12, ink5);
+      if (!isCompact()) {
+        label(ctx, ax + 22, ay + 30, DEEP_SIDE_LABEL, 15, ochre);
+        label(ctx, ax + 22, ay + 51, 'deeper still — unknown', 12, ink5);
+      }
       }
 
       // ── The local basin, named, because being stuck there is the point.
@@ -586,12 +640,19 @@ import { WAYPOINTS } from '../lib/trajectory';
         // The final waypoint sits near the attractor, so its label collided with the deep-side name.
         // Put the last one above its dot and leave the rest to the right.
         const isLast = i === WAYPOINTS.length - 1;
-        if (isLast) label(ctx, px - 6, py - 14, wp.label, 15, paper);
+        if (isCompact()) {
+          /* no in-frame type on a phone — see COMPACT_MAX_W */
+        } else if (isLast) label(ctx, px - 6, py - 14, wp.label, 15, paper);
         else label(ctx, px + 14, py + 5, wp.label, 15, ink3);
       });
 
       // ── The climb, called out once, where it happens.
-      if (span && reveal >= span.t1) {
+      // THE LEADER LINE AND ITS LABEL LIVE OR DIE TOGETHER. Gating only the text left the phone drawing a red
+      // line out to a caption that was not there — the owner saw it immediately: "what is that red line
+      // shooting off in the middle?" A leader with nothing at the end of it is not a reduced annotation, it is
+      // a stray mark, and it is worse than either showing the label or drawing nothing.
+      // The red STRETCH of the path still shows where the climb is on a phone; only the callout goes.
+      if (span && reveal >= span.t1 && !isCompact()) {
         const mid = pts.find((p) => p.t >= (span.t0 + span.t1) / 2)!;
         const [mx, my] = project(mid.x, mid.y, v);
         ctx.strokeStyle = seal;

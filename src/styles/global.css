@@ -183,6 +183,24 @@ body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body)
      of the viewport at rest, and the appendix's own panel padding above covers the case. */
 }
 
+/* ── ON A PHONE THAT CLEARANCE IS NOW A HOLE, so it comes back down. ──
+   The 78px above was sized for the nav as it then was: a wrapped, effectively full-width capsule 68px tall,
+   with the deck resting each slide's top exactly at the viewport top so a headline landed right underneath it.
+   Neither premise holds any more. The phone nav is a 40x38 mark in the top-RIGHT corner, these headlines are
+   left-aligned, and the deck does not engage on phones at all, so no slide is parked with its top against the
+   chrome. What is left is 79px of blank paper above a one-line kicker — measured on all three explainers, and
+   on a COLLAPSED slide that band is a third of the whole section. It reads as something that failed to render,
+   which is part of what the owner saw when they said the slides "collide and doesn't work".
+   22px keeps the panel from starting hard against its own edge. Placed after the rule it overrides and at the
+   same specificity, deliberately: source order is what decides here, and getting that backwards has cost this
+   project several silent fixes. */
+@media (max-width: 640px) {
+  .is-slides > section > .ch-paper,
+  .is-slides > section > .ru-paper,
+  .is-slides > section > .so-paper,
+  .is-slides > section > .story-paper { padding-top: 22px; }
+}
+
 /* The panel inside a slide must be able to fill it, or the centring above just
    moves a short panel down the screen and leaves sky above and below it. */
 .is-slides > section > .story-paper,
