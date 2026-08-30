@@ -17,12 +17,30 @@ import PlushCow from '../components/PlushCow.astro';
 import FluidSky from '../components/proto/FluidSky.astro';
 import SkyWash from '../components/SkyWash.astro';
 import SideRail from '../components/SideRail.astro';
-import { KINDS, sorted, totalEntries, kindSectionId, entrySectionId } from '../data/writing';
+import { getCollection } from 'astro:content';
+import { KINDS, buildKinds, sorted, totalEntries, kindSectionId, entrySectionId } from '../data/writing';
 import { COW_LINES_WRITING } from '../data/cowGlyph';
 import { writingStops } from '../lib/pageStops';
 
-const stops = writingStops(KINDS);
-const total = totalEntries(KINDS);
+// THE PIECES COME FROM MARKDOWN; the kinds stay in data/writing.ts. Drafts are dropped here rather than
+// filtered in the template, so nothing downstream — the rail, the count, the sections — can disagree about
+// what exists. Sorting stays in sorted() where it already lives and is already tested.
+const entries = (await getCollection('writing'))
+  .filter((e) => !e.data.draft)
+  .map((e) => ({
+    slug: e.id,
+    title: e.data.title,
+    date: e.data.date,
+    blurb: e.data.blurb,
+    minutes: e.data.minutes,
+    featured: e.data.featured,
+    kind: e.data.kind,
+    href: `/writing/${e.id}`,
+  }));
+
+const kinds = buildKinds(entries, KINDS);
+const stops = writingStops(kinds);
+const total = totalEntries(kinds);
 
 // Long-form dates, computed from the ISO string rather than typed twice.
 const longDate = (iso: string) =>
@@ -82,7 +100,7 @@ const longDate = (iso: string) =>
       )}
 
       <div class="kind-list" hidden={total === 0}>
-        {KINDS.map((kind) => (
+        {kinds.map((kind) => (
           <section class="kind" id={kindSectionId(kind.key)} aria-labelledby={`${kindSectionId(kind.key)}-h`}>
             <header class="kind-head">
               <h2 id={`${kindSectionId(kind.key)}-h`} class="kind-title">{kind.label}</h2>

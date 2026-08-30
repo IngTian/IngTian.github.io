@@ -88,7 +88,46 @@ export const KINDS: WritingKind[] = [
       'Nothing here yet. The homepage explainer is the prototype; these would be the full-length versions of its three slides.',
     entries: [],
   },
+  /**
+   * The fourth kind, and the file above anticipated it: "a fourth kind (talks, teaching, a reading log) is a
+   * data edit". A quote collection is none of notes, essays or explainers — it is not an argument, it is a
+   * commonplace book — so filing it under one of those would have made that section's gloss a lie.
+   */
+  {
+    key: 'quotes',
+    label: 'Quotes',
+    railLabel: 'Quotes',
+    gloss:
+      'A commonplace book: lines worth keeping, with their source and nothing else. Kept honest by exactness — a quote nobody can check is just a paraphrase with confidence.',
+    // Long enough to name what belongs here, because a test enforces that — and the test is right. "Nothing
+    // here yet" was the first thing written in this slot and it is exactly the filler the rule exists to catch.
+    empty:
+      'Nothing here yet. The first entries are lines about risk and regime change — what markets do when they stop ignoring the fundamentals — each kept with its source so it can be checked.',
+    entries: [],
+  },
 ];
+
+/**
+ * Fill the taxonomy above with entries that came from markdown.
+ *
+ * THE SPLIT THIS ENFORCES: KINDS is editorial copy — what a section IS and what belongs in it — and stays in
+ * TypeScript because it is site voice, not content. The pieces themselves are files in src/content/writing/,
+ * so writing a new one is never a code change. This function is the only seam between the two.
+ *
+ * Returns the same WritingKind shape the page and lib/pageStops already consume, deliberately: nothing
+ * downstream needs to learn that content moved, so the rail, the sorting and their tests are untouched.
+ * Kinds with no files keep their `empty` copy and still render as a section, which is what makes an
+ * announced-but-unwritten section read as a plan rather than an omission.
+ */
+export function buildKinds(
+  entries: readonly (WritingEntry & { kind: string })[],
+  taxonomy: readonly WritingKind[] = KINDS,
+): WritingKind[] {
+  return taxonomy.map((k) => ({
+    ...k,
+    entries: entries.filter((e) => e.kind === k.key).map(({ kind: _kind, ...rest }) => rest),
+  }));
+}
 
 /** Entries of a kind, newest first. Sorting here rather than in the page keeps the page dumb. */
 export function sorted(kind: WritingKind): WritingEntry[] {
