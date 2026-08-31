@@ -37,6 +37,17 @@ jobs:
           node-version-file: .nvmrc # single source of truth (matches ci.yml)
           cache: npm
       - run: npm ci
+      # THE BUILD IS PART OF THE TEST GATE NOW, and without it this job cannot pass.
+      #
+      # tests/distSmoke.test.ts reads dist/**/*.html — it is the only coverage the suite has of RENDERED
+      # output, and it deliberately THROWS when dist/ is missing rather than skipping, because a test that
+      # quietly passes when its subject is absent is worse than no test. dist/ is gitignored, so a fresh
+      # checkout has none: this job ran `npm ci && npm test` and would have failed 8 assertions on push to
+      # main, and since `build` needs `test` and `deploy` needs `build`, EVERY DEPLOY WOULD HAVE STOPPED —
+      # while ci.yml stayed green, because ci.yml happens to build before it tests.
+      # Caught by a cleanup sweep before this branch merged, not by CI, precisely because CI cannot see it.
+      - name: Build (dist/ is what distSmoke reads)
+        run: npm run build
       - name: Test
         run: npm test
 

@@ -543,15 +543,22 @@ titles came to rest hard against the browser chrome — the lead is a number in
   - `tsconfig.json` excludes `tmp_*` and `.tmp-*` — the ad-hoc probes the verification
     loop produces are not the project, and a gate whose output is mostly noise is a
     gate people learn to ignore.
-  - **`astro check` is new here, so it arrived with a BACKLOG.** It is the first thing
-    ever to read the `<script>` bodies in `.astro` files, and those bodies were written
-    for years against a compiler that never looked: as of the branch that added the
-    gate it reported 86 errors, overwhelmingly `ts(18047)/(18049)` "possibly null" on
-    canvas contexts and `querySelector` results in `DescentPath`, `Toc`, `CornerNav`
-    and the proto pages, plus a couple of files `astro check`'s own parser trips over.
-    `tsc --noEmit` was clean at the same commit. **So a red typecheck does not mean you
-    broke it** — check whether the errors name lines you touched, and don't "fix" 86
-    unrelated ones in a change about something else.
+  - **The gate is at ZERO, so a red typecheck means you broke it.** Read that literally:
+    `npm run typecheck` reports `0 errors` today, and there is no inherited noise to
+    excuse a new one. (This bullet previously said the opposite — it described the 86-error
+    backlog `astro check` arrived with and told you a red gate "does not mean you broke
+    it". All 86 were fixed in the same batch that added the gate; leaving that sentence up
+    would have taught the next reader to dismiss a real failure as somebody else's mess,
+    which is how a gate stops being one.)
+  - **The error class those 86 were, because it will come back.** `astro check` is the only
+    thing that reads the `<script>` bodies in `.astro` files, and they were written for
+    years against a compiler that never looked. Almost all of it was `ts(18047)/(18049)`
+    "possibly null" on canvas contexts and `querySelector` results — and the guards were
+    *already correct*. The cause is that TypeScript does not carry a `const`'s narrowing
+    into a **hoisted `function` declaration**, only into arrow functions, since a hoisted
+    function could in principle run before the guard. The fix is a non-null alias right
+    after the guard (`const nav = maybeNav;`), which makes the type true at the
+    declaration so no narrowing has to survive anything. Prefer that to a `!` or a cast.
   - **Types gate the MERGE, tests gate the DEPLOY**, and that asymmetry is
     deliberate: `deploy.yml` runs tests but not typecheck, because a type error cannot
     change the shipped bytes, and blocking a deploy on it would leave the live site
