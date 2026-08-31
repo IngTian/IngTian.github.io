@@ -175,15 +175,21 @@ const longDate = new Date(`${entry.data.date}T00:00:00Z`).toLocaleDateString('en
 
   /* THE PARAGRAPH IMMEDIATELY AFTER A QUOTE IS ITS SOURCE, styled by position rather than by a class, so the
      markdown stays a plain .md with nothing to remember and still renders correctly anywhere else. */
+  /* SET TO THE RIGHT, on the owner's call — the convention for an attribution under a pull-quote, and it also
+     does the work the em dash was doing alone: the eye leaves the quote at its last line, bottom-right, and the
+     source is already there instead of back at the left margin where a new paragraph would start.
+     `margin-left: auto` on a max-width box is what pushes it to the column's right edge; text-align alone would
+     right-align the words inside a box still sitting on the left. */
   .prose blockquote + p {
-    margin-top: 1em;
-    padding-left: 2.6ch;
+    margin-top: 0.85em;
+    margin-left: auto;
+    max-width: 52ch;
+    text-align: right;
     font-family: var(--font-mono);
     font-size: 12px;
     letter-spacing: 0.04em;
     line-height: 1.65;
     color: var(--ink-4);
-    max-width: 52ch;
   }
   .prose blockquote + p::before { content: '— '; color: var(--ink-5); }
   .prose blockquote + p strong { color: var(--ink-2); font-weight: 400; }
@@ -193,6 +199,9 @@ const longDate = new Date(`${entry.data.date}T00:00:00Z`).toLocaleDateString('en
   @media (max-width: 640px) {
     .prose blockquote { padding-left: 2ch; }
     .prose blockquote::before { left: -0.1ch; font-size: 2.1em; }
-    .prose blockquote + p { padding-left: 2ch; }
+    /* The attribution stays right-set on a phone too — at 390px a 52ch box is wider than the column, so it
+       fills the width and the right alignment is what keeps it reading as a source line rather than as the
+       next paragraph. */
+    .prose blockquote + p { max-width: none; }
   }
 </style>
