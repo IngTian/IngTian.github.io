@@ -198,7 +198,14 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
   :global(html.solve-js) .so-panel:first-child { opacity: 0; pointer-events: none; }
   :global(html.solve-js) .so-panel.is-on { opacity: 1; pointer-events: auto; }
   @media (prefers-reduced-motion: no-preference) {
-    .so-panel { transition: opacity 260ms ease; }
+    /* .5s, MATCHING Choice and Rules, and that is the whole fix. The owner: "where to start doesn't have the
+       smooth inter tab animation as other slides." He was right, and the cause was not a missing transition —
+       this one was 260ms while `.ch-panel` and `.ru-panel` are both `.5s ease`. Nearly twice as fast, on a
+       crossfade between two stacked panels, reads as a pop rather than a dissolve: at 260ms the outgoing text is
+       still legible when the incoming text is already solid, so the eye sees two states rather than one moving
+       between them. The stacking was never the problem (.so-textbox is a one-cell grid, like the others).
+       Three slides that share an interaction must share its timing, or the third one feels broken. */
+    .so-panel { transition: opacity .5s ease; }
   }
 
   /* THE OPENNESS STATEMENT, directly under the heading — the sentence the slide rests on, so it is set above

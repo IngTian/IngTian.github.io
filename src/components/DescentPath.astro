@@ -648,12 +648,32 @@ import { WAYPOINTS } from '../lib/trajectory';
         ctx.fill();
       }
 
-      // ── Waypoints, only those the trail has reached.
+      // ── Waypoints, only those the trail has reached — and each one FADES IN rather than appearing.
+      //
+      // The owner: "the descent curve just have the name pops up. can we let the career names fades in with
+      // animations?" They did pop: a waypoint was drawn at full opacity the first frame `reveal` passed its
+      // arrival, so eight names snapped into place one after another while the trail beneath them moved
+      // smoothly. The mismatch is what read as abrupt — the line eases, the type did not.
+      //
+      // The fade is measured in REVEAL units, not milliseconds, so it stays in step with the walk however the
+      // walk is paced (it is driven by elapsed time, and `replay the walk` restarts it). Arrivals are 1/7 apart
+      // for eight waypoints, so 0.055 is about 38% of the gap: long enough to read as a fade, finished well
+      // before the next name arrives, so two never fade at once.
+      // The dot and its name share one alpha deliberately — they are one object arriving, and fading only the
+      // type would look like a label catching up with a dot that was already there.
+      const WP_FADE = 0.055;
       WAYPOINTS.forEach((wp, i) => {
         const arrival = i / (WAYPOINTS.length - 1);
         if (arrival > reveal + 1e-6) return;
+        // `reveal >= 1` short-circuits, and it is not belt-and-braces — without it the LAST waypoint never
+        // appears at all. Its arrival is exactly 1, so (reveal - arrival) is 0 at the end of the walk and the
+        // fade would rest at 0 forever: the newest, most important name on the graph, invisible. It also breaks
+        // the reduced-motion path, which sets reveal = 1 and draws a single finished frame.
+        const fade = reveal >= 1 ? 1 : Math.min(1, Math.max(0, (reveal - arrival) / WP_FADE));
         const [px, py] = project(wp.x, wp.y, v);
         const isBasin = wp.phase === 'basin';
+        const prevAlpha = ctx.globalAlpha;
+        ctx.globalAlpha = prevAlpha * fade;
         ctx.beginPath();
         ctx.arc(px, py, isBasin ? 6 : 4, 0, Math.PI * 2);
         ctx.fillStyle = isBasin ? ochre : paper;
@@ -665,6 +685,9 @@ import { WAYPOINTS } from '../lib/trajectory';
           /* no in-frame type on a phone — see COMPACT_MAX_W */
         } else if (isLast) label(ctx, px - 6, py - 14, wp.label, 15, paper);
         else label(ctx, px + 14, py + 5, wp.label, 15, ink3);
+        // Restore rather than assign 1: the climb callout below sets its own alpha, and a hardcoded reset here
+        // would silently become wrong the moment this loop is drawn inside another alpha.
+        ctx.globalAlpha = prevAlpha;
       });
 
       // ── The climb, called out once, where it happens.
