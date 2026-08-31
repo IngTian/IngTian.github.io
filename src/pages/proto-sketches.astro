@@ -6,7 +6,7 @@
 // src/lib/sketches/, add it to the batch, and it appears here at real width against the real
 // corpus and the real palette.
 //
-// The rule this formalises (see notes/showpiece.md): A STILL FRAME FIRST. Judge it in one look.
+// The rule this formalises: A STILL FRAME FIRST. Judge it in one look.
 // three.js only after a frame survives. Four of the five rejections were only judgeable once
 // finished; the one cheap gate that ever worked was a static SVG page.
 //
@@ -20,13 +20,28 @@ import DescentPath from '../components/DescentPath.astro';
 const data = sketchData();
 const ctx = { w: FRAME.w, h: FRAME.h, pal: PAL, data };
 const sketches = BATCH1.map((s) => ({ meta: s, html: s.draw(ctx) }));
+
+// TWO NOTES ON THE PROPS BELOW.
+//
+// noindex={true}: see the long version in proto-showpiece.astro. Without it BaseLayout takes its
+// other branch and emits a self-referential <link rel="canonical"> instead — so this diagnostic route
+// was not merely unprotected, it was asking to be indexed. Both of the two proto routes that lacked
+// the prop were live and crawlable. tests/protoNoindex.test.ts asserts every src/pages/proto-*.astro
+// passes it; tests/distSmoke.test.ts checks the built HTML.
+//
+// navZone: a `navZone="dark"` used to sit in this list and is DROPPED rather than corrected, because
+// "dark" was never a value the prop has. BaseLayout and CornerNav both declare 'scroll' | 'light',
+// and the nav script reads `dataset.navMode === 'light' ? 'light' : 'scroll'`, so "dark" fell through
+// to 'scroll'. That branch then finds no `.descent` element on this page (<main class="sk">) and pins
+// the zone to 'light' anyway — so removing it changes nothing about what renders, and removes an
+// invalid literal from the one route that had it.
 ---
 <BaseLayout
   title="Proto — showpiece sketches"
   description="Diagnostic route: candidate showpiece frames, judged cheaply before anything is built."
   veilLine="sketches, not decisions"
   veilOnLoad={false}
-  navZone="dark"
+  noindex={true}
 >
   <main class="sk">
     <header class="sk-head">
@@ -40,13 +55,13 @@ const sketches = BATCH1.map((s) => ({ meta: s, html: s.draw(ctx) }));
       </p>
       <p class="lede dim">
         Flip the theme with the corner nav; both must work. Five earlier attempts and their reasons
-        are recorded in <code>notes/showpiece.md</code>.
+        are recorded in the commit history.
       </p>
     </header>
 
-    <!-- The part-1 graph, now interactive: 2D plan / 3D relief, animated trail, and the global
+    {/* The part-1 graph, now interactive: 2D plan / 3D relief, animated trail, and the global
          minimum left deliberately unknown. Shown above the static sketches because it is the one
-         candidate that has moved past the still-frame gate. -->
+         candidate that has moved past the still-frame gate. */}
     <section class="sk-block">
       <div class="sk-meta">
         <p class="sk-n">live · descent path</p>
@@ -116,6 +131,14 @@ const sketches = BATCH1.map((s) => ({ meta: s, html: s.draw(ctx) }));
     text-transform: uppercase; color: var(--ink-4);
   }
   dd { margin: 0; font-size: 14px; line-height: 1.66; color: var(--ink-3); }
+  /* THESE TWO LOOK DEAD TO A GREP AND ARE NOT — do not delete them. The class comes from
+     `class={`v-${meta.verdict.call}`}` in the template above, so the literal strings "v-kill" and "v-keep"
+     appear nowhere else in the repo, and no sketch in BATCH1 has a verdict filled in yet, so they are also
+     absent from the built HTML. That is the page working as designed: kit.ts declares
+     `verdict?: { call: 'keep' | 'kill' | 'unjudged' }` and says it is filled in AFTER a sketch has been looked
+     at, and round-one verdicts were recorded in a design note that has since been deleted.
+     The first one that is will need these colours. 'unjudged' deliberately has no rule — it keeps the neutral
+     dd colour, because "not yet decided" should not be styled as a decision. */
   dd.v-kill { color: var(--seal); }
   dd.v-keep { color: var(--ochre); }
   @media (max-width: 820px) { dl { grid-template-columns: 1fr; gap: 2px 0; } dd { margin-bottom: 10px; } }

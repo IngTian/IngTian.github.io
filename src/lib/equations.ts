@@ -34,48 +34,23 @@ export const PAPER_EQUATIONS = {
   sectorCov: katex.renderToString('\\tilde{\\Sigma}_{gh} = (\\eta^{(g)})^{\\top}\\Sigma_{gh}\\,\\eta^{(h)}', display),
 };
 
-// ── The factor model, for the exposure fan ──────────────────────────────────
-// Baked through the SAME KaTeX -> MathML path as everything else, which is the point: a first
-// pass hand-built this from SVG <tspan> elements and it read as monospace text pretending to
-// be maths — wrong subscript sizing, wrong italic/upright distinction, no proper spacing
-// around operators. Real typesetting is not optional for the one element whose whole job is
-// to say "this is a model".
-
-/** The general form: one asset, many signals. */
-export const FACTOR_EQUATIONS = {
-  general: katex.renderToString(
-    'r_{\\mathrm{TIAN}} = \\alpha + \\sum_{k=1}^{6} \\beta_k f_k + \\varepsilon',
-    display,
-  ),
-  /** How beta is defined — the caption's claim, typeset rather than described in prose. */
-  betaDef: katex.renderToString(
-    '\\beta_k = \\frac{\\sum_{i \\in k} s_i}{\\sum_{j} s_j}',
-    display,
-  ),
-};
-
-/**
- * The expanded form, with each term's fitted loading substituted in.
- *
- * Built from the live loadings so the displayed equation and the drawn fan can never
- * disagree — the numbers come from one source. Zero-loading terms are rendered in a muted
- * colour via \\textcolor so an honest absence reads as deliberate rather than as a typo.
- */
-export function factorExpansion(
-  terms: readonly { symbol: string; beta: number }[],
-): string {
-  const body = terms
-    .map(({ symbol, beta }) => {
-      const coef = beta.toFixed(2);
-      const term = `${coef}\\,f_{\\mathrm{${symbol}}}`;
-      return beta === 0 ? `\\textcolor{#8c8576}{${term}}` : term;
-    })
-    .join(' + ');
-  return katex.renderToString(
-    `r_{\\mathrm{TIAN}} = \\alpha + ${body} + \\varepsilon`,
-    { ...display, trust: true },
-  );
-}
+// ── THE FACTOR MODEL IS GONE, AND IT WAS REJECTED BEFORE IT WAS DEAD ────────────────────────────────────
+//
+// This section held FACTOR_EQUATIONS (a general form and a definition of beta) plus factorExpansion(), a
+// function that baked the same equation with each fitted loading substituted in, muting zero-loading terms
+// via \textcolor. It fed the exposure fan on /proto-showpiece, and that route has been retired, so nothing
+// imports any of it.
+//
+// Two reasons it is deleted rather than parked. The obvious one is that a build-time KaTeX call with no
+// consumer is pure cost — katex is a devDependency precisely so none of it ships, and unreachable bakes make
+// the ledger of what the client receives harder to read.
+//
+// The one that actually settles it: all three rendered `r_{\mathrm{TIAN}}`, and the design note recorded
+// that framing as rejected on a substantive point, not a visual one — "r_TIAN is a RETURN and implies a P&L
+// that does not exist." The maths was mechanically correct and the betas were honest; the variable was a claim
+// the site cannot make. A typeset equation is the most authoritative-looking thing on a page, so a rejected
+// framing kept in perfectly baked form is exactly how it comes back — the next person needing a factor
+// equation finds one ready, correct-looking, and wrong on the only point that mattered.
 
 // ── THE CURSE OF DIMENSIONALITY, for the difficulty slide's fourth beat ──────────────────────────────────
 //

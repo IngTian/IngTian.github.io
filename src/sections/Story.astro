@@ -30,7 +30,7 @@ import { STORY } from '../data/story';
 ---
 <section id="story" class="story" aria-labelledby="story-heading">
   <div class="story-paper">
-    <!-- ONE SECTION, TWO COLUMNS. The owner: "I'm thinking about if it's more natural to merge A
+    {/* ONE SECTION, TWO COLUMNS. The owner: "I'm thinking about if it's more natural to merge A
          descent with one climb with Why the climb. After all they are all describing my career path.
          There is also a huge right panel unused here."
          Both are right. They were two stacked slides describing one subject, and at a wide viewport the
@@ -38,10 +38,10 @@ import { STORY } from '../data/story';
          aspect (1.27) cannot stretch to fill a letterbox frame and the surplus became padding.
          So the prose moves INTO that space: graph left, writing right, one section. The graph is
          STICKY, so it stays visible while its explanation scrolls past — the whole point of merging is
-         that you can read the claim and check the picture at the same time. -->
+         that you can read the claim and check the picture at the same time. */}
     <div class="story-split">
-      <!-- The graph, on the same paper. Passed in as a slot so this component owns the surface and the
-           ink tokens, and DescentPath stays a self-contained piece that inherits them. -->
+      {/* The graph, on the same paper. Passed in as a slot so this component owns the surface and the
+           ink tokens, and DescentPath stays a self-contained piece that inherits them. */}
       <div class="story-figure-slot"><slot /></div>
 
       <div class="story-inner">
@@ -57,7 +57,7 @@ import { STORY } from '../data/story';
           ))}
         </div>
 
-        <!-- THE FIGURES ARE GONE. They were computed at build time rather than typed, but computed from
+        {/* THE FIGURES ARE GONE. They were computed at build time rather than typed, but computed from
              the HERO'S INVENTED FIELD — so "260x feedback ratio" was an exact measurement of a fiction,
              printed where a reader would take it as a fact about a career. A true number about a made-up
              surface is worse than no number, because it borrows the authority of measurement.
@@ -69,7 +69,7 @@ import { STORY } from '../data/story';
              The replacement tail line I put here had EXACTLY THE SAME BUG — same column, same fold, same
              unreachable position — so it is deleted rather than restyled. The section now ends with its last
              body paragraph, and the coda in the drawing is the closing line. Nothing goes at the bottom of
-             this column again. -->
+             this column again. */}
       </div>
     </div>
   </div>
@@ -250,30 +250,11 @@ import { STORY } from '../data/story';
   }
   .story-body:last-child { margin-bottom: 0; }
 
-  /* The figures: measured readings, mono, so they read as instrument output rather than pull-quotes.
-     Three across needed ~1300px; in the 720px prose panel they wrap to a responsive grid instead of
-     being crushed to 220px each. */
-  .story-figures {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: clamp(20px, 2.4vh, 32px) clamp(20px, 2vw, 40px);
-    margin: clamp(28px, 4vh, 52px) 0 0; padding-top: clamp(22px, 3vh, 40px);
-    border-top: 1px solid var(--story-edge);
-  }
-  .story-figure dt {
-    font-family: var(--font-mono); font-size: clamp(26px, 3vw, 40px);
-    color: var(--story-accent); line-height: 1;
-  }
-  .story-figure dd {
-    margin: 14px 0 0; font-size: 14px; line-height: 1.6; color: var(--story-ink-faint);
-  }
-  .story-figure-label {
-    display: block; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.18em;
-    text-transform: uppercase; color: var(--story-ink-soft); margin-bottom: 7px;
-  }
-  @media (max-width: 700px) {
-    .story-figures { grid-template-columns: 1fr; gap: 4vh 0; }
-  }
-
-  /* (.story-tail is gone with the element — see the markup comment. Anything placed at the foot of this
-     column is unreachable in the deck, so the rule is deleted rather than left for someone to reuse.) */
+  /* (.story-tail and the .story-figures dl are both gone with their elements. The tail: anything placed at
+     the foot of this column is unreachable in the deck — see the markup comment. The figures were three mono
+     "instrument readings" under the prose, dropped when the section became one narrow column beside the
+     graph. Both rule sets are deleted rather than left for someone to reuse, because a rule with no markup
+     is a claim about a layout that no longer exists. Note that .story-figure-slot, just above, is LIVE and
+     unrelated: `.story-figure` never matched it — a class selector matches the whole class name, not a
+     prefix — which is exactly why the dead rules were invisible for so long. */
 </style>

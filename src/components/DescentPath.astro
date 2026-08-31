@@ -28,38 +28,38 @@ import { WAYPOINTS } from '../lib/trajectory';
 <section id="descent-path" class="dp" aria-labelledby="dp-heading">
   <header class="dp-head">
     <h2 id="dp-heading">A descent, with one climb</h2>
-    <!-- SHORT, and no number. The lede used to state the climb's height as a figure — but the height is
+    {/* SHORT, and no number. The lede used to state the climb's height as a figure — but the height is
          a real measurement of an INVENTED surface, so quoting it next to a career reads as a claim about
          the career, which it is not. The owner: "you don't need the numbers, the numbers are made up."
-         What is left is the only thing the picture needs said out loud. -->
+         What is left is the only thing the picture needs said out loud. */}
     <p class="dp-lede">
       Years in engineering, and a pivot to quantitative research.
     </p>
 
-    <!-- 3D was offered as a comparison and lost: the relief view measured 2.0% ink against the
+    {/* 3D was offered as a comparison and lost: the relief view measured 2.0% ink against the
          plan view's 3.4% because the surface itself was never rendered, so it read as a 2D curve on
          a distorted grid. The owner chose plan, so the control is gone rather than left as a
-         half-good option. descentPath.ts keeps the projection parameter, which costs nothing. -->
+         half-good option. descentPath.ts keeps the projection parameter, which costs nothing. */}
     <div class="dp-controls">
       <button type="button" class="dp-btn dp-replay" data-replay>replay the walk</button>
     </div>
 
-    <!-- A live readout, so the reveal reads as a WALK with a state rather than a fade-in. It also
-         states the discovery moment, which is the point of the whole device. -->
+    {/* A live readout, so the reveal reads as a WALK with a state rather than a fade-in. It also
+         states the discovery moment, which is the point of the whole device. */}
     <p class="dp-readout" data-readout aria-live="polite"></p>
   </header>
 
   <div class="dp-stage" data-dp-stage>
     <canvas class="dp-canvas" data-dp-canvas aria-hidden="true"></canvas>
 
-    <!-- THE CODA, MOVED HERE, and this is a reachability fix rather than a layout preference.
+    {/* THE CODA, MOVED HERE, and this is a reachability fix rather than a layout preference.
          It used to close the editorial column, where the deck made it unreadable: the story section is
          taller than one screen, so the gesture that would scroll to the coda advanced to the next slide
          instead. The owner: "totally unreacheable with normal scroll… a simple strategy is to put this
          phrase here [the graph's empty lower-right], after the Quantitative Researcher is shown, animated."
          So it lives in the drawing's empty quadrant and fades in once the walk has actually discovered the
          deeper basin — the line only makes sense after that. HTML rather than canvas text, so the display
-         italic renders properly and a screen reader can read it. -->
+         italic renders properly and a screen reader can read it. */}
     <p class="dp-coda" data-dp-coda>
       The deepest point on that surface is not marked, because I do not know where it is. What I know is the
       direction, and that the descent is still running.
@@ -70,10 +70,10 @@ import { WAYPOINTS } from '../lib/trajectory';
     </p>
   </div>
 
-  <!-- The accessible path. Visually hidden because the graph's own labels already name every stop —
+  {/* The accessible path. Visually hidden because the graph's own labels already name every stop —
        a repeated list on screen said the same thing twice and pulled the section back toward the
        resume format this whole piece exists to avoid. Screen readers and no-JS still get everything,
-       in order. -->
+       in order. */}
   <ol class="dp-stops sr-only">
     {WAYPOINTS.map((w) => (
       <li>
@@ -82,10 +82,10 @@ import { WAYPOINTS } from '../lib/trajectory';
     ))}
   </ol>
 
-  <!-- The "deepest point is not marked" footnote is deleted on the owner's instruction. The idea it
+  {/* The "deepest point is not marked" footnote is deleted on the owner's instruction. The idea it
        carried survives where it belongs: the graph draws the deeper basin unlabelled (see
        unknownAttractor), and the editorial's closing line says it in the writing's own voice. Saying it
-       three times in one section was two too many. -->
+       three times in one section was two too many. */}
 </section>
 
 <style>
@@ -113,17 +113,32 @@ import { WAYPOINTS } from '../lib/trajectory';
      BESIDE "Why the climb" as a peer rather than out-shouting it, and kept to one line. */
   :global(.story-paper) .dp-head h2 { font-size: clamp(25px, 2.2vw, 40px); text-wrap: balance; }
   :global(.story-paper) .dp-lede { max-width: 44ch; }
+  /* No `.dp-lede strong` rule, and none is wanted: the lede is one plain sentence by design — see "NO
+     MEASUREMENTS IN THE COPY" at the top of this file — so there is no emphasis to accent. The rule that used
+     to sit here arrived in the same commit as the element and the element never contained a `<strong>` in any
+     revision, so it never matched. Deleting it also removes the temptation to bold a number back into a
+     sentence the file's own header explains must not carry one. */
   .dp-lede {
     font-size: 15.5px; line-height: 1.75; color: var(--dp-body); margin: 14px 0 0;
   }
-  .dp-lede strong { color: var(--dp-accent); font-weight: 400; }
 
   .dp-readout {
     margin: 14px 0 0; min-height: 1.5em;
     font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; color: var(--dp-quiet);
   }
-  .dp-readout b { color: var(--dp-accent); font-weight: 400; }
-  .dp-readout i { color: var(--dp-alert); font-style: normal; }
+  /* :global ON THE CHILD, and it is load-bearing rather than a style preference. The readout's contents are
+     built by the script below (readout.innerHTML, with b and i around the counter and the discovery line), and
+     a node a script created carries no data-astro-cid. Astro's scoping rewrites `.dp-readout b` into
+     `.dp-readout[data-astro-cid-…] b[data-astro-cid-…]`, so BOTH of these rules matched nothing for the whole
+     life of the readout: the counter rendered flat --dp-quiet in UA bold, and the discovery line rendered as a
+     SYNTHESIZED oblique, because astro.config.mjs loads JetBrains Mono in style:'normal' only — which is
+     precisely what `font-style: normal` here exists to prevent.
+     The parent stays scoped (it IS in the template, so it has the cid); only the emphasis selector is made
+     global, which keeps the rules reachable without leaking a bare `b`/`i` rule onto the rest of the site.
+     The alternative — createElement plus classes — does not help on its own: a class in a scoped block gets
+     the same cid attribute appended, so it would need :global() anyway, for more code. */
+  .dp-readout :global(b) { color: var(--dp-accent); font-weight: 400; }
+  .dp-readout :global(i) { color: var(--dp-alert); font-style: normal; }
 
   .dp-controls { display: flex; gap: 8px; margin: 22px 0 0; }
   .dp-btn {
@@ -170,19 +185,10 @@ import { WAYPOINTS } from '../lib/trajectory';
     pointer-events: none;      /* the drawing is not interactive, but never block it either */
   }
   :global(.story-paper) .dp-head .dp-btn { pointer-events: auto; }
-  /* The footnote tucks into the bottom-left corner, over the same empty region. */
-  :global(.story-paper) .dp-foot {
-    position: absolute;
-    bottom: 0; left: 0;
-    margin: 0;
-    max-width: 52ch;
-  }
   /* Narrow screens keep the stacked flow: there is no empty corner to overlay into. */
   @media (max-width: 1000px) {
-    :global(.story-paper) .dp-head,
-    :global(.story-paper) .dp-foot { position: static; max-width: 70ch; }
+    :global(.story-paper) .dp-head { position: static; max-width: 70ch; }
     :global(.story-paper) .dp-stage { height: min(56vh, 90vw); margin: 3vh 0 0; }
-    :global(.story-paper) .dp-foot { margin: 3vh 0 0; }
   }
   .dp-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
@@ -232,11 +238,12 @@ import { WAYPOINTS } from '../lib/trajectory';
   }
   .dp-stage.is-live .dp-fallback { display: none; }
 
-
-  .dp-foot {
-    margin: 4vh 0 0; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.04em;
-    color: var(--dp-line); max-width: 64ch;
-  }
+  /* (There is no `.dp-foot`, and there never was. Three rule sets for it — a base block here, a bottom-left
+     overlay on the paper panel, and a narrow-screen return to flow — arrived in one commit alongside a
+     `.dp-foot` element that was never actually written; `git log -S 'dp-foot'` returns that single commit and
+     `-S 'class="dp-foot"'` returns nothing at all. So they were born orphaned and styled a footnote no reader
+     ever saw. Deleted. The caption the header comment mentions is the section's own copy, and `.dp-coda`
+     above is the only thing that overlays a corner of the stage.) */
 
   /* Narrow screens: the graph's in-frame labels collide below ~720px, so the canvas gives way to the
      ordered list, which stops being visually hidden and becomes the content.
@@ -318,7 +325,10 @@ import { WAYPOINTS } from '../lib/trajectory';
     type Projection, type View,
   } from '../lib/descentPath';
   import { WAYPOINTS, trajectoryFacts, DEEP_SIDE_LABEL } from '../lib/trajectory';
-  import { knownnessFn, knowledgeRadius } from '../lib/knowledge';
+  // knowledgeRadius is NOT imported any more: it only ever fed the readout's "reach" figure, which was
+  // deleted for the reason recorded at markStops() — a real measurement of an invented surface, printed
+  // beside real job titles. The import outlived its only caller and `astro check` flags it.
+  import { knownnessFn } from '../lib/knowledge';
   import { prefersReducedMotion } from '../lib/motion';
 
   const teardowns: Array<() => void> = [];
@@ -332,9 +342,20 @@ import { WAYPOINTS } from '../lib/trajectory';
   }
 
   function init(stage: HTMLElement): (() => void) | null {
-    const canvas = stage.querySelector<HTMLCanvasElement>('[data-dp-canvas]');
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return null;
+    const maybeCanvas = stage.querySelector<HTMLCanvasElement>('[data-dp-canvas]');
+    const maybeCtx = maybeCanvas?.getContext('2d');
+    if (!maybeCanvas || !maybeCtx) return null;
+    // RE-BOUND AFTER THE GUARD, and this is for the typechecker, not the runtime — `npm run typecheck` is a
+    // CI gate now and these two declarations were 79 of its errors. querySelector and getContext both return
+    // nullables, and the guard above narrows them HERE but not inside the drawing functions below:
+    // TypeScript drops a narrowing at the boundary of every closure it cannot prove runs after the check, so
+    // every one of the 76 `ctx.` calls in draw() and the three `canvas.` ones in size() read as "possibly
+    // null". Aliasing the already-narrowed values gives these names their plain non-null types at
+    // declaration, so there is nothing left for a closure to lose.
+    // Deliberately an alias rather than `as` or `!`: the null check is still real and still returns null, so
+    // a canvas-less browser is handled exactly as it was — what is gone is the assertion, not the check.
+    const canvas = maybeCanvas;
+    const ctx = maybeCtx;
     const section = stage.closest('#descent-path') as HTMLElement;
     const replay = section.querySelector<HTMLButtonElement>('[data-replay]');
     const readout = section.querySelector<HTMLElement>('[data-readout]');
@@ -627,12 +648,32 @@ import { WAYPOINTS } from '../lib/trajectory';
         ctx.fill();
       }
 
-      // ── Waypoints, only those the trail has reached.
+      // ── Waypoints, only those the trail has reached — and each one FADES IN rather than appearing.
+      //
+      // The owner: "the descent curve just have the name pops up. can we let the career names fades in with
+      // animations?" They did pop: a waypoint was drawn at full opacity the first frame `reveal` passed its
+      // arrival, so eight names snapped into place one after another while the trail beneath them moved
+      // smoothly. The mismatch is what read as abrupt — the line eases, the type did not.
+      //
+      // The fade is measured in REVEAL units, not milliseconds, so it stays in step with the walk however the
+      // walk is paced (it is driven by elapsed time, and `replay the walk` restarts it). Arrivals are 1/7 apart
+      // for eight waypoints, so 0.055 is about 38% of the gap: long enough to read as a fade, finished well
+      // before the next name arrives, so two never fade at once.
+      // The dot and its name share one alpha deliberately — they are one object arriving, and fading only the
+      // type would look like a label catching up with a dot that was already there.
+      const WP_FADE = 0.055;
       WAYPOINTS.forEach((wp, i) => {
         const arrival = i / (WAYPOINTS.length - 1);
         if (arrival > reveal + 1e-6) return;
+        // `reveal >= 1` short-circuits, and it is not belt-and-braces — without it the LAST waypoint never
+        // appears at all. Its arrival is exactly 1, so (reveal - arrival) is 0 at the end of the walk and the
+        // fade would rest at 0 forever: the newest, most important name on the graph, invisible. It also breaks
+        // the reduced-motion path, which sets reveal = 1 and draws a single finished frame.
+        const fade = reveal >= 1 ? 1 : Math.min(1, Math.max(0, (reveal - arrival) / WP_FADE));
         const [px, py] = project(wp.x, wp.y, v);
         const isBasin = wp.phase === 'basin';
+        const prevAlpha = ctx.globalAlpha;
+        ctx.globalAlpha = prevAlpha * fade;
         ctx.beginPath();
         ctx.arc(px, py, isBasin ? 6 : 4, 0, Math.PI * 2);
         ctx.fillStyle = isBasin ? ochre : paper;
@@ -644,6 +685,9 @@ import { WAYPOINTS } from '../lib/trajectory';
           /* no in-frame type on a phone — see COMPACT_MAX_W */
         } else if (isLast) label(ctx, px - 6, py - 14, wp.label, 15, paper);
         else label(ctx, px + 14, py + 5, wp.label, 15, ink3);
+        // Restore rather than assign 1: the climb callout below sets its own alpha, and a hardcoded reset here
+        // would silently become wrong the moment this loop is drawn inside another alpha.
+        ctx.globalAlpha = prevAlpha;
       });
 
       // ── The climb, called out once, where it happens.

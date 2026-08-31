@@ -22,9 +22,9 @@ const stops = researchStops(publications, researchInterests);
   veilOnLoad={true}
   navZone="light"
 >
-  <!-- Marks the document JS-capable before anything paints, so the CSS can present the cards as
+  {/* Marks the document JS-capable before anything paints, so the CSS can present the cards as
        interactive only when something can respond. The collapse itself happens in the snippet AFTER
-       the papers (a detail cannot be collapsed before it is parsed). -->
+       the papers (a detail cannot be collapsed before it is parsed). */}
   <script is:inline>document.documentElement.classList.add('paper-js');</script>
 
   <main class="research descent is-fluid">
@@ -61,12 +61,12 @@ const stops = researchStops(publications, researchInterests);
         const headline = p.results?.[0];
         return (
         <article class="paper" data-paper>
-          <!-- title + byline span both columns, like a paper masthead.
+          {/* title + byline span both columns, like a paper masthead.
                THE MASTHEAD IS THE CARD'S BUTTON. The owner's brief: the lucid paper card is "elegant…
                probably we will have many papers in the future, so it's fine to have that card in the
                research tab. After clicking on the card, it expands to a more detailed summary."
                A real <button> wrapping the summary, not a click handler on a div: it is keyboard
-               reachable, announces its expanded state, and works with assistive tech for free. -->
+               reachable, announces its expanded state, and works with assistive tech for free. */}
           <button
             type="button"
             class="paper-card"
@@ -81,8 +81,8 @@ const stops = researchStops(publications, researchInterests);
               <span class="byline">{p.authors} · {p.venue}{p.arxivId && <> · arXiv:{p.arxivId}</>} · {p.year}</span>
             </span>
 
-            <!-- The card's own summary, visible while collapsed: the one-line "why it matters" plus a
-                 single headline number. Enough to decide whether to open it. -->
+            {/* The card's own summary, visible while collapsed: the one-line "why it matters" plus a
+                 single headline number. Enough to decide whether to open it. */}
             {p.takeaway && <span class="card-takeaway">{p.takeaway}</span>}
             <span class="card-foot">
               {headline && (
@@ -91,9 +91,9 @@ const stops = researchStops(publications, researchInterests);
                   <span class="card-stat-label">{headline.label}</span>
                 </span>
               )}
-              <!-- The label swaps with the expanded state in CSS (see .card-cue-text), so there is no
+              {/* The label swaps with the expanded state in CSS (see .card-cue-text), so there is no
                    JS-owned copy that could disagree with aria-expanded. aria-hidden because the button
-                   already announces its own state — a screen reader would otherwise hear it twice. -->
+                   already announces its own state — a screen reader would otherwise hear it twice. */}
               <span class="card-cue" aria-hidden="true">
                 <span class="card-cue-text"></span>
                 <span class="card-chevron"></span>
@@ -101,11 +101,11 @@ const stops = researchStops(publications, researchInterests);
             </span>
           </button>
 
-          <!-- two columns: LEFT = idea + formal method (math); RIGHT = results -->
-          <!-- NOT `hidden` in the markup: with JS off, this content must be readable, and an earlier
+          {/* two columns: LEFT = idea + formal method (math); RIGHT = results */}
+          {/* NOT `hidden` in the markup: with JS off, this content must be readable, and an earlier
                version that shipped it hidden made the whole paper unreachable (measured: 0 of 1 panels
                rendered with script execution disabled). The inline head script collapses it before
-               first paint whenever JS is available, so there is no flash for real visitors. -->
+               first paint whenever JS is available, so there is no flash for real visitors. */}
           <div class="paper-body" id={`${paperAnchorId(i)}-detail`} data-paper-detail>
             <div class="paper-left">
               {p.idea && (
@@ -179,7 +179,7 @@ const stops = researchStops(publications, researchInterests);
         );
       })}
 
-      <!-- STATE BEFORE PAINT — but no longer the COLLAPSE before paint. The `html.paper-js` class set in this
+      {/* STATE BEFORE PAINT — but no longer the COLLAPSE before paint. The `html.paper-js` class set in this
            page's head already makes the CSS present every panel closed on the first frame, so this snippet does
            not need to touch them: setting `hidden` as well was a second mechanism for one job, and it was the
            one that made a deep link open nothing (it exempted the linked panel from `hidden` but not from the
@@ -188,7 +188,7 @@ const stops = researchStops(publications, researchInterests);
            the panel a deep link points into, and mirror the resulting state onto the buttons so the chevron
            and the label are right on the first frame rather than one frame late. Closed panels are marked
            `inert` so their links are out of the tab order while they measure zero — a focusable link inside a
-           zero-height box is a keyboard trap on a page that looks empty. -->
+           zero-height box is a keyboard trap on a page that looks empty. */}
       <script is:inline>
         (() => {
           const hash = location.hash.slice(1);

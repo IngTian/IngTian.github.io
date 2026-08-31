@@ -153,65 +153,77 @@ body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body)
   flex-direction: column;
   justify-content: center;
 }
-/* ── THE NAV MUST NOT LAND ON A HEADLINE, which on phones it did — on every slide.
-   The corner nav is a fixed capsule at the top; the deck rests with a slide's top at the viewport top; and a
-   paper panel puts its kicker and headline in the first ~90px. So at rest, on a phone, the capsule sat across
-   the headline of each explainer slide. Measured at 390x844 resting on each stop, covered widths:
-   "What is multi-period portfolio optimization?" 228px · "Now imagine it is not your money." 341px ·
-   "Still an open problem." 212px · "The work" 123px — plus every kicker ("1 / 3", "2 / 3 · the difficulty").
-   Not transient: these are the positions the deck comes to REST at, so the headline was permanently obscured.
 
-   THE FIX IS THE PANEL'S OWN PADDING, NOT --deck-lead. A lead was the obvious lever and it is the wrong one:
-   it lifts the deck's resting position ABOVE the slide, so a full-bleed opaque panel gets a strip of sky above
-   it and reads as a card that has slipped down — Story.astro measured exactly that (paper at 1953, deck resting
-   at 1893, 60px of sky) and documents why it carries no lead, naming the panel's padding-top as the right home
-   for this air. Padding keeps the paper flush to the top of the screen and moves only the content inside it.
+/* ============================================================
+   THE FIVE SLIDE PANELS, ENUMERATED EXACTLY ONCE.
+   .story-paper (Story) · .ch-paper (Choice) · .ru-paper (Rules) · .so-paper (Solve) ·
+   .wk-paper (Work) — the opaque full-bleed panel each slide hangs its content on.
 
-   78px clears the wrapped two-row capsule on phones (12px offset + ~54px tall) and the single-row capsule in
-   landscape (17px + ~44px). These selectors are (0,2,1) against Astro's scoped `.ch-paper[data-astro-cid-…]` at
-   (0,2,0), so the longhand wins over each panel's own `padding` shorthand — which is also why the first attempt
-   at this, a plain `.is-slides > section` rule, silently lost and changed nothing. */
-@media (max-width: 1100px), (max-height: 620px) {
-  .is-slides > section > .story-paper,
-  .is-slides > section > .ch-paper,
-  .is-slides > section > .ru-paper,
-  .is-slides > section > .so-paper,
-  .is-slides > section > .wk-paper { padding-top: 78px; }
-  /* The footer no longer needs its own clearance rule. It used to be a stop of its own, so the deck rested with
-     its first row at the top of the screen and the capsule sat across "Download CV ↓" — 95px of it at 320px, a
-     band where a tap would have hit the nav instead of the link. Nested inside #appendix it is never at the top
-     of the viewport at rest, and the appendix's own panel padding above covers the case. */
-}
+   THIS USED TO BE THREE HAND-WRITTEN COPIES of the same five-class list (flex fill,
+   nav clearance, phone correction) and the third copy had only FOUR entries: .wk-paper
+   was missing from the phone correction. The consequence was live and measurable — the
+   78px nav clearance below applies at max-width:1100px, the 22px correction only at
+   max-width:640px, so on a phone #appendix (class="wk-paper", confirmed in
+   dist/index.html) kept 78px of blank tan above its kicker while its four siblings got
+   22px. A band of empty paper that reads as something that failed to render, in the one
+   place nobody was looking, because the bug was a missing line rather than a wrong one.
 
-/* ── ON A PHONE THAT CLEARANCE IS NOW A HOLE, so it comes back down. ──
-   The 78px above was sized for the nav as it then was: a wrapped, effectively full-width capsule 68px tall,
-   with the deck resting each slide's top exactly at the viewport top so a headline landed right underneath it.
-   Neither premise holds any more. The phone nav is a 40x38 mark in the top-RIGHT corner, these headlines are
-   left-aligned, and the deck does not engage on phones at all, so no slide is parked with its top against the
-   chrome. What is left is 79px of blank paper above a one-line kicker — measured on all three explainers, and
-   on a COLLAPSED slide that band is a third of the whole section. It reads as something that failed to render,
-   which is part of what the owner saw when they said the slides "collide and doesn't work".
-   22px keeps the panel from starting hard against its own edge. Placed after the rule it overrides and at the
-   same specificity, deliberately: source order is what decides here, and getting that backwards has cost this
-   project several silent fixes. */
-@media (max-width: 640px) {
-  .is-slides > section > .ch-paper,
-  .is-slides > section > .ru-paper,
-  .is-slides > section > .so-paper,
-  .is-slides > section > .story-paper { padding-top: 22px; }
-}
-
-/* The panel inside a slide must be able to fill it, or the centring above just
-   moves a short panel down the screen and leaves sky above and below it. */
+   Three parallel lists cannot be kept in sync by care, so there is now one. The nested
+   @media rules below inherit this selector list, which means a SIXTH panel is added in
+   exactly one place and cannot be half-added. Nesting rather than :is() so the emitted
+   selectors — and therefore the specificity — are byte-for-byte what they were:
+   `.is-slides > section > .wk-paper` is (0,2,1), which is what beats Astro's scoped
+   `.wk-paper[data-astro-cid-…]` at (0,2,0) and lets a longhand `padding-top` here
+   override each panel's own `padding` shorthand. An earlier attempt at the clearance
+   used a plain `.is-slides > section` rule, lost that specificity race, and silently
+   changed nothing.
+   ============================================================ */
 .is-slides > section > .story-paper,
 .is-slides > section > .ch-paper,
 .is-slides > section > .ru-paper,
 .is-slides > section > .so-paper,
 .is-slides > section > .wk-paper {
+  /* The panel inside a slide must be able to fill it, or the centring above just moves a
+     short panel down the screen and leaves sky above and below it. */
   flex: 1 0 auto;
   display: flex;
   flex-direction: column;
   justify-content: center;
+
+  /* ── THE NAV MUST NOT LAND ON A HEADLINE, which on phones it did — on every slide.
+     The corner nav is a fixed capsule at the top; the deck rests with a slide's top at the viewport top; and a
+     paper panel puts its kicker and headline in the first ~90px. So at rest, on a phone, the capsule sat across
+     the headline of each explainer slide. Measured at 390x844 resting on each stop, covered widths:
+     "What is multi-period portfolio optimization?" 228px · "Now imagine it is not your money." 341px ·
+     "Still an open problem." 212px · "The work" 123px — plus every kicker ("1 / 3", "2 / 3 · the difficulty").
+     Not transient: these are the positions the deck comes to REST at, so the headline was permanently obscured.
+
+     THE FIX IS THE PANEL'S OWN PADDING, NOT --deck-lead. A lead was the obvious lever and it is the wrong one:
+     it lifts the deck's resting position ABOVE the slide, so a full-bleed opaque panel gets a strip of sky above
+     it and reads as a card that has slipped down — Story.astro measured exactly that (paper at 1953, deck resting
+     at 1893, 60px of sky) and documents why it carries no lead, naming the panel's padding-top as the right home
+     for this air. Padding keeps the paper flush to the top of the screen and moves only the content inside it.
+
+     78px clears the wrapped two-row capsule on phones (12px offset + ~54px tall) and the single-row capsule in
+     landscape (17px + ~44px).
+     The footer needs no clearance rule of its own. It used to be a stop, so the deck rested with its first row at
+     the top of the screen and the capsule sat across "Download CV ↓" — 95px of it at 320px, a band where a tap
+     would have hit the nav instead of the link. Nested inside #appendix it is never at the top of the viewport at
+     rest, and this panel's padding above covers the case. ── */
+  @media (max-width: 1100px), (max-height: 620px) { padding-top: 78px; }
+
+  /* ── ON A PHONE THAT CLEARANCE IS NOW A HOLE, so it comes back down. ──
+     The 78px above was sized for the nav as it then was: a wrapped, effectively full-width capsule 68px tall,
+     with the deck resting each slide's top exactly at the viewport top so a headline landed right underneath it.
+     Neither premise holds any more. The phone nav is a 40x38 mark in the top-RIGHT corner, these headlines are
+     left-aligned, and the deck does not engage on phones at all, so no slide is parked with its top against the
+     chrome. What is left is 79px of blank paper above a one-line kicker — measured on all three explainers, and
+     on a COLLAPSED slide that band is a third of the whole section. It reads as something that failed to render,
+     which is part of what the owner saw when they said the slides "collide and doesn't work".
+     22px keeps the panel from starting hard against its own edge. Placed after the rule it overrides and at the
+     same specificity, deliberately: source order is what decides here, and getting that backwards has cost this
+     project several silent fixes. ── */
+  @media (max-width: 640px) { padding-top: 22px; }
 }
 /* The nested footer must NOT stretch. It is the last flex item in #appendix, and a stretched footer would put its
    links in the middle of a tall band instead of at the foot of the page. `flex: none` keeps it at its own height
@@ -340,11 +352,12 @@ html[data-theme='dark'] .descent::after {
   .descent.is-fluid.fluid-live .sky-wash { opacity: 0.35; }
 }
 
-/* Terminal chrome fill (Terminal.tsx is a React island with no <style>, so its
-   panel background lives here). Light: warm ink glass. Dark: cool charcoal so
-   it sits in the void rather than glowing warm. */
-.terminal-chrome { background: linear-gradient(180deg, rgba(40,36,30,0.7), rgba(20,18,15,0.92)); }
-html[data-theme='dark'] .terminal-chrome { background: linear-gradient(180deg, rgba(24,28,30,0.78), rgba(10,12,13,0.95)); }
+/* (The `.terminal-chrome` fill lived here — two rules, light and dark — because Terminal.tsx was a React island
+   with no <style> of its own. Both are DELETED: the scripted terminal and the whole src/components/terminal/
+   directory are gone, and `grep -rn terminal-chrome src` plus a grep over every dist/**.html now return nothing,
+   so neither rule could match an element on any route. They were shipping in the critical-path stylesheet on all
+   eleven pages to style a component that no longer exists. Note that CLAUDE.md still describes the terminal as
+   the site's one React island — that is stale, and correcting it is on the docs pass, not this one.) */
 
 /* ── Theme-toggle crossfade (View Transitions API). The toggle wraps the
    attribute flip in document.startViewTransition() and adds .theme-vt to <html>

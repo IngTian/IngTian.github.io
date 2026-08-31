@@ -63,11 +63,11 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
       <p class="so-kicker">3 / 3 · where to start</p>
 
       <div class="so-split">
-        <!-- ── WHAT IS OPEN, AND WHERE IT WOULD BE ATTACKED.
+        {/* ── WHAT IS OPEN, AND WHERE IT WOULD BE ATTACKED.
              No equation here any more. An earlier version made the Bellman recursion this slide's spine, which
              asserts a formulation and a solution on a problem that has neither — see data/desk.ts for the
              owner's correction verbatim. The difficulty slide already owns that recursion, where it is true
-             because it is the thing that blows up. -->
+             because it is the thing that blows up. */}
         <div class="so-say">
           <h2 id="so-heading" class="so-head">{OPEN_HEADING}</h2>
 
@@ -86,8 +86,8 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
         <figure class="so-fig">
           <svg class="so-chart" viewBox={`0 0 ${VW} ${VH}`} role="img"
                aria-label={`A lattice of portfolio states across twelve decision points. Values are computed backward from the horizon, then the optimal route is traced forward, beating ${cands.length} candidate policies.`}>
-            <!-- THE SURFACE. Drawn as a wireframe from both directions; the script reveals it right-to-left,
-                 which is the direction the algorithm actually runs. -->
+            {/* THE SURFACE. Drawn as a wireframe from both directions; the script reveals it right-to-left,
+                 which is the direction the algorithm actually runs. */}
             <g class="so-mesh">
               {timeLines.map((line, t) => (
                 <polyline class="so-rib" data-t={t} points={path(line)} />
@@ -97,12 +97,12 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
               ))}
             </g>
 
-            <!-- THE MANY: every candidate policy, at the value of the states it passes through. -->
+            {/* THE MANY: every candidate policy, at the value of the states it passes through. */}
             <g class="so-cands" data-cands>
               {candLines.map((line) => <polyline class="so-cand" points={path(line)} />)}
             </g>
 
-            <!-- THE ONE. Revealed last, forward through time. -->
+            {/* THE ONE. Revealed last, forward through time. */}
             <polyline class="so-opt" data-opt points={path(optLine)} />
             {optLine.map(([x, y], i) => (
               <circle class="so-opt-node" data-opt-node={i} cx={Math.round(x)} cy={Math.round(y)} r="3" />
@@ -117,12 +117,12 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
 
           <p class="so-read" data-read aria-live="polite">A world small enough to solve exactly…</p>
 
-          <!-- THE FIGURE'S CLAIM, NARROWED. The algorithm is real and unit-tested; what changed is what it is
+          {/* THE FIGURE'S CLAIM, NARROWED. The algorithm is real and unit-tested; what changed is what it is
                evidence OF. It is not the method running, and it is not the largest solvable case either — that
                would be false on this slide's own terms, since Gârleanu–Pedersen 2013 is closed-form at
                thousands of names. It is a world handed over complete, and every count below is checked against
                lib/bellman.ts: 12 dates x 9 states = 108 decisions, 972 comparisons, 9^12 paths, and a
-               thirteenth rib at the horizon where value is zero by construction. -->
+               thirteenth rib at the horizon where value is zero by construction. */}
           <figcaption class="so-cap">
             {LEVELS} exposure levels at {PERIODS} dates — {PERIODS * LEVELS} decisions, {PERIODS * LEVELS * LEVELS} comparisons,
             and {LEVELS}<sup>{PERIODS}</sup> = 2.8×10<sup>11</sup> exposure paths the recursion never visits. It is
@@ -134,10 +134,10 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
         </figure>
       </div>
 
-      <!-- THE SELECTOR IS THE DISCIPLINES, in the owner's own words: "from RL, with math, or, stochastic
+      {/* THE SELECTOR IS THE DISCIPLINES, in the owner's own words: "from RL, with math, or, stochastic
            process, probability, as the backbone". It used to be the terms of an equation, which died with the
            equation. Same affordance and position as slide two's band, but what you click is a direction of
-           attack rather than a numbered beat. -->
+           attack rather than a numbered beat. */}
       <ol class="so-terms" aria-label="A few general methodologies">
         {METHODOLOGIES.map((m, i) => (
           <li>
@@ -198,7 +198,14 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
   :global(html.solve-js) .so-panel:first-child { opacity: 0; pointer-events: none; }
   :global(html.solve-js) .so-panel.is-on { opacity: 1; pointer-events: auto; }
   @media (prefers-reduced-motion: no-preference) {
-    .so-panel { transition: opacity 260ms ease; }
+    /* .5s, MATCHING Choice and Rules, and that is the whole fix. The owner: "where to start doesn't have the
+       smooth inter tab animation as other slides." He was right, and the cause was not a missing transition —
+       this one was 260ms while `.ch-panel` and `.ru-panel` are both `.5s ease`. Nearly twice as fast, on a
+       crossfade between two stacked panels, reads as a pop rather than a dissolve: at 260ms the outgoing text is
+       still legible when the incoming text is already solid, so the eye sees two states rather than one moving
+       between them. The stacking was never the problem (.so-textbox is a one-cell grid, like the others).
+       Three slides that share an interaction must share its timing, or the third one feels broken. */
+    .so-panel { transition: opacity .5s ease; }
   }
 
   /* THE OPENNESS STATEMENT, directly under the heading — the sentence the slide rests on, so it is set above
@@ -297,19 +304,10 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     font-size: clamp(20px, 1.8vw, 30px); line-height: 1.24;
     color: var(--s-ink); margin: 0 0 clamp(14px, 2vh, 22px); max-width: 32ch; letter-spacing: -0.008em;
   }
-  .so-body {
-    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.68; color: var(--s-soft);
-    margin: 0 0 12px; max-width: 46ch;
-  }
-  .so-body em { font-style: italic; color: var(--s-ink); }
-
-
-  .so-tools { list-style: none; margin: clamp(14px, 2vh, 20px) 0 0; padding: 0; display: grid; gap: 7px; }
-  .so-tools li { display: grid; gap: 1px; }
-  .so-tool-name {
-    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--s-accent);
-  }
-  .so-tool-role { font-size: 12px; line-height: 1.45; color: var(--s-soft); max-width: 46ch; }
+  /* (.so-body and the .so-tools list are gone with their markup. The slide used to carry a paragraph of prose
+     and a named list of "the tools this uses" beside the lattice; both went when the copy moved into the
+     term-definition strip and the lattice took the whole figure column. Deleted rather than parked, so the
+     sheet only describes elements this section actually renders.) */
 
   /* Tall enough for the surface to read as a surface: at 340px the lattice's depth collapsed and the twelve
      time-slices crowded into a band. */

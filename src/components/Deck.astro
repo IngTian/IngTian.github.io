@@ -24,7 +24,7 @@
 // teardown, matching TerrainHero / Toc / DescentPath.
 ---
 <script>
-  import { deckStops, nextStop, type DeckSlide } from '../lib/deck';
+  import { deckStops, nextStop, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide } from '../lib/deck';
   import { prefersReducedMotion } from '../lib/motion';
   import { isPhone, PHONE_MAX_WIDTH } from '../lib/viewport';
 
@@ -103,7 +103,9 @@
     // THE LOCK IS HELD UNTIL THE SLIDE ANIMATION FINISHES, not until the wheel stream goes quiet.
     // An earlier version cleared it after 140ms of silence, which measured as a bug: a 14-event
     // trackpad flick jumped from the top of the page to the bottom (0 → 6302, every slide at once),
-    // because events still arriving during the ~500ms smooth scroll each triggered another advance.
+    // because events still arriving during the transition each triggered another advance. (That transition was a
+    // ~500ms native smooth scroll then; it is now our own 650ms tween — see tweenTo. The coalescing logic is
+    // unchanged, and the reason it exists is unchanged with it.)
     // Two conditions must BOTH hold before another gesture is honoured — the animation has settled at
     // its target, AND the wheel stream has gone quiet, so leftover momentum cannot advance a slide the
     // reader did not ask for.
@@ -113,7 +115,10 @@
     let animTimer = 0;
     let streamLive = false;
     const QUIET_MS = 160;      // stream considered ended after this much silence
-    const ANIM_MAX_MS = 900;   // hard release, in case a smooth scroll is interrupted and never lands
+    const ANIM_MAX_MS = 900;   // hard release. Now a pure belt-and-braces: our tween is 650ms and calls
+                               // release() itself on its last frame, so this only fires if a frame never
+                               // arrives (a backgrounded tab). It stays because losing the lock forever
+                               // would leave the deck permanently deaf to gestures.
     const THRESHOLD = 18;      // ignore sub-pixel/accidental deltas
 
     /** Programmatic scrolls (anchors, find-in-page, replay buttons) must not be treated as gestures. */
@@ -124,6 +129,47 @@
       target = null;
     }
 
+    // ── THE TRANSITION IS OURS NOW, not the browser's, and the reason is measured.
+    //
+    // The owner, watching his own screen recording: "you notice the sudden change of slides instead of a smooth
+    // transition?" He was right, and it was never a regression — `behavior: 'smooth'` has been here since the
+    // commit that created the deck. It is the browser's curve that is wrong for this: measured on that clip
+    // (578 frames, 55.8fps), a slide took ~500ms but reached near-peak velocity within ~35ms of standstill. A
+    // hard launch and a soft landing is exactly what "sudden" describes.
+    //
+    // Native smooth scroll also cannot be CANCELLED — there is no API to stop one in flight — which is the
+    // second defect in the recording: transitions that double-humped, because a new scroll began while the old
+    // one was still running and the page lurched. Owning the animation makes that one cancelAnimationFrame.
+    //
+    // `behavior: 'instant'` on each step is load-bearing: global.css sets `html { scroll-behavior: smooth }`, so
+    // a plain scrollTo would hand every one of our ~40 frames to the browser's own smoothing and the two curves
+    // would fight. This is the one place that override must be bypassed.
+    let raf = 0;
+
+    function cancelTween(): void {
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    }
+
+    function tweenTo(dest: number): void {
+      cancelTween();
+      const from = window.scrollY;
+      const dist = dest - from;
+      // Already there (or within rounding): do not spend 650ms animating nothing.
+      if (Math.abs(dist) < 2) { window.scrollTo({ top: dest, behavior: 'instant' }); release(); return; }
+      const t0 = performance.now();
+      const step = (now: number): void => {
+        const p = Math.min(1, (now - t0) / DECK_TWEEN_MS);
+        window.scrollTo({ top: Math.round(from + dist * easeInOutCubic(p)), behavior: 'instant' });
+        if (p < 1) {
+          raf = requestAnimationFrame(step);
+        } else {
+          raf = 0;
+          release();   // landed exactly on the stop; no settling, so no off-by-a-pixel rest
+        }
+      };
+      raf = requestAnimationFrame(step);
+    }
+
     function go(dir: 1 | -1): boolean {
       const dest = nextStop(stops, Math.round(window.scrollY), dir);
       if (dest === null) return false;      // at an end — let the browser scroll normally
@@ -132,7 +178,7 @@
       ignoreUntil = Date.now() + ANIM_MAX_MS;
       window.clearTimeout(animTimer);
       animTimer = window.setTimeout(release, ANIM_MAX_MS);
-      window.scrollTo({ top: dest, behavior: 'smooth' });
+      tweenTo(dest);
       return true;
     }
 
@@ -182,6 +228,19 @@
     // page stays navigable in the ways people expect.
     function onKey(e: KeyboardEvent): void {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // ALREADY CONSUMED — the deck is the LAST handler for a key, never a second one.
+      //
+      // This listener is on `window` in the bubble phase, so by the time it runs, any handler on the actual
+      // target has already had the key. The three explainer slides each give their beat <button>s a keydown
+      // that walks the group with the arrows and calls preventDefault() (Choice, Rules, Solve). Without this
+      // guard a keyboard reader focused on a beat chip pressed ArrowDown and got BOTH: the beat advanced and
+      // the deck scrolled a whole slide away from the thing they were stepping through.
+      //
+      // The tag list below cannot cover this: the target is a BUTTON, and BUTTON is deliberately exempted for
+      // space only (space on a button is an activation) — arrows on a button are usually free for the deck to
+      // take, and are only spoken for when a component says so. defaultPrevented is exactly that statement, so
+      // honouring it needs no list of which components use arrows, and a fourth one costs nothing here.
+      if (e.defaultPrevented) return;
       const t = e.target as HTMLElement | null;
       // Never intercept typing, or a control that uses arrows itself.
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
@@ -252,6 +311,9 @@
       window.clearTimeout(quietTimer);
       window.clearTimeout(resizeTimer);
       window.clearTimeout(animTimer);
+      // CANCEL THE TWEEN, or a View Transition leaves a rAF loop still scrolling the page it belongs to —
+      // which on the next route would drag the reader down a document that has no deck at all.
+      cancelTween();
       ro.disconnect();
     };
   }

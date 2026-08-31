@@ -1,6 +1,6 @@
 name: CI
 
-# Build + test gate. Runs on every PR and on pushes to main, so a branch must
+# Build + typecheck + test gate. Runs on every PR and on pushes to main, so a branch must
 # be green before it is merged (enable "Require status checks to pass" on the
 # main branch protection rule to enforce it). Deploy lives in deploy.yml and
 # runs only after a merge to main.
@@ -37,8 +37,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build (type-checked)
+      # This step was called "Build (type-checked)". It was not type-checked, and neither was anything
+      # else: Astro and vitest both hand .ts to esbuild, which strips annotations without ever asking
+      # the compiler. So a build being green said nothing about types — proof, before the Typecheck step
+      # below existed: `tsc --noEmit` reported a real TS2345 in tests/skyShader.test.ts while `npm run
+      # build` and `npm test` were both green. Renamed to stop the name making a promise it cannot keep.
+      - name: Build
         run: npm run build
+
+      # THE ONLY PLACE TYPES ARE CHECKED. Two checkers, because neither covers the other: `astro check`
+      # is the only thing that reads the ~4,400 lines of <script> bodies inside .astro files (tsc cannot
+      # parse .astro at all), and plain `tsc --noEmit` is the only thing that covers tests/ and src/lib
+      # on their own terms. `npm run typecheck` runs both.
+      #
+      # Placed after Build and before Test on purpose. After Build, so the generated content-collection
+      # types in .astro/ exist on a fresh checkout; before Test, because a type error is cheaper to read
+      # than the assertion failure it causes three steps later.
+      - name: Typecheck
+        run: npm run typecheck
 
       - name: Test
         run: npm test

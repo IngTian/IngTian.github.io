@@ -9,14 +9,51 @@
 // WHY THIS IS NOT A RESUME even though it is a list. A résumé lists credentials — title, employer, dates,
 // reverse-chronological — and claims authorization. This lists ARTEFACTS and where to read them. The
 // distinction is that every row here is a thing a reader can go and check.
+import { getCollection } from 'astro:content';
 import { publications, projects } from '../data/profile';
 import { WRITINGS_PROMISE, WRITINGS_TOPICS } from '../data/making';
+import { KINDS } from '../data/writing';
 import PlushCow from '../components/PlushCow.astro';
 import Signature from './Signature.astro';
 
 const featured = publications.find((p) => p.featured);
 const others = publications.filter((p) => !p.featured);
 const shownProjects = projects.slice(0, 2);
+
+// ── THE WRITING COLUMN IS DERIVED, NOT PROMISED. This column said "coming" and carried
+// WRITINGS_PROMISE while /writing/favourite-quotes/ was published, in the nav and live — the homepage was
+// telling visitors the writing did not exist yet. The cause was that its state came from a hand-written
+// constant, so publishing a piece could not possibly update it: nothing linked the two.
+//
+// Reading the collection is what makes that class of lie impossible. `getCollection('writing')` filtered on
+// `!draft` is EXACTLY how src/pages/writing.astro decides what exists, so the homepage and /writing cannot
+// disagree about whether there is any writing — and the next piece is still just a file, with no code change
+// here. The `coming` state below is kept and is correct when the folder is genuinely empty; it is now a
+// consequence of the content rather than a claim about it.
+const writings = (await getCollection('writing'))
+  .filter((e) => !e.data.draft)
+  // Newest first. Deliberately the same rule as sorted() in data/writing.ts — a plain compare on the
+  // schema-normalised YYYY-MM-DD, so lexical order IS date order — and deliberately NOT featured-first,
+  // because /writing ignores `featured` when ordering and two orderings of one shelf read as two shelves.
+  .sort((a, b) => (a.data.date < b.data.date ? 1 : a.data.date > b.data.date ? -1 : 0));
+
+// Two rows, matching the projects column: this slide points, it does not enumerate.
+const shownWritings = writings.slice(0, 2);
+
+// The section name a piece belongs to, taken from the same taxonomy /writing renders its headings from, so a
+// piece cannot be filed under "Miscellaneous" there and something else here. The fallback is unreachable while
+// the schema's `kind` enum and KINDS agree — a test asserts they do — and is there so a mismatch degrades to
+// the raw key instead of `undefined`.
+const kindLabel = (key: string) => KINDS.find((k) => k.key === key)?.label ?? key;
+
+// Month and year, which is the right grain for a running collection: a day is more precision than this line
+// can use, and a bare year would make an August piece look like last winter's. The `T00:00:00Z` + UTC pair is
+// what keeps it honest — parsed as local time, a YYYY-MM-DD date renders one day early west of Greenwich, and
+// that is enough to move a 1st-of-the-month piece into the previous month.
+const monthYear = (iso: string) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
+    year: 'numeric', month: 'long', timeZone: 'UTC',
+  });
 
 // THE TWO HEADLINE NUMBERS, recovered from the shipped homepage. This slide replaced a "Selected writing" glass
 // card that carried them, and dropping them cost the homepage every number on it — which on a quant's site is the
@@ -26,7 +63,7 @@ const shownProjects = projects.slice(0, 2);
 const compounded = featured?.results?.[0];
 const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
 ---
-<!-- THE APPENDIX — the work AND the footer, as one slide. The owner: "i noticed that when i scroll down to the
+{/* THE APPENDIX — the work AND the footer, as one slide. The owner: "i noticed that when i scroll down to the
      work, it seems like you aligned the bottom with the footer so that leaves a huge space below the cow. why not
      merge the footer and the last slide? name it appendix."
      He read the symptom exactly right. The two were separate top-level sections, so the deck gave each its own
@@ -34,14 +71,14 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
      the final stop was a 193px strip. One section, one stop — the page now ends where it stops.
      `Appendix` is his word and it is the better one now: with the links, the seal and the copyright inside it,
      this is no longer only "the work" but the reference matter at the end of a paper, which is exactly the
-     register the rest of the site is written in. -->
+     register the rest of the site is written in. */}
 <section id="appendix" class="wk" aria-labelledby="ap-heading">
   <div class="wk-paper">
     <div class="wk-inner">
       <h2 id="ap-heading" class="wk-title">Appendix</h2>
 
       <div class="wk-cols">
-        <!-- PUBLICATIONS: the paper by name, so a reader knows what they are opening. -->
+        {/* PUBLICATIONS: the paper by name, so a reader knows what they are opening. */}
         <div class="wk-col">
           <p class="wk-col-kicker">Publications</p>
           {featured && (
@@ -51,8 +88,8 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
                 {featured.subject} · {featured.venue}
                 {featured.arxivId && <> · arXiv:{featured.arxivId}</>}
               </p>
-              <!-- Out-of-sample, against two baselines, both named — a number with nothing to compare it to is
-                   decoration. Full table on /research. -->
+              {/* Out-of-sample, against two baselines, both named — a number with nothing to compare it to is
+                   decoration. Full table on /research. */}
               <div class="wk-stats">
                 {compounded && (
                   <div class="wk-stat">
@@ -78,19 +115,39 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
           <a class="wk-link" href="/research">Read the research<span class="wk-arrow" aria-hidden="true">→</span></a>
         </div>
 
-        <!-- WRITINGS: promised honestly, tagged. -->
+        {/* WRITINGS: whatever is actually published, and a promise ONLY while nothing is.
+             Two states, and which one renders is decided by src/content/writing/ rather than by an editor
+             remembering to come back here. Published pieces get the same treatment as the papers and the
+             projects — name, one line, a real link — because that is this slide's whole contract: every row is
+             a thing the reader can go and check. No count and no "1 piece" tag: this panel is written without
+             counts on purpose (see the file header), and the rows themselves are the better answer to "how
+             much is there". */}
         <div class="wk-col">
           <div class="wk-col-head">
             <p class="wk-col-kicker">Writing</p>
-            <span class="wk-tag">coming</span>
+            {writings.length === 0 && <span class="wk-tag">coming</span>}
           </div>
-          <p class="wk-promise">{WRITINGS_PROMISE}</p>
-          <ul class="wk-topics">
-            {WRITINGS_TOPICS.slice(0, 3).map((t) => <li>{t}</li>)}
-          </ul>
+          {writings.length === 0 ? (
+            <Fragment>
+              <p class="wk-promise">{WRITINGS_PROMISE}</p>
+              <ul class="wk-topics">
+                {WRITINGS_TOPICS.slice(0, 3).map((t) => <li>{t}</li>)}
+              </ul>
+            </Fragment>
+          ) : (
+            <Fragment>
+              {shownWritings.map((w) => (
+                <div class="wk-item">
+                  <p class="wk-item-name">{w.data.title}</p>
+                  <p class="wk-item-line">{kindLabel(w.data.kind)} · {monthYear(w.data.date)}</p>
+                </div>
+              ))}
+              <a class="wk-link" href="/writing">Read the writing<span class="wk-arrow" aria-hidden="true">→</span></a>
+            </Fragment>
+          )}
         </div>
 
-        <!-- PROJECTS: last, and briefest — for a quant reader this is supporting evidence. -->
+        {/* PROJECTS: last, and briefest — for a quant reader this is supporting evidence. */}
         <div class="wk-col">
           <p class="wk-col-kicker">Projects</p>
           {shownProjects.map((p) => (
@@ -103,11 +160,11 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
         </div>
       </div>
 
-      <!-- THE COW LIVES HERE NOW — "im thinking if it's better to move the cow to above", pointing at exactly
+      {/* THE COW LIVES HERE NOW — "im thinking if it's better to move the cow to above", pointing at exactly
            this empty band. It solves two things at once: the footer stops asking a 19-word strip to hold both the
            IT seal and a pixel animal, and this slide stops ending in 480px of blank panel (measured: 422px of
            content in a 900px slide). It is still the last thing before the footer, so it keeps its place as the
-           page's closing aside. -->
+           page's closing aside. */}
       <div class="wk-cow">
         <PlushCow size="mark" />
       </div>
@@ -115,10 +172,10 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
     </div>
   </div>
 
-  <!-- The footer, NESTED rather than a sibling. lib/deck.ts counts only the direct <section> children of <main>,
+  {/* The footer, NESTED rather than a sibling. lib/deck.ts counts only the direct <section> children of <main>,
        so nesting is what collapses the two stops into one — no change to the deck itself. It keeps its own dark
        ground because it sits on the descent gradient below the tan panel, which is where the sky reaches
-       near-black: the page still ENDS in the dark, which is the whole point of the descent. -->
+       near-black: the page still ENDS in the dark, which is the whole point of the descent. */}
   <Signature />
 
 <style>

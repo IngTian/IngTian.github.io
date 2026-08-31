@@ -34,3 +34,13 @@ docs/
 # art gallery working directories (ephemeral)
 _incoming-photos/
 _originals/
+
+# Ad-hoc verification scratch — measurement probes, driver scripts and screenshots written while
+# checking a change, then abandoned. 164 of these had accumulated untracked at the repo root and a
+# single `git add -A` swept every one of them into a commit; the pattern belongs here so that cannot
+# happen again. Deliberately BROAD (any .tmp-* directory, any tmp_* file) because each of these was
+# named on the spot by whoever was measuring, and a list of specific names would go stale immediately.
+# Anything worth keeping gets a real name and a real home; anything named tmp_ is disposable by
+# declaration.
+.tmp-*/
+tmp_*

@@ -8,7 +8,7 @@
 // optional Eye-Dome Lighting + elevation emphasis → bottom fade).
 
 import {
-  field, project, projectRaw, normal, computeEDL, litColor, luminance01,
+  field, project, projectRaw, normal, computeEDL, litColor,
   colormap, RANGE, STEP, edlSpend,
   type TerrainRamp, type EDLParams, type LightParams, EDL_DEFAULTS, LIGHT_DEFAULTS, lightDir,
 } from './terrain';
@@ -107,11 +107,15 @@ export function buildGrid(edlParams: EDLParams = EDL_DEFAULTS): GridPoint[] {
   });
 }
 
-/** Derive a palette's "darkness" (0..1) from its top sky color's luminance —
- *  drives the lighting value/gain blend so it adapts across the theme. */
-export function paletteDarkness(topSky: [number, number, number]): number {
-  return Math.max(0, Math.min(1, 1 - luminance01(topSky)));
-}
+// `paletteDarkness(topSky)` was here: 1 - luminance01(topSky), clamped, meant to DERIVE the lighting
+// value/gain blend from a palette's top sky colour so the blend adapted to the theme automatically.
+//
+// Nothing ever called it, and the reason is the interesting part. `darkness` on TerrainConfig is not derived
+// at all — TerrainHero.astro sets it per theme off `data-theme` (0 for light, 1 for the terminal galaxy),
+// alongside the ramp and the walker palette it picks the same way. That is deliberate: dark mode is a chosen
+// look, not a luminance calculation, and the emerald "stars" are a palette decision no formula would produce.
+// An automatic derivation sitting next to the hand-set value invites someone to switch to it and quietly lose
+// the choice. luminance01 stays in lib/terrain.ts, where it is tested and has real callers.
 
 const ZR = 1.55; // elevation → [0,1] normalization half-range (matches the hero)
 

@@ -108,7 +108,7 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     <div class="ru-inner">
       <p class="ru-kicker">2 / 3 · the difficulty</p>
 
-      <!-- ══ TURNED AXIS. The owner: "now this slide is essentially the same format as the previous one, which
+      {/* ══ TURNED AXIS. The owner: "now this slide is essentially the same format as the previous one, which
            might seem to be a repetition. is there anyway we can wrap the second slide in a new format while
            keeping the contents?"
            Correct, and the honest fix is to change the DIRECTION the slide reads rather than to invent a new
@@ -118,14 +118,14 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
            template used twice.
            It also buys the room the larger type needed. The figure goes from 56% of the width to all of it, so
            it can be shorter and still be a bigger drawing, and the beats get a whole band instead of a narrow
-           column. Budgeted at every viewport before it was built: the figure still gets 381px at 1366x768. ══ -->
+           column. Budgeted at every viewport before it was built: the figure still gets 381px at 1366x768. ══ */}
       <div class="ru-flow">
         <h2 id="ru-heading" class="ru-head">Now imagine it is not your money.</h2>
 
         <figure class="ru-fig">
-          <!-- ONE FIGURE, FOUR STATES. The drawing answers whichever beat is live: the cost ladder, the rule
+          {/* ONE FIGURE, FOUR STATES. The drawing answers whichever beat is live: the cost ladder, the rule
                categories, the fan of futures, then everything at once. Sharing one box is what lets the slide
-               hold four ideas on a single screen — it owns exactly 100vh and has no room for four figures. -->
+               hold four ideas on a single screen — it owns exactly 100vh and has no room for four figures. */}
           <p class="ru-fig-head">
             <span class="ru-panel" data-head="0">The same decision, at four sizes</span>
             <span class="ru-panel" data-head="1">Four kinds of rule, all binding at once</span>
@@ -134,8 +134,8 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
           </p>
 
           <div class="ru-stagebox">
-            <!-- ── BEAT 1: THE COST LADDER. Bars are log-scaled and the note says so: the span is six orders of
-                 magnitude, and on a linear axis three of the four bars would be invisible. -->
+            {/* ── BEAT 1: THE COST LADDER. Bars are log-scaled and the note says so: the span is six orders of
+                 magnitude, and on a linear axis three of the four bars would be invisible. */}
             <div class="ru-panel ru-ladder" data-panel="0">
               <ul class="ru-rungs">
                 {ladder.map((r) => {
@@ -167,16 +167,16 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
               </p>
             </div>
 
-            <!-- ── BEAT 2: THE RULE CATEGORIES, each with the reason it exists. Four KINDS, not four examples,
-                 and every one of them is a real category with a real cause. -->
+            {/* ── BEAT 2: THE RULE CATEGORIES, each with the reason it exists. Four KINDS, not four examples,
+                 and every one of them is a real category with a real cause. */}
             <div class="ru-panel ru-rules" data-panel="1">
-              <!-- A PIXEL MARK PER CATEGORY. The owner: "maybe you can now have some pixel arts with SEC, GOV,
+              {/* A PIXEL MARK PER CATEGORY. The owner: "maybe you can now have some pixel arts with SEC, GOV,
                    FED, etc. just to illustrate the ideas of regulations" — the panel's right half was empty and
                    four bare paragraphs is the one beat with nothing to look at.
                    Abstract marks, not agency seals: a document, a facade, a balance, a ledger. Reproducing the
                    SEC's eagle would be a trademark problem and would read as costume; what a reader needs is
                    "an authority wrote this down", which a generic facade says without borrowing anyone's
-                   identity. Compiled from character matrices in data/ruleGlyphs.ts, so they are data. -->
+                   identity. Compiled from character matrices in data/ruleGlyphs.ts, so they are data. */}
               <ul class="ru-cats">
                 {named.map((c) => {
                   const g = RULE_GLYPHS[c.group as RuleGlyphKey];
@@ -205,11 +205,11 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
               </ul>
             </div>
 
-            <!-- ── BEAT 3: THE FAN. Every trajectory drawn once, three picked out in ink.
+            {/* ── BEAT 3: THE FAN. Every trajectory drawn once, three picked out in ink.
                  MEASURED: rasterised into this exact 560x300 box, 120 paths ink about 20% of it — plural enough
                  that the eye stops counting, sparse enough that one thread can still be followed. This is the
                  fix for the mistake the earlier path lattice made, where 625 lines at 0.11 opacity accumulated
-                 into a solid plaid: free trajectories overlap far less than paths through a shared grid. -->
+                 into a solid plaid: free trajectories overlap far less than paths through a shared grid. */}
             <div class="ru-panel ru-fan" data-panel="2">
               <svg class="ru-fanchart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img"
                    aria-label={`${TRAJ_COUNT} possible one-year paths for a single holding, spreading from one starting value to a wide range of outcomes.`}>
@@ -230,12 +230,12 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
               </p>
             </div>
 
-            <!-- ── BEAT 4: the same fan, ghosted, with the scale of the question laid over it — because "all of
-                 it at once" should look like all of it at once rather than like a new subject. -->
-            <!-- ── BEAT 4: THE CONFLICT WEB, beside the tally rather than a bigger number.
+            {/* ── BEAT 4: the same fan, ghosted, with the scale of the question laid over it — because "all of
+                 it at once" should look like all of it at once rather than like a new subject. */}
+            {/* ── BEAT 4: THE CONFLICT WEB, beside the tally rather than a bigger number.
                  The drawing is the argument: rules on a circle, a chord wherever one can breach another. A list
                  of 2,000 rules sounds like 2,000 things to check; the web shows it is really two million PAIRS,
-                 any of which can put you in breach while you fix something else. -->
+                 any of which can put you in breach while you fix something else. */}
             <div class="ru-panel ru-all" data-panel="3">
               <div class="ru-webwrap">
                 <svg class="ru-web" viewBox="0 0 300 300" role="img"
@@ -255,12 +255,12 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
                     return <circle class="ru-webnode" cx={x.toFixed(1)} cy={y.toFixed(1)} r="3" />;
                   })}
                 </svg>
-                <!-- THE MATHEMATICS, in the panel's right half — which was empty, and is the one place on this
+                {/* THE MATHEMATICS, in the panel's right half — which was empty, and is the one place on this
                      slide where an equation is the subject rather than an ornament. Baked to MathML at build
                      time through the same KaTeX path as the terrain pill and the paper showcase, so the client
                      ships no KaTeX runtime. A first instinct would be to set this as styled text; the factor
                      fan's notes record why that was rejected there — hand-built maths reads as "monospace
-                     pretending to be mathematics". -->
+                     pretending to be mathematics". */}
                 <div class="ru-math">
                   <p class="ru-math-lead">
                     Solve it the exact way — dynamic programming, working backward from the horizon:
@@ -307,8 +307,8 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
           </figcaption>
         </figure>
 
-        <!-- THE FOUR BEATS, now a horizontal band. Each is still a real button with the same freeze-on-click
-             behaviour; only the direction changed. -->
+        {/* THE FOUR BEATS, now a horizontal band. Each is still a real button with the same freeze-on-click
+             behaviour; only the direction changed. */}
         <ol class="ru-beats">
             <li>
               <button class="ru-beat" type="button" data-beat="0" aria-pressed="true">
@@ -466,7 +466,6 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     border: 1px solid currentColor; border-radius: 50%;
     width: 18px; height: 18px; display: grid; place-items: center;
   }
-  .ru-beat-say { display: block; min-width: 0; }
   .ru-beat-head {
     /* Floor 16px: measured at 1366x768 this rendered 13.4px, barely above its own body copy. */
     display: block; font-size: clamp(16px, 1.18vw, 19px); line-height: 1.3; color: var(--r-ink);
@@ -633,15 +632,9 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     stroke: var(--r-faint); stroke-width: 1; stroke-dasharray: 3 5;
     vector-effect: non-scaling-stroke; opacity: 0.5;
   }
-  /* THE GHOST. <use> clones the referenced group, and the clone's own classes come with it — so the three
-     accent-lit threads arrived at full strength and the tally sat on a fan louder than itself. Fading the
-     <use> element as a whole is what actually ghosts it, since the clone's internal opacities multiply by it. */
-  .ru-fanchart--ghost { opacity: 0.42; }
-  .ru-fanchart--ghost .ru-traj { opacity: 0.1; }
-  .ru-fanchart--ghost .ru-traj--lit { stroke: var(--r-faint); stroke-width: 1; opacity: 0.14; }
-
-  /* ── BEAT 4: the conflict web beside its tally. Two columns rather than a tally floating over a ghosted fan —
-     the web IS the argument now, so it gets its own space instead of being a backdrop. */
+  /* ── BEAT 4: the conflict web beside the mathematics, in two columns. An earlier version floated a tally of
+     counts over a ghosted <use> clone of the fan; both the tally and the ghost are gone, because the web IS the
+     argument now and it gets its own space instead of being a backdrop to a list of numbers. */
   .ru-all { display: grid; align-items: center; }
   /* The web on the left, the mathematics on the right. The web is the "many interlocking rules" half and the
      equation is the "and you cannot solve it exactly" half — two different reasons the problem is hard, which
@@ -685,21 +678,6 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     fill: none; stroke: var(--r-accent); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.42;
   }
   .ru-webnode { fill: var(--r-faint); opacity: 0.8; }
-  .ru-tally {
-    list-style: none; margin: 0; padding: 0; align-self: center;
-    display: grid; gap: clamp(5px, 0.9vh, 10px);
-  }
-  .ru-tally li {
-    display: grid; grid-template-columns: 7ch minmax(0, 1fr); gap: 0 clamp(10px, 1.2vw, 16px);
-    align-items: baseline;
-  }
-  .ru-tally-n {
-    font-family: var(--font-mono); font-size: clamp(13px, 1.1vw, 16px); color: var(--r-accent);
-    text-align: right; font-variant-numeric: tabular-nums;
-  }
-  .ru-tally-n sup { font-size: 0.68em; }
-  .ru-tally-l { font-size: clamp(13.5px, 1vw, 15.5px); line-height: 1.45; color: var(--r-soft); }
-  .ru-tally--big .ru-tally-n { font-size: clamp(16px, 1.5vw, 22px); color: var(--r-ink); }
 
   .ru-note {
     /* 9px is not a readable size for a sentence that qualifies the drawing above it. */
@@ -712,7 +690,6 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     margin: clamp(6px, 1vh, 12px) 0 0; max-width: 82ch; display: grid;
   }
   .ru-cap > .ru-panel { grid-area: 1 / 1; }
-  .ru-cap sup { font-size: 0.72em; }
 
   /* ── RESPONSIVE, at the END of the sheet on purpose: every declaration here overrides one of the same
      specificity above, so source order is the whole mechanism. */
@@ -767,7 +744,6 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
        the beat's copy and in the caption, so nothing measured is lost. */
     .ru-webwrap { grid-template-columns: minmax(0, 1fr); gap: 0; }
     .ru-web { display: none; }
-    .ru-split { grid-template-columns: 1fr; gap: 3vh 0; }
     .ru-fig { padding-top: 3vh; border-top: 1px solid var(--r-edge); }
     .ru-paper { padding-top: clamp(14px, 2vh, 24px); padding-bottom: clamp(14px, 2vh, 24px); }
     .ru-head { font-size: clamp(22px, 3.4vw, 30px); }
