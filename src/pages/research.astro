@@ -15,12 +15,16 @@ const others = publications.filter((p) => !p.featured);
 // consults, so a Method stop and a Method block can never disagree.
 const stops = researchStops(publications, researchInterests);
 ---
+{/* preloadAccent: .card-takeaway (further down this file) is the one Fraunces rule on /research, so this
+     page opts into the two preload links. The six routes that render no accent text no longer pay 82KB at
+     highest priority for a face they never use — see the note next to <Font> in BaseLayout. */}
 <BaseLayout
   title="Research — Ing Tian"
   description="Selected research by Ing Tian (Zeying Tian) — portfolio optimization and machine learning. Featuring RL-BHRP, a reinforcement-learning-embedded Bayesian Hierarchical Risk Parity approach to adaptive allocation."
   veilLine="a researcher by day"
   veilOnLoad={true}
   navZone="light"
+  preloadAccent={true}
 >
   {/* Marks the document JS-capable before anything paints, so the CSS can present the cards as
        interactive only when something can respond. The collapse itself happens in the snippet AFTER

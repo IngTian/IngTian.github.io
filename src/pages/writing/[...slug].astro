@@ -37,12 +37,17 @@ const longDate = fmt(entry.data.date);
 const updatedLong =
   entry.data.updated && entry.data.updated !== entry.data.date ? fmt(entry.data.updated) : null;
 ---
+{/* preloadAccent: a piece renders Fraunces in three places — .prose blockquote, every .prose em, and the
+     closing line — and blockquotes in particular are the shape of the pieces published so far, so the italic
+     is on screen immediately. The index at /writing has no accent rule and does not opt in. See the note
+     next to <Font> in BaseLayout for why the preload is per page rather than global or gone. */}
 <BaseLayout
   title={`${entry.data.title} — Ing Tian`}
   description={entry.data.blurb}
   veilLine="a thinker in the margins"
   veilOnLoad={true}
   navZone="light"
+  preloadAccent={true}
 >
   <main class="piece descent is-fluid">
     <FluidSky strength={3} variant="reading" />

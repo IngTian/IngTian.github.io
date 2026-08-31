@@ -30,7 +30,10 @@
 // The tree lives in lib/pageStops (homeStops), the same module the /research, /projects and /experience rails
 // read — one place that knows what a rail carries, and unit-tested. Zones stay HERE on the top-level stops
 // because they are a property of the sky behind a stop, not of the page's structure.
-import { homeStops, flattenStops } from '../lib/pageStops';
+// flattenStops came off this import when noUnusedLocals went on: it is what SideRail needs (a rail that runs a
+// scrollspy over every stop at once), and the Toc renders the tree as a tree, so it never had a use for the
+// flattened form. It stays exported and tested in lib/pageStops for the rails that do.
+import { homeStops } from '../lib/pageStops';
 
 const stops = homeStops();
 // Children inherit their parent's zone: they are slides inside the same stretch of sky, and a child with a

@@ -1,5 +1,25 @@
 {
   "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    // UNUSED CODE IS A GATE'S JOB, NOT A REVIEWER'S. Two consecutive audit rounds here spent human
+    // (and agent) attention hand-deleting dead code — an unused `waypointT` export, a whole parked
+    // React island, a lib module nothing imported — and both rounds found it by reading files, which
+    // is the expensive way and the way that misses things. `astro/tsconfigs/strict` does NOT turn
+    // these two on (they are in Astro's `strictest` preset, which also brings
+    // `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` — those two would each be a real
+    // refactor across src/lib, so the two cheap flags are taken on their own rather than the preset).
+    //
+    // WHAT THIS CAN AND CANNOT CATCH, so nobody over-trusts it: it is per-FILE. An unused local, an
+    // unused import, an unused private member — yes. An exported symbol that no other module imports
+    // is invisible to it, because from the compiler's point of view an export is a public API. That
+    // class of dead code (`waypointT` was exactly it) still needs a grep.
+    //
+    // noUnusedParameters is the quieter of the two and worth keeping honest about: it deliberately
+    // exempts anything named with a leading underscore, so a callback that must accept `(_e, i)` to
+    // reach its second argument stays legal. Rename to `_x` rather than reaching for a suppression.
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
   "include": [
     ".astro/types.d.ts",
     "**/*"

@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   researchStops, projectStops, paperSectionId, paperAnchorId, projectSectionId,
-  experienceStops, experienceSectionId, railLabel, homeStops,
+  experienceStops, railLabel, homeStops,
   flattenStops, type Stop,
 } from '../src/lib/pageStops';
+import { mathFor } from '../src/lib/paperMath';
 import type { Publication, Project, TimelineEntry } from '../src/data/profile';
 import { publications, researchInterests, projects, timeline } from '../src/data/profile';
 
@@ -253,6 +254,43 @@ describe('the REAL site data', () => {
 
   it('gives /projects a stop per project', () => {
     expect(projectStops(projects)).toHaveLength(projects.length);
+  });
+
+  /* A ONE-CHARACTER TYPO IN profile.ts CAN DELETE A SECTION OF /research, SILENTLY. That is the hole
+     this closes, and every gate the repo has was blind to it.
+
+     The mechanism: `mathKey` is typed `string` (profile.ts), lib/paperMath resolves it with a plain
+     lookup, and BOTH the page's Method block and the rail's Method stop are conditional on that
+     lookup succeeding. So 'rlbhpr' instead of 'rlbhrp' does not throw and does not render an empty
+     panel — it removes the paper's whole Method block AND its rail stop, in agreement with each
+     other, and `npm run build`, `npm run typecheck` and every other test in this file stay green.
+     The rail-suppression is *correct* behaviour (a stop must never point at an id the page did not
+     emit, which is what pageStops.ts exists for) and that correctness is exactly what hides the
+     loss: tests/distSmoke.test.ts only checks that links resolve, and after the typo there is no
+     link and no target, so nothing is dangling. A consistent absence.
+
+     Why this assertion is over the REAL data and not a fixture: every other `mathKey` in this file
+     is on a synthetic paper() and one case (`'no-such-key'`) asserts that an unresolvable key is
+     handled — the suppression path is well covered, and none of it looks at what profile.ts says.
+
+     Why it does not name 'rlbhrp': a test that hardcodes the expected key would pass while the site
+     was broken (it would be asserting that the table contains a string the test itself supplied).
+     The claim has to be relational — every key the DATA carries resolves in the TABLE — so mathFor()
+     is asked, which is the same function research.astro and pageStops.ts both ask. */
+  it('resolves every mathKey the real publications carry', () => {
+    const keyed = publications.filter((p) => p.mathKey !== undefined);
+    // Asserted, not assumed: if the last mathKey were dropped from profile.ts this must go red rather
+    // than iterate an empty list and pass. Method blocks are a feature of the site, not an accident.
+    expect(keyed.length, 'no publication in profile.ts carries a mathKey any more').toBeGreaterThan(0);
+    for (const p of keyed) {
+      expect(
+        mathFor(p),
+        `publication "${p.title}" has mathKey="${p.mathKey}", which lib/paperMath.ts cannot resolve. ` +
+          'Nothing else will tell you: /research silently drops that paper\'s entire Method block and ' +
+          'its rail stop, and build, typecheck and the rest of the suite all stay green. Fix the key ' +
+          'in src/data/profile.ts, or add the entry to MATH_BY_KEY in src/lib/paperMath.ts.',
+      ).toBeDefined();
+    }
   });
 });
 

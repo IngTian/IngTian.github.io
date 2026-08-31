@@ -4,6 +4,41 @@ import FluidSky from '../components/proto/FluidSky.astro';
 import { Image } from 'astro:assets';
 import { calligraphy, photography, photoDefault } from '../data/artworks';
 import SkyWash from '../components/SkyWash.astro';
+
+// ── THE PHOTO GRID'S ROW GEOMETRY, mirrored here because `sizes` has to describe it.
+//
+// These two numbers are the arguments the gallery script hands justifyRows(), and they are SYNCED BY HAND:
+// the layout call is `justifyRows(ars, W, 340, 14)` in scripts/artGallery.ts. If you retune the row height
+// there, retune it here in the same commit (tests/artSizes.test.ts fails if the two drift apart, which is
+// the only reason a hand-synced pair is acceptable at all — same arrangement as PHONE_MAX_WIDTH's 640).
+//
+// WHY THE HINT IS A PIXEL COUNT AND NOT A VIEWPORT FRACTION. justifyRows solves each row's HEIGHT so the
+// row's widths plus gaps fill the container exactly, and it closes a row the moment that height would fall
+// to or below the target. So every row's height is <= 340 (the closing condition is literally that), and the
+// final row — the one that has nothing left to fill it — is additionally clamped to 340 * 1.16. A tile's
+// width is `aspectRatio * rowHeight`, which makes `aspectRatio * 340 * 1.16` a STRUCTURAL upper bound on
+// how wide any photograph can ever render, at any viewport. Nothing about it scales with vw.
+//
+// The hint used to say `(max-width:1024px) 45vw, 30vw`, which describes a fluid grid this page does not
+// have. At 1440/DPR2 that resolves to 432 * 2 = 864 device px and so picked the 900w variant for all 42
+// photographs — 6,007,600 bytes — while 33 of the 42 are portrait (9:16 or 3:4) and render 140-300 CSS px
+// wide. Measured off the built HTML: the bounds below select 3,128,936 bytes for the same page, i.e.
+// 2,878,664 bytes (47.9%) of the fetch was over-fetch, and the per-photo ideal (each tile's exact rendered
+// width at that viewport) is 3,056,032 — so these bounds are within 2.4% of optimal while never, at any
+// container width from 260px to 3000px, asking for less than the tile actually renders at (verified by
+// re-running justifyRows over that whole sweep: worst actual/hint ratio 0.9993).
+//
+// THE <=1024px BRANCH IS DELIBERATELY LEFT ALONE at 45vw. Below that width .art-wrap becomes a centred
+// max-width:900px column and the container gets narrow enough that a row can no longer reach the 340px
+// target height at all, so the structural bound above goes loose there — on a 390px phone the real portrait
+// tile is ~166 CSS px against a 222px bound, and at DPR3 that quantises up to the 900w variant where 600w
+// is correct. Switching phones to the px bound measured +325,556 bytes at DPR2 and +3,204,220 at DPR3.
+// Phones are the one place today's fluid hint is accidentally about right, so the only branch that changes
+// is the one that was measurably wrong.
+const PHOTO_ROW_TARGET_H = 340;   // justifyRows' targetHeight — every non-final row closes at or below it
+const PHOTO_LAST_ROW_SLACK = 1.16; // justifyRows' cap on the final, unfilled row
+const photoSizes = (ar: number) =>
+  `(max-width:1024px) 45vw, ${Math.ceil(ar * PHOTO_ROW_TARGET_H * PHOTO_LAST_ROW_SLACK)}px`;
 ---
 <BaseLayout
   title="An artist by night — Ing Tian"
@@ -66,7 +101,11 @@ import SkyWash from '../components/SkyWash.astro';
                   data-zoom={p.src.src} data-alt={p.alt}
                   data-title={p.title ?? ''} data-note={p.note ?? ''}
                   role="button" tabindex="0" aria-label={`View photograph${p.title ? ' — ' + p.title : ''} — full screen`}>
-            <Image src={p.src} alt={p.alt} widths={[300, 600, 900]} sizes="(max-width:1024px) 45vw, 30vw"
+            {/* sizes is PER PHOTO, because a tile's width is its own aspect ratio times the row height —
+                see photoSizes() and the long note above it. The rendered size does not change; only which
+                srcset variant the browser chooses to fill it. */}
+            <Image src={p.src} alt={p.alt} widths={[300, 600, 900]}
+                   sizes={photoSizes(p.src.width / p.src.height)}
                    loading={i < 9 ? 'eager' : 'lazy'} decoding="async" />
           </figure>
         ))}

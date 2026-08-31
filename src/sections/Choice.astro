@@ -29,7 +29,7 @@ import { TICKER_GLYPHS, type TickerGlyphKey } from '../data/tickerGlyphs';
 import { BEATS, HOLDINGS, SPLITS, EVENT, DEFINE_DISCLAIMER, POLICIES, BEAT4 } from '../data/define';
 import { afterEvent, changePct, segments } from '../lib/split';
 import {
-  runPolicy, pnlBounds, project as projectPnl, MONTHS as PNL_MONTHS, QUARTER_MARKS, MAINTENANCE,
+  runPolicy, pnlBounds, project as projectPnl, MONTHS as PNL_MONTHS, QUARTER_MARKS,
 } from '../lib/policyPnl';
 
 // BEAT 4 — the PnL curves. Computed at build time, so the client ships coordinates rather than a simulator.
@@ -54,10 +54,13 @@ const quarters = QUARTER_MARKS.filter((q) => q.week > 0).map((q) => ({
 // THE VERDICT IS COMPUTED, never typed — the numbers move whenever the year or a rule is edited, and prose that
 // disagreed with the chart beside it would be worse than no prose. Return per unit of worst fall is the ranking
 // that matters here, and it is deliberately NOT the same as the highest curve.
-const topReturn = runs.reduce((b, r) => (r.final > b.final ? r : b));
 const bestRatio = runs.reduce((b, r) => (r.returnPerRisk > b.returnPerRisk ? r : b));
-const deepest = runs.reduce((b, r) => (r.worstFall < b.worstFall ? r : b));
 const levered = runs.find((r) => r.key === 'levered');
+// `topReturn` (the highest final value) and `deepest` (the worst fall) used to be computed here and went when
+// noUnusedLocals went on. They were the two ends of an earlier verdict that named its own extremes; the closing
+// sentence now makes the same point WITH the levered row instead, because a reduce over `runs` that picks the
+// biggest number is not the argument — "you paid $X to borrow and fell Y%, while this reached less on a smaller
+// fall" is. Both are one line to recompute if the prose ever wants them again.
 // Grouped by who actually holds these books, because that division is the point of the beat.
 const retail = runs.filter((r) => r.kind === 'retail');
 const institutional = runs.filter((r) => r.kind === 'institutional');

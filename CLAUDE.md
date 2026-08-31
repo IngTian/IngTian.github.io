@@ -5,13 +5,22 @@ A personal portfolio for **Ing Tian (Zeying Tian)**. Live at
 human or AI — building on the site: how it's put together, the taste it holds
 to, and the rules that keep it coherent.
 
-**This file is load-bearing, so it has to be true.** It was wrong for a while —
-it documented a React island, a terminal and a data file that had all been
-deleted, and said nothing about the deck, the phone gate or the writing
-collection, which is most of what a change now touches. An agent reading a stale
-guide edits the files the guide names and not the ones that exist. If you change
-something this file describes, change this file in the same commit; if you find a
-claim here that the code contradicts, **the code is the truth** — fix the line.
+**This file is load-bearing, so it has to be true.** It has gone stale twice, and
+both times the same way. First it documented a React island, a terminal and a data
+file that had all been deleted, and said nothing about the deck, the phone gate or
+the writing collection — most of what a change now touches. Then a delete-heavy
+refactor took out `three`, `lib/fanScene.ts`, `FactorFan.astro`,
+`sections/Mountains.astro` and three of the four `/proto-*` routes, and this file
+kept describing all of them — including an explicit **"keep it that way"** about a
+dependency that no longer existed, and a route table listing twelve pages when the
+build printed nine. An agent reading a stale guide edits the files the guide names
+and not the ones that exist; three live defects this month came out of exactly that.
+
+So: if you change something this file describes, change this file in the same commit.
+If you find a claim here that the code contradicts, **the code is the truth** — fix
+the line, and say what is true rather than only deleting the false part. And when a
+paragraph names a file, `ls` it. A pass over every backticked path in this file takes
+one script and finds the dead ones in seconds; doing it by eye is how they survive.
 
 ## The concept — "The Descent"
 
@@ -49,12 +58,29 @@ When in doubt, remove rather than add.
   component with a bundled vanilla `<script>` — see *Interactivity* below. If an
   island ever becomes genuinely necessary, it is `npm i -D @astrojs/react …` (dev
   deps: it's a static build's tooling) plus a deliberate decision recorded here.
-- **`three` is a real dependency, and it ships nowhere a visitor goes.** It is
-  imported once, in `lib/fanScene.ts`, behind a *dynamic* `import()` in
-  `FactorFan.astro` — and `FactorFan` is rendered only by `/proto-showpiece`. So
-  it code-splits into its own 483KB chunk that no content route references
-  (`grep -c fanScene dist/index.html` → 0). Keep it that way: nothing on a shipped
-  page should pull it in statically.
+- **THERE IS NO 3D LIBRARY, AND THE RUNTIME DEPENDENCY LIST IS FOUR PACKAGES.**
+  `dependencies` is `astro`, `@astrojs/sitemap`, `@tailwindcss/vite` and
+  `tailwindcss`; everything else — `katex`, `remark-math`, `rehype-katex`,
+  `@astrojs/check`, `typescript`, `vitest` — is a devDependency, and only output
+  ships. `grep -c three package.json` → 0.
+  - This bullet used to say the opposite, at length: that `three` was "a real
+    dependency", imported once in `lib/fanScene.ts` behind a dynamic `import()` in
+    `FactorFan.astro`, code-split into a 483KB chunk for `/proto-showpiece`, and it
+    ended with the standing instruction **"keep it that way."** The dependency, both
+    files and that route are all deleted, so the line was telling the next agent to
+    preserve something that does not exist — which is the exact failure the opening
+    paragraph of this file is about.
+  - **What is true instead is the site's own answer to wanting 3D: hand-rolled
+    projection, and a still frame before a library.** The hero's dotted landscape is
+    written out longhand in `lib/terrain.ts` — `project`/`projectRaw` are the camera,
+    `normal` and `computeEDL` (eye-dome lighting) are the shading — and painted to an
+    ordinary 2D canvas by `lib/terrainRender.ts`; the Solve slide's lattice is
+    `lib/bellman.ts`. Both are pure, unit-tested, and cost the bundle nothing a
+    library would have cost. And the gate is written down in `lib/sketches/kit.ts`:
+    *a still frame first, in SVG, judged in one look — three.js only after a frame
+    survives being looked at.* Four of the five rejected showpieces were only
+    judgeable once finished, which is what the cheap gate exists to prevent. So: no
+    island, and no 3D library either, until a still frame has earned one.
 - **Type: four roles, TWO downloaded faces.** `--font-display` is **Georgia** and
   `--font-body` is the **system UI stack** — neither downloads anything.
   `--font-mono` is **JetBrains Mono** and `--font-accent` is **Fraunces**, used
@@ -115,11 +141,11 @@ src/
   lib/descentPath.ts, trajectory.ts # the career descent graph's field and route
   lib/{bellman,factorModel,problemSize,complexity,policyPnl,scenario,split}.ts   # the explainer slides' real math
   lib/{justify,scrollspy,pixels,cowSpeech,knowledge,capability,paperMath,equations,signalRubric}.ts
-  sections/{Heights,Interlude,Choice,Rules,Solve,Story,Work}.astro   # the homepage, in scroll order
+  lib/sketches/{kit,batch1}.ts      # the showpiece prototype harness — a sketch is (ctx) -> SVG string; /proto-sketches is its gallery
+  sections/{Heights,Interlude,Choice,Rules,Solve,Story,Work}.astro   # the homepage, in scroll order — ALL of sections/, there is nothing else in it
   sections/Signature.astro          # links + seal — rendered INSIDE Work.astro, not as its own slide
-  sections/Mountains.astro          # PARKED: the old résumé section, off the homepage; only /proto-paper still renders it
   components/Deck.astro             # the deck's event plumbing (homepage only)
-  components/proto/FluidSky.astro   # the WebGL sky canvas — on every page despite the proto/ path
+  components/proto/FluidSky.astro   # the WebGL sky canvas — on all 8 content pages despite the proto/ path (only /proto-sketches omits it)
   components/SkyWash.astro          # woven warm/cold broken-color wash over the sky — pure CSS
   components/TerrainHero.astro      # the hero's terrain canvas (Heights only)
   components/DescentPath.astro      # the career descent graph (inside Story)
@@ -127,14 +153,17 @@ src/
   components/Toc.astro              # the homepage's thin left-margin TOC, driven by homeStops()
   components/CornerNav.astro        # the always-visible glass nav + theme toggle
   components/PlushCow.astro         # the cow, at three scales, with a pixel speech bubble
-  components/{SealMark,Grain,ProjectCard,FactorFan}.astro
+  components/{SealMark,Grain,ProjectCard}.astro
   scripts/artGallery.ts             # the /art page behavior (justified rows, placard, scrollspy, lightbox)
 tests/*.test.ts                     # vitest — every pure lib module, the data/route invariants, the content seam
 ```
 
 ### Routes
 
-Twelve pages, not two:
+**Nine pages, not two**, and that is the number `npm run build` prints (`9 page(s)
+built`) — check it against the build rather than against this table, and `ls
+src/pages` beats both. This line read "twelve" for a while, left over from when three
+more prototype routes existed and the table below still named all four.
 
 | Route | What it is |
 | --- | --- |
@@ -146,21 +175,32 @@ Twelve pages, not two:
 | `/experience` | the timeline — education and roles |
 | `/art` | calligraphy + photography |
 | `/404` | the not-found page (noindex, no canonical) |
-| `/proto-showpiece`, `/proto-sketches`, `/proto-ladder`, `/proto-paper` | **prototypes** |
+| `/proto-sketches` | the one surviving **prototype** — the showpiece sketch gallery |
 
-**The prototype routes are internal.** They exist so a visual choice can be made
-by looking at the real thing in the real page rather than at a screenshot (see the
-project's own habit: put the options in the page as a switcher). They must carry
-`noindex={true}` on `BaseLayout` **and** stay out of the sitemap — `astro.config.mjs`
-filters `/proto-` from the sitemap already, and there is a test asserting the
-noindex. Their rendered bodies quote internal review notes, so an indexed one is a
-real leak, not an untidiness.
+**The prototype routes are internal, and there is one of them left.**
+`/proto-sketches` survives; `/proto-showpiece`, `/proto-ladder` and `/proto-paper`
+were retired once they had answered their question (the reasons are in
+`tests/protoNoindex.test.ts`, which is where the count lives now). Git holds them.
+
+They exist so a visual choice can be made by looking at the real thing in the real
+page rather than at a screenshot (see the project's own habit: put the options in
+the page as a switcher). Every one must carry `noindex={true}` on `BaseLayout`
+**and** stay out of the sitemap — `astro.config.mjs` filters `/proto-` from the
+sitemap already, and `tests/protoNoindex.test.ts` globs `src/pages/proto-*.astro`
+and asserts the prop, so a *new* one is caught the moment it is written. That suite's
+floor is **1, not 0**, deliberately — renaming the `proto-` prefix must turn it red
+rather than leave it iterating over an empty glob, the same hole as `passWithNoTests`.
+Don't "tidy" the floor down. Their rendered bodies quote internal review notes, so an
+indexed one is a real leak, not an untidiness.
 
 ### Interactivity — vanilla scripts, and the contract they keep
 
-`Deck`, `Toc`, `SideRail`, `TerrainHero`, `FluidSky`, `DescentPath`, `FactorFan`
-and the gallery all need JS. Every one of them is a plain Astro component with a
-bundled `<script>`, **not** an island (see *Stack*). The shared contract:
+`Deck`, `Toc`, `SideRail`, `CornerNav`, `TerrainHero`, `FluidSky`, `SkyWash`,
+`DescentPath`, `PlushCow`, the three explainer slides (`Choice`, `Rules`, `Solve`),
+`BaseLayout`'s no-FOUC theme resolver, and the `/art` and `/research` pages all
+need JS — that is the whole list, and `grep -rln '<script' src` regenerates it.
+Every one of them is a plain Astro component or page with a bundled `<script>`,
+**not** an island (see *Stack*). The shared contract:
 
 - **Re-init on `astro:page-load`, with a teardown**, because `ClientRouter` is on
   and a View Transition replaces the DOM without a fresh page load. A script that
@@ -223,8 +263,24 @@ hand-type a number a module can compute.
 **The résumé is not on the homepage**, on the owner's instruction ("you may delete
 everything from below. The record, the experience, everything"). Nothing was lost:
 every block has its own route, and the corner nav plus the footer carry the doors.
-`sections/Mountains.astro` is kept on purpose — off the homepage, still rendered by
-/proto-paper — so the markup is recoverable without git archaeology.
+
+`sections/Mountains.astro` — the old résumé section — **is deleted**, and so is
+/proto-paper, the last route that rendered it. This file used to say it was "kept on
+purpose … so the markup is recoverable without git archaeology"; it isn't kept, and
+git is the archive. What *does* still reference it is a handful of comments that
+were written while it existed: `lib/skyShader.ts` and `components/proto/FluidSky.astro`
+each explain an amplitude decision in terms of where Mountains used to sit, which is
+a historical note on a live decision and is fine to leave.
+
+**One live loose end it left behind, so nobody rediscovers it as a bug.**
+`components/ProjectCard.astro` has two variants, `'teaser'` and `'full'`, and
+`'teaser'` is still the *default* — but its only reason to exist was the homepage
+Mountains section, and the only place that renders a card now is `/projects`, which
+passes `variant="full"` explicitly. So the teaser branch and its "light-on-dark,
+tuned for the dark Mountains gradient" styling are unreachable, and its comments
+describe a surface that no longer exists. Not urgent, and not a rendering bug — but
+don't spend time tuning that branch, and don't trust its comments as a description
+of the site.
 
 ### THE DECK — one gesture, one slide
 
@@ -260,11 +316,16 @@ enough to engage the deck on a viewport whose styles think it's a phone).
 **The number lives in two places and they are synced BY HAND.** `@media
 (max-width: var(--x))` is not valid CSS, so there is no way to feed one value to
 both. **If you change `PHONE_MAX_WIDTH`, change every `@media (max-width: 640px)`
-block with it** — there are 15 (`grep -rn 'max-width: 640px' src`), across
-`global.css`, `CornerNav`, `Toc`, `DescentPath`, `ProjectCard`, `FluidSky`,
-`Heights`, the two proto sections, `404`, `experience`, `research` and
-`writing/[...slug]`. `tests/viewport.test.ts` pins the value so a
-silent drift shows up as a failure rather than as a phone with half a treatment.
+block with it.** `grep -rn 'max-width: 640px' src` returns 15 hits in 12 files, and
+two of the 15 are the prose in `viewport.ts` itself, so there are **13 real CSS
+blocks**: `global.css` ×2, `experience` ×2, and one each in `CornerNav`, `Toc`,
+`DescentPath`, `ProjectCard`, `FluidSky`, `Heights`, `404`, `research` and
+`writing/[...slug]`. (This list used to include "the two proto sections". There are
+no proto *sections* — `src/sections/` holds only the seven homepage slides plus
+Signature — and the one surviving proto route, `/proto-sketches`, breaks at 820px,
+not 640: it is an internal gallery, so it is not part of the phone treatment.)
+`tests/viewport.test.ts` pins the value so a silent drift shows up as a failure
+rather than as a phone with half a treatment.
 
 **The phone gets the same CONTENT as the desktop.** A phone-specific content
 design was built **three times and reverted every time** — do not rebuild it. The
@@ -293,12 +354,24 @@ phone treatment is *bug fixes only*, and the whole of it is:
   a link to `/experience` before that page existed, and `tests/nav.test.ts` now
   asserts every href resolves to a real route, with no duplicate hrefs or labels.
   `CornerNav` renders it.
-- **`profile.ts`'s `links` array is a SECOND list, and it has already diverged.**
+- **`profile.ts`'s `links` array is a SECOND list, and it HAS diverged before.**
   It exists for a different job — the footer, the CV button, and the GitHub/LinkedIn
-  hrefs that JSON-LD's `sameAs` reads — but it also enumerates pages, and it is
-  currently missing `/writing`, so the footer offers four doors where the nav offers
-  five. When you add a page: **`PAGES` is canonical, and `links` must be checked by
-  hand.** Anything that just needs "the pages" should read `PAGES`.
+  hrefs that JSON-LD's `sameAs` reads — but it also enumerates pages, and it once
+  went a whole release missing `/writing` while `PAGES` carried it, so the corner nav
+  offered five doors and the footer four. **The two lists now hold the same five
+  pages**, and the seam is no longer trust-based: `tests/distSmoke.test.ts` reads the
+  built homepage's footer nav and asserts every `PAGES` href reaches it, plus the
+  converse — that the footer never links a page the build didn't produce. A human
+  never caught the original drift; that test did.
+  - They agree on **membership, not on order**, and a comment in `profile.ts` claims
+    otherwise ("The order matches PAGES so the two read the same way round"). It
+    doesn't: `PAGES` runs research → writing → **projects → experience** → art, and
+    `links` runs research → writing → **experience → projects** → art. Nothing reads
+    order across the two lists, so this is cosmetic — but don't trust that comment as
+    a spec, and if you make the orders match, fix the comment or delete it.
+  When you add a page: **`PAGES` is canonical, `links` must be updated by hand, and
+  the dist smoke test is what tells you that you forgot.** Anything that just needs
+  "the pages" should read `PAGES`.
 - **`src/lib/pageStops.ts` is one tree per page, and it drives BOTH the rail and
   the page's section ids.** This is structural, not stylistic: `/research` used to
   render N papers with `featured.map(...)` while building its rail with
@@ -434,8 +507,12 @@ the stationarity condition) or "Moo!".
 
 ## The fluid sky
 
-`components/proto/FluidSky.astro` is the sky on **every** page (the `proto/` path
-is where it was born, not where it belongs). A WebGL canvas: a two-level domain
+`components/proto/FluidSky.astro` is the sky on **every page a visitor reaches** —
+all eight content routes, the 404 included. The only page without it is
+`/proto-sketches`, which also has no `.descent` element at all (`<main class="sk">`):
+it is an internal gallery, deliberately outside the sky's system so a candidate frame
+is judged against a plain ground. (The `proto/` path is where the component was born,
+not where it belongs.) A WebGL canvas: a two-level domain
 warp over the descent/reading ramps, sampled from scroll position, with viscous
 luminance banding and a warm bloom. `lib/skyShader.ts` holds the GLSL,
 `lib/skyPalette.ts` the ramps, `lib/skyLegibility.ts` the **contrast policy** that
@@ -537,7 +614,7 @@ titles came to rest hard against the browser chrome — the lead is a number in
     `tests/skyShader.test.ts` while build and test were both green.
   - **`npm run typecheck` is the only place types are checked**, and it runs **two**
     checkers because neither covers the other: `astro check` is the only thing that
-    reads the ~4,400 lines of `<script>` bodies inside `.astro` files (tsc can't parse
+    reads the ~3,200 lines of `<script>` bodies inside `.astro` files (tsc can't parse
     `.astro`), and `tsc --noEmit` is the only thing that covers `tests/` and `src/lib`.
     Run it after a build so the generated content-collection types in `.astro/` exist.
   - `tsconfig.json` excludes `tmp_*` and `.tmp-*` — the ad-hoc probes the verification
@@ -568,7 +645,8 @@ titles came to rest hard against the browser chrome — the lead is a number in
   required check green with the safety net switched off and nothing red to say so.
 - **Verify visually, not just by build.** Art/layout/animation must be SEEN, and
   small-detail screenshots are unjudgeable — put the options *in the live page* as a
-  switcher and look (that is what the `/proto-*` routes are for). When a browser is
+  switcher and look (that is what a `/proto-*` route is for — `/proto-sketches` is the
+  one that exists, and its harness makes a new candidate cost one function). When a browser is
   needed: `npm run build` → `npm run preview` → drive **one** headless Chrome over
   CDP → screenshot at scroll positions → look → refine. For faint issues,
   contrast-stretch the screenshot or toggle layers off and diff — single-column pixel
