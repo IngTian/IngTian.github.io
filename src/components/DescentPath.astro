@@ -122,8 +122,19 @@ import { WAYPOINTS } from '../lib/trajectory';
     margin: 14px 0 0; min-height: 1.5em;
     font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; color: var(--dp-quiet);
   }
-  .dp-readout b { color: var(--dp-accent); font-weight: 400; }
-  .dp-readout i { color: var(--dp-alert); font-style: normal; }
+  /* :global ON THE CHILD, and it is load-bearing rather than a style preference. The readout's contents are
+     built by the script below (readout.innerHTML, with b and i around the counter and the discovery line), and
+     a node a script created carries no data-astro-cid. Astro's scoping rewrites `.dp-readout b` into
+     `.dp-readout[data-astro-cid-…] b[data-astro-cid-…]`, so BOTH of these rules matched nothing for the whole
+     life of the readout: the counter rendered flat --dp-quiet in UA bold, and the discovery line rendered as a
+     SYNTHESIZED oblique, because astro.config.mjs loads JetBrains Mono in style:'normal' only — which is
+     precisely what `font-style: normal` here exists to prevent.
+     The parent stays scoped (it IS in the template, so it has the cid); only the emphasis selector is made
+     global, which keeps the rules reachable without leaking a bare `b`/`i` rule onto the rest of the site.
+     The alternative — createElement plus classes — does not help on its own: a class in a scoped block gets
+     the same cid attribute appended, so it would need :global() anyway, for more code. */
+  .dp-readout :global(b) { color: var(--dp-accent); font-weight: 400; }
+  .dp-readout :global(i) { color: var(--dp-alert); font-style: normal; }
 
   .dp-controls { display: flex; gap: 8px; margin: 22px 0 0; }
   .dp-btn {
@@ -318,7 +329,10 @@ import { WAYPOINTS } from '../lib/trajectory';
     type Projection, type View,
   } from '../lib/descentPath';
   import { WAYPOINTS, trajectoryFacts, DEEP_SIDE_LABEL } from '../lib/trajectory';
-  import { knownnessFn, knowledgeRadius } from '../lib/knowledge';
+  // knowledgeRadius is NOT imported any more: it only ever fed the readout's "reach" figure, which was
+  // deleted for the reason recorded at markStops() — a real measurement of an invented surface, printed
+  // beside real job titles. The import outlived its only caller and `astro check` flags it.
+  import { knownnessFn } from '../lib/knowledge';
   import { prefersReducedMotion } from '../lib/motion';
 
   const teardowns: Array<() => void> = [];
@@ -332,9 +346,20 @@ import { WAYPOINTS } from '../lib/trajectory';
   }
 
   function init(stage: HTMLElement): (() => void) | null {
-    const canvas = stage.querySelector<HTMLCanvasElement>('[data-dp-canvas]');
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return null;
+    const maybeCanvas = stage.querySelector<HTMLCanvasElement>('[data-dp-canvas]');
+    const maybeCtx = maybeCanvas?.getContext('2d');
+    if (!maybeCanvas || !maybeCtx) return null;
+    // RE-BOUND AFTER THE GUARD, and this is for the typechecker, not the runtime — `npm run typecheck` is a
+    // CI gate now and these two declarations were 79 of its errors. querySelector and getContext both return
+    // nullables, and the guard above narrows them HERE but not inside the drawing functions below:
+    // TypeScript drops a narrowing at the boundary of every closure it cannot prove runs after the check, so
+    // every one of the 76 `ctx.` calls in draw() and the three `canvas.` ones in size() read as "possibly
+    // null". Aliasing the already-narrowed values gives these names their plain non-null types at
+    // declaration, so there is nothing left for a closure to lose.
+    // Deliberately an alias rather than `as` or `!`: the null check is still real and still returns null, so
+    // a canvas-less browser is handled exactly as it was — what is gone is the assertion, not the check.
+    const canvas = maybeCanvas;
+    const ctx = maybeCtx;
     const section = stage.closest('#descent-path') as HTMLElement;
     const replay = section.querySelector<HTMLButtonElement>('[data-replay]');
     const readout = section.querySelector<HTMLElement>('[data-readout]');

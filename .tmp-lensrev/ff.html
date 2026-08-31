@@ -1,0 +1,32 @@
+<!doctype html><meta charset=utf8>
+<style>
+  /* the proposal's exact pattern */
+  .scene { transform: rotateX(3.2deg); }
+  @media (prefers-reduced-motion: no-preference) {
+    .scene { animation: camera linear both; /* animation-timeline: view();  <-- DROPPED, as Firefox does */ }
+  }
+  @keyframes camera {
+    0%   { transform: rotateX(6deg) translateZ(-70px); }
+    50%  { transform: rotateX(0deg); }
+    100% { transform: rotateX(-4deg) translateZ(30px); }
+  }
+  /* control: Interlude's actual shipped pattern, timeline dropped */
+  @media (prefers-reduced-motion: no-preference) {
+    .statement { animation: statement-in linear both; }
+  }
+  @keyframes statement-in {
+    from { opacity: 0.15; transform: translate3d(0, 28px, 0); }
+    to   { opacity: 1;    transform: translate3d(0,0,0); }
+  }
+</style>
+<div class="scene">SCENE</div>
+<p class="statement">STATEMENT</p>
+<pre id="out"></pre>
+<script>
+  const s = getComputedStyle(document.querySelector('.scene'));
+  const t = getComputedStyle(document.querySelector('.statement'));
+  document.getElementById('out').textContent =
+    'SCENE transform=' + s.transform + '\n' +
+    'SCENE animation-duration=' + s.animationDuration + '\n' +
+    'STATEMENT transform=' + t.transform + ' opacity=' + t.opacity;
+</script>

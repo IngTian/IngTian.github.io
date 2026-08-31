@@ -182,6 +182,19 @@
     // page stays navigable in the ways people expect.
     function onKey(e: KeyboardEvent): void {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // ALREADY CONSUMED — the deck is the LAST handler for a key, never a second one.
+      //
+      // This listener is on `window` in the bubble phase, so by the time it runs, any handler on the actual
+      // target has already had the key. The three explainer slides each give their beat <button>s a keydown
+      // that walks the group with the arrows and calls preventDefault() (Choice, Rules, Solve). Without this
+      // guard a keyboard reader focused on a beat chip pressed ArrowDown and got BOTH: the beat advanced and
+      // the deck scrolled a whole slide away from the thing they were stepping through.
+      //
+      // The tag list below cannot cover this: the target is a BUTTON, and BUTTON is deliberately exempted for
+      // space only (space on a button is an activation) — arrows on a button are usually free for the deck to
+      // take, and are only spoken for when a component says so. defaultPrevented is exactly that statement, so
+      // honouring it needs no list of which components use arrows, and a fourth one costs nothing here.
+      if (e.defaultPrevented) return;
       const t = e.target as HTMLElement | null;
       // Never intercept typing, or a control that uses arrows itself.
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;

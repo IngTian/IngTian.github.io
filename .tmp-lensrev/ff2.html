@@ -1,0 +1,36 @@
+<!doctype html><meta charset=utf8>
+<style>
+  .scene { transform: rotateX(3.2deg); }
+  @media (prefers-reduced-motion: no-preference) {
+    .a { animation: camera linear both; }                      /* Firefox-equivalent: no timeline */
+    .b { animation: camera linear both; animation-timeline: view(); animation-range: entry 10% exit 90%; }
+    .c { animation: camera linear both; animation-timeline: view(); animation-range: entry 10% exit 90%; }
+  }
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .d { animation: camera linear both; animation-timeline: view(); animation-range: entry 10% exit 90%; }
+    }
+  }
+  @keyframes camera {
+    0%   { transform: rotateX(6deg) translateZ(-70px); }
+    50%  { transform: rotateX(0deg); }
+    100% { transform: rotateX(-4deg) translateZ(30px); }
+  }
+  .spacer { height: 3000px; }
+</style>
+<div class="scene a">A no-timeline</div>
+<div class="scene b">B with timeline, in view</div>
+<div class="spacer"></div>
+<div class="scene c">C with timeline, far below fold</div>
+<div class="scene d">D guarded by @supports</div>
+<pre id="out"></pre>
+<script>
+  const g = (s) => getComputedStyle(document.querySelector(s)).transform;
+  document.getElementById('out').textContent =
+    'supports view(): ' + CSS.supports('animation-timeline','view()') + '\n' +
+    'A (no timeline)      = ' + g('.a') + '\n' +
+    'B (timeline, in view)= ' + g('.b') + '\n' +
+    'C (timeline, offscr) = ' + g('.c') + '\n' +
+    'D (@supports guard)  = ' + g('.d') + '\n' +
+    'static rotateX(3.2deg) reference: rotateX 3.2 -> m22=' + Math.cos(3.2*Math.PI/180).toFixed(6);
+</script>

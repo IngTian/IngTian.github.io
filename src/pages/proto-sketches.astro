@@ -20,13 +20,28 @@ import DescentPath from '../components/DescentPath.astro';
 const data = sketchData();
 const ctx = { w: FRAME.w, h: FRAME.h, pal: PAL, data };
 const sketches = BATCH1.map((s) => ({ meta: s, html: s.draw(ctx) }));
+
+// TWO NOTES ON THE PROPS BELOW.
+//
+// noindex={true}: see the long version in proto-showpiece.astro. Without it BaseLayout takes its
+// other branch and emits a self-referential <link rel="canonical"> instead — so this diagnostic route
+// was not merely unprotected, it was asking to be indexed. Both of the two proto routes that lacked
+// the prop were live and crawlable. tests/protoNoindex.test.ts asserts every src/pages/proto-*.astro
+// passes it; tests/distSmoke.test.ts checks the built HTML.
+//
+// navZone: a `navZone="dark"` used to sit in this list and is DROPPED rather than corrected, because
+// "dark" was never a value the prop has. BaseLayout and CornerNav both declare 'scroll' | 'light',
+// and the nav script reads `dataset.navMode === 'light' ? 'light' : 'scroll'`, so "dark" fell through
+// to 'scroll'. That branch then finds no `.descent` element on this page (<main class="sk">) and pins
+// the zone to 'light' anyway — so removing it changes nothing about what renders, and removes an
+// invalid literal from the one route that had it.
 ---
 <BaseLayout
   title="Proto — showpiece sketches"
   description="Diagnostic route: candidate showpiece frames, judged cheaply before anything is built."
   veilLine="sketches, not decisions"
   veilOnLoad={false}
-  navZone="dark"
+  noindex={true}
 >
   <main class="sk">
     <header class="sk-head">

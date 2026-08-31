@@ -51,6 +51,21 @@ const FRAMES = [
     risk: 'A slowly rotating translucent polyhedron with glowing labelled nodes is THE WebGL landing-page object of the last four years. It will look dated fast, and it tells the hero terrain’s story twice.',
   },
 ];
+
+// noindex={true} BELOW IS LOAD-BEARING, and its absence was a live leak rather than an untidiness.
+// BaseLayout's head is a single either/or —
+//   {noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
+// — so omitting the prop did not merely fail to discourage a crawler, it took the other branch and
+// shipped canonical="https://ingtian.github.io/proto-showpiece/", an explicit request to index this
+// URL, with robots.txt saying `Allow: /`. What that put in front of a search engine is the rubric and
+// the "ranked #1 / #2 / #3" kill-gate notes above: internal work-in-progress on a route whose whole
+// purpose is to be judged once and thrown away. Every proto-* route must set it —
+// tests/protoNoindex.test.ts fails CI if a new one forgets, and tests/distSmoke.test.ts re-checks it
+// in the rendered HTML.
+//
+// The note lives here and not beside the prop because `{/* … */}` inside an attribute list builds
+// fine but is a parse error to `astro check` (ts(1002)/ts(17002)) — the build being green does not
+// mean the tag is well-formed.
 ---
 <BaseLayout
   title="Proto — showpiece candidates"
@@ -58,6 +73,7 @@ const FRAMES = [
   veilLine="three candidates"
   veilOnLoad={false}
   navZone="light"
+  noindex={true}
 >
   <main class="proto">
     <header class="proto-head">

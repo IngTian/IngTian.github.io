@@ -5,10 +5,20 @@
     "**/*"
   ],
   "exclude": [
-    "dist"
-  ],
-  "compilerOptions": {
-    "jsx": "react-jsx",
-    "jsxImportSource": "react"
-  }
+    "dist",
+    // AD-HOC SCRATCH SCRIPTS ARE NOT THE PROJECT. CLAUDE.md's verification loop produces throwaway
+    // probes ("helper scripts are ad-hoc, recreate as needed") and they land at the repo root as
+    // tmp_*.mjs / tmp_*.ts and .tmp-*/ directories. They are untracked, half-written by design, and
+    // `include: **/*` swept them all in: the first run of `npm run typecheck` reported 4 errors in
+    // tmp_verify_cow.ts (imports of symbols that no longer exist) next to the 1 real error in a
+    // tracked file. A gate whose output is mostly noise from files nobody intends to keep is a gate
+    // people learn to ignore, so it stays scoped to what actually ships.
+    "tmp_*",
+    ".tmp-*"
+  ]
+  // NO "jsx"/"jsxImportSource" OVERRIDE. It used to force jsx: 'react-jsx' + jsxImportSource: 'react'
+  // for the terminal island; the island is deleted, there is not one .tsx file left, and react is
+  // uninstalled — so those two lines pointed the compiler at types that are no longer installed.
+  // Dropping them restores Astro's own defaults from the base config (jsx: 'preserve',
+  // jsxImportSource: 'astro'), which is what an island-free Astro project wants.
 }

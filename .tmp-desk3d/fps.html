@@ -1,0 +1,47 @@
+<!doctype html><html><head><meta charset=utf-8><style>
+:root{--paper:#efe9dd;--ochre:#c8a36a}
+body{margin:0;background:#2a2720;color:var(--paper);font-family:Georgia,serif}
+.stage{perspective:1500px;perspective-origin:50% 38%}
+.scene{transform-style:preserve-3d;position:relative;height:640px;will-change:transform;
+       animation:cam 4s ease-in-out infinite alternate}
+@keyframes cam{from{transform:rotateX(12deg) rotateY(-5deg) translateZ(-140px)}
+               to{transform:rotateX(-4deg) rotateY(5deg) translateZ(60px)}}
+.card{position:absolute;width:230px}
+.bb{transform-style:preserve-3d}
+.face{padding:12px 14px;background:#413e37;border:1px solid rgba(239,233,221,.16);border-radius:6px;
+      box-shadow:0 20px 40px -20px rgba(0,0,0,.7)}
+h4{margin:0 0 3px;font-size:15px} p{margin:0;font-size:11.5px;line-height:1.55;opacity:.72;font-family:system-ui}
+.tag{font-family:ui-monospace,monospace;font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ochre)}
+#out{position:fixed;left:8px;bottom:8px;font-family:ui-monospace,monospace;font-size:13px;color:var(--ochre);background:#000a;padding:6px 10px}
+</style></head><body>
+<div class=stage><div class=scene id=scene></div></div>
+<div id=out>measuring…</div>
+<script>
+const N = Number(new URLSearchParams(location.search).get('n') || 10);
+const BB = new URLSearchParams(location.search).get('bb') !== '0';
+const scene = document.getElementById('scene');
+for (let i=0;i<N;i++){
+  const z = -220 + (i%5)*60;
+  const c=document.createElement('div'); c.className='card';
+  c.style.left=(2+(i%5)*19)+'%'; c.style.top=(20+Math.floor(i/5)*180)+'px';
+  const bbAngle = BB ? '' : '';
+  c.innerHTML=`<div class=bb style="transform:translateZ(${z}px)"><div class=face>
+   <div class=tag>Go &middot; MCP &middot; SQLite</div><h4>Project ${i+1}</h4>
+   <p>A person-centric archive of how you think and grow, mined from sessions.</p></div></div>`;
+  scene.appendChild(c);
+}
+let frames=0, t0=performance.now(), longFrames=0, last=t0;
+function tick(now){
+  frames++; const dt=now-last; if(dt>32) longFrames++; last=now;
+  if(now-t0>4000){
+    const fps=frames/((now-t0)/1000);
+    document.getElementById('out').textContent =
+      `n=${N} cards | ${fps.toFixed(1)} fps over ${((now-t0)/1000).toFixed(1)}s | frames>32ms: ${longFrames}`;
+    document.title = `FPS:${fps.toFixed(1)}:LONG:${longFrames}:N:${N}`;
+    return;
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+</script>
+</body></html>

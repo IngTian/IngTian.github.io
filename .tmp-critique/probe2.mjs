@@ -1,0 +1,33 @@
+const V = await (await fetch('http://localhost:9223/json/new?about:blank', { method: 'PUT' })).json();
+const sock = new WebSocket(V.webSocketDebuggerUrl);
+let id = 0; const pending = new Map();
+sock.addEventListener('message', (e) => { const m = JSON.parse(e.data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); } });
+await new Promise((r) => sock.addEventListener('open', r));
+const send = (method, params = {}) => { const i = ++id; return new Promise((res) => { pending.set(i, res); sock.send(JSON.stringify({ id: i, method, params })); }); };
+const ev = async (x) => (await send('Runtime.evaluate', { expression: x, returnByValue: true, awaitPromise: true })).result?.result?.value;
+await send('Page.enable'); await send('Runtime.enable');
+await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+await send('Page.navigate', { url: 'http://localhost:4322/' });
+await new Promise((r) => setTimeout(r, 3000));
+
+console.log(await ev(`(() => {
+  const q = (s) => document.querySelector(s);
+  const h = (el) => el ? Math.round(el.getBoundingClientRect().height) : null;
+  const mtn = q('#mountains');
+  const kids = Array.from(q('.mtn').children).map(el => ({
+    tag: el.tagName.toLowerCase(),
+    txt: (el.textContent||'').trim().slice(0,34).replace(/\\s+/g,' '),
+    h: h(el),
+  }));
+  return JSON.stringify({
+    mountainsH: h(mtn),
+    spineH: h(q('.spine')),
+    awardsBlockH: 0,
+    featureH: h(q('.feature')),
+    pcardH: h(q('.pcard')),
+    kids,
+    // heading outline of the whole page
+    headings: Array.from(document.querySelectorAll('h1,h2,h3,h4')).map(x => x.tagName + ':' + x.textContent.trim().slice(0,32)),
+  }, null, 1);
+})()`));
+sock.close(); process.exit(0);

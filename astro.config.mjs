@@ -3,6 +3,8 @@ import { defineConfig, fontProviders } from 'astro/config';
 
 import tailwindcss from '@tailwindcss/vite';
 import sitemap from '@astrojs/sitemap';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 
 // https://astro.build/config
 export default defineConfig({
@@ -68,10 +70,37 @@ export default defineConfig({
     plugins: [tailwindcss()]
   },
 
-  // NO REACT. The terminal was the site's only island and it is deleted, so nothing renders a
-  // component: no .tsx files, no client:* directives, no react imports remain. Keeping the integration
-  // would ship the client runtime for nothing — the site is now entirely static HTML plus vanilla
-  // scripts. If an island is ever needed again, re-add @astrojs/react here (it stays in devDeps).
+  // ── MATH IN MARKDOWN, TYPESET AT BUILD TIME ────────────────────────────────────────────────────
+  // The writing shelf's kinds promise derivations and "the mathematics left in", and a .md had no way
+  // to typeset any of it: there was no markdown config here at all, so `$x$` rendered as the literal
+  // dollar signs. remark-math parses the TeX out of the markdown, rehype-katex typesets it.
+  //
+  // output: 'mathml' IS THE LOAD-BEARING OPTION. rehype-katex's default emits KaTeX's HTML span tree,
+  // which is unreadable without katex.min.css AND its ~half-megabyte of KaTeX_* webfonts — a CDN link
+  // or a third webfont family, and both are against this project's font rules (two downloaded faces,
+  // served locally, no third party at build or at runtime). MathML is the browser's own math renderer:
+  // the page ships static <math> markup, zero client JS, zero CSS, zero fonts. Safari, Firefox and
+  // Chromium have all shipped MathML Core. This is the same guarantee src/lib/equations.ts already
+  // holds for the terrain pill and the /research panels, and tests/equations.test.ts asserts it there
+  // ("ships MathML, not a KaTeX runtime") — the markdown path must not be the one that breaks it.
+  //
+  // throwOnError: false matches equations.ts: one malformed formula renders as KaTeX's error markup in
+  // that one spot instead of failing the whole build (and the deploy) over a typo in a note.
+  //
+  // katex is a devDependency, and stays one — nothing about it is shipped, only its output.
+  markdown: {
+    remarkPlugins: [remarkMath],
+    rehypePlugins: [[rehypeKatex, { output: 'mathml', throwOnError: false }]],
+  },
+
+  // NO REACT, AND NOT INSTALLED ANY MORE. The terminal was the site's only island and it is deleted, so
+  // nothing renders a component: no .tsx files, no client:* directives, no react imports remain.
+  // This comment used to claim React "stays in devDeps" — it never did. @astrojs/react, react,
+  // react-dom, @types/react and @types/react-dom all sat in `dependencies`, which is precisely why
+  // nobody noticed: ~8MB reinstalled on every `npm ci`, in CI and in the deploy, for a runtime no page
+  // loads (`grep -rlE 'react-dom|createRoot' dist --include='*.js'` finds nothing). All five are now
+  // uninstalled. If an island is ever needed again, `npm i -D @astrojs/react react react-dom` and add
+  // the integration back here — devDeps is the right home for a static build's tooling.
   integrations: [sitemap({
     // Prototype routes carry noindex, but an unfiltered sitemap still advertises
     // them to crawlers — and their rendered bodies quote internal review notes.

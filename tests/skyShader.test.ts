@@ -14,7 +14,14 @@ describe('SKY_UNIFORMS completeness', () => {
     // Extract uniform declarations from the shader source.
     const declaredRaw = [...source.matchAll(/^\s*uniform\s+\S+\s+(\w+);/gm)].map(m => m[1]);
     const declared = new Set(declaredRaw);
-    const listed = new Set(SKY_UNIFORMS);
+    // Set<string>, EXPLICITLY. SKY_UNIFORMS is `as const`, so `new Set(SKY_UNIFORMS)` infers
+    // Set<'uRamp' | 'uAmp' | …> and its .has() then only accepts those exact literals — while the
+    // names below come out of a regex over the shader source and are plain strings. That is the
+    // point of the check (it asks whether an UNKNOWN name is in the list), so widening the set's
+    // element type is the fix, not casting the argument. It was a real TS2345 that nothing caught:
+    // both `astro build` and vitest strip types with esbuild, so the only thing that ever sees it
+    // is `npm run typecheck` — added in the same pass as this fix.
+    const listed = new Set<string>(SKY_UNIFORMS);
 
     // Both ways: no declared uniform is missing from the list (would read as 0 silently),
     // and no list entry is missing from the shader (would error at uniform location lookup).

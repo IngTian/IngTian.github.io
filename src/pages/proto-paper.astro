@@ -21,7 +21,6 @@
 // Fluid now defaults to strength 1: measured Δ 5.6/255 — visible, but the
 // lightest rung that is. Level 2+ read as too strong.
 import BaseLayout from '../layouts/BaseLayout.astro';
-import Toc from '../components/Toc.astro';
 import SkyWash from '../components/SkyWash.astro';
 import PaperTooth from '../components/proto/PaperTooth.astro';
 import FluidSky from '../components/proto/FluidSky.astro';
@@ -47,7 +46,10 @@ import Signature from '../sections/Signature.astro';
     <Mountains />
     <Signature />
   </main>
-  <Toc />
+  {/* NO Toc HERE. It was copied in with the rest of the homepage furniture, but the rail's stops come from
+      homeStops() — #choice, #rules, #solve, #story, #appendix — and this prototype renders none of them. So it
+      shipped five links that scrolled nowhere; the dist smoke test found them. A rail is wayfinding, and
+      wayfinding that points at nothing is worse than no rail. */}
   <PaperTooth />
 
   <!-- Prototype-only switches: the two remaining layers, plus the fluid strength

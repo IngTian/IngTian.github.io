@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset=utf-8><style>
+:root{--paper:#efe9dd;--ochre:#c8a36a;--indigo:#6d7689}
+body{margin:0;background:#3a3833;color:var(--paper);font-family:Georgia,serif}
+section{padding:24px 40px;border-bottom:1px solid rgba(239,233,221,.15)}
+h3{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ochre);margin:0 0 14px}
+.stage{perspective:1100px;height:300px;position:relative}
+.scene{transform-style:preserve-3d;position:absolute;inset:0}
+.pair-a,.pair-b{position:absolute;top:60px;width:260px;height:110px}
+.pair-a{left:60px;background:rgba(200,163,106,.75);transform:rotateY(42deg)}
+.pair-b{left:180px;background:rgba(109,118,137,.85);transform:rotateY(-42deg)}
+/* PROBE: grouping properties that flatten a 3D rendering context */
+.flat-op{opacity:.99}
+.flat-of{overflow:hidden}
+.flat-bd{backdrop-filter:blur(2px)}
+.flat-fi{filter:brightness(1)}
+/* opaque pile, edge-only buried sheets */
+.pile{position:absolute;left:40px;top:20px;width:620px;transform-style:preserve-3d}
+.sheet{position:absolute;left:0;width:560px;border:1px solid rgba(239,233,221,.16);border-radius:2px;
+  background:#413e37;box-shadow:0 -1px 0 rgba(239,233,221,.10),0 18px 34px -18px rgba(0,0,0,.7)}
+.sheet .body{padding:16px 22px 18px}
+.sheet.buried .body{padding:9px 22px}
+.sheet h4{margin:0 0 5px;font-size:18px;line-height:1.3}
+.sheet.buried h4{font-size:13px;opacity:.62;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet p{margin:0;font-size:12.5px;line-height:1.6;opacity:.7;font-family:system-ui}
+.sheet .cite{font-family:ui-monospace,monospace;font-size:11px;opacity:.55}
+.p1{top:0;transform:translate3d(30px,0,-60px)}
+.p2{top:34px;transform:translate3d(15px,0,-30px)}
+.p3{top:66px;transform:translate3d(0,0,0)}
+.tiny{font-family:ui-monospace,monospace;font-size:11px;opacity:.6;margin-top:8px}
+</style></head><body>
+
+<section><h3>A &mdash; baseline: intersecting planes in preserve-3d (expect INTERPENETRATION)</h3>
+<div class=stage><div class=scene><div class=pair-a></div><div class=pair-b></div></div></div></section>
+
+<section><h3>B &mdash; ancestor has opacity:.99 (grouping property)</h3>
+<div class=stage><div class="scene flat-op"><div class=pair-a></div><div class=pair-b></div></div></div></section>
+
+<section><h3>C &mdash; ancestor has overflow:hidden</h3>
+<div class=stage><div class="scene flat-of"><div class=pair-a></div><div class=pair-b></div></div></div></section>
+
+<section><h3>D &mdash; ancestor has backdrop-filter:blur(2px)</h3>
+<div class=stage><div class="scene flat-bd"><div class=pair-a></div><div class=pair-b></div></div></div></section>
+
+<section><h3>E &mdash; ancestor has filter:brightness(1)</h3>
+<div class=stage><div class="scene flat-fi"><div class=pair-a></div><div class=pair-b></div></div></div></section>
+
+<section><h3>F &mdash; OPAQUE pile, buried sheets show only their top edge</h3>
+<div class="stage" style="height:340px"><div class=scene><div class=pile>
+ <div class="sheet buried p1"><div class=body><h4>Self-Attention on RNN-based Text Classification &mdash; CNSSE / SPIE 12290</h4></div></div>
+ <div class="sheet buried p2"><div class=body><h4>JAMScript compiler analysis &mdash; McGill, Prof. Maheswaran</h4></div></div>
+ <div class="sheet p3"><div class=body><div class=cite>S. Kang, Z. Tian (2025) &middot; arXiv:2508.11856</div>
+  <h4>Optimal Portfolio Construction &mdash; RL-BHRP</h4>
+  <p>Allocation that learns instead of assuming &mdash; diversified and investable, not a backtest curiosity. Sharpe 0.90 vs 0.85 static / 0.76 benchmark.</p></div></div>
+</div></div></div></section>
+
+</body></html>

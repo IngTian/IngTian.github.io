@@ -13,7 +13,7 @@ import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import FluidSky from '../../components/proto/FluidSky.astro';
 import SkyWash from '../../components/SkyWash.astro';
-import { KINDS } from '../../data/writing';
+import { KINDS, kindSectionId } from '../../data/writing';
 
 export async function getStaticPaths() {
   // Drafts get no page, matching the index. Committing an unfinished note must not publish it.
@@ -52,7 +52,12 @@ const updatedLong =
       <header class="piece-head">
         <a class="back" href="/writing">← writing</a>
         <p class="piece-kicker">
-          <a href={`/writing#${entry.data.kind}`}>{kind?.label ?? entry.data.kind}</a>
+          {/* kindSectionId(), NOT the raw kind key. This link used to be `/writing#misc` and landed nowhere:
+              /writing prefixes every section id with `w-` (that helper exists so "the rail and the page cannot
+              disagree", and this page was the third party that did). A fragment that matches no id fails
+              silently — the browser just leaves you at the top of /writing — which is why it shipped. One
+              speller, imported, so it cannot drift again. */}
+          <a href={`/writing#${kindSectionId(entry.data.kind)}`}>{kind?.label ?? entry.data.kind}</a>
           <span aria-hidden="true">·</span>
           <time datetime={entry.data.date}>{longDate}</time>
           {/* Only when it says something new. A piece written once and never touched shows one date; a running
@@ -109,11 +114,19 @@ const updatedLong =
 
   .piece-foot { display: flex; gap: 20px; padding: 8vh 0 12vh; }
 
-  /* Phone: the 34% left margin is a desktop composition — it leaves a 12ch measure at 390px. Matches how
-     /writing and /projects collapse, so the reading pages stay one system. */
-  @media (max-width: 900px) {
-    .piece-block { width: auto; margin-left: clamp(24px, 7vw, 64px); margin-right: clamp(24px, 7vw, 64px); }
-    .piece-head { padding-top: 12vh; }
+  /* Narrow: the 34% left margin is a desktop composition — it leaves a 12ch measure at 390px.
+     1100px AND THE SAME COLLAPSE RULE AS /writing, because this claimed to match the other reading pages and
+     did not. It collapsed at 900px to clamped side margins while /writing, /projects and /research all collapse
+     at 1100px to a centred 760px block (1100 is SideRail's own breakpoint — the margin exists to clear the rail,
+     so it goes when the rail does). Between 901 and 1100px the two writing pages therefore disagreed twice
+     over: the index had already re-centred at 760px while a piece still sat behind a 34% margin, so clicking a
+     title threw the column ~200px sideways, and any narrower width still left the two left edges apart because
+     the collapsed compositions differed too. Identical numbers here mean the reading column simply does not
+     move when you navigate — which was the stated point of borrowing this composition in the first place.
+     The 12vh top padding that used to ride along in here is gone for the same reason: /writing keeps its 14vh
+     at every width, and shaving 2vh only here moved the headline vertically as well when you navigated. */
+  @media (max-width: 1100px) {
+    .piece-block { width: auto; margin: 0 auto; padding: 0 24px; max-width: 760px; }
   }
 </style>
 
@@ -204,6 +217,173 @@ const updatedLong =
   }
   .prose blockquote + p::before { content: '— '; color: var(--ink-5); }
   .prose blockquote + p strong { color: var(--ink-2); font-weight: 400; }
+
+  /* ══ THE REST OF MARKDOWN ═══════════════════════════════════════════════════════════════════════════════
+     Everything above styles a paragraph, two heading levels, a link, a half-styled list and a quote — which is
+     roughly what the first piece happened to contain. The kinds this shelf was built for promise "derivations"
+     and "the mathematics left in", yet a table, a code fence, an image, a figure, a fourth-level heading, a
+     list's own markers and an equation had not one rule between them. Several were not merely unstyled but
+     actively broken (each note says
+     how), so what follows is repair rather than polish. Two rules of the road for anything added later:
+       · it belongs in THIS global block, never the scoped one above — see the note at the top of this style;
+       · Tailwind's preflight zeroes `margin`, `padding` and `border` on EVERY element and strips list markers,
+         so a markdown element with no rule here renders as undifferentiated text, not as a browser default. */
+
+  /* ── TABLE, AND THE PAGE MUST NEVER SCROLL SIDEWAYS BECAUSE OF ONE.
+     Four columns of numbers are wider than a 62ch measure, and a plain <table> insists on at least its own
+     min-content width: it overhangs the column, the overhang widens the DOCUMENT, and a phone gets a horizontal
+     scrollbar on the whole page — every other line of prose then slides sideways under the thumb while you try
+     to read the table. `display: block` + `overflow-x: auto` makes the table its own scroll container (its rows
+     re-wrap into an anonymous table box inside, so it still lays out as a table), so the worst case is a table
+     you drag instead of a page that will not hold still.
+     `width: max-content` capped at 100% lets a two-column table stay its own narrow width instead of stretching
+     across the measure — how the /research metrics table reads too.
+     The cells' `min-width` is what decides between wrapping and scrolling, and it is the interesting part: with
+     no floor, auto table layout squeezes columns until "Max drawdown" is one word per line, which is unreadable
+     in a different way; with a floor the table wraps gently while the columns stay legible, and only starts
+     scrolling once even that is impossible. 8ch is about where a signed number stops breaking. */
+  .prose table {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  /* Hairlines through --hairline-rgb, so they re-theme with the palette instead of needing a dark-mode override
+     list — and stated as `1px solid <colour>` in full because preflight's `border: 0 solid` means a border with
+     only a colour draws nothing. */
+  .prose th, .prose td {
+    min-width: 8ch;
+    padding: 7px 16px 7px 0;
+    text-align: left;
+    vertical-align: baseline;
+    border-bottom: 1px solid rgba(var(--hairline-rgb), 0.12);
+  }
+  .prose th:last-child, .prose td:last-child { padding-right: 0; }
+  .prose td { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .prose thead th {
+    color: var(--ink-4); font-weight: 400; font-size: 9.5px;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    border-bottom: 1px solid rgba(var(--hairline-rgb), 0.3);
+  }
+  /* A leading <th> in a body row names the row rather than labelling a column, so it reads as a label, not as
+     another cell of data. */
+  .prose tbody th { color: var(--ink-1); font-weight: 500; }
+  .prose tbody tr:last-child th, .prose tbody tr:last-child td { border-bottom: 0; }
+
+  /* ── CODE FENCE: SHIKI'S PALETTE, OVERRULED.
+     Astro highlights fences with Shiki's github-dark theme and writes it as INLINE STYLE —
+     `<pre style="background-color:#24292e;color:#e1e4e8">` plus a `style="color:#F97583"` on every token span.
+     On a pale reading page that is a blue-black slab full of pink, purple and cyan: a second entire palette, on
+     a site whose only saturated colour in the light theme is the seal. Inline style cannot be beaten by
+     specificity, which is the whole reason `!important` appears here and the only place it does.
+     Code therefore goes monochrome, deliberately: there is no syntax-colour language in this palette to map
+     Shiki's tokens onto, and quiet ink on a paper-tone panel is exactly what the inline `code` chip above
+     already is. If coloured syntax is ever wanted, the fix is a `markdown.shikiConfig` theme built from the
+     tokens in astro.config.mjs — not more `!important` here.
+     Astro already puts `overflow-x: auto` and `tabindex="0"` on the <pre>, so a long line scrolls inside the
+     block and the scroll region is reachable from the keyboard; `max-width: 100%` is what keeps that overflow
+     off the document, the same job it does for the table. */
+  .prose pre {
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 14px 16px;
+    border: 1px solid rgba(var(--hairline-rgb), 0.14);
+    border-radius: 4px;
+    background: color-mix(in oklab, var(--ink-5) 18%, transparent) !important;
+    color: var(--ink-2) !important;
+    font-size: 12.5px;
+    line-height: 1.6;
+    tab-size: 2;
+  }
+  .prose pre span { color: inherit !important; }
+  /* The inline chip must not double up inside a fence: `.prose code` gives every <code> a tinted background and
+     padding, and a fence IS a <code> inside the <pre> — so a fence was getting a chip drawn around a panel. */
+  .prose pre code {
+    background: none; padding: 0; border-radius: 0;
+    font-size: inherit; color: inherit;
+  }
+
+  /* ── MATH. remark-math + rehype-katex (output: 'mathml') emit `<span class="katex"><math>…</math></span>`:
+     inline math inside its paragraph, DISPLAY math as a direct child of .prose. That structure is what
+     `.prose > .katex` keys off — the two cases are told apart by where they sit, because with MathML output
+     rehype hands us no class that distinguishes them.
+     Two real faults, not just missing polish. The wrapper span is INLINE, so a display equation took no space
+     above or below it (`.prose > * + *` margins do nothing to an inline box) and sat glued to the paragraph
+     that introduced it; and a wide equation had nothing stopping it from overhanging the measure and widening
+     the page, exactly like the table. Making the wrapper a block fixes the first and lets `overflow-x` fix the
+     second.
+     NOT centred, deliberately: `text-align: center` inside a scroll container throws the overflow to BOTH sides
+     and the left half becomes unreachable, because scrollLeft cannot go negative — a long derivation would lose
+     its opening term with no way to scroll back to it. Flush left, scrolls right. */
+  .prose > .katex {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    margin-bottom: 0.75em;   /* + the 1.15em the next element already carries = matched air below and above */
+  }
+  .prose > .katex:not(:first-child) { margin-top: 1.9em; }
+  /* Colour is stated rather than inherited, and this is a choice, not a repair: MathML does inherit `color`, but
+     /research sets its equations at --ink-1 against body copy at --ink-2 because an equation is the subject of
+     the sentence around it, not an aside — and pinning the value means no UA sheet gets a vote.
+     font-family is deliberately LEFT ALONE. The UA's `font-family: math` is what supplies stretchy glyphs —
+     tall parentheses, radicals, summation limits — and forcing the display serif here (as the FactorFan pill
+     does for its one short line) would break exactly the constructs a derivation is made of. */
+  .prose math { color: var(--ink-1); }
+  .prose > .katex math { font-size: 1.15em; }   /* a step above the prose, as on /research */
+
+  /* ── IMAGE. Preflight already gives every <img> `max-width: 100%; height: auto; display: block`, and this
+     restates it because prose images are the one place that has to be true whatever else changes: a markdown
+     image pointing at a local file goes through astro:assets, which writes intrinsic width/height ATTRIBUTES
+     onto the tag, and `height: auto` is what keeps such an image in proportion once max-width shrinks it.
+     Centred in the measure and never wider than it — an overhanging image widens the document just as a table
+     does. */
+  .prose img {
+    display: block; max-width: 100%; height: auto;
+    margin-left: auto; margin-right: auto; border-radius: 2px;
+  }
+
+  /* ── FIGURE + CAPTION. Markdown emits a figure only when the piece writes the HTML by hand, which is exactly
+     when a caption matters, so the caption gets its own register: the accent italic the prose already uses for
+     `em`, small and at --ink-4, so it reads as the author's aside about the image rather than as body copy that
+     happens to sit under it. A figure gets more air than a paragraph because it is a unit. */
+  .prose > figure:not(:first-child) { margin-top: 2.2em; }
+  .prose figcaption {
+    margin-top: 10px;
+    font-family: var(--font-accent); font-style: italic;
+    font-size: 13px; line-height: 1.55; color: var(--ink-4);
+  }
+
+  /* ── H4. h2 is the display serif and h3 the accent italic, so a fourth level cannot be one more size step —
+     at reading scale there is nothing left between an 18px italic and body copy. It changes REGISTER instead,
+     to the small mono label every other meta line on this page is set in. Preflight resets headings to
+     `font-size: inherit; font-weight: inherit`, so with no rule an h4 is indistinguishable from a paragraph. */
+  .prose h4 {
+    font-family: var(--font-mono); font-weight: 400;
+    font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-3); margin-top: 2.2em;
+  }
+
+  /* ── LISTS, WHOSE MARKERS WERE MISSING ALTOGETHER. Preflight sets `ol, ul, menu { list-style: none }`, so the
+     rule further up — which only set padding-left — produced indented lines with no bullets and no numbers: a
+     nested list read as a paragraph that had been pushed right, with nothing to show what nested under what.
+     Restated per level, disc → circle → square (and decimal → alpha → roman), so depth is visible rather than
+     implied, with markers at --ink-4 so structure is legible without the bullets shouting over the words. */
+  .prose ul { list-style: disc; }
+  .prose ol { list-style: decimal; }
+  .prose ul ul { list-style: circle; }
+  .prose ul ul ul { list-style: square; }
+  .prose ol ol { list-style: lower-alpha; }
+  .prose ol ol ol { list-style: lower-roman; }
+  .prose li::marker { color: var(--ink-4); }
+  /* A nested list lives inside its parent <li>, where `.prose > * + *` cannot reach it and preflight has zeroed
+     its margins — so without this the child list starts hard against the line that introduces it. A shallower
+     indent than the top level is the usual convention, and it keeps a three-deep list inside the measure. */
+  .prose li > ul, .prose li > ol { margin-top: 0.4em; padding-left: 1.2em; }
 
   /* On a phone the hanging mark would sit outside the text column, so it comes inside and the quote loses the
      hang rather than the margin. */

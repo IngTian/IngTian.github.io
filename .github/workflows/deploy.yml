@@ -20,6 +20,13 @@ jobs:
   # Gate the deploy on the SAME test suite CI runs. deploy.yml triggers on push
   # to main independently of ci.yml, so without this a red `npm test` could still
   # ship. build (and therefore deploy) waits on this passing.
+  #
+  # TESTS ONLY, NOT `npm run typecheck` — and that asymmetry with ci.yml is deliberate. A type error
+  # cannot change the shipped bytes: Astro strips types with esbuild, so the HTML/CSS/JS built from a
+  # type-error-ridden tree is byte-identical to the same tree with the annotation fixed. Blocking a
+  # deploy on it would leave the LIVE SITE STALE to punish a mistake that is not in the output, which
+  # is the worse failure. Types are the merge gate's job (ci.yml, required check on main); tests gate
+  # the deploy because a red assertion means the logic behind the pixels is actually wrong.
   test:
     runs-on: ubuntu-latest
     steps:
@@ -41,8 +48,13 @@ jobs:
       - name: Build with Astro
         uses: withastro/action@v3
         with:
-          # Astro 6 requires Node >=22.12; the action defaults to 20. Keep this
-          # in step with .nvmrc (local) and ci.yml.
+          # Astro 6 requires Node >=22.12 (astro's own `engines`, mirrored in package.json); the action
+          # defaults to 20, which it rejects. HARDCODED ON PURPOSE, AND THE ONE PLACE THAT IS:
+          # withastro/action takes only `node-version` — it has no `node-version-file` input, and it
+          # does its own checkout, so .nvmrc is not readable before it runs. Everywhere else
+          # (ci.yml, the test job above) reads .nvmrc directly. EDIT THIS LINE AND .nvmrc TOGETHER;
+          # they both say 24 today, and a bump that changes only one of them would build the site on a
+          # different Node than every check that approved it.
           node-version: 24
         # Installs deps, runs `astro build`, and uploads the Pages artifact.
 

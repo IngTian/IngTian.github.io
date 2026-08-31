@@ -1,0 +1,31 @@
+<!doctype html><html><head><meta charset=utf-8><style>
+:root{--paper:#efe9dd;--ochre:#c8a36a}
+body{margin:0;background:#3a3833;color:var(--paper);font-family:Georgia,serif}
+section{padding:18px 30px;border-bottom:1px solid rgba(239,233,221,.15)}
+h3{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ochre);margin:0 0 10px}
+.stage{perspective:1400px;height:170px;position:relative}
+.scene{transform-style:preserve-3d;position:absolute;inset:0;transform:rotateY(-14.4deg)}
+.pos{position:absolute;left:50px;top:24px;width:420px}
+.box{padding:14px 18px;background:#413e37;border:1px solid rgba(239,233,221,.16)}
+h4{margin:0 0 4px;font-size:18px}
+p{margin:0;font-size:12.5px;line-height:1.6;opacity:.75;font-family:system-ui}
+.mono{font-family:ui-monospace,monospace;font-size:11px;opacity:.6}
+/* BAD: card is preserve-3d AND paints a bg; inner counter-rotates inside it */
+.bad{transform-style:preserve-3d}
+.bad .inner{transform:rotateY(14.4deg);transform-style:preserve-3d}
+/* GOOD: billboard wrapper is OUTSIDE, and the painted box is a FLAT child
+   (transform-style default = flat), so nothing intersects it */
+.good{transform:rotateY(14.4deg);transform-style:preserve-3d}
+</style></head><body>
+<section><h3>A &mdash; BAD: counter-rotated inner INSIDE a preserve-3d box that paints its own background</h3>
+<div class=stage><div class=scene><div class="pos box bad"><div class=inner>
+<div class=mono>2023 &mdash; 25</div><h4>Senior Software Engineer &middot; TikTok</h4><p>Dual-tower vision pipeline, billion-scale vector search, 50k QPS.</p></div></div></div></div></section>
+
+<section><h3>B &mdash; GOOD: billboard wrapper outside, painted box is a FLAT child</h3>
+<div class=stage><div class=scene><div class="pos good"><div class=box>
+<div class=mono>2023 &mdash; 25</div><h4>Senior Software Engineer &middot; TikTok</h4><p>Dual-tower vision pipeline, billion-scale vector search, 50k QPS.</p></div></div></div></div></section>
+
+<section><h3>C &mdash; reference: no rotation at all</h3>
+<div class=stage><div style="position:absolute;inset:0"><div class="pos box">
+<div class=mono>2023 &mdash; 25</div><h4>Senior Software Engineer &middot; TikTok</h4><p>Dual-tower vision pipeline, billion-scale vector search, 50k QPS.</p></div></div></div></section>
+</body></html>

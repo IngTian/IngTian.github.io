@@ -415,8 +415,15 @@ const items: Item[] = [
     teardown?.();
     teardown = null;
 
-    const nav = document.querySelector<HTMLElement>('[data-cnav]');
-    if (!nav || !('requestAnimationFrame' in window)) return;
+    // ALIASED AFTER THE GUARD, and this is a type fix rather than a style choice. TypeScript does not carry a
+    // const's narrowing into a HOISTED `function` declaration — only into arrow functions — because a hoisted
+    // function could in principle be called before the guard ran. The guard below is real and correct, but the
+    // `function` bodies further down still saw `HTMLElement | null` and `astro check` reported them the first time it
+    // ever ran on this file. Declaring a non-null alias makes the type true at the declaration, so no narrowing
+    // has to survive anything.
+    const maybeNav = document.querySelector<HTMLElement>('[data-cnav]');
+    if (!maybeNav || !('requestAnimationFrame' in window)) return;
+    const nav = maybeNav;
     const descent = document.querySelector<HTMLElement>('.descent');
 
     // Zone = which LIGHT-theme text color the nav uses. Two modes:

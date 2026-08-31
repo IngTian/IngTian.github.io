@@ -1,0 +1,53 @@
+<!doctype html><html><head><meta charset=utf-8><style>
+:root{--paper:#efe9dd;--ochre:#c8a36a;--indigo:#6d7689;--seal:#b23a2e}
+body{margin:0;background:#2a2720;color:var(--paper);font-family:Georgia,serif;padding:30px}
+h3{font-family:ui-monospace,monospace;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ochre)}
+
+/* ══ CSS-ONLY JOURNAL PAGER — zero JS, radios + :checked, keyboard native ══ */
+.journal{position:relative;width:420px;perspective:1400px}
+.jr{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}  /* NOT display:none — stays focusable */
+.jstack{transform-style:preserve-3d;position:relative;height:230px}
+.page{position:absolute;inset:0;background:#413e37;border:1px solid rgba(239,233,221,.15);
+  box-shadow:0 20px 40px -20px rgba(0,0,0,.72);padding:18px 22px;
+  transform:translate3d(10px,6px,-40px);opacity:0;
+  transition:transform .5s cubic-bezier(.2,.7,.3,1),opacity .35s}
+.page h4{margin:0 0 4px;font-size:17px} .page .role{font-family:ui-monospace,monospace;font-size:11px;color:rgba(200,163,106,.85);margin:0 0 8px}
+.page p{margin:0;font-size:12px;line-height:1.62;color:rgba(239,233,221,.7);font-family:system-ui}
+.jr:nth-of-type(1):checked ~ .jstack .page:nth-child(1),
+.jr:nth-of-type(2):checked ~ .jstack .page:nth-child(2),
+.jr:nth-of-type(3):checked ~ .jstack .page:nth-child(3){transform:translate3d(0,0,0);opacity:1;z-index:3}
+.tabs{display:flex;gap:8px;margin-top:246px}
+.tabs label{width:10px;height:10px;border-radius:50%;border:1px solid rgba(239,233,221,.32);cursor:pointer;
+  transition:background .3s,border-color .3s}
+.jr:nth-of-type(1):checked ~ .tabs label:nth-child(1),
+.jr:nth-of-type(2):checked ~ .tabs label:nth-child(2),
+.jr:nth-of-type(3):checked ~ .tabs label:nth-child(3){background:var(--indigo);border-color:var(--indigo)}
+.jr:focus-visible ~ .tabs label{outline:1px dashed rgba(239,233,221,.4);outline-offset:3px}
+/* NO-JS + reduced motion: every page is simply visible, stacked in the flow */
+@media (prefers-reduced-motion:reduce){
+  .page{transition:none}
+}
+</style></head><body>
+<h3>CSS-only journal pager (3 pages, radios, no JS)</h3>
+<div class=journal>
+ <input class=jr type=radio name=j id=j1 checked><input class=jr type=radio name=j id=j2><input class=jr type=radio name=j id=j3>
+ <div class=jstack>
+  <div class=page><h4>Incoming PhD, Operations Research</h4><p class=role>University of Toronto &middot; Fall 2027 &mdash;</p><p>Multi-period portfolio optimization, advised by Prof. Roy H. Kwon &mdash; and the convex-optimization and duality structure beneath it.</p></div>
+  <div class=page><h4>Software Engineer</h4><p class=role>Electronic Arts &middot; 2026 &mdash;</p><p>Recommendation systems &mdash; dual-tower retrieval and ranking, indexing and serving in Go, training pipelines in Python.</p></div>
+  <div class=page><h4>Senior Software Engineer</h4><p class=role>TikTok &middot; 2023 &mdash; 25</p><p>ML systems for ads at an Exceptional review. Billion-scale vector search tracking $200M in creative spend; 50k QPS.</p></div>
+ </div>
+ <div class=tabs><label for=j1 title="page 1"></label><label for=j2 title="page 2"></label><label for=j3 title="page 3"></label></div>
+</div>
+<div id=probe style="font-family:ui-monospace,monospace;font-size:11px;color:var(--ochre);margin-top:40px;line-height:1.8"></div>
+<script>
+// is the SECOND page's text present in the a11y-relevant DOM even when unshown?
+const pages=[...document.querySelectorAll('.page')];
+const vis=pages.map(p=>getComputedStyle(p).opacity);
+const rects=pages.map(p=>p.getBoundingClientRect().height>0);
+document.getElementById('probe').innerHTML=
+ 'page opacities: '+vis.join(', ')+'<br>'+
+ 'all pages laid out (height>0): '+rects.join(', ')+'<br>'+
+ 'radios focusable (tabIndex): '+[...document.querySelectorAll('.jr')].map(r=>r.tabIndex).join(',')+'<br>'+
+ 'total text in DOM: '+document.querySelector('.jstack').textContent.trim().length+' chars (all 3 pages)';
+</script>
+</body></html>
