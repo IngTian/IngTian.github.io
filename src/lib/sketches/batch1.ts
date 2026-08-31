@@ -15,9 +15,23 @@
 //
 // The five rejected attempts and the open questions are in the commit history.
 
+// FRAME, PAL and `poly` came off this import list when noUnusedLocals went on (see tsconfig.json).
+// None of the five sketches below referenced any of them, and none should: a sketch is handed its
+// size and its palette on SketchCtx — `{ w, h, pal, data }` — and pages/proto-sketches.astro is what
+// feeds FRAME and PAL in, so reaching past the context to the module constants would let a sketch
+// disagree with the frame it is actually being rendered at. Every sketch below reads `pal` off the
+// context — it appears on 38 of this file's non-comment lines — while FRAME.w and FRAME.h were read
+// zero times. (That first figure was written as "33 times" and was simply wrong, which is the argument
+// for counting a thing with grep or not quoting a count at all: a tally in a comment is stale the next
+// time anyone edits the file, and this one was stale on arrival.)
+//
+// `poly` is the different case and worth a grep before anyone "tidies" kit.ts: it is still exported
+// from ./kit and, after this edit, has NO caller anywhere in src. That is exported dead code, which
+// noUnusedLocals cannot see (an export is a public API to the compiler). Left alone on purpose —
+// kit.ts is the shared toolkit for future batches, not this batch's private helpers.
 import {
-  type Sketch, type SketchCtx, FRAME, PAL,
-  svg, line, path, dot, poly, label, prose, wrap, rnd, f2,
+  type Sketch, type SketchCtx,
+  svg, line, path, dot, label, prose, wrap, rnd, f2,
 } from './kit';
 import { field, RANGE } from '../terrain';
 

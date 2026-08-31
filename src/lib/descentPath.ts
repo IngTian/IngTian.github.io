@@ -22,7 +22,13 @@
 // trajectory with its barrier called out. Same field, different subject — a career, not a surface.
 // The section header should say so plainly rather than pretend the field is new.
 
-import { field, grad, RANGE } from './terrain';
+// `grad` was imported here too and never called. It is genuinely not needed: this module reads the
+// field's HEIGHT (to lift the oblique projection, to place contour levels, to decide where the trail
+// climbs) and never its slope — the descending is done in trajectory.ts, whose settle() owns the
+// gradient steps. The import was harmless at runtime but not free to a reader: it advertised that the
+// career graph does its own optimisation, which is the one thing about this file that would be worth
+// knowing and is false. Dropped when noUnusedLocals went on.
+import { field, RANGE } from './terrain';
 import { WAYPOINTS, trajectoryFacts, type Waypoint } from './trajectory';
 
 export type Projection = '2d' | '3d';

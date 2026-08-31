@@ -68,9 +68,17 @@ export const CONSTRAINTS: Constraint[] = [
 /**
  * Fund-scale figures, declared — and ONLY the ones something reads.
  *
- * All three are read. Rules.astro prints `tickers` and `constraints` through lib/problemSize.ts's humanCount
- * and derives its DP state-count exponent from `tickers`; `periods` feeds lib/complexity.ts's decisionVariables
- * and scenarioLeaves, in that section and in tests/complexity.test.ts.
+ * `tickers` and `constraints` reach the page: Rules.astro prints both through lib/problemSize.ts's humanCount
+ * and derives its DP state-count exponent from `tickers`.
+ *
+ * `periods` NO LONGER REACHES ANY PAGE, and this comment used to say it did. It fed lib/complexity.ts's
+ * decisionVariables and scenarioLeaves in Rules.astro until that slide's tally draft was replaced by the
+ * conflict web (the reason is at the beat-four comment in Rules.astro); the two calls went when noUnusedLocals
+ * surfaced them. Its only remaining reader is tests/complexity.test.ts, which asserts those helpers against
+ * real fund scale rather than toy numbers — a reader worth having, but a TEST, not a rendered fact. It is kept
+ * deliberately on that basis and not by oversight: dropping it is a live option that costs that assertion its
+ * real-scale input and needs edits in two test files, so it is the owner's call rather than a side effect of a
+ * typecheck fix. By the rule this comment opens with, it is the one field here on probation.
  *
  * Two more fields used to sit here — `aum: '$1B'` and `drawdownLimit: 0.08` — with no reader anywhere. Both
  * facts DO reach the page, as prose inside the CONSTRAINTS entries above ("Max drawdown 8%…", "At $1B, your

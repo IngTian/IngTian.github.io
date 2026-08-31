@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -133,6 +133,26 @@ const internalHrefs = (p: Page): string[] =>
     .filter((h) => h !== '' && !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(h));
 
 /**
+ * Does this URL path name a FILE rather than a route?
+ *
+ * The site's internal hrefs are two populations and they need two different questions asked. Routes
+ * (`/writing`, `/writing/favourite-quotes`) are extensionless because Astro emits directory pages;
+ * assets carry an extension — `/cv.pdf`, `/favicon.svg`, `/site.webmanifest`, the hashed
+ * `/_astro/*.css`, and the two preloaded `/_astro/fonts/*.woff2`. Asking "is there a built page at
+ * this path" of `/cv.pdf` would report the CV as a dead link; asking "is there a file on disk" of
+ * `/writing` would report every route as one.
+ *
+ * The dividing line is a dot in the last segment — the same rule check 2 below spells inline as
+ * `/\.\w+$/` for the footer's `/cv.pdf`. (Check 2 keeps its own copy on purpose: it *skips* assets,
+ * where this one goes on to look for them on disk, so they are not the same predicate doing the same
+ * job.) It is a heuristic, and the way it could be wrong is a route whose final segment contains a
+ * dot — a writing slug like `v1.0-notes` would be mistaken for a file and looked for on disk. No such
+ * route exists today; if one is ever added, this is the line to fix, and it will fail loudly rather
+ * than quietly pass.
+ */
+const namesAFile = (path: string): boolean => /\/[^/]*\.[a-z0-9]+$/i.test(path);
+
+/**
  * Which built routes are prototypes. Used by the noindex check below — and by NOTHING ELSE any more,
  * which is the point of this note.
  *
@@ -156,29 +176,58 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
     expect(pages().length, NEEDS_BUILD).toBeGreaterThan(5);
   });
 
-  // ── 1. FRAGMENT LINKS RESOLVE ────────────────────────────────────────────────────────────────
+  // ── 1. EVERY INTERNAL LINK RESOLVES ──────────────────────────────────────────────────────────
   // EVERY page, prototypes included — see the note on isProto for why there is no exclusion here.
-  it('resolves every in-page fragment link to an id on the page it points at', () => {
+  //
+  // IT USED TO CHECK ONLY THE HREFS CONTAINING A '#'. The loop opened with `if (hash === -1)
+  // continue;`, which is a much narrower promise than the test's name implied, and the gap was not
+  // theoretical: dist/writing/index.html links its only piece as href="/writing/favourite-quotes",
+  // with no fragment — so the sole door to the sole writing piece was checked by nothing at all here,
+  // and check 2 below only ever looks inside the homepage footer. A renamed .md file (the slug IS the
+  // filename) or a moved route would have shipped a 404 on the newest section of the site with all
+  // three gates green.
+  //
+  // So the fragment is now the OPTIONAL half of the question. Every internal href is resolved to a
+  // path first and that path must exist; an href that also names a fragment must additionally find
+  // the id on the page it lands on. Same walk, same failure list, strictly more coverage.
+  it('resolves every internal link to a built page, and every fragment to an id on it', () => {
     const routes = byRoute();
     const dead: string[] = [];
 
     for (const page of pages()) {
       for (const href of internalHrefs(page)) {
         const hash = href.indexOf('#');
-        if (hash === -1) continue;
-        const frag = href.slice(hash + 1);
-        // `href="#"` is a no-op affordance and `#top` is defined by the HTML spec to mean the
-        // document itself; neither needs an element to exist.
-        if (frag === '' || frag === 'top') continue;
+        const frag = hash === -1 ? null : href.slice(hash + 1);
+        // `href="#"` is a no-op affordance and `#top` is defined by the HTML spec to mean the document
+        // itself, so neither needs an element to exist. Only the ID half is waived, not the whole
+        // href: the old version `continue`d here, which meant a link to a page that does not exist
+        // escaped the check entirely as long as it ended in "#top".
+        const waiveId = frag === '' || frag === 'top';
 
-        // Resolve against the page's own served URL so a same-page "#x", a sibling "writing#x" and
-        // an absolute "/writing#x" all go through one code path. The origin is a throwaway.
-        const target = new URL(href, servedUrl(page.route)).pathname.replace(/\/$/, '');
-        const dest = routes.get(target === '' ? '/' : target);
+        // Resolve against the page's own served URL so a same-page "#x", a sibling "writing#x", an
+        // absolute "/writing#x" and a bare "/writing" all go through one code path. `pathname` also
+        // drops any query string for free. The origin is a throwaway.
+        const path = new URL(href, servedUrl(page.route)).pathname;
+
+        // Assets are checked as files, not as routes — see namesAFile. decodeURIComponent because a
+        // filename with a space or a non-ASCII character is percent-encoded in the href and not on
+        // disk; the gallery's photos are imported by astro:assets rather than linked, but a future
+        // download link would hit this.
+        if (namesAFile(path)) {
+          const onDisk = join(DIST, decodeURIComponent(path).replace(/^\//, '').split('/').join(sep));
+          if (!existsSync(onDisk)) dead.push(`${page.file}: href="${href}" → no file at dist${path}`);
+          continue;
+        }
+
+        // Routes are keyed without a trailing slash (routeOf), while Astro's own hrefs and the ones
+        // hand-written in profile.ts/nav.ts disagree about whether to write one — so normalise here
+        // rather than requiring one spelling. '/' normalises to '' and has to come back.
+        const target = path.replace(/\/+$/, '') || '/';
+        const dest = routes.get(target);
 
         if (!dest) {
-          dead.push(`${page.file}: href="${href}" → no built page at ${target || '/'}`);
-        } else if (!dest.ids.has(frag)) {
+          dead.push(`${page.file}: href="${href}" → no built page at ${target}`);
+        } else if (frag !== null && !waiveId && !dest.ids.has(frag)) {
           dead.push(`${page.file}: href="${href}" → ${dest.file} has no id="${frag}"`);
         }
       }
@@ -186,7 +235,7 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
 
     // One message listing every dead link, because these come in families: a renamed id breaks
     // every link to it at once, and fixing them one failure per run wastes the information.
-    expect(dead, `dead fragment links in the built site:\n  ${dead.join('\n  ')}`).toEqual([]);
+    expect(dead, `dead internal links in the built site:\n  ${dead.join('\n  ')}`).toEqual([]);
   });
 
   // ── 2. THE FOOTER CARRIES THE WHOLE PAGE SET ─────────────────────────────────────────────────

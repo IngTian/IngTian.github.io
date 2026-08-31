@@ -33,7 +33,7 @@ import { BELLMAN_EQUATIONS } from '../lib/equations';
 import { humanCount } from '../lib/problemSize';
 import {
   sizeLadder, trajectories, trajBounds, trajPoints,
-  decisionVariables, scenarioLeaves, magnitude, TRAJ_COUNT, TRAJ_WEEKS,
+  magnitude, TRAJ_COUNT, TRAJ_WEEKS,
   rulePairs, conflictWeb, rulePoint,
 } from '../lib/complexity';
 
@@ -58,10 +58,13 @@ const W = 560, H = 300;
 const box = { x: 0, y: 10, w: W, h: H - 20 };
 const baseY = box.y + (1 - (100 - bounds.lo) / (bounds.hi - bounds.lo)) * box.h;
 
-// Beat four's arithmetic. Deliberately crude, and the caption says so: nobody models the future with a 3-way
-// tree, so it is an honest lower bound on "how many futures are there".
-const vars = decisionVariables(FUND.tickers, FUND.periods);
-const leafExp = magnitude(scenarioLeaves(3, FUND.periods));
+// BEAT FOUR'S OLD ARITHMETIC IS GONE, and the reason is written two comments down. `vars` (the decision-variable
+// count) and `leafExp` (the decimal exponent of a 3-way scenario tree) were computed here for the draft that
+// answered "how hard is this?" with a tally. That draft was replaced precisely BECAUSE a tally undercuts the
+// claim — 10^11 futures is brute-forceable in 282 seconds — so the two numbers outlived the sentences that
+// quoted them and noUnusedLocals is what finally said so. `decisionVariables` and `scenarioLeaves` came off the
+// import with them; both remain exported and covered by tests/complexity.test.ts, so re-quoting either is one
+// line, and lib/complexity.ts is still where that arithmetic belongs.
 
 // Three threads picked out in ink over the fan, so a reader sees that each line is one name's possible future
 // rather than an abstract wash. Fixed indices, so the choice is deterministic like everything else here.

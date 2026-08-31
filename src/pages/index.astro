@@ -15,11 +15,28 @@ import Appendix from '../sections/Work.astro';
 import Deck from '../components/Deck.astro';
 ---
 
-<BaseLayout veilLine="a researcher by day" veilOnLoad={false}>
-  {/* is-slides turns the homepage into the deck: the scroll rests at slide edges instead of
-       anywhere. The mechanism is CSS scroll-snap (see global.css) — no scroll-hijacking JS, so
-       keyboard, trackpad momentum, and find-in-page all keep working. Only the homepage opts in;
-       /research and /projects share .descent and must stay free-scrolling reading pages. */}
+{/* preloadAccent: the Work slide's sub-headlines and its italic editorial line are the homepage's only
+     Fraunces, and they are also the measurement that put this preload back (FCP 1956 -> 2333ms without it,
+     three runs on a production build). See the note next to <Font> in BaseLayout. */}
+<BaseLayout veilLine="a researcher by day" veilOnLoad={false} preloadAccent={true}>
+  {/* is-slides turns the homepage into the deck: the scroll rests at slide edges instead of anywhere.
+       THE MECHANISM IS EXPLICIT JS, NOT CSS SCROLL-SNAP, and this comment used to claim the opposite —
+       which is worth correcting loudly, because this is the first thing anyone reads before adding a
+       section here. Snap was built first and MEASURED: slide gaps here are 819-2346px while one wheel
+       gesture is ~320px, so `scroll-snap-type: y mandatory` kept re-snapping to the slide the gesture
+       started from — the scroll sat at y=84 through eight consecutive gestures. `proximity`,
+       `scroll-snap-stop: always` and a hero shrunk to exactly 100vh all measured identically stuck, so
+       no snap flag can fix it (see the numbers in global.css and lib/deck.ts). The deck is therefore
+       driven by <Deck /> below: it owns a rAF tween to the next stop from lib/deck.ts.
+         What .is-slides itself contributes is only the SLIDE METRICS (global.css): each top-level
+       <section> gets min-height 100vh and centres its content, and the five paper panels get the
+       top clearance that keeps the fixed corner nav off their headlines.
+         The half of the old comment that WAS true, and stays true — keyboard (Home/End/PageUp/PageDown/
+       space/arrows), find-in-page and #anchor jumps, and trackpad momentum all keep working. That is
+       deliberate work in Deck.astro (programmatic scrolls are ignored; one flick is coalesced into one
+       slide), not something a CSS mechanism was giving us for free.
+         Only the homepage opts in; /research and /projects share .descent and must stay free-scrolling
+       reading pages. The deck also disengages entirely under reduced motion and on phones. */}
   <main class="descent is-fluid is-slides">
     <FluidSky strength={4} variant="descent" />
     <SkyWash />
@@ -29,12 +46,21 @@ import Deck from '../components/Deck.astro';
          trajectory, but didn't answer what I do. Normally people think about what do I do first, then my
          trajectory." Correct, and it was backwards — a reader met a career-shaped gradient descent before
          knowing what field it descended into.
-           1. Choice — what the decision IS, and how much of it there is. Six names you recognise, thousands you
-              do not, and the fan of forty-eight people reading the same six headlines to 0.85x-1.34x.
-           2. Rules — what you are not allowed to do, as the feasible set collapsing. Real convex geometry:
-              constraints are half-spaces, so the polytope is clipped and measured (100 -> 20%), not drawn.
+           1. Choice — what the decision IS, defined rather than assumed: ONE object, a hundred dollars in a
+              bar, divided three ways, re-priced after one piece of news, then re-divided month after month.
+              (It is not the earlier "six names you recognise" + a forty-eight-forecaster fan; that draft
+              opened by assuming the concept, and grepping the built page confirmed nothing on the site said
+              what a portfolio was.)
+           2. Rules — how hard it actually is, in four beats: you run a billion dollars and your own slippage
+              is now measurable; you are not allowed to do most of it; nobody knows what any of it will do;
+              now do all of it at once, every month. (It is NOT the convex feasible polygon this comment used
+              to describe — that drawing, and the decision lattice beside it, were exact and unit-tested and
+              still pulled: both answer "what is the feasible set", a question a reader who has never been
+              told no does not have yet, and both SHRINK something on the one slide whose whole claim is that
+              the problem grows the closer you look. See the note at the top of Rules.astro before rebuilding
+              either.)
            3. Solve — the method, as the algorithm running: a real Bellman lattice filling in backward from the
-              horizon, then the optimal route traced forward past 29 candidates.
+              horizon, then the optimal route traced forward past the 29 candidate policies it beat.
 
          Solve used to break the register as the one dark panel. It no longer does — a light-theme reader read
          that as a bug, not as emphasis, so all four paper slides now share one palette and follow the theme. */}
