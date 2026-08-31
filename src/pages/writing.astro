@@ -31,6 +31,7 @@ const entries = (await getCollection('writing'))
     slug: e.id,
     title: e.data.title,
     date: e.data.date,
+    updated: e.data.updated,
     blurb: e.data.blurb,
     minutes: e.data.minutes,
     featured: e.data.featured,
@@ -117,6 +118,9 @@ const longDate = (iso: string) =>
                   <li class="piece" id={entrySectionId(kind.key, e.slug)}>
                     <p class="piece-meta">
                       <time datetime={e.date}>{longDate(e.date)}</time>
+                      {e.updated && e.updated !== e.date && (
+                        <span class="piece-upd">updated <time datetime={e.updated}>{longDate(e.updated)}</time></span>
+                      )}
                       {e.minutes && <span class="piece-mins">{e.minutes} min</span>}
                     </p>
                     <h3 class="piece-title">
@@ -204,6 +208,8 @@ const longDate = (iso: string) =>
     color: var(--ink-4); margin: 0 0 6px;
   }
   .piece-mins::before { content: '·'; margin-right: 12px; }
+  /* Same register as the reading time: a fact about the piece, not part of its title. */
+  .piece-upd::before { content: '·'; margin-right: 12px; }
   .piece-title {
     font-family: var(--font-display); font-weight: 500; font-size: clamp(17px, 1.7vw, 21px);
     line-height: 1.25; color: var(--ink-1); margin: 0;

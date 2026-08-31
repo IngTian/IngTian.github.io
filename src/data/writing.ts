@@ -25,6 +25,9 @@ export interface WritingEntry {
   title: string;
   /** ISO date, so ordering is unambiguous and the page can format it as it likes. */
   date: string;
+  /** ISO date the piece last GAINED something. Absent when it has not changed since publication; the pages
+   *  render it only when it differs from `date`, so an untouched piece shows one date, not two identical. */
+  updated?: string;
   /** One or two sentences: what it argues, in plain language. */
   blurb: string;
   /** Rough reading time in minutes. Omitted when it would be a guess. */
