@@ -63,7 +63,7 @@ const monthYear = (iso: string) =>
 const compounded = featured?.results?.[0];
 const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
 ---
-<!-- THE APPENDIX — the work AND the footer, as one slide. The owner: "i noticed that when i scroll down to the
+{/* THE APPENDIX — the work AND the footer, as one slide. The owner: "i noticed that when i scroll down to the
      work, it seems like you aligned the bottom with the footer so that leaves a huge space below the cow. why not
      merge the footer and the last slide? name it appendix."
      He read the symptom exactly right. The two were separate top-level sections, so the deck gave each its own
@@ -71,14 +71,14 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
      the final stop was a 193px strip. One section, one stop — the page now ends where it stops.
      `Appendix` is his word and it is the better one now: with the links, the seal and the copyright inside it,
      this is no longer only "the work" but the reference matter at the end of a paper, which is exactly the
-     register the rest of the site is written in. -->
+     register the rest of the site is written in. */}
 <section id="appendix" class="wk" aria-labelledby="ap-heading">
   <div class="wk-paper">
     <div class="wk-inner">
       <h2 id="ap-heading" class="wk-title">Appendix</h2>
 
       <div class="wk-cols">
-        <!-- PUBLICATIONS: the paper by name, so a reader knows what they are opening. -->
+        {/* PUBLICATIONS: the paper by name, so a reader knows what they are opening. */}
         <div class="wk-col">
           <p class="wk-col-kicker">Publications</p>
           {featured && (
@@ -88,8 +88,8 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
                 {featured.subject} · {featured.venue}
                 {featured.arxivId && <> · arXiv:{featured.arxivId}</>}
               </p>
-              <!-- Out-of-sample, against two baselines, both named — a number with nothing to compare it to is
-                   decoration. Full table on /research. -->
+              {/* Out-of-sample, against two baselines, both named — a number with nothing to compare it to is
+                   decoration. Full table on /research. */}
               <div class="wk-stats">
                 {compounded && (
                   <div class="wk-stat">
@@ -115,13 +115,13 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
           <a class="wk-link" href="/research">Read the research<span class="wk-arrow" aria-hidden="true">→</span></a>
         </div>
 
-        <!-- WRITINGS: whatever is actually published, and a promise ONLY while nothing is.
+        {/* WRITINGS: whatever is actually published, and a promise ONLY while nothing is.
              Two states, and which one renders is decided by src/content/writing/ rather than by an editor
              remembering to come back here. Published pieces get the same treatment as the papers and the
              projects — name, one line, a real link — because that is this slide's whole contract: every row is
              a thing the reader can go and check. No count and no "1 piece" tag: this panel is written without
              counts on purpose (see the file header), and the rows themselves are the better answer to "how
-             much is there". -->
+             much is there". */}
         <div class="wk-col">
           <div class="wk-col-head">
             <p class="wk-col-kicker">Writing</p>
@@ -147,7 +147,7 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
           )}
         </div>
 
-        <!-- PROJECTS: last, and briefest — for a quant reader this is supporting evidence. -->
+        {/* PROJECTS: last, and briefest — for a quant reader this is supporting evidence. */}
         <div class="wk-col">
           <p class="wk-col-kicker">Projects</p>
           {shownProjects.map((p) => (
@@ -160,11 +160,11 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
         </div>
       </div>
 
-      <!-- THE COW LIVES HERE NOW — "im thinking if it's better to move the cow to above", pointing at exactly
+      {/* THE COW LIVES HERE NOW — "im thinking if it's better to move the cow to above", pointing at exactly
            this empty band. It solves two things at once: the footer stops asking a 19-word strip to hold both the
            IT seal and a pixel animal, and this slide stops ending in 480px of blank panel (measured: 422px of
            content in a 900px slide). It is still the last thing before the footer, so it keeps its place as the
-           page's closing aside. -->
+           page's closing aside. */}
       <div class="wk-cow">
         <PlushCow size="mark" />
       </div>
@@ -172,10 +172,10 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
     </div>
   </div>
 
-  <!-- The footer, NESTED rather than a sibling. lib/deck.ts counts only the direct <section> children of <main>,
+  {/* The footer, NESTED rather than a sibling. lib/deck.ts counts only the direct <section> children of <main>,
        so nesting is what collapses the two stops into one — no change to the deck itself. It keeps its own dark
        ground because it sits on the descent gradient below the tan panel, which is where the sky reaches
-       near-black: the page still ENDS in the dark, which is the whole point of the descent. -->
+       near-black: the page still ENDS in the dark, which is the whole point of the descent. */}
   <Signature />
 
 <style>

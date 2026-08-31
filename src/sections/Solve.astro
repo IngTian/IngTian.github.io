@@ -63,11 +63,11 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
       <p class="so-kicker">3 / 3 · where to start</p>
 
       <div class="so-split">
-        <!-- ── WHAT IS OPEN, AND WHERE IT WOULD BE ATTACKED.
+        {/* ── WHAT IS OPEN, AND WHERE IT WOULD BE ATTACKED.
              No equation here any more. An earlier version made the Bellman recursion this slide's spine, which
              asserts a formulation and a solution on a problem that has neither — see data/desk.ts for the
              owner's correction verbatim. The difficulty slide already owns that recursion, where it is true
-             because it is the thing that blows up. -->
+             because it is the thing that blows up. */}
         <div class="so-say">
           <h2 id="so-heading" class="so-head">{OPEN_HEADING}</h2>
 
@@ -86,8 +86,8 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
         <figure class="so-fig">
           <svg class="so-chart" viewBox={`0 0 ${VW} ${VH}`} role="img"
                aria-label={`A lattice of portfolio states across twelve decision points. Values are computed backward from the horizon, then the optimal route is traced forward, beating ${cands.length} candidate policies.`}>
-            <!-- THE SURFACE. Drawn as a wireframe from both directions; the script reveals it right-to-left,
-                 which is the direction the algorithm actually runs. -->
+            {/* THE SURFACE. Drawn as a wireframe from both directions; the script reveals it right-to-left,
+                 which is the direction the algorithm actually runs. */}
             <g class="so-mesh">
               {timeLines.map((line, t) => (
                 <polyline class="so-rib" data-t={t} points={path(line)} />
@@ -97,12 +97,12 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
               ))}
             </g>
 
-            <!-- THE MANY: every candidate policy, at the value of the states it passes through. -->
+            {/* THE MANY: every candidate policy, at the value of the states it passes through. */}
             <g class="so-cands" data-cands>
               {candLines.map((line) => <polyline class="so-cand" points={path(line)} />)}
             </g>
 
-            <!-- THE ONE. Revealed last, forward through time. -->
+            {/* THE ONE. Revealed last, forward through time. */}
             <polyline class="so-opt" data-opt points={path(optLine)} />
             {optLine.map(([x, y], i) => (
               <circle class="so-opt-node" data-opt-node={i} cx={Math.round(x)} cy={Math.round(y)} r="3" />
@@ -117,12 +117,12 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
 
           <p class="so-read" data-read aria-live="polite">A world small enough to solve exactly…</p>
 
-          <!-- THE FIGURE'S CLAIM, NARROWED. The algorithm is real and unit-tested; what changed is what it is
+          {/* THE FIGURE'S CLAIM, NARROWED. The algorithm is real and unit-tested; what changed is what it is
                evidence OF. It is not the method running, and it is not the largest solvable case either — that
                would be false on this slide's own terms, since Gârleanu–Pedersen 2013 is closed-form at
                thousands of names. It is a world handed over complete, and every count below is checked against
                lib/bellman.ts: 12 dates x 9 states = 108 decisions, 972 comparisons, 9^12 paths, and a
-               thirteenth rib at the horizon where value is zero by construction. -->
+               thirteenth rib at the horizon where value is zero by construction. */}
           <figcaption class="so-cap">
             {LEVELS} exposure levels at {PERIODS} dates — {PERIODS * LEVELS} decisions, {PERIODS * LEVELS * LEVELS} comparisons,
             and {LEVELS}<sup>{PERIODS}</sup> = 2.8×10<sup>11</sup> exposure paths the recursion never visits. It is
@@ -134,10 +134,10 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
         </figure>
       </div>
 
-      <!-- THE SELECTOR IS THE DISCIPLINES, in the owner's own words: "from RL, with math, or, stochastic
+      {/* THE SELECTOR IS THE DISCIPLINES, in the owner's own words: "from RL, with math, or, stochastic
            process, probability, as the backbone". It used to be the terms of an equation, which died with the
            equation. Same affordance and position as slide two's band, but what you click is a direction of
-           attack rather than a numbered beat. -->
+           attack rather than a numbered beat. */}
       <ol class="so-terms" aria-label="A few general methodologies">
         {METHODOLOGIES.map((m, i) => (
           <li>

@@ -11,15 +11,15 @@ for (const phrase of bio.strong) {
 ---
 <section id="heights" class="relative min-h-[108vh] px-[7vw] pb-[12vh]">
   <TerrainHero />
-  <!-- legibility: soft paper fades behind the name (bottom-left) and bio (top-right) -->
+  {/* legibility: soft paper fades behind the name (bottom-left) and bio (top-right) */}
   <div class="hero-legibility" aria-hidden="true"></div>
 
-  <!-- about-me, floated top-right; the empty diagonal to the name IS the composition -->
+  {/* about-me, floated top-right; the empty diagonal to the name IS the composition */}
   <div class="hero-bio absolute top-[22vh] right-[7vw] max-w-[32ch] text-right">
     <p class="font-body text-ink-2/90 leading-[1.6] text-[clamp(13px,1.25vw,15.5px)]" set:html={bioHtml}></p>
   </div>
 
-  <!-- name anchored bottom-left -->
+  {/* name anchored bottom-left */}
   <div class="hero-rise absolute bottom-[16vh] left-[7vw] max-w-[88vw]">
     <h1 class="font-display text-ink-1 leading-[0.9] tracking-[-0.02em] text-[clamp(64px,12vw,132px)]"
         style="font-variation-settings:'opsz' 144,'SOFT' 60; text-shadow: 0 1px 18px rgba(22,20,15,0.06);">
@@ -28,13 +28,13 @@ for (const phrase of bio.strong) {
     <p class="font-display italic text-ink-3 mt-5 text-[clamp(15px,2.2vw,21px)]">{roles}</p>
     <p class="font-mono uppercase tracking-[0.22em] text-ink-3/90 mt-2.5 text-[11px]">{phd} &nbsp;·&nbsp; {rolesSub}</p>
 
-    <!-- THE TAGLINE, directly under the role line. The owner: "maybe put A researcher by day tag line
+    {/* THE TAGLINE, directly under the role line. The owner: "maybe put A researcher by day tag line
          underneath the Quant Researcher · Portfolio Optimization."
          It now reads as the third beat of one introduction — who I am, what I work on, how I spend the day —
          instead of a line floating in the opposite corner. It is still two real LINKS, but they are no longer
          load-bearing navigation: the corner nav carries the page set at all times, so per the owner "the click
          stays an easter egg". That is what the marker-wash and underline affordances below are for — a reward
-         for the curious rather than the only door in. -->
+         for the curious rather than the only door in. */}
     <p class="hero-doors-line font-display italic text-ink-3 leading-[1.5] mt-4 text-[clamp(13.5px,1.35vw,17px)]">
       <a class="research-link" href="/research">A researcher by day</a>, <a class="art-link" href="/art">an artist by night</a>,<br />
       and a mathematician at heart.

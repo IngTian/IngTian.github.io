@@ -28,38 +28,38 @@ import { WAYPOINTS } from '../lib/trajectory';
 <section id="descent-path" class="dp" aria-labelledby="dp-heading">
   <header class="dp-head">
     <h2 id="dp-heading">A descent, with one climb</h2>
-    <!-- SHORT, and no number. The lede used to state the climb's height as a figure — but the height is
+    {/* SHORT, and no number. The lede used to state the climb's height as a figure — but the height is
          a real measurement of an INVENTED surface, so quoting it next to a career reads as a claim about
          the career, which it is not. The owner: "you don't need the numbers, the numbers are made up."
-         What is left is the only thing the picture needs said out loud. -->
+         What is left is the only thing the picture needs said out loud. */}
     <p class="dp-lede">
       Years in engineering, and a pivot to quantitative research.
     </p>
 
-    <!-- 3D was offered as a comparison and lost: the relief view measured 2.0% ink against the
+    {/* 3D was offered as a comparison and lost: the relief view measured 2.0% ink against the
          plan view's 3.4% because the surface itself was never rendered, so it read as a 2D curve on
          a distorted grid. The owner chose plan, so the control is gone rather than left as a
-         half-good option. descentPath.ts keeps the projection parameter, which costs nothing. -->
+         half-good option. descentPath.ts keeps the projection parameter, which costs nothing. */}
     <div class="dp-controls">
       <button type="button" class="dp-btn dp-replay" data-replay>replay the walk</button>
     </div>
 
-    <!-- A live readout, so the reveal reads as a WALK with a state rather than a fade-in. It also
-         states the discovery moment, which is the point of the whole device. -->
+    {/* A live readout, so the reveal reads as a WALK with a state rather than a fade-in. It also
+         states the discovery moment, which is the point of the whole device. */}
     <p class="dp-readout" data-readout aria-live="polite"></p>
   </header>
 
   <div class="dp-stage" data-dp-stage>
     <canvas class="dp-canvas" data-dp-canvas aria-hidden="true"></canvas>
 
-    <!-- THE CODA, MOVED HERE, and this is a reachability fix rather than a layout preference.
+    {/* THE CODA, MOVED HERE, and this is a reachability fix rather than a layout preference.
          It used to close the editorial column, where the deck made it unreadable: the story section is
          taller than one screen, so the gesture that would scroll to the coda advanced to the next slide
          instead. The owner: "totally unreacheable with normal scroll… a simple strategy is to put this
          phrase here [the graph's empty lower-right], after the Quantitative Researcher is shown, animated."
          So it lives in the drawing's empty quadrant and fades in once the walk has actually discovered the
          deeper basin — the line only makes sense after that. HTML rather than canvas text, so the display
-         italic renders properly and a screen reader can read it. -->
+         italic renders properly and a screen reader can read it. */}
     <p class="dp-coda" data-dp-coda>
       The deepest point on that surface is not marked, because I do not know where it is. What I know is the
       direction, and that the descent is still running.
@@ -70,10 +70,10 @@ import { WAYPOINTS } from '../lib/trajectory';
     </p>
   </div>
 
-  <!-- The accessible path. Visually hidden because the graph's own labels already name every stop —
+  {/* The accessible path. Visually hidden because the graph's own labels already name every stop —
        a repeated list on screen said the same thing twice and pulled the section back toward the
        resume format this whole piece exists to avoid. Screen readers and no-JS still get everything,
-       in order. -->
+       in order. */}
   <ol class="dp-stops sr-only">
     {WAYPOINTS.map((w) => (
       <li>
@@ -82,10 +82,10 @@ import { WAYPOINTS } from '../lib/trajectory';
     ))}
   </ol>
 
-  <!-- The "deepest point is not marked" footnote is deleted on the owner's instruction. The idea it
+  {/* The "deepest point is not marked" footnote is deleted on the owner's instruction. The idea it
        carried survives where it belongs: the graph draws the deeper basin unlabelled (see
        unknownAttractor), and the editorial's closing line says it in the writing's own voice. Saying it
-       three times in one section was two too many. -->
+       three times in one section was two too many. */}
 </section>
 
 <style>

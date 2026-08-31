@@ -30,7 +30,7 @@ import { STORY } from '../data/story';
 ---
 <section id="story" class="story" aria-labelledby="story-heading">
   <div class="story-paper">
-    <!-- ONE SECTION, TWO COLUMNS. The owner: "I'm thinking about if it's more natural to merge A
+    {/* ONE SECTION, TWO COLUMNS. The owner: "I'm thinking about if it's more natural to merge A
          descent with one climb with Why the climb. After all they are all describing my career path.
          There is also a huge right panel unused here."
          Both are right. They were two stacked slides describing one subject, and at a wide viewport the
@@ -38,10 +38,10 @@ import { STORY } from '../data/story';
          aspect (1.27) cannot stretch to fill a letterbox frame and the surplus became padding.
          So the prose moves INTO that space: graph left, writing right, one section. The graph is
          STICKY, so it stays visible while its explanation scrolls past — the whole point of merging is
-         that you can read the claim and check the picture at the same time. -->
+         that you can read the claim and check the picture at the same time. */}
     <div class="story-split">
-      <!-- The graph, on the same paper. Passed in as a slot so this component owns the surface and the
-           ink tokens, and DescentPath stays a self-contained piece that inherits them. -->
+      {/* The graph, on the same paper. Passed in as a slot so this component owns the surface and the
+           ink tokens, and DescentPath stays a self-contained piece that inherits them. */}
       <div class="story-figure-slot"><slot /></div>
 
       <div class="story-inner">
@@ -57,7 +57,7 @@ import { STORY } from '../data/story';
           ))}
         </div>
 
-        <!-- THE FIGURES ARE GONE. They were computed at build time rather than typed, but computed from
+        {/* THE FIGURES ARE GONE. They were computed at build time rather than typed, but computed from
              the HERO'S INVENTED FIELD — so "260x feedback ratio" was an exact measurement of a fiction,
              printed where a reader would take it as a fact about a career. A true number about a made-up
              surface is worse than no number, because it borrows the authority of measurement.
@@ -69,7 +69,7 @@ import { STORY } from '../data/story';
              The replacement tail line I put here had EXACTLY THE SAME BUG — same column, same fold, same
              unreachable position — so it is deleted rather than restyled. The section now ends with its last
              body paragraph, and the coda in the drawing is the closing line. Nothing goes at the bottom of
-             this column again. -->
+             this column again. */}
       </div>
     </div>
   </div>

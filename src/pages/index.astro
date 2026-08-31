@@ -16,16 +16,16 @@ import Deck from '../components/Deck.astro';
 ---
 
 <BaseLayout veilLine="a researcher by day" veilOnLoad={false}>
-  <!-- is-slides turns the homepage into the deck: the scroll rests at slide edges instead of
+  {/* is-slides turns the homepage into the deck: the scroll rests at slide edges instead of
        anywhere. The mechanism is CSS scroll-snap (see global.css) — no scroll-hijacking JS, so
        keyboard, trackpad momentum, and find-in-page all keep working. Only the homepage opts in;
-       /research and /projects share .descent and must stay free-scrolling reading pages. -->
+       /research and /projects share .descent and must stay free-scrolling reading pages. */}
   <main class="descent is-fluid is-slides">
     <FluidSky strength={4} variant="descent" />
     <SkyWash />
     <Heights />
     <Interlude />
-    <!-- WHAT I DO COMES BEFORE HOW I GOT HERE, on the owner's observation: "the descent answered my
+    {/* WHAT I DO COMES BEFORE HOW I GOT HERE, on the owner's observation: "the descent answered my
          trajectory, but didn't answer what I do. Normally people think about what do I do first, then my
          trajectory." Correct, and it was backwards — a reader met a career-shaped gradient descent before
          knowing what field it descended into.
@@ -37,31 +37,31 @@ import Deck from '../components/Deck.astro';
               horizon, then the optimal route traced forward past 29 candidates.
 
          Solve used to break the register as the one dark panel. It no longer does — a light-theme reader read
-         that as a bug, not as emphasis, so all four paper slides now share one palette and follow the theme. -->
+         that as a bug, not as emphasis, so all four paper slides now share one palette and follow the theme. */}
     <Choice />
     <Rules />
     <Solve />
-    <!-- THEN the trajectory, which now reads as "and this is how I came to be doing it" rather than as a
+    {/* THEN the trajectory, which now reads as "and this is how I came to be doing it" rather than as a
          riddle about an unnamed field. The graph renders INSIDE the Story panel so the picture and the words
-         that read it are one surface. Settled piece — see notes/showpiece.md. -->
+         that read it are one surface. Settled piece — see notes/showpiece.md. */}
     <Story>
       <DescentPath />
     </Story>
     <Appendix />
-    <!-- MOUNTAINS IS GONE from the homepage, on the owner's instruction: "you may delete everything
+    {/* MOUNTAINS IS GONE from the homepage, on the owner's instruction: "you may delete everything
          from below. The record, the experience, everything." It was the résumé — research interests,
          selected writing, selected experience, projects, recognition — and it is the thing the graph
          and the editorial exist to replace. Nothing was lost: every block already has its own route
          (/research, /experience, /projects), and the footer + corner nav carry the doorways. The
-         section file is kept, unreferenced, so the markup can be recovered from git or re-used. -->
-    <!-- THE TERMINAL IS GONE, on the owner's instruction: "you can delete the terminal at the bottom,
+         section file is kept, unreferenced, so the markup can be recovered from git or re-used. */}
+    {/* THE TERMINAL IS GONE, on the owner's instruction: "you can delete the terminal at the bottom,
          it's already useless." It was the site's only React island; with it removed the homepage ships
          no client framework at all. Its data (data/script.ts), engine (useTypewriter) and spec are
-         deleted with it rather than left as dead weight — git holds them if it ever comes back. -->
+         deleted with it rather than left as dead weight — git holds them if it ever comes back. */}
   </main>
   <Toc />
   <Grain />
-  <!-- One gesture = one slide. Behaviour lives in lib/deck.ts (pure, tested); this only attaches the
-       listeners, and only on the homepage — the reading pages stay free-scrolling. -->
+  {/* One gesture = one slide. Behaviour lives in lib/deck.ts (pure, tested); this only attaches the
+       listeners, and only on the homepage — the reading pages stay free-scrolling. */}
   <Deck />
 </BaseLayout>

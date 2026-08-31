@@ -130,13 +130,13 @@ const updatedLong =
   }
 </style>
 
-<!-- ── THE PROSE STYLE, AND IT MUST BE is:global. NOT a preference — the first version of this was a scoped
+{/* ── THE PROSE STYLE, AND IT MUST BE is:global. NOT a preference — the first version of this was a scoped
      block and NONE of it applied, which is why the owner saw a wall with no spacing and a quote that did not
      read as a quote. Astro scoped styles rewrite every selector with a [data-astro-cid-…] attribute, and the
      elements <Content /> emits are generated from markdown at build time, so they carry no such attribute.
      `.prose blockquote` became `.prose[cid] blockquote[cid]` and matched nothing. The repo's own guide warns
      about this attribute changing specificity; it also silently changes what a selector can REACH.
-     Everything below is nested under .prose so going global cannot leak into the rest of the site. -->
+     Everything below is nested under .prose so going global cannot leak into the rest of the site. */}
 <style is:global>
   /* Measure is 62ch. The block is 860px wide, which at 16px is about 110 characters — a line length nobody
      finishes. */

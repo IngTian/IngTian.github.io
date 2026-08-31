@@ -102,11 +102,11 @@ const allBeats = [...BEATS, BEAT4];
       <p class="ch-kicker">1 / 3</p>
       <h2 id="ch-heading" class="ch-head">What is multi-period portfolio optimization?</h2>
 
-      <!-- Beats LEFT, the object RIGHT — the definition and its illustration read together, and the object
+      {/* Beats LEFT, the object RIGHT — the definition and its illustration read together, and the object
            gets the larger share. Stacking them left the right half of the slide empty and pushed the money bar
-           below the fold of attention. -->
+           below the fold of attention. */}
       <div class="ch-body">
-      <!-- THE FOUR BEATS. Each is a question a stranger would actually ask, answered against the same object.
+      {/* THE FOUR BEATS. Each is a question a stranger would actually ask, answered against the same object.
            The reveal is sequential so the definition builds; with no JS all four show at once, which is the
            finished state and still reads in order.
            EACH ONE IS A REAL BUTTON. The owner: "i should be able to click on the 4 phases and read. it can be
@@ -114,7 +114,7 @@ const allBeats = [...BEATS, BEAT4];
            that only advances on its own timer is a slide that reads at ITS pace, not the reader's — and four
            beats at 4.6s each means the one you want is up to 18s away. Buttons rather than a click handler on a
            <li>, so the beats are keyboard-operable and announced; aria-pressed carries which one is showing.
-           A <button> may only contain phrasing content, hence spans styled as blocks rather than <p>. -->
+           A <button> may only contain phrasing content, hence spans styled as blocks rather than <p>. */}
       <ol class="ch-beats">
         {allBeats.map((b, i) => (
           <li>
@@ -127,7 +127,7 @@ const allBeats = [...BEATS, BEAT4];
       </ol>
 
       <div class="ch-stage">
-        <!-- BEAT 1: the portfolio, as one bar of money divided four ways. -->
+        {/* BEAT 1: the portfolio, as one bar of money divided four ways. */}
         <figure class="ch-panel" data-panel="0">
           <p class="ch-panel-head">$100, split four ways</p>
           <div class="ch-bar ch-bar--big" role="img"
@@ -156,7 +156,7 @@ const allBeats = [...BEATS, BEAT4];
           <p class="ch-panel-foot">That is a portfolio. Nothing more — a decision about where money sits.</p>
         </figure>
 
-        <!-- BEAT 2: the same money, split differently, and what one piece of news does to each. -->
+        {/* BEAT 2: the same money, split differently, and what one piece of news does to each. */}
         <figure class="ch-panel" data-panel="1">
           <p class="ch-panel-head">
             <span class="ch-when">{EVENT.when}</span> {EVENT.what}
@@ -192,7 +192,7 @@ const allBeats = [...BEATS, BEAT4];
           </p>
         </figure>
 
-        <!-- BEAT 3: and you choose again. The same bar, month after month. -->
+        {/* BEAT 3: and you choose again. The same bar, month after month. */}
         <figure class="ch-panel" data-panel="2">
           <p class="ch-panel-head">And then you choose again</p>
           <ul class="ch-months">
@@ -214,12 +214,12 @@ const allBeats = [...BEATS, BEAT4];
           </p>
         </figure>
 
-        <!-- BEAT 4: five ways of running the SAME four holdings through the same year, as weekly PnL curves.
+        {/* BEAT 4: five ways of running the SAME four holdings through the same year, as weekly PnL curves.
              Grouped retail vs institutional because that is the real division — retail books are shaped by
              attention and by leverage sold to beginners, institutional ones by mandates and risk limits.
              The argument the panel has to make is that return and risk are TWO outcomes, not one: the levered
              account takes twice the exposure and still ends below a quarterly rebalancer, because financing on
-             the borrowed half is a real cost and the deepest fall is a real price. -->
+             the borrowed half is a real cost and the deepest fall is a real price. */}
         <figure class="ch-panel" data-panel="3">
           <p class="ch-panel-head">{BEAT4.head}</p>
 
@@ -240,12 +240,12 @@ const allBeats = [...BEATS, BEAT4];
             ))}
           </ul>
 
-          <!-- TWO COLUMNS, one per kind of holder. Measured: as a single stacked list with group headers the
+          {/* TWO COLUMNS, one per kind of holder. Measured: as a single stacked list with group headers the
                legend was 204px and the panel needed 545px against a 441px stage — it clipped the footer at every
                viewport width, including 1700. Side by side it costs ~110px instead, and it says the thing the
                beat is about (these are two different KINDS of book) with position rather than with a label.
                Three numbers per player: where it ended, what it fell, and how much exposure it carried to get
-               there. Exposure is the column that makes the levered row explicable rather than magic. -->
+               there. Exposure is the column that makes the levered row explicable rather than magic. */}
           <div class="ch-pnl-groups">
             {groups.map((g) => (
               <ul class="ch-pnl-legend">
@@ -282,8 +282,8 @@ const allBeats = [...BEATS, BEAT4];
             <strong>{bestRatio.worstFall.toFixed(0)}%</strong> fall. Two answers, not one — <em>that</em> is
             what there is to optimise.          </p>
         </figure>
-      </div><!-- /.ch-stage -->
-      </div><!-- /.ch-body -->
+      </div>{/* /.ch-stage */}
+      </div>{/* /.ch-body */}
 
       <p class="ch-cap">{DEFINE_DISCLAIMER}</p>
     </div>

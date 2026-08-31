@@ -60,8 +60,8 @@ const measure = widestHalf(lines.slice(0, 1)) + 1;
   data-cow-lines={JSON.stringify(spoken)}
   style={`--moo-measure: ${measure}ch`}
 >
-  <!-- THE BUBBLE COMES FIRST in source order so a screen reader hears what the cow says before being told it
-       can press it, and so the visual order (bubble left, cow right) needs no reordering. -->
+  {/* THE BUBBLE COMES FIRST in source order so a screen reader hears what the cow says before being told it
+       can press it, and so the visual order (bubble left, cow right) needs no reordering. */}
   <div class="cow-bubble">
     <svg
       class="cow-moo"
@@ -76,26 +76,26 @@ const measure = widestHalf(lines.slice(0, 1)) + 1;
         <rect x={c.x * MOO_CELL} y={c.y * MOO_CELL} width={MOO_CELL} height={MOO_CELL} />
       ))}
     </svg>
-    <!-- The lines travel as JSON on the wrapper, so the copy stays in data/cowGlyph.ts and the script stays
+    {/* The lines travel as JSON on the wrapper, so the copy stays in data/cowGlyph.ts and the script stays
          generic. A first pass joined them with a separator and wrote a literal NUL byte into the source; JSON
          cannot be ambiguous about where a line ends, and cannot smuggle a control character.
          The first line is rendered at build time, so the bubble is never an empty box: the no-JS and
-         before-first-press states both look finished, which is the project's rule for every default state. -->
-    <!-- TWO ROWS, ALWAYS. Each half is its own nowrap line, so the browser never chooses where to break and the
+         before-first-press states both look finished, which is the project's rule for every default state. */}
+    {/* TWO ROWS, ALWAYS. Each half is its own nowrap line, so the browser never chooses where to break and the
          bubble's height cannot change between messages — which is what was shoving the panel up and down on
          every press. The width follows the wider half instead. Rendered at build time so the no-JS and
-         before-first-press states both look finished. -->
+         before-first-press states both look finished. */}
     <p class="cow-says" data-cow-says aria-live="polite">
       <span class="cow-said" data-said-a>{spoken[0]?.[0]}</span>
       <span class="cow-said" data-said-b>{spoken[0]?.[1]}</span>
     </p>
     {size === 'large' && (
-      <!-- A hint that the cow is pressable — on /writing and /404 it is the only interactive thing on the page.
-           aria-hidden because the button's own label already says so; announcing it twice is noise. -->
+      /* A hint that the cow is pressable — on /writing and /404 it is the only interactive thing on the page.
+           aria-hidden because the button's own label already says so; announcing it twice is noise. */
       <p class="cow-hint" aria-hidden="true">press the cow</p>
     )}
-    <!-- The tail, from a matrix like every other pixel mark here. Not a CSS border-triangle: that has
-         anti-aliased diagonals, which would be the one non-pixel edge in the drawing. -->
+    {/* The tail, from a matrix like every other pixel mark here. Not a CSS border-triangle: that has
+         anti-aliased diagonals, which would be the one non-pixel edge in the drawing. */}
     <svg
       class="cow-tail"
       viewBox={`0 0 ${COW_TAIL_W} ${COW_TAIL_H}`}
