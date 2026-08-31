@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { deckStops, nextStop, currentStop, type DeckSlide } from '../src/lib/deck';
+import {
+  deckStops, nextStop, currentStop, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide,
+} from '../src/lib/deck';
 
 // The real homepage geometry, measured in Chrome at 1700x1050. These numbers are the reason the deck
 // is not CSS scroll-snap: every gap between slides is 1.8x-7.3x a single ~320px wheel gesture, so
@@ -299,5 +301,55 @@ describe('the real homepage geometry', () => {
       const hit = stops.some((y) => Math.abs(y - target) < VH * 0.25);
       expect(hit).toBe(true);
     }
+  });
+});
+
+/**
+ * THE TRANSITION CURVE. The deck stopped using `behavior: 'smooth'` because the browser's curve is
+ * front-loaded — measured on the owner's own screen recording (578 frames at 55.8fps), a slide reached
+ * near-peak velocity within ~35ms of standstill, which is what he described as "the sudden change of slides
+ * instead of a smooth transition". These assert the properties that make the replacement feel deliberate,
+ * rather than restating the formula back to itself.
+ */
+describe('deck transition easing', () => {
+  it('starts and ends exactly at the endpoints, so a slide lands on its stop', () => {
+    expect(easeInOutCubic(0)).toBe(0);
+    expect(easeInOutCubic(1)).toBe(1);
+  });
+
+  it('clamps out-of-range progress instead of overshooting', () => {
+    // A frame can arrive late, making elapsed/duration exceed 1. Unclamped, the page would scroll PAST the
+    // stop and snap back — the exact artefact this change exists to remove.
+    expect(easeInOutCubic(1.4)).toBe(1);
+    expect(easeInOutCubic(-0.2)).toBe(0);
+  });
+
+  it('is symmetric — the departure and the arrival are the same gesture', () => {
+    for (const t of [0.1, 0.25, 0.4, 0.49]) {
+      expect(easeInOutCubic(t) + easeInOutCubic(1 - t)).toBeCloseTo(1, 10);
+    }
+  });
+
+  it('EASES IN: the opening tenth of the time covers only a few percent of the distance', () => {
+    // This is the whole point of the change. The native curve spent its velocity ramp in the first ~7% of the
+    // duration; this covers under 5% of the DISTANCE in the first 10% of the time, so the slide leaves gently.
+    expect(easeInOutCubic(0.1)).toBeLessThan(0.05);
+    expect(easeInOutCubic(0.5)).toBeCloseTo(0.5, 10);
+  });
+
+  it('never moves backwards', () => {
+    let prev = -1;
+    for (let i = 0; i <= 100; i++) {
+      const v = easeInOutCubic(i / 100);
+      expect(v).toBeGreaterThanOrEqual(prev);
+      prev = v;
+    }
+  });
+
+  it('keeps the duration long enough to read as motion and short enough not to feel slow', () => {
+    // 650ms: a little longer than the ~500ms native scroll it replaced, because an ease-in spends the opening
+    // frames at low velocity and the same distance has to be covered in the middle.
+    expect(DECK_TWEEN_MS).toBeGreaterThanOrEqual(450);
+    expect(DECK_TWEEN_MS).toBeLessThanOrEqual(900);
   });
 });

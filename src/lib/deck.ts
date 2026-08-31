@@ -151,3 +151,37 @@ export function currentStop(stops: readonly number[], y: number): number | null 
   for (const s of stops) if (Math.abs(s - y) < Math.abs(best - y)) best = s;
   return best;
 }
+
+/**
+ * How long one slide transition takes, in ms.
+ *
+ * 650, and the number came from the owner's own screen recording rather than taste. Measured on that clip
+ * (578 frames at 55.8fps), the browser's native smooth scroll finished a slide in about 500ms — but spent the
+ * first ~35ms going from a standstill to nearly peak velocity. A launch that fast is what he described as "the
+ * sudden change of slides instead of a smooth transition": the eye reads an instant departure and a soft
+ * arrival, which is the opposite shape from the one that feels deliberate.
+ * A little longer than native, because an ease-IN spends time at low velocity at the start; at 500ms with this
+ * curve the middle has to move faster than the native scroll did to cover the same distance.
+ */
+export const DECK_TWEEN_MS = 650;
+
+/**
+ * Symmetric ease for the deck's scroll — slow, fast, slow.
+ *
+ * WHY WE OWN THE ANIMATION AT ALL. `window.scrollTo({ behavior: 'smooth' })` hands the curve to the browser,
+ * and the browser's curve is front-loaded (see DECK_TWEEN_MS). It is also uncancellable: there is no API to
+ * stop an in-flight native smooth scroll, which is why two overlapping transitions showed up in the recording
+ * as a double lurch — the second scroll began while the first was still running and the position jumped.
+ * A rAF tween fixes both: the shape is ours, and cancelling is one cancelAnimationFrame.
+ *
+ * easeInOutCubic, deliberately, not a spring or a bezier with overshoot: this is a page moving to a resting
+ * position that the reader chose, and overshoot on a full-viewport scroll reads as sloppiness rather than
+ * bounce. Symmetric so departure and arrival feel like the same gesture.
+ *
+ * Pure and clamped, so it is unit-testable and cannot be handed a progress value outside [0, 1] by a frame
+ * that arrives late.
+ */
+export function easeInOutCubic(t: number): number {
+  const p = t <= 0 ? 0 : t >= 1 ? 1 : t;
+  return p < 0.5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2;
+}
