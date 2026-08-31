@@ -227,11 +227,16 @@ export function trail(samples = 360): TrailPoint[] {
   return out;
 }
 
-/** The trail parameter at which the walk reaches waypoint `i`. Waypoints are evenly spaced in the
- *  spline's parameter, so this is exact rather than a search. */
-export function waypointT(i: number): number {
-  return i / (WAYPOINTS.length - 1);
-}
+// `waypointT(i)` lived here — the trail parameter at which the walk reaches waypoint i, which is exactly
+// i / (WAYPOINTS.length - 1) because the waypoints are evenly spaced in the spline's parameter. It was never
+// imported. The one place that needs the number, components/DescentPath.astro's waypoint loop, writes that
+// same division inline against its local `reveal`, and has since it was written.
+//
+// So this is a duplicate with no callers, not a shared helper: exporting it from here made the module look
+// like the owner of a rule the drawing code had already decided for itself. Deleted in that direction rather
+// than the other, because a one-expression identity is cheaper to state where it is used than to import — but
+// if a second consumer ever appears, put the helper back and change DescentPath.astro at the same time. One
+// place or the other, never both.
 
 /** Where the trail turns upward, as a t-range — for calling out the escape. */
 export function climbSpan(pts: readonly TrailPoint[]): { t0: number; t1: number } | null {

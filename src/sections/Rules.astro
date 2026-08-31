@@ -466,7 +466,6 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     border: 1px solid currentColor; border-radius: 50%;
     width: 18px; height: 18px; display: grid; place-items: center;
   }
-  .ru-beat-say { display: block; min-width: 0; }
   .ru-beat-head {
     /* Floor 16px: measured at 1366x768 this rendered 13.4px, barely above its own body copy. */
     display: block; font-size: clamp(16px, 1.18vw, 19px); line-height: 1.3; color: var(--r-ink);
@@ -633,15 +632,9 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     stroke: var(--r-faint); stroke-width: 1; stroke-dasharray: 3 5;
     vector-effect: non-scaling-stroke; opacity: 0.5;
   }
-  /* THE GHOST. <use> clones the referenced group, and the clone's own classes come with it — so the three
-     accent-lit threads arrived at full strength and the tally sat on a fan louder than itself. Fading the
-     <use> element as a whole is what actually ghosts it, since the clone's internal opacities multiply by it. */
-  .ru-fanchart--ghost { opacity: 0.42; }
-  .ru-fanchart--ghost .ru-traj { opacity: 0.1; }
-  .ru-fanchart--ghost .ru-traj--lit { stroke: var(--r-faint); stroke-width: 1; opacity: 0.14; }
-
-  /* ── BEAT 4: the conflict web beside its tally. Two columns rather than a tally floating over a ghosted fan —
-     the web IS the argument now, so it gets its own space instead of being a backdrop. */
+  /* ── BEAT 4: the conflict web beside the mathematics, in two columns. An earlier version floated a tally of
+     counts over a ghosted <use> clone of the fan; both the tally and the ghost are gone, because the web IS the
+     argument now and it gets its own space instead of being a backdrop to a list of numbers. */
   .ru-all { display: grid; align-items: center; }
   /* The web on the left, the mathematics on the right. The web is the "many interlocking rules" half and the
      equation is the "and you cannot solve it exactly" half — two different reasons the problem is hard, which
@@ -685,21 +678,6 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     fill: none; stroke: var(--r-accent); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.42;
   }
   .ru-webnode { fill: var(--r-faint); opacity: 0.8; }
-  .ru-tally {
-    list-style: none; margin: 0; padding: 0; align-self: center;
-    display: grid; gap: clamp(5px, 0.9vh, 10px);
-  }
-  .ru-tally li {
-    display: grid; grid-template-columns: 7ch minmax(0, 1fr); gap: 0 clamp(10px, 1.2vw, 16px);
-    align-items: baseline;
-  }
-  .ru-tally-n {
-    font-family: var(--font-mono); font-size: clamp(13px, 1.1vw, 16px); color: var(--r-accent);
-    text-align: right; font-variant-numeric: tabular-nums;
-  }
-  .ru-tally-n sup { font-size: 0.68em; }
-  .ru-tally-l { font-size: clamp(13.5px, 1vw, 15.5px); line-height: 1.45; color: var(--r-soft); }
-  .ru-tally--big .ru-tally-n { font-size: clamp(16px, 1.5vw, 22px); color: var(--r-ink); }
 
   .ru-note {
     /* 9px is not a readable size for a sentence that qualifies the drawing above it. */
@@ -712,7 +690,6 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     margin: clamp(6px, 1vh, 12px) 0 0; max-width: 82ch; display: grid;
   }
   .ru-cap > .ru-panel { grid-area: 1 / 1; }
-  .ru-cap sup { font-size: 0.72em; }
 
   /* ── RESPONSIVE, at the END of the sheet on purpose: every declaration here overrides one of the same
      specificity above, so source order is the whole mechanism. */
@@ -767,7 +744,6 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
        the beat's copy and in the caption, so nothing measured is lost. */
     .ru-webwrap { grid-template-columns: minmax(0, 1fr); gap: 0; }
     .ru-web { display: none; }
-    .ru-split { grid-template-columns: 1fr; gap: 3vh 0; }
     .ru-fig { padding-top: 3vh; border-top: 1px solid var(--r-edge); }
     .ru-paper { padding-top: clamp(14px, 2vh, 24px); padding-bottom: clamp(14px, 2vh, 24px); }
     .ru-head { font-size: clamp(22px, 3.4vw, 30px); }

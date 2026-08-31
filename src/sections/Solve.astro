@@ -297,19 +297,10 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     font-size: clamp(20px, 1.8vw, 30px); line-height: 1.24;
     color: var(--s-ink); margin: 0 0 clamp(14px, 2vh, 22px); max-width: 32ch; letter-spacing: -0.008em;
   }
-  .so-body {
-    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.68; color: var(--s-soft);
-    margin: 0 0 12px; max-width: 46ch;
-  }
-  .so-body em { font-style: italic; color: var(--s-ink); }
-
-
-  .so-tools { list-style: none; margin: clamp(14px, 2vh, 20px) 0 0; padding: 0; display: grid; gap: 7px; }
-  .so-tools li { display: grid; gap: 1px; }
-  .so-tool-name {
-    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--s-accent);
-  }
-  .so-tool-role { font-size: 12px; line-height: 1.45; color: var(--s-soft); max-width: 46ch; }
+  /* (.so-body and the .so-tools list are gone with their markup. The slide used to carry a paragraph of prose
+     and a named list of "the tools this uses" beside the lattice; both went when the copy moved into the
+     term-definition strip and the lattice took the whole figure column. Deleted rather than parked, so the
+     sheet only describes elements this section actually renders.) */
 
   /* Tall enough for the surface to read as a surface: at 340px the lattice's depth collapsed and the twelve
      time-slices crowded into a band. */

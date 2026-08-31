@@ -1,52 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import {
-  singlePeriodVars, multiPeriodVars, scaleFactor, humanCount, log10Combinations,
-} from '../src/lib/problemSize';
-// The declared sizes moved into data/desk.ts alongside the rest of the concrete example, so the toy
-// problem is now the six instruments over 52 weeks and the real one is the fund's own figures.
-import { FUND, INSTRUMENTS } from '../src/data/desk';
+import { humanCount } from '../src/lib/problemSize';
+import { FUND } from '../src/data/desk';
 
-const TOY = { assets: INSTRUMENTS.length, periods: 52 };
-const REAL = { tickers: FUND.tickers, periods: FUND.periods };
-
-describe('singlePeriodVars / multiPeriodVars', () => {
-  it('single period is one weight per holding', () => {
-    expect(singlePeriodVars(4)).toBe(4);
-  });
-
-  // THE NUMBER THE SLIDE LEANS ON: multi-period is not the same problem repeated, it is a bigger problem.
-  it('multi period multiplies holdings by periods', () => {
-    expect(multiPeriodVars(4, 12)).toBe(48);
-    expect(multiPeriodVars(3000, 24)).toBe(72_000);
-  });
-
-  it('degrades safely on nonsense', () => {
-    expect(multiPeriodVars(-5, 10)).toBe(0);
-    expect(multiPeriodVars(10, -5)).toBe(0);
-    expect(singlePeriodVars(-1)).toBe(0);
-  });
-
-  it('floors fractional inputs rather than producing a fractional count of decisions', () => {
-    expect(multiPeriodVars(4.9, 2.9)).toBe(8);
-  });
-});
-
-describe('scaleFactor', () => {
-  it('reports how much larger the real problem is than the example', () => {
-    // Derived rather than hardcoded: the declared sizes live in data/desk.ts and a change there should not
-    // silently break an assertion about arithmetic that is still correct.
-    const expected = (REAL.tickers * REAL.periods) / (TOY.assets * TOY.periods);
-    expect(scaleFactor(TOY, REAL)).toBeCloseTo(expected, 9);
-  });
-
-  it('the real problem is orders of magnitude larger, which is the slide\'s point', () => {
-    expect(scaleFactor(TOY, REAL)).toBeGreaterThan(100);
-  });
-
-  it('is zero rather than Infinity when the toy problem is empty', () => {
-    expect(scaleFactor({ assets: 0, periods: 0 }, REAL)).toBe(0);
-  });
-});
+// WHY THIS FILE SHRANK. It used to cover singlePeriodVars / multiPeriodVars / scaleFactor /
+// log10Combinations as well. Those computed the difficulty slide's numbers a second time — the slide reads
+// lib/complexity.ts (decisionVariables, scenarioLeaves, rulePairs), and tests/complexity.test.ts guards those.
+// A test suite that is green on arithmetic nothing renders is a liability: it makes the unused copy look load-
+// bearing, and it invites the next edit into the wrong module. So the duplicate half went with its subject.
+//
+// The declared-sizes block below stays here even though FUND lives in data/desk.ts, because what it guards is
+// the same thing humanCount serves: the figures Rules.astro prints in its copy. If FUND.tickers ever dropped
+// below a thousand, the page's sentence "thousands of tickers" would become false while every other test
+// stayed green.
 
 describe('humanCount', () => {
   it('groups thousands', () => {
@@ -65,33 +30,12 @@ describe('humanCount', () => {
     expect(humanCount(NaN)).toBe('—');
     expect(humanCount(Infinity)).toBe('—');
   });
-});
 
-describe('log10Combinations', () => {
-  it('matches known small values', () => {
-    // C(10,5) = 252 -> log10 ≈ 2.401
-    expect(log10Combinations(10, 5)).toBeCloseTo(Math.log10(252), 6);
-    // C(52,5) = 2,598,960
-    expect(log10Combinations(52, 5)).toBeCloseTo(Math.log10(2_598_960), 6);
-  });
-
-  // The reason this returns a magnitude rather than a value: the count of corner portfolios for a real
-  // universe does not fit in a double. That fact IS the argument the slide makes.
-  it('stays finite where the raw combination would overflow', () => {
-    const m = log10Combinations(3000, 100);
-    expect(Number.isFinite(m)).toBe(true);
-    expect(m).toBeGreaterThan(100);          // more than 10^100 corners
-  });
-
-  it('is symmetric in k and n-k', () => {
-    expect(log10Combinations(50, 20)).toBeCloseTo(log10Combinations(50, 30), 9);
-  });
-
-  it('degrades safely at the edges', () => {
-    expect(log10Combinations(0, 0)).toBe(0);
-    expect(log10Combinations(10, 0)).toBe(0);
-    expect(log10Combinations(10, 11)).toBe(0);
-    expect(log10Combinations(10, 10)).toBeCloseTo(0, 9);  // C(10,10) = 1, log10 = 0
+  it('renders the figures the page actually prints', () => {
+    // The two calls Rules.astro makes, asserted on the real data rather than on invented inputs — a change to
+    // FUND that made the copy read strangely should fail here.
+    expect(humanCount(FUND.tickers)).toBe('3,000');
+    expect(humanCount(FUND.constraints)).toBe('2,000');
   });
 });
 
@@ -104,12 +48,11 @@ describe('the declared problem sizes', () => {
     expect(FUND.periods).toBeGreaterThan(1);
   });
 
-  it('the drawdown limit is a real bound, not decoration', () => {
-    expect(FUND.drawdownLimit).toBeGreaterThan(0);
-    expect(FUND.drawdownLimit).toBeLessThan(0.25);
-  });
-
-  it('the toy problem is small enough to teach with', () => {
-    expect(TOY.assets).toBeLessThanOrEqual(6);
+  // FUND once carried `aum` and `drawdownLimit` too. Nothing read either one: the $1B figure and the 8%
+  // drawdown limit reach the page as prose inside CONSTRAINTS, which is where a reader meets them. A second,
+  // unread copy of a number is how two versions of the same fact end up on one page, so only the read fields
+  // are declared now — and this asserts that, so a reintroduced field has to come with a reader.
+  it('declares only the figures something actually reads', () => {
+    expect(Object.keys(FUND).sort()).toEqual(['constraints', 'periods', 'tickers']);
   });
 });

@@ -250,30 +250,11 @@ import { STORY } from '../data/story';
   }
   .story-body:last-child { margin-bottom: 0; }
 
-  /* The figures: measured readings, mono, so they read as instrument output rather than pull-quotes.
-     Three across needed ~1300px; in the 720px prose panel they wrap to a responsive grid instead of
-     being crushed to 220px each. */
-  .story-figures {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: clamp(20px, 2.4vh, 32px) clamp(20px, 2vw, 40px);
-    margin: clamp(28px, 4vh, 52px) 0 0; padding-top: clamp(22px, 3vh, 40px);
-    border-top: 1px solid var(--story-edge);
-  }
-  .story-figure dt {
-    font-family: var(--font-mono); font-size: clamp(26px, 3vw, 40px);
-    color: var(--story-accent); line-height: 1;
-  }
-  .story-figure dd {
-    margin: 14px 0 0; font-size: 14px; line-height: 1.6; color: var(--story-ink-faint);
-  }
-  .story-figure-label {
-    display: block; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.18em;
-    text-transform: uppercase; color: var(--story-ink-soft); margin-bottom: 7px;
-  }
-  @media (max-width: 700px) {
-    .story-figures { grid-template-columns: 1fr; gap: 4vh 0; }
-  }
-
-  /* (.story-tail is gone with the element — see the markup comment. Anything placed at the foot of this
-     column is unreachable in the deck, so the rule is deleted rather than left for someone to reuse.) */
+  /* (.story-tail and the .story-figures dl are both gone with their elements. The tail: anything placed at
+     the foot of this column is unreachable in the deck — see the markup comment. The figures were three mono
+     "instrument readings" under the prose, dropped when the section became one narrow column beside the
+     graph. Both rule sets are deleted rather than left for someone to reuse, because a rule with no markup
+     is a claim about a layout that no longer exists. Note that .story-figure-slot, just above, is LIVE and
+     unrelated: `.story-figure` never matched it — a class selector matches the whole class name, not a
+     prefix — which is exactly why the dead rules were invisible for so long. */
 </style>

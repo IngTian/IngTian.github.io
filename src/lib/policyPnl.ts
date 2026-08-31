@@ -144,8 +144,10 @@ function buildYear(): number[][] {
 
 export const WEEKLY: number[][] = buildYear();
 
-/** Kept under the older name so existing readers of the module still resolve. */
-export const MONTHLY = WEEKLY;
+// `MONTHLY` was aliased to WEEKLY here "so existing readers of the module still resolve". There were none —
+// the alias was added in the same change that renamed the table, and no importer ever used it. An alias whose
+// docstring asserts readers it does not have is worse than a plain duplicate: it argues against its own
+// deletion. MONTHS (above) is a different matter and stays — Choice.astro really does import it.
 
 // ── COSTS AND FINANCING, at weekly resolution ────────────────────────────────────────────────────────────
 

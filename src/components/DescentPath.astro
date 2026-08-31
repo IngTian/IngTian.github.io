@@ -113,10 +113,14 @@ import { WAYPOINTS } from '../lib/trajectory';
      BESIDE "Why the climb" as a peer rather than out-shouting it, and kept to one line. */
   :global(.story-paper) .dp-head h2 { font-size: clamp(25px, 2.2vw, 40px); text-wrap: balance; }
   :global(.story-paper) .dp-lede { max-width: 44ch; }
+  /* No `.dp-lede strong` rule, and none is wanted: the lede is one plain sentence by design — see "NO
+     MEASUREMENTS IN THE COPY" at the top of this file — so there is no emphasis to accent. The rule that used
+     to sit here arrived in the same commit as the element and the element never contained a `<strong>` in any
+     revision, so it never matched. Deleting it also removes the temptation to bold a number back into a
+     sentence the file's own header explains must not carry one. */
   .dp-lede {
     font-size: 15.5px; line-height: 1.75; color: var(--dp-body); margin: 14px 0 0;
   }
-  .dp-lede strong { color: var(--dp-accent); font-weight: 400; }
 
   .dp-readout {
     margin: 14px 0 0; min-height: 1.5em;
@@ -181,19 +185,10 @@ import { WAYPOINTS } from '../lib/trajectory';
     pointer-events: none;      /* the drawing is not interactive, but never block it either */
   }
   :global(.story-paper) .dp-head .dp-btn { pointer-events: auto; }
-  /* The footnote tucks into the bottom-left corner, over the same empty region. */
-  :global(.story-paper) .dp-foot {
-    position: absolute;
-    bottom: 0; left: 0;
-    margin: 0;
-    max-width: 52ch;
-  }
   /* Narrow screens keep the stacked flow: there is no empty corner to overlay into. */
   @media (max-width: 1000px) {
-    :global(.story-paper) .dp-head,
-    :global(.story-paper) .dp-foot { position: static; max-width: 70ch; }
+    :global(.story-paper) .dp-head { position: static; max-width: 70ch; }
     :global(.story-paper) .dp-stage { height: min(56vh, 90vw); margin: 3vh 0 0; }
-    :global(.story-paper) .dp-foot { margin: 3vh 0 0; }
   }
   .dp-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
@@ -243,11 +238,12 @@ import { WAYPOINTS } from '../lib/trajectory';
   }
   .dp-stage.is-live .dp-fallback { display: none; }
 
-
-  .dp-foot {
-    margin: 4vh 0 0; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.04em;
-    color: var(--dp-line); max-width: 64ch;
-  }
+  /* (There is no `.dp-foot`, and there never was. Three rule sets for it — a base block here, a bottom-left
+     overlay on the paper panel, and a narrow-screen return to flow — arrived in one commit alongside a
+     `.dp-foot` element that was never actually written; `git log -S 'dp-foot'` returns that single commit and
+     `-S 'class="dp-foot"'` returns nothing at all. So they were born orphaned and styled a footnote no reader
+     ever saw. Deleted. The caption the header comment mentions is the section's own copy, and `.dp-coda`
+     above is the only thing that overlays a corner of the stage.) */
 
   /* Narrow screens: the graph's in-frame labels collide below ~720px, so the canvas gives way to the
      ordered list, which stops being visually hidden and becomes the content.

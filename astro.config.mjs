@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 import sitemap from '@astrojs/sitemap';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import stripHtmlComments from './src/integrations/stripHtmlComments.ts';
 
 // https://astro.build/config
 export default defineConfig({
@@ -105,5 +106,12 @@ export default defineConfig({
     // Prototype routes carry noindex, but an unfiltered sitemap still advertises
     // them to crawlers — and their rendered bodies quote internal review notes.
     filter: (page) => !page.includes('/proto-'),
-  })]
+  }),
+  // ── COMMENTS STAY IN SOURCE AND DO NOT SHIP. The same argument the sitemap filter above already
+  // makes: the markup comments here quote internal design review verbatim, and they were reaching
+  // every visitor's View Source (measured: 79 comments, ~30KB, 56 of them on the homepage). The
+  // integration runs once at `astro:build:done`, verifies that the reader-visible text and the tag
+  // skeleton of every page are byte-identical before it writes, and never touches `astro dev` — so
+  // the comments are all still there while you work. See src/integrations/stripHtmlComments.ts.
+  stripHtmlComments()]
 });

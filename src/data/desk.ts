@@ -1,77 +1,21 @@
 // src/data/desk.ts
-// THE CONCRETE EXAMPLE — real tickers, invented year.
+// THE DESK AS THE SITE DESCRIBES IT: what a real mandate forbids, how big the problem is, and what an
+// attempt on it would be assembled from.
 //
-// The owner: "let's say you have AAPL, NVDA, META, BOA, XAUUSD, WTIOIL, etc. imagine that you have news now
-// and then, and you pick initial portfolio weights, during news, during the 1 year horizon, you shifted
-// positions (just like every trader), you probably resulted in a turbulent portfolio pnl."
+// WHAT LEFT THIS FILE, so nobody rebuilds it. It opened with a "concrete example" dataset — six real tickers
+// (AAPL, NVDA, META, BAC, XAUUSD, WTI) with invented drifts and vols, six invented news headlines with a
+// per-ticker shock each, a 48-path trader count, and a disclaimer sentence about the whole thing being made
+// up. All of it fed one consumer: the 48-trader Monte Carlo in lib/scenario.ts, which no page renders. The
+// slide that argues "same year, different decisions, different outcome" is src/sections/Choice.astro, and it
+// reads data/define.ts — five NAMED policies over four holdings — because a reader can say out loud what
+// separates five curves and cannot say anything at all about forty-eight.
 //
-// HONESTY, AND IT MATTERS MORE HERE THAN ANYWHERE ELSE ON THE SITE. The ticker names are real; the prices,
-// the news headlines and every path are INVENTED. Real names make invented numbers look authoritative, so
-// the slide states this in its own copy — not only in a source comment — and the headlines are written as
-// plainly generic events rather than as things that actually happened on a date.
+// The disclaimer went with the data and that is the right direction, not a loss of honesty: the invented
+// figures it disclaimed no longer exist. data/define.ts carries its own statement about its own numbers,
+// next to the numbers, which is where such a sentence belongs.
 //
-// The drifts and vols are rounded, textbook-plausible figures for each asset class, chosen so the example
-// behaves recognisably (NVDA swings more than BOA; gold moves against equities on risk-off news). They are
-// characteristics of a made-up world, not estimates anyone should trade on.
-
-import type { Instrument, NewsEvent } from '../lib/scenario';
-
-export const INSTRUMENTS: Instrument[] = [
-  { ticker: 'AAPL',   name: 'Apple',            glyph: 'tech',   drift: 0.11, vol: 0.26 },
-  { ticker: 'NVDA',   name: 'NVIDIA',           glyph: 'chip',   drift: 0.24, vol: 0.52 },
-  { ticker: 'META',   name: 'Meta',             glyph: 'tech',   drift: 0.13, vol: 0.36 },
-  { ticker: 'BAC',    name: 'Bank of America',  glyph: 'bank',   drift: 0.07, vol: 0.24 },
-  { ticker: 'XAUUSD', name: 'Gold',             glyph: 'gold',   drift: 0.05, vol: 0.14 },
-  { ticker: 'WTI',    name: 'Crude oil',        glyph: 'oil',    drift: 0.03, vol: 0.34 },
-];
-
-/**
- * Six headlines across the year, each with a one-week shock per instrument.
- *
- * Written generically on purpose: "a chipmaker beats expectations" rather than a real dated event, so the
- * example cannot be mistaken for a claim about what happened. The shocks are internally consistent — a
- * risk-off week lifts gold and hurts equities — because an inconsistent world would teach the wrong
- * reflexes.
- */
-export const NEWS: NewsEvent[] = [
-  {
-    week: 6,
-    headline: 'Chipmaker beats expectations; AI capex guidance raised',
-    shock: { NVDA: 0.14, AAPL: 0.03, META: 0.05, BAC: 0.00, XAUUSD: -0.01, WTI: 0.01 },
-  },
-  {
-    week: 13,
-    headline: 'Inflation print comes in hot; rate-cut hopes pushed out',
-    shock: { NVDA: -0.09, AAPL: -0.04, META: -0.05, BAC: 0.03, XAUUSD: -0.03, WTI: 0.02 },
-  },
-  {
-    week: 21,
-    headline: 'Regional bank stress resurfaces; flight to safety',
-    shock: { NVDA: -0.06, AAPL: -0.03, META: -0.04, BAC: -0.11, XAUUSD: 0.06, WTI: -0.04 },
-  },
-  {
-    week: 30,
-    headline: 'Supply disruption lifts crude; energy costs jump',
-    shock: { NVDA: -0.02, AAPL: -0.02, META: -0.02, BAC: 0.00, XAUUSD: 0.02, WTI: 0.17 },
-  },
-  {
-    week: 38,
-    headline: 'Antitrust ruling lands against a large platform',
-    shock: { NVDA: 0.01, AAPL: -0.02, META: -0.13, BAC: 0.00, XAUUSD: 0.01, WTI: 0.00 },
-  },
-  {
-    week: 45,
-    headline: 'Soft landing narrative returns; risk appetite recovers',
-    shock: { NVDA: 0.10, AAPL: 0.05, META: 0.07, BAC: 0.04, XAUUSD: -0.03, WTI: 0.02 },
-  },
-];
-
-/** Stated on the slide, in the slide's own words. */
-export const DESK_DISCLAIMER =
-  'Real tickers, invented year: the prices, the headlines and every path below are made up. A worked example, not a backtest.';
-
-/** How many discretionary paths to draw. Enough to read as a population, few enough to stay legible. */
-export const TRADER_COUNT = 48;
+// What remains is all live: CONSTRAINTS and FUND feed src/sections/Rules.astro, METHODOLOGIES and the OPEN_*
+// copy feed src/sections/Solve.astro.
 
 // ── FUND SCALE, AND THE CONSTRAINTS THAT COME WITH IT ────────────────────────────────────────────────
 //
@@ -121,24 +65,32 @@ export const CONSTRAINTS: Constraint[] = [
   },
 ];
 
-/** Fund-scale figures, declared. */
+/**
+ * Fund-scale figures, declared — and ONLY the ones something reads.
+ *
+ * All three are read. Rules.astro prints `tickers` and `constraints` through lib/problemSize.ts's humanCount
+ * and derives its DP state-count exponent from `tickers`; `periods` feeds lib/complexity.ts's decisionVariables
+ * and scenarioLeaves, in that section and in tests/complexity.test.ts.
+ *
+ * Two more fields used to sit here — `aum: '$1B'` and `drawdownLimit: 0.08` — with no reader anywhere. Both
+ * facts DO reach the page, as prose inside the CONSTRAINTS entries above ("Max drawdown 8%…", "At $1B, your
+ * own order moves the price…"), so the unread copies bought nothing and risked something: the day one is
+ * edited and the other is not, the same slide states two different numbers for the same fact. Adding a field
+ * back means adding its reader in the same change — tests/problemSize.test.ts asserts the key set for that
+ * reason.
+ */
 export const FUND = {
-  aum: '$1B',
   tickers: 3000,
   constraints: 2000,
   periods: 24,
-  drawdownLimit: 0.08,
 };
 
-/** WHAT THE JOB IS, in the owner's own framing: find a good strategy to optimise a SEQUENCE of decisions. */
-export const JOB_STATEMENT =
-  'Find a strategy that optimises a sequence of decisions — consistent return, controlled drawdown, every constraint respected, at a scale where your own trading moves the price.';
-
-export const JOB_NOTE =
-  'Sharpe is how that consistency gets measured: return per unit of swing, not return alone. A path that doubles and halves is worth less than one that climbs steadily, because only the second one survives contact with a mandate.';
-
-/** The toolkit, named as instruments with the job each does. */
-
+// TWO COPY BLOCKS LEFT HERE TOO: JOB_STATEMENT ("Find a strategy that optimises a sequence of decisions…")
+// and JOB_NOTE (the Sharpe gloss). Neither had appeared on the site in any build — `grep -c 'optimises a
+// sequence of decisions' dist/index.html` returned 0 — because the sections that once framed the job were
+// rewritten around their own inline copy. Unrendered prose in a data file is the worst kind of stale: it
+// reads like the site's current voice on a claim the site may no longer make, and an editor fixing the page's
+// wording never sees it. If the framing is wanted again it should be written next to the markup that shows it.
 
 // ── THE LAST SLIDE: STILL AN OPEN PROBLEM, AND A FEW GENERAL DIRECTIONS ──────────────────────────────────
 //

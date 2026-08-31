@@ -1,4 +1,38 @@
 ---
+// src/sections/Mountains.astro — the old homepage résumé section, "The record".
+//
+// ── NO PAGE RENDERS THIS, AND THAT IS DELIBERATE. DO NOT DELETE IT AS DEAD CODE. ──
+// An import-graph closure from every entry point in src/pages/ does not reach this file, so a
+// dead-code sweep will flag it every single time. It is PARKED, not abandoned. The same trap that
+// src/lib/capability.ts documents applies here, and the same fix: nothing inside src/ said why an
+// unreferenced file was here, so the next sweep would have had nothing to go on. Hence this comment
+// — the comment IS the protection.
+//
+// The decision is recorded in CLAUDE.md, under "The homepage — the deck":
+//   "**The résumé is not on the homepage**, on the owner's instruction ('you may delete everything
+//    from below. The record, the experience, everything'). Nothing was lost: every block has its own
+//    route, and the corner nav plus the footer carry the doors. `sections/Mountains.astro` is kept on
+//    purpose … so the markup is recoverable without git archaeology."
+//
+// So: the section came off the homepage on the owner's instruction, and the MARKUP was kept on
+// purpose. What is worth keeping is not the content — every fact here lives in src/data/profile.ts,
+// which is the single source and is still read by the live routes — but this particular *shaping* of
+// it: the featured-paper promotion, the four flagship timeline anchors with the intern nested under
+// its employer, the "Elsewhere" tail, and the research-interest pills. That editorial judgement is
+// the expensive part, and it is what /research, /experience and /projects were split out of.
+//
+// WHY IT IS UNREFERENCED RIGHT NOW, which is a change worth naming: /proto-paper was its last
+// renderer, and that route has been retired (an answered question — the paper-editorial treatment
+// was judged, and its two remaining calibration routes printed numbers that no longer matched the
+// shipped shader). Losing a renderer is exactly the moment a parked file looks like garbage, which is
+// why the header arrived in the same change. Note that CLAUDE.md's two mentions of this file still
+// say "/proto-paper still renders it"; that clause is now stale and wants correcting there.
+//
+// If you are reviving this: it was written for the DARK ground at the bottom of the descent
+// (paper-on-dark — see the `text-paper/55` kickers below, and the TEASER note in
+// components/ProjectCard.astro, which still calls this "the homepage Mountains section"). Dropped
+// onto a light surface it will be invisible. It also emits id="mountains", which no current route
+// emits; nothing points at that anchor any more (components/Toc.astro documents removing the stop).
 import ProjectCard from '../components/ProjectCard.astro';
 import { researchInterests, publications, timeline, awards, projects } from '../data/profile';
 

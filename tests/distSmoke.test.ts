@@ -133,11 +133,19 @@ const internalHrefs = (p: Page): string[] =>
     .filter((h) => h !== '' && !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(h));
 
 /**
- * The proto-* routes are excluded from the link check below, and the reason is written out in the
- * skipped test at the bottom of this file rather than hidden here: they render the shared homepage
- * Toc, whose stop list is the homepage's, so /proto-paper carries five anchors to slides it does
- * not contain. Real defect, wrong file for this round, and it is a noindex diagnostic route — the
- * one class of page where a dead in-page anchor costs a visitor nothing, because there are none.
+ * Which built routes are prototypes. Used by the noindex check below — and by NOTHING ELSE any more,
+ * which is the point of this note.
+ *
+ * It used to also exclude the proto routes from the fragment-link check, because /proto-paper rendered
+ * the shared homepage `<Toc />` whose stop list is the HOMEPAGE's slides, so five of its seven rail
+ * entries pointed at ids that page did not contain. That was fixed at the source (proto-paper stopped
+ * rendering the Toc) and /proto-paper has since been retired altogether, so the exclusion protected
+ * nothing. It is gone, and with it the separate proto-only copy of the fragment check that existed to
+ * make the gap visible: the fragment check below now runs over EVERY built page, prototypes included,
+ * which is strictly more coverage than the two tests it replaces.
+ *
+ * Keep it that way. A prototype that borrows the homepage rail again will now fail the main check
+ * rather than a parked one, and re-adding an exclusion here would hide it.
  */
 const isProto = (p: Page): boolean => p.route.startsWith('/proto-');
 
@@ -149,12 +157,12 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
   });
 
   // ── 1. FRAGMENT LINKS RESOLVE ────────────────────────────────────────────────────────────────
+  // EVERY page, prototypes included — see the note on isProto for why there is no exclusion here.
   it('resolves every in-page fragment link to an id on the page it points at', () => {
     const routes = byRoute();
     const dead: string[] = [];
 
     for (const page of pages()) {
-      if (isProto(page)) continue;
       for (const href of internalHrefs(page)) {
         const hash = href.indexOf('#');
         if (hash === -1) continue;
@@ -248,8 +256,13 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
     const protos = pages().filter(isProto);
     // Asserted, not assumed: if the routes are renamed away from the prefix this must go red rather
     // than iterate an empty list and congratulate itself. A lower bound, not an exact count — the
-    // proto routes are a workflow and gaining a fifth is the expected case, not a regression.
-    expect(protos.length, 'no proto-* routes found in dist/').toBeGreaterThanOrEqual(4);
+    // proto routes are a workflow, so gaining one is the expected case, not a regression.
+    //
+    // The floor is 1, and it was 4 until three of the four routes were retired (/proto-showpiece,
+    // /proto-paper, /proto-ladder — all answered questions; see tests/protoNoindex.test.ts for the
+    // full reason each went). Only /proto-sketches ships now. The number is a non-empty guard, not a
+    // census, so it does not need to track the count — but it must never become 0.
+    expect(protos.length, 'no proto-* routes found in dist/').toBeGreaterThanOrEqual(1);
 
     for (const p of protos) {
       const robots = /<meta\s[^>]*name="robots"[^>]*>/i.exec(p.html)?.[0] ?? '';
@@ -291,33 +304,8 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
     expect(bare, `<img> without alt:\n  ${bare.join('\n  ')}`).toEqual([]);
   });
 
-  /* UN-SKIPPED. The cause is fixed at the source: proto-paper no longer renders the homepage <Toc />, which is
-     where its five dead anchors came from. Kept as a test rather than deleted, so a prototype that borrows the
-     rail again is caught immediately. Historical note follows — the exclusion `isProto` applies to the fragment
-     check above, stated as a test so it is a visible gap rather than a silent filter.
-
-     /proto-paper renders the shared homepage <Toc />, whose stop list is the HOMEPAGE's slides, but
-     its own <main> holds only PaperHeights, PaperInterlude, Mountains and Signature. So five of its
-     seven rail entries — #choice, #rules, #solve, #story, #appendix — point at ids that page does not
-     contain, and clicking them does nothing. Verified in the built HTML: proto-paper/index.html has
-     ids heights, terrain, terrain-bubble, interlude, mountains, ri-gloss, signature.
-
-     Parked rather than fixed because the fix belongs in components/Toc.astro (or in proto-paper's
-     decision to render it), neither of which was assigned this round, and because the cost is
-     bounded: these are noindex diagnostic routes with an audience of one. Un-skip after the Toc
-     learns its stops from the page it is on, and delete `isProto` in the same change. */
-  it('resolves fragments on the proto routes too', () => {
-    const routes = byRoute();
-    for (const page of pages().filter(isProto)) {
-      for (const href of internalHrefs(page)) {
-        const hash = href.indexOf('#');
-        if (hash === -1) continue;
-        const frag = href.slice(hash + 1);
-        if (frag === '' || frag === 'top') continue;
-        const target = new URL(href, servedUrl(page.route)).pathname.replace(/\/$/, '');
-        const dest = routes.get(target === '' ? '/' : target);
-        expect(dest?.ids.has(frag), `${page.file}: href="${href}" resolves to nothing`).toBe(true);
-      }
-    }
-  });
+  /* (There is no separate 'resolves fragments on the proto routes too' test any more. It existed only to
+     make the `isProto` exclusion in check 1 a visible gap rather than a silent filter; the exclusion is
+     gone, so check 1 covers the proto routes directly and this was a strict subset of it — with a worse
+     failure message, since it reported one dead anchor per run instead of the whole family at once.) */
 });

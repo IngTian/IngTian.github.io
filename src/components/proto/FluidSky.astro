@@ -15,6 +15,20 @@
 //
 // Perf: viewport-sized (scroll is a uniform), 0.5x internal resolution, ~30fps
 // idle / full rate while scrolling, paused on tab-hide, skipped under 640px.
+//
+// ONE SHAPE: the canvas is always the page-wide fixed backdrop. There used to be a second
+// `mode="contained"` shape — position:absolute inside a 72vh slab, with its own uniform wiring
+// (a fixed depth window, and uYOffset driven by the strength LEVEL rather than by scroll) so five
+// strengths could be stacked on one screen and compared. It existed for /proto-ladder, the
+// strength-calibration route, and for nothing else: `grep -rn 'contained' src/pages` had exactly
+// one hit. The level it was built to pick has been picked and shipped (AMP_BY_LEVEL, below), the
+// route is retired, and that grep is now 0 — so the prop, its class pair and its uniform branch
+// are gone. Deliberately NOT kept "in case": a mode with no caller is a branch nobody exercises,
+// and this component runs on every page, where an untested branch is the expensive kind.
+//
+// (Note the house habit: this rationale is a frontmatter comment, not an HTML one. Astro emits
+// HTML comments into the build, and FluidSky renders on every route — an explanation this long
+// would ship to every visitor on every page. Frontmatter `//` never reaches the output.)
 interface Props {
   /**
    * Where in the pattern the page STARTS, in viewport widths.
@@ -26,36 +40,29 @@ interface Props {
    */
   yStart?: number;
   strength?: 0 | 1 | 2 | 3 | 4;
-  mode?: 'background' | 'contained';
   /** 'descent' (paper text, dawn→ground) | 'reading' (dark ink, luminous) */
   variant?: 'descent' | 'reading';
 }
-const { strength = 4, mode = 'background', variant = 'descent', yStart = 0 } = Astro.props;
+const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
 ---
 <canvas
-  class:list={['fluid-sky', mode === 'contained' ? 'is-contained' : 'is-background']}
+  class="fluid-sky"
   data-fluid-canvas
   aria-hidden="true"
   data-strength={String(strength)}
-  data-mode={mode}
   data-variant={variant}
   data-ystart={String(yStart)}
 ></canvas>
 
 <style>
+  /* One shape now (see ONE SHAPE in the frontmatter): the fixed, page-wide backdrop. The
+     `.is-background` / `.is-contained` modifier pair went with the contained mode — with a
+     single shape the modifier carried no information, so the geometry sits on the element's
+     own class and there is no second rule to keep in sync with it. */
   .fluid-sky {
     pointer-events: none;
     display: block;
-  }
-  .fluid-sky.is-background {
     position: fixed;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    z-index: -2;
-  }
-  .fluid-sky.is-contained {
-    position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
@@ -156,7 +163,16 @@ const { strength = 4, mode = 'background', variant = 'descent', yStart = 0 } = A
       gl!.uniform1i(U.uRamp, 0);
     }
     uploadRamp(true);
-    const contained = cvs.dataset.mode === 'contained';
+    // `html[data-fluid-strength]` is a LIVE OVERRIDE, and it currently has no writer. It existed so
+    // a proto panel could force every canvas on the page to one rung while the level was being
+    // chosen; /proto-ladder and /proto-paper were the only two pages that ever set it, and both are
+    // retired. Nothing in src/ assigns `dataset.fluidStrength` any more — so this branch, the
+    // MutationObserver's `data-fluid-strength` filter below, the `[data-fluid-strength='0']` rule in
+    // the <style> block, and the matching `html[data-fluid-strength='0']` / `html[data-fluid='off']`
+    // fallback rules in global.css are all reachable only from devtools.
+    // Left in place ON PURPOSE for now rather than half-removed: the pieces span this file and
+    // global.css, and stripping only the half that lives here would leave global.css styling an
+    // attribute nothing can set. Remove the set together or not at all.
     function level(): number {
       const live = document.documentElement.dataset.fluidStrength;
       if (live !== undefined) return Number(live);
@@ -164,14 +180,16 @@ const { strength = 4, mode = 'background', variant = 'descent', yStart = 0 } = A
     }
     let gateTop = 0.55;
     function measureGate(): void {
-      if (contained) { gateTop = 1.0; return; }
       if (variant === 'reading') { gateTop = 0.0; return; }
-      // Descent pages: find where content starts. Look for #mountains (homepage),
-      // else fall back to the first element child of <main> with text content, else
-      // treat the whole page as a reading zone (gateTop = 0.0, the conservative
-      // direction — engages the legibility gate everywhere).
-      const content = document.getElementById('mountains') ||
-        Array.from(document.querySelector('main')?.children ?? [])
+      // Descent pages: find where content starts, i.e. the first element child of <main> that
+      // carries text; if there is none, treat the whole page as a reading zone (gateTop = 0.0,
+      // the conservative direction — engages the legibility gate everywhere).
+      //
+      // This used to consult `#mountains` first, back when the résumé section was the homepage's
+      // content zone. It isn't: Mountains came off the homepage, and with /proto-paper retired no
+      // route emits that id at all, so the lookup could only ever return null. The <main>-child
+      // scan is what has actually been running on every page, and it is the general rule anyway.
+      const content = Array.from(document.querySelector('main')?.children ?? [])
           .find((el): el is HTMLElement => el instanceof HTMLElement && el.textContent?.trim().length > 0) as HTMLElement | undefined;
       if (!content) { gateTop = 0.0; return; }
       const top = content.getBoundingClientRect().top + window.scrollY;
@@ -206,17 +224,10 @@ const { strength = 4, mode = 'background', variant = 'descent', yStart = 0 } = A
       sizeTo();
       uploadRamp();
       const vw = mVw, vh = mVh, docH = mDocH;
-      if (contained) {
-        gl!.uniform1f(U.uYOffset, level() * 2.0);
-        gl!.uniform1f(U.uYSpan, (cvs.clientHeight || vh) / (cvs.clientWidth || vw));
-        gl!.uniform1f(U.uDepth0, 0.0);
-        gl!.uniform1f(U.uDepthSpan, 1.0);
-      } else {
-        gl!.uniform1f(U.uYOffset, window.scrollY / vw + yStart);
-        gl!.uniform1f(U.uYSpan, vh / vw);
-        gl!.uniform1f(U.uDepth0, window.scrollY / docH);
-        gl!.uniform1f(U.uDepthSpan, vh / docH);
-      }
+      gl!.uniform1f(U.uYOffset, window.scrollY / vw + yStart);
+      gl!.uniform1f(U.uYSpan, vh / vw);
+      gl!.uniform1f(U.uDepth0, window.scrollY / docH);
+      gl!.uniform1f(U.uDepthSpan, vh / docH);
       gl!.uniform1f(U.uAmp, AMP_BY_LEVEL[Math.max(0, Math.min(4, level()))] ?? 1.0);
       gl!.uniform1f(U.uDark, document.documentElement.dataset.theme === 'dark' ? 1 : 0);
       gl!.uniform3f(U.uNebula, 0.055, 0.105, 0.115);
@@ -235,7 +246,7 @@ const { strength = 4, mode = 'background', variant = 'descent', yStart = 0 } = A
 
     sizeTo(true);
     draw(performance.now());
-    if (!contained) cvs.closest('.descent')?.classList.add('fluid-live');
+    cvs.closest('.descent')?.classList.add('fluid-live');
     const reduce = prefersReducedMotion();
     let rafId = 0, running = false, last = 0, scrolling = false;
     function loop(now: number): void {
@@ -253,7 +264,7 @@ const { strength = 4, mode = 'background', variant = 'descent', yStart = 0 } = A
     }
     const onLost = (e: Event) => {
       e.preventDefault(); stop();
-      if (!contained) cvs.closest('.descent')?.classList.remove('fluid-live');
+      cvs.closest('.descent')?.classList.remove('fluid-live');
     };
     const onRestored = () => { initAll(); };
     const onVis = () => { if (document.hidden) stop(); else start(); };
@@ -276,7 +287,7 @@ const { strength = 4, mode = 'background', variant = 'descent', yStart = 0 } = A
       window.clearTimeout(resizeT);
       resizeT = window.setTimeout(() => {
         const hidden = getComputedStyle(cvs).display === 'none';
-        if (!contained) cvs.closest('.descent')?.classList.toggle('fluid-live', !hidden);
+        cvs.closest('.descent')?.classList.toggle('fluid-live', !hidden);
         if (hidden) { stop(); return; }
         start();
         sizeTo(true); measureLayout(); measureGate(); draw(performance.now());

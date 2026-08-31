@@ -570,7 +570,9 @@ const allBeats = [...BEATS, BEAT4];
     font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase;
     color: var(--c-accent);
   }
-  .ch-pnl-gloss { grid-column: 2 / -1; font-size: 11px; line-height: 1.4; color: var(--c-faint); }
+  /* (.ch-pnl-gloss is gone with its element — a per-legend explanatory line under the group label. The
+     disclaimer it duplicated is .ch-cap below, which is one sentence for the whole figure rather than one per
+     group, and that is the version that shipped.) */
 
   .ch-cap {
     /* 10.5px is a footnote size and this is a real disclaimer a reader should be able to read. */
