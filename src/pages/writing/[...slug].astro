@@ -94,56 +94,7 @@ const longDate = new Date(`${entry.data.date}T00:00:00Z`).toLocaleDateString('en
     margin-top: 14px; color: var(--ink-1); text-wrap: balance;
   }
 
-  /* ── THE PROSE STYLE. Written once, for every piece that will ever exist, rather than per file.
-     Measure is 62ch: the reading pages already hold prose to roughly this, and a markdown body with no measure
-     would run the full 860px block, which is about 110 characters — unreadable at 16px. */
-  .prose { max-width: 62ch; color: var(--ink-2); font-size: 16px; line-height: 1.75; }
-  .prose > * + * { margin-top: 1.1em; }
-  .prose h2 {
-    font-family: var(--font-display); font-weight: 500; color: var(--ink-1);
-    font-size: clamp(22px, 2.2vw, 28px); line-height: 1.2; margin-top: 2.2em;
-  }
-  .prose h3 {
-    font-family: var(--font-accent); font-style: italic; color: var(--ink-1);
-    font-size: clamp(18px, 1.7vw, 21px); margin-top: 1.8em;
-  }
-  .prose a { color: var(--ink-1); text-decoration: none; box-shadow: inset 0 -1px 0 0 var(--ochre); }
-  .prose a:hover { color: var(--seal); }
-  .prose strong { color: var(--ink-1); font-weight: 500; }
-  .prose code {
-    font-family: var(--font-mono); font-size: 0.88em;
-    background: color-mix(in oklab, var(--ink-5) 12%, transparent); padding: 1px 5px; border-radius: 3px;
-  }
-  .prose ul, .prose ol { padding-left: 1.4em; }
-  .prose li + li { margin-top: 0.4em; }
-  .prose hr { border: 0; border-top: 1px solid var(--ink-5); margin: 2.4em 0; opacity: 0.5; }
-
-  /* ── BLOCKQUOTES CARRY THE FIRST PIECE, so they are the part of this style that had to be right.
-     A quote collection in markdown is a run of `>` blocks, each followed by its attribution — so the quote is
-     set in the display serif at reading size and given an ochre rule, and the paragraph IMMEDIATELY AFTER a
-     quote is treated as its source line: small, mono, quiet. `blockquote + p` does that without asking the
-     markdown to carry any classes, which keeps the file a plain .md that renders correctly anywhere. */
-  .prose blockquote {
-    margin-top: 1.8em;
-    padding-left: 22px;
-    border-left: 2px solid var(--ochre);
-    font-family: var(--font-display);
-    font-size: clamp(19px, 1.9vw, 23px);
-    line-height: 1.5;
-    color: var(--ink-1);
-  }
-  .prose blockquote p { margin: 0; }
-  .prose blockquote + p {
-    margin-top: 0.7em;
-    padding-left: 24px;
-    font-family: var(--font-mono);
-    font-size: 11.5px;
-    letter-spacing: 0.06em;
-    line-height: 1.6;
-    color: var(--ink-4);
-    max-width: 46ch;
-  }
-  .prose blockquote + p strong { color: var(--ink-3); font-weight: 400; }
+  /* The prose style lives in the is:global block below, and it HAS to. See the note there. */
 
   .piece-foot { display: flex; gap: 20px; padding: 8vh 0 12vh; }
 
@@ -152,5 +103,96 @@ const longDate = new Date(`${entry.data.date}T00:00:00Z`).toLocaleDateString('en
   @media (max-width: 900px) {
     .piece-block { width: auto; margin-left: clamp(24px, 7vw, 64px); margin-right: clamp(24px, 7vw, 64px); }
     .piece-head { padding-top: 12vh; }
+  }
+</style>
+
+<!-- ── THE PROSE STYLE, AND IT MUST BE is:global. NOT a preference — the first version of this was a scoped
+     block and NONE of it applied, which is why the owner saw a wall with no spacing and a quote that did not
+     read as a quote. Astro scoped styles rewrite every selector with a [data-astro-cid-…] attribute, and the
+     elements <Content /> emits are generated from markdown at build time, so they carry no such attribute.
+     `.prose blockquote` became `.prose[cid] blockquote[cid]` and matched nothing. The repo's own guide warns
+     about this attribute changing specificity; it also silently changes what a selector can REACH.
+     Everything below is nested under .prose so going global cannot leak into the rest of the site. -->
+<style is:global>
+  /* Measure is 62ch. The block is 860px wide, which at 16px is about 110 characters — a line length nobody
+     finishes. */
+  .prose { max-width: 62ch; color: var(--ink-2); font-size: 16px; line-height: 1.75; }
+  .prose > * + * { margin-top: 1.15em; }
+  .prose > :first-child { margin-top: 0; }
+  .prose h2 {
+    font-family: var(--font-display); font-weight: 500; color: var(--ink-1);
+    font-size: clamp(22px, 2.2vw, 28px); line-height: 1.2; margin-top: 2.4em;
+  }
+  .prose h3 {
+    font-family: var(--font-accent); font-style: italic; color: var(--ink-1);
+    font-size: clamp(18px, 1.7vw, 21px); margin-top: 2em;
+  }
+  .prose a { color: var(--ink-1); text-decoration: none; box-shadow: inset 0 -1px 0 0 var(--ochre); }
+  .prose a:hover { color: var(--seal); }
+  .prose strong { color: var(--ink-1); font-weight: 500; }
+  .prose em { font-family: var(--font-accent); font-style: italic; }
+  .prose code {
+    font-family: var(--font-mono); font-size: 0.88em;
+    background: color-mix(in oklab, var(--ink-5) 14%, transparent); padding: 1px 5px; border-radius: 3px;
+  }
+  .prose ul, .prose ol { padding-left: 1.4em; }
+  .prose li + li { margin-top: 0.4em; }
+  .prose hr { border: 0; border-top: 1px solid var(--ink-5); margin: 2.6em 0; opacity: 0.5; }
+
+  /* ── A QUOTE HAS TO LOOK LIKE A QUOTE. The owner: "i cant even read sometimes… to be a quote."
+     The earlier attempt was a size bump and a left rule, which is what a callout looks like, not what a
+     quotation looks like. This is a pull-quote: a hanging opening mark in ochre doing the announcing, the words
+     in the display serif large enough to be the loudest thing in the column, and the attribution set as a
+     separate register underneath — mono, small, em-dashed — so the eye never has to work out where the quote
+     stops and the source begins.
+     The mark HANGS in the left margin (negative offset inside padding that clears it) rather than sitting
+     inline, so the quote's own first line stays flush with the prose above it and the block still reads as part
+     of the column. Generous space above and below makes each quote a unit, which is what a collection needs. */
+  .prose blockquote {
+    position: relative;
+    margin-top: 2.6em;
+    padding-left: 2.6ch;
+    font-family: var(--font-display);
+    font-size: clamp(21px, 2.5vw, 27px);
+    line-height: 1.42;
+    letter-spacing: -0.008em;
+    color: var(--ink-1);
+    text-wrap: pretty;
+  }
+  .prose blockquote::before {
+    content: '\201C';
+    position: absolute;
+    left: -0.28ch;
+    top: -0.06em;
+    font-family: var(--font-display);
+    font-size: 2.5em;
+    line-height: 1;
+    color: var(--ochre);
+    opacity: 0.5;
+  }
+  .prose blockquote p { margin: 0; }
+  .prose blockquote p + p { margin-top: 0.5em; }
+
+  /* THE PARAGRAPH IMMEDIATELY AFTER A QUOTE IS ITS SOURCE, styled by position rather than by a class, so the
+     markdown stays a plain .md with nothing to remember and still renders correctly anywhere else. */
+  .prose blockquote + p {
+    margin-top: 1em;
+    padding-left: 2.6ch;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    line-height: 1.65;
+    color: var(--ink-4);
+    max-width: 52ch;
+  }
+  .prose blockquote + p::before { content: '— '; color: var(--ink-5); }
+  .prose blockquote + p strong { color: var(--ink-2); font-weight: 400; }
+
+  /* On a phone the hanging mark would sit outside the text column, so it comes inside and the quote loses the
+     hang rather than the margin. */
+  @media (max-width: 640px) {
+    .prose blockquote { padding-left: 2ch; }
+    .prose blockquote::before { left: -0.1ch; font-size: 2.1em; }
+    .prose blockquote + p { padding-left: 2ch; }
   }
 </style>

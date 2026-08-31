@@ -37,7 +37,7 @@ const writing = defineCollection({
      * build error instead of a piece that silently belongs to no section and never renders.
      * Must stay in step with the keys in data/writing.ts — there is a test asserting exactly that.
      */
-    kind: z.enum(['notes', 'essays', 'explainers', 'quotes']),
+    kind: z.enum(['notes', 'essays', 'explainers', 'misc']),
     /** One or two sentences: what it argues, in plain language. Shown on the index, not on the piece. */
     blurb: z.string(),
     /** Rough reading time. Omit rather than guess — the index only prints it when it is real. */

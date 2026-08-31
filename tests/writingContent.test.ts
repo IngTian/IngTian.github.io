@@ -31,9 +31,9 @@ describe('writing content seam', () => {
   });
 
   it('groups entries under their declared kind', () => {
-    const built = buildKinds([entry('quotes', 'a'), entry('essays', 'b'), entry('quotes', 'c')]);
+    const built = buildKinds([entry('misc', 'a'), entry('essays', 'b'), entry('misc', 'c')]);
     const byKey = Object.fromEntries(built.map((k) => [k.key, k.entries.map((e) => e.slug)]));
-    expect(byKey.quotes).toEqual(['a', 'c']);
+    expect(byKey.misc).toEqual(['a', 'c']);
     expect(byKey.essays).toEqual(['b']);
     expect(byKey.notes).toEqual([]);
   });
@@ -41,13 +41,13 @@ describe('writing content seam', () => {
   it('drops the kind field from the entries it emits', () => {
     // The kind is the grouping key, not a property of the piece — leaving it on would let a template render a
     // section heading from an entry and quietly disagree with the section it sits in.
-    const [first] = buildKinds([entry('quotes', 'a')]).find((k) => k.key === 'quotes')!.entries;
+    const [first] = buildKinds([entry('misc', 'a')]).find((k) => k.key === 'misc')!.entries;
     expect(first).not.toHaveProperty('kind');
     expect(first.slug).toBe('a');
   });
 
   it('preserves taxonomy order and keeps empty kinds, so a section still announces itself', () => {
-    const built = buildKinds([entry('quotes', 'a')]);
+    const built = buildKinds([entry('misc', 'a')]);
     expect(built.map((k) => k.key)).toEqual(KINDS.map((k) => k.key));
     expect(built.every((k) => typeof k.empty === 'string' && k.empty.length > 0)).toBe(true);
   });
@@ -55,16 +55,16 @@ describe('writing content seam', () => {
   it('ignores an entry whose kind no section declares, rather than throwing', () => {
     // A piece can only reach buildKinds after passing the schema's enum, so this is belt and braces — but the
     // failure mode if it ever happened must be a missing row, not a broken build of the whole site.
-    const built = buildKinds([entry('nonexistent', 'x'), entry('quotes', 'a')]);
+    const built = buildKinds([entry('nonexistent', 'x'), entry('misc', 'a')]);
     expect(totalEntries(built)).toBe(1);
   });
 
   it('leaves ordering to sorted(), newest first', () => {
     const built = buildKinds([
-      entry('quotes', 'old', '2020-01-01'),
-      entry('quotes', 'new', '2026-08-15'),
+      entry('misc', 'old', '2020-01-01'),
+      entry('misc', 'new', '2026-08-15'),
     ]);
-    const quotes = built.find((k) => k.key === 'quotes')!;
+    const quotes = built.find((k) => k.key === 'misc')!;
     expect(sorted(quotes).map((e) => e.slug)).toEqual(['new', 'old']);
   });
 });

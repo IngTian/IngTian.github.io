@@ -91,14 +91,20 @@ export const KINDS: WritingKind[] = [
   /**
    * The fourth kind, and the file above anticipated it: "a fourth kind (talks, teaching, a reading log) is a
    * data edit". A quote collection is none of notes, essays or explainers — it is not an argument, it is a
-   * commonplace book — so filing it under one of those would have made that section's gloss a lie.
+   * commonplace book — so filing it under one of those would have made that section's gloss untrue.
+   *
+   * MISCELLANEOUS, NOT "QUOTES", on the owner's call: "having only one quote doc under quotes is weird." He is
+   * right, and the fault is scale rather than taxonomy — a section whose name promises a genre and holds one
+   * file reads as an unfinished shelf. A section named for the leftovers holds one honestly, and holds the
+   * reading log and the talk notes later without being renamed. If quotes ever outgrow it, THAT is the moment
+   * to promote them to their own kind, which is a data edit.
    */
   {
-    key: 'quotes',
-    label: 'Quotes',
-    railLabel: 'Quotes',
+    key: 'misc',
+    label: 'Miscellaneous',
+    railLabel: 'Misc',
     gloss:
-      'A commonplace book: lines worth keeping, with their source and nothing else. Kept honest by exactness — a quote nobody can check is just a paraphrase with confidence.',
+      'The shelf for things that are not papers, essays or explainers — quote collections, reading notes, whatever else is worth keeping. Kept honest by exactness: anything quoted here carries its source.',
     // Long enough to name what belongs here, because a test enforces that — and the test is right. "Nothing
     // here yet" was the first thing written in this slot and it is exactly the filler the rule exists to catch.
     empty:

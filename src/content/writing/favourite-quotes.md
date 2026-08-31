@@ -1,7 +1,7 @@
 ---
 title: Favourite quotes
 date: 2026-08-15
-kind: quotes
+kind: misc
 blurb: Lines I keep coming back to, mostly about risk, regimes, and the gap between a model and the world it is supposed to describe.
 ---
 
