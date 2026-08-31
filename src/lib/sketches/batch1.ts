@@ -13,7 +13,7 @@
 //   D  the question  — withholding, so curiosity has somewhere to go
 //   E  the section   — time as depth, strata below the descent's ground
 //
-// See notes/showpiece.md for the five rejected attempts and the open questions.
+// The five rejected attempts and the open questions are in the commit history.
 
 import {
   type Sketch, type SketchCtx, FRAME, PAL,

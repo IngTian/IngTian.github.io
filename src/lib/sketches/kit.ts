@@ -52,7 +52,7 @@ export interface SketchData {
   awards: typeof awards;
   interests: typeof researchInterests;
   /** 42 photographs, each with a real written title and note (mean 82 chars). The only material
-   *  on the site with a VOICE in it — see notes/showpiece.md. */
+   *  on the site with a VOICE in it. */
   photos: { file: string; title: string; note: string }[];
   /** 20 signals scored 1-5 against a published rubric, with justifications. */
   signals: typeof SIGNAL_WEIGHTS.signals;
@@ -92,7 +92,7 @@ export interface SketchCtx {
 }
 
 /** A candidate. `verdict` is filled in AFTER it has been looked at — the file becomes the record
- *  of what was tried and why it died, which is what notes/showpiece.md is for at the prose level. */
+ *  of what was tried and why it died, which the commit history carries at the prose level. */
 export interface Sketch {
   id: string;
   title: string;

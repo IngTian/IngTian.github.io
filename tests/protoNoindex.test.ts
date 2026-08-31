@@ -29,7 +29,7 @@ import { describe, expect, it } from 'vitest';
  * /proto-ladder (a calibration ladder whose value was picked, shipped, and whose printed numbers had
  * gone stale against the amplitudes FluidSky actually uses). They were answered questions; git keeps
  * them. /proto-sketches survives because its still-frame gate is the cheapest thing that ever worked
- * here (notes/showpiece.md). So the floor is 1 rather than 4 — the point of the number was never the
+ * here. So the floor is 1 rather than 4 — the point of the number was never the
  * count, it was that an empty glob must be RED: renaming the `proto-` prefix would otherwise leave
  * the it.each below with nothing to iterate and this file would go green while checking nothing, the
  * same shape of hole as `passWithNoTests`. Do not "tidy" the floor to 0.

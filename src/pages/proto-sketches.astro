@@ -6,7 +6,7 @@
 // src/lib/sketches/, add it to the batch, and it appears here at real width against the real
 // corpus and the real palette.
 //
-// The rule this formalises (see notes/showpiece.md): A STILL FRAME FIRST. Judge it in one look.
+// The rule this formalises: A STILL FRAME FIRST. Judge it in one look.
 // three.js only after a frame survives. Four of the five rejections were only judgeable once
 // finished; the one cheap gate that ever worked was a static SVG page.
 //
@@ -55,7 +55,7 @@ const sketches = BATCH1.map((s) => ({ meta: s, html: s.draw(ctx) }));
       </p>
       <p class="lede dim">
         Flip the theme with the corner nav; both must work. Five earlier attempts and their reasons
-        are recorded in <code>notes/showpiece.md</code>.
+        are recorded in the commit history.
       </p>
     </header>
 
@@ -136,7 +136,7 @@ const sketches = BATCH1.map((s) => ({ meta: s, html: s.draw(ctx) }));
      appear nowhere else in the repo, and no sketch in BATCH1 has a verdict filled in yet, so they are also
      absent from the built HTML. That is the page working as designed: kit.ts declares
      `verdict?: { call: 'keep' | 'kill' | 'unjudged' }` and says it is filled in AFTER a sketch has been looked
-     at, and notes/showpiece.md already records round-one verdicts that have not been written back here.
+     at, and round-one verdicts were recorded in a design note that has since been deleted.
      The first one that is will need these colours. 'unjudged' deliberately has no rule — it keeps the neutral
      dd colour, because "not yet decided" should not be styled as a decision. */
   dd.v-kill { color: var(--seal); }

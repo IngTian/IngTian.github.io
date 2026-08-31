@@ -4,10 +4,11 @@
 // ── NO PAGE IMPORTS THIS, AND THAT IS DELIBERATE. DO NOT DELETE IT AS DEAD CODE. ──
 // An import-graph closure from every entry point in src/pages/ does not reach this file, so a
 // dead-code sweep flags it every single time. It survived one such sweep only because a human
-// went and read notes/showpiece.md; the next sweep would have had nothing to go on, because
-// nothing inside src/ said why an unreferenced module was here. Hence this comment.
+// went and read a design note in notes/, and that folder is now deleted too — so this comment is the
+// ONLY surviving record of why an unreferenced module is here. It is quoted rather than referenced
+// for exactly that reason: a pointer outlives its target, a quotation does not.
 //
-// The decision is written down in notes/showpiece.md, under "What IS decided, and committed":
+// The decision, verbatim from that note ("What IS decided, and committed"):
 //   "src/lib/capability.ts — breadth statistics (HHI, effective dimensions). Rejected as a
 //    *subject* but kept: they are honest and may serve as substructure."
 // The showpiece slot at the bottom of the homepage is intentionally empty after five rejected

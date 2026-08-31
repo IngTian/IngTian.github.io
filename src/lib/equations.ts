@@ -45,7 +45,7 @@ export const PAPER_EQUATIONS = {
 // consumer is pure cost — katex is a devDependency precisely so none of it ships, and unreachable bakes make
 // the ledger of what the client receives harder to read.
 //
-// The one that actually settles it: all three rendered `r_{\mathrm{TIAN}}`, and notes/showpiece.md records
+// The one that actually settles it: all three rendered `r_{\mathrm{TIAN}}`, and the design note recorded
 // that framing as rejected on a substantive point, not a visual one — "r_TIAN is a RETURN and implies a P&L
 // that does not exist." The maths was mechanically correct and the betas were honest; the variable was a claim
 // the site cannot make. A typeset equation is the most authoritative-looking thing on a page, so a rejected
