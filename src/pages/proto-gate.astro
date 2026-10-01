@@ -1,71 +1,53 @@
 ---
-// /proto-gate — INTERNAL. Four line treatments for the first-visit gate, in the real page at real size, with
-// a switcher. This exists because the owner looked at the shipped gate and said "ur lines are horrible", and
-// because small-detail screenshots of this kind of thing are unjudgeable: the question is whether a field of
-// 30-odd strokes reads as combed or as a tangle, which is a whole-frame impression.
+// /proto-gate — INTERNAL. A sweep of the gate comb's TILT dial, one variable, everything else fixed.
 //
-// It is the same habit /proto-sketches formalises — put the candidates in the live page and look — and it
-// carries noindex for the same reason: the body quotes internal review notes, so an indexed copy is a leak.
-// tests/protoNoindex.test.ts globs src/pages/proto-*.astro and asserts the prop, so this is checked.
+// THIS PAGE USED TO COMPARE FOUR DIFFERENT LINE TREATMENTS AND THAT WAS A BAD COMPARISON. The owner:
+// "your other 3 are horribly implemented they are not even real comparisons." Correct. Each of the four was
+// built independently and chose its own stroke count, spacing, cut length and projection, so flipping between
+// them varied four parameter sets at once — and `contour` differed from `comb` on TWO axes simultaneously
+// (level-set geometry AND whether elevation was projected), which is confounded by construction. Comparing
+// four things that differ in four ways tells you nothing about any one of them.
+//
+// Combed contours won, so what is left is a genuine single-variable question: how much tilt. lib/gateLines.ts
+// is written by an agent that could measure the picture but never see it, and it said as much — "2.6 is my
+// judgement call and I cannot see the result." Below, only `tilt` changes. Same field, same camera, same
+// seed count, same axis, same knots, same ramp. That is a real comparison.
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { gateTrails, GATE_VIEW_H, GATE_VIEW_W } from '../lib/gatePaths';
-import * as comb from '../lib/gateVariants/comb';
-import * as contour from '../lib/gateVariants/contour';
-import * as descentTrunc from '../lib/gateVariants/descentTrunc';
+import { GATE_VIEW_H, GATE_VIEW_W } from '../lib/gatePaths';
+import { COMB_DEFAULTS, MAX_FIELD_GRAD, trails } from '../lib/gateLines';
 import { name, roles } from '../data/profile';
 
-// The shipped one is included deliberately as the control: every alternative has to beat what it replaces,
-// and the knot is much easier to see next to a frame that does not have one.
-const VARIANTS = [
-  {
-    key: 'shipped',
-    label: 'Shipped (full descent)',
-    note: 'Gradient descent run to convergence. Centripetal spline, so the 173.8-degree hairpins are gone — but every stroke still ends in one of the field’s three basins, which is the knot.',
-    metrics: 'turn 76.6° · length 22× · busiest cell ~71% · 271 pair crossings',
-    trails: gateTrails(),
-  },
-  {
-    key: 'comb',
-    label: comb.LABEL,
-    note: comb.NOTE,
-    metrics: 'turn 12.7° · length 1.00× · busiest cell 10% · 0 pair crossings',
-    trails: comb.trails(),
-  },
-  {
-    key: 'contour',
-    label: contour.LABEL,
-    note: contour.NOTE,
-    metrics: 'turn 32.3° · length 1.70× · busiest cell 16% · keeps elevation',
-    trails: contour.trails(),
-  },
-  {
-    key: 'descentTrunc',
-    label: descentTrunc.LABEL,
-    note: descentTrunc.NOTE,
-    metrics: 'turn 18.8° · length 1.00× · busiest cell 9% · still literal descent',
-    trails: descentTrunc.trails(),
-  },
-];
+// Every value clears MAX_FIELD_GRAD (1.8668), so each one still carries the no-knot guarantee — the point is
+// to pick a look, not to show what breaking the theorem looks like. The author's own notes on the extremes:
+// 4.5 is "ruled paper" (5.6 deg of turn, <=43px bow), 2.1 "bows up to 98px" at 27.2 deg and wanders off axis.
+const TILTS = [2.0, 2.6, 3.4, 4.5];
+
+const FRAMES = TILTS.map((tilt) => ({
+  key: `t${String(tilt).replace('.', '')}`,
+  tilt,
+  isDefault: tilt === COMB_DEFAULTS.tilt,
+  trails: trails({ tilt }),
+}));
 
 const letters = [...`${name.first} ${name.last}`];
 ---
 
 <BaseLayout
-  title="Gate line variants — internal"
-  description="Internal prototype: four line treatments for the first-visit gate."
+  title="Gate comb — tilt sweep (internal)"
+  description="Internal prototype: the gate comb's tilt dial, swept with every other parameter held fixed."
   veilOnLoad={false}
   noindex={true}
 >
   <main class="pg">
-    {/* A REAL, VISUALLY HIDDEN <h1>. The page is four full-bleed previews and has no visible headline, so it
-        shipped with zero <h1> and tests/distSmoke.test.ts's "exactly one <h1>" invariant caught it — the same
-        assertion that caught the gate shipping TWO. The name inside each frame cannot be the heading: it is
-        repeated once per variant, which would give four. `sr-only` is a Tailwind core utility. */}
-    <h1 class="sr-only">Gate line variants — internal</h1>
-    {VARIANTS.map((v, i) => (
-      <section class="pg-frame" data-variant={v.key} data-active={i === 0 ? 'true' : 'false'}>
+    {/* A real, visually hidden <h1>. The page is full-bleed previews with no visible headline, and the name
+        inside each frame repeats once per frame — so it cannot be the heading. distSmoke asserts exactly one
+        per document and caught this page shipping zero. */}
+    <h1 class="sr-only">Gate comb — tilt sweep (internal)</h1>
+
+    {FRAMES.map((f, i) => (
+      <section class="pg-frame" data-variant={f.key} data-active={f.isDefault ? 'true' : 'false'} aria-hidden={!f.isDefault}>
         <svg viewBox={`0 0 ${GATE_VIEW_W} ${GATE_VIEW_H}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
-          {v.trails.map((t) => (
+          {f.trails.map((t) => (
             <path d={t.d} stroke-opacity={t.opacity} stroke-width={t.width} pathLength="1" />
           ))}
         </svg>
@@ -73,24 +55,32 @@ const letters = [...`${name.first} ${name.last}`];
           <p class="pg-name">{letters.map((ch) => (ch === ' ' ? <span class="pg-sp"> </span> : <span>{ch}</span>))}</p>
           <p class="pg-roles">{roles}</p>
         </div>
+        <span class="pg-hidden-i">{i}</span>
       </section>
     ))}
 
-    <nav class="pg-switch" aria-label="Variant">
-      {VARIANTS.map((v, i) => (
-        <button type="button" data-pick={v.key} aria-pressed={i === 0 ? 'true' : 'false'}>
-          {v.label}
+    <nav class="pg-switch" aria-label="Tilt">
+      {FRAMES.map((f) => (
+        <button type="button" data-pick={f.key} aria-pressed={f.isDefault ? 'true' : 'false'}>
+          tilt {f.tilt}{f.isDefault ? ' ·' : ''}
         </button>
       ))}
     </nav>
 
     <aside class="pg-info">
-      {VARIANTS.map((v, i) => (
-        <div data-info={v.key} hidden={i !== 0}>
-          <p class="pg-metrics">{v.metrics} · {v.trails.length} strokes</p>
-          <p class="pg-note">{v.note}</p>
+      {FRAMES.map((f) => (
+        <div data-info={f.key} hidden={!f.isDefault}>
+          <p class="pg-metrics">
+            tilt {f.tilt} · {f.trails.length} strokes · floor is {MAX_FIELD_GRAD} (max |grad field|)
+            {f.isDefault ? ' · current default' : ''}
+          </p>
         </div>
       ))}
+      <p class="pg-note">
+        Only <strong>tilt</strong> changes between these. Higher is calmer and straighter; lower lets the terrain
+        bend the strokes more, at the cost of wandering off the comb's axis. Every value here still clears the
+        no-knot bound. Arrow keys flip — that is how a difference this small becomes visible.
+      </p>
     </aside>
   </main>
 </BaseLayout>
@@ -100,15 +90,15 @@ const letters = [...`${name.first} ${name.last}`];
 
   .pg-frame {
     position: fixed; inset: 0; opacity: 0; pointer-events: none;
-    transition: opacity 180ms ease;
     display: flex; align-items: center; justify-content: center;
   }
   .pg-frame[data-active='true'] { opacity: 1; }
   .pg-frame svg { position: absolute; inset: 0; width: 100%; height: 100%; }
   .pg-frame path { fill: none; stroke: var(--ochre); stroke-linecap: round; }
+  /* No transition on purpose: an instant swap is what makes two nearly-identical frames comparable. A
+     cross-fade blends them and hides exactly the difference you are trying to see. */
+  .pg-hidden-i { display: none; }
 
-  /* The name is here because the lines have to be judged WITH it on top — a field that reads beautifully
-     empty can still fight the text, and the text is the point of the screen. */
   .pg-text { position: relative; text-align: center; }
   .pg-name {
     font-family: var(--font-display), Georgia, serif; color: var(--paper);
@@ -123,7 +113,7 @@ const letters = [...`${name.first} ${name.last}`];
   }
 
   .pg-switch {
-    position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
+    position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%);
     display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; z-index: 5;
   }
   .pg-switch button {
@@ -138,27 +128,25 @@ const letters = [...`${name.first} ${name.last}`];
 
   .pg-info {
     position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
-    width: min(92vw, 880px); text-align: center; z-index: 5;
+    width: min(92vw, 820px); text-align: center; z-index: 5;
   }
   .pg-metrics {
     font-family: var(--font-mono), ui-monospace, monospace; font-size: 10.5px;
-    color: color-mix(in srgb, var(--ochre) 80%, transparent); margin: 0 0 4px;
-    letter-spacing: .04em;
+    color: color-mix(in srgb, var(--ochre) 80%, transparent); margin: 0 0 4px; letter-spacing: .04em;
   }
   .pg-note {
-    font-size: 12px; line-height: 1.5; margin: 0;
-    color: color-mix(in srgb, var(--paper) 52%, transparent);
+    font-size: 11.5px; line-height: 1.5; margin: 0;
+    color: color-mix(in srgb, var(--paper) 46%, transparent);
   }
 
   @media (max-width: 820px) {
-    .pg-switch { bottom: 118px; }
+    .pg-switch { bottom: 112px; }
     .pg-note { display: none; }
   }
 </style>
 
 <script>
-  // Plain switcher. Re-inits on astro:page-load with a teardown, per the Interactivity contract — a proto
-  // route is still a page a View Transition can swap.
+  // Plain switcher, re-initialised on astro:page-load with a teardown, per the Interactivity contract.
   let dispose: (() => void) | null = null;
 
   function initProtoGate(): void {
@@ -169,7 +157,9 @@ const letters = [...`${name.first} ${name.last}`];
 
     const pick = (key: string): void => {
       for (const f of document.querySelectorAll<HTMLElement>('.pg-frame')) {
-        f.dataset.active = String(f.dataset.variant === key);
+        const on = f.dataset.variant === key;
+        f.dataset.active = String(on);
+        f.setAttribute('aria-hidden', String(!on));
       }
       for (const b of nav.querySelectorAll<HTMLButtonElement>('button')) {
         b.setAttribute('aria-pressed', String(b.dataset.pick === key));
@@ -184,14 +174,11 @@ const letters = [...`${name.first} ${name.last}`];
       if (b?.dataset.pick) pick(b.dataset.pick);
     };
 
-    // Left/right arrows too — flipping back and forth fast is how a difference this subtle becomes visible.
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       const keys = [...nav.querySelectorAll<HTMLButtonElement>('button')].map((b) => b.dataset.pick ?? '');
-      const cur = keys.findIndex((k) => {
-        const f = document.querySelector<HTMLElement>(`.pg-frame[data-variant="${k}"]`);
-        return f?.dataset.active === 'true';
-      });
+      const cur = keys.findIndex((k) =>
+        document.querySelector<HTMLElement>(`.pg-frame[data-variant="${k}"]`)?.dataset.active === 'true');
       const next = (cur + (e.key === 'ArrowRight' ? 1 : keys.length - 1)) % keys.length;
       const key = keys[next];
       if (key) pick(key);

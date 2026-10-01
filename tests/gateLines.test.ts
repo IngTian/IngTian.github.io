@@ -10,7 +10,7 @@
 // The shipped numbers, for whoever reads a failure here: 30 trails, worst turning angle 12.7 degrees, length
 // ratio 1.003, coverage 100% x 100%, busiest cell 10.0%, zero crossings between any two strokes.
 import { describe, expect, it } from 'vitest';
-import { LABEL, NOTE, trails } from '../src/lib/gateVariants/comb';
+import { COMB_DEFAULTS, LABEL, MAX_FIELD_GRAD, NOTE, trails } from '../src/lib/gateLines';
 import { GATE_VIEW_H, GATE_VIEW_W } from '../src/lib/gatePaths';
 import { RANGE, grad } from '../src/lib/terrain';
 
@@ -94,7 +94,7 @@ describe('comb — the module contract', () => {
   it('scales to a viewBox it was not tuned at', () => {
     // The band geometry is written in terms of w and h, and `project` scales with min(w, h). A portrait
     // viewBox is the case most likely to expose a hardcoded 1200 or 800.
-    const tall = trails(900, 1400);
+    const tall = trails({ w: 900, h: 1400 });
     expect(tall).toHaveLength(T.length);
     for (const t of tall) expect(t.d).not.toMatch(/NaN|Infinity/);
     // Different viewBox, different geometry — otherwise the arguments are being ignored.
@@ -228,5 +228,57 @@ describe('comb — the no-knot guarantee, in both halves', () => {
       }
     }
     expect(hits.slice(0, 8), `${hits.length} crossings`).toEqual([]);
+  });
+});
+
+describe('the dials, now that they are parameters rather than constants', () => {
+  // TILT became a parameter because the agent that chose 2.6 could measure the picture but never see it, and
+  // said so. /proto-gate sweeps it with everything else fixed. That makes two things worth pinning: the
+  // guarantee cannot be voided through the new door, and the dials must actually move the drawing.
+
+  it('CLAMPS tilt to keep the no-knot theorem true', () => {
+    // The whole reason this module cannot knot is that TILT exceeds max|grad field|, so grad g never vanishes
+    // and g has no critical point — hence no closed level sets and none that meet. A caller sweeping the dial
+    // must not be able to undo that by typing a smaller number, so the floor is enforced in code. Equal
+    // output for 0.1 and 1.0 is the clamp doing its job: both land on the same floor.
+    const far = trails({ tilt: 0.1 });
+    const near = trails({ tilt: 1.0 });
+    expect(JSON.stringify(far)).toBe(JSON.stringify(near));
+    for (const t of far) expect(t.d).not.toMatch(/NaN|Infinity/);
+  });
+
+  it('keeps the shipped default above the measured bound', () => {
+    // If someone lowers DEFAULT_TILT below the grid-measured maximum gradient, the clamp silently takes over
+    // and the documented default stops being what ships. This asserts the two stay consistent.
+    expect(COMB_DEFAULTS.tilt).toBeGreaterThan(MAX_FIELD_GRAD);
+  });
+
+  it('actually changes the drawing when tilt changes', () => {
+    // A dial wired to nothing is worse than no dial: the sweep page would show four identical frames and
+    // invite a choice between them.
+    expect(trails({ tilt: 2.0 })[0].d).not.toBe(trails({ tilt: 4.5 })[0].d);
+  });
+
+  it('honours the seed count, and the ramp still spans its full range', () => {
+    const few = trails({ seeds: 12 });
+    expect(few).toHaveLength(12);
+    expect(few[0].opacity).toBeCloseTo(0.1, 3);
+    expect(few[few.length - 1].opacity).toBeCloseTo(0.55, 3);
+    expect(few[0].width).toBeCloseTo(0.5, 2);
+    expect(few[few.length - 1].width).toBeCloseTo(1.6, 2);
+  });
+
+  it('survives a degenerate seed count instead of dividing by zero', () => {
+    // seeds = 1 would make the ramp's divisor (seeds - 1) zero. Floored at 2.
+    for (const t of trails({ seeds: 1 })) expect(t.d).not.toMatch(/NaN|Infinity/);
+  });
+
+  it('changes the drawing when the axis angle changes', () => {
+    expect(trails({ axisDeg: 0 })[0].d).not.toBe(trails({ axisDeg: 20 })[0].d);
+  });
+
+  it('is still deterministic with options supplied', () => {
+    const a = JSON.stringify(trails({ tilt: 3.4, seeds: 18, axisDeg: 11 }));
+    expect(JSON.stringify(trails({ tilt: 3.4, seeds: 18, axisDeg: 11 }))).toBe(a);
   });
 });

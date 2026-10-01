@@ -10,7 +10,14 @@
 // tests/distSmoke.test.ts asserts the shipped HTML carries no covering class, so the invariant is checked
 // against the build rather than trusted.
 import { name, roles } from '../data/profile';
-import { GATE_VIEW_H, GATE_VIEW_W, gateTrails } from '../lib/gatePaths';
+// THE LINES ARE COMBED CONTOURS, not descent trails, and that was decided by looking. The first version drew
+// gradient descent run to convergence; the owner's verdict was "ur lines are horrible", and the measurements
+// agreed — every stroke ends in one of the field's three basins, so 36 of them piled into 3 points (71% of the
+// set in one 20x20 cell, 271 pair crossings) with a 22x length spread. lib/gateLines.ts draws iso-cost
+// contours of the same field under a tilt instead, where "no knot" is a theorem rather than a tuning. Three
+// treatments were built and compared in /proto-gate; this is the one that won.
+import { GATE_VIEW_H, GATE_VIEW_W } from '../lib/gatePaths';
+import { trails as gateTrails } from '../lib/gateLines';
 import { GATE_DISMISS_MS, GATE_REVEAL_EVENT, GATE_SEEN_KEY, GATE_UP_ATTR } from '../lib/gate';
 
 const trails = gateTrails();

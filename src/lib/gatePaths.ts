@@ -1,22 +1,29 @@
 // src/lib/gatePaths.ts
 //
-// THE GATE'S GEOMETRY, COMPUTED AT BUILD TIME. The first-visit gate draws gradient-descent trails on the
-// SAME loss field the hero paints, through the SAME camera, so the moment it dissolves the shapes on screen
-// already rhyme with the shapes behind them. Nothing here runs in the browser: Gate.astro calls gateTrails()
-// during the build and ships the result as static SVG, so the visual costs zero runtime JS.
+// THE GATE'S SHARED DRAWING TOOLKIT: the viewBox it draws into, the shape of a stroke, and the spline that
+// turns a polyline into a smooth path. That is all this file is now, and the shrinking is the point.
 //
-// WHY NOT THE REFERENCE'S 36 HARDCODED BEZIERS. The design this replaces (21st.dev's BackgroundPaths) builds
-// its curves from magic-number control points. That is the exact thing this site's own rule rejects — five
-// showpieces were binned for "looking like they meant something without meaning anything", and the
-// replacement rule is that the surface has to be real math, computed. These curves ARE descent runs, so they
-// converge into the field's three basins instead of running parallel. That is a visible difference from the
-// reference and it was accepted deliberately: convergence downward is the site's whole metaphor.
+// IT USED TO GENERATE THE LINES TOO, from gradient descent run to convergence on a 6x6 lattice of starts —
+// gateTrails/gateSpawns/gateDescent/hasRealExtent/hash01 and the lattice constants. The owner looked at the
+// result: "ur lines are horrible." The measurements agreed, and in a way that no tuning could fix: every
+// descent run ends in one of the field's three minima, so 36 strokes piled into 3 points (71% of the set
+// inside one cell of a 20x20 grid, 271 pair crossings) with a 22x spread in length. Three replacements were
+// built and compared in /proto-gate; combed contours won, and they live in lib/gateLines.ts.
 //
-// `grad` is deliberately NOT imported here — noUnusedLocals is on, and this module never needs the gradient
-// directly (runDescent already walks it). tests/gatePaths.test.ts imports grad from ./terrain itself to
-// assert convergence.
-import { RANGE, field, project, runDescent } from './terrain';
-import { TERRAIN_CONFIG_DEFAULTS } from './terrainRender';
+// So that generator has no caller left anywhere in src. `noUnusedLocals` cannot see that — an export is a
+// public API as far as the compiler is concerned — which is precisely the case CLAUDE.md says "still needs a
+// grep". The grep was run; this deletion is its result.
+//
+// WHAT SURVIVES IS THE PART THAT EARNED IT. catmullRomPath is centripetal, and that was the one real bug
+// behind the owner's verdict rather than a matter of composition: gradient descent sprints down a steep slope
+// and crawls near a minimum, so a trail's points were up to 412.8x unevenly spaced, and uniform Catmull-Rom
+// overshoots past about 5x — the rendered curve held a 173.8-degree hairpin. Centripetal cannot cusp at any
+// spacing, and every candidate treatment was built on top of it.
+// NO IMPORTS. Worth noticing rather than passing over: this file used to pull in RANGE, field, project and
+// runDescent from terrain.ts plus the renderer's camera config, because it generated the geometry itself. With
+// the generator gone it depends on nothing at all — it is pure 2D curve arithmetic, and the knowledge of the
+// loss field and the camera now lives in exactly one place, lib/gateLines.ts. The typecheck gate is what
+// pointed this out, by failing on the orphaned import the moment the generator was removed.
 
 export interface Pt { x: number; y: number }
 export interface Trail {
@@ -31,57 +38,6 @@ export interface Trail {
 /** viewBox of the gate's SVG. Fixed, so the paths are resolution-independent markup. */
 export const GATE_VIEW_W = 1200;
 export const GATE_VIEW_H = 800;
-
-/** 6 x 6 = 36, matching the reference's density. */
-export const LATTICE = 6;
-export const SPAWN_COUNT = LATTICE * LATTICE;
-
-/** Minimum projected extent, in viewBox px, for a trail to be worth drawing. See gateTrails. */
-export const MIN_SPAN = 24;
-
-/**
- * The hero's camera, imported rather than retyped. TerrainHero.astro's own comment is the reason:
- * "walkers must use the SAME zoom to stay on the surface". The gate is in the same position — if this
- * number drifts from the renderer's, the trails stop lining up with the terrain they dissolve into.
- */
-const ZOOM = TERRAIN_CONFIG_DEFAULTS.zoom;
-
-/**
- * Deterministic [0,1) from an integer. This exists because the reference seeded its per-path timing with
- * `Math.random()`, and this site has a standing determinism rule — the Rules slide's fan is a seeded walk
- * precisely because "a fan that shimmered between builds would undercut a slide whose whole claim is that
- * the scale is real". The same reasoning applies to a picture rebuilt on every deploy.
- */
-export function hash01(n: number): number {
-  let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
-  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
-  h ^= h >>> 16;
-  return (h >>> 0) / 4294967296;
-}
-
-/** A lattice over the field, each point nudged off its cell centre so the fans do not read as a grid. */
-export function gateSpawns(): Array<[number, number]> {
-  const cell = (2 * RANGE) / LATTICE;
-  const out: Array<[number, number]> = [];
-  for (let row = 0; row < LATTICE; row++) {
-    for (let col = 0; col < LATTICE; col++) {
-      const i = row * LATTICE + col;
-      // 0.9 of a half-cell keeps a jittered point inside its own cell, so coverage stays even.
-      const jx = (hash01(i * 2) - 0.5) * cell * 0.9;
-      const jy = (hash01(i * 2 + 1) - 0.5) * cell * 0.9;
-      out.push([
-        -RANGE + cell * (col + 0.5) + jx,
-        -RANGE + cell * (row + 0.5) + jy,
-      ]);
-    }
-  }
-  return out;
-}
-
-/** The world-space descent from one spawn. Exported so a test can assert convergence before projection. */
-export function gateDescent(x0: number, y0: number): Array<Pt> {
-  return runDescent(x0, y0);
-}
 
 const r1 = (n: number): number => Math.round(n * 10) / 10;
 
@@ -145,61 +101,4 @@ export function catmullRomPath(pts: readonly Pt[]): string {
       + ` ${r1(p2.x)},${r1(p2.y)}`;
   }
   return d;
-}
-
-/**
- * Does a projected path go anywhere?
- *
- * A Gaussian's centre is a stationary point, so a spawn landing on one makes runDescent break on its first
- * iteration and return ten copies of a single coordinate — which draws as nothing, or as a dot. This is the
- * guard against shipping such a path.
- *
- * MEASURED, SO THE COMMENT CAN BE HONEST: today it drops NOTHING. All 36 spawns produce real trails. The
- * un-jittered 6x6 lattice does put a point at (-1.3, -0.433), about 0.1 from the BUMPS centre (-1.4, -0.5) —
- * which is what made this look urgent while planning — but the jitter moves that point clear, and even the
- * flattest spawn in the set (|grad| = 0.0497, out in the corner where every Gaussian has decayed) still
- * travels 1.9 world units over 140 iterations. So this is a guard, not a filter that currently does work.
- * It is kept because the spawn set is tuning-sensitive: change LATTICE, RANGE, the jitter factor or BUMPS and
- * the collision comes back silently. It is exported so a test can hand it a degenerate path directly —
- * asserting on gateTrails()'s output count proved nothing while nothing was being dropped.
- */
-export function hasRealExtent(pts: readonly Pt[]): boolean {
-  if (pts.length === 0) return false;
-  const xs = pts.map((p) => p.x);
-  const ys = pts.map((p) => p.y);
-  const span = Math.max(
-    Math.max(...xs) - Math.min(...xs),
-    Math.max(...ys) - Math.min(...ys),
-  );
-  return span >= MIN_SPAN;
-}
-
-/**
- * The shipped trails. Degenerate paths are dropped by hasRealExtent (see the note there for why that
- * currently removes nothing and is kept anyway), so the count is allowed to come in under SPAWN_COUNT.
- */
-export function gateTrails(): Trail[] {
-  const projected = gateSpawns().map(([x0, y0]) =>
-    // field() ALREADY folds in ZSCALE (`return z * ZSCALE`) — multiplying again here would double the
-    // relief and lift the trails off the surface. terrainRender.ts passes field() straight through too.
-    gateDescent(x0, y0).map(({ x, y }) => {
-      const [sx, sy] = project(x, y, field(x, y), GATE_VIEW_W, GATE_VIEW_H, ZOOM);
-      return { x: sx, y: sy };
-    }),
-  );
-
-  const kept = projected.filter(hasRealExtent);
-
-  const last = Math.max(1, kept.length - 1);
-  return kept.map((pts, i) => {
-    const t = i / last;
-    return {
-      d: catmullRomPath(pts),
-      i,
-      // The reference graded opacity and width together to fake depth; same idea, clamped and computed
-      // here so the markup carries the numbers and the runtime does no work.
-      opacity: Math.round((0.1 + t * 0.45) * 1000) / 1000,
-      width: Math.round((0.5 + t * 1.1) * 100) / 100,
-    };
-  });
 }
