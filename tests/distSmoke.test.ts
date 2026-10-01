@@ -358,3 +358,77 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
      gone, so check 1 covers the proto routes directly and this was a strict subset of it — with a worse
      failure message, since it reported one dead anchor per run instead of the whole family at once.) */
 });
+
+/* ================================================================================================
+   THE FIRST-VISIT GATE. Three of these four assertions are about things that cannot be seen from a
+   unit test: whether the gate reached one route and not the other eight, and whether the shipped
+   HTML is in a state a visitor could get stuck in. The gate's POLICY is tested in tests/gate.test.ts
+   (storage that throws, reduced-motion dismissal, idempotency) — this file is the only place that can
+   answer "and what actually went into the page".
+   ================================================================================================ */
+describe('the first-visit gate, as shipped', () => {
+  const home = byRoute().get('/');
+
+  it('is on the homepage', () => {
+    expect(home, 'no / in dist').toBeDefined();
+    expect(home!.html).toMatch(/data-gate\b/);
+  });
+
+  it('is on NO other route', () => {
+    // A full-screen interstitial on /research would be hostile, and the only thing stopping it is that
+    // Gate.astro is rendered from index.astro rather than BaseLayout. That is a structural choice, so it
+    // gets a structural test: move the component one file up and this goes red on eight pages at once.
+    for (const p of pages()) {
+      if (p.route === '/') continue;
+      expect(p.html, `${p.route} must not carry the gate`).not.toMatch(/data-gate\b/);
+    }
+  });
+
+  it('SHIPS DISMISSED — the no-JS invariant', () => {
+    // THE ONE THAT MATTERS. The gate must be raised by script, never by markup. If `is-up` is ever
+    // rendered onto the element, a visitor whose JS failed is locked out of the site with no way to
+    // dismiss it — and so is every crawler that does not run scripts. Checking `markup` (scripts and
+    // styles stripped) is what makes this assertion mean what it says: the class name appears in both the
+    // stylesheet and the raise-script by design, and neither is a covering state.
+    expect(home!.markup).not.toMatch(/class="[^"]*\bis-up\b/);
+  });
+
+  it('gives the button a real element and an accessible name', () => {
+    const btn = home!.markup.match(/<button[^>]*data-gate-enter[^>]*>([\s\S]*?)<\/button>/);
+    expect(btn, 'the gate needs a real <button>').not.toBeNull();
+    expect(btn![1].replace(/<[^>]*>/g, '').trim().length).toBeGreaterThan(3);
+  });
+
+  it('marks the decorative field aria-hidden and the dialog labelled', () => {
+    expect(home!.markup).toMatch(/<svg[^>]*class="[^"]*gate-field[^"]*"[^>]*aria-hidden="true"/);
+    expect(home!.markup).toMatch(/aria-labelledby="gate-name"/);
+    expect(home!.markup).toMatch(/id="gate-name"/);
+  });
+
+  it('normalises every trail with pathLength, so one dasharray fits them all', () => {
+    // pathLength is an SVG ATTRIBUTE. It was written as a CSS declaration first, where it is silently
+    // dropped — and with it dropped, `stroke-dasharray: 1` means one user unit on a path hundreds of
+    // units long, which draws a dotted line instead of a sweep. The attribute is the fix, so the
+    // attribute is what gets asserted.
+    const paths = home!.markup.match(/<path[^>]*class="[^"]*gate-trail[^"]*"[^>]*>/g) ?? [];
+    expect(paths.length).toBeGreaterThanOrEqual(28);
+    for (const p of paths) expect(p, p).toMatch(/pathLength="1"/);
+  });
+
+  it('clears the dash properties under reduced motion', () => {
+    // Disabling the draw-in without clearing stroke-dasharray would leave every trail at a full dash
+    // offset — invisible. The reduced-motion state has to be FINISHED, not merely still.
+    //
+    // Reads the emitted stylesheets AND the page itself: Astro's `inlineStylesheets: 'auto'` can inline a
+    // small scoped stylesheet into the <head> instead of emitting a file, so globbing _astro/*.css alone
+    // would fail for a reason that has nothing to do with whether the CSS shipped.
+    const cssFiles = existsSync(join(DIST, '_astro'))
+      ? readdirSync(join(DIST, '_astro'))
+          .filter((f) => f.endsWith('.css'))
+          .map((f) => readFileSync(join(DIST, '_astro', f), 'utf8'))
+      : [];
+    const haystack = [...cssFiles, home!.html].join('\n');
+    expect(haystack).toMatch(/prefers-reduced-motion:\s*reduce/);
+    expect(haystack).toMatch(/stroke-dasharray:\s*none/);
+  });
+});

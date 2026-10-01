@@ -177,11 +177,22 @@ const personLd = {
         navZone tells it how to pick light-theme text color per page. */}
     <CornerNav navZone={navZone} />
     {/* "The Descent" loader: a night veil covering the page wipes DOWNWARD off
-        the bottom to reveal it. It plays on every home<->/art navigation, and on
-        a fresh load only when this page opts in (veilOnLoad) — so entering the
-        home page directly shows no veil, but the gallery (and all transitions)
-        do. Each page carries its own line. transform/opacity only; gated behind
-        prefers-reduced-motion (finished state = uncovered page). */}
+        the bottom to reveal it. It plays on EVERY client-side navigation (the
+        after-swap listener at the bottom of this file, in both directions), and
+        on a fresh load only when the destination opts in via veilOnLoad.
+        Each page carries its own line. transform/opacity only; gated behind
+        prefers-reduced-motion (finished state = uncovered page).
+
+        SIX OF THE NINE ROUTES OPT IN: /art, /experience, /projects, /research,
+        /writing and /writing/<slug>. The three that do not are /, /404 and
+        /proto-sketches. This paragraph used to say "the gallery", and the script
+        below said "only /art opts in" — both were written when that was true and
+        neither was updated when five more routes joined.
+
+        The homepage's fresh load is covered by components/Gate.astro instead —
+        a first-visit-only gate, rendered from index.astro. The two cannot collide:
+        the gate fires only on a fresh load with its session flag unset, and the
+        veil's fresh-load branch is off for / anyway. */}
     <div
       class="descent-veil"
       aria-hidden="true"
@@ -258,7 +269,7 @@ const personLd = {
     if (!window.__descentVeilInit) {
       window.__descentVeilInit = true; // first load only
       var v = document.querySelector('[data-veil]');
-      if (v && v.dataset.veilOnLoad === 'true') play(); // only /art opts in
+      if (v && v.dataset.veilOnLoad === 'true') play(); // six routes opt in; / does not (see above)
     }
     // else: a transition re-run — the after-swap listener handles it.
   })();
