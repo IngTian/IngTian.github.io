@@ -13,6 +13,7 @@ import Rules from '../sections/Rules.astro';
 import Solve from '../sections/Solve.astro';
 import Appendix from '../sections/Work.astro';
 import Deck from '../components/Deck.astro';
+import Gate from '../components/Gate.astro';
 ---
 
 {/* preloadAccent: the Work slide's sub-headlines and its italic editorial line are the homepage's only
@@ -90,4 +91,9 @@ import Deck from '../components/Deck.astro';
   {/* One gesture = one slide. Behaviour lives in lib/deck.ts (pure, tested); this only attaches the
        listeners, and only on the homepage — the reading pages stay free-scrolling. */}
   <Deck />
+  {/* FIRST-VISIT ONLY, AND HOMEPAGE ONLY — which is why it is here and not in BaseLayout: a full-screen
+       interstitial on /research would be hostile, and rendering it from the layout is the one edit that
+       would silently give it to all nine routes. It ships DISMISSED and an inline script raises it, so a
+       visitor whose JS failed gets the page rather than a locked door. See Gate.astro. */}
+  <Gate />
 </BaseLayout>

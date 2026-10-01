@@ -1,0 +1,250 @@
+---
+// THE FIRST-VISIT GATE. Rendered from index.astro ONLY — never BaseLayout, so no other route can inherit a
+// full-screen interstitial. See docs/superpowers/specs/2026-10-01-first-visit-gate-design.md.
+//
+// THE ONE INVARIANT THAT MATTERS: this ships NOT COVERING, and JS raises it. The static HTML carries the gate
+// in its dismissed state and an inline script adds .is-up. A click-gate that defaulted to covering would lock
+// out every visitor whose JS failed, and would also hide the page from anything that does not run scripts.
+// The page's full markup is in the HTML either way, so this is an overlay, not a content gate — which is what
+// keeps it crawlable. Same trick as BaseLayout's descent-veil, which parks itself off-screen by default.
+// tests/distSmoke.test.ts asserts the shipped HTML carries no covering class, so the invariant is checked
+// against the build rather than trusted.
+import { name, roles } from '../data/profile';
+import { GATE_VIEW_H, GATE_VIEW_W, gateTrails } from '../lib/gatePaths';
+import { GATE_DISMISS_MS, GATE_SEEN_KEY } from '../lib/gate';
+
+const trails = gateTrails();
+const letters = [...`${name.first} ${name.last}`];
+---
+
+<div class="gate" data-gate role="dialog" aria-modal="true" aria-labelledby="gate-name">
+  <svg
+    class="gate-field"
+    viewBox={`0 0 ${GATE_VIEW_W} ${GATE_VIEW_H}`}
+    preserveAspectRatio="xMidYMid slice"
+    aria-hidden="true"
+    focusable="false"
+  >
+    {trails.map((t) => (
+      <path
+        class="gate-trail"
+        d={t.d}
+        style={`--i:${t.i}`}
+        stroke-opacity={t.opacity}
+        stroke-width={t.width}
+        pathLength="1"
+      />
+    ))}
+  </svg>
+
+  <div class="gate-text">
+    {/* A <p>, NOT an <h1>, and that is a correctness fix rather than a style choice. The gate shipped with
+        an <h1> first and tests/distSmoke.test.ts caught it immediately: "index.html has 2 <h1> elements; a
+        document gets exactly one". The hero's name is the homepage's real heading and this is a loader on
+        top of it, so the second <h1> was a duplicate outline, not a second section — and the a11y bar here
+        is 100. The dialog keeps its accessible name because aria-labelledby may point at ANY element, so
+        nothing about the announcement changes. */}
+    <p class="gate-name" id="gate-name">
+      {letters.map((ch, i) => (
+        ch === ' '
+          ? <span class="gate-space"> </span>
+          : <span class="gate-letter" style={`--l:${i}`}>{ch}</span>
+      ))}
+    </p>
+    <p class="gate-roles">{roles}</p>
+    <button class="gate-enter" type="button" data-gate-enter>
+      enter the descent <span aria-hidden="true">→</span>
+    </button>
+  </div>
+</div>
+
+<style>
+  /* PARKED, NOT COVERING. Default state is fully dismissed: no JS means no gate. */
+  .gate {
+    position: fixed;
+    inset: 0;
+    z-index: 10000; /* above .descent-veil's 9999 — if both ever raise, the gate owns the screen */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .gate.is-up {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .gate-field { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .gate-trail { fill: none; stroke: var(--ochre); stroke-linecap: round; }
+
+  .gate-text { position: relative; text-align: center; padding: 0 7vw; }
+
+  .gate-name {
+    font-family: var(--font-display), Georgia, serif;
+    color: var(--paper);
+    font-size: clamp(44px, 9vw, 116px);
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .gate-letter, .gate-space { display: inline-block; }
+  .gate-space { width: 0.3em; }
+
+  .gate-roles {
+    /* Display italic, matching Heights.astro's treatment of the same string — the dissolve only reads as
+       one screen if the words land in the same voice as well as the same place. The spec said mono; the
+       hero reserves mono for the line BELOW this one, so matching the hero wins. */
+    font-family: var(--font-display), Georgia, serif;
+    font-style: italic;
+    color: rgba(239, 233, 221, 0.62);
+    font-size: clamp(15px, 2.2vw, 21px);
+    margin: 18px 0 0;
+  }
+
+  .gate-enter {
+    /* The site's existing chip treatment (see sections/Signature.astro), not the reference's glassmorphic
+       panel. There is no such vocabulary here and adding one for a single button is what the taste rules
+       exist to prevent. */
+    margin-top: 34px;
+    font-size: 12.5px;
+    padding: 10px 18px;
+    border-radius: 9999px;
+    background: transparent;
+    color: rgba(239, 233, 221, 0.8);
+    border: 1px solid color-mix(in srgb, var(--ochre) 25%, transparent);
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease;
+  }
+  .gate-enter:hover { color: var(--paper); border-color: var(--ochre); }
+  .gate-enter:focus-visible { outline: 2px solid var(--ochre); outline-offset: 3px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .gate { transition: opacity 600ms ease, visibility 600ms ease; }
+
+    /* The ONE paint-bound animation, and it is a one-shot: ~1200ms total, never a loop. The reference
+       looped forever, which would repaint the whole viewport indefinitely behind a page that already runs
+       a full-screen WebGL canvas. pathLength="1" is set as an ATTRIBUTE on each path (it is an SVG
+       attribute, not a CSS property — as a declaration here it would be dropped and the dasharray would
+       be 1 user unit on a path hundreds of units long, i.e. a dotted line, not a draw-in). With the path
+       length normalised to 1, one dasharray value fits every trail regardless of its real length. */
+    .gate.is-up .gate-trail {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+      animation: gate-draw 1200ms ease-out forwards;
+      animation-delay: calc(var(--i) * 18ms);
+    }
+    @keyframes gate-draw { to { stroke-dashoffset: 0; } }
+
+    .gate.is-up .gate-letter {
+      opacity: 0;
+      animation: gate-letter 520ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      animation-delay: calc(150ms + var(--l) * 30ms);
+    }
+    @keyframes gate-letter {
+      from { opacity: 0; transform: translateY(36px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    .gate.is-up .gate-roles,
+    .gate.is-up .gate-enter {
+      opacity: 0;
+      animation: gate-fade 600ms ease forwards;
+    }
+    .gate.is-up .gate-roles { animation-delay: 400ms; }
+    .gate.is-up .gate-enter { animation-delay: 700ms; }
+    @keyframes gate-fade { to { opacity: 1; } }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* THE FINISHED STATE, and the dash properties have to be cleared explicitly. Leaving dasharray set
+       while disabling the animation would render every trail at a full dash offset — invisible. That is a
+       broken state wearing a finished state's clothes, which is exactly what the motion rule forbids. */
+    .gate-trail { stroke-dasharray: none; stroke-dashoffset: 0; }
+    .gate-letter, .gate-roles, .gate-enter { opacity: 1; transform: none; }
+  }
+
+  /* Phones get half the trails. The content is the same — phone work here is parity plus bug fixes — but 36
+     full-screen strokes is a real paint cost on a phone, and halving them is invisible at that width. */
+  @media (max-width: 640px) {
+    .gate-trail:nth-child(2n) { display: none; }
+  }
+</style>
+
+<script is:inline define:vars={{ KEY: GATE_SEEN_KEY, MS: GATE_DISMISS_MS }}>
+  // Synchronous, so a first visit covers before first paint with no flash of homepage-then-gate. Mirrors
+  // BaseLayout's veil script, which is inline for the same reason.
+  //
+  // The policy this duplicates lives in lib/gate.ts and is unit-tested there. It is restated inline rather
+  // than imported because a module script cannot run before first paint, and the whole value of the gate's
+  // no-flash behaviour depends on running early. The two must agree: KEY and MS are injected from the same
+  // constants, and lib/gate.ts's tests are what pin the semantics (fail closed, timer not transitionend,
+  // idempotent). If you change the rule, change it there first.
+  (function () {
+    var gate = document.querySelector('[data-gate]');
+    if (!gate) return;
+
+    var store = null;
+    try { store = window.sessionStorage; } catch (e) { store = null; }
+
+    // FAIL CLOSED: no store, or a store that throws, means do not raise. See lib/gate.ts.
+    var seen = true;
+    if (store) {
+      try { seen = store.getItem(KEY) !== null; } catch (e) { seen = true; }
+    }
+    if (seen) return;
+
+    var main = document.querySelector('main');
+    var done = false;
+
+    function reduced() {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    function swallow(e) {
+      if (!done) e.preventDefault();
+    }
+
+    function onKey(e) {
+      if (e.key === 'Escape') { dismiss(); return; }
+      // Keep focus inside: the only focusable thing is the button, so Tab is a no-op.
+      if (e.key === 'Tab') e.preventDefault();
+    }
+
+    function dismiss() {
+      if (done) return;            // idempotent: Escape then click must not run this twice
+      done = true;
+      try { if (store) store.setItem(KEY, '1'); } catch (e) { /* denied; it reappears next load */ }
+
+      gate.classList.remove('is-up');
+      document.documentElement.style.overflow = '';
+      if (main) main.removeAttribute('inert');
+      window.removeEventListener('wheel', swallow, { passive: false });
+      window.removeEventListener('touchmove', swallow, { passive: false });
+      document.removeEventListener('keydown', onKey, true);
+
+      // A TIMER, never transitionend — under reduced motion no transition fires and this would never run,
+      // leaving the page scroll-locked forever. dismissMs() in lib/gate.ts owns this number.
+      window.setTimeout(function () {
+        // The deck measured its stops while the document was scroll-locked; make it re-measure.
+        window.dispatchEvent(new Event('resize'));
+      }, reduced() ? 0 : MS);
+    }
+
+    gate.classList.add('is-up');
+    document.documentElement.style.overflow = 'hidden';
+    if (main) main.setAttribute('inert', '');
+    window.addEventListener('wheel', swallow, { passive: false });
+    window.addEventListener('touchmove', swallow, { passive: false });
+    document.addEventListener('keydown', onKey, true);
+
+    var btn = gate.querySelector('[data-gate-enter]');
+    if (btn) {
+      btn.addEventListener('click', dismiss);
+      try { btn.focus({ preventScroll: true }); } catch (e) { btn.focus(); }
+    }
+  })();
+</script>
