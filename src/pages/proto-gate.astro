@@ -17,24 +17,29 @@ import { GATE_VIEW_H, GATE_VIEW_W } from '../lib/gatePaths';
 import { COMB_DEFAULTS, MAX_FIELD_GRAD, trails } from '../lib/gateLines';
 import { name, roles } from '../data/profile';
 
-// Every value clears MAX_FIELD_GRAD (1.8668), so each one still carries the no-knot guarantee — the point is
-// to pick a look, not to show what breaking the theorem looks like. The author's own notes on the extremes:
-// 4.5 is "ruled paper" (5.6 deg of turn, <=43px bow), 2.1 "bows up to 98px" at 27.2 deg and wanders off axis.
-const TILTS = [2.0, 2.6, 3.4, 4.5];
+// NOW SWEEPING THE STROKE COUNT, because that is the live question. The owner: "the problem with urs is that
+// you got too many lines. maybe cut a few so that it's more elegant."
+//
+// Worth knowing while looking, because it reframes the count: the 21st.dev reference that started this draws
+// THIRTY-SIX paths per family and renders the family twice, so seventy-two. It does not look busy because its
+// opacity ramp runs 0.1 to 1.0 — most of its strokes are nearly invisible and you read maybe eight of them
+// over a haze. Ours ramps 0.10 to 0.55, so every stroke sits in the same mid-range and all of them read at
+// once. Count is one lever; the ramp is the other, and it may be the stronger one.
+const COUNTS = [8, 12, 18, 30];
 
-const FRAMES = TILTS.map((tilt) => ({
-  key: `t${String(tilt).replace('.', '')}`,
-  tilt,
-  isDefault: tilt === COMB_DEFAULTS.tilt,
-  trails: trails({ tilt }),
+const FRAMES = COUNTS.map((seeds) => ({
+  key: `n${seeds}`,
+  seeds,
+  isDefault: seeds === COMB_DEFAULTS.seeds,
+  trails: trails({ seeds }),
 }));
 
 const letters = [...`${name.first} ${name.last}`];
 ---
 
 <BaseLayout
-  title="Gate comb — tilt sweep (internal)"
-  description="Internal prototype: the gate comb's tilt dial, swept with every other parameter held fixed."
+  title="Gate comb — stroke-count sweep (internal)"
+  description="Internal prototype: the gate comb's stroke count, swept with every other parameter held fixed."
   veilOnLoad={false}
   noindex={true}
 >
@@ -42,7 +47,7 @@ const letters = [...`${name.first} ${name.last}`];
     {/* A real, visually hidden <h1>. The page is full-bleed previews with no visible headline, and the name
         inside each frame repeats once per frame — so it cannot be the heading. distSmoke asserts exactly one
         per document and caught this page shipping zero. */}
-    <h1 class="sr-only">Gate comb — tilt sweep (internal)</h1>
+    <h1 class="sr-only">Gate comb — stroke-count sweep (internal)</h1>
 
     {FRAMES.map((f, i) => (
       <section class="pg-frame" data-variant={f.key} data-active={f.isDefault ? 'true' : 'false'} aria-hidden={!f.isDefault}>
@@ -59,10 +64,10 @@ const letters = [...`${name.first} ${name.last}`];
       </section>
     ))}
 
-    <nav class="pg-switch" aria-label="Tilt">
+    <nav class="pg-switch" aria-label="Stroke count">
       {FRAMES.map((f) => (
         <button type="button" data-pick={f.key} aria-pressed={f.isDefault ? 'true' : 'false'}>
-          tilt {f.tilt}{f.isDefault ? ' ·' : ''}
+          {f.seeds} lines{f.isDefault ? ' ·' : ''}
         </button>
       ))}
     </nav>
@@ -71,15 +76,16 @@ const letters = [...`${name.first} ${name.last}`];
       {FRAMES.map((f) => (
         <div data-info={f.key} hidden={!f.isDefault}>
           <p class="pg-metrics">
-            tilt {f.tilt} · {f.trails.length} strokes · floor is {MAX_FIELD_GRAD} (max |grad field|)
-            {f.isDefault ? ' · current default' : ''}
+            {f.trails.length} strokes · tilt {COMB_DEFAULTS.tilt} (fixed) · no-knot floor {MAX_FIELD_GRAD}
+            {f.isDefault ? ' · what ships today' : ''}
           </p>
         </div>
       ))}
       <p class="pg-note">
-        Only <strong>tilt</strong> changes between these. Higher is calmer and straighter; lower lets the terrain
-        bend the strokes more, at the cost of wandering off the comb's axis. Every value here still clears the
-        no-knot bound. Arrow keys flip — that is how a difference this small becomes visible.
+        Only the <strong>stroke count</strong> changes between these — same field, same tilt, same axis, same
+        ramp. For reference, the design this started from draws 36 per family and renders two families; it
+        reads sparse because its opacity ramp runs 0.1&ndash;1.0 so most strokes recede, where ours runs
+        0.10&ndash;0.55 and they all read at once. Arrow keys flip.
       </p>
     </aside>
   </main>
