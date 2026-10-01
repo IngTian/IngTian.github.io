@@ -1,0 +1,209 @@
+---
+// /proto-gate — INTERNAL. Four line treatments for the first-visit gate, in the real page at real size, with
+// a switcher. This exists because the owner looked at the shipped gate and said "ur lines are horrible", and
+// because small-detail screenshots of this kind of thing are unjudgeable: the question is whether a field of
+// 30-odd strokes reads as combed or as a tangle, which is a whole-frame impression.
+//
+// It is the same habit /proto-sketches formalises — put the candidates in the live page and look — and it
+// carries noindex for the same reason: the body quotes internal review notes, so an indexed copy is a leak.
+// tests/protoNoindex.test.ts globs src/pages/proto-*.astro and asserts the prop, so this is checked.
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { gateTrails, GATE_VIEW_H, GATE_VIEW_W } from '../lib/gatePaths';
+import * as comb from '../lib/gateVariants/comb';
+import * as contour from '../lib/gateVariants/contour';
+import * as descentTrunc from '../lib/gateVariants/descentTrunc';
+import { name, roles } from '../data/profile';
+
+// The shipped one is included deliberately as the control: every alternative has to beat what it replaces,
+// and the knot is much easier to see next to a frame that does not have one.
+const VARIANTS = [
+  {
+    key: 'shipped',
+    label: 'Shipped (full descent)',
+    note: 'Gradient descent run to convergence. Centripetal spline, so the 173.8-degree hairpins are gone — but every stroke still ends in one of the field’s three basins, which is the knot.',
+    metrics: 'turn 76.6° · length 22× · busiest cell ~71% · 271 pair crossings',
+    trails: gateTrails(),
+  },
+  {
+    key: 'comb',
+    label: comb.LABEL,
+    note: comb.NOTE,
+    metrics: 'turn 12.7° · length 1.00× · busiest cell 10% · 0 pair crossings',
+    trails: comb.trails(),
+  },
+  {
+    key: 'contour',
+    label: contour.LABEL,
+    note: contour.NOTE,
+    metrics: 'turn 32.3° · length 1.70× · busiest cell 16% · keeps elevation',
+    trails: contour.trails(),
+  },
+  {
+    key: 'descentTrunc',
+    label: descentTrunc.LABEL,
+    note: descentTrunc.NOTE,
+    metrics: 'turn 18.8° · length 1.00× · busiest cell 9% · still literal descent',
+    trails: descentTrunc.trails(),
+  },
+];
+
+const letters = [...`${name.first} ${name.last}`];
+---
+
+<BaseLayout
+  title="Gate line variants — internal"
+  description="Internal prototype: four line treatments for the first-visit gate."
+  veilOnLoad={false}
+  noindex={true}
+>
+  <main class="pg">
+    {/* A REAL, VISUALLY HIDDEN <h1>. The page is four full-bleed previews and has no visible headline, so it
+        shipped with zero <h1> and tests/distSmoke.test.ts's "exactly one <h1>" invariant caught it — the same
+        assertion that caught the gate shipping TWO. The name inside each frame cannot be the heading: it is
+        repeated once per variant, which would give four. `sr-only` is a Tailwind core utility. */}
+    <h1 class="sr-only">Gate line variants — internal</h1>
+    {VARIANTS.map((v, i) => (
+      <section class="pg-frame" data-variant={v.key} data-active={i === 0 ? 'true' : 'false'}>
+        <svg viewBox={`0 0 ${GATE_VIEW_W} ${GATE_VIEW_H}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+          {v.trails.map((t) => (
+            <path d={t.d} stroke-opacity={t.opacity} stroke-width={t.width} pathLength="1" />
+          ))}
+        </svg>
+        <div class="pg-text">
+          <p class="pg-name">{letters.map((ch) => (ch === ' ' ? <span class="pg-sp"> </span> : <span>{ch}</span>))}</p>
+          <p class="pg-roles">{roles}</p>
+        </div>
+      </section>
+    ))}
+
+    <nav class="pg-switch" aria-label="Variant">
+      {VARIANTS.map((v, i) => (
+        <button type="button" data-pick={v.key} aria-pressed={i === 0 ? 'true' : 'false'}>
+          {v.label}
+        </button>
+      ))}
+    </nav>
+
+    <aside class="pg-info">
+      {VARIANTS.map((v, i) => (
+        <div data-info={v.key} hidden={i !== 0}>
+          <p class="pg-metrics">{v.metrics} · {v.trails.length} strokes</p>
+          <p class="pg-note">{v.note}</p>
+        </div>
+      ))}
+    </aside>
+  </main>
+</BaseLayout>
+
+<style>
+  .pg { position: relative; min-height: 100vh; background: var(--bg); overflow: hidden; }
+
+  .pg-frame {
+    position: fixed; inset: 0; opacity: 0; pointer-events: none;
+    transition: opacity 180ms ease;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pg-frame[data-active='true'] { opacity: 1; }
+  .pg-frame svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .pg-frame path { fill: none; stroke: var(--ochre); stroke-linecap: round; }
+
+  /* The name is here because the lines have to be judged WITH it on top — a field that reads beautifully
+     empty can still fight the text, and the text is the point of the screen. */
+  .pg-text { position: relative; text-align: center; }
+  .pg-name {
+    font-family: var(--font-display), Georgia, serif; color: var(--paper);
+    font-size: clamp(44px, 9vw, 116px); line-height: .95; letter-spacing: -.02em; margin: 0;
+  }
+  .pg-name span { display: inline-block; }
+  .pg-sp { width: .3em; }
+  .pg-roles {
+    font-family: var(--font-display), Georgia, serif; font-style: italic;
+    color: color-mix(in srgb, var(--paper) 62%, transparent);
+    font-size: clamp(15px, 2.2vw, 21px); margin: 18px 0 0;
+  }
+
+  .pg-switch {
+    position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
+    display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; z-index: 5;
+  }
+  .pg-switch button {
+    font-family: var(--font-mono), ui-monospace, monospace; font-size: 11px;
+    padding: 7px 13px; border-radius: 99px; cursor: pointer;
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
+    color: color-mix(in srgb, var(--paper) 70%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ochre) 22%, transparent);
+    backdrop-filter: blur(6px);
+  }
+  .pg-switch button[aria-pressed='true'] { color: var(--paper); border-color: var(--ochre); }
+
+  .pg-info {
+    position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+    width: min(92vw, 880px); text-align: center; z-index: 5;
+  }
+  .pg-metrics {
+    font-family: var(--font-mono), ui-monospace, monospace; font-size: 10.5px;
+    color: color-mix(in srgb, var(--ochre) 80%, transparent); margin: 0 0 4px;
+    letter-spacing: .04em;
+  }
+  .pg-note {
+    font-size: 12px; line-height: 1.5; margin: 0;
+    color: color-mix(in srgb, var(--paper) 52%, transparent);
+  }
+
+  @media (max-width: 820px) {
+    .pg-switch { bottom: 118px; }
+    .pg-note { display: none; }
+  }
+</style>
+
+<script>
+  // Plain switcher. Re-inits on astro:page-load with a teardown, per the Interactivity contract — a proto
+  // route is still a page a View Transition can swap.
+  let dispose: (() => void) | null = null;
+
+  function initProtoGate(): void {
+    dispose?.();
+    dispose = null;
+    const nav = document.querySelector<HTMLElement>('.pg-switch');
+    if (!nav) return;
+
+    const pick = (key: string): void => {
+      for (const f of document.querySelectorAll<HTMLElement>('.pg-frame')) {
+        f.dataset.active = String(f.dataset.variant === key);
+      }
+      for (const b of nav.querySelectorAll<HTMLButtonElement>('button')) {
+        b.setAttribute('aria-pressed', String(b.dataset.pick === key));
+      }
+      for (const d of document.querySelectorAll<HTMLElement>('[data-info]')) {
+        d.hidden = d.dataset.info !== key;
+      }
+    };
+
+    const onClick = (e: Event): void => {
+      const b = (e.target as HTMLElement | null)?.closest<HTMLButtonElement>('button[data-pick]');
+      if (b?.dataset.pick) pick(b.dataset.pick);
+    };
+
+    // Left/right arrows too — flipping back and forth fast is how a difference this subtle becomes visible.
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const keys = [...nav.querySelectorAll<HTMLButtonElement>('button')].map((b) => b.dataset.pick ?? '');
+      const cur = keys.findIndex((k) => {
+        const f = document.querySelector<HTMLElement>(`.pg-frame[data-variant="${k}"]`);
+        return f?.dataset.active === 'true';
+      });
+      const next = (cur + (e.key === 'ArrowRight' ? 1 : keys.length - 1)) % keys.length;
+      const key = keys[next];
+      if (key) pick(key);
+    };
+
+    nav.addEventListener('click', onClick);
+    document.addEventListener('keydown', onKey);
+    dispose = () => {
+      nav.removeEventListener('click', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }
+
+  document.addEventListener('astro:page-load', initProtoGate);
+</script>
