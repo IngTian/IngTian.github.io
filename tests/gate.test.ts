@@ -5,7 +5,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   GATE_DISMISS_MS, GATE_SEEN_KEY, type GateStore,
-  dismissMs, hasSeenGate, isFreshLoad, markGateSeen, shouldRaiseGate,
+  GATE_REVEAL_EVENT, GATE_UP_ATTR,
+  dismissMs, hasSeenGate, isCovered, isFreshLoad, markGateSeen, shouldRaiseGate,
 } from '../src/lib/gate';
 
 const okStore = (seed: Record<string, string> = {}): GateStore => {
@@ -108,5 +109,43 @@ describe('the dismissal is idempotent', () => {
     markGateSeen(store);
     expect(set).toHaveBeenCalledTimes(2);
     expect(hasSeenGate(store)).toBe(true);
+  });
+});
+
+describe('isCovered — do not animate what nobody can see', () => {
+  // MEASURED WASTE, not a theory. While the gate is up, two full-screen workloads run behind an opaque
+  // layer and produce zero visible pixels: TerrainHero's 2D canvas loop (its IntersectionObserver reports
+  // the hero as visible, because the gate is a separate position:fixed element, not an ancestor) and
+  // FluidSky's WebGL shader (which only pauses on visibilitychange, i.e. the tab being hidden). And because
+  // this is a CLICK gate rather than a timed one, the waste is unbounded — reading the title card for ten
+  // seconds buys ten seconds of invisible WebGL.
+  //
+  // Deferring is safe because TerrainHero paints its static frame at line 186, unconditionally, BEFORE the
+  // loop block. So a deferred hero is not cold at the reveal: it is the finished static frame, which is also
+  // exactly what the site already ships under reduced motion.
+  const el = (attrs: string[]) => ({ hasAttribute: (n: string) => attrs.includes(n) });
+
+  it('reports covered when the root carries the gate attribute', () => {
+    expect(isCovered(el([GATE_UP_ATTR]))).toBe(true);
+  });
+
+  it('reports clear when it does not', () => {
+    expect(isCovered(el([]))).toBe(false);
+  });
+
+  it('FAILS OPEN on a missing root, so animation never gets stuck off', () => {
+    // The opposite asymmetry to hasSeenGate. There, failing closed avoids a lockout. Here, "covered"
+    // suppresses motion — so an unknown state must read as CLEAR, or a page with no gate at all (every
+    // route except /) could sit frozen.
+    expect(isCovered(null)).toBe(false);
+    expect(isCovered(undefined)).toBe(false);
+  });
+
+  it('pins the cross-file contract', () => {
+    // These two strings are a seam between four files: Gate.astro sets and clears the attribute and fires
+    // the event; TerrainHero and FluidSky read them. A typo in any one of them would silently leave the
+    // animation paused forever, which looks like a broken hero rather than a missing optimisation.
+    expect(GATE_UP_ATTR).toBe('data-gate-up');
+    expect(GATE_REVEAL_EVENT).toBe('descent:revealed');
   });
 });

@@ -21,6 +21,44 @@ export const GATE_SEEN_KEY = 'descent.gate.seen';
 /** Must match the CSS dismissal duration in Gate.astro. */
 export const GATE_DISMISS_MS = 600;
 
+/**
+ * Set on `<html>` while the gate covers the page, and the event fired when it stops.
+ *
+ * These exist because of a measured waste, not a theory. While the gate is up, two full-screen workloads run
+ * behind an opaque layer and paint nothing a visitor can see:
+ *
+ *   • TerrainHero's 2D canvas loop at ~30fps — its IntersectionObserver reports the hero as VISIBLE, because
+ *     the gate is a sibling `position: fixed` element rather than an ancestor, so occlusion is invisible to it.
+ *   • FluidSky's full-viewport WebGL shader — it pauses on `visibilitychange` (the tab being hidden) and has
+ *     no notion of being covered.
+ *
+ * And this is a CLICK gate, so the waste is unbounded: a visitor who reads the title card for ten seconds
+ * buys ten seconds of invisible WebGL on top of a paint-bound 36-stroke draw-in.
+ *
+ * DEFERRING IS SAFE, which the spec doubted — it worried about "a cold hero at the reveal". TerrainHero paints
+ * its static frame unconditionally at `frame(0, false)` BEFORE the loop block, so a paused hero is not cold,
+ * it is the finished static frame — exactly what the site already ships under reduced motion. Only the motion
+ * waits.
+ *
+ * The attribute goes on `<html>` rather than `<body>` because `ClientRouter` replaces `<body>` on a View
+ * Transition, and Astro's `swapRootAttributes` strips root attributes on swap — so a stale flag cannot
+ * survive a navigation and leave the hero frozen.
+ */
+export const GATE_UP_ATTR = 'data-gate-up';
+export const GATE_REVEAL_EVENT = 'descent:revealed';
+
+/**
+ * Is the page currently covered by the gate?
+ *
+ * FAILS OPEN — the opposite asymmetry to `hasSeenGate`. There, an unknown state must not raise a gate, because
+ * the cost is a lockout. Here, "covered" SUPPRESSES motion, so an unknown state must read as clear: every
+ * route except `/` has no gate at all, and a wrong answer would freeze their hero permanently. Asked rather
+ * than re-derived, the same way `prefersReducedMotion()` and `isPhone()` are.
+ */
+export function isCovered(root: { hasAttribute(n: string): boolean } | null | undefined): boolean {
+  return !!root && root.hasAttribute(GATE_UP_ATTR);
+}
+
 /** The slice of Storage this module needs. Narrow on purpose, so a test can hand it a hostile fake. */
 export interface GateStore {
   getItem(k: string): string | null;

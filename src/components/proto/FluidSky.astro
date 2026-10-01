@@ -77,6 +77,7 @@ const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
 
 <script>
   import { prefersReducedMotion } from '../../lib/motion';
+  import { GATE_REVEAL_EVENT, isCovered } from '../../lib/gate';
   import { VERTEX_SHADER, fragmentShader, SKY_UNIFORMS } from '../../lib/skyShader';
   import { gateFor, tintBudget, nebulaCeiling, type SkyVariant } from '../../lib/skyLegibility';
   import { rampFor, type Theme } from '../../lib/skyPalette';
@@ -267,10 +268,20 @@ const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
       cvs.closest('.descent')?.classList.remove('fluid-live');
     };
     const onRestored = () => { initAll(); };
-    const onVis = () => { if (document.hidden) stop(); else start(); };
+    // BEING COVERED IS A REASON TO STOP, exactly like the tab being hidden — this handler already encoded
+    // "don't shade pixels nobody is looking at", and an opaque full-screen gate over the canvas is the same
+    // situation by a different route. It was missing because occlusion is invisible from here: the gate is a
+    // sibling position:fixed element, so nothing about this canvas's own visibility changes. On a first visit
+    // that left a full-viewport WebGL shader running behind an opaque layer for as long as the visitor took
+    // to click through, which on a click-gate is unbounded.
+    const onVis = () => {
+      if (document.hidden || isCovered(document.documentElement)) stop();
+      else start();
+    };
     cvs.addEventListener('webglcontextlost', onLost as EventListener);
     cvs.addEventListener('webglcontextrestored', onRestored);
     document.addEventListener('visibilitychange', onVis);
+    document.addEventListener(GATE_REVEAL_EVENT, onVis);
     let scrollRaf = 0, scrollIdleT = 0;
     const onScroll = () => {
       scrolling = true;
@@ -289,7 +300,9 @@ const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
         const hidden = getComputedStyle(cvs).display === 'none';
         cvs.closest('.descent')?.classList.toggle('fluid-live', !hidden);
         if (hidden) { stop(); return; }
-        start();
+        // onVis(), not start() — a resize while the gate still covers the page must not restart the shader,
+        // and the gate dispatches a resize on dismissal so the deck re-measures. One decision point.
+        onVis();
         sizeTo(true); measureLayout(); measureGate(); draw(performance.now());
       }, 160);
     };
@@ -303,7 +316,9 @@ const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
 
     const settle = window.setTimeout(() => { sizeTo(true); measureLayout(); measureGate(); draw(performance.now()); }, 1200);
 
-    start();
+    // onVis() rather than start(), so a first visit never spins the shader up behind the gate at all —
+    // this runs on astro:page-load, which is after the gate's parse-time script has set the flag.
+    onVis();
 
     return () => {
       stop();
@@ -312,6 +327,7 @@ const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
       if (scrollRaf) cancelAnimationFrame(scrollRaf);
       window.clearTimeout(scrollIdleT);
       document.removeEventListener('visibilitychange', onVis);
+      document.removeEventListener(GATE_REVEAL_EVENT, onVis);
       cvs.removeEventListener('webglcontextlost', onLost as EventListener);
       cvs.removeEventListener('webglcontextrestored', onRestored);
       window.removeEventListener('scroll', onScroll);

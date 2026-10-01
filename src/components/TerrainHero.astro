@@ -38,6 +38,7 @@ const bubbles = JSON.stringify([
            TERRAIN_LIGHT, TERRAIN_TERMINAL, type TerrainRamp } from '../lib/terrain';
   import { buildGrid, paintTerrain, TERRAIN_CONFIG_DEFAULTS, type GridPoint } from '../lib/terrainRender';
   import { prefersReducedMotion } from '../lib/motion';
+  import { GATE_REVEAL_EVENT, isCovered } from '../lib/gate';
 
   // The canvas is JS-painted, so it can't inherit CSS tokens — pick the ramp +
   // walker colors from the active theme (data-theme on <html>). Read fresh on
@@ -195,18 +196,34 @@ const bubbles = JSON.stringify([
     // throttled to ~30fps — imperceptible for this gentle motion, half the cost.
     let rafId = 0;
     let io: IntersectionObserver | null = null;
+    let revealed: (() => void) | null = null;
     if (!reduce) {
       let running = false, last = 0;
       const loop = (ts: number) => {
         if (ts - last > 33) { frame(ts, true); last = ts; }
         rafId = requestAnimationFrame(loop);
       };
+      // OCCLUSION IS INVISIBLE TO AN INTERSECTION OBSERVER, which is why the gate has to say so explicitly.
+      // On a first visit the gate covers this canvas with an opaque full-screen layer, but the gate is a
+      // SIBLING position:fixed element rather than an ancestor — so the hero is still "intersecting the
+      // viewport" and this loop ran at ~30fps painting pixels nobody could see, for as long as the visitor
+      // took to click through. isCovered() is asked here the same way prefersReducedMotion() is.
+      //
+      // The static frame has already been painted above (frame(0, false)), so a hero that is waiting is not
+      // blank or cold — it is the finished still frame, which is also the reduced-motion state.
+      const apply = (visible: boolean) => {
+        const show = visible && !isCovered(document.documentElement);
+        if (show && !running) { running = true; last = 0; rafId = requestAnimationFrame(loop); }
+        else if (!show && running) { running = false; cancelAnimationFrame(rafId); }
+      };
+      let onscreen = false;
       io = new IntersectionObserver((entries) => {
-        const visible = entries[0].isIntersecting;
-        if (visible && !running) { running = true; last = 0; rafId = requestAnimationFrame(loop); }
-        else if (!visible && running) { running = false; cancelAnimationFrame(rafId); }
+        onscreen = entries[0].isIntersecting;
+        apply(onscreen);
       }, { threshold: 0 });
       io.observe(cvs);
+      revealed = () => apply(onscreen);
+      document.addEventListener(GATE_REVEAL_EVENT, revealed);
     }
 
     // Dispose everything this instance attached, so a later re-init (View
@@ -216,6 +233,7 @@ const bubbles = JSON.stringify([
       window.removeEventListener('resize', onResize);
       if (rafId) cancelAnimationFrame(rafId);
       io?.disconnect();
+      if (revealed) document.removeEventListener(GATE_REVEAL_EVENT, revealed);
     };
   }
 

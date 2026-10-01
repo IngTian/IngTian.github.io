@@ -11,7 +11,7 @@
 // against the build rather than trusted.
 import { name, roles } from '../data/profile';
 import { GATE_VIEW_H, GATE_VIEW_W, gateTrails } from '../lib/gatePaths';
-import { GATE_DISMISS_MS, GATE_SEEN_KEY } from '../lib/gate';
+import { GATE_DISMISS_MS, GATE_REVEAL_EVENT, GATE_SEEN_KEY, GATE_UP_ATTR } from '../lib/gate';
 
 const trails = gateTrails();
 const letters = [...`${name.first} ${name.last}`];
@@ -182,7 +182,7 @@ const letters = [...`${name.first} ${name.last}`];
   }
 </style>
 
-<script is:inline define:vars={{ KEY: GATE_SEEN_KEY, MS: GATE_DISMISS_MS }}>
+<script is:inline define:vars={{ KEY: GATE_SEEN_KEY, MS: GATE_DISMISS_MS, UP: GATE_UP_ATTR, REVEAL: GATE_REVEAL_EVENT }}>
   // Synchronous, so a first visit covers before first paint with no flash of homepage-then-gate. Mirrors
   // BaseLayout's veil script, which is inline for the same reason.
   //
@@ -293,6 +293,10 @@ const letters = [...`${name.first} ${name.last}`];
 
       gate.classList.remove('is-up');
       document.documentElement.style.overflow = '';
+      // Let the hero and the sky start animating: they held off while nothing they drew could be seen.
+      // Order matters — clear the flag BEFORE firing, so a listener that re-reads it sees the new state.
+      document.documentElement.removeAttribute(UP);
+      document.dispatchEvent(new Event(REVEAL));
       setInert(false);
       window.removeEventListener('wheel', swallow, { passive: false });
       window.removeEventListener('touchmove', swallow, { passive: false });
@@ -309,6 +313,10 @@ const letters = [...`${name.first} ${name.last}`];
 
     gate.classList.add('is-up');
     document.documentElement.style.overflow = 'hidden';
+    // Raised BEFORE the canvases initialise, because this script is inline and parse-time while theirs run on
+    // astro:page-load — so they see the flag on their very first check and never start a loop at all, rather
+    // than starting one and being stopped a moment later.
+    document.documentElement.setAttribute(UP, '');
     setInert(true);
     window.addEventListener('wheel', swallow, { passive: false });
     window.addEventListener('touchmove', swallow, { passive: false });
