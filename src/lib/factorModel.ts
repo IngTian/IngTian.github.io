@@ -130,16 +130,42 @@ export function signals(): Signal[] {
   return out;
 }
 
-/** The same signal list with stable ids, for matching against committed LLM scores. The id
- *  is '<collection>:<index>' and the label is carried alongside, so an edited item is
- *  DETECTED (label mismatch) rather than silently keeping a stale score. */
+/**
+ * A signal id, derived from WHAT the item is rather than WHERE it sits in its array.
+ *
+ * THIS USED TO BE '<collection>:<index>' AND THE INDEX WAS THE BUG. The owner, on being told a new project
+ * needs a new committed score: "you shouldn't write tests depending on the specific projects/papers/blogs
+ * right? if that's the case, we need to update tests every single time. that's horrible." Mostly it did not —
+ * the rest of the suite reads lengths and shapes — but this seam genuinely did, and worse than "every time":
+ * a positional id means a REORDER renames every item after the insertion point, so adding one project at the
+ * front of the list invalidated all of them at once. Appending `offchart` at index 0 made `projects:0` mean
+ * offchart while the committed score for `projects:0` still said witness, `projects:1` said witness against a
+ * score for manifold, and so on down the array — one content edit, N stale scores, none of them really stale.
+ *
+ * Keyed by slug, the id travels with the item: reordering the array is free, adding an item costs exactly one
+ * new score, and renaming an item correctly reads as "this is different text, re-judge it" (the old id goes
+ * orphaned, the new one missing). That last cost is not removable and should not be — the score is a judgement
+ * about evidence, so new evidence has to be judged. What IS removable is being asked to re-judge nine items
+ * because a tenth was inserted above them.
+ */
+export function signalId(collection: string, label: string): string {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `${collection}:${slug}`;
+}
+
+/** The same signal list with stable ids, for matching against committed LLM scores. The label is carried
+ *  alongside the id so an EDIT to an item's text is detected rather than silently keeping a stale score —
+ *  see signalId above for why the id is a slug and not an index. */
 export function identifiedSignals(): { id: string; label: string; factor: string }[] {
   const out: { id: string; label: string; factor: string }[] = [];
-  timeline.forEach((t, i) => out.push({ id: `timeline:${i}`, label: t.title, factor: 'experience' }));
-  publications.forEach((p, i) => out.push({ id: `publications:${i}`, label: p.title, factor: 'research' }));
-  researchInterests.forEach((r, i) => out.push({ id: `interests:${i}`, label: r.label, factor: 'research' }));
-  projects.forEach((p, i) => out.push({ id: `projects:${i}`, label: p.name, factor: 'projects' }));
-  awards.forEach((a, i) => out.push({ id: `awards:${i}`, label: a.title, factor: 'craft' }));
+  for (const t of timeline) out.push({ id: signalId('timeline', t.title), label: t.title, factor: 'experience' });
+  for (const p of publications) out.push({ id: signalId('publications', p.title), label: p.title, factor: 'research' });
+  for (const r of researchInterests) out.push({ id: signalId('interests', r.label), label: r.label, factor: 'research' });
+  for (const p of projects) out.push({ id: signalId('projects', p.name), label: p.name, factor: 'projects' });
+  for (const a of awards) out.push({ id: signalId('awards', a.title), label: a.title, factor: 'craft' });
   return out;
 }
 

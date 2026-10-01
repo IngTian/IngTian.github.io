@@ -163,7 +163,11 @@ describe('identifiedSignals', () => {
   });
 
   it('namespaces ids by collection, so two collections cannot collide', () => {
-    for (const l of live) expect(l.id).toMatch(/^[a-z]+:\d+$/);
+    // The shape is '<collection>:<slug>'. This used to require `\d+` for the second half, back when the id was
+    // an array index — the namespacing is the part worth pinning, and it survived the change; the digits were
+    // incidental to it. Slugs instead of indices are why inserting one project no longer renames every project
+    // after it (see factorModel.signalId).
+    for (const l of live) expect(l.id, l.label).toMatch(/^[a-z]+:[a-z0-9]+(-[a-z0-9]+)*$/);
   });
 
   it('carries a non-empty label for every signal', () => {
