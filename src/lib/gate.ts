@@ -54,8 +54,32 @@ export function markGateSeen(store: GateStore | null): void {
   }
 }
 
-export function shouldRaiseGate(store: GateStore | null): boolean {
-  return !hasSeenGate(store);
+/**
+ * Is this a real page load, as opposed to ClientRouter re-executing the script after a swap?
+ *
+ * An inline script runs DURING parse on a genuine load, so `document.readyState` is 'loading'. When
+ * Astro's router re-runs it after a View Transition the document is already 'complete'. That one
+ * difference is the whole discriminator, and it needs no flag on `window`.
+ */
+export function isFreshLoad(readyState: string): boolean {
+  return readyState === 'loading';
+}
+
+/**
+ * Raise the gate?
+ *
+ * BOTH TERMS ARE LOAD-BEARING, and the second one was missing at first — the gate shipped able to appear
+ * mid-session. The gate's inline script exists only in the homepage's HTML, so Astro's ClientRouter does not
+ * find it in `scriptsAlreadyRan` for a visitor whose entry page was something else, and EXECUTES it on the
+ * navigation into `/`. A reader arriving on /research from a search result and clicking "home" got a
+ * full-screen interstitial over a page they were already going to, concurrently with the veil.
+ *
+ * BaseLayout's veil script has guarded the same hazard since it was written (`__descentVeilInit`, commented
+ * "first load only"), which is the precedent: an inline script in this codebase must assume it will be
+ * re-executed. Expressed here rather than only in the script so it is the tested rule and not a trick.
+ */
+export function shouldRaiseGate(store: GateStore | null, freshLoad: boolean): boolean {
+  return freshLoad && !hasSeenGate(store);
 }
 
 /**

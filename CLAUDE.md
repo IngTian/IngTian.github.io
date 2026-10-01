@@ -136,6 +136,8 @@ src/
   lib/pageStops.ts                  # pure Stop trees: one tree per page drives BOTH its rail and its section ids — unit-tested
   lib/viewport.ts                   # PHONE_MAX_WIDTH = 640 + isPhone() — the one phone gate
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate
+  lib/gate.ts                       # the first-visit gate's POLICY: session flag, fresh-load test, dismissal timing — unit-tested
+  lib/gatePaths.ts                  # the gate's geometry: build-time descent trails on the hero's own field — unit-tested
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
   lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter
   lib/descentPath.ts, trajectory.ts # the career descent graph's field and route
@@ -145,6 +147,7 @@ src/
   sections/{Heights,Interlude,Choice,Rules,Solve,Story,Work}.astro   # the homepage, in scroll order — ALL of sections/, there is nothing else in it
   sections/Signature.astro          # links + seal — rendered INSIDE Work.astro, not as its own slide
   components/Deck.astro             # the deck's event plumbing (homepage only)
+  components/Gate.astro             # the first-visit gate (homepage only) — see "The first-visit gate" below
   components/proto/FluidSky.astro   # the WebGL sky canvas — on all 8 content pages despite the proto/ path (only /proto-sketches omits it)
   components/SkyWash.astro          # woven warm/cold broken-color wash over the sky — pure CSS
   components/TerrainHero.astro      # the hero's terrain canvas (Heights only)
@@ -196,9 +199,10 @@ indexed one is a real leak, not an untidiness.
 ### Interactivity — vanilla scripts, and the contract they keep
 
 `Deck`, `Toc`, `SideRail`, `CornerNav`, `TerrainHero`, `FluidSky`, `SkyWash`,
-`DescentPath`, `PlushCow`, the three explainer slides (`Choice`, `Rules`, `Solve`),
-`BaseLayout`'s no-FOUC theme resolver, and the `/art` and `/research` pages all
-need JS — that is the whole list, and `grep -rln '<script' src` regenerates it.
+`DescentPath`, `PlushCow`, `Gate`, the three explainer slides (`Choice`, `Rules`,
+`Solve`), `BaseLayout`'s no-FOUC theme resolver, and the `/art` and `/research`
+pages all need JS — that is the whole list, and `grep -rln '<script' src`
+regenerates it.
 Every one of them is a plain Astro component or page with a bundled `<script>`,
 **not** an island (see *Stack*). The shared contract:
 
@@ -306,6 +310,54 @@ scroll."*
 - **It does not engage under reduced motion, and it does not engage on a phone.**
   Both fall back to an ordinary free scroll, which is a *finished* state.
 
+## The first-visit gate
+
+`components/Gate.astro` + `lib/gate.ts` (policy, tested) + `lib/gatePaths.ts` (geometry,
+tested). On a **first visit in a session**, the homepage opens behind a dismissible
+full-screen gate: 36 gradient-descent trails on the hero's own loss field, the name
+springing in letter by letter, and one button reading `enter the descent`. Homepage only —
+rendered from `index.astro`, **never `BaseLayout`**, because moving it up one file is the
+single edit that would hand a full-screen interstitial to all nine routes.
+
+The trails are `runDescent` on `lib/terrain.ts`'s field, projected through
+`TERRAIN_CONFIG_DEFAULTS.zoom` — the hero's camera, imported so the two cannot drift. They
+**converge into the field's three basins** rather than running parallel, which is the
+deliberate difference from the 21st.dev reference that inspired it: the reference's curves
+are magic-number Béziers, and the rule here is that the surface has to be real math.
+
+**Four traps, each of which shipped and was caught in review. Do not reintroduce them.**
+
+1. **It must ship NOT COVERING and be raised by script.** The static HTML carries
+   `class="gate"`; the inline script adds `is-up`. A gate that defaulted to covering locks
+   out every visitor whose JS failed, and hides the page from anything that does not run
+   scripts. `tests/distSmoke.test.ts` asserts the shipped markup carries no covering class.
+2. **An inline script RE-EXECUTES on a View Transition.** The gate's script lives only in
+   `/`'s HTML, so `ClientRouter` does not find it in `scriptsAlreadyRan` for a visitor whose
+   entry page was another route, and runs it on the navigation into `/`. Guard is
+   `document.readyState !== 'loading'` (`isFreshLoad()` owns the rule). `BaseLayout`'s veil
+   has had `__descentVeilInit` for the same hazard since it was written.
+3. **`preventDefault()` does not stop a sibling listener.** `Deck.astro` also listens on
+   `window` for `wheel`, and **its `onWheel` does not check `defaultPrevented`** (it does for
+   keydown, not for wheel). `overflow: hidden` suppresses only the *user's* scrolling
+   mechanism — `window.scrollTo()` still works — so one flick scrolled the page behind the
+   gate and dismissal revealed a later slide instead of the hero. Use
+   `stopImmediatePropagation()`, and swallow the deck's keys too.
+4. **Window/document listeners outlive the gate's DOM.** `ClientRouter` replaces
+   `document.body`, so without a teardown `swallow`/`onKey` keep calling `preventDefault`
+   forever: wheel scrolling and Tab dead site-wide, with no gate on screen to explain it.
+   `astro:before-swap` dismisses. This is what the *Interactivity* contract's "with a
+   teardown" means.
+
+`inert` goes on **every body child except the gate**, not on `<main>`: 18 focusable elements
+(Toc links, CornerNav's page and mark links, the menu button, the theme toggle) render after
+`</main>`, so inerting the landmark alone leaves a "modal" you can tab behind.
+
+**Worth knowing before redesigning it:** the native `<dialog>.showModal()` gives real top-layer
+inertness, a cycling focus trap, Escape via `cancel`, a `::backdrop`, and closed-means-hidden
+for free — and this codebase already uses it for the `/art` lightbox
+(`art.astro` + `scripts/artGallery.ts`). Hand-rolling those was reviewed as the weakest part of
+this component. It would not have fixed traps 3 or 4.
+
 ## Phones
 
 `lib/viewport.ts` is the one phone gate: **`PHONE_MAX_WIDTH = 640`** and
@@ -316,11 +368,14 @@ enough to engage the deck on a viewport whose styles think it's a phone).
 **The number lives in two places and they are synced BY HAND.** `@media
 (max-width: var(--x))` is not valid CSS, so there is no way to feed one value to
 both. **If you change `PHONE_MAX_WIDTH`, change every `@media (max-width: 640px)`
-block with it.** `grep -rn 'max-width: 640px' src` returns 15 hits in 12 files, and
-two of the 15 are the prose in `viewport.ts` itself, so there are **13 real CSS
+block with it.** `grep -rn 'max-width: 640px' src` returns 16 hits in 13 files, and
+two of the 16 are the prose in `viewport.ts` itself, so there are **14 real CSS
 blocks**: `global.css` ×2, `experience` ×2, and one each in `CornerNav`, `Toc`,
-`DescentPath`, `ProjectCard`, `FluidSky`, `Heights`, `404`, `research` and
-`writing/[...slug]`. (This list used to include "the two proto sections". There are
+`DescentPath`, `ProjectCard`, `FluidSky`, `Heights`, `404`, `research`,
+`writing/[...slug]` and `Gate` (which halves its trail count rather than changing
+layout). Re-run the grep rather than trusting this sentence — it said "15 hits in 12
+files … 13 real CSS blocks" for one release after `Gate.astro` added the fourteenth,
+which is how a hand-sync checklist quietly stops being one. (This list used to include "the two proto sections". There are
 no proto *sections* — `src/sections/` holds only the seven homepage slides plus
 Signature — and the one surviving proto route, `/proto-sketches`, breaks at 820px,
 not 640: it is an internal gallery, so it is not part of the phone treatment.)

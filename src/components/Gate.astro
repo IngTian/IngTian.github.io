@@ -100,7 +100,7 @@ const letters = [...`${name.first} ${name.last}`];
        hero reserves mono for the line BELOW this one, so matching the hero wins. */
     font-family: var(--font-display), Georgia, serif;
     font-style: italic;
-    color: rgba(239, 233, 221, 0.62);
+    color: color-mix(in srgb, var(--paper) 62%, transparent);
     font-size: clamp(15px, 2.2vw, 21px);
     margin: 18px 0 0;
   }
@@ -114,12 +114,20 @@ const letters = [...`${name.first} ${name.last}`];
     padding: 10px 18px;
     border-radius: 9999px;
     background: transparent;
-    color: rgba(239, 233, 221, 0.8);
+    /* A TOKEN, NOT A HARDCODED RGBA. This was rgba(239,233,221,0.8) — the LIGHT theme's --paper, frozen —
+       while :hover below resolves var(--paper) live, so in dark theme the label changed hue on hover
+       (#efe9dd -> #dfe3df). Signature.astro, the model this chip is borrowed from, uses text-paper/80,
+       which follows the theme. Palette discipline is a taste rule here, not a preference. */
+    color: color-mix(in srgb, var(--paper) 80%, transparent);
     border: 1px solid color-mix(in srgb, var(--ochre) 25%, transparent);
     cursor: pointer;
     transition: color 0.2s ease, border-color 0.2s ease;
   }
   .gate-enter:hover { color: var(--paper); border-color: var(--ochre); }
+  /* :focus AS WELL AS :focus-visible. The script focuses this button programmatically, and Chrome does not
+     match :focus-visible on a programmatic focus with no prior keyboard interaction — so the only control
+     in a modal dialog had no visible focus indicator until the visitor happened to press a key. */
+  .gate-enter:focus,
   .gate-enter:focus-visible { outline: 2px solid var(--ochre); outline-offset: 3px; }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -187,6 +195,15 @@ const letters = [...`${name.first} ${name.last}`];
     var gate = document.querySelector('[data-gate]');
     if (!gate) return;
 
+    // FRESH LOAD ONLY. An inline script runs during parse, so readyState is 'loading'; when ClientRouter
+    // re-executes it after a View Transition the document is already 'complete'. Without this the gate
+    // raised mid-session: the script lives only in /'s HTML, so a visitor whose entry page was /research
+    // (the indexed, linkable entry) is not carrying it in Astro's `scriptsAlreadyRan`, and clicking "home"
+    // executed it for the first time — a full-screen interstitial over a page they were already going to.
+    // BaseLayout's veil has guarded the identical hazard since it was written (`__descentVeilInit`,
+    // "first load only"). isFreshLoad() in lib/gate.ts owns this rule and is tested there.
+    if (document.readyState !== 'loading') return;
+
     var store = null;
     try { store = window.sessionStorage; } catch (e) { store = null; }
 
@@ -197,21 +214,76 @@ const letters = [...`${name.first} ${name.last}`];
     }
     if (seen) return;
 
-    var main = document.querySelector('main');
     var done = false;
+    var btn = gate.querySelector('[data-gate-enter]');
 
     function reduced() {
       return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     }
 
+    // STOPIMMEDIATEPROPAGATION, NOT JUST PREVENTDEFAULT — and the difference is the whole bug this fixes.
+    // preventDefault() cancels the browser's own scrolling; it does nothing to a SIBLING listener. Deck.astro
+    // also listens on window for wheel, and its onWheel does NOT check e.defaultPrevented (it checks it for
+    // keydown, at Deck.astro:243, but not for wheel). So one flick while the gate was up ran the deck's
+    // tween — window.scrollTo() still works under `overflow: hidden`, which by spec suppresses only the
+    // USER's scrolling mechanism and leaves programmatic scrolling intact — and the visitor clicked "enter
+    // the descent" to arrive in the middle of a later slide, never seeing the hero the gate exists to
+    // introduce. This listener is registered at parse time and the deck's at astro:page-load, so the gate's
+    // runs first and stopImmediatePropagation keeps the deck from ever seeing the event.
     function swallow(e) {
-      if (!done) e.preventDefault();
+      if (done) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
     }
+
+    // The deck's keys have to be swallowed for the same reason, and the previous version let every one of
+    // them through: it handled Escape and Tab and returned, so ArrowDown/PageDown/space/Home/End reached
+    // Deck.onKey and paged the document behind the gate.
+    var DECK_KEYS = [
+      'ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' ', 'Spacebar',
+    ];
 
     function onKey(e) {
       if (e.key === 'Escape') { dismiss(); return; }
-      // Keep focus inside: the only focusable thing is the button, so Tab is a no-op.
-      if (e.key === 'Tab') e.preventDefault();
+      if (e.key === 'Tab') {
+        // A REAL TRAP, NOT A FREEZE. Blanket-blocking Tab looked like a trap but was one: clicking the
+        // gate's background blurs the button to <body>, and from there a blocked Tab left a keyboard
+        // visitor unable to reach the only control, with Escape the undocumented sole exit. Put focus back
+        // on the button instead, so Tab cycles where there is one stop.
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (btn) btn.focus();
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Spacebar' || e.key === ' ') {
+        // Let the button's own activation through, but never the deck's page-down on space.
+        if (e.target === btn) return;
+      }
+      if (DECK_KEYS.indexOf(e.key) !== -1) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    }
+
+    // EVERY BODY CHILD EXCEPT THE GATE, not just <main>. `inert` on main alone left 18 focusable elements
+    // reachable — measured against dist: 7 Toc links, 5 CornerNav page links, 4 CornerNav mark links
+    // (GitHub / mailto / cv.pdf / LinkedIn), the nav menu button and the theme toggle, all of which render
+    // AFTER </main>. The old comment claimed "the only focusable thing is the button", which was true of
+    // the gate and false of the document, so the trap rested entirely on blanket-blocking Tab.
+    var inerted = [];
+    function setInert(on) {
+      if (on) {
+        var kids = document.body.children;
+        for (var i = 0; i < kids.length; i++) {
+          var k = kids[i];
+          if (k === gate || k.tagName === 'SCRIPT' || k.hasAttribute('inert')) continue;
+          k.setAttribute('inert', '');
+          inerted.push(k);
+        }
+      } else {
+        for (var j = 0; j < inerted.length; j++) inerted[j].removeAttribute('inert');
+        inerted = [];
+      }
     }
 
     function dismiss() {
@@ -221,10 +293,11 @@ const letters = [...`${name.first} ${name.last}`];
 
       gate.classList.remove('is-up');
       document.documentElement.style.overflow = '';
-      if (main) main.removeAttribute('inert');
+      setInert(false);
       window.removeEventListener('wheel', swallow, { passive: false });
       window.removeEventListener('touchmove', swallow, { passive: false });
       document.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('astro:before-swap', dismiss);
 
       // A TIMER, never transitionend — under reduced motion no transition fires and this would never run,
       // leaving the page scroll-locked forever. dismissMs() in lib/gate.ts owns this number.
@@ -236,12 +309,19 @@ const letters = [...`${name.first} ${name.last}`];
 
     gate.classList.add('is-up');
     document.documentElement.style.overflow = 'hidden';
-    if (main) main.setAttribute('inert', '');
+    setInert(true);
     window.addEventListener('wheel', swallow, { passive: false });
     window.addEventListener('touchmove', swallow, { passive: false });
     document.addEventListener('keydown', onKey, true);
 
-    var btn = gate.querySelector('[data-gate-enter]');
+    // LEAVING THE PAGE IS A DISMISSAL, and without this the listeners outlived the element they belong to.
+    // ClientRouter replaces document.body on a navigation, so the gate's DOM disappears while `swallow` and
+    // `onKey` — bound to window and document, which survive the swap — keep calling preventDefault forever:
+    // wheel and trackpad scrolling dead on every page, Tab dead site-wide, for the rest of the session, with
+    // no gate on screen to explain it. The visitor concludes their mouse broke. CLAUDE.md's Interactivity
+    // contract has required "re-init on astro:page-load, WITH A TEARDOWN" all along; this is the teardown.
+    document.addEventListener('astro:before-swap', dismiss);
+
     if (btn) {
       btn.addEventListener('click', dismiss);
       try { btn.focus({ preventScroll: true }); } catch (e) { btn.focus(); }

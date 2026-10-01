@@ -432,3 +432,39 @@ describe('the first-visit gate, as shipped', () => {
     expect(haystack).toMatch(/stroke-dasharray:\s*none/);
   });
 });
+
+describe('the gate script, after the whole-branch review', () => {
+  const home = byRoute().get('/')!;
+  const script = (home.html.match(/<script>[\s\S]*?data-gate[\s\S]*?<\/script>/g) ?? []).join('\n');
+
+  it('ships the raise-script at all', () => {
+    expect(script.length, 'no inline gate script in dist/index.html').toBeGreaterThan(200);
+  });
+
+  it('guards against ClientRouter re-executing it mid-session', () => {
+    // The script exists only in /'s HTML, so Astro does not carry it in `scriptsAlreadyRan` for a visitor
+    // whose entry page was another route — it gets EXECUTED on the navigation into /. Without the readyState
+    // guard the gate raised over a homepage the visitor was already going to.
+    expect(script).toMatch(/readyState\s*!==\s*['"]loading['"]/);
+  });
+
+  it('stops the event reaching the deck, not merely the browser', () => {
+    // preventDefault() cancels the browser's scroll; it does nothing to Deck.astro's sibling window
+    // listener, whose onWheel does not check defaultPrevented. Without stopImmediatePropagation one flick
+    // scrolled the page behind the gate and dismissal revealed a later slide instead of the hero.
+    expect(script).toMatch(/stopImmediatePropagation/);
+  });
+
+  it('tears itself down when the page is swapped away', () => {
+    // swallow/onKey are bound to window and document, which survive a View Transition; the gate's DOM does
+    // not. Without this, wheel scrolling and Tab stayed dead site-wide for the rest of the session.
+    expect(script).toMatch(/astro:before-swap/);
+  });
+
+  it('inerts every body child, not just one element', () => {
+    // 18 focusable elements render after the main landmark closes (Toc links, CornerNav's page and mark
+    // links, the menu button, the theme toggle). Inerting one element left all of them reachable behind
+    // what claims to be a modal.
+    expect(script).toMatch(/document\.body\.children/);
+  });
+});

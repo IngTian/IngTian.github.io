@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   GATE_DISMISS_MS, GATE_SEEN_KEY, type GateStore,
-  dismissMs, hasSeenGate, markGateSeen, shouldRaiseGate,
+  dismissMs, hasSeenGate, isFreshLoad, markGateSeen, shouldRaiseGate,
 } from '../src/lib/gate';
 
 const okStore = (seed: Record<string, string> = {}): GateStore => {
@@ -23,22 +23,48 @@ const throwingStore = (): GateStore => ({
 
 describe('shouldRaiseGate — the lockout-safety decision', () => {
   it('raises on a first visit', () => {
-    expect(shouldRaiseGate(okStore())).toBe(true);
+    expect(shouldRaiseGate(okStore(), true)).toBe(true);
   });
 
   it('does not raise once the session has seen it', () => {
-    expect(shouldRaiseGate(okStore({ [GATE_SEEN_KEY]: '1' }))).toBe(false);
+    expect(shouldRaiseGate(okStore({ [GATE_SEEN_KEY]: '1' }), true)).toBe(false);
   });
 
   it('FAILS CLOSED when storage throws', () => {
     // Private mode and disabled storage both throw on access. Raising a gate we cannot remember
     // dismissing risks showing it on every navigation; worse, a throw mid-raise could leave the page
     // scroll-locked with nothing to dismiss. Not raising costs an animation; raising costs the site.
-    expect(shouldRaiseGate(throwingStore())).toBe(false);
+    expect(shouldRaiseGate(throwingStore(), true)).toBe(false);
   });
 
   it('FAILS CLOSED when there is no storage at all', () => {
-    expect(shouldRaiseGate(null)).toBe(false);
+    expect(shouldRaiseGate(null, true)).toBe(false);
+  });
+
+  it('DOES NOT RAISE on a client-side navigation, even with the flag unset', () => {
+    // THE RULE WAS INCOMPLETE AND THE SITE PAID FOR IT. The gate's inline script lives only in /'s HTML,
+    // so for a visitor whose entry page is something else — arriving on /research from a search result,
+    // which is the indexed entry — Astro's ClientRouter does not find it in `scriptsAlreadyRan` and
+    // EXECUTES it when they click "home". sessionStorage is unset at that moment, so the old rule raised
+    // a full-screen interstitial over a homepage the visitor was already navigating to. BaseLayout's veil
+    // script has carried a `__descentVeilInit` "first load only" guard for exactly this reason.
+    //
+    // "Fresh load" is therefore part of the policy, not an implementation detail of the script.
+    expect(shouldRaiseGate(okStore(), false)).toBe(false);
+  });
+
+  it('is false when neither condition holds', () => {
+    expect(shouldRaiseGate(okStore({ [GATE_SEEN_KEY]: '1' }), false)).toBe(false);
+  });
+});
+
+describe('isFreshLoad — how the script tells a parse from a re-run', () => {
+  it('is true only while the document is still parsing', () => {
+    // An inline script runs during parse on a real load (readyState 'loading'); when ClientRouter
+    // re-executes it after a swap the document is already 'complete'. That difference is the whole test.
+    expect(isFreshLoad('loading')).toBe(true);
+    expect(isFreshLoad('interactive')).toBe(false);
+    expect(isFreshLoad('complete')).toBe(false);
   });
 });
 
