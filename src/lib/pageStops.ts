@@ -123,7 +123,9 @@ export function projectSectionId(index: number): string {
  *
  * Flat and literal rather than invented section labels ("Overview / Projects /
  * Archive") — the rail's job is navigation, and fake structure on a page that IS
- * projects would be padding. Two stops today; it grows with the list.
+ * projects would be padding. It grows with the list; the count is deliberately not
+ * written here, because the line that said "Two stops today" went stale the first
+ * time the list grew.
  */
 export function projectStops(projects: readonly Project[]): Stop[] {
   return projects.map((p, i) => ({ label: p.name, target: projectSectionId(i) }));

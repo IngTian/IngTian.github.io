@@ -238,8 +238,20 @@ describe('the REAL site data', () => {
   it('nests today, naming the real paper, with unique targets', () => {
     const stops = researchStops(publications, researchInterests);
     expect(stops.some((s) => !!s.children?.length)).toBe(true);
-    // the rail must name the paper, not show a bare "Method"
-    expect(flattenStops(stops).map((s) => s.label)).toContain('RL-BHRP');
+    // The rail must name the paper, not show a bare "Method".
+    //
+    // DERIVED FROM THE DATA, NOT TYPED: this used to assert `toContain('RL-BHRP')`, which made renaming a paper
+    // a test failure — "you shouldn't write tests depending on the specific projects/papers/blogs right? if
+    // that's the case, we need to update tests every single time. that's horrible." Correct, and the literal
+    // bought nothing: what is worth pinning is the RELATIONSHIP (a featured paper's rail label is its own
+    // shortTitle), which is exactly what breaks if someone makes the rail print "Method" again. Now the paper
+    // can be retitled, replaced or joined by a second one and this test still asks the right question.
+    // shortTitle is optional on Publication, so it is asserted rather than passed straight into toContain —
+    // `toContain(undefined)` fails with a message about undefined instead of about the missing field.
+    const lead = publications.find((p) => p.featured);
+    const short = lead?.shortTitle;
+    expect(short, 'the featured paper needs a shortTitle for the rail to name it').toBeTruthy();
+    expect(flattenStops(stops).map((s) => s.label)).toContain(short);
     const all = targets(stops);
     expect(new Set(all).size).toBe(all.length);
   });

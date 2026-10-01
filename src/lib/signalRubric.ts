@@ -16,10 +16,20 @@
 // WHY SCORES ARE A COMMITTED ARTEFACT AND NOT A BUILD-TIME CALL:
 // An LLM call at build time would make two builds of identical content produce different
 // betas — breaking the site's determinism rule, drifting the numbers between deploys for no
-// content reason, and putting an API key in the deploy path. Instead `npm run score` writes
-// src/data/signalWeights.ts, that file is committed and reviewed like any other change, and
-// the build only ever reads it. A PR then shows the score diff, so a moved beta is visible
-// BEFORE it ships.
+// content reason, and putting an API key in the deploy path. So the scores live in
+// src/data/signalWeights.ts, committed and reviewed like any other change, and the build only
+// ever reads them. A PR then shows the score diff, so a moved beta is visible BEFORE it ships.
+//
+// THERE IS NO `npm run score`, AND TWO COMMENTS HERE USED TO SAY THERE WAS — including the one
+// directly above, which named it as the thing that writes signalWeights.ts. `package.json` has
+// seven scripts and none of them is `score`, so the three staleness tests in
+// tests/signalWeights.test.ts were failing with "re-run the scorer" and sending the reader after
+// a command that has never existed. The procedure is real but it is MANUAL, and it is written
+// down at the top of signalWeights.ts: three raters with different stances score each item
+// against RUBRIC_PROMPT below, independently, and the median is what gets committed. Doing that
+// by hand is the honest cost of keeping an API key out of the build; pretending a script does it
+// was the part that had to go. If that ever gets automated, the script goes in package.json in
+// the same commit as the comment that claims it.
 
 /** The scale. Deliberately coarse: an LLM asked for 1-100 invents precision it does not
  *  have, and a five-point scale with named anchors is reproducible enough that two runs
@@ -94,8 +104,19 @@ export function hashContent(parts: readonly string[]): string {
   return (h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0'));
 }
 
-/** Which scored ids no longer match the live content, and which live items are unscored.
- *  Either condition means `npm run score` needs re-running. */
+/**
+ * Which scored ids no longer match the live content, and which live items are unscored.
+ *
+ * Any of the three means the committed scores need a rating pass (see the note at the top of this file for what
+ * that is — it is manual, and there is no script). What each one means:
+ *   • missing   — a live item has no score. Unavoidable when content is added: a score is a judgement about
+ *                 evidence, so new evidence has to be judged. One new item costs exactly one rating.
+ *   • changed   — the id still resolves but the item's text moved, so the score describes words that are gone.
+ *   • orphaned  — a score whose item no longer exists.
+ * Ids are slugs of the item's own label, not array indices (see factorModel.signalId). That is what keeps
+ * `changed` honest: under index keys, inserting one item at the front of a list renamed every item below it and
+ * reported the whole collection as drifted when nothing about those items had changed at all.
+ */
 export function staleSignals(
   live: readonly { id: string; label: string }[],
   scored: readonly ScoredSignal[],

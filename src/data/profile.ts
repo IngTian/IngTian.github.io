@@ -68,7 +68,15 @@ export interface Project {
   stack: string[];       // tech tags, e.g. ['Go', 'MCP', 'SQLite']
   links: ProjectLink[];  // repo / live / writeup
   highlights?: string[]; // a few notable points, surfaced on the /projects page
-  featured?: boolean;    // gets the full treatment on /projects
+  /**
+   * NOTHING READS THIS FOR PROJECTS TODAY, and the comment here used to claim it "gets the full treatment on
+   * /projects" — false: pages/projects.astro passes variant="full" to every card unconditionally, so the flag
+   * changes no pixel. (`grep -rn '\.featured' src` finds only publication and writing call sites.) What
+   * actually decides prominence is ARRAY POSITION, because Work.astro slices the first two for the homepage.
+   * It is kept, and kept marking the two lead entries, because it is the natural hook if /projects ever does
+   * give its lead a different treatment — but until something renders from it, array order is the truth.
+   */
+  featured?: boolean;
 }
 
 export const name = { first: 'Ing', last: 'Tian' } as const;
@@ -166,7 +174,36 @@ export const awards: Award[] = [
 // = roles, and Selected writing = papers). Shown as a teaser on the homepage
 // and in full on /projects. Engineering output: kept a clear second to the
 // research signal in the site's identity hierarchy.
+//
+// ARRAY ORDER IS RENDERED, not just stored: sections/Work.astro slices `projects.slice(0, 2)` for the
+// homepage appendix, so the first two entries are the only ones a reader meets without clicking through.
+// `offchart` leads for that reason — it is the one project here whose content is method rather than
+// tooling (point-in-time ranking, refusing look-ahead bias), which is the identity the site claims.
+// Everything after it descends by how much it says to that reader.
+//
+// Three repos on the same GitHub profile are deliberately NOT here, so the next sweep does not "find" them
+// and add them: `pdhg` is 43 real lines of correct Chambolle-Pock abandoned after two days, and its repo
+// description still advertises non-convex support the tree does not contain — the site cannot link out to a
+// claim it would not make itself. `market-witness` is a 774-line wrapper around `witness`, which is already
+// here. The old COMP/ECSE coursework is archived.
 export const projects: Project[] = [
+  {
+    name: 'offchart',
+    year: '2026',
+    tagline:
+      "CFTC positioning data since 1986 in one SQLite file — every percentile ranked against the past, never against data that didn't exist yet.",
+    blurb:
+      'All seven CFTC Commitments of Traders datasets across its four report families, the legacy series reaching back to 1986-01-15, fetched keyless into one SQLite file and drawn by Grafana from two committed dashboards — the repo owns no charting code at all. The work is in the data’s bad habits. A market code is a stable key but not a stable series: on 2023-05-02 the Consolidated NASDAQ re-based from the $100 contract to the $20 E-mini and open interest jumped 49,531 → 255,954 with no position changing hands, so history is cut at unit breaks and at gaps over a quarter, and percentiles restart inside a segment. Prices are joined backward only, because “nearest” would put a close that did not exist yet beside a Tuesday position. It states what it is not, too: positioning is contemporaneous with price rather than predictive, and the forward-return study is named as the next piece of work rather than as something done.',
+    stack: ['Python', 'pandas', 'SQLite', 'Grafana', 'GitHub Actions'],
+    links: [{ label: 'GitHub', href: 'https://github.com/IngTian/offchart' }],
+    highlights: [
+      'Causality proven by truncation, with negative controls: a percentile computed on a prefix must be bit-identical to the full series sliced, and the suite asserts that a full-sample rank and a centred rolling mean both FAIL that check.',
+      'Look-ahead is refused in all four places it enters — the statistic, the gate on it, the as-of join, and the query: the committed dashboard JSON is linted by the test suite, which fails on PERCENT_RANK, CUME_DIST, NTILE or a bare RANK() OVER.',
+      'Three of its own claims re-measured and corrected: the open-interest residual is publisher rounding, cohort nets sum to zero only to within 4 contracts, CR4/CR8 divide by the side total — each shipping the test that disproves the old reading.',
+      'A committed 5MB slice of the database backs 130 test functions that touch no network, and every market code in it is there to make one awkward case true: the 2023 re-basing, a market-week whose nets do not sum to zero, two markets sharing one name.',
+    ],
+    featured: true,
+  },
   {
     name: 'witness',
     year: '2026',
@@ -182,6 +219,38 @@ export const projects: Project[] = [
       'Pluggable "lenses" (a markdown EXTRACT/REVIEW prompt pair) let you track any domain — coding, math — through the same engine.',
     ],
     featured: true,
+  },
+  {
+    name: 'trading-desk',
+    year: '2026',
+    tagline:
+      'A personal trading record in the terminal, where a figure with a missing input prints as an em dash and its reason, not a number.',
+    blurb:
+      'Three things in three places: the tool is this repo, the record is a SQLite file outside it, and the thesis behind each position is written wherever the author already writes — the only string shared between the book and the writing is the bet’s slug, because every richer pointer the project tried eventually rotted. What the tool guarantees is integrity, never judgement. The four parts of the return — trading, income, offsets, currency effect — tie to the total to the cent rather than exactly, since float32 marks make equality the wrong test, and the tie is checked before any of them prints. The rule the whole design turns on is that NULL means not recorded, never zero and never parity: a figure with a missing input prints as an em dash with the reason beneath it, because a partial total is not a conservative estimate, it is a wrong number that reads as a right one.',
+    stack: ['Python', 'SQLite', 'Textual', 'PyPI'],
+    links: [{ label: 'GitHub', href: 'https://github.com/IngTian/trading-desk' }],
+    highlights: [
+      'Integrity lives in the database, not the client: 16 STRICT tables, 22 triggers and 102 CHECK clauses, so a closed trade holding shares, a net-short fill or an edited audit row is refused even from a raw sqlite3 prompt.',
+      'Cost basis is average cost reduced pro rata on a sell, and returns nothing rather than a number when a fill is undated. The SQL view it replaced averaged buy fills only, so a trim followed by a higher buy turned a realised gain into a loss.',
+      'Every currency is held native and only the current balance is translated; contributed capital uses the rate on its own deposit date. Translating past movements at today’s rate cancels the currency gain on the principal.',
+      '164 test functions over the seams, plus the two CI jobs that are the real gates: one builds a wheel and creates a fresh book with it in a clean venv, and one greps the tree so no real amount from the author’s own book can be committed.',
+    ],
+  },
+  {
+    name: 'daylogs',
+    year: '2026',
+    tagline:
+      'A terminal day log for weight, food and spending where typing the number by hand is the mechanism rather than the friction.',
+    blurb:
+      'One process, one SQLite file, three things: what you weigh, what you eat, what you spend. Entry is a one-line sigil grammar — `127 Grocery Item X !grocery ~receipt in wallet`, where `!` marks a category and `~` a note — and every write answers with its consequence (`12.40 lunch → restaurant 289.50 of 200.00`) rather than an acknowledgement. There is deliberately no bank integration and no health-app import: the typing is what makes you notice the number, so automating it away would remove the point. Where the arithmetic is easy to get sloppy it is stated honestly instead — calories net against Mifflin-St Jeor resting BMR scaled by an activity factor, and an unset profile yields no factor at all rather than a silent 1.2. BMI shows as a bare number with no band and no chart, because a BMI curve is the weight curve times a constant.',
+    stack: ['Python', 'Textual', 'SQLite', 'Claude Code CLI', 'PyPI'],
+    links: [{ label: 'GitHub', href: 'https://github.com/IngTian/daylogs' }],
+    highlights: [
+      'On PyPI across five releases, with exactly one declared runtime dependency — textual — behind ~9,000 lines of package source and ~1,365 test functions.',
+      'The keymap is data: one table generates the bindings, the contextual footer and the `?` overlay, so the footer cannot name a key that is not bound — and a test parses every example in the README’s grammar table with the real parser.',
+      'Pure logic with injected clocks: parsers take `now` and the `claude -p` runners are injected so no test spawns a subprocess. CI runs nightly as well as on push, because eight date-dependent tests once broke on the calendar alone with nothing pushed.',
+      '`PRAGMA journal_mode=DELETE` on purpose — WAL’s sidecar files can sync independently under iCloud Drive and corrupt the database on the receiving device. Backup copies via `VACUUM INTO`, and export reads its table list out of the schema.',
+    ],
   },
   {
     name: 'manifold',

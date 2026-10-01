@@ -409,6 +409,33 @@ cross-reference and every computed number; turning writing back into a TS array
 would make a new post a code change. The seam between the two is exactly one
 function (`buildKinds`), and that is the whole point.
 
+### Adding a résumé item costs one hand-written score
+
+Every `timeline`, `publications`, `researchInterests`, `projects` and `awards` entry
+is also a **signal** in the Rules slide's factor model, and its beta comes from a
+committed evidence-strength score in `src/data/signalWeights.ts`. So adding one
+project is a **two-file change**, and `tests/signalWeights.test.ts` enforces it —
+three assertions (`missing`, `changed`, `orphaned`) go red until the new item has a
+score, a factor and a `because` clause naming the evidence.
+
+**There is no `npm run score`.** Two comments claimed there was and the test failure
+messages still say "re-run the scorer"; the procedure is real but manual, and it is
+written at the top of `signalWeights.ts` — three raters with different stances score
+the item against `RUBRIC_PROMPT` independently, and the **median** is committed. An
+LLM call at build time is deliberately refused (it would make two builds of identical
+content disagree and put an API key in the deploy path), so the manual pass is the
+price of that. Nothing may score 5 without third-party review; arXiv is a 4.
+
+**Ids are slugs of the item's label, never array indices.** `signalId()` in
+`lib/factorModel.ts` owns the spelling. This changed because index keys made a
+*reorder* look like a content change: inserting `offchart` at the front of `projects`
+renamed every entry below it, so one addition reported the whole collection as
+drifted. Keyed by slug, reordering is free — which matters, because **array order is
+rendered**: `sections/Work.astro` slices `projects.slice(0, 2)` for the homepage
+appendix, so the first two entries are the only ones a reader meets without clicking.
+(`Project.featured` does *not* control that, and does not control anything today —
+`projects.astro` passes `variant="full"` to every card.)
+
 ## Writing is markdown
 
 The owner: *"i want the writing to be flexible. so essentially writing.ts displays

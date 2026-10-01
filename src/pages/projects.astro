@@ -12,7 +12,7 @@ const stops = projectStops(projects);
 ---
 <BaseLayout
   title="Projects — Ing Tian"
-  description="Selected projects by Ing Tian (Zeying Tian) — shipped tools and systems. Featuring witness, a Go plugin that keeps a person-centric archive of how you think and grow as you code."
+  description="Selected projects by Ing Tian (Zeying Tian) — shipped tools and systems. Featuring offchart, a point-in-time pipeline for CFTC positioning data that ranks every percentile against the past only, and witness, a Go tool that archives how its subject changed."
   veilLine="a builder by trade"
   veilOnLoad={true}
   navZone="light"
@@ -27,7 +27,11 @@ const stops = projectStops(projects);
       <header class="projects-head">
         <a class="back" href="/">← back</a>
         <h1>Projects</h1>
-        <p class="lede">Shipped tools and systems — built end to end. Fewer, but finished; each one solves a problem I actually had.</p>
+        {/* "Fewer, but finished" was true at two entries and strained at five, and the second half of it sat
+            directly above an entry whose own last sentence says its key piece of work is not done. The claim
+            that survives the list growing is the one the entries actually support: each is finished for what it
+            claims to be, which is offchart's own framing of itself. */}
+        <p class="lede">Shipped tools and systems — built end to end. Each one solves a problem I actually had, and each is finished for what it claims to be.</p>
       </header>
 
       <div class="project-list">

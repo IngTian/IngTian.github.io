@@ -8,7 +8,8 @@
 import { describe, it, expect } from 'vitest';
 import { SIGNAL_WEIGHTS } from '../src/data/signalWeights';
 import { staleSignals, SCALE } from '../src/lib/signalRubric';
-import { identifiedSignals, loadings, FACTORS } from '../src/lib/factorModel';
+import { identifiedSignals, loadings, FACTORS, signalId } from '../src/lib/factorModel';
+import { publications } from '../src/data/profile';
 
 describe('the committed scores match the live content', () => {
   const live = identifiedSignals();
@@ -82,10 +83,22 @@ describe('the honesty ceiling', () => {
     }
   });
 
-  it('scores the RL-BHRP paper as the strongest single artefact', () => {
-    const paper = SIGNAL_WEIGHTS.signals.find((s) => s.id === 'publications:0')!;
+  it('scores the featured paper at the top of the scale, with nothing above it', () => {
+    // DERIVED, NOT TYPED. This read `find((s) => s.id === 'publications:0')` and broke the moment ids stopped
+    // being array indices — and it would equally have broken on a second publication being added above this
+    // one. The id is now looked up through the same speller the live data uses, so the test asks about THE
+    // FEATURED PAPER rather than about whatever happens to sit in slot zero.
+    //
+    // It also no longer claims the paper is the unique maximum. offchart now also scores 4, which is a real
+    // result of the rating pass and not a regression: the ceiling is 4 (nothing is peer-checked), so "the
+    // strongest artefact" was always going to be a tie as soon as a second item earned the top tier. What
+    // must stay true is that nothing EXCEEDS the paper.
+    const lead = publications.find((p) => p.featured);
+    expect(lead, 'no featured publication').toBeDefined();
+    const paper = SIGNAL_WEIGHTS.signals.find((s) => s.id === signalId('publications', lead!.title));
+    expect(paper, 'the featured paper has no committed score').toBeDefined();
     const max = Math.max(...SIGNAL_WEIGHTS.signals.map((s) => s.score));
-    expect(paper.score).toBe(max);
+    expect(paper!.score).toBe(max);
   });
 });
 
