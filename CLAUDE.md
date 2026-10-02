@@ -346,7 +346,20 @@ rule exists partly to avoid exactly this.
 Two deviations from the source, both measured: stroke widths are scaled by `REF_STROKE_SCALE =
 0.4`, because `meet` scales the 696-wide viewBox by viewport width (1.72× in a ~1200px demo,
 2.87× at 2000px) so the authored 0.5–1.55 renders as 1.4–4.4 CSS px on a real desktop; and only
-the strongest twelve of each family animate, after the full 72 flashed in practice.
+the strongest twelve of each family animate, which is a *looks* call — the rest stay drawn and
+still, so the haze does not shimmer.
+  - That second line used to end "after the full 72 flashed in practice", and **the flashing had
+    nothing to do with the count** — see trap 5. Reducing the count while the real cause was still
+    in place is why the flashing survived three more attempts. The sentence is corrected rather
+    than deleted because it is the exact shape of a wrong lead: a number that was changed next to
+    a symptom that then persisted, written up as if the change had fixed it.
+
+**The animation is driven from a rAF loop in `Gate.astro`, NOT from CSS keyframes, and that is
+load-bearing** — the component is the one place on this site where that is true, against the
+*Interactivity* contract's usual preference. The source is framer-motion animating `pathLength`,
+`pathOffset` and `opacity`; the loop reproduces those three directly as a dash written in real
+user units, read from each path's `data-len`. Four CSS translations of the same three values
+shipped first and every one produced a different artifact. Keep it in JS.
 
 ### Four things were rejected here, each after looking at it
 
@@ -391,7 +404,8 @@ every decision came from the owner looking at it in the real page at real size.*
 metric, an argument, or a screenshot in a card. `/proto-gate` exists for that, and a candidate that
 cannot be put there at full size is not ready to be proposed.
 
-**Four traps, each of which shipped and was caught in review. Do not reintroduce them.**
+**Six traps, each of which shipped. The first four were caught in review; the last two shipped to
+the owner and cost five rounds between them. Do not reintroduce any of them.**
 
 1. **It must ship NOT COVERING and be raised by script.** The static HTML carries
    `class="gate"`; the inline script adds `is-up`. A gate that defaulted to covering locks
@@ -413,6 +427,33 @@ cannot be put there at full size is not ready to be proposed.
    forever: wheel scrolling and Tab dead site-wide, with no gate on screen to explain it.
    `astro:before-swap` dismisses. This is what the *Interactivity* contract's "with a
    teardown" means.
+5. **A dash of FIXED length on these curves FLASHES, and the growth from 0.3 to 1 is what stops
+   it.** This is the single most expensive bug in the component's history: reported as *"the screen
+   is just flashing"*, diagnosed wrong **four times** (expensive paint, frame starvation,
+   `vector-effect`, stroke count) and fixed only after opening a browser. Most of each curve lies
+   **outside** the `696×316` viewBox, so a dash that keeps its length just slides in and out of the
+   visible frame forever — ink appearing and disappearing, which is what flashing *is*. The source
+   grows the drawn dash from 30% of the arc to 100% across each cycle, so the curve resolves to
+   fully drawn instead of blinking. The growth looks like the decorative part of the animation and
+   is the functional part; it was dropped once as "never visible". Two more traps in the same
+   family, both found the same way: `pathLength="1"` with fractional dash values loses precision
+   on a ~1580-unit curve and stipples it, and **Chrome will not interpolate a `calc()` containing
+   an unregistered custom property** — it snaps to the end value, so the keyframes silently did
+   nothing.
+6. **NOTHING on this screen may rest at `opacity: 0`.** Three elements animated in from `opacity:
+   0` behind a `forwards` fade, and any element whose animation does not run or is interrupted is
+   then permanently invisible. What vanished was **the owner's name** on the first screen of his
+   portfolio, and on a later report the roles line together with the modal's **only button** — a
+   gate with no way through it. Everything now animates `transform` from a state that is already
+   legible. `tests/distSmoke.test.ts` asserts no `.gate-*` rule declares `opacity: 0`; the `.gate`
+   container is exempt, because that is trap 1's not-covering resting state.
+
+**The process lesson, which cost more than any single bug above:** every one of those five wrong
+diagnoses came from reading the markup and reasoning about what it should do. The two real causes
+took minutes to find once one headless Chrome was driven over CDP and the computed values were
+read back. For a rendering bug here, **measure first** — and measure the symptom, not a proxy: the
+check that finally settled it samples total drawn ink four times 1.5s apart, because "flashing"
+*is* ink that comes and goes, and a 3.2% swing with nothing at `opacity: 0` is the proof.
 
 `inert` goes on **every body child except the gate**, not on `<main>`: 18 focusable elements
 (Toc links, CornerNav's page and mark links, the menu button, the theme toggle) render after
@@ -829,7 +870,13 @@ titles came to rest hard against the browser chrome — the lead is a number in
   NOT "fix" this back to ochre. The seal red stays the brand mark in both
   themes (brightened to `#e0574a` for the dark ground).
 - **Motion:** animate only `transform` / `opacity`; NEVER animate `filter: blur`
-  (bake it). ALL motion is gated behind `@media (prefers-reduced-motion:
+  (bake it).
+  - **One named exception, and it is not a cheat to be tidied away:** the gate's
+    strokes animate `stroke-dasharray`/`stroke-dashoffset`, which are **paint**
+    properties — a line that draws itself cannot be expressed as a transform or a
+    fade. It is affordable only because the dash is confined to 24 paths and the
+    gate is gone after one gesture. Do not generalise it to anything that persists
+    while the page is being read, and do not "fix" the gate to comply. ALL motion is gated behind `@media (prefers-reduced-motion:
   no-preference)` via `lib/motion.ts`. The no-motion state must look *finished* —
   it's also the Firefox fallback (`animation-timeline` isn't in Firefox yet), and
   it's what a reduced-motion reader gets instead of the deck.
