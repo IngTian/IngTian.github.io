@@ -136,8 +136,11 @@ src/
   lib/pageStops.ts                  # pure Stop trees: one tree per page drives BOTH its rail and its section ids — unit-tested
   lib/viewport.ts                   # PHONE_MAX_WIDTH = 640 + isPhone() — the one phone gate
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate
-  lib/gate.ts                       # the first-visit gate's POLICY: session flag, fresh-load test, dismissal timing — unit-tested
-  lib/gatePaths.ts                  # the gate's geometry: build-time descent trails on the hero's own field — unit-tested
+  lib/gate.ts                       # the first-visit gate's POLICY: session flag, fresh-load test, dismissal timing, isCovered — unit-tested
+  lib/gatePaths.ts                  # the gate's shared TOOLKIT only: viewBox, the Trail shape, the centripetal spline. It imports nothing
+  lib/gateRefPaths.ts               # WHAT THE GATE DRAWS: the ported 21st.dev geometry + each curve's measured arc length — unit-tested
+  lib/gateLines.ts                  # combed contours of the hero's field — built, compared in /proto-gate, NOT shipped (see below)
+  lib/gateProtoShapes.ts            # four black-hole candidates, /proto-gate only, deliberately barely tested
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
   lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter
   lib/descentPath.ts, trajectory.ts # the career descent graph's field and route
@@ -163,10 +166,11 @@ tests/*.test.ts                     # vitest — every pure lib module, the data
 
 ### Routes
 
-**Nine pages, not two**, and that is the number `npm run build` prints (`9 page(s)
-built`) — check it against the build rather than against this table, and `ls
-src/pages` beats both. This line read "twelve" for a while, left over from when three
-more prototype routes existed and the table below still named all four.
+**Ten pages**, and that is the number `npm run build` prints (`10 page(s) built`) —
+check it against the build rather than against this table, and `ls src/pages` beats
+both. This line has now been wrong twice in opposite directions: it read "twelve"
+when three prototype routes had been deleted, then "nine" for six commits after
+`/proto-gate` was added. Re-run the build; do not trust the sentence.
 
 | Route | What it is |
 | --- | --- |
@@ -178,11 +182,12 @@ more prototype routes existed and the table below still named all four.
 | `/experience` | the timeline — education and roles |
 | `/art` | calligraphy + photography |
 | `/404` | the not-found page (noindex, no canonical) |
-| `/proto-sketches` | the one surviving **prototype** — the showpiece sketch gallery |
+| `/proto-sketches` | **prototype** — the showpiece sketch gallery |
+| `/proto-gate` | **prototype** — six candidate first-visit gates at full size |
 
-**The prototype routes are internal, and there is one of them left.**
-`/proto-sketches` survives; `/proto-showpiece`, `/proto-ladder` and `/proto-paper`
-were retired once they had answered their question (the reasons are in
+**The prototype routes are internal, and there are two of them.**
+`/proto-sketches` and `/proto-gate` survive; `/proto-showpiece`, `/proto-ladder` and
+`/proto-paper` were retired once they had answered their question (the reasons are in
 `tests/protoNoindex.test.ts`, which is where the count lives now). Git holds them.
 
 They exist so a visual choice can be made by looking at the real thing in the real
@@ -312,28 +317,42 @@ scroll."*
 
 ## The first-visit gate
 
-`components/Gate.astro` + `lib/gate.ts` (policy, tested) + `lib/gatePaths.ts` (geometry,
+`components/Gate.astro` + `lib/gate.ts` (policy, tested) + `lib/gateRefPaths.ts` (geometry,
 tested). On a **first visit in a session**, the homepage opens behind a dismissible
-full-screen gate: 36 gradient-descent trails on the hero's own loss field, the name
-springing in letter by letter, and one button reading `enter the descent`. Homepage only —
-rendered from `index.astro`, **never `BaseLayout`**, because moving it up one file is the
-single edit that would hand a full-screen interstitial to all nine routes.
+full-screen gate: flowing curves, the name springing in letter by letter, and one button
+reading `enter the descent`. Homepage only — rendered from `index.astro`, **never
+`BaseLayout`**, because moving it up one file is the single edit that would hand a
+full-screen interstitial to all ten routes.
 
-The lines are **combed contours** (`lib/gateLines.ts`): iso-cost level sets of the hero's own
-loss field under a linear tilt, walked at unit speed and cut at one shared screen length, read
-in plan through the hero's camera (`TERRAIN_CONFIG_DEFAULTS.zoom`, imported so the two cannot
-drift). `lib/gatePaths.ts` is only the shared toolkit now — the viewBox, the `Trail` shape, and
-the centripetal spline.
+**The lines are a PORT of the 21st.dev "BackgroundPaths" component, not this site's own
+mathematics, and that is a deliberate trade.** Five original treatments were built and looked
+at in `/proto-gate`; the owner's verdict was *"the original is the best... i mean itself is
+already good enough."* `lib/gateRefPaths.ts` transcribes its geometry exactly — 36 curves per
+family, two mirrored families, 72 paths — with tests asserting the `d`-strings byte-for-byte,
+because two of its properties are easy to misread and were misread twice here:
 
-**The tilt is what makes it safe, and it is a theorem rather than a tuning.** It exceeds the
-field's maximum gradient (`MAX_FIELD_GRAD = 1.8668`, measured on a 401×401 grid), so `grad g`
-can never vanish; a function with no critical points has no closed level sets and none that
-meet. Zero crossings over all pairs, against 271 in the version this replaced. **The floor is
-clamped in code** — a caller sweeping the dial must not be able to void it.
+1. **The family CONVERGES.** The `5i` offset enters the two halves of each curve with OPPOSITE
+   sign, so the left end moves right while the right end moves left and each successive curve is
+   squeezed inward. It is not a translation. That nesting is where its interest comes from, and
+   it is the thing no field-based version could reproduce.
+2. **Its opacity ramps 0.1 → 1.0**, so most strokes recede and a reader picks out about eight
+   over a haze. That is why 72 of its lines read sparser than 30 of ours did at 0.10 → 0.55,
+   where nothing receded.
 
-### Three things were rejected here, each after looking at it
+It is a borrowed drawing. **If it stays, it should carry a credit** — the provenance is written
+at the top of `gateRefPaths.ts` rather than left implicit, and the site's "real math, computed"
+rule exists partly to avoid exactly this.
 
-Do not rebuild them. All three were judged in `/proto-gate`, which is what that route is for.
+Two deviations from the source, both measured: stroke widths are scaled by `REF_STROKE_SCALE =
+0.4`, because `meet` scales the 696-wide viewBox by viewport width (1.72× in a ~1200px demo,
+2.87× at 2000px) so the authored 0.5–1.55 renders as 1.4–4.4 CSS px on a real desktop; and only
+the strongest twelve of each family animate, after the full 72 flashed in practice.
+
+### Four things were rejected here, each after looking at it
+
+Do not rebuild them. All four were judged in `/proto-gate`, which is what that route is for. Note the
+shape of the list: every rejection was decided by LOOKING, and three of the four were things that
+measured better than what won.
 
 1. **Descent trails run to convergence** — the first version. Every stroke ends in one of the
    field's three basins, so 36 of them piled into 3 points: 71% of the set inside one cell of a
@@ -354,10 +373,23 @@ Do not rebuild them. All three were judged in `/proto-gate`, which is what that 
    because the tilt leaves only the terrain's irregular wobble showing. **Being mathematically
    elegant is not the same as looking unforced.**
 
-Everything visible is a dial with a default picked by looking, not by argument: **8 strokes**
-(from 8/12/18/30), **opacity 0.10 → 0.80** (from four ramps — the narrow 0.10→0.55 band it
-shipped with was why 30 strokes read busier than the reference's 72, since nothing receded),
-and tilt. Change one at a time.
+4. **Combed contours of the hero's own field** (`lib/gateLines.ts`) — this one SHIPPED for several
+   commits and is the most instructive loss. Its no-knot property is a theorem rather than a tuning:
+   the tilt exceeds the field's maximum gradient (`MAX_FIELD_GRAD = 1.8668`, measured on a 401×401
+   grid), so `grad g` cannot vanish, so there are no closed level sets and none that meet — zero
+   crossings against 271 for the descent trails. Three of its dials were then settled by sweeping one
+   variable at a time in `/proto-gate`: **8 strokes** (from 8/12/18/30) and **opacity 0.10 → 0.80**
+   (from four ramps). It still lost: *"the lines reads parallel and seems dull."*
+   **And the parallelism was the theorem's own cost.** To guarantee no knots the tilt must swamp the
+   field, which is exactly what flattens the terrain out of the picture. A safe drawing and an
+   interesting one were in direct tension, and the guarantee won on the metrics and lost on the wall.
+   The module and its tests are kept because `/proto-gate` renders it as the comparison; it is not
+   dead code, but it is not what ships.
+
+The lesson across all four, worth more than any of them: **this gate was redesigned five times and
+every decision came from the owner looking at it in the real page at real size.** Not one came from a
+metric, an argument, or a screenshot in a card. `/proto-gate` exists for that, and a candidate that
+cannot be put there at full size is not ready to be proposed.
 
 **Four traps, each of which shipped and was caught in review. Do not reintroduce them.**
 
