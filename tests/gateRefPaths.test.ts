@@ -5,7 +5,7 @@
 // rather than trusted.
 import { describe, expect, it } from 'vitest';
 import {
-  REF_COUNT, REF_POSITIONS, REF_STROKE_SCALE, REF_VIEW_H, REF_VIEW_W, refFamily, refTrails,
+  GATE_COUNT, REF_COUNT, REF_POSITIONS, REF_STROKE_SCALE, REF_VIEW_H, REF_VIEW_W, refFamily, refTrails,
 } from '../src/lib/gateRefPaths';
 
 describe('refFamily — transcribed exactly', () => {
@@ -55,6 +55,58 @@ describe('refFamily — transcribed exactly', () => {
     for (let i = 1; i < F.length; i++) {
       expect(F[i].opacity).toBeGreaterThanOrEqual(F[i - 1].opacity);
     }
+  });
+
+  it('SMOOTHING removes the corner the source has at every join but the first', () => {
+    // The source joins two cubics at (152-dx, 343-dy). The tangent arriving is (464-2dx, 127) and the tangent
+    // leaving is (464, 127), so the join is only tangent-continuous at dx = 0 — every other curve has a visible
+    // corner there, up to 32.8 degrees at i = 35 on the position = +1 side. That is the "i still see sharp edge
+    // corners" report, and it is in the reference too.
+    //
+    // Read the kink straight out of the emitted d-string rather than recomputing it from the formula, so this
+    // tests what actually ships.
+    const kink = (d: string): number => {
+      const n = d.replace(/[MC]/g, ' ').trim().split(/\s+/).map(Number);
+      // M p0 | C c0 c1 join | C c2 c3 end  ->  flat list of x,y pairs
+      const [, , , , c1x, c1y, jx, jy, c2x, c2y] = n;
+      const inA = Math.atan2(jy - c1y, jx - c1x);
+      const outA = Math.atan2(c2y - jy, c2x - jx);
+      return Math.abs(((inA - outA) * 180) / Math.PI);
+    };
+
+    const raw = refFamily(1, REF_COUNT, false);
+    const smooth = refFamily(1, REF_COUNT, true);
+    const worstRaw = Math.max(...raw.map((t) => kink(t.d)));
+    const worstSmooth = Math.max(...smooth.map((t) => kink(t.d)));
+
+    expect(worstRaw, "the source's own corner should still be measurable in the faithful port").toBeGreaterThan(30);
+    expect(worstSmooth, 'smoothing must leave the join tangent-continuous').toBeLessThan(0.5);
+
+    // ...and it must do that WITHOUT moving the curve: same endpoints, so the family still converges the way
+    // the whole drawing depends on. Reflecting one arm onto the other would have passed the test above while
+    // swinging the long second cubic across the frame.
+    for (let i = 0; i < raw.length; i++) {
+      const ends = (d: string) => d.replace(/[MC]/g, ' ').trim().split(/\s+/).map(Number);
+      const a = ends(raw[i].d), b = ends(smooth[i].d);
+      expect([b[0], b[1]], `curve ${i} moved its start`).toEqual([a[0], a[1]]);
+      expect([b[12], b[13]], `curve ${i} moved its end`).toEqual([a[12], a[13]]);
+    }
+  });
+
+  it('a smaller count SUBSAMPLES the family rather than truncating it', () => {
+    // "less lines" must not also mean a smaller, flatter drawing. Every per-curve number is indexed off i — the
+    // 5i/6i offsets, the 0.1+0.03i opacity ramp, the 0.5+0.03i width ramp — so drawing the first 24 of 36 would
+    // span two thirds of the spread and top out at 0.79 opacity. Spreading the indices keeps the full ramps and
+    // the full footprint: the same picture, fewer strokes.
+    const full = refFamily(1, REF_COUNT);
+    const few = refFamily(1, GATE_COUNT);
+    expect(few).toHaveLength(GATE_COUNT);
+    expect(few[few.length - 1].opacity, 'the opacity ramp must still reach the top').toBe(full[full.length - 1].opacity);
+    expect(few[few.length - 1].width, 'the width ramp must still reach the top').toBeCloseTo(full[full.length - 1].width, 3);
+    expect(few[0].d, 'the first curve is the same curve either way').toBe(full[0].d);
+
+    const startY = (d: string) => Number(d.slice(1).split(/[C\s]/)[1]);
+    expect(startY(few[few.length - 1].d), 'the last curve must land where the 36th does').toBeCloseTo(startY(full[full.length - 1].d), 1);
   });
 
   it('scales the WIDTHS down from the source, deliberately and by a stated factor', () => {

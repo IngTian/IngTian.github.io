@@ -138,7 +138,7 @@ src/
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate
   lib/gate.ts                       # the first-visit gate's POLICY: session flag, fresh-load test, dismissal timing, isCovered — unit-tested
   lib/gatePaths.ts                  # the gate's shared TOOLKIT only: viewBox, the Trail shape, the centripetal spline. It imports nothing
-  lib/gateRefPaths.ts               # WHAT THE GATE DRAWS: the ported 21st.dev geometry + each curve's measured arc length — unit-tested
+  lib/gateRefPaths.ts               # WHAT THE GATE DRAWS: the ported 21st.dev geometry, each curve's measured arc length, the join smoothing, GATE_COUNT and the zoom — unit-tested
   lib/gateLines.ts                  # combed contours of the hero's field — built, compared in /proto-gate, NOT shipped (see below)
   lib/gateProtoShapes.ts            # four black-hole candidates, /proto-gate only, deliberately barely tested
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
@@ -347,17 +347,46 @@ rule exists partly to avoid exactly this.
 defect** — together they produced *"your lines seem lifeless and some kids drew them in
 kindergarten"*. Both survivors are derived numbers, not preferences:
 
-1. **`REF_STROKE_SCALE = 0.6`.** `meet` scales the 696-wide viewBox by viewport width — 1.72× in a
-   ~1200px demo, 2.86× at 2000px — so the authored 0.5–1.55 ships as 1.4–4.4 CSS px on a desktop,
-   heavier than the reference. 1.72 / 2.86 = **0.6** reproduces the demo's own 0.86–2.67px, and a
-   browser measures 0.86–2.66 at 2000px. It was `0.4` for a release, which is a third *thinner*
-   than the reference: correcting "too thick" by overshooting well past the target is how that fix
-   became the next complaint.
-2. **The field opens 4s into its cycle** (`LEAD_MS`). Faithfully, every path starts 30% drawn with
-   the drawn window at the curve's *start* — which is off the top-left corner — so the first two
-   seconds are a stubby comb bunched against the left edge, resolving only after about five. The
-   source is a landing page you sit on; a gate is dismissed in a gesture, so that comb was the
-   whole impression. One shared lead, so the source's in-phase coherence is untouched.
+1. **`REF_ZOOM = 1.357`, and it is the correction that made two others unnecessary.** The source
+   hands its SVG `viewBox="0 0 696 316"` and lets `meet` fit it, so apparent zoom is purely a
+   function of container width: the owner's reference screenshot (1467×958) sits at **2.108×**, this
+   site was at **2.859×** on a 1990px window. Same geometry, 1.357× bigger on screen — "seems like
+   the example i gave you zoomed out a bit compared to yours". Widening the viewBox about its own
+   centre by that ratio puts the site at 2.107×; the build ships
+   `viewBox="-124.2 -56.4 944.5 428.8"`.
+   - **This is why `REF_STROKE_SCALE` is back to 1.** At 2.859× the source's authored 0.5–1.55
+     renders 1.4–4.4 CSS px, genuinely heavier than the reference, and it was reported as such
+     twice — so I scaled the widths to 0.4, then 0.6, when the drawing was simply too big. At
+     2.107× the authored widths land at **1.05–3.27 px, which is the reference's own figure to two
+     decimals.** Two dials were compensating for a third. When a drawing looks wrong at one size,
+     check the size before retuning what is in it.
+2. **The dash scheme is NOT the source's, and this one is a fix rather than a preference.** See the
+   rAF paragraph below for what replaced it and why — the summary is that the source's growing dash
+   has a once-per-cycle discontinuity that makes whole lines pop out of existence.
+
+Two further departures that are the owner's dials rather than fidelity decisions:
+
+- **`GATE_COUNT = 24` per family**, not the source's 36 ("less lines"). It **subsamples**: every
+  per-curve number is indexed off `i` — the 5i/6i offsets, the `0.1 + 0.03i` opacity ramp, the
+  `0.5 + 0.03i` width ramp — so drawing the *first* 24 would also shrink the footprint to two
+  thirds and cap opacity at 0.79, which is three changes when one was asked for. Spreading the
+  indices over the original range keeps both ramps and the full spread: the same picture, fewer
+  strokes. `tests/gateRefPaths.test.ts` asserts that.
+- **The joins are smoothed** (`refFamily(..., smooth)`), because the source has a corner in every
+  curve but the first — see below.
+
+**THE SOURCE HAS A MEASURABLE CORNER IN EVERY CURVE BUT THE FIRST.** Each curve is two cubics
+meeting at `(152 - dx, 343 - dy)`; the tangent arriving is `(464 - 2dx, 127)` and the tangent
+leaving is `(464, 127)`, equal only when `dx = 0`. So the join kinks progressively: **up to 32.8° at
+i = 35 on the `position = +1` side, and 6.4° on the mirror**, which is exactly why the owner's red
+box landed in the left half of the frame. He also worked out himself that it is in the reference
+("in the example i show you it's already like this but bc it's black and white it's less
+noticeable"). Smoothing points both control arms along their *average* direction and keeps their
+lengths, so the endpoints and the long sweep are untouched while the tangent becomes continuous.
+Reflecting one arm onto the other would also remove the kink but swings the second cubic — the big
+visible sweep — across the frame, which changes the drawing instead of repairing it. It is an opt-in
+argument so the byte-for-byte assertions still test the real port, and a test reads the kink back
+out of the emitted `d`-string: **>30° raw, <0.5° smoothed, with endpoints unmoved.**
 
 The three that were removed, because each is a way to get this wrong again:
 
@@ -383,14 +412,34 @@ load-bearing** — the component is the one place on this site where that is tru
 user units, read from each path's `data-len`. Four CSS translations of the same three values
 shipped first and every one produced a different artifact. Keep it in JS.
 
-**One detail of that translation is easy to get wrong and was: the dash GAP is a whole path length,
-not the undrawn remainder.** framer-motion's `pathSpacing` defaults to 1 and its units are
-normalised path lengths, so the source's pattern period is `drawn + len` and exactly one segment is
-ever visible. Writing the remainder makes the period exactly `len`, so the pattern tiles the path
-perfectly and whatever slides off the end immediately re-enters at the start — a second segment on
-every curve, for the whole cycle, that the source never draws. That is what turned a woven field
-into a scatter of short disconnected ends, and it is the literal content of the "kindergarten"
-screenshot. If the strokes ever look chopped again, check this line first.
+**TWO LAYERS, AND THE DASH NO LONGER CHANGES SIZE. This is the part that is deliberately unlike the
+source, and it must not be "restored".**
+
+The source grows `pathLength` 0.3 → 1 and repeats, which has a discontinuity built into it: every
+repeat restarts at 0.3, so once per cycle the dash collapses from the whole arc back to a fragment
+at the curve's off-screen start and the stroke pops out between two frames. And because only about a
+quarter of each curve is inside the viewBox at all, a stroke is *only on screen* while its drawn
+window overlaps that quarter — so lines also went dark simply by sliding past. The report was
+**"there are lines that vanish suddenly which is not good. entire lines go dark immediately."**
+
+- **`.gate-haze`** draws every curve **whole and undashed**, permanently, at `0.3` of its own ramp
+  opacity. Nothing visible can disappear any more. Raise it and the frame fills in until the
+  travelling segment stops reading as travelling; lower it and the vanishing comes back.
+- **`.gate-live`** carries the travelling segment on top, so the motion is a brightness passing
+  *along* a line that is already there rather than the line itself coming and going.
+- **The live dash and gap are CONSTANT** (`DRAWN_FRAC = 0.55`, the two summing to the whole arc) and
+  only the offset advances. That makes the pattern strictly periodic in the offset: advancing it one
+  full period reproduces the identical picture, so there is no frame anywhere to special-case. The
+  check is that the drawn length is *byte-identical* at 0.7s, 6s, 13s and 21s — if it varies, the
+  growing dash is back and so is the popping.
+
+Keep the segment the longer of the two: make the gap the larger and the curves read as fragments
+chasing each other. And note what this retires — an earlier version reproduced framer-motion's
+`pathSpacing: 1` by writing the gap as a **whole path length**, which was right for fidelity but is
+no longer what ships; with the remainder written instead the period was exactly `len`, the pattern
+tiled the path, and whatever left the end re-entered at the start as a second segment on every
+curve. That was the scatter of short disconnected ends in the "kindergarten" screenshot. If the
+strokes ever look chopped again, the dash arithmetic is the first place to look.
 
 ### Four things were rejected here, each after looking at it
 
@@ -458,19 +507,23 @@ the owner and cost five rounds between them. Do not reintroduce any of them.**
    forever: wheel scrolling and Tab dead site-wide, with no gate on screen to explain it.
    `astro:before-swap` dismisses. This is what the *Interactivity* contract's "with a
    teardown" means.
-5. **A dash of FIXED length on these curves FLASHES, and the growth from 0.3 to 1 is what stops
-   it.** This is the single most expensive bug in the component's history: reported as *"the screen
-   is just flashing"*, diagnosed wrong **four times** (expensive paint, frame starvation,
-   `vector-effect`, stroke count) and fixed only after opening a browser. Most of each curve lies
-   **outside** the `696×316` viewBox, so a dash that keeps its length just slides in and out of the
-   visible frame forever — ink appearing and disappearing, which is what flashing *is*. The source
-   grows the drawn dash from 30% of the arc to 100% across each cycle, so the curve resolves to
-   fully drawn instead of blinking. The growth looks like the decorative part of the animation and
-   is the functional part; it was dropped once as "never visible". Two more traps in the same
-   family, both found the same way: `pathLength="1"` with fractional dash values loses precision
-   on a ~1580-unit curve and stipples it, and **Chrome will not interpolate a `calc()` containing
-   an unregistered custom property** — it snaps to the end value, so the keyframes silently did
-   nothing.
+5. **Only about a QUARTER of each curve is inside the viewBox, so any dash scheme can make a whole
+   stroke disappear — and that is the trap, not the dash length.** This is the most expensive bug in
+   the component's history: reported as *"the screen is just flashing"*, diagnosed wrong **four
+   times** (expensive paint, frame starvation, `vector-effect`, stroke count) and fixed only after
+   opening a browser. A dash whose window slides off that quarter takes the line with it, and the
+   source's growing dash adds a hard reset once per cycle on top.
+   - **Careful with this bullet's history: it used to say the exact opposite of what now ships.** It
+     read *"a dash of FIXED length FLASHES, and the growth from 0.3 to 1 is what stops it"* — which
+     was a true observation about one specific combination (fixed length, period equal to the arc,
+     scattered phases, no layer underneath) wrongly generalised into a rule. What ships today **is**
+     a fixed-length dash, and it is safe for two structural reasons: its period is constant, so the
+     cycle has no discontinuity at all, and `.gate-haze` draws every curve whole underneath, so no
+     stroke is ever the thing that appears or disappears. Both are in the rAF section above.
+   - Two more traps in the same family, both found the same way: `pathLength="1"` with fractional
+     dash values loses precision on a ~1580-unit curve and stipples it, and **Chrome will not
+     interpolate a `calc()` containing an unregistered custom property** — it snaps to the end
+     value, so the keyframes silently did nothing.
 6. **NOTHING on this screen may rest at `opacity: 0`.** Three elements animated in from `opacity:
    0` behind a `forwards` fade, and any element whose animation does not run or is interrupted is
    then permanently invisible. What vanished was **the owner's name** on the first screen of his
@@ -905,11 +958,11 @@ titles came to rest hard against the browser chrome — the lead is a number in
   - **One named exception, and it is not a cheat to be tidied away:** the gate's
     strokes animate `stroke-dasharray`/`stroke-dashoffset`, which are **paint**
     properties — a line that draws itself cannot be expressed as a transform or a
-    fade. It is affordable because one rAF writes all 72 dashes, so the frame costs
-    one style/paint pass rather than 72 competing animations (a trace measures 60.0
-    fps), and because the gate is gone after one gesture. Do not generalise it to
-    anything that persists while the page is being read, and do not "fix" the gate
-    to comply. ALL motion is gated behind `@media (prefers-reduced-motion:
+    fade. It is affordable because one rAF writes all 48 live dashes, so the frame
+    costs one style/paint pass rather than 48 competing animations (a trace measures
+    60.0 fps over 96 paths), and because the gate is gone after one gesture. Do not
+    generalise it to anything that persists while the page is being read, and do not
+    "fix" the gate to comply. ALL motion is gated behind `@media (prefers-reduced-motion:
   no-preference)` via `lib/motion.ts`. The no-motion state must look *finished* —
   it's also the Firefox fallback (`animation-timeline` isn't in Firefox yet), and
   it's what a reduced-motion reader gets instead of the deck.

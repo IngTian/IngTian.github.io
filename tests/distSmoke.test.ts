@@ -446,7 +446,15 @@ describe('the first-visit gate, as shipped', () => {
       expect(p, `no arc length reaches the client for this stroke: ${p}`)
         .toMatch(/(data-len="\d|--off:-\d|stroke-dasharray="\d{2,})/);
     }
-    expect(home!.markup, 'the two mirrored families should stay as groups').toMatch(/<g class="gate-fam"/);
+    // BOTH LAYERS MUST SHIP, and this is the assertion that the "lines vanish suddenly" fix is still in place.
+    // The haze layer draws every curve whole and undashed; the live layer carries the travelling segment. Delete
+    // the haze and the strokes go back to blinking out whenever the dash slides off the visible quarter of the
+    // curve, which is a defect that reads as a rendering bug rather than as a design change — so it is worth a
+    // test rather than a comment. Two of each, one per mirrored family.
+    const haze = home!.markup.match(/<g class="gate-fam gate-haze"/g) ?? [];
+    const live = home!.markup.match(/<g class="gate-fam gate-live"/g) ?? [];
+    expect(haze.length, 'the permanent haze layer is gone — strokes will vanish again').toBe(2);
+    expect(live.length, 'the travelling layer is gone — the field would be static').toBe(2);
   });
 
   it('resets the dash under reduced motion, so no stroke is left half-drawn', () => {

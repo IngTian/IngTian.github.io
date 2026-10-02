@@ -20,20 +20,24 @@ import { name, roles } from '../data/profile';
 // end moves left) and its opacity ramps all the way 0.1 -> 1.0, so most strokes recede and a reader picks out
 // about eight over a haze. Our combed version structurally could not do the first part — its no-knot guarantee
 // needs a tilt that exceeds the field's maximum gradient, which forces the strokes parallel.
-import { REF_POSITIONS, REF_VIEW_H, REF_VIEW_W, refFamily } from '../lib/gateRefPaths';
+import { GATE_COUNT, REF_POSITIONS, refFamily, refViewBox } from '../lib/gateRefPaths';
 import { GATE_DISMISS_MS, GATE_REVEAL_EVENT, GATE_SEEN_KEY, GATE_UP_ATTR } from '../lib/gate';
 
 // The two mirrored families stay SEPARATE, as two groups. The original renders <FloatingPaths position={1} />
 // and position={-1}; keeping that split is also what makes the motion affordable — a group is one composited
 // layer, so two groups is two transforms instead of 72 paint-bound path animations. See the CSS.
-const families = REF_POSITIONS.map((p) => refFamily(p));
+// GATE_COUNT curves per family rather than the source's 36, and SMOOTHED at the join — see gateRefPaths for
+// both. The viewBox is pulled back to the reference's own apparent scale, which is what lets the stroke widths
+// be the source's unscaled.
+const families = REF_POSITIONS.map((p) => refFamily(p, GATE_COUNT, true));
+const viewBox = refViewBox();
 const letters = [...`${name.first} ${name.last}`];
 ---
 
 <div class="gate" data-gate role="dialog" aria-modal="true" aria-labelledby="gate-name">
   <svg
     class="gate-field"
-    viewBox={`0 0 ${REF_VIEW_W} ${REF_VIEW_H}`}
+    viewBox={viewBox}
     preserveAspectRatio="xMidYMid meet"
     aria-hidden="true"
     focusable="false"
@@ -49,11 +53,35 @@ const letters = [...`${name.first} ${name.last}`];
         defeats the renderer's stroke caching, and with 72 full-screen paths that is not free. The original does
         not use it either; `meet` already removed the ~24% of extra weight that `slice` was adding, so the
         widths below are the source's own and scale the way the source's do. */}
+    {/* TWO LAYERS PER FAMILY, AND THE FIRST ONE IS WHY NOTHING VANISHES.
+
+        The report was "there are lines that vanish suddenly which is not good. entire lines go dark
+        immediately", and it was true: with a single dashed layer, a stroke is only on screen while its drawn
+        window overlaps the quarter of the curve the viewBox actually shows. When the window slides past, the
+        whole line is simply gone — and at the end of each cycle the dash also snapped from the full arc back
+        to a fragment at the off-screen start, which pops the line out between two frames.
+
+        So the haze layer draws every curve WHOLE and undashed, permanently, at a low fraction of its ramp
+        opacity. Nothing on screen can now disappear. The live layer carries the travelling segment on top, so
+        the motion is a brightness passing ALONG a line that is already there rather than the line itself
+        coming and going. The reference's look survives because the haze is faint enough that the live
+        segment's ends still read as ends.
+
+        The live layer is also seamless now: its dash and gap are CONSTANT and only the offset advances, so the
+        pattern period is fixed and sliding it by one period returns the exact same picture. There is no moment
+        in the cycle where any value jumps — which is the property the growing dash could never have. */}
     {families.map((fam, f) => (
-      <g class="gate-fam" data-fam={f}>
-        {/* data-len carries the curve's measured arc length in user units. The script below reads it and
-            writes the dash itself, so nothing here depends on pathLength normalisation or on CSS being able
-            to interpolate a two-value dasharray. With no JS the path is simply drawn whole. */}
+      <g class="gate-fam gate-haze" data-fam={f} aria-hidden="true">
+        {fam.map((t) => (
+          <path class="gate-base" d={t.d} stroke-opacity={t.opacity} stroke-width={t.width} />
+        ))}
+      </g>
+    ))}
+    {families.map((fam, f) => (
+      <g class="gate-fam gate-live" data-fam={f}>
+        {/* data-len carries the curve's measured arc length in user units. The script reads it and writes the
+            dash itself, so nothing here depends on pathLength normalisation or on CSS being able to
+            interpolate a two-value dasharray. With no JS this layer is simply drawn whole, over the haze. */}
         {fam.map((t) => (
           <path
             class="gate-trail"
@@ -114,7 +142,13 @@ const letters = [...`${name.first} ${name.last}`];
      the field read as muddy: the opacity ramp starts at 0.1, and a GOLD line at a tenth opacity over near-black
      has almost no luminance left to carry, where a near-white one still reads as light. `--paper` is the site's
      ivory rather than pure #fff, which keeps palette discipline without losing the original's effect. */
-  .gate-trail { fill: none; stroke: var(--paper); stroke-linecap: round; }
+  .gate-trail, .gate-base { fill: none; stroke: var(--paper); stroke-linecap: round; }
+
+  /* The permanent haze. 0.3 of each curve's own ramp opacity, so the strongest curves read as faint continuous
+     threads and the weakest are effectively invisible until the live segment crosses them — which is the
+     reference's own hierarchy, where most strokes recede and a reader picks out about eight. Raising this fills
+     the frame in and the travelling segment stops reading as travelling; lowering it brings the vanishing back. */
+  .gate-haze { opacity: 0.3; }
 
   .gate-text { position: relative; text-align: center; padding: 0 7vw; }
 
@@ -245,14 +279,21 @@ const letters = [...`${name.first} ${name.last}`];
        forbids. Opacity is pinned at the midpoint of the pulse for the same reason it was before: without it a
        reader with motion off sees the drawing at full strength, a different picture rather than a still. */
     .gate-trail { stroke-dasharray: none; stroke-dashoffset: 0; opacity: 0.45; }
+    /* The haze is redundant once the live layer is drawn whole — two coincident strokes per curve would just
+       read as one heavier stroke, i.e. a different picture again rather than a still of this one. */
+    .gate-haze { display: none; }
     .gate-letter, .gate-roles, .gate-enter { opacity: 1; transform: none; }
   }
 
-  /* Phones get half the strokes — 36 of the 72, one whole mirrored family's worth thinned out. The content is
-     the same (phone work here is parity plus bug fixes), but 72 full-screen strokes animating a dash offset
-     forever is a real paint cost on a phone, and at that width the thinning is invisible. */
+  /* Phones get half the strokes. The content is the same (phone work here is parity plus bug fixes), but
+     full-screen strokes sliding a dash offset forever is a real paint cost on a phone, and at that width the
+     thinning is invisible.
+       THE SELECTOR TARGETS BOTH LAYERS, which is load-bearing now that there are two: scoping it to
+     `.gate-trail` alone would thin the live layer while the haze kept drawing all of them, leaving half the
+     curves as permanent faint lines no travelling segment ever visits. `.gate-fam > path` catches the haze and
+     the live group at identical indices, so a curve is dropped from both or neither. */
   @media (max-width: 640px) {
-    .gate-trail:nth-child(2n) { display: none; }
+    .gate-fam > path:nth-child(2n) { display: none; }
   }
 </style>
 
@@ -388,56 +429,36 @@ const letters = [...`${name.first} ${name.last}`];
       }, reduced() ? 0 : MS);
     }
 
-    // ── THE FLOW, DRIVEN HERE RATHER THAN IN CSS ────────────────────────────────────────────────────
-    // A faithful read of the source's per-path animation:
-    //     pathLength 0.3 -> 1          the drawn dash GROWS from 30% of the curve to all of it
-    //     pathOffset 0 -> 1 -> 0       the dash travels forward, then back
-    //     opacity    0.3 -> 0.6 -> 0.3 the element pulses
-    //     duration   20-30s, linear, repeating forever
+    // ── THE FLOW: A SLIDING PATTERN, WHICH IS WHY IT HAS NO SEAM ────────────────────────────────────────
+    // The source animates three things per path — pathLength 0.3 -> 1, pathOffset 0 -> 1 -> 0, opacity
+    // 0.3 -> 0.6 -> 0.3, linear over 20-30s, repeating forever. Reproducing that literally shipped, and it has
+    // ONE structural flaw that no amount of tuning removes: every repeat restarts pathLength at 0.3, so once per
+    // cycle the dash collapses from the whole arc back to a fragment at the off-screen start and the line pops
+    // out of existence between two frames. "entire lines go dark immediately."
     //
-    // THE GROWTH IS THE PART THAT MATTERS AND I DROPPED IT ONCE. Most of each curve lies outside the viewBox,
-    // so a dash of FIXED length slides in and out of the visible frame and the strokes appear to flash. Because
-    // the dash grows to the full curve by the end of each cycle, the drawing resolves instead of blinking.
+    // So the drawn length and the gap are now CONSTANT and only the offset advances. That makes the dash pattern
+    // strictly periodic in the offset: advancing it by one period reproduces the identical picture, so there is
+    // no frame anywhere in the cycle where any value jumps. A stroke's ends travel along it, and the stroke
+    // itself is never the thing that appears or disappears — the haze layer underneath is always drawn.
     //
-    // EVERY path animates, and EVERY path starts at the same point in its cycle. Both of those are the source,
-    // and deviating from either is what made the field read as "lifeless ... some kids drew them in
-    // kindergarten":
+    // DASH + GAP IS THE WHOLE ARC, so each curve carries exactly one segment and one space, and the segment is
+    // the longer of the two. Make the gap the larger and the curves read as fragments chasing each other.
     //
-    //   - Animating only the strongest twelve per family left 48 of the 72 frozen at full length. A frozen
-    //     stroke beside a travelling one does not read as depth, it reads as a stroke that failed, and the
-    //     static ones dominate because they are drawn end to end. (Twelve was a guess at the flashing, which
-    //     turned out to be the dash growth — so the reduction fixed nothing and cost the motion.)
-    //   - The source passes NO delay. All 72 begin at pathLength 0.3 together and separate only because each
-    //     draws its duration from 20-30s, so the opening gesture is one coherent sweep that slowly frays. I
-    //     scattered the phases across the whole cycle instead, which replaces that sweep with 72 unrelated
-    //     strokes caught mid-stride — the shape of the complaint exactly.
-    //
-    // Two substitutions, and only two.
-    //
-    // 1. Durations come from a deterministic LCG rather than Math.random(), because a drawing that differs
-    //    between builds is against the house rule the Rules slide's seeded walk follows. Same uniform spread
-    //    over the same 20-30s.
-    //
-    // 2. THE FIELD OPENS FOUR SECONDS INTO ITS CYCLE, and this is the one place where copying the source
-    //    exactly gives the wrong result. Faithfully, every path begins 30% drawn with the drawn window at its
-    //    START — and the start of these curves is off the top-left corner, so for the first couple of seconds
-    //    the field is a stubby comb bunched against the left edge, filling out only after about five. The source
-    //    is a LANDING page: you sit on it and watch it resolve. This is a gate, dismissed in a gesture, so those
-    //    first two seconds are the entire impression and that comb is what got screenshotted as "some kids drew
-    //    them in kindergarten". Leading by 4s opens on the reference picture instead. Every path shares the one
-    //    lead, so the in-phase coherence the source gets from having no delay is kept exactly.
-    var LEAD_MS = 4000;
+    // Opacity keeps the source's triangular pulse, which is already seamless: it returns to its starting value
+    // at the end of the cycle, so it can loop without a step.
+    var DRAWN_FRAC = 0.55;
     var flowing = [];
     if (!reduced()) {
-      var fams = gate.querySelectorAll('.gate-fam');
-      for (var fi = 0; fi < fams.length; fi++) {
-        var ps = fams[fi].querySelectorAll('.gate-trail');
-        for (var k = 0; k < ps.length; k++) {
-          var len = parseFloat(ps[k].getAttribute('data-len') || '0');
-          var seed = (fi * 36 + k) * 9301 + 49297;
-          var dur = 20000 + ((seed % 233280) / 233280) * 10000;
-          if (len > 0) flowing.push({ el: ps[k], len: len, dur: dur, ph: LEAD_MS / dur });
-        }
+      // All the live strokes in document order. The family no longer matters here — the phase is global, and the
+      // seed only needs to be stable per element, so one flat query replaces the nested one.
+      var ps = gate.querySelectorAll('.gate-live .gate-trail');
+      for (var k = 0; k < ps.length; k++) {
+        var len = parseFloat(ps[k].getAttribute('data-len') || '0');
+        // A deterministic LCG rather than the source's Math.random(), because a drawing that differs between
+        // builds is against the same house rule the Rules slide's seeded walk follows. Same 20-30s spread.
+        var seed = (k + 1) * 9301 + 49297;
+        var dur = 20000 + ((seed % 233280) / 233280) * 10000;
+        if (len > 0) flowing.push({ el: ps[k], len: len, dur: dur, drawn: len * DRAWN_FRAC, gap: len * (1 - DRAWN_FRAC) });
       }
     }
 
@@ -445,18 +466,15 @@ const letters = [...`${name.first} ${name.last}`];
     function flow(now) {
       for (var n = 0; n < flowing.length; n++) {
         var f = flowing[n];
-        var t = (((now / f.dur) + f.ph) % 1);
-        var drawn = (0.3 + 0.7 * t) * f.len;             // pathLength 0.3 -> 1
-        var tri = t < 0.5 ? t * 2 : (1 - t) * 2;          // pathOffset 0 -> 1 -> 0
-        // THE GAP IS A WHOLE PATH LENGTH, NOT THE REMAINDER. framer-motion's `pathSpacing` defaults to 1, and
-        // its units are normalised path lengths — so the source's gap is the FULL arc, making the pattern
-        // period `drawn + len`. Writing the remainder instead makes the period exactly `len`, so the pattern
-        // tiles the path perfectly and whatever slides off the end immediately re-enters at the start. That is
-        // a second stroke segment that the source does not draw, on every curve, for the whole cycle — the
-        // scattering of short disconnected ends that read as "some kids drew them in kindergarten".
-        f.el.style.strokeDasharray = drawn + ' ' + f.len;
-        f.el.style.strokeDashoffset = String(-tri * f.len);
-        f.el.style.opacity = String(0.3 + 0.3 * tri);     // opacity 0.3 -> 0.6 -> 0.3
+        var t = (now / f.dur) % 1;
+        // The dash is written once per frame but never changes shape — only where it sits. One period is the
+        // whole arc, so an offset of -t*len for t over [0,1) walks the segment exactly once around and lands
+        // back where it started: periodic by construction, with no frame to special-case.
+        f.el.style.strokeDasharray = f.drawn + ' ' + f.gap;
+        f.el.style.strokeDashoffset = String(-t * f.len);
+        // The source's triangular pulse, which already loops without a step because it ends where it began.
+        var tri = t < 0.5 ? t * 2 : (1 - t) * 2;
+        f.el.style.opacity = String(0.45 + 0.35 * tri);
       }
       flowRaf = requestAnimationFrame(flow);
     }

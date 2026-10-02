@@ -47,20 +47,47 @@ export const REF_POSITIONS = [1, -1] as const;
  * is what flips the convergence into a translation, so the arithmetic is written out rather than inlined.
  */
 /**
- * Stroke widths are scaled DOWN from the source's, and the GOAL is to match the original's APPARENT weight at
- * the size it was designed in — not to be thinner than it.
+ * THE WIDTHS ARE THE SOURCE'S, UNSCALED, AND THE SCALE CONSTANT IS KEPT ONLY AS THE DIAL IT WAS.
  *
- * The source ramps 0.5 -> 1.55 in user units, and `meet` scales a 696-wide viewBox by the viewport width. In a
- * ~1200px demo container that is 1.72x, so the demo's own lines land at 0.86-2.67 CSS px. On a 2000px desktop
- * the scale is 2.86x, so shipping the authored widths unchanged gives 1.4-4.4px — visibly heavier than the
- * reference, which is the "lines are again too thick" report. The factor that reproduces the demo is therefore
- * 1.72 / 2.86 = 0.6, not an eyeballed number.
+ * This was 0.4, then 0.6, and both were the wrong fix for a correctly-reported symptom. Measured off the
+ * reference screenshot the owner supplied (1467x958), `meet` scales the 696-wide viewBox by 2.108x there, so the
+ * authored 0.5-1.55 renders as **1.05-3.27 CSS px**. The site was rendering at 2.859x on a 1990px window, where
+ * the same authored widths give 1.4-4.4px — so the strokes really were too heavy, and I thinned them. Twice.
  *
- * It was 0.4 for one release, which overshot: 0.57-1.78px is a THIRD thinner than the reference, and thin dim
- * strokes are most of why the field read as "lifeless ... some kids drew them in kindergarten". Correcting a
- * too-thick complaint by going well past the target is how the fix became the next defect.
+ * But the strokes were never the problem: at 2.859x the whole DRAWING is 1.357x too big, and the owner saw that
+ * directly — "seems like the example i gave you zoomed out a bit compared to yours". Zooming out to the
+ * reference's own scale (see `REF_ZOOM`) makes the authored widths land at 1.05-3.27px by themselves. Scaling
+ * them too would then make them a third THINNER than the reference, which is what "lifeless" was.
+ *
+ * The lesson, since it has now cost three rounds: when a drawing looks wrong at one size, check the SIZE before
+ * retuning what is in it. Two of the three dials I turned were compensating for the third.
  */
-export const REF_STROKE_SCALE = 0.6;
+export const REF_STROKE_SCALE = 1;
+
+/**
+ * How far the camera is pulled back from the source's own viewBox.
+ *
+ * The source hands its SVG `viewBox="0 0 696 316"` and lets `meet` fit it to the container, so the apparent
+ * zoom is entirely a function of container width: the reference screenshot sits at 2.108x, this site at 2.859x
+ * on a 1990px window. Same geometry, same code, 1.357x bigger on screen — which is why the field read as
+ * crowding the frame when the reference does not. Widening the viewBox about its own centre by that ratio puts
+ * the site at 2.107x, and then every other number the source authored (widths, spacing, the 6px rise) is
+ * correct as written.
+ */
+export const REF_ZOOM = 1.357;
+
+/** One decimal is plenty for these coordinates, and keeps integers printing as integers. */
+const r1 = (v: number): number => Math.round(v * 10) / 10;
+
+/**
+ * The viewBox, pulled back by `zoom` about the centre of the source's own. Exported rather than written into
+ * the component so the zoom and the stroke widths cannot be retuned independently again.
+ */
+export function refViewBox(zoom = REF_ZOOM): string {
+  const w = REF_VIEW_W * zoom;
+  const h = REF_VIEW_H * zoom;
+  return `${r1((REF_VIEW_W - w) / 2)} ${r1((REF_VIEW_H - h) / 2)} ${r1(w)} ${r1(h)}`;
+}
 
 /** A point, for the arc-length flattening below. */
 interface P { x: number; y: number }
@@ -82,16 +109,54 @@ function cubicLength(p0: P, c1: P, c2: P, p1: P): number {
   return len;
 }
 
-export function refFamily(position: number, count = REF_COUNT): Trail[] {
-  return Array.from({ length: count }, (_, i) => {
+export function refFamily(position: number, count = REF_COUNT, smooth = false): Trail[] {
+  // A SMALLER COUNT SUBSAMPLES THE SOURCE'S FAMILY — it does not truncate it.
+  //
+  // Every one of the source's per-curve numbers is indexed off `i`: the offsets 5i and 6i that make the family
+  // converge, the opacity ramp 0.1 + 0.03i, the width ramp 0.5 + 0.03i. So just drawing the first 24 of 36 gives
+  // a field that spans two thirds of the spread and tops out at 0.79 opacity instead of 1.0 — fewer lines AND a
+  // smaller, flatter drawing, which is three changes when one was asked for. Spreading the indices over the
+  // original range instead means 24 curves occupy exactly the 36's footprint, with the full opacity and width
+  // ramps intact: the same picture, drawn with fewer strokes.
+  //
+  // At count = REF_COUNT the stretch is 1 and every value is the source's integer again, which is what keeps the
+  // byte-for-byte d-string assertions meaningful rather than merely passing.
+  const stretch = count > 1 ? (REF_COUNT - 1) / (count - 1) : 1;
+  return Array.from({ length: count }, (_, idx) => {
+    const i = idx * stretch;
     const dx = i * 5 * position;
     const dy = i * 6;
 
     const x0 = -(380 - dx), y0 = -(189 + dy);   // start, and its own first control point
-    const cx1 = -(312 - dx), cy1 = 216 - dy;
-    const ex1 = 152 - dx, ey1 = 343 - dy;        // end of the first cubic
-    const cx2 = 616 - dx, cy2 = 470 - dy;
+    let cx1 = -(312 - dx), cy1 = 216 - dy;
+    const ex1 = 152 - dx, ey1 = 343 - dy;        // end of the first cubic = the JOIN
+    let cx2 = 616 - dx, cy2 = 470 - dy;
     const cx3 = 684 - dx, cy3 = 875 - dy;        // the final control point and the endpoint coincide
+
+    // ── THE SOURCE HAS A CORNER IN EVERY CURVE BUT THE FIRST, AND `smooth` TAKES IT OUT ───────────────────
+    //
+    // Each curve is two cubics meeting at the join above. The tangent arriving is (464 - 2*dx, 127) and the
+    // tangent leaving is (464, 127) — equal only when dx = 0. So the join is tangent-continuous for i = 0 and
+    // kinks progressively after it: measured over the family, up to **32.8 degrees at i = 35 on the position
+    // = +1 side**, and 6.4 degrees on the mirror, which is why the corners cluster in the left half of the
+    // frame. That is the "i still see sharp edge corners" report, and it is in the reference too — the owner
+    // spotted that himself ("in the example i show you it's already like this but bc it's black and white it's
+    // less noticeable").
+    //
+    // The fix points both control arms along their AVERAGE direction and keeps their lengths, so the endpoints
+    // and the overall sweep are untouched while the tangent becomes continuous. Averaging rather than
+    // reflecting one arm onto the other matters: reflecting moves the whole second cubic, which is the long
+    // visible sweep, and that changes the drawing instead of repairing it.
+    if (smooth) {
+      const inx = ex1 - cx1, iny = ey1 - cy1;
+      const outx = cx2 - ex1, outy = cy2 - ey1;
+      const li = Math.hypot(inx, iny), lo = Math.hypot(outx, outy);
+      const ax = inx / li + outx / lo, ay = iny / li + outy / lo;
+      const al = Math.hypot(ax, ay) || 1;
+      const ux = ax / al, uy = ay / al;
+      cx1 = r1(ex1 - li * ux); cy1 = r1(ey1 - li * uy);
+      cx2 = r1(ex1 + lo * ux); cy2 = r1(ey1 + lo * uy);
+    }
 
     // THE REAL ARC LENGTH, IN USER UNITS, computed here rather than declared as pathLength="1".
     //
@@ -107,10 +172,15 @@ export function refFamily(position: number, count = REF_COUNT): Trail[] {
       + cubicLength({ x: ex1, y: ey1 }, { x: cx2, y: cy2 }, { x: cx3, y: cy3 }, { x: cx3, y: cy3 });
 
     return {
-      d: `M${x0} ${y0}C${x0} ${y0} ${cx1} ${cy1} ${ex1} ${ey1}`
-        + `C${cx2} ${cy2} ${cx3} ${cy3} ${cx3} ${cy3}`,
+      // Every coordinate goes through r1 because a subsampled family has fractional offsets (stretch is 35/23
+      // at count = 24). At count = REF_COUNT they are all integers and r1 leaves them, and JS prints an integer
+      // without a trailing `.0`, so the d-string is byte-identical to the source there.
+      d: `M${r1(x0)} ${r1(y0)}C${r1(x0)} ${r1(y0)} ${r1(cx1)} ${r1(cy1)} ${r1(ex1)} ${r1(ey1)}`
+        + `C${r1(cx2)} ${r1(cy2)} ${r1(cx3)} ${r1(cy3)} ${r1(cx3)} ${r1(cy3)}`,
       len: Math.round(len * 10) / 10,
-      i,
+      // The ELEMENT index, not the stretched one — this keys DOM order and a CSS stagger, so it has to stay
+      // 0..count-1. The stretched `i` above is the source's curve number and only feeds the formulas.
+      i: idx,
       // The source's ramps. Opacity is clamped: at i = 35 the expression gives 1.15, and an SVG
       // stroke-opacity above 1 is invalid — the browser clamps it, so doing it here keeps the emitted
       // attribute honest rather than relying on the renderer to tidy up.
@@ -121,8 +191,19 @@ export function refFamily(position: number, count = REF_COUNT): Trail[] {
 }
 
 /** Both mirrored families, in draw order, re-indexed 0..n-1 so a CSS stagger can key off `i`. */
-export function refTrails(count = REF_COUNT): Trail[] {
+export function refTrails(count = REF_COUNT, smooth = false): Trail[] {
   const out: Trail[] = [];
-  for (const p of REF_POSITIONS) for (const t of refFamily(p, count)) out.push(t);
+  for (const p of REF_POSITIONS) for (const t of refFamily(p, count, smooth)) out.push(t);
   return out.map((t, i) => ({ ...t, i }));
 }
+
+/**
+ * How many curves per family the GATE draws, as opposed to how many the source authored.
+ *
+ * The source's 36 is kept as `REF_COUNT` because it is part of the transcription. This is the owner's dial, and
+ * it is 24 on his instruction ("less lines"). The count is not free: the opacity ramp is `0.1 + 0.03i`, so it is
+ * indexed to position in the family rather than to the family's size, and dropping the count therefore drops the
+ * TOP of the ramp with it — 24 curves end at 0.79 rather than 1.0, so the whole field recedes slightly. That is
+ * a look worth having on purpose and a surprise worth not rediscovering.
+ */
+export const GATE_COUNT = 24;
