@@ -1,99 +1,113 @@
 ---
-// /proto-gate — INTERNAL. A sweep of the gate comb's TILT dial, one variable, everything else fixed.
+// /proto-gate — INTERNAL. Six candidate gates, each built as a REAL full-screen gate rather than a thumbnail.
 //
-// THIS PAGE USED TO COMPARE FOUR DIFFERENT LINE TREATMENTS AND THAT WAS A BAD COMPARISON. The owner:
-// "your other 3 are horribly implemented they are not even real comparisons." Correct. Each of the four was
-// built independently and chose its own stroke count, spacing, cut length and projection, so flipping between
-// them varied four parameter sets at once — and `contour` differed from `comb` on TWO axes simultaneously
-// (level-set geometry AND whether elevation was projected), which is confounded by construction. Comparing
-// four things that differ in four ways tells you nothing about any one of them.
+// The owner: "all your three doesn't read too well tbh. can u build all 4 as a real gate and let me see? we have
+// so many ideas." Right on both counts. A 355px card cannot settle a full-bleed composition — the repo's own
+// rule is that art must be SEEN and that small-detail screenshots are unjudgeable — and six separate ideas had
+// accumulated across two companion screens with nowhere to see them at size.
 //
-// Combed contours won, so what is left is a genuine single-variable question: how much tilt. lib/gateLines.ts
-// is written by an agent that could measure the picture but never see it, and it said as much — "2.6 is my
-// judgement call and I cannot see the result." Below, only `tilt` changes. Same field, same camera, same
-// seed count, same axis, same knots, same ramp. That is a real comparison.
+// Every frame carries the real name, the real roles line and the real button at the real scale, on the real
+// ground. The only thing that differs between frames is the drawing behind, and the ramp is the shipped one
+// wherever a ramp applies. That is the "one variable" discipline this page earned the hard way: an earlier
+// version compared four treatments that each chose their own count, spacing and projection, and the owner's
+// verdict was "they are not even real comparisons."
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { GATE_VIEW_H, GATE_VIEW_W } from '../lib/gatePaths';
-import { COMB_DEFAULTS, MAX_FIELD_GRAD, trails } from '../lib/gateLines';
+import { COMB_DEFAULTS, trails } from '../lib/gateLines';
+import { REF_VIEW_H, REF_VIEW_W, refTrails } from '../lib/gateRefPaths';
+import { SHAPE_VIEW_H, SHAPE_VIEW_W, protoShapes } from '../lib/gateProtoShapes';
 import { name, roles } from '../data/profile';
 
-// NOW SWEEPING TILT, and this is the last dial. Count (8) and ramp (0.10 -> 0.80) are settled by looking, and
-// so is the field: five harmonic alternatives were rendered at these exact parameters — Re(z3), Re(e^z),
-// Re(sin z), flow past a cylinder, Re(z2) — and the comb won, on a reason worth keeping. The owner: "i think
-// the current vertical comb your option f is better bc it's less structural and pattern-noticable. others are
-// so systematic." A saddle or an exponential fan announces itself as a recognisable motif; the comb reads as
-// incidental, because the tilt leaves only the terrain's irregular wobble showing.
-//
-// WHICH MAKES TILT THE DULL-VERSUS-PATTERNED DIAL, and the one thing still open. It must clear
-// MAX_FIELD_GRAD (1.8668) or the no-knot guarantee is void — gateLines clamps it at 1.05x that, so 1.96 is the
-// floor. Nearer the floor, more of the terrain bends the strokes (the module's own measurements: 2.1 bows a
-// stroke up to 98px against 2.6's 8-77px) and the picture is less uniform. Higher is calmer and straighter: at
-// 4.5 the worst turn falls to 5.6 degrees, which is ruled paper.
-//
-// So this sweep is biased LOW on purpose — the complaint was dullness, and more wobble is the cure that does
-// not introduce a motif. Everything else fixed: same field, same 8 strokes, same ramp, same axis.
-const TILTS = [2.0, 2.2, 2.6, 3.2];
+interface Frame {
+  key: string;
+  label: string;
+  note: string;
+  view: [number, number];
+  /** Either a Trail list rendered as paths, or ready-made SVG children (the shapes need circles too). */
+  paths?: { d: string; i: number; opacity: number; width: number }[];
+  svg?: string;
+}
 
-const FRAMES = TILTS.map((tilt) => ({
-  key: `t${String(tilt).replace('.', '')}`,
-  label: `tilt ${tilt.toFixed(1)}`,
-  isDefault: tilt === COMB_DEFAULTS.tilt,
-  trails: trails({ tilt }),
-}));
+const FRAMES: Frame[] = [
+  {
+    key: 'ref',
+    label: 'The original (ported)',
+    note: '72 paths — 36 per family, two mirrored families, the 21st.dev geometry transcribed exactly. The '
+      + 'family CONVERGES (the offset enters the two halves with opposite sign) and its opacity ramps 0.1→1.0, '
+      + 'so most strokes recede and you read about eight over a haze. Borrowed, not derived: someone else’s '
+      + 'drawing, and it would need crediting if it ships.',
+    view: [REF_VIEW_W, REF_VIEW_H],
+    paths: refTrails(),
+  },
+  {
+    key: 'comb',
+    label: 'Combed contours (ships today)',
+    note: `Iso-cost contours of the hero’s own loss field under a ${COMB_DEFAULTS.tilt} tilt. 8 strokes, ramp `
+      + '0.10→0.80. No-knot is a theorem here rather than a tuning — but the tilt has to exceed the field’s '
+      + 'maximum gradient, so it swamps the terrain, which is exactly why it reads parallel.',
+    view: [GATE_VIEW_W, GATE_VIEW_H],
+    paths: trails(),
+  },
+  ...protoShapes().map((s) => ({
+    key: s.key,
+    label: s.label,
+    note: s.note,
+    view: [SHAPE_VIEW_W, SHAPE_VIEW_H] as [number, number],
+    svg: s.svg,
+  })),
+];
 
 const letters = [...`${name.first} ${name.last}`];
 ---
 
 <BaseLayout
-  title="Gate comb — tilt sweep (internal)"
-  description="Internal prototype: the gate comb's tilt dial, swept with every other parameter held fixed."
+  title="Gate candidates — internal"
+  description="Internal prototype: six candidate first-visit gates, each at full size."
   veilOnLoad={false}
   noindex={true}
 >
   <main class="pg">
-    {/* A real, visually hidden <h1>. The page is full-bleed previews with no visible headline, and the name
-        inside each frame repeats once per frame — so it cannot be the heading. distSmoke asserts exactly one
-        per document and caught this page shipping zero. */}
-    <h1 class="sr-only">Gate comb — tilt sweep (internal)</h1>
+    {/* A real, visually hidden h1. The page is full-bleed previews with no visible headline, and the name in
+        each frame repeats once per frame so it cannot be the heading. distSmoke asserts exactly one per
+        document and caught this page shipping zero. */}
+    <h1 class="sr-only">Gate candidates — internal</h1>
 
     {FRAMES.map((f, i) => (
-      <section class="pg-frame" data-variant={f.key} data-active={f.isDefault ? 'true' : 'false'} aria-hidden={!f.isDefault}>
-        <svg viewBox={`0 0 ${GATE_VIEW_W} ${GATE_VIEW_H}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
-          {f.trails.map((t) => (
-            <path d={t.d} stroke-opacity={t.opacity} stroke-width={t.width} pathLength="1" />
-          ))}
-        </svg>
+      <section class="pg-frame" data-variant={f.key} data-active={i === 0 ? 'true' : 'false'} aria-hidden={i !== 0}>
+        {f.paths ? (
+          <svg viewBox={`0 0 ${f.view[0]} ${f.view[1]}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+            {f.paths.map((t) => (
+              <path d={t.d} stroke-opacity={t.opacity} stroke-width={t.width} pathLength="1" />
+            ))}
+          </svg>
+        ) : (
+          <svg
+            viewBox={`0 0 ${f.view[0]} ${f.view[1]}`}
+            preserveAspectRatio="xMidYMid slice"
+            aria-hidden="true"
+            focusable="false"
+            set:html={f.svg}
+          />
+        )}
+
         <div class="pg-text">
           <p class="pg-name">{letters.map((ch) => (ch === ' ' ? <span class="pg-sp"> </span> : <span>{ch}</span>))}</p>
           <p class="pg-roles">{roles}</p>
+          <span class="pg-btn">enter the descent <span aria-hidden="true">→</span></span>
         </div>
-        <span class="pg-hidden-i">{i}</span>
       </section>
     ))}
 
-    <nav class="pg-switch" aria-label="Tilt">
-      {FRAMES.map((f) => (
-        <button type="button" data-pick={f.key} aria-pressed={f.isDefault ? 'true' : 'false'}>
-          {f.label}{f.isDefault ? ' ·' : ''}
-        </button>
+    <nav class="pg-switch" aria-label="Candidate">
+      {FRAMES.map((f, i) => (
+        <button type="button" data-pick={f.key} aria-pressed={i === 0 ? 'true' : 'false'}>{f.label}</button>
       ))}
     </nav>
 
     <aside class="pg-info">
-      {FRAMES.map((f) => (
-        <div data-info={f.key} hidden={!f.isDefault}>
-          <p class="pg-metrics">
-            {f.trails.length} strokes · ramp {COMB_DEFAULTS.opacity[0]}&ndash;{COMB_DEFAULTS.opacity[1]} (both fixed) · no-knot floor {MAX_FIELD_GRAD}
-            {f.isDefault ? ' · what ships today' : ''}
-          </p>
-        </div>
+      {FRAMES.map((f, i) => (
+        <p data-info={f.key} hidden={i !== 0} class="pg-note">{f.note}</p>
       ))}
-      <p class="pg-note">
-        Only <strong>tilt</strong> changes — same field, same 8 strokes, same ramp, same axis. Lower lets more
-        of the terrain bend the strokes, so the set is less uniform without gaining a recognisable pattern;
-        higher flattens toward ruled paper. 1.96 is the floor below which the no-knot guarantee stops
-        holding, and the code clamps there. Arrow keys flip.
-      </p>
     </aside>
   </main>
 </BaseLayout>
@@ -106,13 +120,14 @@ const letters = [...`${name.first} ${name.last}`];
     display: flex; align-items: center; justify-content: center;
   }
   .pg-frame[data-active='true'] { opacity: 1; }
+  /* No transition on purpose: an instant swap is what makes two frames comparable. A cross-fade blends them
+     and hides exactly the difference being judged. */
   .pg-frame svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .pg-frame path { fill: none; stroke: var(--ochre); stroke-linecap: round; }
-  /* No transition on purpose: an instant swap is what makes two nearly-identical frames comparable. A
-     cross-fade blends them and hides exactly the difference you are trying to see. */
-  .pg-hidden-i { display: none; }
+  /* :global because three of the six inject their children through set:html, so those nodes carry no scope
+     attribute — the trap documented in CLAUDE.md. */
+  .pg-frame :global(path) { stroke: var(--ochre); stroke-linecap: round; fill: none; }
 
-  .pg-text { position: relative; text-align: center; }
+  .pg-text { position: relative; text-align: center; padding: 0 7vw; }
   .pg-name {
     font-family: var(--font-display), Georgia, serif; color: var(--paper);
     font-size: clamp(44px, 9vw, 116px); line-height: .95; letter-spacing: -.02em; margin: 0;
@@ -124,14 +139,20 @@ const letters = [...`${name.first} ${name.last}`];
     color: color-mix(in srgb, var(--paper) 62%, transparent);
     font-size: clamp(15px, 2.2vw, 21px); margin: 18px 0 0;
   }
+  .pg-btn {
+    display: inline-block; margin-top: 34px; font-size: 12.5px; padding: 10px 18px; border-radius: 9999px;
+    font-family: var(--font-mono), ui-monospace, monospace;
+    color: color-mix(in srgb, var(--paper) 80%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ochre) 25%, transparent);
+  }
 
   .pg-switch {
-    position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%);
-    display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; z-index: 5;
+    position: fixed; left: 50%; bottom: 72px; transform: translateX(-50%);
+    display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; z-index: 5; max-width: 94vw;
   }
   .pg-switch button {
-    font-family: var(--font-mono), ui-monospace, monospace; font-size: 11px;
-    padding: 7px 13px; border-radius: 99px; cursor: pointer;
+    font-family: var(--font-mono), ui-monospace, monospace; font-size: 10.5px;
+    padding: 6px 11px; border-radius: 99px; cursor: pointer;
     background: color-mix(in srgb, var(--bg) 72%, transparent);
     color: color-mix(in srgb, var(--paper) 70%, transparent);
     border: 1px solid color-mix(in srgb, var(--ochre) 22%, transparent);
@@ -140,20 +161,16 @@ const letters = [...`${name.first} ${name.last}`];
   .pg-switch button[aria-pressed='true'] { color: var(--paper); border-color: var(--ochre); }
 
   .pg-info {
-    position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
-    width: min(92vw, 820px); text-align: center; z-index: 5;
-  }
-  .pg-metrics {
-    font-family: var(--font-mono), ui-monospace, monospace; font-size: 10.5px;
-    color: color-mix(in srgb, var(--ochre) 80%, transparent); margin: 0 0 4px; letter-spacing: .04em;
+    position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%);
+    width: min(94vw, 900px); text-align: center; z-index: 5;
   }
   .pg-note {
-    font-size: 11.5px; line-height: 1.5; margin: 0;
+    font-size: 11px; line-height: 1.5; margin: 0;
     color: color-mix(in srgb, var(--paper) 46%, transparent);
   }
 
   @media (max-width: 820px) {
-    .pg-switch { bottom: 112px; }
+    .pg-switch { bottom: 104px; }
     .pg-note { display: none; }
   }
 </style>
