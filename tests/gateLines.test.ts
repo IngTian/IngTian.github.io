@@ -70,15 +70,22 @@ describe('comb — the module contract', () => {
     expect(T.map((t) => t.i)).toEqual(T.map((_t, i) => i));
   });
 
-  it('ramps opacity and width monotonically, inside the shipped bands', () => {
+  it('ramps opacity and width monotonically, and lands exactly on the declared ends', () => {
+    // DERIVED FROM COMB_DEFAULTS, NOT TYPED. These numbers were hardcoded as 0.55 and 1.6 and went stale the
+    // first time the ramp was retuned — the third aesthetic constant in this suite to do that, after an
+    // invented 24-trail floor and an incidental 28-stroke floor in distSmoke. A ramp END is a taste decision
+    // that will move again; what is worth asserting is the RELATIONSHIP, that the ramp actually spans the
+    // declared band monotonically. Retune the dial and this test keeps asking the right question.
     for (let i = 1; i < T.length; i++) {
       expect(T[i].opacity).toBeGreaterThanOrEqual(T[i - 1].opacity);
       expect(T[i].width).toBeGreaterThanOrEqual(T[i - 1].width);
     }
-    expect(T[0].opacity).toBeGreaterThanOrEqual(0.1);
-    expect(T[T.length - 1].opacity).toBeLessThanOrEqual(0.55);
-    expect(T[0].width).toBeGreaterThanOrEqual(0.5);
-    expect(T[T.length - 1].width).toBeLessThanOrEqual(1.6);
+    const [o0, o1] = COMB_DEFAULTS.opacity;
+    const [w0, w1] = COMB_DEFAULTS.width;
+    expect(T[0].opacity).toBeCloseTo(o0, 3);
+    expect(T[T.length - 1].opacity).toBeCloseTo(o1, 3);
+    expect(T[0].width).toBeCloseTo(w0, 2);
+    expect(T[T.length - 1].width).toBeCloseTo(w1, 2);
   });
 
   it('is byte-identical across calls (the determinism rule)', () => {
@@ -268,10 +275,11 @@ describe('the dials, now that they are parameters rather than constants', () => 
   it('honours the seed count, and the ramp still spans its full range', () => {
     const few = trails({ seeds: 12 });
     expect(few).toHaveLength(12);
-    expect(few[0].opacity).toBeCloseTo(0.1, 3);
-    expect(few[few.length - 1].opacity).toBeCloseTo(0.55, 3);
-    expect(few[0].width).toBeCloseTo(0.5, 2);
-    expect(few[few.length - 1].width).toBeCloseTo(1.6, 2);
+    // Also derived — the point here is that changing the COUNT does not change the ramp's reach.
+    expect(few[0].opacity).toBeCloseTo(COMB_DEFAULTS.opacity[0], 3);
+    expect(few[few.length - 1].opacity).toBeCloseTo(COMB_DEFAULTS.opacity[1], 3);
+    expect(few[0].width).toBeCloseTo(COMB_DEFAULTS.width[0], 2);
+    expect(few[few.length - 1].width).toBeCloseTo(COMB_DEFAULTS.width[1], 2);
   });
 
   it('survives a degenerate seed count instead of dividing by zero', () => {

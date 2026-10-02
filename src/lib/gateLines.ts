@@ -151,8 +151,18 @@ export const COMB_DEFAULTS = {
   tilt: DEFAULT_TILT,
   seeds: DEFAULT_SEEDS,
   axisDeg: DEFAULT_AXIS_DEG,
-  opacity: [0.1, 0.55] as [number, number],
-  width: [0.5, 1.6] as [number, number],
+  /**
+   * 0.10 -> 0.80, chosen by looking at four ramps in /proto-gate at a fixed 8 strokes.
+   *
+   * It shipped at 0.10 -> 0.55 and that narrow band was the real reason the set read crowded, more than the
+   * count was: every stroke sat in the same register, so nothing receded and all of them arrived at once. The
+   * reference this design came from draws SEVENTY-TWO strokes and still reads sparse, because it ramps
+   * 0.1 -> 1.0 — most of its lines are nearly invisible and a reader picks out about eight over a haze. 0.80
+   * takes most of that separation without going to full opacity, where the strongest stroke starts to compete
+   * with the name sitting on top of it.
+   */
+  opacity: [0.1, 0.8] as [number, number],
+  width: [0.5, 1.9] as [number, number],
 } as const;
 
 /**
