@@ -33,6 +33,15 @@ export interface Trail {
   i: number;
   opacity: number;
   width: number;
+  /**
+   * The curve's arc length in user units, when the producer knows it.
+   *
+   * Optional because only the ported reference geometry needs it. It exists because dashing a long path via
+   * pathLength="1" and fractional dash values renders as a sub-unit stipple in Chrome — the scale factor is
+   * ~2000x and the dash computation loses precision. Knowing the real length lets the dash and its offset be
+   * plain user units, with nothing scaled.
+   */
+  len?: number;
 }
 
 /** viewBox of the gate's SVG. Fixed, so the paths are resolution-independent markup. */

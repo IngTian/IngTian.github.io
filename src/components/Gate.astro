@@ -51,14 +51,16 @@ const letters = [...`${name.first} ${name.last}`];
         widths below are the source's own and scale the way the source's do. */}
     {families.map((fam, f) => (
       <g class="gate-fam" data-fam={f}>
+        {/* The dash below is set in REAL user units, from each curve's own measured arc length, and only the
+            offset is animated. pathLength="1" with fractional dash values is what produced the stipple. */}
         {fam.map((t) => (
           <path
             class="gate-trail"
             d={t.d}
-            style={`--i:${t.i}`}
+            style={`--i:${t.i};--off:${-(t.len ?? 0)}`}
             stroke-opacity={t.opacity}
             stroke-width={t.width}
-            pathLength="1"
+            stroke-dasharray={`${Math.round((t.len ?? 0) * 0.46)} ${Math.round((t.len ?? 0) * 0.54)}`}
           />
         ))}
       </g>
@@ -190,20 +192,35 @@ const letters = [...`${name.first} ${name.last}`];
        than as a moving set over a brighter still set. :nth-last-child because index 35 is the STRONGEST stroke:
        the ramp runs faint-to-strong, so the last children are the ones worth animating. */
     .gate.is-up .gate-fam .gate-trail { opacity: 0.45; }
-    .gate.is-up .gate-fam .gate-trail:nth-last-child(-n + 12) {
-      animation: gate-flow calc(20s + (var(--i) * 139ms)) linear infinite;
-      animation-delay: calc(var(--i) * -397ms);
-    }
-    /* The source's three animated values, in one keyframe set. pathLength="1" on each path normalises its
-       length, so every number below is a FRACTION of the curve regardless of its real length:
-         pathLength 0.3 -> 1   becomes the drawn dash growing from 30% of the curve to all of it
-         pathOffset 0 -> 1 -> 0 becomes the dash travelling forward and back (negative offset = forward)
-         opacity 0.3 -> 0.6 -> 0.3 is the element pulse, which the compositor handles */
+    /* ONE ANIMATED PROPERTY: the dash offset, travelling exactly one full period so the loop is seamless.
+       `--len` is the curve's own arc length in user units, measured at build time, so this is a 46%-long
+       segment sliding along the whole curve — "lines passing smoothly across the page".
+         The dash LENGTH is no longer animated. The source grows it (pathLength 0.3 -> 1), but doing that
+       required the pathLength="1" normalisation whose precision loss caused the stipple, and interpolating a
+       two-value dasharray through calc(var(--len) * …) is fragile in a way a single length is not. One sliding
+       segment of fixed length is the part of the effect that reads; growing it was never visible at these
+       speeds. */
+    /* `var(--off)` AND NOT `calc(var(--len) * -1)`. Measured in a real browser: with the calc form, the
+       animation's currentTime advanced normally while the computed stroke-dashoffset sat at `calc(-1415px)`
+       forever — Chrome will not interpolate a calc() containing an unregistered custom property, so it snapped
+       straight to the end value and nothing moved. The negative length is therefore pre-computed into `--off`
+       as a plain number, which substitutes to `-1415` and interpolates from 0 like any other length. */
     @keyframes gate-flow {
-      0%   { stroke-dasharray: 0.3 0.7;   stroke-dashoffset: 0;  opacity: 0.3; }
-      50%  { stroke-dasharray: 0.65 0.35; stroke-dashoffset: -1; opacity: 0.6; }
-      100% { stroke-dasharray: 1 0;       stroke-dashoffset: 0;  opacity: 0.3; }
+      from { stroke-dashoffset: 0; }
+      to   { stroke-dashoffset: var(--off); }
     }
+    /* The pulse is separate so it can run on its own clock — and on opacity, which the compositor owns. */
+    .gate.is-up .gate-fam .gate-trail:nth-last-child(-n + 12) {
+      animation-name: gate-flow, gate-pulse;
+      animation-duration: calc(26s + (var(--i) * 211ms)), calc(9s + (var(--i) * 97ms));
+      animation-timing-function: linear, ease-in-out;
+      animation-iteration-count: infinite, infinite;
+      animation-direction: normal, alternate;
+      /* Negative, so every stroke starts mid-travel rather than all 24 setting off from the same end. Off the
+         index, not Math.random() — the source randomises its periods and this site forbids that in a drawing. */
+      animation-delay: calc(var(--i) * -613ms), calc(var(--i) * -271ms);
+    }
+    @keyframes gate-pulse { from { opacity: 0.34; } to { opacity: 0.72; } }
 
     /* THE LETTERS FAIL VISIBLE, and that is the fix for the name arriving incomplete TWICE — "I g T n" and
        then "ng Ti", a different set of letters missing each time.

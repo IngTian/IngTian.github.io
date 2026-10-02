@@ -429,14 +429,26 @@ describe('the first-visit gate, as shipped', () => {
     // caching stroked geometry and forces all 72 to be re-stroked at device resolution every frame. That is
     // the real suspect, and it is what this test pins.
     //
-    // pathLength="1" is asserted alongside it because the dash keyframes are written as FRACTIONS (0.3 of the
-    // curve, 0.65, 1). Without the attribute those become user units on curves ~2000 units long, i.e. an
-    // invisible dotted line rather than a travelling segment.
+    // AND pathLength MUST NOT COME BACK, which is the opposite of what this test asserted an hour ago. The
+    // dash was first expressed as fractions with pathLength="1" so one keyframe could fit every curve. Driving
+    // one headless Chrome and actually looking showed what that renders as: thousands of sub-unit dashes, a
+    // stippled shimmer across the frame — because these curves are ~1580 user units long, so pathLength="1"
+    // asks the renderer to compute dashes at a ~1580x scale and it loses precision. That shimmer WAS the
+    // "flashing", through three wrong diagnoses of mine.
+    //
+    // The dash is now in real user units from each curve's measured arc length, carried in `--len` for the
+    // offset keyframe. So: no pathLength, a real dasharray, and a --len to animate against.
     const paths = home!.markup.match(/<path[^>]*class="[^"]*gate-trail[^"]*"[^>]*>/g) ?? [];
     expect(paths.length, 'the gate shipped no strokes at all').toBeGreaterThanOrEqual(1);
     for (const p of paths) {
       expect(p, `vector-effect is back on a gate stroke: ${p}`).not.toMatch(/vector-effect/);
-      expect(p, `a gate stroke lost pathLength: ${p}`).toMatch(/pathLength="1"/);
+      expect(p, `pathLength is back — it renders as a stipple on curves this long: ${p}`)
+        .not.toMatch(/pathLength/);
+      expect(p, `a gate stroke has no --off for the dash offset to travel: ${p}`).toMatch(/--off:-\d/);
+      // A real dash: two lengths in the hundreds, not fractions under 1.
+      const dash = /stroke-dasharray="(\d+) (\d+)"/.exec(p);
+      expect(dash, `a gate stroke has no real-unit dasharray: ${p}`).not.toBeNull();
+      expect(Number(dash![1]), 'the dash is sub-unit again, i.e. a stipple').toBeGreaterThan(10);
     }
     // And the two mirrored families stay as groups, which is what the source renders.
     expect(home!.markup).toMatch(/<g class="gate-fam"/);

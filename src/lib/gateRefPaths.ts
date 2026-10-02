@@ -57,6 +57,26 @@ export const REF_POSITIONS = [1, -1] as const;
  */
 export const REF_STROKE_SCALE = 0.4;
 
+/** A point, for the arc-length flattening below. */
+interface P { x: number; y: number }
+
+/** One cubic Bézier, sampled. 64 steps puts the length error under 0.1% for curves this smooth. */
+function cubicLength(p0: P, c1: P, c2: P, p1: P): number {
+  const at = (t: number): P => {
+    const u = 1 - t;
+    const a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
+    return { x: a * p0.x + b * c1.x + c * c2.x + d * p1.x, y: a * p0.y + b * c1.y + c * c2.y + d * p1.y };
+  };
+  let len = 0;
+  let prev = at(0);
+  for (let i = 1; i <= 64; i++) {
+    const cur = at(i / 64);
+    len += Math.hypot(cur.x - prev.x, cur.y - prev.y);
+    prev = cur;
+  }
+  return len;
+}
+
 export function refFamily(position: number, count = REF_COUNT): Trail[] {
   return Array.from({ length: count }, (_, i) => {
     const dx = i * 5 * position;
@@ -68,9 +88,23 @@ export function refFamily(position: number, count = REF_COUNT): Trail[] {
     const cx2 = 616 - dx, cy2 = 470 - dy;
     const cx3 = 684 - dx, cy3 = 875 - dy;        // the final control point and the endpoint coincide
 
+    // THE REAL ARC LENGTH, IN USER UNITS, computed here rather than declared as pathLength="1".
+    //
+    // The first attempt set pathLength="1" so the dash could be written as fractions (0.3 of the curve, 0.7
+    // gap). Measured in a real browser, that renders as thousands of sub-unit dashes instead of one long
+    // segment: these curves are ~2000 user units long, so pathLength="1" asks the renderer to work at a 2000x
+    // scale factor and the dash computation loses its precision. On screen it is a stippled shimmer, which is
+    // what "the screen is just flashing" actually was — not frame starvation, which was my second wrong guess,
+    // and not the dash being inherently too expensive, which was my first.
+    //
+    // With the true length known, dash and offset are plain user units and nothing has to be scaled at all.
+    const len = cubicLength({ x: x0, y: y0 }, { x: x0, y: y0 }, { x: cx1, y: cy1 }, { x: ex1, y: ey1 })
+      + cubicLength({ x: ex1, y: ey1 }, { x: cx2, y: cy2 }, { x: cx3, y: cy3 }, { x: cx3, y: cy3 });
+
     return {
       d: `M${x0} ${y0}C${x0} ${y0} ${cx1} ${cy1} ${ex1} ${ey1}`
         + `C${cx2} ${cy2} ${cx3} ${cy3} ${cx3} ${cy3}`,
+      len: Math.round(len * 10) / 10,
       i,
       // The source's ramps. Opacity is clamped: at i = 35 the expression gives 1.15, and an SVG
       // stroke-opacity above 1 is invalid — the browser clamps it, so doing it here keeps the emitted
