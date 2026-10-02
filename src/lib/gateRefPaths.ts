@@ -47,15 +47,20 @@ export const REF_POSITIONS = [1, -1] as const;
  * is what flips the convergence into a translation, so the arithmetic is written out rather than inlined.
  */
 /**
- * Stroke widths are scaled DOWN from the source's, and that is a deliberate deviation.
+ * Stroke widths are scaled DOWN from the source's, and the GOAL is to match the original's APPARENT weight at
+ * the size it was designed in — not to be thinner than it.
  *
- * The source ramps 0.5 -> 1.55 in user units, and `meet` scales a 696-wide viewBox by the viewport width: 1.72x
- * in a ~1200px demo container, but 2.76x at 1920px and 2.87x at 2000px. So the same authored width that reads
- * as a hairline in the original's own demo renders at 1.4-4.4 CSS px on a real desktop — "lines are again too
- * thick", twice. 0.4 brings a 2000px-wide viewport back to roughly 0.55-1.7px, which is what the demo looks
- * like at the size it was designed in.
+ * The source ramps 0.5 -> 1.55 in user units, and `meet` scales a 696-wide viewBox by the viewport width. In a
+ * ~1200px demo container that is 1.72x, so the demo's own lines land at 0.86-2.67 CSS px. On a 2000px desktop
+ * the scale is 2.86x, so shipping the authored widths unchanged gives 1.4-4.4px — visibly heavier than the
+ * reference, which is the "lines are again too thick" report. The factor that reproduces the demo is therefore
+ * 1.72 / 2.86 = 0.6, not an eyeballed number.
+ *
+ * It was 0.4 for one release, which overshot: 0.57-1.78px is a THIRD thinner than the reference, and thin dim
+ * strokes are most of why the field read as "lifeless ... some kids drew them in kindergarten". Correcting a
+ * too-thick complaint by going well past the target is how the fix became the next defect.
  */
-export const REF_STROKE_SCALE = 0.4;
+export const REF_STROKE_SCALE = 0.6;
 
 /** A point, for the arc-length flattening below. */
 interface P { x: number; y: number }

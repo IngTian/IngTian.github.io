@@ -109,7 +109,12 @@ const letters = [...`${name.first} ${name.last}`];
   }
 
   .gate-field { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .gate-trail { fill: none; stroke: var(--ochre); stroke-linecap: round; }
+  /* THE STROKES ARE PAPER, NOT OCHRE, because the source draws them in `currentColor` under
+     `dark:text-white` — white threads on a near-black ground. Ochre was my substitution and it is most of why
+     the field read as muddy: the opacity ramp starts at 0.1, and a GOLD line at a tenth opacity over near-black
+     has almost no luminance left to carry, where a near-white one still reads as light. `--paper` is the site's
+     ivory rather than pure #fff, which keeps palette discipline without losing the original's effect. */
+  .gate-trail { fill: none; stroke: var(--paper); stroke-linecap: round; }
 
   .gate-text { position: relative; text-align: center; padding: 0 7vw; }
 
@@ -394,29 +399,44 @@ const letters = [...`${name.first} ${name.last}`];
     // so a dash of FIXED length slides in and out of the visible frame and the strokes appear to flash. Because
     // the dash grows to the full curve by the end of each cycle, the drawing resolves instead of blinking.
     //
-    // Only the strongest twelve of each family animate; the rest stay whole and still. Phases come off the
-    // index rather than Math.random(), which the source uses and this site forbids in a drawing.
+    // EVERY path animates, and EVERY path starts at the same point in its cycle. Both of those are the source,
+    // and deviating from either is what made the field read as "lifeless ... some kids drew them in
+    // kindergarten":
     //
-    // THE SECOND FAMILY IS OFFSET BY HALF A CYCLE. Both families animate the same index range, so without the
-    // offset a stroke and its mirror image reach the end of their cycle in the same frame — and the end of a
-    // cycle is the one discontinuity here, where the dash snaps from the whole curve back to 30% of it. Two of
-    // those firing together, on opposite sides of the screen, reads as a deliberate bilateral pattern. That is
-    // the "so systematic" quality the harmonic fields were rejected for.
+    //   - Animating only the strongest twelve per family left 48 of the 72 frozen at full length. A frozen
+    //     stroke beside a travelling one does not read as depth, it reads as a stroke that failed, and the
+    //     static ones dominate because they are drawn end to end. (Twelve was a guess at the flashing, which
+    //     turned out to be the dash growth — so the reduction fixed nothing and cost the motion.)
+    //   - The source passes NO delay. All 72 begin at pathLength 0.3 together and separate only because each
+    //     draws its duration from 20-30s, so the opening gesture is one coherent sweep that slowly frays. I
+    //     scattered the phases across the whole cycle instead, which replaces that sweep with 72 unrelated
+    //     strokes caught mid-stride — the shape of the complaint exactly.
+    //
+    // Two substitutions, and only two.
+    //
+    // 1. Durations come from a deterministic LCG rather than Math.random(), because a drawing that differs
+    //    between builds is against the house rule the Rules slide's seeded walk follows. Same uniform spread
+    //    over the same 20-30s.
+    //
+    // 2. THE FIELD OPENS FOUR SECONDS INTO ITS CYCLE, and this is the one place where copying the source
+    //    exactly gives the wrong result. Faithfully, every path begins 30% drawn with the drawn window at its
+    //    START — and the start of these curves is off the top-left corner, so for the first couple of seconds
+    //    the field is a stubby comb bunched against the left edge, filling out only after about five. The source
+    //    is a LANDING page: you sit on it and watch it resolve. This is a gate, dismissed in a gesture, so those
+    //    first two seconds are the entire impression and that comb is what got screenshotted as "some kids drew
+    //    them in kindergarten". Leading by 4s opens on the reference picture instead. Every path shares the one
+    //    lead, so the in-phase coherence the source gets from having no delay is kept exactly.
+    var LEAD_MS = 4000;
     var flowing = [];
     if (!reduced()) {
       var fams = gate.querySelectorAll('.gate-fam');
       for (var fi = 0; fi < fams.length; fi++) {
         var ps = fams[fi].querySelectorAll('.gate-trail');
-        for (var k = Math.max(0, ps.length - 12); k < ps.length; k++) {
+        for (var k = 0; k < ps.length; k++) {
           var len = parseFloat(ps[k].getAttribute('data-len') || '0');
-          if (len > 0) {
-            flowing.push({
-              el: ps[k],
-              len: len,
-              dur: 20000 + ((k * 7) % 11) * 1000,
-              ph: ((((k * 137) % 1000) / 1000) + fi * 0.5) % 1,
-            });
-          }
+          var seed = (fi * 36 + k) * 9301 + 49297;
+          var dur = 20000 + ((seed % 233280) / 233280) * 10000;
+          if (len > 0) flowing.push({ el: ps[k], len: len, dur: dur, ph: LEAD_MS / dur });
         }
       }
     }
@@ -428,7 +448,13 @@ const letters = [...`${name.first} ${name.last}`];
         var t = (((now / f.dur) + f.ph) % 1);
         var drawn = (0.3 + 0.7 * t) * f.len;             // pathLength 0.3 -> 1
         var tri = t < 0.5 ? t * 2 : (1 - t) * 2;          // pathOffset 0 -> 1 -> 0
-        f.el.style.strokeDasharray = drawn + ' ' + Math.max(0, f.len - drawn);
+        // THE GAP IS A WHOLE PATH LENGTH, NOT THE REMAINDER. framer-motion's `pathSpacing` defaults to 1, and
+        // its units are normalised path lengths — so the source's gap is the FULL arc, making the pattern
+        // period `drawn + len`. Writing the remainder instead makes the period exactly `len`, so the pattern
+        // tiles the path perfectly and whatever slides off the end immediately re-enters at the start. That is
+        // a second stroke segment that the source does not draw, on every curve, for the whole cycle — the
+        // scattering of short disconnected ends that read as "some kids drew them in kindergarten".
+        f.el.style.strokeDasharray = drawn + ' ' + f.len;
         f.el.style.strokeDashoffset = String(-tri * f.len);
         f.el.style.opacity = String(0.3 + 0.3 * tri);     // opacity 0.3 -> 0.6 -> 0.3
       }

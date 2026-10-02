@@ -343,16 +343,38 @@ It is a borrowed drawing. **If it stays, it should carry a credit** — the prov
 at the top of `gateRefPaths.ts` rather than left implicit, and the site's "real math, computed"
 rule exists partly to avoid exactly this.
 
-Two deviations from the source, both measured: stroke widths are scaled by `REF_STROKE_SCALE =
-0.4`, because `meet` scales the 696-wide viewBox by viewport width (1.72× in a ~1200px demo,
-2.87× at 2000px) so the authored 0.5–1.55 renders as 1.4–4.4 CSS px on a real desktop; and only
-the strongest twelve of each family animate, which is a *looks* call — the rest stay drawn and
-still, so the haze does not shimmer.
-  - That second line used to end "after the full 72 flashed in practice", and **the flashing had
-    nothing to do with the count** — see trap 5. Reducing the count while the real cause was still
-    in place is why the flashing survived three more attempts. The sentence is corrected rather
-    than deleted because it is the exact shape of a wrong lead: a number that was changed next to
-    a symptom that then persisted, written up as if the change had fixed it.
+**TWO deviations from the source, and only two. There were five, and the other three were each a
+defect** — together they produced *"your lines seem lifeless and some kids drew them in
+kindergarten"*. Both survivors are derived numbers, not preferences:
+
+1. **`REF_STROKE_SCALE = 0.6`.** `meet` scales the 696-wide viewBox by viewport width — 1.72× in a
+   ~1200px demo, 2.86× at 2000px — so the authored 0.5–1.55 ships as 1.4–4.4 CSS px on a desktop,
+   heavier than the reference. 1.72 / 2.86 = **0.6** reproduces the demo's own 0.86–2.67px, and a
+   browser measures 0.86–2.66 at 2000px. It was `0.4` for a release, which is a third *thinner*
+   than the reference: correcting "too thick" by overshooting well past the target is how that fix
+   became the next complaint.
+2. **The field opens 4s into its cycle** (`LEAD_MS`). Faithfully, every path starts 30% drawn with
+   the drawn window at the curve's *start* — which is off the top-left corner — so the first two
+   seconds are a stubby comb bunched against the left edge, resolving only after about five. The
+   source is a landing page you sit on; a gate is dismissed in a gesture, so that comb was the
+   whole impression. One shared lead, so the source's in-phase coherence is untouched.
+
+The three that were removed, because each is a way to get this wrong again:
+
+- **Strokes were `--ochre`; the source draws `currentColor` under `dark:text-white`.** The opacity
+  ramp starts at 0.1, and a gold line at a tenth opacity over near-black has no luminance left to
+  carry where a near-white one still reads as light. They are `--paper` now — the site's ivory, not
+  pure `#fff`, so palette discipline holds.
+- **Only the strongest twelve per family animated**, leaving 48 of 72 frozen at full length. A
+  frozen stroke beside a travelling one does not read as depth, it reads as a stroke that failed,
+  and the static ones dominate because they are drawn end to end. All 72 animate, and a trace
+  measures **60.0 fps** with them doing so, so the count was never the cost it was assumed to be.
+  (Twelve was a guess at the flashing — see trap 5 — so it fixed nothing and cost the motion. That
+  line used to read "after the full 72 flashed in practice", which is how a wrong lead survives: a
+  number changed next to a symptom that then persisted, written up as if it had worked.)
+- **Phases were scattered across the cycle.** The source passes *no delay*: all 72 begin together
+  and separate only because each draws a 20–30s duration, so the opening is one coherent sweep that
+  slowly frays. Scattering replaced it with 72 unrelated strokes caught mid-stride.
 
 **The animation is driven from a rAF loop in `Gate.astro`, NOT from CSS keyframes, and that is
 load-bearing** — the component is the one place on this site where that is true, against the
@@ -360,6 +382,15 @@ load-bearing** — the component is the one place on this site where that is tru
 `pathOffset` and `opacity`; the loop reproduces those three directly as a dash written in real
 user units, read from each path's `data-len`. Four CSS translations of the same three values
 shipped first and every one produced a different artifact. Keep it in JS.
+
+**One detail of that translation is easy to get wrong and was: the dash GAP is a whole path length,
+not the undrawn remainder.** framer-motion's `pathSpacing` defaults to 1 and its units are
+normalised path lengths, so the source's pattern period is `drawn + len` and exactly one segment is
+ever visible. Writing the remainder makes the period exactly `len`, so the pattern tiles the path
+perfectly and whatever slides off the end immediately re-enters at the start — a second segment on
+every curve, for the whole cycle, that the source never draws. That is what turned a woven field
+into a scatter of short disconnected ends, and it is the literal content of the "kindergarten"
+screenshot. If the strokes ever look chopped again, check this line first.
 
 ### Four things were rejected here, each after looking at it
 
@@ -874,9 +905,11 @@ titles came to rest hard against the browser chrome — the lead is a number in
   - **One named exception, and it is not a cheat to be tidied away:** the gate's
     strokes animate `stroke-dasharray`/`stroke-dashoffset`, which are **paint**
     properties — a line that draws itself cannot be expressed as a transform or a
-    fade. It is affordable only because the dash is confined to 24 paths and the
-    gate is gone after one gesture. Do not generalise it to anything that persists
-    while the page is being read, and do not "fix" the gate to comply. ALL motion is gated behind `@media (prefers-reduced-motion:
+    fade. It is affordable because one rAF writes all 72 dashes, so the frame costs
+    one style/paint pass rather than 72 competing animations (a trace measures 60.0
+    fps), and because the gate is gone after one gesture. Do not generalise it to
+    anything that persists while the page is being read, and do not "fix" the gate
+    to comply. ALL motion is gated behind `@media (prefers-reduced-motion:
   no-preference)` via `lib/motion.ts`. The no-motion state must look *finished* —
   it's also the Firefox fallback (`animation-timeline` isn't in Firefox yet), and
   it's what a reduced-motion reader gets instead of the deck.
