@@ -108,8 +108,20 @@ const DEFAULT_AXIS_DEG = 7;
  */
 const COVER = 0.88;
 
-/** 30 strokes, spaced 28.5px apart on screen at the shipped viewBox. The reference's comb is this dense. */
-const DEFAULT_SEEDS = 30;
+/**
+ * EIGHT, chosen by looking at 8 / 12 / 18 / 30 in /proto-gate: "8 lines read better i guess".
+ *
+ * It was 30, on the reasoning that the 21st.dev reference's comb is that dense. The reasoning was wrong in a
+ * way worth writing down, because the number is not really the point. That reference draws 36 paths per family
+ * and renders the family twice — 72 — and still reads sparse, because its opacity ramp runs 0.1 to 1.0, so most
+ * of its strokes are nearly invisible and a reader picks out eight over a haze. Ours ramps 0.10 to 0.55: every
+ * stroke sits in the same mid-range, nothing recedes, and all of them arrive at once. Thirty of ours therefore
+ * read busier than seventy-two of theirs.
+ *
+ * So eight is the honest fix for the density ONLY as this file currently draws. Widen the ramp and the right
+ * count goes back up.
+ */
+const DEFAULT_SEEDS = 8;
 
 /** The three dials that change how the comb LOOKS. Everything else in this file is mechanism. */
 export interface CombOpts {
@@ -119,6 +131,17 @@ export interface CombOpts {
   seeds?: number;
   /** The comb's axis, in degrees below horizontal on screen. */
   axisDeg?: number;
+  /**
+   * Opacity of the faintest and strongest stroke.
+   *
+   * THE STRONGEST LEVER ON HOW DENSE THE SET LOOKS, more than the count. The 21st.dev reference draws 72
+   * strokes and still reads sparse because it ramps 0.1 -> 1.0: most of its lines are nearly invisible and a
+   * reader picks out roughly eight over a haze. A narrow band puts every stroke in the same register, so all
+   * of them read at once and the set looks crowded at any count.
+   */
+  opacity?: [number, number];
+  /** Width of the faintest and strongest stroke, in viewBox px. */
+  width?: [number, number];
   w?: number;
   h?: number;
 }
@@ -128,6 +151,8 @@ export const COMB_DEFAULTS = {
   tilt: DEFAULT_TILT,
   seeds: DEFAULT_SEEDS,
   axisDeg: DEFAULT_AXIS_DEG,
+  opacity: [0.1, 0.55] as [number, number],
+  width: [0.5, 1.6] as [number, number],
 } as const;
 
 /**
@@ -255,6 +280,8 @@ export function trails(opts: CombOpts = {}): Trail[] {
   const w = opts.w ?? GATE_VIEW_W;
   const h = opts.h ?? GATE_VIEW_H;
   const seeds = Math.max(2, Math.round(opts.seeds ?? DEFAULT_SEEDS));
+  const [o0, o1] = opts.opacity ?? COMB_DEFAULTS.opacity;
+  const [w0, w1] = opts.width ?? COMB_DEFAULTS.width;
   const axisDeg = opts.axisDeg ?? DEFAULT_AXIS_DEG;
   // CLAMPED, NOT TRUSTED. A tilt at or below MAX_FIELD_GRAD puts a critical point back into g, and with it
   // closed level sets and crossings — the knot this whole module exists to remove. A caller sweeping the dial
@@ -299,10 +326,10 @@ export function trails(opts: CombOpts = {}): Trail[] {
     return {
       d: catmullRomPath(pts),
       i,
-      // The ramp the descent trails used, kept identical so the replacement reads as the same drawing done
-      // two ways: opacity 0.10 -> 0.55, width 0.5 -> 1.6.
-      opacity: Math.round((0.1 + t * 0.45) * 1000) / 1000,
-      width: Math.round((0.5 + t * 1.1) * 100) / 100,
+      // Linear from the faint end to the strong end. Linear and not eased on purpose: the reference is linear
+      // too, and an ease would make the dial's two endpoints stop describing what you actually see.
+      opacity: Math.round((o0 + (o1 - o0) * t) * 1000) / 1000,
+      width: Math.round((w0 + (w1 - w0) * t) * 100) / 100,
     };
   });
 }

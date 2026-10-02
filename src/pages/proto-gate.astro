@@ -17,29 +17,35 @@ import { GATE_VIEW_H, GATE_VIEW_W } from '../lib/gatePaths';
 import { COMB_DEFAULTS, MAX_FIELD_GRAD, trails } from '../lib/gateLines';
 import { name, roles } from '../data/profile';
 
-// NOW SWEEPING THE STROKE COUNT, because that is the live question. The owner: "the problem with urs is that
-// you got too many lines. maybe cut a few so that it's more elegant."
+// NOW SWEEPING THE OPACITY RAMP. The count is settled — the owner looked at 8 / 12 / 18 / 30 and said "8 lines
+// read better i guess" — so 8 is the default and the remaining lever is the one the reference actually wins on.
 //
-// Worth knowing while looking, because it reframes the count: the 21st.dev reference that started this draws
-// THIRTY-SIX paths per family and renders the family twice, so seventy-two. It does not look busy because its
-// opacity ramp runs 0.1 to 1.0 — most of its strokes are nearly invisible and you read maybe eight of them
-// over a haze. Ours ramps 0.10 to 0.55, so every stroke sits in the same mid-range and all of them read at
-// once. Count is one lever; the ramp is the other, and it may be the stronger one.
-const COUNTS = [8, 12, 18, 30];
+// It draws 72 strokes and still reads sparse, because it ramps 0.1 -> 1.0: most of its lines are nearly
+// invisible and a reader picks out roughly eight over a haze. Ours shipped 0.10 -> 0.55, a narrow mid-range
+// band where nothing recedes and every stroke arrives at once. At eight strokes that is the whole character of
+// the frame, so it is worth seeing rather than reasoning about.
+//
+// Everything else is fixed: same field, same tilt, same axis, same 8 strokes. One variable.
+const RAMPS: Array<{ key: string; label: string; opacity: [number, number]; width: [number, number] }> = [
+  { key: 'flat', label: '0.10 → 0.55', opacity: [0.1, 0.55], width: [0.5, 1.6] },
+  { key: 'mid', label: '0.10 → 0.80', opacity: [0.1, 0.8], width: [0.5, 1.9] },
+  { key: 'ref', label: '0.10 → 1.00 (the reference)', opacity: [0.1, 1], width: [0.5, 2.2] },
+  { key: 'deep', label: '0.04 → 1.00 (deepest haze)', opacity: [0.04, 1], width: [0.4, 2.6] },
+];
 
-const FRAMES = COUNTS.map((seeds) => ({
-  key: `n${seeds}`,
-  seeds,
-  isDefault: seeds === COMB_DEFAULTS.seeds,
-  trails: trails({ seeds }),
+const FRAMES = RAMPS.map((r) => ({
+  key: r.key,
+  label: r.label,
+  isDefault: r.opacity[0] === COMB_DEFAULTS.opacity[0] && r.opacity[1] === COMB_DEFAULTS.opacity[1],
+  trails: trails({ opacity: r.opacity, width: r.width }),
 }));
 
 const letters = [...`${name.first} ${name.last}`];
 ---
 
 <BaseLayout
-  title="Gate comb — stroke-count sweep (internal)"
-  description="Internal prototype: the gate comb's stroke count, swept with every other parameter held fixed."
+  title="Gate comb — opacity-ramp sweep (internal)"
+  description="Internal prototype: the gate comb's opacity ramp, swept with every other parameter held fixed."
   veilOnLoad={false}
   noindex={true}
 >
@@ -47,7 +53,7 @@ const letters = [...`${name.first} ${name.last}`];
     {/* A real, visually hidden <h1>. The page is full-bleed previews with no visible headline, and the name
         inside each frame repeats once per frame — so it cannot be the heading. distSmoke asserts exactly one
         per document and caught this page shipping zero. */}
-    <h1 class="sr-only">Gate comb — stroke-count sweep (internal)</h1>
+    <h1 class="sr-only">Gate comb — opacity-ramp sweep (internal)</h1>
 
     {FRAMES.map((f, i) => (
       <section class="pg-frame" data-variant={f.key} data-active={f.isDefault ? 'true' : 'false'} aria-hidden={!f.isDefault}>
@@ -64,10 +70,10 @@ const letters = [...`${name.first} ${name.last}`];
       </section>
     ))}
 
-    <nav class="pg-switch" aria-label="Stroke count">
+    <nav class="pg-switch" aria-label="Opacity ramp">
       {FRAMES.map((f) => (
         <button type="button" data-pick={f.key} aria-pressed={f.isDefault ? 'true' : 'false'}>
-          {f.seeds} lines{f.isDefault ? ' ·' : ''}
+          {f.label}{f.isDefault ? ' ·' : ''}
         </button>
       ))}
     </nav>
@@ -76,16 +82,15 @@ const letters = [...`${name.first} ${name.last}`];
       {FRAMES.map((f) => (
         <div data-info={f.key} hidden={!f.isDefault}>
           <p class="pg-metrics">
-            {f.trails.length} strokes · tilt {COMB_DEFAULTS.tilt} (fixed) · no-knot floor {MAX_FIELD_GRAD}
+            {f.trails.length} strokes (fixed) · tilt {COMB_DEFAULTS.tilt} · no-knot floor {MAX_FIELD_GRAD}
             {f.isDefault ? ' · what ships today' : ''}
           </p>
         </div>
       ))}
       <p class="pg-note">
-        Only the <strong>stroke count</strong> changes between these — same field, same tilt, same axis, same
-        ramp. For reference, the design this started from draws 36 per family and renders two families; it
-        reads sparse because its opacity ramp runs 0.1&ndash;1.0 so most strokes recede, where ours runs
-        0.10&ndash;0.55 and they all read at once. Arrow keys flip.
+        Only the <strong>opacity ramp</strong> changes — same field, same tilt, same axis, same 8 strokes.
+        A wide ramp makes the faint strokes recede into a haze and lets one or two carry the frame, which is
+        how the original reads sparse while drawing 72 lines. Arrow keys flip.
       </p>
     </aside>
   </main>

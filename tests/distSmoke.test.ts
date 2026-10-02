@@ -410,8 +410,14 @@ describe('the first-visit gate, as shipped', () => {
     // dropped — and with it dropped, `stroke-dasharray: 1` means one user unit on a path hundreds of
     // units long, which draws a dotted line instead of a sweep. The attribute is the fix, so the
     // attribute is what gets asserted.
+    //
+    // THE FLOOR USED TO BE 28 AND IT WAS INCIDENTAL, not a requirement — it came from the 36 descent trails
+    // that shipped when this was written. The stroke count is an aesthetic dial (now 8, picked by looking at a
+    // sweep) and this assertion is not about it: what must hold is that EVERY stroke carries the attribute,
+    // whatever the count. A floor of 1 still catches the case this exists to catch, which is the gate shipping
+    // with no lines in it at all.
     const paths = home!.markup.match(/<path[^>]*class="[^"]*gate-trail[^"]*"[^>]*>/g) ?? [];
-    expect(paths.length).toBeGreaterThanOrEqual(28);
+    expect(paths.length, 'the gate shipped no strokes at all').toBeGreaterThanOrEqual(1);
     for (const p of paths) expect(p, p).toMatch(/pathLength="1"/);
   });
 

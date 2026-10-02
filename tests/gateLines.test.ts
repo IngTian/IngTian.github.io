@@ -56,11 +56,17 @@ describe('comb — the module contract', () => {
     expect(NOTE.length).toBeGreaterThan(40);
   });
 
-  it('ships 24 to 48 trails, indexed 0..n-1 in draw order', () => {
+  it('ships a sane number of trails, indexed 0..n-1 in draw order', () => {
+    // THE FLOOR WAS 24 AND THAT NUMBER WAS INVENTED, not measured. It came from the brief that commissioned
+    // this module, where I guessed the reference's density; the owner then looked at 8 / 12 / 18 / 30 in
+    // /proto-gate and picked 8. A count chosen by looking beats a count I made up, so the assertion now pins
+    // what a count assertion is actually for — catching a generator that returns nothing, or thousands — and
+    // leaves the aesthetic range to the dial. The properties that matter (turn, length rhythm, no knot,
+    // coverage) are asserted separately and all still hold at 8.
+    expect(T.length).toBeGreaterThanOrEqual(4);
+    expect(T.length).toBeLessThanOrEqual(64);
     // The index is not decoration: Gate.astro keys its CSS draw-in stagger off it, so a gap or a repeat
     // would stall or double up one stroke's animation.
-    expect(T.length).toBeGreaterThanOrEqual(24);
-    expect(T.length).toBeLessThanOrEqual(48);
     expect(T.map((t) => t.i)).toEqual(T.map((_t, i) => i));
   });
 
