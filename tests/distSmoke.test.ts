@@ -416,42 +416,37 @@ describe('the first-visit gate, as shipped', () => {
     expect(home!.markup).toMatch(/id="gate-name"/);
   });
 
-  it('keeps vector-effect OFF the strokes, and normalises them with pathLength', () => {
-    // THIS REPLACED A TEST THAT ENSHRINED A WRONG CONCLUSION, which is worth recording so the belief does not
-    // come back. The gate once shipped broken — "completely broken, cant even rendering. the screen is just
-    // flashing", with the name's letters stuck at their opening keyframe reading "I g T n" — and I attributed
-    // it to animating stroke-dashoffset on all 72 paths, then wrote an assertion forbidding any animation on
-    // the strokes.
+  it('NOTHING ON THE GATE HAS AN INVISIBLE RESTING STATE', () => {
+    // THE BUG THIS PINS COST THE OWNER TWO SCREENSHOTS. The letters, the roles line and the button each had
+    // `opacity: 0` in CSS with a `forwards` animation expected to bring them back. Any element whose animation
+    // does not run or is interrupted is then permanently invisible — and what vanished was the owner's NAME on
+    // the first screen of his portfolio, and later the roles line together with the modal's only button.
     //
-    // The source refutes that: framer-motion implements pathLength/pathOffset by writing stroke-dasharray and
-    // stroke-dashoffset, so the original animates the dash on 72 paths and runs fine. What my broken version
-    // ALSO had, added in the same commit, was vector-effect="non-scaling-stroke" — which stops the renderer
-    // caching stroked geometry and forces all 72 to be re-stroked at device resolution every frame. That is
-    // the real suspect, and it is what this test pins.
-    //
-    // AND pathLength MUST NOT COME BACK, which is the opposite of what this test asserted an hour ago. The
-    // dash was first expressed as fractions with pathLength="1" so one keyframe could fit every curve. Driving
-    // one headless Chrome and actually looking showed what that renders as: thousands of sub-unit dashes, a
-    // stippled shimmer across the frame — because these curves are ~1580 user units long, so pathLength="1"
-    // asks the renderer to compute dashes at a ~1580x scale and it loses precision. That shimmer WAS the
-    // "flashing", through three wrong diagnoses of mine.
-    //
-    // The dash is now in real user units from each curve's measured arc length, carried in `--len` for the
-    // offset keyframe. So: no pathLength, a real dasharray, and a --len to animate against.
+    // Every one of them now animates TRANSFORM from a state that is already legible. So the rule is: no gate
+    // element may declare `opacity: 0`. A fade-in is not worth a screen that can lose its own content.
+    const css = gateCss();
+    const gateRules = [...css.matchAll(/\.gate[a-z-]*\[[^\]]*\][^{}]*\{[^}]*\}/g)].map((m) => m[0]);
+    expect(gateRules.length, 'no gate rules found in the shipped CSS').toBeGreaterThan(3);
+    for (const r of gateRules) {
+      // The container itself is legitimately opacity:0 — that IS the not-covering resting state (trap 1).
+      if (/\.gate\[/.test(r) && !/\.gate-/.test(r)) continue;
+      expect(r, `a gate element rests at opacity 0 and can lose itself: ${r}`).not.toMatch(/opacity:\s*0[;}]/);
+    }
+  });
+
+  it('keeps vector-effect off the strokes and gets the arc length to the client', () => {
+    // vector-effect defeats the renderer's stroke caching, and with 72 full-screen paths that is not free.
+    // The arc length has to reach the client under SOME name because every dash scheme needs it: it has been
+    // pathLength, then a dasharray attribute plus --off, and is now data-len read by the flow driver. The
+    // assertion is deliberately agnostic about which, having been rewritten three times chasing that detail.
     const paths = home!.markup.match(/<path[^>]*class="[^"]*gate-trail[^"]*"[^>]*>/g) ?? [];
     expect(paths.length, 'the gate shipped no strokes at all').toBeGreaterThanOrEqual(1);
     for (const p of paths) {
       expect(p, `vector-effect is back on a gate stroke: ${p}`).not.toMatch(/vector-effect/);
-      expect(p, `pathLength is back — it renders as a stipple on curves this long: ${p}`)
-        .not.toMatch(/pathLength/);
-      expect(p, `a gate stroke has no --off for the dash offset to travel: ${p}`).toMatch(/--off:-\d/);
-      // A real dash: two lengths in the hundreds, not fractions under 1.
-      const dash = /stroke-dasharray="(\d+) (\d+)"/.exec(p);
-      expect(dash, `a gate stroke has no real-unit dasharray: ${p}`).not.toBeNull();
-      expect(Number(dash![1]), 'the dash is sub-unit again, i.e. a stipple').toBeGreaterThan(10);
+      expect(p, `no arc length reaches the client for this stroke: ${p}`)
+        .toMatch(/(data-len="\d|--off:-\d|stroke-dasharray="\d{2,})/);
     }
-    // And the two mirrored families stay as groups, which is what the source renders.
-    expect(home!.markup).toMatch(/<g class="gate-fam"/);
+    expect(home!.markup, 'the two mirrored families should stay as groups').toMatch(/<g class="gate-fam"/);
   });
 
   it('resets the dash under reduced motion, so no stroke is left half-drawn', () => {

@@ -51,16 +51,16 @@ const letters = [...`${name.first} ${name.last}`];
         widths below are the source's own and scale the way the source's do. */}
     {families.map((fam, f) => (
       <g class="gate-fam" data-fam={f}>
-        {/* The dash below is set in REAL user units, from each curve's own measured arc length, and only the
-            offset is animated. pathLength="1" with fractional dash values is what produced the stipple. */}
+        {/* data-len carries the curve's measured arc length in user units. The script below reads it and
+            writes the dash itself, so nothing here depends on pathLength normalisation or on CSS being able
+            to interpolate a two-value dasharray. With no JS the path is simply drawn whole. */}
         {fam.map((t) => (
           <path
             class="gate-trail"
             d={t.d}
-            style={`--i:${t.i};--off:${-(t.len ?? 0)}`}
+            data-len={t.len}
             stroke-opacity={t.opacity}
             stroke-width={t.width}
-            stroke-dasharray={`${Math.round((t.len ?? 0) * 0.46)} ${Math.round((t.len ?? 0) * 0.54)}`}
           />
         ))}
       </g>
@@ -182,45 +182,12 @@ const letters = [...`${name.first} ${name.last}`];
        really is the problem and the fix is fewer animated paths — animate the strongest dozen and leave the
        haze static — not removing the motion again. Said out loud because I cannot see the result and the owner
        can. */
-    /* ONLY THE STRONGEST TWELVE OF EACH FAMILY ANIMATE — 24 paths, not 72.
-         This is the concession the second failure bought. The source animates all 36 per family and runs fine
-       in its own demo, but its demo is a page containing nothing else; here the gate sits over the entire
-       homepage DOM, and the owner has now seen it flash twice. Twenty-four travelling strokes is still "lines
-       passing smoothly across the page" — the faint end of the ramp was never legible enough to read as motion
-       anyway, which is exactly why those are the ones that stop.
-         The static ones are parked at the midpoint of the pulse so the two groups read as one drawing rather
-       than as a moving set over a brighter still set. :nth-last-child because index 35 is the STRONGEST stroke:
-       the ramp runs faint-to-strong, so the last children are the ones worth animating. */
+    /* NO CSS ANIMATION ON THE STROKES AT ALL — the dash is driven from JS below, the way the source does it.
+       Four CSS translations of framer-motion's pathLength/pathOffset shipped here and each produced a different
+       artifact: a sub-unit stipple, an offset that never interpolated, and finally a fixed-length dash that slid
+       in and out of the visible frame forever. The resting state set here is what a visitor sees with JS off or
+       under reduced motion: the whole curve, drawn, at the midpoint of the pulse. */
     .gate.is-up .gate-fam .gate-trail { opacity: 0.45; }
-    /* ONE ANIMATED PROPERTY: the dash offset, travelling exactly one full period so the loop is seamless.
-       `--len` is the curve's own arc length in user units, measured at build time, so this is a 46%-long
-       segment sliding along the whole curve — "lines passing smoothly across the page".
-         The dash LENGTH is no longer animated. The source grows it (pathLength 0.3 -> 1), but doing that
-       required the pathLength="1" normalisation whose precision loss caused the stipple, and interpolating a
-       two-value dasharray through calc(var(--len) * …) is fragile in a way a single length is not. One sliding
-       segment of fixed length is the part of the effect that reads; growing it was never visible at these
-       speeds. */
-    /* `var(--off)` AND NOT `calc(var(--len) * -1)`. Measured in a real browser: with the calc form, the
-       animation's currentTime advanced normally while the computed stroke-dashoffset sat at `calc(-1415px)`
-       forever — Chrome will not interpolate a calc() containing an unregistered custom property, so it snapped
-       straight to the end value and nothing moved. The negative length is therefore pre-computed into `--off`
-       as a plain number, which substitutes to `-1415` and interpolates from 0 like any other length. */
-    @keyframes gate-flow {
-      from { stroke-dashoffset: 0; }
-      to   { stroke-dashoffset: var(--off); }
-    }
-    /* The pulse is separate so it can run on its own clock — and on opacity, which the compositor owns. */
-    .gate.is-up .gate-fam .gate-trail:nth-last-child(-n + 12) {
-      animation-name: gate-flow, gate-pulse;
-      animation-duration: calc(26s + (var(--i) * 211ms)), calc(9s + (var(--i) * 97ms));
-      animation-timing-function: linear, ease-in-out;
-      animation-iteration-count: infinite, infinite;
-      animation-direction: normal, alternate;
-      /* Negative, so every stroke starts mid-travel rather than all 24 setting off from the same end. Off the
-         index, not Math.random() — the source randomises its periods and this site forbids that in a drawing. */
-      animation-delay: calc(var(--i) * -613ms), calc(var(--i) * -271ms);
-    }
-    @keyframes gate-pulse { from { opacity: 0.34; } to { opacity: 0.72; } }
 
     /* THE LETTERS FAIL VISIBLE, and that is the fix for the name arriving incomplete TWICE — "I g T n" and
        then "ng Ti", a different set of letters missing each time.
@@ -242,14 +209,20 @@ const letters = [...`${name.first} ${name.last}`];
       to   { transform: none; }
     }
 
+    /* THESE FAIL VISIBLE TOO. They had `opacity: 0` with a `forwards` fade, which is the same hazard the
+       letters had — and it bit for the same reason: a screenshot arrived with the name present but the roles
+       line AND the button both missing, on a modal whose only control is that button. Nothing on this screen
+       may have an invisible resting state. They rise instead, from a state that is already legible. */
     .gate.is-up .gate-roles,
     .gate.is-up .gate-enter {
-      opacity: 0;
-      animation: gate-fade 600ms ease forwards;
+      animation: gate-rise 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
     }
     .gate.is-up .gate-roles { animation-delay: 400ms; }
     .gate.is-up .gate-enter { animation-delay: 700ms; }
-    @keyframes gate-fade { to { opacity: 1; } }
+    @keyframes gate-rise {
+      from { transform: translateY(14px); }
+      to   { transform: none; }
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -388,6 +361,9 @@ const letters = [...`${name.first} ${name.last}`];
       try { if (store) store.setItem(KEY, '1'); } catch (e) { /* denied; it reappears next load */ }
 
       gate.classList.remove('is-up');
+      // The flow has nothing left to draw on once the gate is down, and a rAF loop painting a hidden overlay
+      // is exactly the waste the data-gate-up flag exists to prevent elsewhere.
+      if (flowRaf) { cancelAnimationFrame(flowRaf); flowRaf = 0; }
       document.documentElement.style.overflow = '';
       // Let the hero and the sky start animating: they held off while nothing they drew could be seen.
       // Order matters — clear the flag BEFORE firing, so a listener that re-reads it sees the new state.
@@ -406,6 +382,59 @@ const letters = [...`${name.first} ${name.last}`];
         window.dispatchEvent(new Event('resize'));
       }, reduced() ? 0 : MS);
     }
+
+    // ── THE FLOW, DRIVEN HERE RATHER THAN IN CSS ────────────────────────────────────────────────────
+    // A faithful read of the source's per-path animation:
+    //     pathLength 0.3 -> 1          the drawn dash GROWS from 30% of the curve to all of it
+    //     pathOffset 0 -> 1 -> 0       the dash travels forward, then back
+    //     opacity    0.3 -> 0.6 -> 0.3 the element pulses
+    //     duration   20-30s, linear, repeating forever
+    //
+    // THE GROWTH IS THE PART THAT MATTERS AND I DROPPED IT ONCE. Most of each curve lies outside the viewBox,
+    // so a dash of FIXED length slides in and out of the visible frame and the strokes appear to flash. Because
+    // the dash grows to the full curve by the end of each cycle, the drawing resolves instead of blinking.
+    //
+    // Only the strongest twelve of each family animate; the rest stay whole and still. Phases come off the
+    // index rather than Math.random(), which the source uses and this site forbids in a drawing.
+    //
+    // THE SECOND FAMILY IS OFFSET BY HALF A CYCLE. Both families animate the same index range, so without the
+    // offset a stroke and its mirror image reach the end of their cycle in the same frame — and the end of a
+    // cycle is the one discontinuity here, where the dash snaps from the whole curve back to 30% of it. Two of
+    // those firing together, on opposite sides of the screen, reads as a deliberate bilateral pattern. That is
+    // the "so systematic" quality the harmonic fields were rejected for.
+    var flowing = [];
+    if (!reduced()) {
+      var fams = gate.querySelectorAll('.gate-fam');
+      for (var fi = 0; fi < fams.length; fi++) {
+        var ps = fams[fi].querySelectorAll('.gate-trail');
+        for (var k = Math.max(0, ps.length - 12); k < ps.length; k++) {
+          var len = parseFloat(ps[k].getAttribute('data-len') || '0');
+          if (len > 0) {
+            flowing.push({
+              el: ps[k],
+              len: len,
+              dur: 20000 + ((k * 7) % 11) * 1000,
+              ph: ((((k * 137) % 1000) / 1000) + fi * 0.5) % 1,
+            });
+          }
+        }
+      }
+    }
+
+    var flowRaf = 0;
+    function flow(now) {
+      for (var n = 0; n < flowing.length; n++) {
+        var f = flowing[n];
+        var t = (((now / f.dur) + f.ph) % 1);
+        var drawn = (0.3 + 0.7 * t) * f.len;             // pathLength 0.3 -> 1
+        var tri = t < 0.5 ? t * 2 : (1 - t) * 2;          // pathOffset 0 -> 1 -> 0
+        f.el.style.strokeDasharray = drawn + ' ' + Math.max(0, f.len - drawn);
+        f.el.style.strokeDashoffset = String(-tri * f.len);
+        f.el.style.opacity = String(0.3 + 0.3 * tri);     // opacity 0.3 -> 0.6 -> 0.3
+      }
+      flowRaf = requestAnimationFrame(flow);
+    }
+    if (flowing.length) flowRaf = requestAnimationFrame(flow);
 
     gate.classList.add('is-up');
     document.documentElement.style.overflow = 'hidden';
