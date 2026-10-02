@@ -10,28 +10,39 @@
 // tests/distSmoke.test.ts asserts the shipped HTML carries no covering class, so the invariant is checked
 // against the build rather than trusted.
 import { name, roles } from '../data/profile';
-// THE LINES ARE COMBED CONTOURS, not descent trails, and that was decided by looking. The first version drew
-// gradient descent run to convergence; the owner's verdict was "ur lines are horrible", and the measurements
-// agreed — every stroke ends in one of the field's three basins, so 36 of them piled into 3 points (71% of the
-// set in one 20x20 cell, 271 pair crossings) with a 22x length spread. lib/gateLines.ts draws iso-cost
-// contours of the same field under a tilt instead, where "no knot" is a theorem rather than a tuning. Three
-// treatments were built and compared in /proto-gate; this is the one that won.
-import { GATE_VIEW_H, GATE_VIEW_W } from '../lib/gatePaths';
-import { trails as gateTrails } from '../lib/gateLines';
+// THE LINES ARE THE ORIGINAL 21st.dev GEOMETRY, ported. Six candidates were built as real full-screen gates in
+// /proto-gate — descent trails, combed contours of the hero's own field, and four black-hole readings — and the
+// owner's verdict was "the original is the best". It is a BORROWED drawing rather than one this site derived,
+// which is a real cost and is written up in lib/gateRefPaths.ts; it should carry a credit if it stays.
+//
+// What makes it work, and what every original attempt here failed to reproduce: the family CONVERGES (the
+// offset enters the two halves of each curve with opposite sign, so the left end moves right while the right
+// end moves left) and its opacity ramps all the way 0.1 -> 1.0, so most strokes recede and a reader picks out
+// about eight over a haze. Our combed version structurally could not do the first part — its no-knot guarantee
+// needs a tilt that exceeds the field's maximum gradient, which forces the strokes parallel.
+import { REF_VIEW_H, REF_VIEW_W, refTrails } from '../lib/gateRefPaths';
 import { GATE_DISMISS_MS, GATE_REVEAL_EVENT, GATE_SEEN_KEY, GATE_UP_ATTR } from '../lib/gate';
 
-const trails = gateTrails();
+const trails = refTrails();
 const letters = [...`${name.first} ${name.last}`];
 ---
 
 <div class="gate" data-gate role="dialog" aria-modal="true" aria-labelledby="gate-name">
   <svg
     class="gate-field"
-    viewBox={`0 0 ${GATE_VIEW_W} ${GATE_VIEW_H}`}
-    preserveAspectRatio="xMidYMid slice"
+    viewBox={`0 0 ${REF_VIEW_W} ${REF_VIEW_H}`}
+    preserveAspectRatio="xMidYMid meet"
     aria-hidden="true"
     focusable="false"
   >
+    {/* MEET, NOT SLICE — which is also the thickness fix. The original leaves preserveAspectRatio at its
+        default, and that default is meet. On a 1920x1080 screen meet scales the 696-wide box by 2.76 where
+        slice scales by 3.42, so slice was drawing every stroke about 24% thicker than the source does at the
+        same authored width. meet still fills the screen, because the geometry runs far outside the viewBox
+        (y -189..875) and an SVG clips to its element rather than to its viewBox.
+
+        vector-effect pins the stroke to the authored width in CSS px regardless of that scale, so 0.5 means
+        half a pixel and the faint end of the ramp stays genuinely hairline at any viewport. */}
     {trails.map((t) => (
       <path
         class="gate-trail"
@@ -39,6 +50,7 @@ const letters = [...`${name.first} ${name.last}`];
         style={`--i:${t.i}`}
         stroke-opacity={t.opacity}
         stroke-width={t.width}
+        vector-effect="non-scaling-stroke"
         pathLength="1"
       />
     ))}
@@ -140,19 +152,36 @@ const letters = [...`${name.first} ${name.last}`];
   @media (prefers-reduced-motion: no-preference) {
     .gate { transition: opacity 600ms ease, visibility 600ms ease; }
 
-    /* The ONE paint-bound animation, and it is a one-shot: ~1200ms total, never a loop. The reference
-       looped forever, which would repaint the whole viewport indefinitely behind a page that already runs
-       a full-screen WebGL canvas. pathLength="1" is set as an ATTRIBUTE on each path (it is an SVG
-       attribute, not a CSS property — as a declaration here it would be dropped and the dasharray would
-       be 1 user unit on a path hundreds of units long, i.e. a dotted line, not a draw-in). With the path
-       length normalised to 1, one dasharray value fits every trail regardless of its real length. */
+    /* THE MOTION, RESTORED. The owner: "in the original script ive shown you they got emotions" — the
+       original animates every path forever and this port had dropped it to a 1200ms one-shot, because an
+       endless full-viewport paint-bound animation was the wrong thing to add on top of a page already running
+       a WebGL shader and a terrain canvas.
+         IT IS AFFORDABLE NOW, and for a specific reason: while the gate is up, those two canvases are PAUSED
+       (see the data-gate-up flag and lib/gate.ts). The budget this animation needs is exactly the budget that
+       fix freed. So the loop is back, as the only thing moving on screen.
+         What the source does per path: pathLength 0.3 -> 1 once, pathOffset cycling 0 -> 1 -> 0, and element
+       opacity cycling 0.3 -> 0.6 -> 0.3, linear, over 20-30s, repeating forever. Here: pathLength="1" is an
+       ATTRIBUTE on each path (it is an SVG attribute, not a CSS property — as a declaration it is silently
+       dropped), which normalises every path's length to 1 so a single dasharray fits all 72 regardless of
+       their real lengths. A `0.3 0.7` dash is therefore a segment covering 30% of the path, and travelling
+       the offset from 0 to 1 walks that segment along the whole curve. Only the dash is paint-bound; the
+       opacity pulse animates the ELEMENT, which the compositor handles, exactly as the source's does.
+         The one deliberate simplification: the source also grows pathLength 0.3 -> 1 on first play, which
+       would need a second animation on the same property. The travelling segment is the dominant read, so
+       it is dropped rather than approximated badly.
+         DESYNC WITHOUT RANDOMNESS. The source uses `20 + Math.random() * 10`, which this site forbids in a
+       drawing. The period comes off the index instead, with a negative delay so every path starts mid-cycle
+       rather than all 72 setting off together. */
     .gate.is-up .gate-trail {
-      stroke-dasharray: 1;
-      stroke-dashoffset: 1;
-      animation: gate-draw 1200ms ease-out forwards;
-      animation-delay: calc(var(--i) * 18ms);
+      stroke-dasharray: 0.3 0.7;
+      animation: gate-flow calc(20s + (var(--i) * 137ms)) linear infinite;
+      animation-delay: calc(var(--i) * -411ms);
     }
-    @keyframes gate-draw { to { stroke-dashoffset: 0; } }
+    @keyframes gate-flow {
+      0%   { stroke-dashoffset: 0; opacity: 0.3; }
+      50%  { opacity: 0.6; }
+      100% { stroke-dashoffset: -1; opacity: 0.3; }
+    }
 
     .gate.is-up .gate-letter {
       opacity: 0;
@@ -177,13 +206,18 @@ const letters = [...`${name.first} ${name.last}`];
   @media (prefers-reduced-motion: reduce) {
     /* THE FINISHED STATE, and the dash properties have to be cleared explicitly. Leaving dasharray set
        while disabling the animation would render every trail at a full dash offset — invisible. That is a
-       broken state wearing a finished state's clothes, which is exactly what the motion rule forbids. */
-    .gate-trail { stroke-dasharray: none; stroke-dashoffset: 0; }
+       broken state wearing a finished state's clothes, which is exactly what the motion rule forbids.
+         The opacity is pinned too, and that is not cosmetic. The flow animation pulses ELEMENT opacity
+       between 0.3 and 0.6, so a reader with motion off would otherwise get solid lines at opacity 1 —
+       roughly twice as strong as anyone else sees, a different drawing rather than a still of the same one.
+       0.45 is the midpoint of the pulse. */
+    .gate-trail { stroke-dasharray: none; stroke-dashoffset: 0; opacity: 0.45; }
     .gate-letter, .gate-roles, .gate-enter { opacity: 1; transform: none; }
   }
 
-  /* Phones get half the trails. The content is the same — phone work here is parity plus bug fixes — but 36
-     full-screen strokes is a real paint cost on a phone, and halving them is invisible at that width. */
+  /* Phones get half the strokes — 36 of the 72, one whole mirrored family's worth thinned out. The content is
+     the same (phone work here is parity plus bug fixes), but 72 full-screen strokes animating a dash offset
+     forever is a real paint cost on a phone, and at that width the thinning is invisible. */
   @media (max-width: 640px) {
     .gate-trail:nth-child(2n) { display: none; }
   }
