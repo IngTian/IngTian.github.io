@@ -458,7 +458,24 @@ const letters = [...`${name.first} ${name.last}`];
         // builds is against the same house rule the Rules slide's seeded walk follows. Same 20-30s spread.
         var seed = (k + 1) * 9301 + 49297;
         var dur = 20000 + ((seed % 233280) / 233280) * 10000;
-        if (len > 0) flowing.push({ el: ps[k], len: len, dur: dur, drawn: len * DRAWN_FRAC, gap: len * (1 - DRAWN_FRAC) });
+        // ── PHASES ARE SCATTERED, AND THAT IS A FIX, NOT A RELAPSE ──────────────────────────────────────
+        // With every stroke at the same phase, all 48 dashes END at the same point along their curves, and
+        // because the curves are a nested family those ends line up into a single hard brightness FRONT that
+        // sweeps across the frame. Behind it only the haze is left, so the field reads as having a dim band
+        // with a sharp edge: "why do we have these darker trails?" Measured, the phase spread was 4.1% of a
+        // cycle — lockstep.
+        //
+        // Scattering them breaks the front into individual ends at unrelated places, which is both what the
+        // reference looks like and the only way to have a travelling highlight without a visible wavefront.
+        //
+        // This was tried before and was WRONG then, which is worth being precise about rather than treating
+        // as a reason not to do it now: at that point there was no haze layer, the dash still grew and
+        // snapped once per cycle, and the gap arithmetic was tiling each curve with a second segment. Scatter
+        // on top of those three and the field is 48 unrelated strokes blinking out of step. With a permanent
+        // haze carrying the drawing, coherence is no longer what holds the picture together, so scattering
+        // now costs nothing and removes the front.
+        var ph = ((seed * 4919) % 233280) / 233280;
+        if (len > 0) flowing.push({ el: ps[k], len: len, dur: dur, ph: ph, drawn: len * DRAWN_FRAC, gap: len * (1 - DRAWN_FRAC) });
       }
     }
 
@@ -466,7 +483,7 @@ const letters = [...`${name.first} ${name.last}`];
     function flow(now) {
       for (var n = 0; n < flowing.length; n++) {
         var f = flowing[n];
-        var t = (now / f.dur) % 1;
+        var t = ((now / f.dur) + f.ph) % 1;
         // The dash is written once per frame but never changes shape — only where it sits. One period is the
         // whole arc, so an offset of -t*len for t over [0,1) walks the segment exactly once around and lands
         // back where it started: periodic by construction, with no frame to special-case.

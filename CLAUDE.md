@@ -401,9 +401,21 @@ The three that were removed, because each is a way to get this wrong again:
   (Twelve was a guess at the flashing — see trap 5 — so it fixed nothing and cost the motion. That
   line used to read "after the full 72 flashed in practice", which is how a wrong lead survives: a
   number changed next to a symptom that then persisted, written up as if it had worked.)
-- **Phases were scattered across the cycle.** The source passes *no delay*: all 72 begin together
-  and separate only because each draws a 20–30s duration, so the opening is one coherent sweep that
-  slowly frays. Scattering replaced it with 72 unrelated strokes caught mid-stride.
+- **Phases were scattered across the cycle — and they are scattered again now, deliberately. Read
+  this bullet before "fixing" it back.** The source passes *no delay*: all its paths begin together
+  and separate only through their 20–30s durations. Copying that was right while the live layer was
+  the only layer, and it became wrong the moment the haze was added underneath, for a reason that is
+  purely geometric: with every stroke at the same phase, all 48 dashes END at the same point along
+  their curves, and because the curves are a nested family those ends line up into **one hard
+  brightness front** sweeping across the frame, with nothing but 0.3-opacity haze behind it. That is
+  the *"why do we have these darker trails?"* report. Measured, the phase spread was **4.1% of a
+  cycle**; scattered it is **97.5%**, and the front becomes individual ends in unrelated places,
+  which is also what the reference looks like.
+  - So the ordering matters: coherent phase is correct with one layer and wrong with two, because
+    the haze — not the phase — is what holds the picture together once it exists. The earlier
+    scattered version failed for three *other* reasons that are all fixed (no haze, a dash that grew
+    and snapped once per cycle, and gap arithmetic that tiled a second segment onto every curve), so
+    "we tried scattering and it looked bad" is not a reason to undo this.
 
 **The animation is driven from a rAF loop in `Gate.astro`, NOT from CSS keyframes, and that is
 load-bearing** — the component is the one place on this site where that is true, against the
