@@ -416,49 +416,41 @@ describe('the first-visit gate, as shipped', () => {
     expect(home!.markup).toMatch(/id="gate-name"/);
   });
 
-  it('NEVER ANIMATES A PAINT PROPERTY ON THE STROKES — the regression that broke the page', () => {
-    // THIS ASSERTION EXISTS BECAUSE THE GATE SHIPPED BROKEN ONCE. It animated stroke-dashoffset on all 72
-    // paths to reproduce the original's travelling dash. stroke-dashoffset is a PAINT property and each of
-    // these paths has a viewport-sized bounding box (the geometry sweeps y=-189..875 through a 316-tall box),
-    // so every frame repainted the whole screen 72 times. The page janked so hard the name's letter animations
-    // never finished — the owner saw "I g T n" instead of "Ing Tian" — and the compositor showed partial
-    // frames: "completely broken, cant even rendering. the screen is just flashing."
+  it('keeps vector-effect OFF the strokes, and normalises them with pathLength', () => {
+    // THIS REPLACED A TEST THAT ENSHRINED A WRONG CONCLUSION, which is worth recording so the belief does not
+    // come back. The gate once shipped broken — "completely broken, cant even rendering. the screen is just
+    // flashing", with the name's letters stuck at their opening keyframe reading "I g T n" — and I attributed
+    // it to animating stroke-dashoffset on all 72 paths, then wrote an assertion forbidding any animation on
+    // the strokes.
     //
-    // The replacement animates transform and opacity on the two FAMILY GROUPS, which the compositor handles
-    // without repainting. This test is what stops the paint-bound version coming back, because nothing else
-    // would: it typechecks, it builds, and it looks correct in the markup.
+    // The source refutes that: framer-motion implements pathLength/pathOffset by writing stroke-dasharray and
+    // stroke-dashoffset, so the original animates the dash on 72 paths and runs fine. What my broken version
+    // ALSO had, added in the same commit, was vector-effect="non-scaling-stroke" — which stops the renderer
+    // caching stroked geometry and forces all 72 to be re-stroked at device resolution every frame. That is
+    // the real suspect, and it is what this test pins.
+    //
+    // pathLength="1" is asserted alongside it because the dash keyframes are written as FRACTIONS (0.3 of the
+    // curve, 0.65, 1). Without the attribute those become user units on curves ~2000 units long, i.e. an
+    // invisible dotted line rather than a travelling segment.
     const paths = home!.markup.match(/<path[^>]*class="[^"]*gate-trail[^"]*"[^>]*>/g) ?? [];
     expect(paths.length, 'the gate shipped no strokes at all').toBeGreaterThanOrEqual(1);
-
-    const css = gateCss();
-    // SCOPED TO THE GATE'S OWN RULES. A first version of this assertion scanned every keyframe in every
-    // stylesheet and failed on `ru-draw` — the Rules slide's line-drawing animation, which is a bounded
-    // one-shot on a small element and none of this test's business. What matters here is narrower and exact:
-    // the gate's STROKES must not be animated at all. Animate the group and the compositor moves a layer;
-    // animate the paths and the main thread repaints 72 viewport-sized boxes every frame.
-    const trailRules = [...css.matchAll(/\.gate-trail[^{}]*\{[^}]*\}/g)].map((m) => m[0]);
-    expect(trailRules.length, 'no .gate-trail rule found in the shipped CSS').toBeGreaterThanOrEqual(1);
-    for (const r of trailRules) {
-      expect(r, `a .gate-trail rule animates something: ${r}`).not.toMatch(/animation/);
+    for (const p of paths) {
+      expect(p, `vector-effect is back on a gate stroke: ${p}`).not.toMatch(/vector-effect/);
+      expect(p, `a gate stroke lost pathLength: ${p}`).toMatch(/pathLength="1"/);
     }
-
-    // And the motion that does exist is on the groups.
-    expect(home!.markup, 'the two mirrored families should be groups, so the compositor can move them')
-      .toMatch(/<g class="gate-fam"/);
-    expect(css).toMatch(/\.gate-fam[^{]*\{[^}]*animation/);
+    // And the two mirrored families stay as groups, which is what the source renders.
+    expect(home!.markup).toMatch(/<g class="gate-fam"/);
   });
 
-  it('parks the drawing at the midpoint under reduced motion', () => {
-    // The finished state has to be a STILL OF THE SAME PICTURE, not a different one. The groups breathe
-    // between 0.42 and 0.78, so leaving them at their default opacity 1 would show a reader with motion off a
-    // noticeably stronger drawing than anyone else sees. 0.6 is the midpoint.
-    //
-    // This replaced an assertion about `stroke-dasharray: none`, which the old travelling-dash version needed
-    // because a disabled dash animation leaves every stroke invisible at a full offset. There are no dash
-    // properties left to reset.
+  it('resets the dash under reduced motion, so no stroke is left half-drawn', () => {
+    // The animation's 0% keyframe is `stroke-dasharray: 0.3 0.7`. With the animation disabled and the dash left
+    // set, 70% of every curve is simply missing — a broken state wearing a finished state's clothes, which is
+    // exactly what this project's motion rule forbids. Opacity is pinned at the pulse's midpoint for the
+    // related reason: otherwise a reader with motion off gets the drawing at full strength, a different picture
+    // rather than a still of the same one.
     const css = gateCss();
     expect(css).toMatch(/prefers-reduced-motion:\s*reduce/);
-    expect(css).toMatch(/\.gate-fam[^{]*\{[^}]*opacity:\s*\.?0?\.6/);
+    expect(css).toMatch(/stroke-dasharray:\s*none/);
   });
 });
 

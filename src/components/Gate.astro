@@ -52,7 +52,14 @@ const letters = [...`${name.first} ${name.last}`];
     {families.map((fam, f) => (
       <g class="gate-fam" data-fam={f}>
         {fam.map((t) => (
-          <path class="gate-trail" d={t.d} stroke-opacity={t.opacity} stroke-width={t.width} />
+          <path
+            class="gate-trail"
+            d={t.d}
+            style={`--i:${t.i}`}
+            stroke-opacity={t.opacity}
+            stroke-width={t.width}
+            pathLength="1"
+          />
         ))}
       </g>
     ))}
@@ -154,42 +161,39 @@ const letters = [...`${name.first} ${name.last}`];
   @media (prefers-reduced-motion: no-preference) {
     .gate { transition: opacity 600ms ease, visibility 600ms ease; }
 
-    /* THE MOTION, AND THIS IS THE SECOND ATTEMPT AT IT. The owner: "in the original script ive shown you they
-       got emotions", so the animation this port had dropped came back — as the original's travelling dash,
-       animating stroke-dashoffset on all 72 paths. That shipped and BROKE THE PAGE: "completely broken, cant
-       even rendering. the screen is just flashing."
-         The cause, stated exactly, because the reasoning that produced it was mine and it was wrong.
-       stroke-dashoffset is a PAINT property, and a path's invalidation rect is its bounding box — which for
-       these is the whole viewport, since the geometry sweeps from y=-189 to y=875 through a 316-tall box. So
-       every frame repainted the entire screen 72 times over. The page janked hard enough that the letters'
-       520ms animations never got frames to finish, leaving some stuck at opacity 0 — the screenshot showed
-       "I g T n" instead of "Ing Tian" — and the flashing was the compositor presenting partial frames.
-       vector-effect="non-scaling-stroke" compounded it by defeating stroke caching.
-         I had flagged exactly this risk when the one-shot was written, then talked myself out of it: pausing
-       the WebGL sky and the terrain canvas behind the gate "freed the budget". False comfort. Pausing one
-       shader frees a fixed, modest amount; 72 full-viewport paint-bound animations are a different order of
-       magnitude, and no amount of freed budget makes them cheap.
-         SO THE MOTION IS COMPOSITOR-ONLY. transform and opacity, on the two GROUPS instead of on 72 paths —
-       two layers the compositor moves without the main thread repainting anything. The families drift in
-       opposite directions over 34s and 41s and breathe out of phase over 11s, so the angle at which the two
-       combs cross slowly opens and closes, and nothing ever repaints.
-         WHAT IS LOST, plainly: the travelling dash segment, and per-path phase variation — the breathing is
-       per family now. That is the price of a page that renders. If the dash is ever wanted back it belongs on
-       a handful of paths, never all 72. */
-    .gate.is-up .gate-fam {
-      animation: gate-drift 34s ease-in-out infinite alternate,
-                 gate-breathe 11s ease-in-out infinite alternate;
+    /* THE MOTION, THIRD ATTEMPT, AND THE SECOND ATTEMPT'S DIAGNOSIS WAS WRONG.
+         History, because it is the useful part. The port first dropped the original's endless animation for a
+       1200ms one-shot. Asked for it back — "in the original script ive shown you they got emotions" — I added
+       the travelling dash on all 72 paths AND vector-effect="non-scaling-stroke" in the same change. It broke:
+       "completely broken, cant even rendering. the screen is just flashing." Letters stuck at their opening
+       keyframe, so the name read "I g T n".
+         I blamed the dash, removed it, and replaced the whole thing with a slow transform drift on two groups.
+       That was compositor-cheap and the owner's verdict was correct: "the animation i've given to u is gone...
+       i think yours is basically static."
+         THE DIAGNOSIS WAS THE PART THAT WAS WRONG. The original animates the dash on 72 paths too —
+       framer-motion implements pathLength/pathOffset by writing stroke-dasharray and stroke-dashoffset — and
+       it runs fine in its own demo. So "72 paint-bound paths cannot work" was refuted by the source itself.
+       What my version had that the source does not is vector-effect, which stops the renderer caching stroked
+       geometry and forces all 72 paths to be re-stroked at device resolution every frame. That is the far more
+       likely cost, and it came in on the same commit, which is why it got away with it.
+         So: the dash is back, faithfully, and vector-effect stays gone. If this still flashes then the dash
+       really is the problem and the fix is fewer animated paths — animate the strongest dozen and leave the
+       haze static — not removing the motion again. Said out loud because I cannot see the result and the owner
+       can. */
+    .gate.is-up .gate-trail {
+      animation: gate-flow calc(20s + (var(--i) * 139ms)) linear infinite;
+      animation-delay: calc(var(--i) * -397ms);
     }
-    /* The second family drifts the other way and breathes out of phase, so the crossing angle between the two
-       combs opens and closes. That is the only reason two families are kept separate rather than flattened. */
-    .gate.is-up .gate-fam[data-fam='1'] {
-      animation: gate-drift-b 41s ease-in-out infinite alternate,
-                 gate-breathe 11s ease-in-out infinite alternate;
-      animation-delay: 0s, -5.5s;
+    /* The source's three animated values, in one keyframe set. pathLength="1" on each path normalises its
+       length, so every number below is a FRACTION of the curve regardless of its real length:
+         pathLength 0.3 -> 1   becomes the drawn dash growing from 30% of the curve to all of it
+         pathOffset 0 -> 1 -> 0 becomes the dash travelling forward and back (negative offset = forward)
+         opacity 0.3 -> 0.6 -> 0.3 is the element pulse, which the compositor handles */
+    @keyframes gate-flow {
+      0%   { stroke-dasharray: 0.3 0.7;   stroke-dashoffset: 0;  opacity: 0.3; }
+      50%  { stroke-dasharray: 0.65 0.35; stroke-dashoffset: -1; opacity: 0.6; }
+      100% { stroke-dasharray: 1 0;       stroke-dashoffset: 0;  opacity: 0.3; }
     }
-    @keyframes gate-drift   { to { transform: translate(-26px, -15px); } }
-    @keyframes gate-drift-b { to { transform: translate(22px, 12px); } }
-    @keyframes gate-breathe { from { opacity: 0.42; } to { opacity: 0.78; } }
 
     .gate.is-up .gate-letter {
       opacity: 0;
@@ -220,7 +224,12 @@ const letters = [...`${name.first} ${name.last}`];
        to reset dasharray here, because leaving it set with the animation disabled renders every stroke at a
        full dash offset, i.e. invisible — a broken state wearing a finished state's clothes. That animation is
        gone (it repainted the viewport 72 times a frame and broke the page), so the hazard is gone with it. */
-    .gate-fam { opacity: 0.6; transform: none; }
+    /* THE DASH RESET IS BACK because the dash is back. Leaving stroke-dasharray set while the animation is
+       disabled renders every stroke at a partial dash — the 0% keyframe is `0.3 0.7`, so 70% of every curve
+       would simply be missing. A broken state wearing a finished state's clothes, which is what the motion rule
+       forbids. Opacity is pinned at the midpoint of the pulse for the same reason it was before: without it a
+       reader with motion off sees the drawing at full strength, a different picture rather than a still. */
+    .gate-trail { stroke-dasharray: none; stroke-dashoffset: 0; opacity: 0.45; }
     .gate-letter, .gate-roles, .gate-enter { opacity: 1; transform: none; }
   }
 
