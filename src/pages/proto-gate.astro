@@ -17,35 +17,36 @@ import { GATE_VIEW_H, GATE_VIEW_W } from '../lib/gatePaths';
 import { COMB_DEFAULTS, MAX_FIELD_GRAD, trails } from '../lib/gateLines';
 import { name, roles } from '../data/profile';
 
-// NOW SWEEPING THE OPACITY RAMP. The count is settled — the owner looked at 8 / 12 / 18 / 30 and said "8 lines
-// read better i guess" — so 8 is the default and the remaining lever is the one the reference actually wins on.
+// NOW SWEEPING TILT, and this is the last dial. Count (8) and ramp (0.10 -> 0.80) are settled by looking, and
+// so is the field: five harmonic alternatives were rendered at these exact parameters — Re(z3), Re(e^z),
+// Re(sin z), flow past a cylinder, Re(z2) — and the comb won, on a reason worth keeping. The owner: "i think
+// the current vertical comb your option f is better bc it's less structural and pattern-noticable. others are
+// so systematic." A saddle or an exponential fan announces itself as a recognisable motif; the comb reads as
+// incidental, because the tilt leaves only the terrain's irregular wobble showing.
 //
-// It draws 72 strokes and still reads sparse, because it ramps 0.1 -> 1.0: most of its lines are nearly
-// invisible and a reader picks out roughly eight over a haze. Ours shipped 0.10 -> 0.55, a narrow mid-range
-// band where nothing recedes and every stroke arrives at once. At eight strokes that is the whole character of
-// the frame, so it is worth seeing rather than reasoning about.
+// WHICH MAKES TILT THE DULL-VERSUS-PATTERNED DIAL, and the one thing still open. It must clear
+// MAX_FIELD_GRAD (1.8668) or the no-knot guarantee is void — gateLines clamps it at 1.05x that, so 1.96 is the
+// floor. Nearer the floor, more of the terrain bends the strokes (the module's own measurements: 2.1 bows a
+// stroke up to 98px against 2.6's 8-77px) and the picture is less uniform. Higher is calmer and straighter: at
+// 4.5 the worst turn falls to 5.6 degrees, which is ruled paper.
 //
-// Everything else is fixed: same field, same tilt, same axis, same 8 strokes. One variable.
-const RAMPS: Array<{ key: string; label: string; opacity: [number, number]; width: [number, number] }> = [
-  { key: 'flat', label: '0.10 → 0.55', opacity: [0.1, 0.55], width: [0.5, 1.6] },
-  { key: 'mid', label: '0.10 → 0.80', opacity: [0.1, 0.8], width: [0.5, 1.9] },
-  { key: 'ref', label: '0.10 → 1.00 (the reference)', opacity: [0.1, 1], width: [0.5, 2.2] },
-  { key: 'deep', label: '0.04 → 1.00 (deepest haze)', opacity: [0.04, 1], width: [0.4, 2.6] },
-];
+// So this sweep is biased LOW on purpose — the complaint was dullness, and more wobble is the cure that does
+// not introduce a motif. Everything else fixed: same field, same 8 strokes, same ramp, same axis.
+const TILTS = [2.0, 2.2, 2.6, 3.2];
 
-const FRAMES = RAMPS.map((r) => ({
-  key: r.key,
-  label: r.label,
-  isDefault: r.opacity[0] === COMB_DEFAULTS.opacity[0] && r.opacity[1] === COMB_DEFAULTS.opacity[1],
-  trails: trails({ opacity: r.opacity, width: r.width }),
+const FRAMES = TILTS.map((tilt) => ({
+  key: `t${String(tilt).replace('.', '')}`,
+  label: `tilt ${tilt.toFixed(1)}`,
+  isDefault: tilt === COMB_DEFAULTS.tilt,
+  trails: trails({ tilt }),
 }));
 
 const letters = [...`${name.first} ${name.last}`];
 ---
 
 <BaseLayout
-  title="Gate comb — opacity-ramp sweep (internal)"
-  description="Internal prototype: the gate comb's opacity ramp, swept with every other parameter held fixed."
+  title="Gate comb — tilt sweep (internal)"
+  description="Internal prototype: the gate comb's tilt dial, swept with every other parameter held fixed."
   veilOnLoad={false}
   noindex={true}
 >
@@ -53,7 +54,7 @@ const letters = [...`${name.first} ${name.last}`];
     {/* A real, visually hidden <h1>. The page is full-bleed previews with no visible headline, and the name
         inside each frame repeats once per frame — so it cannot be the heading. distSmoke asserts exactly one
         per document and caught this page shipping zero. */}
-    <h1 class="sr-only">Gate comb — opacity-ramp sweep (internal)</h1>
+    <h1 class="sr-only">Gate comb — tilt sweep (internal)</h1>
 
     {FRAMES.map((f, i) => (
       <section class="pg-frame" data-variant={f.key} data-active={f.isDefault ? 'true' : 'false'} aria-hidden={!f.isDefault}>
@@ -70,7 +71,7 @@ const letters = [...`${name.first} ${name.last}`];
       </section>
     ))}
 
-    <nav class="pg-switch" aria-label="Opacity ramp">
+    <nav class="pg-switch" aria-label="Tilt">
       {FRAMES.map((f) => (
         <button type="button" data-pick={f.key} aria-pressed={f.isDefault ? 'true' : 'false'}>
           {f.label}{f.isDefault ? ' ·' : ''}
@@ -82,15 +83,16 @@ const letters = [...`${name.first} ${name.last}`];
       {FRAMES.map((f) => (
         <div data-info={f.key} hidden={!f.isDefault}>
           <p class="pg-metrics">
-            {f.trails.length} strokes (fixed) · tilt {COMB_DEFAULTS.tilt} · no-knot floor {MAX_FIELD_GRAD}
+            {f.trails.length} strokes · ramp {COMB_DEFAULTS.opacity[0]}&ndash;{COMB_DEFAULTS.opacity[1]} (both fixed) · no-knot floor {MAX_FIELD_GRAD}
             {f.isDefault ? ' · what ships today' : ''}
           </p>
         </div>
       ))}
       <p class="pg-note">
-        Only the <strong>opacity ramp</strong> changes — same field, same tilt, same axis, same 8 strokes.
-        A wide ramp makes the faint strokes recede into a haze and lets one or two carry the frame, which is
-        how the original reads sparse while drawing 72 lines. Arrow keys flip.
+        Only <strong>tilt</strong> changes — same field, same 8 strokes, same ramp, same axis. Lower lets more
+        of the terrain bend the strokes, so the set is less uniform without gaining a recognisable pattern;
+        higher flattens toward ruled paper. 1.96 is the floor below which the no-knot guarantee stops
+        holding, and the code clamps there. Arrow keys flip.
       </p>
     </aside>
   </main>

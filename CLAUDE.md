@@ -319,11 +319,45 @@ springing in letter by letter, and one button reading `enter the descent`. Homep
 rendered from `index.astro`, **never `BaseLayout`**, because moving it up one file is the
 single edit that would hand a full-screen interstitial to all nine routes.
 
-The trails are `runDescent` on `lib/terrain.ts`'s field, projected through
-`TERRAIN_CONFIG_DEFAULTS.zoom` — the hero's camera, imported so the two cannot drift. They
-**converge into the field's three basins** rather than running parallel, which is the
-deliberate difference from the 21st.dev reference that inspired it: the reference's curves
-are magic-number Béziers, and the rule here is that the surface has to be real math.
+The lines are **combed contours** (`lib/gateLines.ts`): iso-cost level sets of the hero's own
+loss field under a linear tilt, walked at unit speed and cut at one shared screen length, read
+in plan through the hero's camera (`TERRAIN_CONFIG_DEFAULTS.zoom`, imported so the two cannot
+drift). `lib/gatePaths.ts` is only the shared toolkit now — the viewBox, the `Trail` shape, and
+the centripetal spline.
+
+**The tilt is what makes it safe, and it is a theorem rather than a tuning.** It exceeds the
+field's maximum gradient (`MAX_FIELD_GRAD = 1.8668`, measured on a 401×401 grid), so `grad g`
+can never vanish; a function with no critical points has no closed level sets and none that
+meet. Zero crossings over all pairs, against 271 in the version this replaced. **The floor is
+clamped in code** — a caller sweeping the dial must not be able to void it.
+
+### Three things were rejected here, each after looking at it
+
+Do not rebuild them. All three were judged in `/proto-gate`, which is what that route is for.
+
+1. **Descent trails run to convergence** — the first version. Every stroke ends in one of the
+   field's three basins, so 36 of them piled into 3 points: 71% of the set inside one cell of a
+   20×20 grid, 271 pair crossings, 22× spread in length. The owner: *"ur lines are horrible."*
+   (Its separate, real bug was uniform Catmull-Rom over 412× uneven spacing, which drew a
+   173.8° hairpin. That fix — centripetal — survives and is why the spline is in `gatePaths`.)
+2. **Truncated descent, and marching-squares contours with elevation** — built, measured, cut.
+   And a process lesson worth more than either: they were compared *against each other and the
+   comb simultaneously*, each having chosen its own count, spacing and projection, so four
+   frames differed in four ways. The owner: *"they are not even real comparisons."* Correct.
+   **Sweep one variable.**
+3. **Five harmonic fields** — `Re(z³)`, `Re(eᶻ)`, `Re(sin z)`, flow past a cylinder, `Re(z²)`,
+   all rendered at the settled parameters. They are *better behaved* than the comb — the
+   maximum principle forbids a harmonic function interior extrema, so their contours cannot
+   close into rings with no tilt needed at all — and they still lost, for a reason worth
+   keeping: *"less structural and pattern-noticable. others are so systematic."* A saddle or an
+   exponential fan announces itself as a recognisable motif. The comb reads as incidental,
+   because the tilt leaves only the terrain's irregular wobble showing. **Being mathematically
+   elegant is not the same as looking unforced.**
+
+Everything visible is a dial with a default picked by looking, not by argument: **8 strokes**
+(from 8/12/18/30), **opacity 0.10 → 0.80** (from four ramps — the narrow 0.10→0.55 band it
+shipped with was why 30 strokes read busier than the reference's 72, since nothing receded),
+and tilt. Change one at a time.
 
 **Four traps, each of which shipped and was caught in review. Do not reintroduce them.**
 
