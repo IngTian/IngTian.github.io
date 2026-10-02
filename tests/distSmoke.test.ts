@@ -411,7 +411,10 @@ describe('the first-visit gate, as shipped', () => {
   });
 
   it('marks the decorative field aria-hidden and the dialog labelled', () => {
-    expect(home!.markup).toMatch(/<svg[^>]*class="[^"]*gate-field[^"]*"[^>]*aria-hidden="true"/);
+    // A canvas now, not an svg — the field became one when the trails needed a decaying tail, which is per-pixel
+    // alpha falloff and not something a stroke can carry. Element-agnostic on purpose: what matters to a11y is
+    // that the decorative field is hidden from the tree, not which tag draws it.
+    expect(home!.markup).toMatch(/<canvas[^>]*class="[^"]*gate-field[^"]*"[^>]*aria-hidden="true"/);
     expect(home!.markup).toMatch(/aria-labelledby="gate-name"/);
     expect(home!.markup).toMatch(/id="gate-name"/);
   });
@@ -434,34 +437,29 @@ describe('the first-visit gate, as shipped', () => {
     }
   });
 
-  it('DRAWS EVERY STROKE WHOLE — no dash anywhere, which is the only state that neither vanishes nor trails', () => {
-    // THIS REPLACES FIVE EARLIER ASSERTIONS AND IS THE CONCLUSION OF ALL OF THEM.
+  it('PAINTS TRAVELLING TRAILS ON A CANVAS — no dash anywhere, and not a still image either', () => {
+    // THIS REPLACES SEVEN EARLIER ASSERTIONS AND IS THE CONCLUSION OF THE WHOLE ARC.
     //
-    // Six dash schemes shipped on this component. Each was a correct implementation of something, and each was
-    // reported as a defect, because a dash is a PARTIAL line and its gap has only two possible readings:
-    //   - leave it empty and the stroke is absent whenever the gap covers the quarter of the curve the viewBox
-    //     shows — "entire lines go dark immediately";
-    //   - fill it faintly, with a layer underneath, and the gap becomes a dimmer continuation of a brighter
-    //     segment — "seems like the line leaves a trail behind. remove that trail."
-    // Same artifact, two descriptions. It is not tunable, so the dash is gone and the motion moved to a
-    // transform on the groups. The invariant is therefore the simplest one this component has ever had: no gate
-    // stroke carries a dash, in the markup or in the CSS.
-    const paths = home!.markup.match(/<path[^>]*class="[^"]*gate-trail[^"]*"[^>]*>/g) ?? [];
-    expect(paths.length, 'the gate shipped no strokes at all').toBeGreaterThanOrEqual(1);
-    for (const p of paths) {
-      // vector-effect defeats the renderer's stroke caching across every full-screen path; it was measured as a
-      // real cost here and the source does not use it either.
-      expect(p, `vector-effect is back on a gate stroke: ${p}`).not.toMatch(/vector-effect/);
-      expect(p, `a dash is back on a gate stroke — it will vanish or trail: ${p}`)
-        .not.toMatch(/stroke-dasharray|stroke-dashoffset|pathLength/);
-    }
-    // SCOPED TO GATE RULES. The homepage stylesheet is shared, and the Choice and Rules slides both legitimately
-    // use dashes (.ch-line--*, .ru-traj, and their faint .ch-pnl-base / .ru-base guides) — an unscoped scan
-    // matches those and fails on code this test has no opinion about.
-    // SPLIT, NOT A REGEX. The obvious pattern for "a rule whose selector mentions .gate" is
-    // /[^{}]*\.gate[a-z-]*[^{}]*\{[^}]*\}/g, and on a ~100KB stylesheet its two unbounded [^{}]* runs backtrack
-    // for **4.5 seconds** — it passed in isolation and blew vitest's 5s timeout inside the full suite, which
-    // reads as a broken assertion rather than a slow one. Splitting on braces is linear.
+    // Six dash schemes shipped on this field. Each was a correct implementation of something and each was
+    // reported as a defect, because a dash makes a line PARTIAL and its gap has only two readings: empty, and
+    // the stroke is absent whenever the gap covers the quarter of the curve the viewBox shows ("entire lines go
+    // dark immediately"); or faintly filled from a layer underneath, and the gap becomes a dimmer continuation
+    // ("the line leaves a trail behind. remove that trail."). Same artifact, two descriptions, not tunable.
+    //
+    // What was actually wanted was an asteroid trail — a bright head with a tail decaying to nothing over an
+    // empty background — which is per-pixel alpha falloff along a stroke. That is a canvas, not an SVG stroke.
+    // So the field is a canvas, and the two things worth pinning are the two rejected states:
+    const field = home!.markup.match(/<canvas[^>]*class="[^"]*gate-field[^"]*"[^>]*>/g) ?? [];
+    expect(field.length, 'the gate field is not a canvas any more — did an SVG come back?').toBe(1);
+
+    // 1. NOT PARTIAL. No gate stroke or rule may carry a dash. Scoped to gate rules: the homepage stylesheet is
+    //    shared and the Choice and Rules slides use dashes legitimately (.ch-line--*, .ru-traj and their faint
+    //    guides), so an unscoped scan fails on code this test has no opinion about.
+    //
+    //    SPLIT, NOT A REGEX. The obvious pattern for "a rule whose selector mentions .gate" is
+    //    /[^{}]*\.gate[a-z-]*[^{}]*\{[^}]*\}/g, and on a ~100KB stylesheet its two unbounded [^{}]* runs
+    //    backtrack for 4.5 SECONDS — it passed in isolation and blew vitest's 5s timeout inside the full suite,
+    //    which reads as a broken assertion rather than a slow one. Splitting on braces is linear.
     const css = gateCss();
     const gateRules = css.split('}').filter((seg) => {
       const brace = seg.lastIndexOf('{');
@@ -471,9 +469,21 @@ describe('the first-visit gate, as shipped', () => {
     for (const r of gateRules) {
       expect(r, `a dash is back in a gate rule: ${r.trim()}`).not.toMatch(/stroke-das/);
     }
-    // And the motion must still exist, or "no dash" would be satisfied by a dead still frame — which is its own
-    // rejected state: an earlier drift was judged "basically static".
-    expect(css, 'the field drift is gone and the gate is now a still image').toMatch(/gate-drift/);
+    expect(home!.markup, 'an SVG stroke field is back on the gate').not.toMatch(/class="gate-trail"/);
+
+    // 2. NOT STATIC. The painter has to actually ship, or "no dash" is satisfied by a blank canvas — and a field
+    //    that does not move was itself rejected ("i think yours is basically static"). The script is a bundled
+    //    module, so assert the homepage pulls in a module that carries the painter's own marker rather than
+    //    guessing at a hashed filename.
+    // `.html`, NOT `.markup` — stripNonMarkup removes every <script> on purpose, so scanning markup for script
+    // tags finds zero and the assertion fails while the painter is present and working.
+    const scripts = [...home!.html.matchAll(/<script[^>]*src="([^"]+)"/g)].map((m) => m[1]);
+    expect(scripts.length, 'the homepage ships no module scripts at all').toBeGreaterThan(0);
+    const painted = scripts.some((src) => {
+      const file = join(DIST, src.replace(/^\//, ''));
+      return existsSync(file) && /destination-out/.test(readFileSync(file, 'utf8'));
+    });
+    expect(painted, 'no shipped script composites a decaying tail — the trails are gone').toBe(true);
   });
 
   it('parks the drift under reduced motion, and needs nothing undone to do it', () => {

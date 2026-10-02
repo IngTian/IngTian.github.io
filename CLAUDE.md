@@ -138,7 +138,8 @@ src/
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate
   lib/gate.ts                       # the first-visit gate's POLICY: session flag, fresh-load test, dismissal timing, isCovered — unit-tested
   lib/gatePaths.ts                  # the gate's shared TOOLKIT only: viewBox, the Trail shape, the centripetal spline. It imports nothing
-  lib/gateRefPaths.ts               # WHAT THE GATE DRAWS: the ported 21st.dev geometry, each curve's measured arc length, the join smoothing, GATE_COUNT and the zoom — unit-tested
+  lib/gateRefPaths.ts               # the gate's TRACKS: the ported 21st.dev geometry, each curve's arc length, the join smoothing, GATE_COUNT and the zoom — unit-tested
+  lib/gateComets.ts                 # how something TRAVELS one: d-string -> arc-length polyline, pointAt, the hand-rolled `meet` fit, deterministic jitter — unit-tested
   lib/gateLines.ts                  # combed contours of the hero's field — built, compared in /proto-gate, NOT shipped (see below)
   lib/gateProtoShapes.ts            # four black-hole candidates, /proto-gate only, deliberately barely tested
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
@@ -210,6 +211,15 @@ pages all need JS — that is the whole list, and `grep -rln '<script' src`
 regenerates it.
 Every one of them is a plain Astro component or page with a bundled `<script>`,
 **not** an island (see *Stack*). The shared contract:
+
+**`Gate` carries TWO scripts, and the split is deliberate.** An `is:inline` one holds the
+policy — raise, swallow, dismiss, teardown — because it has to run before first paint, and
+inline means it cannot import, which is why `lib/gate.ts`'s rules are *restated* there and
+unit-tested separately. A second, ordinary bundled `<script>` paints the comet field, and
+being bundled is the point: it imports the geometry and both gates instead of duplicating
+them, and it is allowed to arrive a frame late because the gate is already up. If you need
+something in a component before first paint, inline it and accept restating; otherwise
+don't, and keep the imports.
 
 - **Re-init on `astro:page-load`, with a teardown**, because `ClientRouter` is on
   and a View Transition replaces the DOM without a fresh page load. A script that
@@ -415,53 +425,68 @@ The three that were removed, because each is a way to get this wrong again:
   survives: **when a decision is copied from a reference, write down what it depends on**, because
   the thing that invalidates it is usually a change somewhere else.
 
-**THERE IS NO DASH ON THE STROKES, AND NO JS DRIVING THEM. Six dash schemes shipped here and every
-one was reported as a defect; this is the conclusion of all six and it is the most load-bearing
-paragraph in this section.**
+**THE FIELD IS A CANVAS OF TRAVELLING COMET TRAILS, AND THE CURVES ARE NO LONGER DRAWN AT ALL —
+they are the TRACKS the heads move along.** This is the settled answer after seven attempts, and the
+brief that produced it is the owner's: *"what i imagine is lines travelling through the background
+like the trails of asteroids."*
 
-A dash is a **partial line**. It has two ends and a gap, and the gap has exactly two possible
-readings — both of which were built, shipped, and rejected:
+`components/Gate.astro` (canvas, rAF loop, teardown) + `lib/gateComets.ts` (pure, tested: the track
+parser, arc-length lookup, the `meet` fit, the deterministic jitter).
 
-- Leave the gap empty and the stroke is simply **absent** whenever the gap covers the quarter of the
-  curve the viewBox shows. Plus the source restarts `pathLength` at 0.3 every repeat, so once per
-  cycle the dash collapses to a fragment at the off-screen start and the line pops out between two
-  frames. *"there are lines that vanish suddenly which is not good. entire lines go dark
-  immediately."*
-- Fill the gap faintly — a second permanent layer under the travelling one — and the gap becomes a
-  **dimmer continuation** of a brighter segment. *"seems like the line leaves a trail behind. remove
-  that trail."*
+**Why a canvas, and why no dash can ever come back.** Six dash schemes shipped here and every one was
+reported as a defect, because a dash makes a line **partial** and its gap has only two readings:
 
-**They are the same artifact described from two sides, and it is not tunable.** The two-layer version
-(`.gate-haze` under `.gate-live`, with a constant-length dash so the cycle had no discontinuity at
-all) was a *correct* implementation and still lost, which is the signal that the problem was the
-premise. So: every curve is drawn whole, evenly lit end to end, one layer, no `stroke-dasharray`
-anywhere. Depth comes from the family's opacity ramp — *which* curve you are looking at — never from
-which part of one.
+- leave the gap empty and the stroke is simply **absent** whenever it covers the quarter of the curve
+  the viewBox shows — *"entire lines go dark immediately"*;
+- fill it faintly with a permanent layer underneath and the gap becomes a **dimmer continuation** of a
+  brighter segment — *"seems like the line leaves a trail behind. remove that trail."*
 
-**The motion is `gate-drift`: two CSS transforms on the two groups, and nothing else.** This also
-puts the component back inside the *Taste rules*' motion constraint, which it had been the one
-documented exception to.
+Those are one artifact described from two sides, and it is not tunable: the last two attempts were
+*correct* implementations (a faithful reproduction of framer-motion's `pathLength`/`pathOffset`, then a
+constant-length dash whose cycle had no discontinuity anywhere) and both still lost. Removing the dash
+entirely then produced the opposite complaint — a static drawing. What was actually wanted is an
+**asteroid trail: a bright head with a tail decaying to nothing over an empty background**, which is
+per-pixel alpha falloff *along* a stroke. SVG cannot express that; on a canvas it is one compositing
+call. **So there is no `stroke-dasharray` anywhere on the gate, and the next person wanting to animate
+these curves should reach for the canvas, not for a dash.**
 
-- **It drifts along the lines' own direction.** The second cubic's tangent is `(464, 127)` for every
-  curve in both families — independent of the offset, so it genuinely is the family's shared
-  direction — normalising to `(0.964, 0.264)`. Translating along it slides each curve approximately
-  along *itself*, so the field reads as flowing. Translate along any other axis and it reads
-  immediately as a picture being shoved sideways.
-- **Amplitude and period are set against the line spacing, not by taste.** Adjacent curves are 9.13
-  user units apart, which is **19 CSS px** at the shipped 2.107×, so flow becomes legible at roughly
-  one spacing every couple of seconds. The first version of this drift measured **4.6 px/s** and
-  would have earned *"i think yours is basically static"* a second time — that verdict is already in
-  this file's history. It now runs 96 user units over 18s, **11.2 px/s**, measured at 14 px/s and
-  9.4 px/s for the two families in opposite directions.
-- **It alternates rather than looping, and the two periods differ (18s against 23s).** A one-way loop
-  would have to map the family onto itself, which is exactly one curve's offset — but the family is
-  finite, so its first and last curve have no neighbour to become and the opacity ramp would snap at
-  every wrap. `alternate` has no wrap; unequal periods mean the two families are rarely at their
-  turnarounds together, so the composite is always moving.
+How it works, and the parts that are load-bearing:
 
-`tests/distSmoke.test.ts` asserts the whole of this against the build: no gate stroke and no gate CSS
-rule carries a dash, and `gate-drift` is still present — because "no dash" on its own is also
-satisfied by a dead still frame, which is its own rejected state.
+- **The tail is `destination-out`, not a colour.** Each frame the whole surface has its alpha scaled
+  down and only the newest sliver of travel is drawn, so every head trails an exponential. Fading
+  toward a background *colour* would need an opaque canvas, and an opaque full-screen layer is exactly
+  what the fluid sky's first invariant forbids.
+- **The decay is a TIME constant (`TAIL_TAU = 0.62s`), not a per-frame factor.** A per-frame constant
+  makes tail length depend on frame rate — shorter on a 120Hz display, longer on a busy machine.
+- **Travel is parameterised by ARC LENGTH, which is what `lib/gateComets.ts` is for.** Parameterise by
+  the Bézier's `t` instead and a head races through the curve's flat stretches and crawls through its
+  bends, which reads as a speed glitch rather than as a moving object. A test pins even speed to
+  within 5%.
+- **The wrap is invisible by geometry, not by arithmetic.** Both ends of every curve sit well outside
+  the viewBox — the family runs from `(-380,-189)` to `(684,875)` inside a box of
+  `(-124,-56,944,429)` — so a head restarts off-screen. That is the seam every dash scheme fought
+  with, and here it simply cannot be seen.
+- **Phases spread over the whole track**, deterministically (`jitter`, never `Math.random()`), so some
+  heads are mid-frame, some have not arrived and some have left. The aligned-front defect that cost a
+  round of its own is structurally impossible now.
+- **`fitMeet` reproduces `preserveAspectRatio="xMidYMid meet"` by hand**, because the renderer no
+  longer does that arithmetic and the composition — the zoom in particular, measured against the
+  owner's reference screenshot — must not shift just because the element type changed. Tested against
+  the SVG behaviour it replaces.
+- **No geometry reaches the HTML.** The canvas is empty markup and the module script imports the
+  curves itself, so the 48 `d`-strings are not in the homepage response at all.
+
+Measured: **60.0 fps** from a renderer trace (not rAF — see *Conventions*), DPR capped at 2 like the
+hero's.
+
+**This also makes the gate a relative of the hero rather than an unrelated borrowed drawing.**
+`TerrainHero` paints its gradient-descent walkers as fading comet trails; the gate now speaks the same
+language on the ported curves. Worth knowing if the borrowed-geometry question is ever revisited — the
+*motion* is now the site's own even though the tracks are not.
+
+`tests/distSmoke.test.ts` pins both rejected states against the build: no gate stroke or gate CSS rule
+carries a dash, **and** a shipped script must still composite a decaying tail — because "no dash" on
+its own is also satisfied by a dead still frame, which is its own rejected state.
 
 ### Four things were rejected here, each after looking at it
 
@@ -582,14 +607,16 @@ enough to engage the deck on a viewport whose styles think it's a phone).
 **The number lives in two places and they are synced BY HAND.** `@media
 (max-width: var(--x))` is not valid CSS, so there is no way to feed one value to
 both. **If you change `PHONE_MAX_WIDTH`, change every `@media (max-width: 640px)`
-block with it.** `grep -rn 'max-width: 640px' src` returns 16 hits in 13 files, and
-two of the 16 are the prose in `viewport.ts` itself, so there are **14 real CSS
+block with it.** `grep -rn 'max-width: 640px' src` returns 15 hits in 12 files, and
+two of the 15 are the prose in `viewport.ts` itself, so there are **13 real CSS
 blocks**: `global.css` ×2, `experience` ×2, and one each in `CornerNav`, `Toc`,
-`DescentPath`, `ProjectCard`, `FluidSky`, `Heights`, `404`, `research`,
-`writing/[...slug]` and `Gate` (which halves its trail count rather than changing
-layout). Re-run the grep rather than trusting this sentence — it said "15 hits in 12
-files … 13 real CSS blocks" for one release after `Gate.astro` added the fourteenth,
-which is how a hand-sync checklist quietly stops being one. (This list used to include "the two proto sections". There are
+`DescentPath`, `ProjectCard`, `FluidSky`, `Heights`, `404`, `research` and
+`writing/[...slug]`. Re-run the grep rather than trusting this sentence — it has now
+been wrong in both directions. It said "15 hits … 13 blocks" for a release after
+`Gate.astro` added a fourteenth, then "16 … 14" for a release after `Gate` dropped it
+again: the gate's field became a canvas, so it halves its comet count through
+`isPhone()` instead of through a media query. A grep-backed checklist stops being one
+the moment the number is copied rather than re-measured. (This list used to include "the two proto sections". There are
 no proto *sections* — `src/sections/` holds only the seven homepage slides plus
 Signature — and the one surviving proto route, `/proto-sketches`, breaks at 820px,
 not 640: it is an internal gallery, so it is not part of the phone treatment.)
@@ -978,15 +1005,15 @@ titles came to rest hard against the browser chrome — the lead is a number in
   themes (brightened to `#e0574a` for the dark ground).
 - **Motion:** animate only `transform` / `opacity`; NEVER animate `filter: blur`
   (bake it).
-  - **There are no exceptions to this rule on the site today.** The gate held the only
-    one for several commits — it animated `stroke-dasharray`/`stroke-dashoffset`, which
-    are **paint** properties, on the grounds that a line drawing itself cannot be
-    expressed as a transform. That was true, and the feature it bought was rejected on
-    its looks anyway (see *The first-visit gate*), so the gate now drifts two groups with
-    `transform` and the rule stands unqualified. Worth noting because the exception read
-    as permanent while it existed: a paint-property animation was argued for at length,
-    shipped six times, and in the end the design that satisfied the rule was also the one
-    that looked right. ALL motion is gated behind `@media (prefers-reduced-motion:
+  - **The rule is about CSS/DOM animation, and a canvas is outside it, not an exception
+    to it.** The gate's comet trails are painted — the whole point of them is a tail that
+    decays per pixel — but they are drawn into a `<canvas>` by a rAF loop, so there is no
+    animated CSS property and no compositor layer being invalidated. The hero's terrain
+    works the same way. What the rule forbids is animating paint properties on DOM nodes,
+    and the gate did exactly that for several commits (`stroke-dasharray` on 48–72
+    full-screen paths) before all six versions of it were rejected on looks. **Both the
+    rule and the design now point the same way: if a line has to draw itself or trail,
+    that is canvas work.** ALL motion is gated behind `@media (prefers-reduced-motion:
   no-preference)` via `lib/motion.ts`. The no-motion state must look *finished* —
   it's also the Firefox fallback (`animation-timeline` isn't in Firefox yet), and
   it's what a reduced-motion reader gets instead of the deck.

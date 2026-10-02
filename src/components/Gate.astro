@@ -20,64 +20,40 @@ import { name, roles } from '../data/profile';
 // end moves left) and its opacity ramps all the way 0.1 -> 1.0, so most strokes recede and a reader picks out
 // about eight over a haze. Our combed version structurally could not do the first part — its no-knot guarantee
 // needs a tilt that exceeds the field's maximum gradient, which forces the strokes parallel.
-import { GATE_COUNT, REF_POSITIONS, refFamily, refViewBox } from '../lib/gateRefPaths';
 import { GATE_DISMISS_MS, GATE_REVEAL_EVENT, GATE_SEEN_KEY, GATE_UP_ATTR } from '../lib/gate';
 
-// The two mirrored families stay SEPARATE, as two groups. The original renders <FloatingPaths position={1} />
-// and position={-1}; keeping that split is also what makes the motion affordable — a group is one composited
-// layer, so two groups is two transforms instead of 72 paint-bound path animations. See the CSS.
-// GATE_COUNT curves per family rather than the source's 36, and SMOOTHED at the join — see gateRefPaths for
-// both. The viewBox is pulled back to the reference's own apparent scale, which is what lets the stroke widths
-// be the source's unscaled.
-const families = REF_POSITIONS.map((p) => refFamily(p, GATE_COUNT, true));
-const viewBox = refViewBox();
+// NO GEOMETRY IS RENDERED AT BUILD TIME ANY MORE, which is why nothing is imported from gateRefPaths here.
+// The field is a canvas, and the module script at the bottom of this file imports the curves itself — so the
+// 48 `d`-strings never reach the HTML at all. That is a few KB off every homepage response, and it means there
+// is exactly one place the geometry is read from rather than one in the markup and one in the script.
 const letters = [...`${name.first} ${name.last}`];
 ---
 
 <div class="gate" data-gate role="dialog" aria-modal="true" aria-labelledby="gate-name">
-  <svg
-    class="gate-field"
-    viewBox={viewBox}
-    preserveAspectRatio="xMidYMid meet"
-    aria-hidden="true"
-    focusable="false"
-  >
-    {/* MEET, NOT SLICE — which is also the thickness fix. The original leaves preserveAspectRatio at its
-        default, and that default is meet. On a 1920x1080 screen meet scales the 696-wide box by 2.76 where
-        slice scales by 3.42, so slice was drawing every stroke about 24% thicker than the source does at the
-        same authored width. meet still fills the screen, because the geometry runs far outside the viewBox
-        (y -189..875) and an SVG clips to its element rather than to its viewBox.
+  {/* A CANVAS, NOT AN SVG, AND THE REASON IS THE TAIL.
 
-        NO vector-effect HERE ANY MORE, and that was a performance decision as much as a fidelity one. It pins
-        the stroke to its authored CSS width regardless of scale, which made the lines hairline — but it also
-        defeats the renderer's stroke caching, and with 72 full-screen paths that is not free. The original does
-        not use it either; `meet` already removed the ~24% of extra weight that `slice` was adding, so the
-        widths below are the source's own and scale the way the source's do. */}
-    {/* ONE LAYER, NO DASH AT ALL. Every curve is drawn whole, at a uniform brightness along its length.
+      The brief: "what i imagine is lines travelling through the background like the trails of asteroids." An
+      asteroid trail is a bright HEAD with a tail that decays smoothly to nothing — not a lit section of a line
+      that is otherwise present. Six SVG dash schemes were built trying to get there and all six were rejected,
+      because a dash can only ever make a line partial: its gap reads as the line vanishing, or, with anything
+      drawn underneath, as a trail hanging off it. Both were reported in those words.
 
-        THERE IS NO DASH HERE ON PURPOSE AND REINTRODUCING ONE WOULD UNDO THREE ROUNDS OF REVIEW. The source
-        animates a travelling dash, and a dash is inescapably a PARTIAL line: it has two ends, and somewhere on
-        the curve there is a stretch the dash is not covering. Every version of that got rejected, each time
-        for the same thing seen from a different angle:
-          - with nothing underneath, a stroke was simply absent whenever its window slid off the quarter of the
-            curve the viewBox shows — "entire lines go dark immediately";
-          - with a faint full-length layer underneath to stop that, the uncovered stretch became visible as a
-            dimmer continuation — "seems like the line leaves a trail behind. remove that trail."
-        Those are the same artifact: the dash's gap. It cannot be tuned away, only removed, which is what this
-        does. The brightness ramp across the family (0.1 -> 1.0) stays, so depth still comes from which curve
-        you are looking at rather than from which part of it.
+      A decaying tail is not expressible as a dash at all. It needs per-pixel alpha falloff along the stroke,
+      which on a canvas is one line of compositing — each frame the whole surface is faded with
+      `destination-out` and only the newest sliver of travel is drawn, so every head trails an exponential that
+      goes to zero. In SVG the same effect would be a stack of sub-paths per curve with hand-computed opacities,
+      rebuilt every frame.
 
-        The motion moved to the FIELD instead — see `gate-drift` in the CSS. A slow counter-drift of the two
-        mirrored families makes the lines appear to flow while each one stays complete and evenly lit, which is
-        the "lines passing smoothly across the page" this was always meant to be. */}
-    {families.map((fam, f) => (
-      <g class="gate-fam" data-fam={f}>
-        {fam.map((t) => (
-          <path class="gate-trail" d={t.d} stroke-opacity={t.opacity} stroke-width={t.width} />
-        ))}
-      </g>
-    ))}
-  </svg>
+      The CURVES ARE UNCHANGED: still the ported 21st.dev family, still smoothed at the join, still at the zoom
+      measured against the owner's reference. They are no longer things that get drawn, though — they are the
+      TRACKS the heads travel along. `lib/gateComets.ts` turns each one into an arc-length-parameterised
+      polyline so travel is at constant speed, and `fitMeet` there reproduces `preserveAspectRatio="xMidYMid
+      meet"` by hand, because the renderer is no longer doing that arithmetic for us and the composition must
+      not shift just because the element type did.
+
+      This also makes the gate a relative of the hero instead of an unrelated borrowed drawing: `TerrainHero`
+      paints its gradient-descent walkers as fading comet trails, which is the same language. */}
+  <canvas class="gate-field" data-gate-field aria-hidden="true"></canvas>
 
   <div class="gate-text">
     {/* A <p>, NOT an <h1>, and that is a correctness fix rather than a style choice. The gate shipped with
@@ -126,7 +102,10 @@ const letters = [...`${name.first} ${name.last}`];
      the field read as muddy: the opacity ramp starts at 0.1, and a GOLD line at a tenth opacity over near-black
      has almost no luminance left to carry, where a near-white one still reads as light. `--paper` is the site's
      ivory rather than pure #fff, which keeps palette discipline without losing the original's effect. */
-  .gate-trail { fill: none; stroke: var(--paper); stroke-linecap: round; }
+  /* The canvas reads its ink off this, via getComputedStyle, so the trails stay on a palette token instead of
+     a hardcoded rgba — the same mistake the gate's button label made once (a frozen light-theme --paper that
+     changed hue against a live var on hover). */
+  .gate-field { color: var(--paper); }
 
   .gate-text { position: relative; text-align: center; padding: 0 7vw; }
 
@@ -200,25 +179,6 @@ const letters = [...`${name.first} ${name.last}`];
          It alternates rather than looping. A one-way loop would need the translation to map the family onto
        itself, which is exactly one curve's offset — but the family is finite, so its first and last curve have
        no neighbour to become, and the opacity ramp would snap back at every wrap. Alternating has no wrap. */
-    /* AMPLITUDE AND PERIOD ARE SET AGAINST THE LINE SPACING, because "is this moving" is not a matter of taste.
-       Adjacent curves sit 9.13 user units apart vertically, which is 19 CSS px at the shipped 2.107x — so a
-       drift becomes legible as flow at roughly one line-spacing per couple of seconds, and reads as a still
-       image well below that. The first version of this measured 4.6 px/s and would have earned "basically
-       static" a second time; 96 user units over 18s is 11.2 px/s, about one spacing every 1.7s.
-         The two periods are deliberately unequal. With `alternate` each family slows to a stop at its
-       turnaround, and 18 against 23 means they are rarely both there, so the composite is always moving. */
-    .gate-fam {
-      animation: gate-drift 18s ease-in-out infinite alternate;
-      will-change: transform;
-    }
-    .gate-fam[data-fam='1'] {
-      animation-duration: 23s;
-      animation-direction: alternate-reverse;
-    }
-    @keyframes gate-drift {
-      from { transform: translate(-48px, -13px); }
-      to   { transform: translate(48px, 13px); }
-    }
 
     /* THE LETTERS FAIL VISIBLE, and that is the fix for the name arriving incomplete TWICE — "I g T n" and
        then "ng Ti", a different set of letters missing each time.
@@ -264,20 +224,18 @@ const letters = [...`${name.first} ${name.last}`];
        brighter than anything a moving reader saw. Neither applies: the strokes carry no animated property at
        all, and the only motion is a transform on the two groups. Parking that transform at the midpoint of its
        range leaves exactly the drawing everyone else sees, mid-drift. */
-    .gate-fam { animation: none; transform: none; }
+    /* Nothing to park: the canvas checks prefersReducedMotion() itself and paints ONE finished frame of
+       trails mid-flight rather than animating them. A still of the same picture, which is what the motion rule
+       asks for, and it has to be the canvas's own branch because a CSS rule cannot reach into a rAF loop. */
     .gate-letter, .gate-roles, .gate-enter { opacity: 1; transform: none; }
   }
 
-  /* Phones get half the strokes. The content is the same (phone work here is parity plus bug fixes), but
-     full-screen strokes sliding a dash offset forever is a real paint cost on a phone, and at that width the
-     thinning is invisible.
-       THE SELECTOR TARGETS BOTH LAYERS, which is load-bearing now that there are two: scoping it to
-     `.gate-trail` alone would thin the live layer while the haze kept drawing all of them, leaving half the
-     curves as permanent faint lines no travelling segment ever visits. `.gate-fam > path` catches the haze and
-     the live group at identical indices, so a curve is dropped from both or neither. */
-  @media (max-width: 640px) {
-    .gate-fam > path:nth-child(2n) { display: none; }
-  }
+  /* NO PHONE MEDIA QUERY HERE ANY MORE. It used to hide every other SVG path; the canvas halves its own comet
+     count through isPhone() from lib/viewport.ts, which is the one phone gate.
+       Note for the hand-sync checklist in CLAUDE.md that counts phone breakpoints by grep: this file has
+     dropped out of it. The breakpoint is deliberately NOT written out in this comment — spelling it here would
+     keep the file in the grep's results as a hit that is only prose, which is precisely the kind of false entry
+     that made that checklist wrong before. */
 </style>
 
 <script is:inline define:vars={{ KEY: GATE_SEEN_KEY, MS: GATE_DISMISS_MS, UP: GATE_UP_ATTR, REVEAL: GATE_REVEAL_EVENT }}>
@@ -409,11 +367,11 @@ const letters = [...`${name.first} ${name.last}`];
       }, reduced() ? 0 : MS);
     }
 
-    // NO JS DRIVES THE STROKES ANY MORE. The motion is `gate-drift` in the CSS above: two transforms on two
-    // groups, which the compositor runs without a main-thread frame and without repainting the paths at all.
-    // Five dash schemes were driven from here before this; the reason none of them stayed is written at
-    // `gate-drift` and in the markup above, and the short version is that a dash is a partial line and both
-    // halves of that — an empty gap and a faintly-filled one — were reported as defects.
+    // THIS SCRIPT DOES NOT DRAW ANYTHING. It owns the gate's policy — raise, swallow, dismiss, teardown — and
+    // has to be inline to run before first paint. The field is painted by the module script at the bottom of
+    // this file, which can import from lib/ precisely because it is NOT inline and does not need to beat the
+    // first frame. Six dash schemes were driven from here before this; the reason none stayed is in the markup
+    // comment above the canvas.
 
     gate.classList.add('is-up');
     document.documentElement.style.overflow = 'hidden';
@@ -439,4 +397,200 @@ const letters = [...`${name.first} ${name.last}`];
       try { btn.focus({ preventScroll: true }); } catch (e) { btn.focus(); }
     }
   })();
+</script>
+
+<script>
+  // ── THE ASTEROID TRAILS ──────────────────────────────────────────────────────────────────────────────
+  // A bundled module script, NOT inline, which is what lets it import the geometry and the two gates instead of
+  // restating them. It is allowed to be late: the inline script above has already raised the gate before first
+  // paint, so this only has to arrive before a visitor has finished reading a name.
+  //
+  // Everything pure is in lib/gateComets.ts with a spec; what stays here is the plumbing the Interactivity
+  // contract says stays here — the canvas, the rAF loop, resize, visibility, and teardown.
+  import { GATE_COUNT, REF_POSITIONS, refFamily, refViewBox } from '../lib/gateRefPaths';
+  import { fitMeet, jitter, parseTrack, pointAt, type Track } from '../lib/gateComets';
+  import { prefersReducedMotion } from '../lib/motion';
+  import { isPhone } from '../lib/viewport';
+
+  interface Comet { track: Track; s: number; speed: number; alpha: number; width: number }
+
+  // HOW LONG A TAIL LIVES, in seconds rather than in frames. The fade is applied per frame, so a per-frame
+  // constant would make tail length depend on the frame rate — shorter on a 120Hz display, longer when the
+  // machine is busy. Expressed as a time constant and converted with the real dt, the streak is the same length
+  // everywhere. 0.62s of decay at the speed below is a tail of roughly 250 CSS px.
+  const TAIL_TAU = 0.62;
+  // Arc units per second. The visible window is about a quarter of each ~1580-unit curve, so ~70 puts a head
+  // across the frame in about six seconds: fast enough to read as travelling, slow enough not to strobe.
+  const SPEED = 70;
+  const SPEED_SPREAD = 0.45;   // +/- 45%, so heads never move as a block
+  const DPR_CAP = 2;           // the hero's cap, for the same reason: 3x on a phone buys nothing visible here
+
+  let raf = 0;
+  let stop: (() => void) | null = null;
+
+  function start(): void {
+    const maybeCanvas = document.querySelector<HTMLCanvasElement>('[data-gate-field]');
+    const maybeGate = document.querySelector<HTMLElement>('[data-gate]');
+    if (!maybeCanvas || !maybeGate) return;
+    // Non-null aliases straight after the guard: TypeScript does not carry a const's narrowing into the hoisted
+    // functions below, and that is exactly the ts(18047) class CLAUDE.md warns will come back.
+    const cv = maybeCanvas;
+    const gate = maybeGate;
+    const maybeCtx = cv.getContext('2d');
+    if (!maybeCtx) return;
+    const c2 = maybeCtx;
+
+    // If the gate is not covering there is nothing to draw over and no reason to hold a loop — a repeat visit in
+    // the same session never raises it.
+    if (!gate.classList.contains('is-up')) return;
+
+    const vb = refViewBox().split(/\s+/).map(Number) as [number, number, number, number];
+    const ink = getComputedStyle(cv).color || 'rgb(239,233,221)';
+    const reduced = prefersReducedMotion();
+
+    // One comet per curve; on a phone, every other one. The content is identical either way, which is this
+    // project's phone rule, but a full-screen canvas redrawing 48 streaks is a real cost on a handset.
+    const step = isPhone() ? 2 : 1;
+    const comets: Comet[] = [];
+    let n = 0;
+    for (const p of REF_POSITIONS) {
+      const fam = refFamily(p, GATE_COUNT, true);
+      for (let i = 0; i < fam.length; i += step) {
+        const t = fam[i];
+        const track = parseTrack(t.d);
+        comets.push({
+          track,
+          // Phases spread over the WHOLE track, not just its visible part, so at any moment some heads are
+          // mid-frame, some are still off the top-left, and some have already left past the bottom-right. That
+          // is what makes them read as independent objects rather than as a formation — the aligned-front
+          // defect, which cost a round of its own, is impossible here for the same reason.
+          s: jitter(n, 1) * track.total,
+          speed: SPEED * (1 + (jitter(n, 7) - 0.5) * 2 * SPEED_SPREAD),
+          alpha: t.opacity,
+          width: t.width,
+        });
+        n++;
+      }
+    }
+
+    let fit = { scale: 1, dx: 0, dy: 0 };
+    let cssW = 0;
+    let cssH = 0;
+
+    /** Project a point from the curves' user space into CSS px. */
+    function px(q: { x: number; y: number }): { x: number; y: number } {
+      return { x: q.x * fit.scale + fit.dx, y: q.y * fit.scale + fit.dy };
+    }
+
+    /** Stroke between two arc-length positions as a polyline, so it follows the curve instead of cutting it. */
+    function arc(cm: Comet, from: number, to: number, alpha: number): void {
+      const span = to - from;
+      if (span <= 0 || alpha <= 0.002) return;
+      const steps = Math.max(1, Math.min(8, Math.ceil(span / 6)));
+      c2.beginPath();
+      for (let k = 0; k <= steps; k++) {
+        const q = px(pointAt(cm.track, from + (span * k) / steps));
+        if (k === 0) c2.moveTo(q.x, q.y);
+        else c2.lineTo(q.x, q.y);
+      }
+      c2.globalAlpha = alpha;
+      c2.lineWidth = Math.max(0.6, cm.width * fit.scale);
+      c2.strokeStyle = ink;
+      c2.stroke();
+    }
+
+    /**
+     * THE FINISHED STATE for a reader with motion off: the same picture, held still. The falloff is drawn
+     * explicitly here because the animated version gets its taper from repeated compositing, and a still frame
+     * has no sequence of frames to accumulate one from.
+     */
+    function still(): void {
+      c2.clearRect(0, 0, cssW, cssH);
+      const SEGS = 26;
+      for (const cm of comets) {
+        const tail = cm.speed * TAIL_TAU * 2.2;
+        for (let k = 0; k < SEGS; k++) {
+          arc(cm, cm.s - (tail * (k + 1)) / SEGS, cm.s - (tail * k) / SEGS, cm.alpha * Math.exp((-k / SEGS) * 2.2));
+        }
+      }
+      c2.globalAlpha = 1;
+    }
+
+    function resize(): void {
+      const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+      cssW = cv.clientWidth;
+      cssH = cv.clientHeight;
+      cv.width = Math.max(1, Math.round(cssW * dpr));
+      cv.height = Math.max(1, Math.round(cssH * dpr));
+      c2.setTransform(dpr, 0, 0, dpr, 0, 0);   // draw in CSS px; the transform handles density
+      c2.clearRect(0, 0, cssW, cssH);
+      fit = fitMeet(vb, cssW, cssH);
+      c2.lineCap = 'round';
+      if (reduced) still();
+    }
+
+    let last = 0;
+    function frame(now: number): void {
+      // Clamp dt. A backgrounded tab or one long task hands back a gap of seconds, and advancing the heads by
+      // that would teleport them while the fade wiped every tail in a single step.
+      const dt = last ? Math.min((now - last) / 1000, 0.05) : 0.016;
+      last = now;
+
+      // THE TAIL, IN ONE OPERATION. destination-out scales down the alpha of what is already on the canvas, so
+      // every previously drawn sliver decays toward transparent at a fixed time constant while the canvas itself
+      // stays transparent over the gate behind it. Fading toward a background COLOUR instead would require an
+      // opaque canvas, and an opaque full-screen layer is what the fluid sky's first invariant exists to avoid.
+      c2.globalCompositeOperation = 'destination-out';
+      c2.globalAlpha = 1 - Math.exp(-dt / TAIL_TAU);
+      c2.fillStyle = '#000';
+      c2.fillRect(0, 0, cssW, cssH);
+      c2.globalCompositeOperation = 'source-over';
+
+      for (const cm of comets) {
+        const from = cm.s;
+        cm.s += cm.speed * dt;
+        if (cm.s >= cm.track.total) {
+          // Wrap. Both ends of every curve sit well outside the viewBox — the family runs from (-380,-189) to
+          // (684,875) inside a box of (-124,-56,944,429) — so a head restarts off-screen and no reset is ever
+          // visible. That is the seam every dash scheme here fought with, solved by geometry instead of by
+          // arithmetic.
+          cm.s = 0;
+          continue;
+        }
+        arc(cm, from, cm.s, cm.alpha);
+      }
+      c2.globalAlpha = 1;
+      raf = requestAnimationFrame(frame);
+    }
+
+    function onVis(): void {
+      if (document.hidden) {
+        if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      } else if (!raf && !reduced) {
+        last = 0;
+        raf = requestAnimationFrame(frame);
+      }
+    }
+
+    resize();
+    window.addEventListener('resize', resize);
+    document.addEventListener('visibilitychange', onVis);
+    if (!reduced) raf = requestAnimationFrame(frame);
+
+    stop = () => {
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      window.removeEventListener('resize', resize);
+      document.removeEventListener('visibilitychange', onVis);
+      stop = null;
+    };
+  }
+
+  // Teardown on every exit. ClientRouter replaces document.body, so without this the resize and visibility
+  // listeners outlive the canvas they draw on — trap 4 in CLAUDE.md, one layer down. Dismissal fires the reveal
+  // event, after which there is nothing left to draw over.
+  document.addEventListener('astro:before-swap', () => stop?.());
+  window.addEventListener('descent:revealed', () => stop?.());
+  document.addEventListener('astro:page-load', () => { stop?.(); start(); });
+  if (document.readyState !== 'loading') start();
+  else document.addEventListener('DOMContentLoaded', start, { once: true });
 </script>
