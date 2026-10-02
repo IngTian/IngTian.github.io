@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { fitMeet, jitter, parseCubics, parseTrack, pointAt } from '../src/lib/gateComets';
+import { fitMeet, jitter, parseCubics, parseTrack, pointAt, visibleWindow } from '../src/lib/gateComets';
 import { GATE_COUNT, REF_VIEW_H, REF_VIEW_W, refFamily, refViewBox } from '../src/lib/gateRefPaths';
 
 describe('reading the gate curves as travellable tracks', () => {
@@ -123,5 +123,59 @@ describe('deterministic jitter', () => {
       vb2 += (b[i] - mb) ** 2;
     }
     expect(Math.abs(cov / Math.sqrt(va * vb2))).toBeLessThan(0.4);
+  });
+});
+
+describe('the on-screen arc window — the fix for "entire lines go dark immediately"', () => {
+  const vb = refViewBox().split(/\s+/).map(Number) as [number, number, number, number];
+  const fam = refFamily(1, GATE_COUNT, true);
+
+  it('returns a window strictly inside the arc, because most of each curve is off-frame', () => {
+    // This is the measurement the whole fix rests on: only part of each curve is ever in the picture, so a dash
+    // sweeping the WHOLE arc is off-screen for most of its cycle. Measured in the reference's own geometry, each
+    // stroke is entirely absent for 25-59% of its cycle, mean 42%.
+    for (const t of fam) {
+      const track = parseTrack(t.d);
+      const { a, b } = visibleWindow(track, vb);
+      expect(a, 'window starts before the arc').toBeGreaterThanOrEqual(0);
+      expect(b, 'window ends past the arc').toBeLessThanOrEqual(track.total + 1e-6);
+      expect(b, 'empty or inverted window').toBeGreaterThan(a);
+      // Strictly inside at BOTH ends — if a window ever covered the whole arc, clipping to it would be a no-op
+      // and the blank would silently come back.
+      expect(a / track.total, 'the curve starts on screen, so nothing is being clipped').toBeGreaterThan(0.05);
+      expect(b / track.total, 'the curve ends on screen, so nothing is being clipped').toBeLessThan(0.95);
+    }
+  });
+
+  it('every sampled point inside the window is in the box, and the ends bracket the visible run', () => {
+    const track = parseTrack(fam[12].d);
+    const { a, b } = visibleWindow(track, vb);
+    const inBox = (p: { x: number; y: number }) =>
+      p.x >= vb[0] && p.x <= vb[0] + vb[2] && p.y >= vb[1] && p.y <= vb[1] + vb[3];
+    // The endpoints are the first and last in-box samples, so just outside them the curve has left the box.
+    expect(inBox(pointAt(track, a))).toBe(true);
+    expect(inBox(pointAt(track, b))).toBe(true);
+    expect(inBox(pointAt(track, Math.max(0, a - track.total * 0.03)))).toBe(false);
+    expect(inBox(pointAt(track, Math.min(track.total, b + track.total * 0.03)))).toBe(false);
+  });
+
+  it('degrades to the whole arc rather than an empty window', () => {
+    // A curve with no sampled point in the box must not come back as a zero-width window: a caller clamping
+    // travel to it would pin the dash to a single spot forever. Falling back to the full arc reproduces the
+    // unclipped behaviour instead, which is merely the old defect rather than a frozen stroke.
+    const track = parseTrack(fam[0].d);
+    const elsewhere: [number, number, number, number] = [100000, 100000, 10, 10];
+    expect(visibleWindow(track, elsewhere)).toEqual({ a: 0, b: track.total });
+  });
+
+  it('a bigger box can only widen the window', () => {
+    const track = parseTrack(fam[8].d);
+    const tight = visibleWindow(track, vb);
+    const loose = visibleWindow(track, [vb[0] - 200, vb[1] - 200, vb[2] + 400, vb[3] + 400]);
+    // Why this matters: the window is computed against the viewBox at BUILD time, but `meet` letterboxes and an
+    // SVG clips to its element, so the real on-screen region is a superset. Monotonicity is what makes that
+    // approximation safe in the right direction — the shipped window is always inside what is visible.
+    expect(loose.a).toBeLessThanOrEqual(tight.a);
+    expect(loose.b).toBeGreaterThanOrEqual(tight.b);
   });
 });

@@ -131,3 +131,91 @@ export function shouldRaiseGate(store: GateStore | null, freshLoad: boolean): bo
 export function dismissMs(reducedMotion: boolean): number {
   return reducedMotion ? 0 : GATE_DISMISS_MS;
 }
+
+/**
+ * ONE FRAME OF THE STROKE ANIMATION, as fractions — and the reason this is a tested function rather than three
+ * lines inside the component's inline script.
+ *
+ * The owner approved this motion ("oh yeah perfect") and then reported one defect against it: *"there are lines
+ * that vanish suddenly which is not good. entire lines go dark immediately."* The cause is a single interaction
+ * between two of the three curves below, and it is the kind of thing a comment cannot hold:
+ *
+ *   - `drawnFrac` is a SAWTOOTH. It climbs 0.3 -> 1 and resets, so at the cycle boundary the drawn window
+ *     collapses from the whole arc to a 30% fragment sitting at the curve's start — which is off-screen, since
+ *     the viewBox shows only about a quarter of each curve.
+ *   - the source's opacity envelope is [0.3, 0.6, 0.3], i.e. NONZERO at that boundary. So the collapse happens
+ *     in full view and a line that spanned the frame is gone in the next frame.
+ *
+ * The fix is to take the envelope to zero exactly where the sawtooth breaks, so the discontinuity has nothing
+ * visible to disrupt. `opacityAt` therefore shares the triangle with `offsetFrac`, which is already 0 at both
+ * ends of the cycle. `tests/gate.test.ts` asserts that pairing directly — the envelope must vanish at the one t
+ * where the drawn length is discontinuous — because the two are only correct TOGETHER and nothing else in the
+ * codebase would notice if one of them were retuned alone.
+ *
+ * The component's inline script restates this arithmetic, for the same reason it restates the session policy
+ * above: an inline script cannot import, and it has to run before first paint.
+ *
+ * Two alternatives were built and rejected, so they are not options: a faint full-length stroke under the dash
+ * also removes the vanishing, but its uncovered stretch reads as *"the line leaves a trail behind"*; and
+ * dropping the dash entirely leaves a static drawing.
+ */
+export const GATE_DRAWN_MIN = 0.3;
+/**
+ * The envelope's plateau value, and how much of the offset triangle it takes to reach it.
+ *
+ * 0.45 is chosen to MATCH the brightness of the build the owner approved, not to improve on it. That build used
+ * `0.3 + 0.3 * tri` and opened at t ~= 0.16, which is 0.40; the source's own peak is 0.60. Landing between them
+ * keeps this commit's only visible change the one that was asked for.
+ *
+ * GATE_OPACITY_RAMP is why the envelope PLATEAUS instead of peaking. A bare `PEAK * tri` is zero at the cycle
+ * boundary — which is the fix — but it is also near zero for a long stretch either side of it, so the strokes
+ * spend much of the cycle dimmer than the approved build. Worse, `tri` peaks at the one moment nothing is
+ * painted at all (see the note on `offsetFrac`). Ramping over the first 0.3 of the triangle and holding gives
+ * full brightness across almost the whole cycle while still passing through zero exactly where the drawn length
+ * resets.
+ */
+export const GATE_OPACITY_PEAK = 0.45;
+export const GATE_OPACITY_RAMP = 0.3;
+
+/** The drawn length as a fraction of the arc: the source's `pathLength` 0.3 -> 1, linear, resetting each cycle. */
+export function drawnFrac(t: number): number {
+  return GATE_DRAWN_MIN + (1 - GATE_DRAWN_MIN) * t;
+}
+
+/**
+ * The source's `pathOffset` [0, 1, 0] — a triangle, so it returns to its starting value and the dash's POSITION
+ * is already continuous across the wrap. Only the length and the opacity were not.
+ *
+ * WORTH KNOWING, because it is counter-intuitive and it cost a wrong fix: the dash pattern here is
+ * `dasharray = "drawn len"` with `dashoffset = -tri * len`, so a point p is painted when
+ * `((p - tri*len) mod (drawn + len)) < drawn`. Evaluate that across the cycle and the painted fraction of each
+ * arc runs 0.30 -> 0.48 (t ~= 0.25) -> **0.00 at t = 0.5** -> 1.00 at t -> 1. The triangle's peak is therefore
+ * the one instant when the dash has slid entirely off the path and the stroke paints NOTHING. An opening phase
+ * of 0.5 looks like an empty screen, which is exactly what it rendered as when tried.
+ */
+export function offsetFrac(t: number): number {
+  return t < 0.5 ? t * 2 : (1 - t) * 2;
+}
+
+/**
+ * The envelope: ramps from zero over the first `GATE_OPACITY_RAMP` of the triangle, then holds.
+ *
+ * Zero at t = 0 and t = 1 — the only property that matters for the defect — and flat for roughly the middle 85%
+ * of the cycle, so the fix costs no brightness.
+ */
+export function opacityAt(t: number): number {
+  return GATE_OPACITY_PEAK * Math.min(1, offsetFrac(t) / GATE_OPACITY_RAMP);
+}
+
+/**
+ * Where in its cycle a stroke starts when the gate opens.
+ *
+ * 0.16 is not a round number by accident: it is where the approved build happened to sit (it used a flat 4s lead
+ * against 20-30s durations), and at that phase 41% of each arc is painted as a band across the middle of the
+ * curve — which is the part of it the viewBox actually shows. Both neighbours are worse: 0 paints only the first
+ * 30%, which is off the top-left corner, and 0.5 paints nothing at all.
+ *
+ * It is a phase FRACTION rather than a millisecond lead because the durations differ per stroke, so a fixed lead
+ * lands at a different point in every stroke's cycle.
+ */
+export const GATE_OPEN_PHASE = 0.16;

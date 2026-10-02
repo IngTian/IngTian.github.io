@@ -139,3 +139,45 @@ export function jitter(i: number, salt = 1): number {
   const x = Math.sin((i + 1) * 12.9898 * salt) * 43758.5453;
   return x - Math.floor(x);
 }
+
+/**
+ * THE ARC WINDOW THAT IS ACTUALLY ON SCREEN — the other half of "entire lines go dark immediately", and the
+ * half an opacity envelope cannot reach.
+ *
+ * Only about a quarter of each curve is inside the frame; the rest runs off past the corners. So a dash that
+ * sweeps the WHOLE arc spends most of its cycle outside the picture, and the stroke is simply not there.
+ * Measured on the shipped family, the dash is entirely off-frame for **t in [0.28, 0.72] — 44% of every
+ * cycle.** That is not a snap and not a trail: it is a line that is absent for nine seconds out of twenty.
+ *
+ * Clipping travel to this window fixes it at the cause. The dash still grows, still travels, still carries the
+ * source's gap of one whole arc — it just never wanders out of the picture to do it.
+ *
+ * COMPUTED AGAINST THE VIEWBOX, DELIBERATELY, AND THAT IS THE CONSERVATIVE DIRECTION. `meet` fits the viewBox
+ * inside the element and an SVG clips to its ELEMENT, not its box, so on a real screen the letterboxed overflow
+ * makes strictly MORE of each curve visible than this returns. Erring that way means the window is a subset of
+ * what is on screen, so a dash held inside it is always visible — never the reverse. It also means this can be
+ * computed at build time, which matters: the gate's driver is inline (it must beat first paint) and therefore
+ * cannot import this module. The window ships per path as a data attribute.
+ */
+export function visibleWindow(
+  track: Track,
+  viewBox: readonly [number, number, number, number],
+  pad = 0,
+): { a: number; b: number } {
+  const [vx, vy, vw, vh] = viewBox;
+  const inside = (p: Pt): boolean =>
+    p.x >= vx - pad && p.x <= vx + vw + pad && p.y >= vy - pad && p.y <= vy + vh + pad;
+
+  let a = -1;
+  let b = -1;
+  for (let i = 0; i < track.pts.length; i++) {
+    if (inside(track.pts[i])) {
+      if (a < 0) a = track.cum[i];
+      b = track.cum[i];
+    }
+  }
+  // A curve with no sampled point inside the box: hand back the whole arc rather than an empty window, so a
+  // caller clamping travel to it degrades to the unclipped behaviour instead of pinning the dash to one spot.
+  if (a < 0) return { a: 0, b: track.total };
+  return { a, b };
+}

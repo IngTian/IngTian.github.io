@@ -411,10 +411,10 @@ describe('the first-visit gate, as shipped', () => {
   });
 
   it('marks the decorative field aria-hidden and the dialog labelled', () => {
-    // A canvas now, not an svg — the field became one when the trails needed a decaying tail, which is per-pixel
-    // alpha falloff and not something a stroke can carry. Element-agnostic on purpose: what matters to a11y is
-    // that the decorative field is hidden from the tree, not which tag draws it.
-    expect(home!.markup).toMatch(/<canvas[^>]*class="[^"]*gate-field[^"]*"[^>]*aria-hidden="true"/);
+    // An SVG, and it went back to being one: the canvas version was built on a misreading of "trails of
+    // asteroids" and the owner had already approved the SVG dash. What matters to a11y either way is that the
+    // decorative field is hidden from the tree.
+    expect(home!.markup).toMatch(/<svg[^>]*class="[^"]*gate-field[^"]*"[^>]*aria-hidden="true"/);
     expect(home!.markup).toMatch(/aria-labelledby="gate-name"/);
     expect(home!.markup).toMatch(/id="gate-name"/);
   });
@@ -437,53 +437,50 @@ describe('the first-visit gate, as shipped', () => {
     }
   });
 
-  it('PAINTS TRAVELLING TRAILS ON A CANVAS — no dash anywhere, and not a still image either', () => {
-    // THIS REPLACES SEVEN EARLIER ASSERTIONS AND IS THE CONCLUSION OF THE WHOLE ARC.
+  it('KEEPS THE APPROVED TRAVELLING DASH, AND FADES TO ZERO WHERE IT RESETS', () => {
+    // Two things, and the pair is the point.
     //
-    // Six dash schemes shipped on this field. Each was a correct implementation of something and each was
-    // reported as a defect, because a dash makes a line PARTIAL and its gap has only two readings: empty, and
-    // the stroke is absent whenever the gap covers the quarter of the curve the viewBox shows ("entire lines go
-    // dark immediately"); or faintly filled from a layer underneath, and the gap becomes a dimmer continuation
-    // ("the line leaves a trail behind. remove that trail."). Same artifact, two descriptions, not tunable.
+    // (1) THE MOTION IS THE APPROVED ONE. The owner reviewed this exact treatment — a dash travelling along each
+    //     curve, written in real user units from the arc length — and said "oh yeah perfect. now that's what im
+    //     talking about." Everything after it was fixing the ONE defect he reported against it, and two of those
+    //     attempts replaced the motion instead: a permanent faint stroke under the dash (which he read as "the
+    //     line leaves a trail behind"), then no dash at all (a static drawing), then a canvas of comet trails
+    //     from over-reading "like the trails of asteroids". So this pins the dash as present.
     //
-    // What was actually wanted was an asteroid trail — a bright head with a tail decaying to nothing over an
-    // empty background — which is per-pixel alpha falloff along a stroke. That is a canvas, not an SVG stroke.
-    // So the field is a canvas, and the two things worth pinning are the two rejected states:
-    const field = home!.markup.match(/<canvas[^>]*class="[^"]*gate-field[^"]*"[^>]*>/g) ?? [];
-    expect(field.length, 'the gate field is not a canvas any more — did an SVG come back?').toBe(1);
-
-    // 1. NOT PARTIAL. No gate stroke or rule may carry a dash. Scoped to gate rules: the homepage stylesheet is
-    //    shared and the Choice and Rules slides use dashes legitimately (.ch-line--*, .ru-traj and their faint
-    //    guides), so an unscoped scan fails on code this test has no opinion about.
-    //
-    //    SPLIT, NOT A REGEX. The obvious pattern for "a rule whose selector mentions .gate" is
-    //    /[^{}]*\.gate[a-z-]*[^{}]*\{[^}]*\}/g, and on a ~100KB stylesheet its two unbounded [^{}]* runs
-    //    backtrack for 4.5 SECONDS — it passed in isolation and blew vitest's 5s timeout inside the full suite,
-    //    which reads as a broken assertion rather than a slow one. Splitting on braces is linear.
-    const css = gateCss();
-    const gateRules = css.split('}').filter((seg) => {
-      const brace = seg.lastIndexOf('{');
-      return brace !== -1 && seg.slice(0, brace).includes('.gate');
-    });
-    expect(gateRules.length, 'no gate rules found in the shipped CSS — the selector drifted').toBeGreaterThan(3);
-    for (const r of gateRules) {
-      expect(r, `a dash is back in a gate rule: ${r.trim()}`).not.toMatch(/stroke-das/);
+    // (2) THE DEFECT IS FIXED AT ITS CAUSE. "entire lines go dark immediately" happened because the drawn length
+    //     is a sawtooth — it collapses from the whole arc to a 30% fragment at the curve's off-screen start once
+    //     per cycle — while the source's opacity envelope is 0.3, not 0, at that instant. The envelope now shares
+    //     the offset triangle and so is zero exactly there. The arithmetic is unit-tested in tests/gate.test.ts;
+    //     what this checks is that the SHIPPED script is driven by those same constants, because the inline
+    //     script cannot import and a hardcoded copy is exactly the kind of thing that drifts.
+    const paths = home!.markup.match(/<path[^>]*class="[^"]*gate-trail[^"]*"[^>]*>/g) ?? [];
+    expect(paths.length, 'the gate shipped no strokes at all').toBeGreaterThanOrEqual(1);
+    for (const p of paths) {
+      // vector-effect defeats the renderer's stroke caching across every full-screen path; measured as a real
+      // cost here, and the source does not use it either.
+      expect(p, `vector-effect is back on a gate stroke: ${p}`).not.toMatch(/vector-effect/);
+      expect(p, `the arc length no longer reaches the client, so the dash cannot be written: ${p}`)
+        .toMatch(/data-len="\d/);
     }
-    expect(home!.markup, 'an SVG stroke field is back on the gate').not.toMatch(/class="gate-trail"/);
 
-    // 2. NOT STATIC. The painter has to actually ship, or "no dash" is satisfied by a blank canvas — and a field
-    //    that does not move was itself rejected ("i think yours is basically static"). The script is a bundled
-    //    module, so assert the homepage pulls in a module that carries the painter's own marker rather than
-    //    guessing at a hashed filename.
-    // `.html`, NOT `.markup` — stripNonMarkup removes every <script> on purpose, so scanning markup for script
-    // tags finds zero and the assertion fails while the painter is present and working.
-    const scripts = [...home!.html.matchAll(/<script[^>]*src="([^"]+)"/g)].map((m) => m[1]);
-    expect(scripts.length, 'the homepage ships no module scripts at all').toBeGreaterThan(0);
-    const painted = scripts.some((src) => {
-      const file = join(DIST, src.replace(/^\//, ''));
-      return existsSync(file) && /destination-out/.test(readFileSync(file, 'utf8'));
-    });
-    expect(painted, 'no shipped script composites a decaying tail — the trails are gone').toBe(true);
+    // No second permanently-drawn layer. That is what read as a trail, so it is worth a test rather than a note.
+    expect(home!.markup, 'a faint underlay is back — it will read as a trail behind every line')
+      .not.toMatch(/class="gate-(base|haze)"/);
+    expect(home!.markup, 'the field is a canvas again; the SVG dash is the approved treatment')
+      .not.toMatch(/<canvas[^>]*gate-field/);
+
+    // The script is inline (it has to beat first paint), so it is in the HTML itself rather than a module.
+    const html = home!.html;
+    expect(html, 'the script no longer writes a dash — the strokes cannot be travelling')
+      .toMatch(/strokeDasharray/);
+    // define:vars inlines the tested constants as `const PEAK = 0.72` (or similar). Assert the envelope is a
+    // bare multiple of the triangle: an additive floor is precisely the bug.
+    expect(html, 'the opacity envelope has an additive floor again, so the reset will be visible')
+      .not.toMatch(/style\.opacity\s*=\s*String\(\s*0?\.\d+\s*\+/);
+    // The envelope must be the PLATEAU form driven by both tested constants — a bare `PEAK * tri` passes the
+    // zero-crossing check above while being dimmer than the approved build for most of the cycle.
+    expect(html, 'the envelope is not driven by the tested constants, or lost its plateau')
+      .toMatch(/PEAK\s*\*\s*Math\.min\(\s*1\s*,\s*tri\s*\/\s*RAMP\s*\)/);
   });
 
   it('parks the drift under reduced motion, and needs nothing undone to do it', () => {

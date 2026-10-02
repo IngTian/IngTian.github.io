@@ -139,7 +139,7 @@ src/
   lib/gate.ts                       # the first-visit gate's POLICY: session flag, fresh-load test, dismissal timing, isCovered — unit-tested
   lib/gatePaths.ts                  # the gate's shared TOOLKIT only: viewBox, the Trail shape, the centripetal spline. It imports nothing
   lib/gateRefPaths.ts               # the gate's TRACKS: the ported 21st.dev geometry, each curve's arc length, the join smoothing, GATE_COUNT and the zoom — unit-tested
-  lib/gateComets.ts                 # how something TRAVELS one: d-string -> arc-length polyline, pointAt, the hand-rolled `meet` fit, deterministic jitter — unit-tested
+  lib/gateComets.ts                 # d-string -> arc-length polyline, pointAt, visibleWindow (which arc of a curve is ON SCREEN — the vanish fix), the hand-rolled `meet` fit — unit-tested
   lib/gateLines.ts                  # combed contours of the hero's field — built, compared in /proto-gate, NOT shipped (see below)
   lib/gateProtoShapes.ts            # four black-hole candidates, /proto-gate only, deliberately barely tested
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
@@ -212,14 +212,17 @@ regenerates it.
 Every one of them is a plain Astro component or page with a bundled `<script>`,
 **not** an island (see *Stack*). The shared contract:
 
-**`Gate` carries TWO scripts, and the split is deliberate.** An `is:inline` one holds the
-policy — raise, swallow, dismiss, teardown — because it has to run before first paint, and
-inline means it cannot import, which is why `lib/gate.ts`'s rules are *restated* there and
-unit-tested separately. A second, ordinary bundled `<script>` paints the comet field, and
-being bundled is the point: it imports the geometry and both gates instead of duplicating
-them, and it is allowed to arrive a frame late because the gate is already up. If you need
-something in a component before first paint, inline it and accept restating; otherwise
-don't, and keep the imports.
+**`Gate`'s script is `is:inline`, and that constraint shapes the component.** It has to run
+before first paint — it is what raises the gate — and an inline script cannot import. So
+everything it needs either gets *restated* in it (the session policy, which `lib/gate.ts`
+holds and unit-tests independently) or gets handed in through `define:vars` (the dash's
+tuned numbers: `GATE_DRAWN_MIN`, `GATE_OPACITY_PEAK`, `GATE_OPACITY_RAMP`,
+`GATE_OPEN_PHASE`). Prefer `define:vars` for anything numeric: a restated number drifts
+from its test silently, and these four decide whether strokes vanish.
+  Anything that can be computed at BUILD time should be, for the same reason — that is why
+each curve's on-screen arc window is a `data-` attribute rather than something the script
+works out (see the gate section). A bundled, importing second script was tried and is gone
+with the canvas field it painted.
 
 - **Re-init on `astro:page-load`, with a teardown**, because `ClientRouter` is on
   and a View Transition replaces the DOM without a fresh page load. A script that
@@ -370,10 +373,12 @@ kindergarten"*. Both survivors are derived numbers, not preferences:
      2.107× the authored widths land at **1.05–3.27 px, which is the reference's own figure to two
      decimals.** Two dials were compensating for a third. When a drawing looks wrong at one size,
      check the size before retuning what is in it.
-2. **The ANIMATION is not the source's at all: there is no dash, and the field drifts instead.** This
-   is the biggest departure and the most firmly settled — six dash schemes were built and every one
-   was rejected. The section *"THERE IS NO DASH ON THE STROKES"* below is the whole argument; read it
-   before touching the motion.
+2. **The animation IS the source's travelling dash, with two corrections.** The dash's arithmetic is
+   faithful (verified against framer-motion's `buildSVGPath`, not inferred); what changed is that the
+   opacity envelope reaches zero where the drawn length resets, and the dash's travel is clipped to
+   the arc that is actually on screen. Both exist to fix *"entire lines go dark immediately"*, which
+   is a defect the reference has too. The section below is the whole argument — read it before
+   touching the motion, because four earlier attempts replaced the motion instead of fixing it.
 
 Two further departures that are the owner's dials rather than fidelity decisions:
 
@@ -425,68 +430,71 @@ The three that were removed, because each is a way to get this wrong again:
   survives: **when a decision is copied from a reference, write down what it depends on**, because
   the thing that invalidates it is usually a change somewhere else.
 
-**THE FIELD IS A CANVAS OF TRAVELLING COMET TRAILS, AND THE CURVES ARE NO LONGER DRAWN AT ALL —
-they are the TRACKS the heads move along.** This is the settled answer after seven attempts, and the
-brief that produced it is the owner's: *"what i imagine is lines travelling through the background
-like the trails of asteroids."*
+**THE FIELD IS AN SVG OF TRAVELLING DASHES — the approved treatment — AND THE TWO THINGS THAT WERE
+WRONG WITH IT ARE FIXED AT THEIR CAUSES.** The owner reviewed this exact motion and said *"oh yeah
+perfect. now that's what im talking about"*, then reported four follow-ups. Three of them (zoom,
+smoothing, count) are above. The fourth — *"there are lines that vanish suddenly which is not good.
+entire lines go dark immediately"* — took four wrong attempts, each of which replaced the motion
+instead of fixing it, so **read this before changing the animation**.
 
-`components/Gate.astro` (canvas, rAF loop, teardown) + `lib/gateComets.ts` (pure, tested: the track
-parser, arc-length lookup, the `meet` fit, the deterministic jitter).
+`components/Gate.astro` (markup + the inline driver) + `lib/gate.ts` (`drawnFrac` / `offsetFrac` /
+`opacityAt` / `GATE_OPEN_PHASE`, unit-tested) + `lib/gateComets.ts` (`parseTrack` / `visibleWindow`,
+unit-tested).
 
-**Why a canvas, and why no dash can ever come back.** Six dash schemes shipped here and every one was
-reported as a defect, because a dash makes a line **partial** and its gap has only two readings:
+**First, the dash semantics, verified against framer-motion's source rather than inferred.**
+`buildSVGPath` sets `pathLength="1"` and writes `stroke-dasharray = "<L> <S>"` and
+`stroke-dashoffset = "<-O>"`, with `pathSpacing` defaulting to **1**. So the period is `L + 1`, which
+always exceeds the arc: **at most one dash is ever on the path, and it CLIPS at the end rather than
+wrapping.** The painted span is `[O, min(1, O + L))`, i.e. a dash whose leading edge sits at `O` and
+slides forward. Several earlier "fixes" here assumed it wrapped and reasoned in circles from that.
 
-- leave the gap empty and the stroke is simply **absent** whenever it covers the quarter of the curve
-  the viewBox shows — *"entire lines go dark immediately"*;
-- fill it faintly with a permanent layer underneath and the gap becomes a **dimmer continuation** of a
-  brighter segment — *"seems like the line leaves a trail behind. remove that trail."*
+**Second, the vanishing had TWO separate causes.** Fixing either alone leaves the complaint standing:
 
-Those are one artifact described from two sides, and it is not tunable: the last two attempts were
-*correct* implementations (a faithful reproduction of framer-motion's `pathLength`/`pathOffset`, then a
-constant-length dash whose cycle had no discontinuity anywhere) and both still lost. Removing the dash
-entirely then produced the opposite complaint — a static drawing. What was actually wanted is an
-**asteroid trail: a bright head with a tail decaying to nothing over an empty background**, which is
-per-pixel alpha falloff *along* a stroke. SVG cannot express that; on a canvas it is one compositing
-call. **So there is no `stroke-dasharray` anywhere on the gate, and the next person wanting to animate
-these curves should reach for the canvas, not for a dash.**
+1. **A visible RESET.** `drawnFrac` is a sawtooth — it ends the cycle at the whole arc and begins the
+   next at 30% of it, parked at the curve's off-screen start — while the source's envelope is `0.3` at
+   that instant, not 0. So a line that spanned the frame was gone in the next frame. `opacityAt` now
+   takes the envelope to **zero exactly where the sawtooth breaks**, so the discontinuity has nothing
+   visible to disrupt. Measured: the collapse now happens at **alpha 0.0019**.
+   - It **plateaus** rather than peaking (`GATE_OPACITY_RAMP`), for two reasons. A bare `PEAK * tri`
+     is near zero for a long stretch either side of the boundary, which would dim most of the cycle;
+     and `tri` peaks at `t = 0.5`, which is the one moment **nothing is painted at all**.
+2. **A 42% BLANK.** Only part of each curve is ever in frame, so a dash sweeping the whole arc spends
+   most of its cycle outside the picture: measured, each stroke was **entirely absent for 25–59% of
+   its own cycle, mean 42%** — in the reference too. No opacity curve can reach this. `visibleWindow`
+   measures each curve's on-screen arc span at build time and ships it as `data-a`/`data-b`; the
+   driver sweeps the dash's leading edge over `[a + m - drawn, b - m]` instead of `0 → len`, so the
+   painted span always straddles the frame. Measured after: absence **0.5%** of the cycle (that
+   remainder is the deliberate zero above), minimum coverage never below **18%** of the window. A dash
+   END is on frame far more of the time, so it reads as *more* motion, not less.
+   - The window is computed against the **viewBox**, at build time, and both choices are deliberate.
+     Build time because the driver is inline and cannot import; the viewBox because `meet`
+     letterboxes and an SVG clips to its **element**, so the real visible region is a superset — the
+     shipped window is always *inside* what is on screen, which is the safe direction. A test pins
+     that monotonicity.
 
-How it works, and the parts that are load-bearing:
+**`GATE_OPEN_PHASE = 0.16`** is where a stroke starts when the gate opens, and it is not arbitrary:
+integrating the painted fraction across the cycle gives 0.30 at `t=0`, a maximum near `t=0.25`, **zero
+at `t=0.5`**, and 1.00 as `t → 1`. Both obvious choices are wrong — phase 0 paints only the curve's
+first 30%, which is off the top-left corner (**the reference itself therefore opens on an empty
+frame**), and phase 0.5 paints nothing, which rendered as a blank screen when tried. 0.16 is where the
+approved build happened to sit, and it lands on the envelope's plateau so the gate does not open
+dimmer than it runs.
 
-- **The tail is `destination-out`, not a colour.** Each frame the whole surface has its alpha scaled
-  down and only the newest sliver of travel is drawn, so every head trails an exponential. Fading
-  toward a background *colour* would need an opaque canvas, and an opaque full-screen layer is exactly
-  what the fluid sky's first invariant forbids.
-- **The decay is a TIME constant (`TAIL_TAU = 0.62s`), not a per-frame factor.** A per-frame constant
-  makes tail length depend on frame rate — shorter on a 120Hz display, longer on a busy machine.
-- **Travel is parameterised by ARC LENGTH, which is what `lib/gateComets.ts` is for.** Parameterise by
-  the Bézier's `t` instead and a head races through the curve's flat stretches and crawls through its
-  bends, which reads as a speed glitch rather than as a moving object. A test pins even speed to
-  within 5%.
-- **The wrap is invisible by geometry, not by arithmetic.** Both ends of every curve sit well outside
-  the viewBox — the family runs from `(-380,-189)` to `(684,875)` inside a box of
-  `(-124,-56,944,429)` — so a head restarts off-screen. That is the seam every dash scheme fought
-  with, and here it simply cannot be seen.
-- **Phases spread over the whole track**, deterministically (`jitter`, never `Math.random()`), so some
-  heads are mid-frame, some have not arrived and some have left. The aligned-front defect that cost a
-  round of its own is structurally impossible now.
-- **`fitMeet` reproduces `preserveAspectRatio="xMidYMid meet"` by hand**, because the renderer no
-  longer does that arithmetic and the composition — the zoom in particular, measured against the
-  owner's reference screenshot — must not shift just because the element type changed. Tested against
-  the SVG behaviour it replaces.
-- **No geometry reaches the HTML.** The canvas is empty markup and the module script imports the
-  curves itself, so the 48 `d`-strings are not in the homepage response at all.
+**Four rejected attempts at this, so they are not options:**
 
-Measured: **60.0 fps** from a renderer trace (not rAF — see *Conventions*), DPR capped at 2 like the
-hero's.
+- a faint full-length stroke under the dash — stops the vanishing, but its uncovered stretch reads as
+  *"seems like the line leaves a trail behind. remove that trail."*;
+- no dash at all, with the groups drifting by transform — *"now it's just this"*, a static drawing;
+- a canvas of comet trails (`destination-out` tails over an empty field) — built from over-reading
+  *"like the trails of asteroids"* as literal comets; *"i think u misunderstood me."*;
+- scattering the dash phases — fine in itself, but it was a fix for the aligned-front artifact that
+  only existed because of the underlay.
 
-**This also makes the gate a relative of the hero rather than an unrelated borrowed drawing.**
-`TerrainHero` paints its gradient-descent walkers as fading comet trails; the gate now speaks the same
-language on the ported curves. Worth knowing if the borrowed-geometry question is ever revisited — the
-*motion* is now the site's own even though the tracks are not.
-
-`tests/distSmoke.test.ts` pins both rejected states against the build: no gate stroke or gate CSS rule
-carries a dash, **and** a shipped script must still composite a decaying tail — because "no dash" on
-its own is also satisfied by a dead still frame, which is its own rejected state.
+**There is also a v2 of the reference, and it is NOT what this ports.** The same author rewrote
+`background-paths` in June 2025: 37 generated sine waves in `viewBox="-2400 -800 4800 1600"` with
+`slice`, a purple→pink→blue gradient stroke, no dash, and the only motion a slow `y` bob. The owner's
+link is to **v1** — he described the reference as black and white, which v2 is not. If a future ask
+sounds like "gentle bobbing gradient waves", that is v2 and it is a different component.
 
 ### Four things were rejected here, each after looking at it
 
@@ -607,16 +615,17 @@ enough to engage the deck on a viewport whose styles think it's a phone).
 **The number lives in two places and they are synced BY HAND.** `@media
 (max-width: var(--x))` is not valid CSS, so there is no way to feed one value to
 both. **If you change `PHONE_MAX_WIDTH`, change every `@media (max-width: 640px)`
-block with it.** `grep -rn 'max-width: 640px' src` returns 15 hits in 12 files, and
-two of the 15 are the prose in `viewport.ts` itself, so there are **13 real CSS
+block with it.** `grep -rn 'max-width: 640px' src` returns 16 hits in 13 files, and
+two of the 16 are the prose in `viewport.ts` itself, so there are **14 real CSS
 blocks**: `global.css` ×2, `experience` ×2, and one each in `CornerNav`, `Toc`,
-`DescentPath`, `ProjectCard`, `FluidSky`, `Heights`, `404`, `research` and
-`writing/[...slug]`. Re-run the grep rather than trusting this sentence — it has now
-been wrong in both directions. It said "15 hits … 13 blocks" for a release after
-`Gate.astro` added a fourteenth, then "16 … 14" for a release after `Gate` dropped it
-again: the gate's field became a canvas, so it halves its comet count through
-`isPhone()` instead of through a media query. A grep-backed checklist stops being one
-the moment the number is copied rather than re-measured. (This list used to include "the two proto sections". There are
+`DescentPath`, `ProjectCard`, `FluidSky`, `Heights`, `404`, `research`,
+`writing/[...slug]` and `Gate` (which halves its stroke count rather than changing
+layout). **Re-run the grep rather than trusting this sentence — it has now been wrong
+three times, in both directions.** "15 … 13" was right until `Gate.astro` added a
+fourteenth block; then "16 … 14" was right until the gate's field briefly became a
+canvas and dropped out; now the SVG field is back and so is its block. The sentence
+has never been wrong because someone miscounted — only because someone copied the
+number instead of re-measuring it. (This list used to include "the two proto sections". There are
 no proto *sections* — `src/sections/` holds only the seven homepage slides plus
 Signature — and the one surviving proto route, `/proto-sketches`, breaks at 820px,
 not 640: it is an internal gallery, so it is not part of the phone treatment.)
@@ -1005,15 +1014,15 @@ titles came to rest hard against the browser chrome — the lead is a number in
   themes (brightened to `#e0574a` for the dark ground).
 - **Motion:** animate only `transform` / `opacity`; NEVER animate `filter: blur`
   (bake it).
-  - **The rule is about CSS/DOM animation, and a canvas is outside it, not an exception
-    to it.** The gate's comet trails are painted — the whole point of them is a tail that
-    decays per pixel — but they are drawn into a `<canvas>` by a rAF loop, so there is no
-    animated CSS property and no compositor layer being invalidated. The hero's terrain
-    works the same way. What the rule forbids is animating paint properties on DOM nodes,
-    and the gate did exactly that for several commits (`stroke-dasharray` on 48–72
-    full-screen paths) before all six versions of it were rejected on looks. **Both the
-    rule and the design now point the same way: if a line has to draw itself or trail,
-    that is canvas work.** ALL motion is gated behind `@media (prefers-reduced-motion:
+  - **One exception, and it is the gate's strokes.** They animate `stroke-dasharray` and
+    `stroke-dashoffset`, which are **paint** properties on DOM nodes — exactly what this rule
+    forbids — because a line that draws itself along its own length cannot be expressed as a
+    transform or a fade. It is affordable because ONE rAF writes all 48 dashes, so a frame
+    costs one style/paint pass rather than 48 competing animations, and because the gate is
+    gone after a gesture. A canvas version that would have satisfied the rule was built and
+    rejected on looks, so the exception is the shipped design, not a shortcut. **Do not
+    generalise it to anything that persists while a page is being read**, and do not "fix"
+    the gate to comply. ALL motion is gated behind `@media (prefers-reduced-motion:
   no-preference)` via `lib/motion.ts`. The no-motion state must look *finished* —
   it's also the Firefox fallback (`animation-timeline` isn't in Firefox yet), and
   it's what a reduced-motion reader gets instead of the deck.
