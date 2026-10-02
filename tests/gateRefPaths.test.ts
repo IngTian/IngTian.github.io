@@ -4,7 +4,9 @@
 // two properties below are also the two I personally got wrong while reading it, which is why they are pinned
 // rather than trusted.
 import { describe, expect, it } from 'vitest';
-import { REF_COUNT, REF_POSITIONS, REF_VIEW_H, REF_VIEW_W, refFamily, refTrails } from '../src/lib/gateRefPaths';
+import {
+  REF_COUNT, REF_POSITIONS, REF_STROKE_SCALE, REF_VIEW_H, REF_VIEW_W, refFamily, refTrails,
+} from '../src/lib/gateRefPaths';
 
 describe('refFamily — transcribed exactly', () => {
   it('reproduces the source d-string for i = 0', () => {
@@ -50,9 +52,25 @@ describe('refFamily — transcribed exactly', () => {
     expect(F[0].opacity).toBeCloseTo(0.1, 3);
     // 0.1 + 35*0.03 = 1.15 in the source. An SVG stroke-opacity above 1 is invalid.
     expect(F[F.length - 1].opacity).toBe(1);
-    expect(F[F.length - 1].width).toBeCloseTo(1.55, 2);
     for (let i = 1; i < F.length; i++) {
       expect(F[i].opacity).toBeGreaterThanOrEqual(F[i - 1].opacity);
+    }
+  });
+
+  it('scales the WIDTHS down from the source, deliberately and by a stated factor', () => {
+    // THE ONE PLACE THIS PORT IS NOT A TRANSCRIPTION, so it is asserted against the source values times the
+    // factor rather than against literals — otherwise retuning the factor silently turns this into a test of
+    // nothing. Why it deviates: `meet` scales the 696-wide viewBox by the viewport width, which is 1.72x in a
+    // ~1200px demo container but 2.87x at 2000px. The source's authored 0.5-1.55 therefore renders as a
+    // hairline where it was designed and as 1.4-4.4 CSS px on a real desktop — "lines are again too thick",
+    // reported twice.
+    const F = refFamily(1);
+    expect(F[0].width).toBeCloseTo(0.5 * REF_STROKE_SCALE, 3);
+    expect(F[F.length - 1].width).toBeCloseTo(1.55 * REF_STROKE_SCALE, 3);
+    expect(REF_STROKE_SCALE, 'a scale above 1 would make them thicker than the source, never the intent')
+      .toBeLessThanOrEqual(1);
+    for (let i = 1; i < F.length; i++) {
+      expect(F[i].width).toBeGreaterThan(F[i - 1].width);
     }
   });
 });

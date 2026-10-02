@@ -46,6 +46,17 @@ export const REF_POSITIONS = [1, -1] as const;
  * `M-${380 - i * 5 * position}` — which is the NEGATIVE of (380 - 5ip), not (-380 - 5ip). Getting that wrong
  * is what flips the convergence into a translation, so the arithmetic is written out rather than inlined.
  */
+/**
+ * Stroke widths are scaled DOWN from the source's, and that is a deliberate deviation.
+ *
+ * The source ramps 0.5 -> 1.55 in user units, and `meet` scales a 696-wide viewBox by the viewport width: 1.72x
+ * in a ~1200px demo container, but 2.76x at 1920px and 2.87x at 2000px. So the same authored width that reads
+ * as a hairline in the original's own demo renders at 1.4-4.4 CSS px on a real desktop — "lines are again too
+ * thick", twice. 0.4 brings a 2000px-wide viewport back to roughly 0.55-1.7px, which is what the demo looks
+ * like at the size it was designed in.
+ */
+export const REF_STROKE_SCALE = 0.4;
+
 export function refFamily(position: number, count = REF_COUNT): Trail[] {
   return Array.from({ length: count }, (_, i) => {
     const dx = i * 5 * position;
@@ -65,7 +76,7 @@ export function refFamily(position: number, count = REF_COUNT): Trail[] {
       // stroke-opacity above 1 is invalid — the browser clamps it, so doing it here keeps the emitted
       // attribute honest rather than relying on the renderer to tidy up.
       opacity: Math.min(1, Math.round((0.1 + i * 0.03) * 1000) / 1000),
-      width: Math.round((0.5 + i * 0.03) * 100) / 100,
+      width: Math.round((0.5 + i * 0.03) * REF_STROKE_SCALE * 1000) / 1000,
     };
   });
 }
