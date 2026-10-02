@@ -20,10 +20,13 @@ import { name, roles } from '../data/profile';
 // end moves left) and its opacity ramps all the way 0.1 -> 1.0, so most strokes recede and a reader picks out
 // about eight over a haze. Our combed version structurally could not do the first part — its no-knot guarantee
 // needs a tilt that exceeds the field's maximum gradient, which forces the strokes parallel.
-import { REF_VIEW_H, REF_VIEW_W, refTrails } from '../lib/gateRefPaths';
+import { REF_POSITIONS, REF_VIEW_H, REF_VIEW_W, refFamily } from '../lib/gateRefPaths';
 import { GATE_DISMISS_MS, GATE_REVEAL_EVENT, GATE_SEEN_KEY, GATE_UP_ATTR } from '../lib/gate';
 
-const trails = refTrails();
+// The two mirrored families stay SEPARATE, as two groups. The original renders <FloatingPaths position={1} />
+// and position={-1}; keeping that split is also what makes the motion affordable — a group is one composited
+// layer, so two groups is two transforms instead of 72 paint-bound path animations. See the CSS.
+const families = REF_POSITIONS.map((p) => refFamily(p));
 const letters = [...`${name.first} ${name.last}`];
 ---
 
@@ -41,18 +44,17 @@ const letters = [...`${name.first} ${name.last}`];
         same authored width. meet still fills the screen, because the geometry runs far outside the viewBox
         (y -189..875) and an SVG clips to its element rather than to its viewBox.
 
-        vector-effect pins the stroke to the authored width in CSS px regardless of that scale, so 0.5 means
-        half a pixel and the faint end of the ramp stays genuinely hairline at any viewport. */}
-    {trails.map((t) => (
-      <path
-        class="gate-trail"
-        d={t.d}
-        style={`--i:${t.i}`}
-        stroke-opacity={t.opacity}
-        stroke-width={t.width}
-        vector-effect="non-scaling-stroke"
-        pathLength="1"
-      />
+        NO vector-effect HERE ANY MORE, and that was a performance decision as much as a fidelity one. It pins
+        the stroke to its authored CSS width regardless of scale, which made the lines hairline — but it also
+        defeats the renderer's stroke caching, and with 72 full-screen paths that is not free. The original does
+        not use it either; `meet` already removed the ~24% of extra weight that `slice` was adding, so the
+        widths below are the source's own and scale the way the source's do. */}
+    {families.map((fam, f) => (
+      <g class="gate-fam" data-fam={f}>
+        {fam.map((t) => (
+          <path class="gate-trail" d={t.d} stroke-opacity={t.opacity} stroke-width={t.width} />
+        ))}
+      </g>
     ))}
   </svg>
 
@@ -152,36 +154,42 @@ const letters = [...`${name.first} ${name.last}`];
   @media (prefers-reduced-motion: no-preference) {
     .gate { transition: opacity 600ms ease, visibility 600ms ease; }
 
-    /* THE MOTION, RESTORED. The owner: "in the original script ive shown you they got emotions" — the
-       original animates every path forever and this port had dropped it to a 1200ms one-shot, because an
-       endless full-viewport paint-bound animation was the wrong thing to add on top of a page already running
-       a WebGL shader and a terrain canvas.
-         IT IS AFFORDABLE NOW, and for a specific reason: while the gate is up, those two canvases are PAUSED
-       (see the data-gate-up flag and lib/gate.ts). The budget this animation needs is exactly the budget that
-       fix freed. So the loop is back, as the only thing moving on screen.
-         What the source does per path: pathLength 0.3 -> 1 once, pathOffset cycling 0 -> 1 -> 0, and element
-       opacity cycling 0.3 -> 0.6 -> 0.3, linear, over 20-30s, repeating forever. Here: pathLength="1" is an
-       ATTRIBUTE on each path (it is an SVG attribute, not a CSS property — as a declaration it is silently
-       dropped), which normalises every path's length to 1 so a single dasharray fits all 72 regardless of
-       their real lengths. A `0.3 0.7` dash is therefore a segment covering 30% of the path, and travelling
-       the offset from 0 to 1 walks that segment along the whole curve. Only the dash is paint-bound; the
-       opacity pulse animates the ELEMENT, which the compositor handles, exactly as the source's does.
-         The one deliberate simplification: the source also grows pathLength 0.3 -> 1 on first play, which
-       would need a second animation on the same property. The travelling segment is the dominant read, so
-       it is dropped rather than approximated badly.
-         DESYNC WITHOUT RANDOMNESS. The source uses `20 + Math.random() * 10`, which this site forbids in a
-       drawing. The period comes off the index instead, with a negative delay so every path starts mid-cycle
-       rather than all 72 setting off together. */
-    .gate.is-up .gate-trail {
-      stroke-dasharray: 0.3 0.7;
-      animation: gate-flow calc(20s + (var(--i) * 137ms)) linear infinite;
-      animation-delay: calc(var(--i) * -411ms);
+    /* THE MOTION, AND THIS IS THE SECOND ATTEMPT AT IT. The owner: "in the original script ive shown you they
+       got emotions", so the animation this port had dropped came back — as the original's travelling dash,
+       animating stroke-dashoffset on all 72 paths. That shipped and BROKE THE PAGE: "completely broken, cant
+       even rendering. the screen is just flashing."
+         The cause, stated exactly, because the reasoning that produced it was mine and it was wrong.
+       stroke-dashoffset is a PAINT property, and a path's invalidation rect is its bounding box — which for
+       these is the whole viewport, since the geometry sweeps from y=-189 to y=875 through a 316-tall box. So
+       every frame repainted the entire screen 72 times over. The page janked hard enough that the letters'
+       520ms animations never got frames to finish, leaving some stuck at opacity 0 — the screenshot showed
+       "I g T n" instead of "Ing Tian" — and the flashing was the compositor presenting partial frames.
+       vector-effect="non-scaling-stroke" compounded it by defeating stroke caching.
+         I had flagged exactly this risk when the one-shot was written, then talked myself out of it: pausing
+       the WebGL sky and the terrain canvas behind the gate "freed the budget". False comfort. Pausing one
+       shader frees a fixed, modest amount; 72 full-viewport paint-bound animations are a different order of
+       magnitude, and no amount of freed budget makes them cheap.
+         SO THE MOTION IS COMPOSITOR-ONLY. transform and opacity, on the two GROUPS instead of on 72 paths —
+       two layers the compositor moves without the main thread repainting anything. The families drift in
+       opposite directions over 34s and 41s and breathe out of phase over 11s, so the angle at which the two
+       combs cross slowly opens and closes, and nothing ever repaints.
+         WHAT IS LOST, plainly: the travelling dash segment, and per-path phase variation — the breathing is
+       per family now. That is the price of a page that renders. If the dash is ever wanted back it belongs on
+       a handful of paths, never all 72. */
+    .gate.is-up .gate-fam {
+      animation: gate-drift 34s ease-in-out infinite alternate,
+                 gate-breathe 11s ease-in-out infinite alternate;
     }
-    @keyframes gate-flow {
-      0%   { stroke-dashoffset: 0; opacity: 0.3; }
-      50%  { opacity: 0.6; }
-      100% { stroke-dashoffset: -1; opacity: 0.3; }
+    /* The second family drifts the other way and breathes out of phase, so the crossing angle between the two
+       combs opens and closes. That is the only reason two families are kept separate rather than flattened. */
+    .gate.is-up .gate-fam[data-fam='1'] {
+      animation: gate-drift-b 41s ease-in-out infinite alternate,
+                 gate-breathe 11s ease-in-out infinite alternate;
+      animation-delay: 0s, -5.5s;
     }
+    @keyframes gate-drift   { to { transform: translate(-26px, -15px); } }
+    @keyframes gate-drift-b { to { transform: translate(22px, 12px); } }
+    @keyframes gate-breathe { from { opacity: 0.42; } to { opacity: 0.78; } }
 
     .gate.is-up .gate-letter {
       opacity: 0;
@@ -204,14 +212,15 @@ const letters = [...`${name.first} ${name.last}`];
   }
 
   @media (prefers-reduced-motion: reduce) {
-    /* THE FINISHED STATE, and the dash properties have to be cleared explicitly. Leaving dasharray set
-       while disabling the animation would render every trail at a full dash offset — invisible. That is a
-       broken state wearing a finished state's clothes, which is exactly what the motion rule forbids.
-         The opacity is pinned too, and that is not cosmetic. The flow animation pulses ELEMENT opacity
-       between 0.3 and 0.6, so a reader with motion off would otherwise get solid lines at opacity 1 —
-       roughly twice as strong as anyone else sees, a different drawing rather than a still of the same one.
-       0.45 is the midpoint of the pulse. */
-    .gate-trail { stroke-dasharray: none; stroke-dashoffset: 0; opacity: 0.45; }
+    /* THE FINISHED STATE: both families parked, at the midpoint of the breathing they would otherwise do.
+       The opacity is pinned and that is not cosmetic — the drift/breathe pair animates group opacity between
+       0.42 and 0.78, so without this a reader with motion off would get the drawing at full strength, which is
+       a different picture rather than a still of the same one. 0.6 is the midpoint.
+         There are no dash properties to clear any more. An earlier version animated stroke-dashoffset and had
+       to reset dasharray here, because leaving it set with the animation disabled renders every stroke at a
+       full dash offset, i.e. invisible — a broken state wearing a finished state's clothes. That animation is
+       gone (it repainted the viewport 72 times a frame and broke the page), so the hazard is gone with it. */
+    .gate-fam { opacity: 0.6; transform: none; }
     .gate-letter, .gate-roles, .gate-enter { opacity: 1; transform: none; }
   }
 

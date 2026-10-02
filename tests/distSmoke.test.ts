@@ -369,6 +369,17 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
 describe('the first-visit gate, as shipped', () => {
   const home = byRoute().get('/');
 
+  /** The gate's CSS, from the emitted stylesheets AND the page — Astro's inlineStylesheets: 'auto' may put a
+   *  small scoped sheet in the <head> instead of emitting a file, and which one it picks is not this test's
+   *  subject. */
+  const gateCss = (): string => {
+    const files = existsSync(join(DIST, '_astro'))
+      ? readdirSync(join(DIST, '_astro')).filter((f) => f.endsWith('.css'))
+        .map((f) => readFileSync(join(DIST, '_astro', f), 'utf8'))
+      : [];
+    return [...files, home!.html].join('\n');
+  };
+
   it('is on the homepage', () => {
     expect(home, 'no / in dist').toBeDefined();
     expect(home!.html).toMatch(/data-gate\b/);
@@ -405,37 +416,49 @@ describe('the first-visit gate, as shipped', () => {
     expect(home!.markup).toMatch(/id="gate-name"/);
   });
 
-  it('normalises every trail with pathLength, so one dasharray fits them all', () => {
-    // pathLength is an SVG ATTRIBUTE. It was written as a CSS declaration first, where it is silently
-    // dropped — and with it dropped, `stroke-dasharray: 1` means one user unit on a path hundreds of
-    // units long, which draws a dotted line instead of a sweep. The attribute is the fix, so the
-    // attribute is what gets asserted.
+  it('NEVER ANIMATES A PAINT PROPERTY ON THE STROKES — the regression that broke the page', () => {
+    // THIS ASSERTION EXISTS BECAUSE THE GATE SHIPPED BROKEN ONCE. It animated stroke-dashoffset on all 72
+    // paths to reproduce the original's travelling dash. stroke-dashoffset is a PAINT property and each of
+    // these paths has a viewport-sized bounding box (the geometry sweeps y=-189..875 through a 316-tall box),
+    // so every frame repainted the whole screen 72 times. The page janked so hard the name's letter animations
+    // never finished — the owner saw "I g T n" instead of "Ing Tian" — and the compositor showed partial
+    // frames: "completely broken, cant even rendering. the screen is just flashing."
     //
-    // THE FLOOR USED TO BE 28 AND IT WAS INCIDENTAL, not a requirement — it came from the 36 descent trails
-    // that shipped when this was written. The stroke count is an aesthetic dial (now 8, picked by looking at a
-    // sweep) and this assertion is not about it: what must hold is that EVERY stroke carries the attribute,
-    // whatever the count. A floor of 1 still catches the case this exists to catch, which is the gate shipping
-    // with no lines in it at all.
+    // The replacement animates transform and opacity on the two FAMILY GROUPS, which the compositor handles
+    // without repainting. This test is what stops the paint-bound version coming back, because nothing else
+    // would: it typechecks, it builds, and it looks correct in the markup.
     const paths = home!.markup.match(/<path[^>]*class="[^"]*gate-trail[^"]*"[^>]*>/g) ?? [];
     expect(paths.length, 'the gate shipped no strokes at all').toBeGreaterThanOrEqual(1);
-    for (const p of paths) expect(p, p).toMatch(/pathLength="1"/);
+
+    const css = gateCss();
+    // SCOPED TO THE GATE'S OWN RULES. A first version of this assertion scanned every keyframe in every
+    // stylesheet and failed on `ru-draw` — the Rules slide's line-drawing animation, which is a bounded
+    // one-shot on a small element and none of this test's business. What matters here is narrower and exact:
+    // the gate's STROKES must not be animated at all. Animate the group and the compositor moves a layer;
+    // animate the paths and the main thread repaints 72 viewport-sized boxes every frame.
+    const trailRules = [...css.matchAll(/\.gate-trail[^{}]*\{[^}]*\}/g)].map((m) => m[0]);
+    expect(trailRules.length, 'no .gate-trail rule found in the shipped CSS').toBeGreaterThanOrEqual(1);
+    for (const r of trailRules) {
+      expect(r, `a .gate-trail rule animates something: ${r}`).not.toMatch(/animation/);
+    }
+
+    // And the motion that does exist is on the groups.
+    expect(home!.markup, 'the two mirrored families should be groups, so the compositor can move them')
+      .toMatch(/<g class="gate-fam"/);
+    expect(css).toMatch(/\.gate-fam[^{]*\{[^}]*animation/);
   });
 
-  it('clears the dash properties under reduced motion', () => {
-    // Disabling the draw-in without clearing stroke-dasharray would leave every trail at a full dash
-    // offset — invisible. The reduced-motion state has to be FINISHED, not merely still.
+  it('parks the drawing at the midpoint under reduced motion', () => {
+    // The finished state has to be a STILL OF THE SAME PICTURE, not a different one. The groups breathe
+    // between 0.42 and 0.78, so leaving them at their default opacity 1 would show a reader with motion off a
+    // noticeably stronger drawing than anyone else sees. 0.6 is the midpoint.
     //
-    // Reads the emitted stylesheets AND the page itself: Astro's `inlineStylesheets: 'auto'` can inline a
-    // small scoped stylesheet into the <head> instead of emitting a file, so globbing _astro/*.css alone
-    // would fail for a reason that has nothing to do with whether the CSS shipped.
-    const cssFiles = existsSync(join(DIST, '_astro'))
-      ? readdirSync(join(DIST, '_astro'))
-          .filter((f) => f.endsWith('.css'))
-          .map((f) => readFileSync(join(DIST, '_astro', f), 'utf8'))
-      : [];
-    const haystack = [...cssFiles, home!.html].join('\n');
-    expect(haystack).toMatch(/prefers-reduced-motion:\s*reduce/);
-    expect(haystack).toMatch(/stroke-dasharray:\s*none/);
+    // This replaced an assertion about `stroke-dasharray: none`, which the old travelling-dash version needed
+    // because a disabled dash animation leaves every stroke invisible at a full offset. There are no dash
+    // properties left to reset.
+    const css = gateCss();
+    expect(css).toMatch(/prefers-reduced-motion:\s*reduce/);
+    expect(css).toMatch(/\.gate-fam[^{]*\{[^}]*opacity:\s*\.?0?\.6/);
   });
 });
 
