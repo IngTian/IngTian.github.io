@@ -360,9 +360,10 @@ kindergarten"*. Both survivors are derived numbers, not preferences:
      2.107× the authored widths land at **1.05–3.27 px, which is the reference's own figure to two
      decimals.** Two dials were compensating for a third. When a drawing looks wrong at one size,
      check the size before retuning what is in it.
-2. **The dash scheme is NOT the source's, and this one is a fix rather than a preference.** See the
-   rAF paragraph below for what replaced it and why — the summary is that the source's growing dash
-   has a once-per-cycle discontinuity that makes whole lines pop out of existence.
+2. **The ANIMATION is not the source's at all: there is no dash, and the field drifts instead.** This
+   is the biggest departure and the most firmly settled — six dash schemes were built and every one
+   was rejected. The section *"THERE IS NO DASH ON THE STROKES"* below is the whole argument; read it
+   before touching the motion.
 
 Two further departures that are the owner's dials rather than fidelity decisions:
 
@@ -401,57 +402,66 @@ The three that were removed, because each is a way to get this wrong again:
   (Twelve was a guess at the flashing — see trap 5 — so it fixed nothing and cost the motion. That
   line used to read "after the full 72 flashed in practice", which is how a wrong lead survives: a
   number changed next to a symptom that then persisted, written up as if it had worked.)
-- **Phases were scattered across the cycle — and they are scattered again now, deliberately. Read
-  this bullet before "fixing" it back.** The source passes *no delay*: all its paths begin together
-  and separate only through their 20–30s durations. Copying that was right while the live layer was
-  the only layer, and it became wrong the moment the haze was added underneath, for a reason that is
-  purely geometric: with every stroke at the same phase, all 48 dashes END at the same point along
-  their curves, and because the curves are a nested family those ends line up into **one hard
-  brightness front** sweeping across the frame, with nothing but 0.3-opacity haze behind it. That is
-  the *"why do we have these darker trails?"* report. Measured, the phase spread was **4.1% of a
-  cycle**; scattered it is **97.5%**, and the front becomes individual ends in unrelated places,
-  which is also what the reference looks like.
-  - So the ordering matters: coherent phase is correct with one layer and wrong with two, because
-    the haze — not the phase — is what holds the picture together once it exists. The earlier
-    scattered version failed for three *other* reasons that are all fixed (no haze, a dash that grew
-    and snapped once per cycle, and gap arithmetic that tiled a second segment onto every curve), so
-    "we tried scattering and it looked bad" is not a reason to undo this.
+- **Dash PHASE was a live argument through three commits, and it is moot now that there is no dash.**
+  Kept because the episode is the clearest example in this file of a correct decision becoming wrong
+  when something else changes underneath it. The source passes no delay, so all its paths move
+  together. Copying that was right while the dashed layer was the only layer. It became wrong the
+  moment a permanent layer went underneath, for a purely geometric reason: with every stroke at the
+  same phase, all 48 dashes *end* at the same point along their curves, and since the curves are a
+  nested family those ends line up into **one hard brightness front** sweeping the frame with only
+  haze behind it — *"why do we have these darker trails?"*. Measured, the spread was **4.1% of a
+  cycle**; scattering took it to **97.5%** and dissolved the front into unrelated ends. Then the
+  trail itself was rejected, the dash went, and the whole question evaporated. The lesson that
+  survives: **when a decision is copied from a reference, write down what it depends on**, because
+  the thing that invalidates it is usually a change somewhere else.
 
-**The animation is driven from a rAF loop in `Gate.astro`, NOT from CSS keyframes, and that is
-load-bearing** — the component is the one place on this site where that is true, against the
-*Interactivity* contract's usual preference. The source is framer-motion animating `pathLength`,
-`pathOffset` and `opacity`; the loop reproduces those three directly as a dash written in real
-user units, read from each path's `data-len`. Four CSS translations of the same three values
-shipped first and every one produced a different artifact. Keep it in JS.
+**THERE IS NO DASH ON THE STROKES, AND NO JS DRIVING THEM. Six dash schemes shipped here and every
+one was reported as a defect; this is the conclusion of all six and it is the most load-bearing
+paragraph in this section.**
 
-**TWO LAYERS, AND THE DASH NO LONGER CHANGES SIZE. This is the part that is deliberately unlike the
-source, and it must not be "restored".**
+A dash is a **partial line**. It has two ends and a gap, and the gap has exactly two possible
+readings — both of which were built, shipped, and rejected:
 
-The source grows `pathLength` 0.3 → 1 and repeats, which has a discontinuity built into it: every
-repeat restarts at 0.3, so once per cycle the dash collapses from the whole arc back to a fragment
-at the curve's off-screen start and the stroke pops out between two frames. And because only about a
-quarter of each curve is inside the viewBox at all, a stroke is *only on screen* while its drawn
-window overlaps that quarter — so lines also went dark simply by sliding past. The report was
-**"there are lines that vanish suddenly which is not good. entire lines go dark immediately."**
+- Leave the gap empty and the stroke is simply **absent** whenever the gap covers the quarter of the
+  curve the viewBox shows. Plus the source restarts `pathLength` at 0.3 every repeat, so once per
+  cycle the dash collapses to a fragment at the off-screen start and the line pops out between two
+  frames. *"there are lines that vanish suddenly which is not good. entire lines go dark
+  immediately."*
+- Fill the gap faintly — a second permanent layer under the travelling one — and the gap becomes a
+  **dimmer continuation** of a brighter segment. *"seems like the line leaves a trail behind. remove
+  that trail."*
 
-- **`.gate-haze`** draws every curve **whole and undashed**, permanently, at `0.3` of its own ramp
-  opacity. Nothing visible can disappear any more. Raise it and the frame fills in until the
-  travelling segment stops reading as travelling; lower it and the vanishing comes back.
-- **`.gate-live`** carries the travelling segment on top, so the motion is a brightness passing
-  *along* a line that is already there rather than the line itself coming and going.
-- **The live dash and gap are CONSTANT** (`DRAWN_FRAC = 0.55`, the two summing to the whole arc) and
-  only the offset advances. That makes the pattern strictly periodic in the offset: advancing it one
-  full period reproduces the identical picture, so there is no frame anywhere to special-case. The
-  check is that the drawn length is *byte-identical* at 0.7s, 6s, 13s and 21s — if it varies, the
-  growing dash is back and so is the popping.
+**They are the same artifact described from two sides, and it is not tunable.** The two-layer version
+(`.gate-haze` under `.gate-live`, with a constant-length dash so the cycle had no discontinuity at
+all) was a *correct* implementation and still lost, which is the signal that the problem was the
+premise. So: every curve is drawn whole, evenly lit end to end, one layer, no `stroke-dasharray`
+anywhere. Depth comes from the family's opacity ramp — *which* curve you are looking at — never from
+which part of one.
 
-Keep the segment the longer of the two: make the gap the larger and the curves read as fragments
-chasing each other. And note what this retires — an earlier version reproduced framer-motion's
-`pathSpacing: 1` by writing the gap as a **whole path length**, which was right for fidelity but is
-no longer what ships; with the remainder written instead the period was exactly `len`, the pattern
-tiled the path, and whatever left the end re-entered at the start as a second segment on every
-curve. That was the scatter of short disconnected ends in the "kindergarten" screenshot. If the
-strokes ever look chopped again, the dash arithmetic is the first place to look.
+**The motion is `gate-drift`: two CSS transforms on the two groups, and nothing else.** This also
+puts the component back inside the *Taste rules*' motion constraint, which it had been the one
+documented exception to.
+
+- **It drifts along the lines' own direction.** The second cubic's tangent is `(464, 127)` for every
+  curve in both families — independent of the offset, so it genuinely is the family's shared
+  direction — normalising to `(0.964, 0.264)`. Translating along it slides each curve approximately
+  along *itself*, so the field reads as flowing. Translate along any other axis and it reads
+  immediately as a picture being shoved sideways.
+- **Amplitude and period are set against the line spacing, not by taste.** Adjacent curves are 9.13
+  user units apart, which is **19 CSS px** at the shipped 2.107×, so flow becomes legible at roughly
+  one spacing every couple of seconds. The first version of this drift measured **4.6 px/s** and
+  would have earned *"i think yours is basically static"* a second time — that verdict is already in
+  this file's history. It now runs 96 user units over 18s, **11.2 px/s**, measured at 14 px/s and
+  9.4 px/s for the two families in opposite directions.
+- **It alternates rather than looping, and the two periods differ (18s against 23s).** A one-way loop
+  would have to map the family onto itself, which is exactly one curve's offset — but the family is
+  finite, so its first and last curve have no neighbour to become and the opacity ramp would snap at
+  every wrap. `alternate` has no wrap; unequal periods mean the two families are rarely at their
+  turnarounds together, so the composite is always moving.
+
+`tests/distSmoke.test.ts` asserts the whole of this against the build: no gate stroke and no gate CSS
+rule carries a dash, and `gate-drift` is still present — because "no dash" on its own is also
+satisfied by a dead still frame, which is its own rejected state.
 
 ### Four things were rejected here, each after looking at it
 
@@ -528,10 +538,11 @@ the owner and cost five rounds between them. Do not reintroduce any of them.**
    - **Careful with this bullet's history: it used to say the exact opposite of what now ships.** It
      read *"a dash of FIXED length FLASHES, and the growth from 0.3 to 1 is what stops it"* — which
      was a true observation about one specific combination (fixed length, period equal to the arc,
-     scattered phases, no layer underneath) wrongly generalised into a rule. What ships today **is**
-     a fixed-length dash, and it is safe for two structural reasons: its period is constant, so the
-     cycle has no discontinuity at all, and `.gate-haze` draws every curve whole underneath, so no
-     stroke is ever the thing that appears or disappears. Both are in the rAF section above.
+     scattered phases, no layer underneath) wrongly generalised into a rule — and the rule it stated
+     was then used to justify two more dash schemes, both of which were also rejected. **There is no
+     dash on the gate at all now**, so the only safe reading of this bullet is the one at the top of
+     it: the viewBox shows about a quarter of each curve, and any scheme that makes a stroke partial
+     will eventually make it look broken. See *"THERE IS NO DASH ON THE STROKES"* above.
    - Two more traps in the same family, both found the same way: `pathLength="1"` with fractional
      dash values loses precision on a ~1580-unit curve and stipples it, and **Chrome will not
      interpolate a `calc()` containing an unregistered custom property** — it snaps to the end
@@ -967,14 +978,15 @@ titles came to rest hard against the browser chrome — the lead is a number in
   themes (brightened to `#e0574a` for the dark ground).
 - **Motion:** animate only `transform` / `opacity`; NEVER animate `filter: blur`
   (bake it).
-  - **One named exception, and it is not a cheat to be tidied away:** the gate's
-    strokes animate `stroke-dasharray`/`stroke-dashoffset`, which are **paint**
-    properties — a line that draws itself cannot be expressed as a transform or a
-    fade. It is affordable because one rAF writes all 48 live dashes, so the frame
-    costs one style/paint pass rather than 48 competing animations (a trace measures
-    60.0 fps over 96 paths), and because the gate is gone after one gesture. Do not
-    generalise it to anything that persists while the page is being read, and do not
-    "fix" the gate to comply. ALL motion is gated behind `@media (prefers-reduced-motion:
+  - **There are no exceptions to this rule on the site today.** The gate held the only
+    one for several commits — it animated `stroke-dasharray`/`stroke-dashoffset`, which
+    are **paint** properties, on the grounds that a line drawing itself cannot be
+    expressed as a transform. That was true, and the feature it bought was rejected on
+    its looks anyway (see *The first-visit gate*), so the gate now drifts two groups with
+    `transform` and the rule stands unqualified. Worth noting because the exception read
+    as permanent while it existed: a paint-property animation was argued for at length,
+    shipped six times, and in the end the design that satisfied the rule was also the one
+    that looked right. ALL motion is gated behind `@media (prefers-reduced-motion:
   no-preference)` via `lib/motion.ts`. The no-motion state must look *finished* —
   it's also the Firefox fallback (`animation-timeline` isn't in Firefox yet), and
   it's what a reduced-motion reader gets instead of the deck.

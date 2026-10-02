@@ -434,38 +434,56 @@ describe('the first-visit gate, as shipped', () => {
     }
   });
 
-  it('keeps vector-effect off the strokes and gets the arc length to the client', () => {
-    // vector-effect defeats the renderer's stroke caching, and with 72 full-screen paths that is not free.
-    // The arc length has to reach the client under SOME name because every dash scheme needs it: it has been
-    // pathLength, then a dasharray attribute plus --off, and is now data-len read by the flow driver. The
-    // assertion is deliberately agnostic about which, having been rewritten three times chasing that detail.
+  it('DRAWS EVERY STROKE WHOLE — no dash anywhere, which is the only state that neither vanishes nor trails', () => {
+    // THIS REPLACES FIVE EARLIER ASSERTIONS AND IS THE CONCLUSION OF ALL OF THEM.
+    //
+    // Six dash schemes shipped on this component. Each was a correct implementation of something, and each was
+    // reported as a defect, because a dash is a PARTIAL line and its gap has only two possible readings:
+    //   - leave it empty and the stroke is absent whenever the gap covers the quarter of the curve the viewBox
+    //     shows — "entire lines go dark immediately";
+    //   - fill it faintly, with a layer underneath, and the gap becomes a dimmer continuation of a brighter
+    //     segment — "seems like the line leaves a trail behind. remove that trail."
+    // Same artifact, two descriptions. It is not tunable, so the dash is gone and the motion moved to a
+    // transform on the groups. The invariant is therefore the simplest one this component has ever had: no gate
+    // stroke carries a dash, in the markup or in the CSS.
     const paths = home!.markup.match(/<path[^>]*class="[^"]*gate-trail[^"]*"[^>]*>/g) ?? [];
     expect(paths.length, 'the gate shipped no strokes at all').toBeGreaterThanOrEqual(1);
     for (const p of paths) {
+      // vector-effect defeats the renderer's stroke caching across every full-screen path; it was measured as a
+      // real cost here and the source does not use it either.
       expect(p, `vector-effect is back on a gate stroke: ${p}`).not.toMatch(/vector-effect/);
-      expect(p, `no arc length reaches the client for this stroke: ${p}`)
-        .toMatch(/(data-len="\d|--off:-\d|stroke-dasharray="\d{2,})/);
+      expect(p, `a dash is back on a gate stroke — it will vanish or trail: ${p}`)
+        .not.toMatch(/stroke-dasharray|stroke-dashoffset|pathLength/);
     }
-    // BOTH LAYERS MUST SHIP, and this is the assertion that the "lines vanish suddenly" fix is still in place.
-    // The haze layer draws every curve whole and undashed; the live layer carries the travelling segment. Delete
-    // the haze and the strokes go back to blinking out whenever the dash slides off the visible quarter of the
-    // curve, which is a defect that reads as a rendering bug rather than as a design change — so it is worth a
-    // test rather than a comment. Two of each, one per mirrored family.
-    const haze = home!.markup.match(/<g class="gate-fam gate-haze"/g) ?? [];
-    const live = home!.markup.match(/<g class="gate-fam gate-live"/g) ?? [];
-    expect(haze.length, 'the permanent haze layer is gone — strokes will vanish again').toBe(2);
-    expect(live.length, 'the travelling layer is gone — the field would be static').toBe(2);
+    // SCOPED TO GATE RULES. The homepage stylesheet is shared, and the Choice and Rules slides both legitimately
+    // use dashes (.ch-line--*, .ru-traj, and their faint .ch-pnl-base / .ru-base guides) — an unscoped scan
+    // matches those and fails on code this test has no opinion about.
+    // SPLIT, NOT A REGEX. The obvious pattern for "a rule whose selector mentions .gate" is
+    // /[^{}]*\.gate[a-z-]*[^{}]*\{[^}]*\}/g, and on a ~100KB stylesheet its two unbounded [^{}]* runs backtrack
+    // for **4.5 seconds** — it passed in isolation and blew vitest's 5s timeout inside the full suite, which
+    // reads as a broken assertion rather than a slow one. Splitting on braces is linear.
+    const css = gateCss();
+    const gateRules = css.split('}').filter((seg) => {
+      const brace = seg.lastIndexOf('{');
+      return brace !== -1 && seg.slice(0, brace).includes('.gate');
+    });
+    expect(gateRules.length, 'no gate rules found in the shipped CSS — the selector drifted').toBeGreaterThan(3);
+    for (const r of gateRules) {
+      expect(r, `a dash is back in a gate rule: ${r.trim()}`).not.toMatch(/stroke-das/);
+    }
+    // And the motion must still exist, or "no dash" would be satisfied by a dead still frame — which is its own
+    // rejected state: an earlier drift was judged "basically static".
+    expect(css, 'the field drift is gone and the gate is now a still image').toMatch(/gate-drift/);
   });
 
-  it('resets the dash under reduced motion, so no stroke is left half-drawn', () => {
-    // The animation's 0% keyframe is `stroke-dasharray: 0.3 0.7`. With the animation disabled and the dash left
-    // set, 70% of every curve is simply missing — a broken state wearing a finished state's clothes, which is
-    // exactly what this project's motion rule forbids. Opacity is pinned at the pulse's midpoint for the
-    // related reason: otherwise a reader with motion off gets the drawing at full strength, a different picture
-    // rather than a still of the same one.
+  it('parks the drift under reduced motion, and needs nothing undone to do it', () => {
+    // The finished state is now the same picture rather than a repaired one. Previous versions had to reset a
+    // dasharray (or every stroke rendered partially drawn) and pin a group opacity (or the still was brighter
+    // than anything a moving reader saw). With the strokes carrying no animated property, stopping the groups'
+    // transform is the whole of it.
     const css = gateCss();
     expect(css).toMatch(/prefers-reduced-motion:\s*reduce/);
-    expect(css).toMatch(/stroke-dasharray:\s*none/);
+    expect(css, 'the drift still runs for a reader who asked for no motion').toMatch(/animation:\s*none/);
   });
 });
 

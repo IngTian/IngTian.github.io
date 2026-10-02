@@ -53,43 +53,27 @@ const letters = [...`${name.first} ${name.last}`];
         defeats the renderer's stroke caching, and with 72 full-screen paths that is not free. The original does
         not use it either; `meet` already removed the ~24% of extra weight that `slice` was adding, so the
         widths below are the source's own and scale the way the source's do. */}
-    {/* TWO LAYERS PER FAMILY, AND THE FIRST ONE IS WHY NOTHING VANISHES.
+    {/* ONE LAYER, NO DASH AT ALL. Every curve is drawn whole, at a uniform brightness along its length.
 
-        The report was "there are lines that vanish suddenly which is not good. entire lines go dark
-        immediately", and it was true: with a single dashed layer, a stroke is only on screen while its drawn
-        window overlaps the quarter of the curve the viewBox actually shows. When the window slides past, the
-        whole line is simply gone — and at the end of each cycle the dash also snapped from the full arc back
-        to a fragment at the off-screen start, which pops the line out between two frames.
+        THERE IS NO DASH HERE ON PURPOSE AND REINTRODUCING ONE WOULD UNDO THREE ROUNDS OF REVIEW. The source
+        animates a travelling dash, and a dash is inescapably a PARTIAL line: it has two ends, and somewhere on
+        the curve there is a stretch the dash is not covering. Every version of that got rejected, each time
+        for the same thing seen from a different angle:
+          - with nothing underneath, a stroke was simply absent whenever its window slid off the quarter of the
+            curve the viewBox shows — "entire lines go dark immediately";
+          - with a faint full-length layer underneath to stop that, the uncovered stretch became visible as a
+            dimmer continuation — "seems like the line leaves a trail behind. remove that trail."
+        Those are the same artifact: the dash's gap. It cannot be tuned away, only removed, which is what this
+        does. The brightness ramp across the family (0.1 -> 1.0) stays, so depth still comes from which curve
+        you are looking at rather than from which part of it.
 
-        So the haze layer draws every curve WHOLE and undashed, permanently, at a low fraction of its ramp
-        opacity. Nothing on screen can now disappear. The live layer carries the travelling segment on top, so
-        the motion is a brightness passing ALONG a line that is already there rather than the line itself
-        coming and going. The reference's look survives because the haze is faint enough that the live
-        segment's ends still read as ends.
-
-        The live layer is also seamless now: its dash and gap are CONSTANT and only the offset advances, so the
-        pattern period is fixed and sliding it by one period returns the exact same picture. There is no moment
-        in the cycle where any value jumps — which is the property the growing dash could never have. */}
+        The motion moved to the FIELD instead — see `gate-drift` in the CSS. A slow counter-drift of the two
+        mirrored families makes the lines appear to flow while each one stays complete and evenly lit, which is
+        the "lines passing smoothly across the page" this was always meant to be. */}
     {families.map((fam, f) => (
-      <g class="gate-fam gate-haze" data-fam={f} aria-hidden="true">
+      <g class="gate-fam" data-fam={f}>
         {fam.map((t) => (
-          <path class="gate-base" d={t.d} stroke-opacity={t.opacity} stroke-width={t.width} />
-        ))}
-      </g>
-    ))}
-    {families.map((fam, f) => (
-      <g class="gate-fam gate-live" data-fam={f}>
-        {/* data-len carries the curve's measured arc length in user units. The script reads it and writes the
-            dash itself, so nothing here depends on pathLength normalisation or on CSS being able to
-            interpolate a two-value dasharray. With no JS this layer is simply drawn whole, over the haze. */}
-        {fam.map((t) => (
-          <path
-            class="gate-trail"
-            d={t.d}
-            data-len={t.len}
-            stroke-opacity={t.opacity}
-            stroke-width={t.width}
-          />
+          <path class="gate-trail" d={t.d} stroke-opacity={t.opacity} stroke-width={t.width} />
         ))}
       </g>
     ))}
@@ -142,13 +126,7 @@ const letters = [...`${name.first} ${name.last}`];
      the field read as muddy: the opacity ramp starts at 0.1, and a GOLD line at a tenth opacity over near-black
      has almost no luminance left to carry, where a near-white one still reads as light. `--paper` is the site's
      ivory rather than pure #fff, which keeps palette discipline without losing the original's effect. */
-  .gate-trail, .gate-base { fill: none; stroke: var(--paper); stroke-linecap: round; }
-
-  /* The permanent haze. 0.3 of each curve's own ramp opacity, so the strongest curves read as faint continuous
-     threads and the weakest are effectively invisible until the live segment crosses them — which is the
-     reference's own hierarchy, where most strokes recede and a reader picks out about eight. Raising this fills
-     the frame in and the travelling segment stops reading as travelling; lowering it brings the vanishing back. */
-  .gate-haze { opacity: 0.3; }
+  .gate-trail { fill: none; stroke: var(--paper); stroke-linecap: round; }
 
   .gate-text { position: relative; text-align: center; padding: 0 7vw; }
 
@@ -202,31 +180,45 @@ const letters = [...`${name.first} ${name.last}`];
   @media (prefers-reduced-motion: no-preference) {
     .gate { transition: opacity 600ms ease, visibility 600ms ease; }
 
-    /* THE MOTION, THIRD ATTEMPT, AND THE SECOND ATTEMPT'S DIAGNOSIS WAS WRONG.
-         History, because it is the useful part. The port first dropped the original's endless animation for a
-       1200ms one-shot. Asked for it back — "in the original script ive shown you they got emotions" — I added
-       the travelling dash on all 72 paths AND vector-effect="non-scaling-stroke" in the same change. It broke:
-       "completely broken, cant even rendering. the screen is just flashing." Letters stuck at their opening
-       keyframe, so the name read "I g T n".
-         I blamed the dash, removed it, and replaced the whole thing with a slow transform drift on two groups.
-       That was compositor-cheap and the owner's verdict was correct: "the animation i've given to u is gone...
-       i think yours is basically static."
-         THE DIAGNOSIS WAS THE PART THAT WAS WRONG. The original animates the dash on 72 paths too —
-       framer-motion implements pathLength/pathOffset by writing stroke-dasharray and stroke-dashoffset — and
-       it runs fine in its own demo. So "72 paint-bound paths cannot work" was refuted by the source itself.
-       What my version had that the source does not is vector-effect, which stops the renderer caching stroked
-       geometry and forces all 72 paths to be re-stroked at device resolution every frame. That is the far more
-       likely cost, and it came in on the same commit, which is why it got away with it.
-         So: the dash is back, faithfully, and vector-effect stays gone. If this still flashes then the dash
-       really is the problem and the fix is fewer animated paths — animate the strongest dozen and leave the
-       haze static — not removing the motion again. Said out loud because I cannot see the result and the owner
-       can. */
-    /* NO CSS ANIMATION ON THE STROKES AT ALL — the dash is driven from JS below, the way the source does it.
-       Four CSS translations of framer-motion's pathLength/pathOffset shipped here and each produced a different
-       artifact: a sub-unit stipple, an offset that never interpolated, and finally a fixed-length dash that slid
-       in and out of the visible frame forever. The resting state set here is what a visitor sees with JS off or
-       under reduced motion: the whole curve, drawn, at the midpoint of the pulse. */
-    .gate.is-up .gate-fam .gate-trail { opacity: 0.45; }
+    /* THE MOTION IS A DRIFT OF THE WHOLE FIELD, NOT A DASH ON THE STROKES.
+         The history is worth keeping short, because its conclusion is now settled: five dash schemes shipped
+       here — a one-shot, a CSS translation of framer-motion's pathLength/pathOffset (four times, each failing
+       differently: a sub-unit stipple, a calc() that never interpolated, a fixed dash sliding in and out of
+       frame), then a faithful JS reproduction, then a seamless constant-length version over a static haze. The
+       last two were correct implementations and still lost, because the problem is not the implementation. A
+       dash is a partial line. Its gap is either empty (the line vanishes) or faintly filled (the line trails).
+       Both were reported, and they are the same artifact.
+         So the strokes carry no animation at all now, and the motion is two transforms on two groups — which is
+       also what the TASTE RULES want: transform only, composited, no per-frame paint. An earlier version of this
+       was judged "basically static", so the amplitude here is deliberately larger than that one's and the two
+       families counter-drift rather than moving together, which is what makes the flow legible.
+         DRIFT ALONG THE LINES' OWN DIRECTION. The second cubic's tangent is (464, 127) for every curve in both
+       families — independent of the offset, so it really is the family's shared direction — which normalises to
+       (0.964, 0.264). Translating along it slides each curve approximately along ITSELF, so the field reads as
+       flowing rather than as a picture being shoved sideways. Translating along any other axis reads as the
+       latter immediately.
+         It alternates rather than looping. A one-way loop would need the translation to map the family onto
+       itself, which is exactly one curve's offset — but the family is finite, so its first and last curve have
+       no neighbour to become, and the opacity ramp would snap back at every wrap. Alternating has no wrap. */
+    /* AMPLITUDE AND PERIOD ARE SET AGAINST THE LINE SPACING, because "is this moving" is not a matter of taste.
+       Adjacent curves sit 9.13 user units apart vertically, which is 19 CSS px at the shipped 2.107x — so a
+       drift becomes legible as flow at roughly one line-spacing per couple of seconds, and reads as a still
+       image well below that. The first version of this measured 4.6 px/s and would have earned "basically
+       static" a second time; 96 user units over 18s is 11.2 px/s, about one spacing every 1.7s.
+         The two periods are deliberately unequal. With `alternate` each family slows to a stop at its
+       turnaround, and 18 against 23 means they are rarely both there, so the composite is always moving. */
+    .gate-fam {
+      animation: gate-drift 18s ease-in-out infinite alternate;
+      will-change: transform;
+    }
+    .gate-fam[data-fam='1'] {
+      animation-duration: 23s;
+      animation-direction: alternate-reverse;
+    }
+    @keyframes gate-drift {
+      from { transform: translate(-48px, -13px); }
+      to   { transform: translate(48px, 13px); }
+    }
 
     /* THE LETTERS FAIL VISIBLE, and that is the fix for the name arriving incomplete TWICE — "I g T n" and
        then "ng Ti", a different set of letters missing each time.
@@ -265,23 +257,14 @@ const letters = [...`${name.first} ${name.last}`];
   }
 
   @media (prefers-reduced-motion: reduce) {
-    /* THE FINISHED STATE: both families parked, at the midpoint of the breathing they would otherwise do.
-       The opacity is pinned and that is not cosmetic — the drift/breathe pair animates group opacity between
-       0.42 and 0.78, so without this a reader with motion off would get the drawing at full strength, which is
-       a different picture rather than a still of the same one. 0.6 is the midpoint.
-         There are no dash properties to clear any more. An earlier version animated stroke-dashoffset and had
-       to reset dasharray here, because leaving it set with the animation disabled renders every stroke at a
-       full dash offset, i.e. invisible — a broken state wearing a finished state's clothes. That animation is
-       gone (it repainted the viewport 72 times a frame and broke the page), so the hazard is gone with it. */
-    /* THE DASH RESET IS BACK because the dash is back. Leaving stroke-dasharray set while the animation is
-       disabled renders every stroke at a partial dash — the 0% keyframe is `0.3 0.7`, so 70% of every curve
-       would simply be missing. A broken state wearing a finished state's clothes, which is what the motion rule
-       forbids. Opacity is pinned at the midpoint of the pulse for the same reason it was before: without it a
-       reader with motion off sees the drawing at full strength, a different picture rather than a still. */
-    .gate-trail { stroke-dasharray: none; stroke-dashoffset: 0; opacity: 0.45; }
-    /* The haze is redundant once the live layer is drawn whole — two coincident strokes per curve would just
-       read as one heavier stroke, i.e. a different picture again rather than a still of this one. */
-    .gate-haze { display: none; }
+    /* THE FINISHED STATE IS NOW GENUINELY THE SAME PICTURE, which is the first time that has been true here.
+       Earlier versions had to undo something: a dash reset, because leaving stroke-dasharray set with the
+       animation disabled renders every stroke partially drawn — a broken state wearing a finished state's
+       clothes — and an opacity pin, because the group opacity was itself animated so the unanimated state was
+       brighter than anything a moving reader saw. Neither applies: the strokes carry no animated property at
+       all, and the only motion is a transform on the two groups. Parking that transform at the midpoint of its
+       range leaves exactly the drawing everyone else sees, mid-drift. */
+    .gate-fam { animation: none; transform: none; }
     .gate-letter, .gate-roles, .gate-enter { opacity: 1; transform: none; }
   }
 
@@ -407,9 +390,6 @@ const letters = [...`${name.first} ${name.last}`];
       try { if (store) store.setItem(KEY, '1'); } catch (e) { /* denied; it reappears next load */ }
 
       gate.classList.remove('is-up');
-      // The flow has nothing left to draw on once the gate is down, and a rAF loop painting a hidden overlay
-      // is exactly the waste the data-gate-up flag exists to prevent elsewhere.
-      if (flowRaf) { cancelAnimationFrame(flowRaf); flowRaf = 0; }
       document.documentElement.style.overflow = '';
       // Let the hero and the sky start animating: they held off while nothing they drew could be seen.
       // Order matters — clear the flag BEFORE firing, so a listener that re-reads it sees the new state.
@@ -429,73 +409,11 @@ const letters = [...`${name.first} ${name.last}`];
       }, reduced() ? 0 : MS);
     }
 
-    // ── THE FLOW: A SLIDING PATTERN, WHICH IS WHY IT HAS NO SEAM ────────────────────────────────────────
-    // The source animates three things per path — pathLength 0.3 -> 1, pathOffset 0 -> 1 -> 0, opacity
-    // 0.3 -> 0.6 -> 0.3, linear over 20-30s, repeating forever. Reproducing that literally shipped, and it has
-    // ONE structural flaw that no amount of tuning removes: every repeat restarts pathLength at 0.3, so once per
-    // cycle the dash collapses from the whole arc back to a fragment at the off-screen start and the line pops
-    // out of existence between two frames. "entire lines go dark immediately."
-    //
-    // So the drawn length and the gap are now CONSTANT and only the offset advances. That makes the dash pattern
-    // strictly periodic in the offset: advancing it by one period reproduces the identical picture, so there is
-    // no frame anywhere in the cycle where any value jumps. A stroke's ends travel along it, and the stroke
-    // itself is never the thing that appears or disappears — the haze layer underneath is always drawn.
-    //
-    // DASH + GAP IS THE WHOLE ARC, so each curve carries exactly one segment and one space, and the segment is
-    // the longer of the two. Make the gap the larger and the curves read as fragments chasing each other.
-    //
-    // Opacity keeps the source's triangular pulse, which is already seamless: it returns to its starting value
-    // at the end of the cycle, so it can loop without a step.
-    var DRAWN_FRAC = 0.55;
-    var flowing = [];
-    if (!reduced()) {
-      // All the live strokes in document order. The family no longer matters here — the phase is global, and the
-      // seed only needs to be stable per element, so one flat query replaces the nested one.
-      var ps = gate.querySelectorAll('.gate-live .gate-trail');
-      for (var k = 0; k < ps.length; k++) {
-        var len = parseFloat(ps[k].getAttribute('data-len') || '0');
-        // A deterministic LCG rather than the source's Math.random(), because a drawing that differs between
-        // builds is against the same house rule the Rules slide's seeded walk follows. Same 20-30s spread.
-        var seed = (k + 1) * 9301 + 49297;
-        var dur = 20000 + ((seed % 233280) / 233280) * 10000;
-        // ── PHASES ARE SCATTERED, AND THAT IS A FIX, NOT A RELAPSE ──────────────────────────────────────
-        // With every stroke at the same phase, all 48 dashes END at the same point along their curves, and
-        // because the curves are a nested family those ends line up into a single hard brightness FRONT that
-        // sweeps across the frame. Behind it only the haze is left, so the field reads as having a dim band
-        // with a sharp edge: "why do we have these darker trails?" Measured, the phase spread was 4.1% of a
-        // cycle — lockstep.
-        //
-        // Scattering them breaks the front into individual ends at unrelated places, which is both what the
-        // reference looks like and the only way to have a travelling highlight without a visible wavefront.
-        //
-        // This was tried before and was WRONG then, which is worth being precise about rather than treating
-        // as a reason not to do it now: at that point there was no haze layer, the dash still grew and
-        // snapped once per cycle, and the gap arithmetic was tiling each curve with a second segment. Scatter
-        // on top of those three and the field is 48 unrelated strokes blinking out of step. With a permanent
-        // haze carrying the drawing, coherence is no longer what holds the picture together, so scattering
-        // now costs nothing and removes the front.
-        var ph = ((seed * 4919) % 233280) / 233280;
-        if (len > 0) flowing.push({ el: ps[k], len: len, dur: dur, ph: ph, drawn: len * DRAWN_FRAC, gap: len * (1 - DRAWN_FRAC) });
-      }
-    }
-
-    var flowRaf = 0;
-    function flow(now) {
-      for (var n = 0; n < flowing.length; n++) {
-        var f = flowing[n];
-        var t = ((now / f.dur) + f.ph) % 1;
-        // The dash is written once per frame but never changes shape — only where it sits. One period is the
-        // whole arc, so an offset of -t*len for t over [0,1) walks the segment exactly once around and lands
-        // back where it started: periodic by construction, with no frame to special-case.
-        f.el.style.strokeDasharray = f.drawn + ' ' + f.gap;
-        f.el.style.strokeDashoffset = String(-t * f.len);
-        // The source's triangular pulse, which already loops without a step because it ends where it began.
-        var tri = t < 0.5 ? t * 2 : (1 - t) * 2;
-        f.el.style.opacity = String(0.45 + 0.35 * tri);
-      }
-      flowRaf = requestAnimationFrame(flow);
-    }
-    if (flowing.length) flowRaf = requestAnimationFrame(flow);
+    // NO JS DRIVES THE STROKES ANY MORE. The motion is `gate-drift` in the CSS above: two transforms on two
+    // groups, which the compositor runs without a main-thread frame and without repainting the paths at all.
+    // Five dash schemes were driven from here before this; the reason none of them stayed is written at
+    // `gate-drift` and in the markup above, and the short version is that a dash is a partial line and both
+    // halves of that — an empty gap and a faintly-filled one — were reported as defects.
 
     gate.classList.add('is-up');
     document.documentElement.style.overflow = 'hidden';
