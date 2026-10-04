@@ -507,7 +507,13 @@ const letters = [...`${name.first} ${name.last}`];
           // from the attribute avoids restating the ramp here: gateRefPaths owns it.
           var w0 = parseFloat(ps[k].getAttribute('stroke-width') || '1');
           var seed = (fi * 36 + k) * 9301 + 49297;
-          var dur = 20000 + ((seed % 233280) / 233280) * 10000;
+          // 6-9s PER TRAVERSE, not the source's 20-30s, and this is the one number that was never pulled far
+          // enough to matter. Measured: at 20-30s a stroke advances 8-12% of its traverse during a 2.5s dwell,
+          // so the thing the whole dash exists to do — "lines travelling through the background" — covered a
+          // tenth of its journey while anyone was looking. At 6-9s a dwell covers 28-42% and the sweep reads.
+          // The source can afford 20-30s because it is a LANDING page you sit on; a gate is dismissed in a
+          // gesture, which is the same correction GATE_OPEN_PHASE makes for the opening frame.
+          var dur = 6000 + ((seed % 233280) / 233280) * 3000;
           // A per-stroke phase for the weight and tint curves, from the same deterministic stream the
           // durations use. Without it the whole family would thicken and warm in unison, which reads as the
           // drawing breathing rather than as strokes each having their own weight.
@@ -604,6 +610,14 @@ const letters = [...`${name.first} ${name.last}`];
     setInert(true);
     window.addEventListener('wheel', swallow, { passive: false });
     window.addEventListener('touchmove', swallow, { passive: false });
+    // A TOUCH ANYWHERE DISMISSES, because otherwise a phone has no way out but one button.
+    //
+    // `touchmove` above is swallowed (trap 3: it would otherwise reach Deck.astro's sibling listener and scroll
+    // the page behind the gate), and onKey only exits on Escape — a key a phone does not have. So a visitor
+    // following a link on a phone, which is the arrival path for anyone coming from LinkedIn, had exactly one
+    // 44px target and no gesture. `touchend` rather than `touchstart` so a scroll attempt that gets swallowed
+    // still counts as "let me in" rather than firing before the finger has decided.
+    window.addEventListener('touchend', dismiss, { passive: true });
     document.addEventListener('keydown', onKey, true);
 
     // LEAVING THE PAGE IS A DISMISSAL, and without this the listeners outlived the element they belong to.

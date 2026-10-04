@@ -510,9 +510,28 @@ stating:
 - **Both curves are PERIODIC in `t`**, returning to their starting value at the cycle boundary. The envelope
   goes to zero there to hide the drawn-length reset; a width or colour that jumped at the same instant would put
   the discontinuity straight back on screen in another channel. A test pins that directly.
-- **Two cycles per traverse, not one.** A single cycle over 20–30s is far too slow to read in the few seconds a
-  gate is up. Weight and colour are offset by a quarter cycle so they do not peak together — coinciding, they
-  read as one crude pulse rather than two properties of the stroke.
+- **Two cycles per traverse, not one**, and the TRAVERSE itself is **6–9s** rather than the source's 20–30s.
+  Weight and colour are offset by a quarter cycle so they do not peak together — coinciding, they read as one
+  crude pulse rather than two properties of the stroke.
+  - **THE RATE WAS THE ONE DIAL NEVER PULLED FAR ENOUGH TO MATTER, and it is the answer to "still seems a
+    little bit dull".** Measured: at 20–30s a stroke advances **8–12% of its traverse during a 2.5s dwell**, so
+    the thing the dash exists to do — lines travelling through the background — covered a tenth of its journey
+    while anyone was looking. At 6–9s a dwell covers **22–33%** and the sweep reads. The source can afford
+    20–30s because it is a landing page you sit on; a gate is dismissed in a gesture. That is the same
+    correction `GATE_OPEN_PHASE` makes for the opening frame, applied to the motion instead of the composition.
+  - Note the shape of the mistake, because it is a cheap one to repeat: `widthAt`'s own doc comment stated the
+    principle — "a single cycle over 20–30s is far too slow to read as variation in the few seconds a gate is on
+    screen" — and the traverse it rides on was left at exactly 20–30s. **A stated principle contradicted by the
+    constant next to it.**
+
+**CONTRAST IS NOT THE PROBLEM, and this is recorded so nobody "fixes" it.** The strokes' effective alpha runs
+**0.045–0.45** (per-path `stroke-opacity` 0.1→1.0 times the envelope's 0.45 plateau), which reads as alarming on
+paper and predicts that half the field is invisible. Measured against the real background — `--bg: #16140f`,
+L\* 6.37 — the 48 strokes land at **dL\* 4.2 to 42.5, with NONE below the just-noticeable difference and 46 of 48
+at dL\* ≥ 5.** L\* is steeply nonlinear near black, so a 4.5%-alpha ivory line over near-black still reads
+clearly. Raising the opacity or the widths would have been a fix for a defect that is not there — and would have
+undone the owner's own "let the line be a little bit thinner". **The arithmetic of an alpha says nothing about
+whether a stroke is visible; composite it over the actual background and take the L\* difference.**
 - **The colour leans WARM/COOL between palette tokens, and the script never names a colour.** `.gate-field`
   declares `--trail-base`/`--trail-warm`/`--trail-cool` as `--paper`/`--ochre`/`--indigo`, and the driver reads
   them once with `getComputedStyle`. That keeps palette discipline *and* re-themes for free: under dark,
@@ -635,6 +654,12 @@ the owner and cost five rounds between them. Do not reintroduce any of them.**
    mechanism — `window.scrollTo()` still works — so one flick scrolled the page behind the
    gate and dismissal revealed a later slide instead of the hero. Use
    `stopImmediatePropagation()`, and swallow the deck's keys too.
+   - **Swallowing `touchmove` left a phone with no way out but the button**, which is the defect that fix
+     created and nobody noticed for several releases: `onKey` exits only on Escape, a key a phone does not
+     have, so a visitor arriving from a link on a handset had one 44px target and no gesture. That is the
+     modal arrival path for anyone following a LinkedIn link. `touchend` now dismisses from anywhere on the
+     gate — `touchend` rather than `touchstart`, so a swallowed scroll attempt still counts as "let me in"
+     rather than firing before the finger has decided.
 4. **Window/document listeners outlive the gate's DOM.** `ClientRouter` replaces
    `document.body`, so without a teardown `swallow`/`onKey` keep calling `preventDefault`
    forever: wheel scrolling and Tab dead site-wide, with no gate on screen to explain it.

@@ -16,7 +16,14 @@
 // semantics. Change the rule here first.
 
 /** The session flag. Namespaced so it cannot collide with the theme key BaseLayout's resolver reads. */
-export const GATE_SEEN_KEY = 'descent.gate.seen';
+/**
+ * VERSIONED, so changing the gate is visible to someone who already opened the site this session.
+ *
+ * It was `'descent.gate.seen'`. During a run of design iterations that is actively misleading: the owner
+ * reloads, the flag is already set, the gate does not raise, and the change appears not to have shipped. Bump
+ * the suffix whenever the gate changes enough to want a second look.
+ */
+export const GATE_SEEN_KEY = 'descent.gate.seen.v2';
 
 /** Must match the CSS dismissal duration in Gate.astro. */
 export const GATE_DISMISS_MS = 600;
@@ -211,7 +218,7 @@ export function opacityAt(t: number): number {
  * Where in its cycle a stroke starts when the gate opens.
  *
  * 0.16 is not a round number by accident: it is where the approved build happened to sit (it used a flat 4s lead
- * against 20-30s durations), and at that phase 41% of each arc is painted as a band across the middle of the
+ * against the then-20-30s durations), and at that phase 41% of each arc is painted as a band across the middle of the
  * curve — which is the part of it the viewBox actually shows. Both neighbours are worse: 0 paints only the first
  * 30%, which is off the top-left corner, and 0.5 paints nothing at all.
  *
@@ -243,8 +250,10 @@ export const GATE_WIDTH_SWING = 0.35;
 /**
  * Weight multiplier at cycle position `t`, for a stroke carrying its own `phase`.
  *
- * TWO cycles per traverse, not one: a single cycle over 20-30s is far too slow to read as variation in the few
- * seconds a gate is on screen. The per-stroke phase stops the family pulsing in unison, which would read as the
+ * TWO cycles per traverse, not one: a single cycle across a whole traverse is too slow to read as variation in
+ * the few seconds a gate is on screen. Worth knowing that this reasoning was stated here while the TRAVERSE it
+ * rides on was still 20-30s, which made these curves 10-15s and the dash itself a tenth-of-a-journey per dwell.
+ * The traverse is 6-9s now; the principle was right and the number it applied to was not. The per-stroke phase stops the family pulsing in unison, which would read as the
  * whole drawing breathing rather than as individual strokes having their own weight.
  */
 export function widthAt(t: number, phase = 0): number {
