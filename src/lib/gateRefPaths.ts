@@ -27,7 +27,29 @@
 //   4. Most of the geometry lies outside the viewBox: y runs -189 to 875 against a 316-tall box, so only the
 //      slice crossing the frame is ever seen. That is load-bearing, not sloppiness — it is what makes the
 //      curves read as long sweeps passing through rather than as arcs that start and stop.
-import type { Trail } from './gatePaths';
+/**
+ * One curve, as the gate draws it.
+ *
+ * This used to live in `lib/gatePaths.ts` alongside a viewBox and a centripetal spline that served the comb and
+ * descent-trail candidates. Those were rejected, `/proto-gate` retired, and the file went with them — so the
+ * type now lives with its only producer.
+ *
+ * `len` is REQUIRED, and that is the simplification the move bought. It was optional because the comb's trails
+ * had no arc length to report; every curve here has one, and it is load-bearing: dashing a ~1580-unit path via
+ * `pathLength="1"` and fractional dash values renders as a sub-unit stipple in Chrome, because the scale factor
+ * is ~2000x and the dash computation loses its precision. Knowing the true length keeps the dash and its offset
+ * in plain user units with nothing scaled.
+ */
+export interface Trail {
+  /** SVG path data, rounded to 0.1px. */
+  d: string;
+  /** Index among the emitted curves, which is what DOM order and the ramps key off. */
+  i: number;
+  opacity: number;
+  width: number;
+  /** Arc length in user units. */
+  len: number;
+}
 
 /** The original's viewBox, kept exactly: the curve constants are only meaningful against it. */
 export const REF_VIEW_W = 696;

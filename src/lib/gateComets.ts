@@ -1,6 +1,5 @@
 /**
- * THE GATE'S TRACKS: the ported curves, re-expressed as arc-length-parameterised polylines so something can
- * TRAVEL along them.
+ * THE GATE'S CURVES, measured: flattened to arc length, and asked which part of each one is on screen.
  *
  * Why this exists at all. Six dash schemes shipped on the gate and every one was rejected, because a dash makes
  * a line partial and its gap reads either as the line vanishing or as a trail hanging off it. Then the
@@ -42,14 +41,15 @@ const bez = (a: number, b: number, c: number, d: number, t: number): number => {
 };
 
 /**
- * Read the two cubics out of a gate `d`-string.
+ * Read the two cubics out of a gate `d`-string. NOT exported: `parseTrack` is the only caller, and an
+ * export with one internal consumer invites a test that pins an implementation detail.
  *
  * Deliberately a narrow parser rather than a general one: these strings are emitted by `refFamily` in exactly
  * one shape (`M x y C x y x y x y C x y x y x y`), so the honest thing is to pull the 14 numbers out in order
  * and assert the count. A general SVG path parser here would be code with no second caller and a lot of
  * unreachable branches — and it would hide a malformed string instead of failing on it.
  */
-export function parseCubics(d: string): Cubic[] {
+function parseCubics(d: string): Cubic[] {
   const n = d.replace(/[MC]/g, ' ').trim().split(/[\s,]+/).map(Number);
   if (n.length !== 14 || n.some((v) => !Number.isFinite(v))) {
     throw new Error(`gate track: expected 14 finite coordinates, got ${n.length} from "${d}"`);
@@ -87,57 +87,6 @@ export function parseTrack(d: string, steps = 120): Track {
     cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
   }
   return { pts, cum, total: cum[cum.length - 1] };
-}
-
-/**
- * The point at arc length `s` along the track, clamped to its ends.
- *
- * Binary search rather than a linear scan: a head and its tail are sampled many times per frame, and the tail
- * is walked backwards from the head, so this is the one function in the gate that runs in a hot loop.
- */
-export function pointAt(track: Track, s: number): Pt {
-  const { pts, cum, total } = track;
-  if (s <= 0) return pts[0];
-  if (s >= total) return pts[pts.length - 1];
-  let lo = 0;
-  let hi = cum.length - 1;
-  while (hi - lo > 1) {
-    const mid = (lo + hi) >> 1;
-    if (cum[mid] <= s) lo = mid; else hi = mid;
-  }
-  const span = cum[hi] - cum[lo];
-  const f = span > 0 ? (s - cum[lo]) / span : 0;
-  return {
-    x: pts[lo].x + (pts[hi].x - pts[lo].x) * f,
-    y: pts[lo].y + (pts[hi].y - pts[lo].y) * f,
-  };
-}
-
-/**
- * The `meet` fit, in one place.
- *
- * The gate used to be an SVG, and `preserveAspectRatio="xMidYMid meet"` did this arithmetic in the renderer.
- * On a canvas it has to be written out, and it must agree with the SVG version exactly or the composition the
- * owner settled on — the zoom in particular, measured against his reference screenshot — would quietly change
- * the moment the element type did.
- */
-export function fitMeet(
-  viewBox: readonly [number, number, number, number],
-  w: number,
-  h: number,
-): { scale: number; dx: number; dy: number } {
-  const [vx, vy, vw, vh] = viewBox;
-  const scale = Math.min(w / vw, h / vh);
-  return { scale, dx: (w - vw * scale) / 2 - vx * scale, dy: (h - vh * scale) / 2 - vy * scale };
-}
-
-/**
- * Deterministic [0,1) from an integer index — the site forbids `Math.random()` in a drawing, because two builds
- * of the same content must not disagree (the same rule the Rules slide's seeded walk follows).
- */
-export function jitter(i: number, salt = 1): number {
-  const x = Math.sin((i + 1) * 12.9898 * salt) * 43758.5453;
-  return x - Math.floor(x);
 }
 
 /**

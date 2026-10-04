@@ -463,6 +463,16 @@ describe('the first-visit gate, as shipped', () => {
         .toMatch(/data-len="\d/);
     }
 
+    // THE ON-SCREEN ARC WINDOW MUST SHIP. The entire fix for "entire lines go dark immediately" is that travel
+    // is clipped to [a, b] — the arc of each curve that is actually in frame, measured at build time because the
+    // driver is inline and cannot import. If these attributes stop being emitted the driver silently falls back
+    // to the whole arc (`data-b` defaults to the full length), which is exactly the 42%-blank defect, and
+    // nothing else in the suite would notice.
+    for (const p of paths) {
+      expect(p, `no on-screen window ships for this stroke: ${p}`).toMatch(/data-a="[\d.]+"/);
+      expect(p, `no on-screen window ships for this stroke: ${p}`).toMatch(/data-b="[\d.]+"/);
+    }
+
     // No second permanently-drawn layer. That is what read as a trail, so it is worth a test rather than a note.
     expect(home!.markup, 'a faint underlay is back — it will read as a trail behind every line')
       .not.toMatch(/class="gate-(base|haze)"/);
@@ -477,30 +487,78 @@ describe('the first-visit gate, as shipped', () => {
     // bare multiple of the triangle: an additive floor is precisely the bug.
     expect(html, 'the opacity envelope has an additive floor again, so the reset will be visible')
       .not.toMatch(/style\.opacity\s*=\s*String\(\s*0?\.\d+\s*\+/);
-    // The envelope must be the PLATEAU form driven by both tested constants — a bare `PEAK * tri` passes the
-    // zero-crossing check above while being dimmer than the approved build for most of the cycle.
-    expect(html, 'the envelope is not driven by the tested constants, or lost its plateau')
-      .toMatch(/PEAK\s*\*\s*Math\.min\(\s*1\s*,\s*tri\s*\/\s*RAMP\s*\)/);
+    // THE CLAIM IS "DRIVEN BY THE TESTED CONSTANTS", NOT "SPELLED THIS WAY".
+    //
+    // This assertion used to match the inline script's source character-for-character, down to the name of a
+    // loop local (`tri`). Renaming it, or hoisting the envelope into a helper, turned the test red with
+    // byte-identical output — which is why it had been rewritten once per redesign, and why pinning an
+    // expression's shape is the wrong instrument.
+    //
+    // What genuinely needs guarding is the seam: the driver is `is:inline` so it CANNOT import, and the four
+    // numbers that decide whether strokes vanish are unit-tested in lib/gate.ts. `define:vars` is what keeps
+    // the two on one value. So assert that the constants arrive that way and that the opacity write is computed
+    // from them — the arithmetic itself is proven in tests/gate.test.ts, where it belongs.
+    expect(html, 'GATE_OPACITY_PEAK is no longer handed to the script by define:vars')
+      .toMatch(/\bPEAK\s*=\s*0?\.\d+/);
+    expect(html, 'GATE_OPACITY_RAMP is no longer handed to the script by define:vars')
+      .toMatch(/\bRAMP\s*=\s*0?\.\d+/);
+    const opacityWrite = /\.opacity\s*=\s*([^;]{0,120});/.exec(html)?.[1] ?? '';
+    expect(opacityWrite, 'no opacity write found in the shipped script').not.toBe('');
+    expect(opacityWrite, 'the envelope ignores the tested peak — a hardcoded copy will drift')
+      .toMatch(/PEAK/);
+    expect(opacityWrite, 'the envelope ignores the tested ramp, so it peaks instead of plateauing')
+      .toMatch(/RAMP/);
   });
 
-  it('parks the drift under reduced motion, and needs nothing undone to do it', () => {
-    // The finished state is now the same picture rather than a repaired one. Previous versions had to reset a
-    // dasharray (or every stroke rendered partially drawn) and pin a group opacity (or the still was brighter
-    // than anything a moving reader saw). With the strokes carrying no animated property, stopping the groups'
-    // transform is the whole of it.
+  it('gives a reduced-motion reader the same picture, held still', () => {
+    // SCOPED TO THE GATE'S OWN BLOCK, which this test did not used to be: it searched the entire homepage
+    // stylesheet for `prefers-reduced-motion` and `animation: none`, both of which the bundle has carried since
+    // BaseLayout was written. It passed regardless of what the gate did, and its name still said "drift" two
+    // commits after the drift was deleted.
+    //
+    // What matters is narrow: under reduced motion the strokes must be PINNED, not animated and not reset. The
+    // driver never runs (`if (!reduced())`), so no inline dash is ever written and there is nothing to undo —
+    // the one thing needed is the opacity pin, because the per-path `stroke-opacity` attribute ramps to 1.0 and
+    // without it a still reader sees the drawing at full strength: a different picture, not a still of this one.
     const css = gateCss();
-    expect(css).toMatch(/prefers-reduced-motion:\s*reduce/);
-    expect(css, 'the drift still runs for a reader who asked for no motion').toMatch(/animation:\s*none/);
+    const blocks = [...css.matchAll(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{/g)];
+    expect(blocks.length, 'the gate CSS has no reduced-motion block').toBeGreaterThan(0);
+    // Take the stylesheet from each such block and keep the one that governs a gate stroke.
+    const governing = blocks
+      .map((m) => css.slice(m.index ?? 0, (m.index ?? 0) + 1200))
+      .filter((b) => /\.gate-trail/.test(b));
+    expect(governing.length, 'no reduced-motion rule reaches .gate-trail').toBeGreaterThan(0);
+    expect(governing[0], 'the strokes are not pinned for a reader with motion off').toMatch(/opacity:\s*0?\.\d/);
   });
 });
 
 describe('the gate script, after the whole-branch review', () => {
   const home = byRoute().get('/')!;
-  const script = (home.html.match(/<script>[\s\S]*?data-gate[\s\S]*?<\/script>/g) ?? []).join('\n');
+  /**
+   * THE GATE'S OWN SCRIPT BLOCK, not "every script on the page".
+   *
+   * This used to be a lazy `/<script>[\s\S]*?data-gate[\s\S]*?<\/script>/`, which starts at the document's FIRST
+   * <script> — BaseLayout's theme resolver — and ends at the first </script> after the `data-gate` div: one
+   * match, 236KB, 14 blocks. Every assertion below then meant "appears somewhere in the page's script", which
+   * is not what any of their comments claim. Splitting on the tag and keeping the one block that mentions
+   * `[data-gate]` gives the ~17KB that actually belongs to the gate.
+   */
+  const script = home.html
+    .split(/<script\b[^>]*>/)
+    .map((b) => b.split('</script>')[0])
+    .filter((b) => b.includes('[data-gate]'))
+    .join('\n');
 
-  it('ships the raise-script at all', () => {
-    expect(script.length, 'no inline gate script in dist/index.html').toBeGreaterThan(200);
+  it('captures the gate block and nothing else', () => {
+    // Guards the capture itself, because every assertion in this describe is only as good as it. If the split
+    // ever grabs the whole page again, these numbers go wrong long before the assertions do.
+    expect(script.length, 'no script block mentions [data-gate]').toBeGreaterThan(2000);
+    expect(script.length, 'the capture has swallowed other script blocks again').toBeLessThan(60000);
+    expect(script, 'the capture reaches outside the gate block').not.toMatch(/localStorage\.getItem\('theme'\)/);
   });
+
+  // NO 'does the script exist' TEST. The four below each match a pattern that appears nowhere else in the
+  // shipped page, so they already fail if the script is missing — an extra length check only duplicated them.
 
   it('guards against ClientRouter re-executing it mid-session', () => {
     // The script exists only in /'s HTML, so Astro does not carry it in `scriptsAlreadyRan` for a visitor

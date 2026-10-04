@@ -137,11 +137,8 @@ src/
   lib/viewport.ts                   # PHONE_MAX_WIDTH = 640 + isPhone() — the one phone gate
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate
   lib/gate.ts                       # the first-visit gate's POLICY: session flag, fresh-load test, dismissal timing, isCovered — unit-tested
-  lib/gatePaths.ts                  # the gate's shared TOOLKIT only: viewBox, the Trail shape, the centripetal spline. It imports nothing
-  lib/gateRefPaths.ts               # the gate's TRACKS: the ported 21st.dev geometry, each curve's arc length, the join smoothing, GATE_COUNT and the zoom — unit-tested
-  lib/gateComets.ts                 # d-string -> arc-length polyline, pointAt, visibleWindow (which arc of a curve is ON SCREEN — the vanish fix), the hand-rolled `meet` fit — unit-tested
-  lib/gateLines.ts                  # combed contours of the hero's field — built, compared in /proto-gate, NOT shipped (see below)
-  lib/gateProtoShapes.ts            # four black-hole candidates, /proto-gate only, deliberately barely tested
+  lib/gateRefPaths.ts               # WHAT THE GATE DRAWS: the ported 21st.dev geometry, the Trail shape, each curve's arc length, the join smoothing, GATE_COUNT and the zoom — unit-tested
+  lib/gateComets.ts                 # d-string -> arc-length polyline + visibleWindow (which arc of a curve is ON SCREEN — the vanish fix). Two exports; it had six until the canvas gate was reverted — unit-tested
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
   lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter
   lib/descentPath.ts, trajectory.ts # the career descent graph's field and route
@@ -167,11 +164,12 @@ tests/*.test.ts                     # vitest — every pure lib module, the data
 
 ### Routes
 
-**Ten pages**, and that is the number `npm run build` prints (`10 page(s) built`) —
+**Nine pages**, and that is the number `npm run build` prints (`9 page(s) built`) —
 check it against the build rather than against this table, and `ls src/pages` beats
-both. This line has now been wrong twice in opposite directions: it read "twelve"
-when three prototype routes had been deleted, then "nine" for six commits after
-`/proto-gate` was added. Re-run the build; do not trust the sentence.
+both. **This line has now been wrong three times**: it read "twelve" when three
+prototype routes had been deleted, then "nine" for six commits after `/proto-gate`
+was added, then "ten" after `/proto-gate` was retired again. Re-run the build; the
+sentence has never once been corrected before the build disagreed with it.
 
 | Route | What it is |
 | --- | --- |
@@ -184,12 +182,18 @@ when three prototype routes had been deleted, then "nine" for six commits after
 | `/art` | calligraphy + photography |
 | `/404` | the not-found page (noindex, no canonical) |
 | `/proto-sketches` | **prototype** — the showpiece sketch gallery |
-| `/proto-gate` | **prototype** — six candidate first-visit gates at full size |
 
-**The prototype routes are internal, and there are two of them.**
-`/proto-sketches` and `/proto-gate` survive; `/proto-showpiece`, `/proto-ladder` and
-`/proto-paper` were retired once they had answered their question (the reasons are in
+**The prototype route is internal, and there is one of them.** `/proto-sketches`
+survives; `/proto-showpiece`, `/proto-ladder`, `/proto-paper` and now `/proto-gate`
+were each retired once they had answered their question (the reasons are in
 `tests/protoNoindex.test.ts`, which is where the count lives now). Git holds them.
+  `/proto-gate` is the instructive one: it rendered six candidate gates side by side
+and settled the choice, but by the time the shipped gate was approved its own "the
+original (ported)" frame had drifted — still 36 strokes, the source viewBox, ochre,
+static, with none of the four corrections the real gate had gained — and one frame was
+still labelled "ships today" about a design that had lost. **A prototype that is not
+rebuilt alongside what ships becomes a confident lie.** Retiring it on schedule is
+cheaper than maintaining it.
 
 They exist so a visual choice can be made by looking at the real thing in the real
 page rather than at a screenshot (see the project's own habit: put the options in
@@ -410,14 +414,19 @@ The three that were removed, because each is a way to get this wrong again:
   ramp starts at 0.1, and a gold line at a tenth opacity over near-black has no luminance left to
   carry where a near-white one still reads as light. They are `--paper` now — the site's ivory, not
   pure `#fff`, so palette discipline holds.
-- **Only the strongest twelve per family animated**, leaving 48 of 72 frozen at full length. A
-  frozen stroke beside a travelling one does not read as depth, it reads as a stroke that failed,
-  and the static ones dominate because they are drawn end to end. All 72 animate, and a trace
-  measures **60.0 fps** with them doing so, so the count was never the cost it was assumed to be.
-  (Twelve was a guess at the flashing — see trap 5 — so it fixed nothing and cost the motion. That
-  line used to read "after the full 72 flashed in practice", which is how a wrong lead survives: a
-  number changed next to a symptom that then persisted, written up as if it had worked.)
-- **Dash PHASE was a live argument through three commits, and it is moot now that there is no dash.**
+- **Only the strongest twelve per family animated**, leaving the rest frozen at full length. A frozen
+  stroke beside a travelling one does not read as depth, it reads as a stroke that failed, and the static
+  ones dominate because they are drawn end to end. **Every stroke animates**, and a trace measured
+  **60.0 fps** doing so back when 72 of them shipped, so the count was never the cost it was assumed to
+  be — 48 ship today (`GATE_COUNT` 24, two families).
+  (Twelve was a guess at the flashing — see trap 5 — so it fixed nothing and cost the motion. That line
+  used to read "after the full 72 flashed in practice", which is how a wrong lead survives: a number
+  changed next to a symptom that then persisted, written up as if it had worked. Note the second-order
+  version of the same failure, which this bullet itself committed: it went on quoting "48 of 72" after
+  the count dropped to 48 total. **Prefer naming the rule over the arithmetic** — "every stroke", not a
+  number that is downstream of a dial.)
+- **Dash PHASE was a live argument through three commits, and it is moot — not because the dash went (it is
+  back and shipping), but because the layer that made phase matter did not.**
   Kept because the episode is the clearest example in this file of a correct decision becoming wrong
   when something else changes underneath it. The source passes no delay, so all its paths move
   together. Copying that was right while the dashed layer was the only layer. It became wrong the
@@ -498,15 +507,18 @@ sounds like "gentle bobbing gradient waves", that is v2 and it is a different co
 
 ### Four things were rejected here, each after looking at it
 
-Do not rebuild them. All four were judged in `/proto-gate`, which is what that route is for. Note the
-shape of the list: every rejection was decided by LOOKING, and three of the four were things that
-measured better than what won.
+Do not rebuild them. All four were judged in `/proto-gate` — a route that has since been retired, so these
+notes are now the only record outside git. Note the shape of the list: every rejection was decided by LOOKING,
+and three of the four were things that measured better than what won.
 
 1. **Descent trails run to convergence** — the first version. Every stroke ends in one of the
    field's three basins, so 36 of them piled into 3 points: 71% of the set inside one cell of a
    20×20 grid, 271 pair crossings, 22× spread in length. The owner: *"ur lines are horrible."*
    (Its separate, real bug was uniform Catmull-Rom over 412× uneven spacing, which drew a
-   173.8° hairpin. That fix — centripetal — survives and is why the spline is in `gatePaths`.)
+   173.8° hairpin. The fix was centripetal Catmull-Rom, which provably cannot cusp at any spacing; it lived in
+   `lib/gatePaths.ts` and was deleted with the comb, since the ported geometry is cubics and needs no spline.
+   Git holds it, and the rule it taught is the durable part: **uniform Catmull-Rom overshoots once the spacing
+   ratio passes about 5×.**)
 2. **Truncated descent, and marching-squares contours with elevation** — built, measured, cut.
    And a process lesson worth more than either: they were compared *against each other and the
    comb simultaneously*, each having chosen its own count, spacing and projection, so four
@@ -526,18 +538,22 @@ measured better than what won.
    the tilt exceeds the field's maximum gradient (`MAX_FIELD_GRAD = 1.8668`, measured on a 401×401
    grid), so `grad g` cannot vanish, so there are no closed level sets and none that meet — zero
    crossings against 271 for the descent trails. Three of its dials were then settled by sweeping one
-   variable at a time in `/proto-gate`: **8 strokes** (from 8/12/18/30) and **opacity 0.10 → 0.80**
-   (from four ramps). It still lost: *"the lines reads parallel and seems dull."*
+   variable at a time: **8 strokes** (from 8/12/18/30) and **opacity 0.10 → 0.80** (from four ramps). It
+   still lost: *"the lines reads parallel and seems dull."*
    **And the parallelism was the theorem's own cost.** To guarantee no knots the tilt must swamp the
    field, which is exactly what flattens the terrain out of the picture. A safe drawing and an
    interesting one were in direct tension, and the guarantee won on the metrics and lost on the wall.
-   The module and its tests are kept because `/proto-gate` renders it as the comparison; it is not
-   dead code, but it is not what ships.
+   `lib/gateLines.ts` and its 20 tests are **deleted** — this entry used to end "the module and its tests are
+   kept because /proto-gate renders it as the comparison; it is not dead code, but it is not what ships", and
+   when the route went, that sentence was the whole of its justification. One assertion was rescued first: it
+   measured max|grad| = 1.8668 over the hero's field on a 401×401 grid, which is a property of `lib/terrain.ts`
+   rather than of the comb, and nothing else covered it. It lives in `tests/terrain.test.ts` now.
 
 The lesson across all four, worth more than any of them: **this gate was redesigned five times and
 every decision came from the owner looking at it in the real page at real size.** Not one came from a
-metric, an argument, or a screenshot in a card. `/proto-gate` exists for that, and a candidate that
-cannot be put there at full size is not ready to be proposed.
+metric, an argument, or a screenshot in a card. A `/proto-*` route exists for that, and a candidate that
+cannot be put in one at full size is not ready to be proposed — but build it, use it, and retire it when the
+question is answered, because an un-maintained prototype drifts into misinformation (see *Routes*).
 
 **Six traps, each of which shipped. The first four were caught in review; the last two shipped to
 the owner and cost five rounds between them. Do not reintroduce any of them.**
@@ -572,10 +588,10 @@ the owner and cost five rounds between them. Do not reintroduce any of them.**
      read *"a dash of FIXED length FLASHES, and the growth from 0.3 to 1 is what stops it"* — which
      was a true observation about one specific combination (fixed length, period equal to the arc,
      scattered phases, no layer underneath) wrongly generalised into a rule — and the rule it stated
-     was then used to justify two more dash schemes, both of which were also rejected. **There is no
-     dash on the gate at all now**, so the only safe reading of this bullet is the one at the top of
-     it: the viewBox shows about a quarter of each curve, and any scheme that makes a stroke partial
-     will eventually make it look broken. See *"THERE IS NO DASH ON THE STROKES"* above.
+     was then used to justify two more dash schemes, both of which were also rejected. **A dash DOES ship
+     today**, so read only the claim at the top of this bullet: the viewBox shows about a quarter of each
+     curve, so any scheme that lets a stroke's painted span leave that quarter will eventually look broken.
+     That is why travel is clipped to the measured on-screen window — see the motion section above.
    - Two more traps in the same family, both found the same way: `pathLength="1"` with fractional
      dash values loses precision on a ~1580-unit curve and stipples it, and **Chrome will not
      interpolate a `calc()` containing an unregistered custom property** — it snaps to the end

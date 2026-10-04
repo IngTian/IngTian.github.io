@@ -205,30 +205,23 @@ const letters = [...`${name.first} ${name.last}`];
   @media (prefers-reduced-motion: no-preference) {
     .gate { transition: opacity 600ms ease, visibility 600ms ease; }
 
-    /* THE MOTION, THIRD ATTEMPT, AND THE SECOND ATTEMPT'S DIAGNOSIS WAS WRONG.
-         History, because it is the useful part. The port first dropped the original's endless animation for a
-       1200ms one-shot. Asked for it back — "in the original script ive shown you they got emotions" — I added
-       the travelling dash on all 72 paths AND vector-effect="non-scaling-stroke" in the same change. It broke:
-       "completely broken, cant even rendering. the screen is just flashing." Letters stuck at their opening
-       keyframe, so the name read "I g T n".
-         I blamed the dash, removed it, and replaced the whole thing with a slow transform drift on two groups.
-       That was compositor-cheap and the owner's verdict was correct: "the animation i've given to u is gone...
-       i think yours is basically static."
-         THE DIAGNOSIS WAS THE PART THAT WAS WRONG. The original animates the dash on 72 paths too —
-       framer-motion implements pathLength/pathOffset by writing stroke-dasharray and stroke-dashoffset — and
-       it runs fine in its own demo. So "72 paint-bound paths cannot work" was refuted by the source itself.
-       What my version had that the source does not is vector-effect, which stops the renderer caching stroked
-       geometry and forces all 72 paths to be re-stroked at device resolution every frame. That is the far more
-       likely cost, and it came in on the same commit, which is why it got away with it.
-         So: the dash is back, faithfully, and vector-effect stays gone. If this still flashes then the dash
-       really is the problem and the fix is fewer animated paths — animate the strongest dozen and leave the
-       haze static — not removing the motion again. Said out loud because I cannot see the result and the owner
-       can. */
-    /* NO CSS ANIMATION ON THE STROKES AT ALL — the dash is driven from JS below, the way the source does it.
-       Four CSS translations of framer-motion's pathLength/pathOffset shipped here and each produced a different
-       artifact: a sub-unit stipple, an offset that never interpolated, and finally a fixed-length dash that slid
-       in and out of the visible frame forever. The resting state set here is what a visitor sees with JS off or
-       under reduced motion: the whole curve, drawn, at the midpoint of the pulse. */
+    /* NO CSS ANIMATION ON THE STROKES — the dash is driven from the script below, the way the source does it.
+       Four CSS translations of framer-motion's pathLength/pathOffset shipped here first and each produced its own
+       artifact: a sub-unit stipple, an offset that never interpolated, a fixed-length dash that slid in and out
+       of frame. Keep it in JS.
+         VECTOR-EFFECT MUST STAY OFF, which is the one durable finding from the round where this "flashed".
+       `vector-effect="non-scaling-stroke"` stops the renderer caching stroked geometry, so every full-screen path
+       is re-stroked at device resolution every frame. It arrived in the same commit as the dash, which is how it
+       escaped blame for a while — the source animates a dash on just as many paths and runs fine without it.
+       tests/distSmoke.test.ts asserts it stays off.
+         The resting opacity below is what a visitor sees with JS off or under reduced motion.
+
+       This block used to carry ~20 lines of narrative about three earlier attempts, ending in a standing
+       instruction to "animate the strongest dozen and leave the haze static" if the problem came back. Both of
+       those were then built and rejected — the frozen strokes read as failed ones, and the haze underlay read as
+       a trail behind every line, which distSmoke now forbids outright. A comment that prescribes a rejected fix
+       is worse than no comment, so the prescription is gone and the history now lives in CLAUDE.md where the
+       rest of the rejections are. */
     .gate.is-up .gate-fam .gate-trail { opacity: 0.45; }
 
     /* THE LETTERS FAIL VISIBLE, and that is the fix for the name arriving incomplete TWICE — "I g T n" and
@@ -268,26 +261,26 @@ const letters = [...`${name.first} ${name.last}`];
   }
 
   @media (prefers-reduced-motion: reduce) {
-    /* THE FINISHED STATE: both families parked, at the midpoint of the breathing they would otherwise do.
-       The opacity is pinned and that is not cosmetic — the drift/breathe pair animates group opacity between
-       0.42 and 0.78, so without this a reader with motion off would get the drawing at full strength, which is
-       a different picture rather than a still of the same one. 0.6 is the midpoint.
-         There are no dash properties to clear any more. An earlier version animated stroke-dashoffset and had
-       to reset dasharray here, because leaving it set with the animation disabled renders every stroke at a
-       full dash offset, i.e. invisible — a broken state wearing a finished state's clothes. That animation is
-       gone (it repainted the viewport 72 times a frame and broke the page), so the hazard is gone with it. */
-    /* THE DASH RESET IS BACK because the dash is back. Leaving stroke-dasharray set while the animation is
-       disabled renders every stroke at a partial dash — the 0% keyframe is `0.3 0.7`, so 70% of every curve
-       would simply be missing. A broken state wearing a finished state's clothes, which is what the motion rule
-       forbids. Opacity is pinned at the midpoint of the pulse for the same reason it was before: without it a
-       reader with motion off sees the drawing at full strength, a different picture rather than a still. */
-    .gate-trail { stroke-dasharray: none; stroke-dashoffset: 0; opacity: 0.45; }
+    /* THE FINISHED STATE, and it needs exactly one declaration.
+         The driver is never built under reduced motion (`if (!reduced())` below), so no stroke ever receives an
+       inline dash and there is nothing to clear — a `stroke-dasharray: none` reset used to sit here and reset
+       nothing. What IS needed is the opacity pin: the per-path `stroke-opacity` attribute ramps to 1.0, so
+       without this a reader with motion off gets the drawing at full strength, which is a different picture
+       rather than a still of the same one. 0.45 is the envelope's plateau, i.e. where a moving reader spends
+       most of the cycle.
+         Two contradictory comment blocks used to be stacked here, one saying there was no dash to reset and the
+       next saying the reset was back, each written in a different round and neither deleting the other. Between
+       them they asserted a drift/breathe animation, a `0.3 0.7` keyframe and a 72-path count — none of which
+       exist (48 strokes ship, and the only keyframes in this file are `gate-letter` and `gate-rise`). */
+    .gate-trail { opacity: 0.45; }
     .gate-letter, .gate-roles, .gate-enter { opacity: 1; transform: none; }
   }
 
-  /* Phones get half the strokes — 36 of the 72, one whole mirrored family's worth thinned out. The content is
-     the same (phone work here is parity plus bug fixes), but 72 full-screen strokes animating a dash offset
-     forever is a real paint cost on a phone, and at that width the thinning is invisible. */
+  /* Phones get half the strokes — 24 of the 48, every other curve in each family. The content is the same
+     (phone work here is parity plus bug fixes), but 48 full-screen strokes animating a dash offset forever is a
+     real paint cost on a handset, and at that width the thinning is invisible.
+       The counts in this comment said 36 of 72 until GATE_COUNT dropped to 24 per family. Prefer describing the
+     RULE ("every other curve") over the arithmetic, since the arithmetic is downstream of a dial. */
   @media (max-width: 640px) {
     .gate-trail:nth-child(2n) { display: none; }
   }
@@ -426,43 +419,34 @@ const letters = [...`${name.first} ${name.last}`];
     }
 
     // ── THE FLOW, DRIVEN HERE RATHER THAN IN CSS ────────────────────────────────────────────────────
-    // A faithful read of the source's per-path animation:
-    //     pathLength 0.3 -> 1          the drawn dash GROWS from 30% of the curve to all of it
-    //     pathOffset 0 -> 1 -> 0       the dash travels forward, then back
+    // The source's per-path animation, which this reproduces:
+    //     pathLength 0.3 -> 1          the drawn dash grows from 30% of the arc to all of it, then RESETS
+    //     pathOffset 0 -> 1 -> 0       the dash's leading edge travels forward, then back
     //     opacity    0.3 -> 0.6 -> 0.3 the element pulses
-    //     duration   20-30s, linear, repeating forever
+    //     duration   20-30s, linear, repeating forever, no delay
     //
-    // THE GROWTH IS THE PART THAT MATTERS AND I DROPPED IT ONCE. Most of each curve lies outside the viewBox,
-    // so a dash of FIXED length slides in and out of the visible frame and the strokes appear to flash. Because
-    // the dash grows to the full curve by the end of each cycle, the drawing resolves instead of blinking.
+    // THE DASH DOES NOT WRAP — IT CLIPS, and this is the detail everything else here depends on. framer-motion
+    // sets pathLength="1" and writes `stroke-dasharray = "<L> <S>"` with pathSpacing defaulting to 1, so the
+    // period is L+1 and always exceeds the arc: at most ONE dash is ever on the path, and the painted span is
+    // [O, min(1, O+L)). Earlier rounds here assumed it tiled and reasoned in circles from that.
     //
-    // EVERY path animates, and EVERY path starts at the same point in its cycle. Both of those are the source,
-    // and deviating from either is what made the field read as "lifeless ... some kids drew them in
-    // kindergarten":
+    // EVERY path animates, and every path starts at the same point in its cycle — both are the source, and
+    // deviating from either produced "lifeless ... some kids drew them in kindergarten". Animating only a subset
+    // leaves the rest frozen at full length, which reads as strokes that failed rather than as depth; scattering
+    // the phases replaces the source's coherent sweep with unrelated strokes caught mid-stride.
     //
-    //   - Animating only the strongest twelve per family left 48 of the 72 frozen at full length. A frozen
-    //     stroke beside a travelling one does not read as depth, it reads as a stroke that failed, and the
-    //     static ones dominate because they are drawn end to end. (Twelve was a guess at the flashing, which
-    //     turned out to be the dash growth — so the reduction fixed nothing and cost the motion.)
-    //   - The source passes NO delay. All 72 begin at pathLength 0.3 together and separate only because each
-    //     draws its duration from 20-30s, so the opening gesture is one coherent sweep that slowly frays. I
-    //     scattered the phases across the whole cycle instead, which replaces that sweep with 72 unrelated
-    //     strokes caught mid-stride — the shape of the complaint exactly.
+    // TWO CORRECTIONS to the source, both for "entire lines go dark immediately", both at their own cause:
+    //   1. the opacity envelope reaches ZERO where the drawn length resets, so the sawtooth's discontinuity has
+    //      nothing visible to disrupt (opacityAt in lib/gate.ts);
+    //   2. travel is CLIPPED to the arc that is actually on screen, so a stroke is never off-frame for most of
+    //      its cycle (the data-a/data-b window, measured by visibleWindow at build time).
+    // One substitution: durations come from a deterministic LCG rather than Math.random(), because a drawing
+    // that differs between builds is against the house rule the Rules slide's seeded walk follows.
     //
-    // Two substitutions, and only two.
-    //
-    // 1. Durations come from a deterministic LCG rather than Math.random(), because a drawing that differs
-    //    between builds is against the house rule the Rules slide's seeded walk follows. Same uniform spread
-    //    over the same 20-30s.
-    //
-    // 2. THE FIELD OPENS FOUR SECONDS INTO ITS CYCLE, and this is the one place where copying the source
-    //    exactly gives the wrong result. Faithfully, every path begins 30% drawn with the drawn window at its
-    //    START — and the start of these curves is off the top-left corner, so for the first couple of seconds
-    //    the field is a stubby comb bunched against the left edge, filling out only after about five. The source
-    //    is a LANDING page: you sit on it and watch it resolve. This is a gate, dismissed in a gesture, so those
-    //    first two seconds are the entire impression and that comb is what got screenshotted as "some kids drew
-    //    them in kindergarten". Leading by 4s opens on the reference picture instead. Every path shares the one
-    //    lead, so the in-phase coherence the source gets from having no delay is kept exactly.
+    // This header previously asserted that a fixed-length dash flashes and that growth is what prevents it, and
+    // that the field opens on a 4-second lead. Neither is true — the first was a wrong generalisation that went
+    // on to justify two rejected schemes, and the second was superseded by the phase fraction below while the
+    // old text stayed. The rejections now live in CLAUDE.md, in one place.
     // WHERE A STROKE STARTS, and the envelope, both come from lib/gate.ts via define:vars — see GATE_OPEN_PHASE
     // and opacityAt there for why 0.16 and why the envelope plateaus instead of peaking. Both are unit-tested,
     // and both are numbers this script must not be allowed to drift from.
