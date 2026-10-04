@@ -136,7 +136,7 @@ src/
   lib/pageStops.ts                  # pure Stop trees: one tree per page drives BOTH its rail and its section ids — unit-tested
   lib/viewport.ts                   # PHONE_MAX_WIDTH = 640 + isPhone() — the one phone gate
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate
-  lib/gate.ts                       # the gate's POLICY (session flag, fresh-load test, dismissal timing, isCovered) AND its motion envelope (drawnFrac/offsetFrac/opacityAt + the four tuned numbers the inline script is handed) — unit-tested
+  lib/gate.ts                       # the gate's POLICY (session flag, fresh-load test, dismissal timing, isCovered) AND every motion curve (drawnFrac/offsetFrac/opacityAt/widthAt/tintAt + the tuned numbers the inline script is handed) — unit-tested
   lib/gateRefPaths.ts               # WHAT THE GATE DRAWS: the ported 21st.dev geometry, the Trail shape, each curve's arc length, the join smoothing, GATE_COUNT and the zoom — unit-tested
   lib/gateComets.ts                 # d-string -> arc-length polyline + visibleWindow (which arc of a curve is ON SCREEN — the vanish fix). Two exports; it had six until the canvas gate was reverted — unit-tested
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
@@ -371,12 +371,18 @@ kindergarten"*. Both survivors are derived numbers, not preferences:
    the example i gave you zoomed out a bit compared to yours". Widening the viewBox about its own
    centre by that ratio puts the site at 2.107×; the build ships
    `viewBox="-124.2 -56.4 944.5 428.8"`.
-   - **This is why `REF_STROKE_SCALE` is back to 1.** At 2.859× the source's authored 0.5–1.55
-     renders 1.4–4.4 CSS px, genuinely heavier than the reference, and it was reported as such
-     twice — so I scaled the widths to 0.4, then 0.6, when the drawing was simply too big. At
-     2.107× the authored widths land at **1.05–3.27 px, which is the reference's own figure to two
-     decimals.** Two dials were compensating for a third. When a drawing looks wrong at one size,
-     check the size before retuning what is in it.
+   - **This is why `REF_STROKE_SCALE` went back to 1 — and why it is 0.7 today.** At 2.859× the
+     source's authored 0.5–1.55 renders 1.4–4.4 CSS px, genuinely heavier than the reference, and it
+     was reported as such twice; I scaled the widths to 0.4, then 0.6, when the drawing was simply
+     too big. Fixing the zoom put the authored widths at **1.05–3.27 px, the reference's own figure
+     to two decimals** — two dials had been compensating for a third. **When a drawing looks wrong
+     at one size, check the size before retuning what is in it.**
+     The scale then came *down* to **0.7**, which is a different kind of change: a deliberate
+     departure on the owner's request — *"let the line be a little bit thinner"* — rather than a
+     correction. Measured, the strokes now render **0.58–2.91 CSS px** against the reference's
+     1.05–3.27. The coupling test still compares the two, asserting the site renders at
+     `REF_STROKE_SCALE` of the reference's weight, so the zoom and the scale cannot drift apart
+     unnoticed; only the expected ratio moved.
 2. **The animation IS the source's travelling dash, with two corrections.** The dash's arithmetic is
    faithful (verified against framer-motion's `buildSVGPath`, not inferred); what changed is that the
    opacity envelope reaches zero where the drawn length resets, and the dash's travel is clipped to
@@ -394,6 +400,17 @@ Two further departures that are the owner's dials rather than fidelity decisions
   strokes. `tests/gateRefPaths.test.ts` asserts that.
 - **The joins are smoothed** (`refFamily(..., smooth)`), because the source has a corner in every
   curve but the first — see below.
+- **`REF_WIDTH_SPREAD = 0.22` wobbles each curve's weight off the ramp**, on the owner's ask that
+  *"different lines may have different thicknesses among them"*. The widths already varied — the
+  source ramps 0.5 → 1.55 with the index — but monotonically, so neighbours differ by 0.03 and the
+  family reads as one smooth gradient rather than as strokes of different weights. Breaking the
+  ordering locally is what makes the variation visible; the ramp's *trend* is left intact because
+  that is what carries depth. A test asserts both halves: the ordering must be broken somewhere,
+  and the top third must still outweigh the bottom third.
+  - **It is sized against the scale, not chosen alone.** At 0.3 against a 0.8 scale the heaviest
+    curve measured **3.45 px against the 3.27 it was supposed to come down from** — the wobble had
+    pushed the maximum *up*, so "a little bit thinner" was not delivered at the one place it shows
+    most. A test now bounds the widest stroke actually emitted, not just the ramp.
 
 **THE SOURCE HAS A MEASURABLE CORNER IN EVERY CURVE BUT THE FIRST.** Each curve is two cubics
 meeting at `(152 - dx, 343 - dy)`; the tangent arriving is `(464 - 2dx, 127)` and the tangent
@@ -480,6 +497,36 @@ slides forward. Several earlier "fixes" here assumed it wrapped and reasoned in 
      letterboxes and an SVG clips to its **element**, so the real visible region is a superset — the
      shipped window is always *inside* what is on screen, which is the safe direction. A test pins
      that monotonicity.
+
+**WEIGHT AND COLOUR ALSO MOVE AS A STROKE TRAVELS** (`widthAt` / `tintAt` in `lib/gate.ts`), on the owner's
+ask for thickness variation *"when you move across the screen"* and *"a little bit color variation to the lines
+when it moves"*. Both are per-element, per-frame style writes alongside the dash, and both matter in a way worth
+stating:
+
+- **SVG cannot vary either ALONG one stroke.** A path has a single width and a single colour at any instant, so
+  tapering head-to-tail would need per-pixel control — a canvas, which was built and rejected. The variation is
+  therefore in TIME: a stroke thickens and cools as it crosses. From the reader's side that is much the same
+  impression, because what they are watching is whichever part of the curve is inside the frame.
+- **Both curves are PERIODIC in `t`**, returning to their starting value at the cycle boundary. The envelope
+  goes to zero there to hide the drawn-length reset; a width or colour that jumped at the same instant would put
+  the discontinuity straight back on screen in another channel. A test pins that directly.
+- **Two cycles per traverse, not one.** A single cycle over 20–30s is far too slow to read in the few seconds a
+  gate is up. Weight and colour are offset by a quarter cycle so they do not peak together — coinciding, they
+  read as one crude pulse rather than two properties of the stroke.
+- **The colour leans WARM/COOL between palette tokens, and the script never names a colour.** `.gate-field`
+  declares `--trail-base`/`--trail-warm`/`--trail-cool` as `--paper`/`--ochre`/`--indigo`, and the driver reads
+  them once with `getComputedStyle`. That keeps palette discipline *and* re-themes for free: under dark,
+  `--ochre` is the phosphor emerald, which is exactly what a dark-theme stroke should warm toward. The lean is
+  small (0.22) because the strokes must stay near-ink — in the light theme the seal is the only saturated
+  colour — and because it is the same warm/cold broken colour `SkyWash` already weaves over the sky, so the gate
+  borrows the site's own idiom rather than inventing one.
+  - **The tokens are HEX, and that cost a silent no-op.** `getPropertyValue` on a custom property hands back the
+    authored string, so `--ochre` arrives as `#c8a36a`; an `rgb()`-only parser fell through to its default and
+    made warm and cool both equal the base. The animation ran every frame and changed nothing — 1 distinct
+    stroke colour across 48 strokes, found by measuring computed colours rather than by reading the code. It now
+    measures 27 distinct colours with all 48 changing over 2.6s.
+
+Measured after all of it: **60.0 fps**, five style writes per stroke per frame instead of three.
 
 **`GATE_OPEN_PHASE = 0.16`** is where a stroke starts when the gate opens, and it is not arbitrary:
 integrating the painted fraction across the cycle gives 0.30 at `t=0`, a maximum near `t=0.25`, **zero
@@ -1052,10 +1099,10 @@ titles came to rest hard against the browser chrome — the lead is a number in
   themes (brightened to `#e0574a` for the dark ground).
 - **Motion:** animate only `transform` / `opacity`; NEVER animate `filter: blur`
   (bake it).
-  - **One exception, and it is the gate's strokes.** They animate `stroke-dasharray` and
-    `stroke-dashoffset`, which are **paint** properties on DOM nodes — exactly what this rule
-    forbids — because a line that draws itself along its own length cannot be expressed as a
-    transform or a fade. It is affordable because ONE rAF writes all 48 dashes, so a frame
+  - **One exception, and it is the gate's strokes.** They animate `stroke-dasharray`,
+    `stroke-dashoffset`, `stroke-width` and `stroke` — all **paint** properties on DOM nodes,
+    exactly what this rule forbids — because a line that draws itself along its own length, and
+    varies its weight and hue as it travels, cannot be expressed as a transform or a fade. It is affordable because ONE rAF writes all 48 dashes, so a frame
     costs one style/paint pass rather than 48 competing animations, and because the gate is
     gone after a gesture. A canvas version that would have satisfied the rule was built and
     rejected on looks, so the exception is the shipped design, not a shortcut. **Do not

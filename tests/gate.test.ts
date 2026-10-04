@@ -11,6 +11,7 @@ import {
   GATE_REVEAL_EVENT,
   GATE_SEEN_KEY,
   GATE_UP_ATTR,
+  GATE_WIDTH_SWING,
   dismissMs,
   drawnFrac,
   hasSeenGate,
@@ -20,7 +21,9 @@ import {
   offsetFrac,
   opacityAt,
   shouldRaiseGate,
+  tintAt,
   type GateStore,
+  widthAt,
 } from '../src/lib/gate';
 
 const okStore = (seed: Record<string, string> = {}): GateStore => {
@@ -252,5 +255,63 @@ describe('the stroke animation, and the pairing that stops lines vanishing', () 
     expect(paintedFrac(GATE_OPEN_PHASE), 'the opening phase paints too little of the arc').toBeGreaterThan(0.35);
     // ...and the opening must land on the envelope's plateau, or the gate opens dimmer than it runs.
     expect(opacityAt(GATE_OPEN_PHASE)).toBeCloseTo(GATE_OPACITY_PEAK, 6);
+  });
+});
+
+describe('weight and colour varying as a stroke travels', () => {
+  it('both return to their starting value at the cycle boundary', () => {
+    // THE PROPERTY THAT MATTERS MOST, and the reason these are curves rather than ad-hoc arithmetic. The drawn
+    // length resets at t = 1, and the whole point of the opacity envelope is to hide that reset by reaching
+    // zero there. A width or colour that JUMPED at the same instant would put a visible discontinuity back on
+    // screen in a different channel — a stroke that fades out thin and warm must fade back in thin and warm.
+    for (const phase of [0, 0.17, 0.5, 0.83]) {
+      expect(widthAt(1, phase)).toBeCloseTo(widthAt(0, phase), 10);
+      expect(tintAt(1, phase)).toBeCloseTo(tintAt(0, phase), 10);
+    }
+  });
+
+  it('stays within the stated swing, so a thin stroke never outweighs a heavy one', () => {
+    // The ramp across the family is what carries depth. If the per-frame swing were large enough to reorder
+    // two curves' weights, the depth would come and go — so the multiplier is bounded by the stated constant.
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let k = 0; k <= 400; k++) {
+      const v = widthAt(k / 400, 0.3);
+      lo = Math.min(lo, v);
+      hi = Math.max(hi, v);
+    }
+    expect(lo).toBeCloseTo(1 - GATE_WIDTH_SWING, 2);
+    expect(hi).toBeCloseTo(1 + GATE_WIDTH_SWING, 2);
+    expect(lo, 'a stroke must never invert to zero or negative width').toBeGreaterThan(0.3);
+  });
+
+  it('leans both warm and cool, and passes through the base ink', () => {
+    // tintAt is a mix factor, not a colour: negative leans cool, positive warm, zero is the token as authored.
+    // All three have to occur, or the "colour variation" is a one-way tint rather than a shimmer.
+    const vals = Array.from({ length: 400 }, (_, k) => tintAt(k / 400, 0));
+    expect(Math.min(...vals)).toBeLessThan(-0.9);
+    expect(Math.max(...vals)).toBeGreaterThan(0.9);
+    expect(Math.min(...vals.map(Math.abs)), 'never passes through the base ink').toBeLessThan(0.05);
+  });
+
+  it('does not peak together with the weight', () => {
+    // Offset by a quarter cycle on purpose. Coinciding, thickening and warming read as one crude pulse rather
+    // than as two independent properties of the stroke.
+    const n = 512;
+    const w = Array.from({ length: n }, (_, k) => widthAt(k / n, 0) - 1);
+    const c = Array.from({ length: n }, (_, k) => tintAt(k / n, 0));
+    const dot = w.reduce((a, v, i) => a + v * c[i], 0);
+    const norm = Math.sqrt(w.reduce((a, v) => a + v * v, 0) * c.reduce((a, v) => a + v * v, 0));
+    expect(Math.abs(dot / norm), 'weight and colour move together').toBeLessThan(0.1);
+  });
+
+  it('varies fast enough to be seen while the gate is on screen', () => {
+    // A gate lives a few seconds against a 20-30s dash cycle, so one weight cycle per traverse would be
+    // invisible. Two cycles per traverse puts a full swing inside about 10s of a 20s stroke.
+    const period = 1 / 2;   // two cycles over t in [0,1)
+    expect(widthAt(period / 2, 0)).toBeCloseTo(widthAt(period * 1.5, 0), 6);
+    // Over the first 15% of a cycle — roughly 3s of a 20s stroke — the weight must already have moved.
+    const moved = Math.abs(widthAt(0.15, 0) - widthAt(0, 0));
+    expect(moved, 'the weight barely moves in the time a gate is actually looked at').toBeGreaterThan(0.2);
   });
 });

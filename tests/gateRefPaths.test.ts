@@ -11,10 +11,12 @@ import {
   REF_STROKE_SCALE,
   REF_VIEW_H,
   REF_VIEW_W,
+  REF_WIDTH_SPREAD,
   REF_ZOOM,
   refFamily,
   refTrails,
   refViewBox,
+  widthWobble,
 } from '../src/lib/gateRefPaths';
 
 describe('refFamily — transcribed exactly', () => {
@@ -111,7 +113,13 @@ describe('refFamily — transcribed exactly', () => {
     const few = refFamily(1, GATE_COUNT);
     expect(few).toHaveLength(GATE_COUNT);
     expect(few[few.length - 1].opacity, 'the opacity ramp must still reach the top').toBe(full[full.length - 1].opacity);
-    expect(few[few.length - 1].width, 'the width ramp must still reach the top').toBeCloseTo(full[full.length - 1].width, 3);
+    // NOT the last curve's width directly: REF_WIDTH_SPREAD wobbles each curve by index, so the 24th of 24
+    // and the 36th of 36 are different curves of the ramp and legitimately differ. What must survive the
+    // subsample is the ramp's REACH — the heavy end stays as heavy — so compare the top of each family with the
+    // wobble's own tolerance.
+    const top = (f: ReturnType<typeof refFamily>) => Math.max(...f.map((t) => t.width));
+    expect(top(few) / top(full), 'the width ramp no longer reaches the top')
+      .toBeGreaterThan(1 - REF_WIDTH_SPREAD);
     expect(few[0].d, 'the first curve is the same curve either way').toBe(full[0].d);
 
     const startY = (d: string) => Number(d.slice(1).split(/[C\s]/)[1]);
@@ -126,12 +134,38 @@ describe('refFamily — transcribed exactly', () => {
     // hairline where it was designed and as 1.4-4.4 CSS px on a real desktop — "lines are again too thick",
     // reported twice.
     const F = refFamily(1);
-    expect(F[0].width).toBeCloseTo(0.5 * REF_STROKE_SCALE, 3);
-    expect(F[F.length - 1].width).toBeCloseTo(1.55 * REF_STROKE_SCALE, 3);
+
+    // THE RAMP, with the wobble divided back out. Asserted against the source's own 0.5 and 1.55 times the
+    // stated factor, so retuning REF_STROKE_SCALE by accident still fails while a deliberate change is a
+    // one-line edit here.
+    const ramp = (t: (typeof F)[number], idx: number) =>
+      t.width / (1 + widthWobble(idx) * REF_WIDTH_SPREAD);
+    expect(ramp(F[0], 0)).toBeCloseTo(0.5 * REF_STROKE_SCALE, 2);
+    expect(ramp(F[F.length - 1], F.length - 1)).toBeCloseTo(1.55 * REF_STROKE_SCALE, 2);
     expect(REF_STROKE_SCALE, 'a scale above 1 would make them thicker than the source, never the intent')
       .toBeLessThanOrEqual(1);
-    for (let i = 1; i < F.length; i++) {
-      expect(F[i].width).toBeGreaterThan(F[i - 1].width);
+
+    // NOT MONOTONE ANY MORE, AND THAT IS THE POINT. This loop used to assert every curve is wider than its
+    // neighbour, which is exactly the smooth gradient the owner asked to break: "different lines may have
+    // different thicknesses among them". So the assertion inverts — the ordering must be broken somewhere —
+    // while the ramp's TREND, which is what carries depth, still has to hold across the family.
+    let inversions = 0;
+    for (let i = 1; i < F.length; i++) if (F[i].width < F[i - 1].width) inversions++;
+    expect(inversions, 'the widths are still a smooth gradient; the per-curve wobble is gone').toBeGreaterThan(2);
+
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const third = Math.floor(F.length / 3);
+    expect(
+      mean(F.slice(-third).map((t) => t.width)),
+      'the ramp no longer trends upward, so the family has lost its depth',
+    ).toBeGreaterThan(mean(F.slice(0, third).map((t) => t.width)) * 1.5);
+
+    // And the wobble must stay a wobble: no curve may depart from its ramp value by more than the spread, or a
+    // thin stroke could outweigh a heavy one and the ramp would stop reading as depth at all.
+    for (let i = 0; i < F.length; i++) {
+      const r = ramp(F[i], i);
+      expect(Math.abs(F[i].width / r - 1), `curve ${i} departs from the ramp by more than the spread`)
+        .toBeLessThanOrEqual(REF_WIDTH_SPREAD + 1e-6);
     }
   });
 });
@@ -225,15 +259,29 @@ describe('the zoom and the stroke scale, which are COUPLED and had no test at al
     const vb = refViewBox().split(/\s+/).map(Number);
     const siteScale = WINDOW_W / vb[2];
 
-    const thinnest = F[0].width * siteScale;
-    const thickest = F[F.length - 1].width * siteScale;
-    // The reference's own figures: its authored 0.5 and 1.55 at its own 2.108x.
-    expect(thinnest).toBeCloseTo(0.5 * refScale, 1);
-    expect(thickest).toBeCloseTo(1.55 * refScale, 1);
-    // Stated absolutely too, because these are the numbers the decision was argued in.
-    expect(thinnest).toBeGreaterThan(1.0);
-    expect(thinnest).toBeLessThan(1.1);
-    expect(thickest).toBeGreaterThan(3.2);
-    expect(thickest).toBeLessThan(3.35);
+    // A DELIBERATE DEPARTURE NOW, BY A STATED FACTOR. This used to assert the apparent widths land exactly on
+    // the reference's 1.05-3.27 CSS px, and it failed the moment the owner asked for thinner strokes — which is
+    // the test working. The comparison is kept rather than dropped, because the reference is still the anchor:
+    // what is asserted is that the site renders at REF_STROKE_SCALE of the reference's weight, so the zoom and
+    // the scale remain coupled and an accidental change to either still fails.
+    //
+    // The wobble is divided out so this measures the ramp rather than one arbitrary curve.
+    const rampW = (t: (typeof F)[number], idx: number) =>
+      t.width / (1 + widthWobble(idx) * REF_WIDTH_SPREAD);
+    const thinnest = rampW(F[0], 0) * siteScale;
+    const thickest = rampW(F[F.length - 1], F.length - 1) * siteScale;
+    expect(thinnest).toBeCloseTo(0.5 * refScale * REF_STROKE_SCALE, 1);
+    expect(thickest).toBeCloseTo(1.55 * refScale * REF_STROKE_SCALE, 1);
+    // And stated absolutely, because a ratio alone would still pass if BOTH dials drifted together.
+    expect(thinnest, 'the thin end is no longer the hairline it is meant to be').toBeGreaterThan(0.6);
+    expect(thinnest).toBeLessThan(0.9);
+    expect(thickest).toBeGreaterThan(2.0);
+    expect(thickest).toBeLessThan(2.6);
+    // AND THE WOBBLE MUST NOT PUSH THE HEAVIEST STROKE BACK UP. This is the regression that measurement caught:
+    // a +30% wobble on a 0.8 scale took the maximum to 3.45px, above the 3.27 it was supposed to come down
+    // from. The bound is on the widest stroke actually emitted, not on the ramp.
+    const widest = Math.max(...F.map((t) => t.width)) * siteScale;
+    expect(widest, 'the per-curve wobble has pushed the heaviest stroke above the old release')
+      .toBeLessThan(3.0);
   });
 });

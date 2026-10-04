@@ -154,7 +154,17 @@ const letters = [...`${name.first} ${name.last}`];
      the field read as muddy: the opacity ramp starts at 0.1, and a GOLD line at a tenth opacity over near-black
      has almost no luminance left to carry, where a near-white one still reads as light. `--paper` is the site's
      ivory rather than pure #fff, which keeps palette discipline without losing the original's effect. */
-  .gate-trail { fill: none; stroke: var(--paper); stroke-linecap: round; }
+  /* THE THREE TOKENS THE STROKES MAY LEAN BETWEEN, declared here so the script can read them with
+     getComputedStyle and never names a colour itself. That matters twice over: the palette rule allows only
+     tokens from tokens.css, and these resolve per THEME — in dark, `--ochre` is the phosphor emerald, which is
+     exactly what a dark-theme stroke should warm toward. The script reads them once at init; the theme toggle
+     is `inert` behind the gate, so it cannot change under the animation. */
+  .gate-field {
+    --trail-base: var(--paper);
+    --trail-warm: var(--ochre);
+    --trail-cool: var(--indigo);
+  }
+  .gate-trail { fill: none; stroke: var(--trail-base); stroke-linecap: round; }
 
   .gate-text { position: relative; text-align: center; padding: 0 7vw; }
 
@@ -453,6 +463,37 @@ const letters = [...`${name.first} ${name.last}`];
     // WHERE A STROKE STARTS, and the envelope, both come from lib/gate.ts via define:vars — see GATE_OPEN_PHASE
     // and opacityAt there for why 0.16 and why the envelope plateaus instead of peaking. Both are unit-tested,
     // and both are numbers this script must not be allowed to drift from.
+    // HOW FAR A STROKE MAY LEAN toward warm or cool. Deliberately small: the strokes must stay near-ink, both
+    // because the palette rule keeps the seal the only saturated colour in the light theme and because the point
+    // is a shimmer a reader notices without being able to name.
+    var TINT = 0.22;
+    var SWING = 0.35;        // GATE_WIDTH_SWING in lib/gate.ts
+    var TAU = Math.PI * 2;
+
+    /**
+     * A CSS colour -> [r, g, b]. HEX FIRST, and that is not defensive coding — the palette in tokens.css is
+     * written in hex (`--ochre: #c8a36a`) and getPropertyValue on a custom property hands the authored string
+     * straight back rather than a resolved rgb(). An rgb()-only parser silently fell through to the default
+     * here, which made warm and cool both equal the base: the colour animation ran every frame and changed
+     * nothing. It cost one measurement to find and would never have been visible in review.
+     */
+    function rgb(v) {
+      var t = String(v).trim();
+      var hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(t);
+      if (hex) {
+        var h = hex[1];
+        if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+        return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+      }
+      var m = t.match(/-?[\d.]+/g);
+      return m && m.length >= 3 ? [+m[0], +m[1], +m[2]] : [239, 233, 221];
+    }
+    var field = gate.querySelector('.gate-field');
+    var fieldCs = field ? getComputedStyle(field) : null;
+    var base = rgb(fieldCs ? fieldCs.getPropertyValue('--trail-base') : '');
+    var warm = rgb(fieldCs ? fieldCs.getPropertyValue('--trail-warm') : '');
+    var cool = rgb(fieldCs ? fieldCs.getPropertyValue('--trail-cool') : '');
+
     var flowing = [];
     if (!reduced()) {
       var fams = gate.querySelectorAll('.gate-fam');
@@ -462,9 +503,18 @@ const letters = [...`${name.first} ${name.last}`];
           var len = parseFloat(ps[k].getAttribute('data-len') || '0');
           var wa = parseFloat(ps[k].getAttribute('data-a') || '0');
           var wb = parseFloat(ps[k].getAttribute('data-b') || String(len));
+          // The authored width, kept so the per-frame multiplier has something to multiply. Reading it back
+          // from the attribute avoids restating the ramp here: gateRefPaths owns it.
+          var w0 = parseFloat(ps[k].getAttribute('stroke-width') || '1');
           var seed = (fi * 36 + k) * 9301 + 49297;
           var dur = 20000 + ((seed % 233280) / 233280) * 10000;
-          if (len > 0) flowing.push({ el: ps[k], len: len, dur: dur, ph: OPEN_PHASE, a: wa, b: wb });
+          // A per-stroke phase for the weight and tint curves, from the same deterministic stream the
+          // durations use. Without it the whole family would thicken and warm in unison, which reads as the
+          // drawing breathing rather than as strokes each having their own weight.
+          var cph = ((seed * 7919) % 1000) / 1000;
+          if (len > 0) {
+            flowing.push({ el: ps[k], len: len, dur: dur, ph: OPEN_PHASE, a: wa, b: wb, w0: w0, cph: cph });
+          }
         }
       }
     }
@@ -525,6 +575,21 @@ const letters = [...`${name.first} ${name.last}`];
         // opacityAt() in lib/gate: ramps off zero over the first RAMP of the triangle, then holds. Zero at the
         // cycle boundary is the whole fix; the plateau is what stops the fix costing brightness.
         f.el.style.opacity = String(PEAK * Math.min(1, tri / RAMP));
+
+        // ── WEIGHT AND COLOUR VARY AS THE STROKE TRAVELS ────────────────────────────────────────────────
+        // widthAt / tintAt in lib/gate.ts own both curves and are unit-tested there; what is restated here is
+        // only their arithmetic, because this script cannot import. Both are periodic in t, so neither adds a
+        // discontinuity at the cycle boundary the envelope is hiding.
+        //
+        // SVG gives one width and one colour per path per frame, so this is variation in TIME, not along the
+        // stroke. Tapering head-to-tail would need a canvas, which was built and rejected.
+        f.el.style.strokeWidth = String(f.w0 * (1 + SWING * Math.sin(TAU * (2 * t + f.cph))));
+        var tint = Math.sin(TAU * (2 * t + f.cph + 0.25));
+        var mix = tint > 0 ? warm : cool;
+        var amt = Math.abs(tint) * TINT;
+        f.el.style.stroke = 'rgb(' + Math.round(base[0] + (mix[0] - base[0]) * amt) + ','
+          + Math.round(base[1] + (mix[1] - base[1]) * amt) + ','
+          + Math.round(base[2] + (mix[2] - base[2]) * amt) + ')';
       }
       flowRaf = requestAnimationFrame(flow);
     }

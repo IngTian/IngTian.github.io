@@ -219,3 +219,50 @@ export function opacityAt(t: number): number {
  * lands at a different point in every stroke's cycle.
  */
 export const GATE_OPEN_PHASE = 0.16;
+
+/**
+ * HOW A STROKE'S WEIGHT AND COLOUR MOVE THROUGH ITS CYCLE.
+ *
+ * The owner's ask: *"when you move across the screen maybe let the thickness vary"* and *"can we add a little
+ * bit color variation to the lines when it moves"*.
+ *
+ * Both are per-element and per-frame, which SVG can do — `stroke-width` and `stroke` are plain presentation
+ * properties the driver already overwrites alongside the dash. What SVG CANNOT do is vary either ALONG one
+ * stroke: a path has a single width and a single colour at any instant. Tapering a line from head to tail needs
+ * per-pixel control, i.e. a canvas, and that was built and rejected (see the gate's rejection list). So the
+ * variation is in TIME — a stroke thickens and cools as it crosses — which from the reader's side is much the
+ * same impression, because what they are watching is whichever part of the curve is inside the frame.
+ *
+ * Both curves are continuous and PERIODIC: they return to their starting value at the cycle boundary, where
+ * `drawnFrac` resets. Anything discontinuous there would reintroduce the pop the envelope exists to hide.
+ */
+
+/** Peak-to-trough weight swing, as a fraction of the stroke's own authored width. */
+export const GATE_WIDTH_SWING = 0.35;
+
+/**
+ * Weight multiplier at cycle position `t`, for a stroke carrying its own `phase`.
+ *
+ * TWO cycles per traverse, not one: a single cycle over 20-30s is far too slow to read as variation in the few
+ * seconds a gate is on screen. The per-stroke phase stops the family pulsing in unison, which would read as the
+ * whole drawing breathing rather than as individual strokes having their own weight.
+ */
+export function widthAt(t: number, phase = 0): number {
+  return 1 + GATE_WIDTH_SWING * Math.sin(2 * Math.PI * (2 * t + phase));
+}
+
+/**
+ * WARM/COOL MIX at cycle position `t`, in [-1, 1]: negative leans cool, positive leans warm, zero is the base
+ * ink. The caller owns which tokens those are — this decides only how far and in which direction.
+ *
+ * Why warm/cool rather than a hue rotation: the palette rule allows only the tokens in `tokens.css`, and in the
+ * light theme the seal is the one saturated colour. Leaning a near-white stroke slightly toward ochre or indigo
+ * keeps it near-white and stays inside the palette — and it is the same warm/cold broken colour `SkyWash`
+ * already weaves over the sky, so the gate borrows the site's own idiom rather than introducing a new one.
+ *
+ * Offset from `widthAt` by a quarter cycle so weight and colour do not peak together; coinciding, they read as
+ * one crude pulse instead of two independent properties.
+ */
+export function tintAt(t: number, phase = 0): number {
+  return Math.sin(2 * Math.PI * (2 * t + phase + 0.25));
+}

@@ -84,7 +84,34 @@ export const REF_POSITIONS = [1, -1] as const;
  * The lesson, since it has now cost three rounds: when a drawing looks wrong at one size, check the SIZE before
  * retuning what is in it. Two of the three dials I turned were compensating for the third.
  */
-export const REF_STROKE_SCALE = 1;
+export const REF_STROKE_SCALE = 0.7;
+
+/**
+ * How much a stroke's width may depart from the ramp, as a fraction of it.
+ *
+ * The source's widths are monotone in the index (0.5 + 0.03i), so neighbours differ by 0.03 and the family
+ * reads as a single smooth gradient — "different lines may have different thicknesses among them" is asking for
+ * the opposite of that. This breaks the ordering locally while leaving the ramp's trend intact, which is what
+ * still carries depth: the thin end stays thin on average and the heavy end stays heavy.
+ *
+ * SIZED AGAINST THE SCALE, not chosen alone. At 0.3 with REF_STROKE_SCALE 0.8 the heaviest curve measured 3.45
+ * CSS px against the previous release's 3.27 — the wobble had pushed the maximum UP, so "a little bit thinner"
+ * was not delivered at the one place it shows most. 0.22 against a 0.7 scale puts the band at roughly
+ * 0.58-2.79px: about 15% under the old maximum, with the variation unmistakable.
+ *
+ * Deterministic, never Math.random() — a drawing that differs between builds is against the same house rule the
+ * Rules slide's seeded walk follows.
+ */
+export const REF_WIDTH_SPREAD = 0.22;
+
+/**
+ * Stable [-1, 1) from a curve index. Two independent streams via `salt`, so width variation cannot correlate
+ * with anything else keyed off the same index.
+ */
+export function widthWobble(i: number, salt = 1): number {
+  const x = Math.sin((i + 1) * 12.9898 * salt) * 43758.5453;
+  return (x - Math.floor(x)) * 2 - 1;
+}
 
 /**
  * How far the camera is pulled back from the source's own viewBox.
@@ -207,7 +234,11 @@ export function refFamily(position: number, count = REF_COUNT, smooth = false): 
       // stroke-opacity above 1 is invalid — the browser clamps it, so doing it here keeps the emitted
       // attribute honest rather than relying on the renderer to tidy up.
       opacity: Math.min(1, Math.round((0.1 + i * 0.03) * 1000) / 1000),
-      width: Math.round((0.5 + i * 0.03) * REF_STROKE_SCALE * 1000) / 1000,
+      // The source's ramp, scaled, then wobbled per curve so the family reads as varied weights rather than as
+      // one gradient. `idx` rather than the stretched `i`, so the wobble does not change when GATE_COUNT does.
+      width: Math.round(
+        (0.5 + i * 0.03) * REF_STROKE_SCALE * (1 + widthWobble(idx) * REF_WIDTH_SPREAD) * 1000,
+      ) / 1000,
     };
   });
 }
