@@ -34,9 +34,10 @@ const bubbles = JSON.stringify([
 </style>
 
 <script>
-  import { field, runDescent, project, SPAWNS,
-           TERRAIN_LIGHT, TERRAIN_TERMINAL, type TerrainRamp } from '../lib/terrain';
-  import { buildGrid, paintTerrain, TERRAIN_CONFIG_DEFAULTS, type GridPoint } from '../lib/terrainRender';
+  // The two ramps and the TerrainRamp type left with `themePalette` — lib/terrainRender owns the per-theme
+  // selection now, so this component no longer names a colour.
+  import { field, runDescent, project, SPAWNS } from '../lib/terrain';
+  import { buildGrid, paintTerrain, terrainConfig, terrainPalette, type GridPoint } from '../lib/terrainRender';
   import { prefersReducedMotion } from '../lib/motion';
   import { GATE_REVEAL_EVENT, isCovered } from '../lib/gate';
 
@@ -45,24 +46,9 @@ const bubbles = JSON.stringify([
   // each init so a View-Transition swap or a live theme toggle repaints correctly.
   // Dark = the "terminal galaxy": cyan-blue "Glacier" ice dots read as a star
   // field on the charcoal void; light = the shipped warm "Classic" ochre→indigo.
-  type WalkerPalette = { glow: [number,number,number]; settled: [number,number,number]; trail: [number,number,number] };
-  // `darkness` (0 = light, 1 = dark) drives the directional-light value/gain
-  // blend in the shared renderer so the relief reads on both the pale and the
-  // dark sky. `dotScale` is a per-theme radius bump — dark gets a touch more (its
-  // dots read as a fainter starfield on the void), light a little.
-  function themePalette(): { ramp: TerrainRamp; walker: WalkerPalette; darkness: number; dotScale: number } {
-    // Walker trios:
-    //   dark  = Glacier — frost glow, ice settle, recessive teal trail (screensaver)
-    //   light = Classic — the shipped paper glow, ochre settle, indigo trail
-    if (document.documentElement.dataset.theme === 'dark')
-      return { ramp: TERRAIN_TERMINAL, walker: { glow: [227,242,247], settled: [134,188,204], trail: [73,127,146] }, darkness: 1, dotScale: 1.18 };
-    // LIGHT dotScale trimmed 1.15 → 1.08. Light theme now spends its EDL shade on
-    // VALUE rather than opacity (see edlSpend in lib/terrain.ts), which by itself
-    // adds ink — and "heavier" is not the goal, "clearer" is. The radius trim
-    // offsets that ink increase while keeping visible presence on the ridge.
-    return { ramp: TERRAIN_LIGHT, walker: { glow: [244,239,228], settled: [200,163,106], trail: [92,108,140] }, darkness: 0, dotScale: 1.08 };
-  }
-
+  // The per-theme ramp/walker/darkness/dotScale now live in lib/terrainRender.ts as `terrainPalette`, because
+  // the GATE paints this same field and lands its camera on this component's frame. A handover only reads as a
+  // continuation if both painters produce identical pixels, so the selection cannot be duplicated here.
   // Teardown handle for the previous init — re-init runs on every page load AND
   // after each View Transition swap (astro:page-load), so we must dispose the
   // prior instance's listeners / rAF loop / observer or they leak across
@@ -81,7 +67,7 @@ const bubbles = JSON.stringify([
     const ctx = cvs.getContext('2d')!;
     const reduce = prefersReducedMotion();
     const BUBBLES = JSON.parse(cvs.dataset.bubbles || '[]') as Array<null | { word?: string; mathml?: string }>;
-    const { ramp, walker, darkness, dotScale } = themePalette();
+    const { walker } = terrainPalette(document.documentElement.dataset.theme === 'dark');
     const [gr, gg, gb] = walker.glow;      // walker head-glow
     const [sr, sg, sb] = walker.settled;   // settled-at-minimum accent
     const [tr, tg, tb] = walker.trail;      // descending trail
@@ -92,7 +78,7 @@ const bubbles = JSON.stringify([
     // starfield: the dark theme's dots twinkle as temperature-tinted stars (its
     // whole conceit is that they read as a star field); light theme keeps the
     // shipped warm relief untouched.
-    const cfg = { ...TERRAIN_CONFIG_DEFAULTS, ramp, darkness, dotScale, starfield: darkness > 0.5 };
+    const cfg = terrainConfig(document.documentElement.dataset.theme === 'dark');
     const ZOOM = cfg.zoom;                 // walkers must use the SAME zoom to stay on the surface
     let grid: GridPoint[] = buildGrid(cfg.edlParams);
 

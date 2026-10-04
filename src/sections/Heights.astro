@@ -150,6 +150,17 @@ for (const phrase of bio.strong) {
      so it reads as a second beat rather than a subtitle glued to the line. */
   /* TerrainHero is position:absolute inset:0 z-0; keep text above it. */
   #heights .hero-rise, #heights .hero-bio { position: absolute; z-index: 2; }
+
+  /* ONE NAME ON SCREEN AT A TIME — the other half of the entrance's FLIP handoff.
+     The entrance flies a stand-in copy of the name from the centre of the screen to exactly this block's
+     position and size, then the overlay is removed. While that is in flight the real name must not be visible,
+     or there are two `Ing Tian`s overlapping — which is what the first build of it did, because the overlay's
+     ground fades out mid-travel and reveals this block underneath.
+       `data-gate-up` is set and removed by the entrance's inline policy script, which is also the script that
+     carries the backstop timer, so this cannot outlive the entrance: if the painter never runs the attribute is
+     still removed and the name still appears. Worth stating because an invisible name on the first screen is a
+     defect this component has shipped twice. */
+  :global(html[data-gate-up]) #heights .hero-rise { visibility: hidden; }
   .hero-legibility {
     position: absolute; inset: 0; z-index: 1; pointer-events: none;
     background:

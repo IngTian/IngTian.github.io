@@ -8,9 +8,24 @@
 // optional Eye-Dome Lighting + elevation emphasis → bottom fade).
 
 import {
-  field, project, projectRaw, normal, computeEDL, litColor,
-  colormap, RANGE, STEP, edlSpend,
-  type TerrainRamp, type EDLParams, type LightParams, EDL_DEFAULTS, LIGHT_DEFAULTS, lightDir,
+  EDL_DEFAULTS,
+  LIGHT_DEFAULTS,
+  RANGE,
+  STEP,
+  TERRAIN_LIGHT,
+  TERRAIN_TERMINAL,
+  colormap,
+  computeEDL,
+  edlSpend,
+  field,
+  lightDir,
+  litColor,
+  normal,
+  project,
+  projectRaw,
+  type EDLParams,
+  type LightParams,
+  type TerrainRamp,
 } from './terrain';
 
 /** All the knobs the lab exposes; the hero passes the baked defaults. */
@@ -226,3 +241,73 @@ export function paintTerrain(
 
 // Re-export a couple of helpers the callers want alongside this module.
 export { projectRaw, field };
+
+/** The walker trio: a descent head, its settled resting colour, and the trail it leaves. */
+export interface WalkerPalette {
+  glow: [number, number, number];
+  settled: [number, number, number];
+  trail: [number, number, number];
+}
+
+/** Everything about the terrain that depends on the active theme. */
+export interface TerrainPalette {
+  ramp: TerrainRamp;
+  walker: WalkerPalette;
+  darkness: number;
+  dotScale: number;
+}
+
+/**
+ * THE PER-THEME TERRAIN PALETTE, in one place because TWO components now paint this field.
+ *
+ * It was a private `themePalette()` inside `TerrainHero.astro`. The gate paints the same terrain and lands its
+ * camera on the hero's frame, and "lands on" means the two must produce identical pixels at the handover — same
+ * ramp, same darkness, same dot scale. A second copy that drifted would turn a continuation into a visible
+ * cross-fade, which is the exact failure the whole gate redesign is trying to remove. So this is a
+ * two-places-must-agree seam, and it lives in lib with a spec.
+ *
+ * The canvas is JS-painted and cannot inherit CSS tokens, so the theme is read from `data-theme` by the caller
+ * and passed in. Read it fresh on each init: a View-Transition swap or a live theme toggle must repaint.
+ *
+ * Dark = the "terminal galaxy": cyan-blue "Glacier" ice dots reading as a star field on the charcoal void.
+ * Light = the shipped warm "Classic" ochre→indigo.
+ *
+ * `darkness` (0 light, 1 dark) drives the directional-light value/gain blend in the renderer so the relief
+ * reads on both the pale and the dark sky. `dotScale` is a per-theme radius bump: dark gets a touch more (its
+ * dots read as a fainter starfield), light a little. The light value was trimmed 1.15 -> 1.08 when the light
+ * theme started spending its EDL shade on VALUE rather than opacity (see `edlSpend` in lib/terrain.ts), which
+ * by itself adds ink — "heavier" is not the goal, "clearer" is.
+ */
+export function terrainPalette(dark: boolean): TerrainPalette {
+  if (dark) {
+    return {
+      ramp: TERRAIN_TERMINAL,
+      walker: { glow: [227, 242, 247], settled: [134, 188, 204], trail: [73, 127, 146] },
+      darkness: 1,
+      dotScale: 1.18,
+    };
+  }
+  return {
+    ramp: TERRAIN_LIGHT,
+    walker: { glow: [244, 239, 228], settled: [200, 163, 106], trail: [92, 108, 140] },
+    darkness: 0,
+    dotScale: 1.08,
+  };
+}
+
+/**
+ * The terrain config for a theme: the baked defaults plus everything theme-dependent.
+ *
+ * Both painters build their config through this, so "the hero's camera" is a single expression rather than a
+ * spread that each component assembles for itself.
+ */
+export function terrainConfig(dark: boolean): TerrainConfig {
+  const p = terrainPalette(dark);
+  return {
+    ...TERRAIN_CONFIG_DEFAULTS,
+    ramp: p.ramp,
+    darkness: p.darkness,
+    dotScale: p.dotScale,
+    starfield: p.darkness > 0.5,
+  };
+}
