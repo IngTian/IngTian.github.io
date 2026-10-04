@@ -483,8 +483,10 @@ describe('the first-visit gate, as shipped', () => {
     const html = home!.html;
     expect(html, 'the script no longer writes a dash — the strokes cannot be travelling')
       .toMatch(/strokeDasharray/);
-    // define:vars inlines the tested constants as `const PEAK = 0.72` (or similar). Assert the envelope is a
-    // bare multiple of the triangle: an additive floor is precisely the bug.
+    // An additive floor is precisely what this guards against: the source's envelope sits at 0.3 rather than 0
+    // where the drawn length resets, which is what made the reset visible. The constants are asserted below by
+    // NAME rather than by value — a comment here quoting `const PEAK = 0.72` outlived two retunings of it (it is
+    // 0.45 now), which is exactly why the number is not written out again.
     expect(html, 'the opacity envelope has an additive floor again, so the reset will be visible')
       .not.toMatch(/style\.opacity\s*=\s*String\(\s*0?\.\d+\s*\+/);
     // THE CLAIM IS "DRIVEN BY THE TESTED CONSTANTS", NOT "SPELLED THIS WAY".

@@ -2,7 +2,7 @@
 // The gate's POLICY, which is where every way this feature can lock a visitor out of the site lives. These
 // are unit tests rather than DOM tests on purpose: this repo has no jsdom (distSmoke reads built HTML with
 // regexes) and driving a browser is forbidden, so anything that must be proven has to be a pure function.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   GATE_DISMISS_MS,
   GATE_OPACITY_PEAK,
@@ -116,13 +116,26 @@ describe('dismissMs — why dismissal is a timer and not a transitionend', () =>
 });
 
 describe('the dismissal is idempotent', () => {
-  it('marking twice leaves one value and does not throw', () => {
-    const set = vi.fn();
-    const store: GateStore = { getItem: () => '1', setItem: set };
+  it('marking twice leaves one value, and reads back as seen', () => {
+    // REWRITTEN BECAUSE IT ASSERTED THE OPPOSITE OF ITS OWN TITLE. The stub was
+    // `{ getItem: () => '1', setItem: vi.fn() }`, so `hasSeenGate` returned true before `markGateSeen` had done
+    // anything — the second assertion could not fail — and the first asserted `setItem` ran TWICE, which is
+    // what idempotent would NOT mean. Both passed while testing nothing.
+    //
+    // A real in-memory store instead: write twice, and check the store ends up holding exactly one key with the
+    // flag in it. That is the property the name promises, and it is the one that matters — a visitor who
+    // dismisses the gate must not accumulate session keys.
+    const mem = new Map<string, string>();
+    const store: GateStore = {
+      getItem: (k) => mem.get(k) ?? null,
+      setItem: (k, v) => { mem.set(k, v); },
+    };
     markGateSeen(store);
     markGateSeen(store);
-    expect(set).toHaveBeenCalledTimes(2);
+    expect(mem.size, 'marking twice left more than one key behind').toBe(1);
     expect(hasSeenGate(store)).toBe(true);
+    // And it genuinely transitioned: a fresh store must read as unseen, or the assertion above is vacuous.
+    expect(hasSeenGate({ getItem: () => null, setItem: () => {} })).toBe(false);
   });
 });
 

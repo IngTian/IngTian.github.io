@@ -136,7 +136,7 @@ src/
   lib/pageStops.ts                  # pure Stop trees: one tree per page drives BOTH its rail and its section ids — unit-tested
   lib/viewport.ts                   # PHONE_MAX_WIDTH = 640 + isPhone() — the one phone gate
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate
-  lib/gate.ts                       # the first-visit gate's POLICY: session flag, fresh-load test, dismissal timing, isCovered — unit-tested
+  lib/gate.ts                       # the gate's POLICY (session flag, fresh-load test, dismissal timing, isCovered) AND its motion envelope (drawnFrac/offsetFrac/opacityAt + the four tuned numbers the inline script is handed) — unit-tested
   lib/gateRefPaths.ts               # WHAT THE GATE DRAWS: the ported 21st.dev geometry, the Trail shape, each curve's arc length, the join smoothing, GATE_COUNT and the zoom — unit-tested
   lib/gateComets.ts                 # d-string -> arc-length polyline + visibleWindow (which arc of a curve is ON SCREEN — the vanish fix). Two exports; it had six until the canvas gate was reverted — unit-tested
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
@@ -339,7 +339,7 @@ tested). On a **first visit in a session**, the homepage opens behind a dismissi
 full-screen gate: flowing curves, the name springing in letter by letter, and one button
 reading `enter the descent`. Homepage only — rendered from `index.astro`, **never
 `BaseLayout`**, because moving it up one file is the single edit that would hand a
-full-screen interstitial to all ten routes.
+full-screen interstitial to all nine routes.
 
 **The lines are a PORT of the 21st.dev "BackgroundPaths" component, not this site's own
 mathematics, and that is a deliberate trade.** Five original treatments were built and looked
@@ -505,11 +505,11 @@ dimmer than it runs.
 link is to **v1** — he described the reference as black and white, which v2 is not. If a future ask
 sounds like "gentle bobbing gradient waves", that is v2 and it is a different component.
 
-### Four things were rejected here, each after looking at it
+### Five things were rejected here, each after looking at it
 
-Do not rebuild them. All four were judged in `/proto-gate` — a route that has since been retired, so these
+Do not rebuild them. All five were judged in `/proto-gate` — a route that has since been retired, so these
 notes are now the only record outside git. Note the shape of the list: every rejection was decided by LOOKING,
-and three of the four were things that measured better than what won.
+and three of them were things that measured better than what won.
 
 1. **Descent trails run to convergence** — the first version. Every stroke ends in one of the
    field's three basins, so 36 of them piled into 3 points: 71% of the set inside one cell of a
@@ -549,7 +549,22 @@ and three of the four were things that measured better than what won.
    measured max|grad| = 1.8668 over the hero's field on a 401×401 grid, which is a property of `lib/terrain.ts`
    rather than of the comb, and nothing else covered it. It lives in `tests/terrain.test.ts` now.
 
-The lesson across all four, worth more than any of them: **this gate was redesigned five times and
+5. **Four black-hole readings** (`lib/gateProtoShapes.ts`, deleted) — proposed when the owner asked whether the
+   maths could go and something more pictorial arrive: *"maybe drop some math functions alltogether ... literally
+   looks like a blackhole in the middle."* Built as **streamlines parting** (potential flow past a disc, as level
+   sets of ψ = y(1 − a²/r²), solved by Newton steps rather than integrated so a line cannot drift off its own
+   level set), **gravitational lensing** (rays integrated under a = −k·r̂/r² with the speed renormalised, so the
+   bending, the crossing behind the mass and the capture of the innermost rays all fall out of the physics),
+   **the void alone**, and an **accretion disc**. The owner: *"all your three doesn't read too well tbh"*, and
+   then the verdict that ended the whole search — *"do u still have the background path ive given to u. it's
+   already good enough."*
+   - Two things worth keeping from it. The disc was flagged **in its own source** as the least defensible of the
+     four by this site's rules, because its arcs were *drawn at chosen radii, not solved from anything* — written
+     down before it was looked at, and it lost. And this entry exists at all only because the module was read
+     before being deleted: CLAUDE.md had never listed these four, so retiring `/proto-gate` would otherwise have
+     erased the record of an entire rejected direction.
+
+The lesson across all five, worth more than any of them: **this gate was redesigned five times and
 every decision came from the owner looking at it in the real page at real size.** Not one came from a
 metric, an argument, or a screenshot in a card. A `/proto-*` route exists for that, and a candidate that
 cannot be put in one at full size is not ready to be proposed — but build it, use it, and retire it when the
@@ -984,6 +999,13 @@ titles came to rest hard against the browser chrome — the lead is a number in
     function could in principle run before the guard. The fix is a non-null alias right
     after the guard (`const nav = maybeNav;`), which makes the type true at the
     declaration so no narrowing has to survive anything. Prefer that to a `!` or a cast.
+  - **`noUnusedLocals` IS ON AND IT WILL NOT FIND A DEAD EXPORT.** It is per-file and per-binding: an unused
+    local or parameter is an error, but an `export` has, by definition, a possible consumer elsewhere, so
+    TypeScript says nothing. That is exactly how `pointAt`, `fitMeet` and `jitter` survived three commits in
+    `lib/gateComets.ts` after the code that called them was reverted — green build, green typecheck, green
+    tests, because their own spec still imported them. **A dead export needs a grep, and a test that is the
+    only consumer of what it tests is not coverage.** For each export ask: who outside this module and outside
+    `tests/` uses it?
   - **Types gate the MERGE, tests gate the DEPLOY**, and that asymmetry is
     deliberate: `deploy.yml` runs tests but not typecheck, because a type error cannot
     change the shipped bytes, and blocking a deploy on it would leave the live site

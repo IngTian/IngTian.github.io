@@ -5,7 +5,16 @@
 // rather than trusted.
 import { describe, expect, it } from 'vitest';
 import {
-  GATE_COUNT, REF_COUNT, REF_POSITIONS, REF_STROKE_SCALE, REF_VIEW_H, REF_VIEW_W, refFamily, refTrails,
+  GATE_COUNT,
+  REF_COUNT,
+  REF_POSITIONS,
+  REF_STROKE_SCALE,
+  REF_VIEW_H,
+  REF_VIEW_W,
+  REF_ZOOM,
+  refFamily,
+  refTrails,
+  refViewBox,
 } from '../src/lib/gateRefPaths';
 
 describe('refFamily — transcribed exactly', () => {
@@ -151,9 +160,80 @@ describe('refTrails — both families, as the component renders them', () => {
 
   it('runs well outside that viewBox on purpose', () => {
     // y spans -189..875 against a 316-tall box. Only the slice crossing the frame is seen, which is what makes
-    // the curves read as long sweeps passing through rather than arcs that begin and end on screen.
-    const ys = T.flatMap((t) => [...t.d.matchAll(/-?\d+(?=\s|$)/g)].map((m) => Number(m[0])));
-    expect(Math.min(...ys)).toBeLessThan(0);
-    expect(Math.max(...ys)).toBeGreaterThan(REF_VIEW_H);
+    // the curves read as long sweeps passing through rather than arcs that begin and end on screen. It is also
+    // why the dash's travel has to be clipped — see visibleWindow.
+    //
+    // THIS READS ONLY THE Y COORDINATES, and that is the fix. It used to regex every number followed by
+    // whitespace, x values included, so `min < 0` was satisfied by x = -555 from the mirrored family: the lower
+    // bound passed no matter where the y values sat, which is precisely the condition it exists to forbid. The
+    // old lookahead also skipped any number followed by `C`, so it was not reading the whole path either.
+    const ys = T.flatMap((t) => {
+      const n = t.d.replace(/[MC]/g, ' ').trim().split(/\s+/).map(Number);
+      return n.filter((_, i) => i % 2 === 1);   // "x y" pairs, so y is every second value
+    });
+    expect(ys.every(Number.isFinite), 'the d-string stopped parsing as x/y pairs').toBe(true);
+    expect(Math.min(...ys), 'no curve starts above the box').toBeLessThan(0);
+    expect(Math.max(...ys), 'no curve ends below the box').toBeGreaterThan(REF_VIEW_H);
+  });
+});
+
+describe('the zoom and the stroke scale, which are COUPLED and had no test at all', () => {
+  // The owner's reference screenshot, which is the only external source of truth either number has.
+  const REF_SHOT_W = 1467;
+  const REF_SHOT_H = 958;
+  // The window the site was measured in when the correction was derived.
+  const WINDOW_W = 1990;
+
+  /** `preserveAspectRatio="xMidYMid meet"`: fit the box inside the element, scaling by the tighter axis. */
+  const meetScale = (vbW: number, vbH: number, w: number, h: number) => Math.min(w / vbW, h / vbH);
+
+  it('puts the site at the reference screenshot\'s own apparent scale', () => {
+    // The reference renders the source's 696-wide box into 1467x958, so `meet` scales it by 2.108x. Unzoomed,
+    // a 1990px window scales the same box by 2.859x — the same geometry 1.357x bigger on screen, which is what
+    // "zoomed out a bit compared to yours" was describing.
+    const refScale = meetScale(REF_VIEW_W, REF_VIEW_H, REF_SHOT_W, REF_SHOT_H);
+    const unzoomed = WINDOW_W / REF_VIEW_W;
+    expect(unzoomed / refScale, 'the 1.357x discrepancy REF_ZOOM exists to cancel').toBeCloseTo(REF_ZOOM, 2);
+
+    // And with the zoom applied, the site lands on the reference's scale.
+    const vb = refViewBox().split(/\s+/).map(Number);
+    expect(WINDOW_W / vb[2], 'the shipped viewBox no longer matches the reference scale').toBeCloseTo(refScale, 2);
+  });
+
+  it('widens the viewBox about its own CENTRE, so the composition does not slide', () => {
+    // Widening from the origin instead would shift every curve up and left by half the added size — the same
+    // apparent scale, a different picture.
+    //
+    // Tolerance is half a user unit, not a tenth, and that is a real finding rather than a loosened bound: the
+    // viewBox is emitted rounded to one decimal (944.47 -> 944.5), so the centre lands at 348.05 against a true
+    // 348. At the shipped 2.107x that is 0.1 CSS px of drift across the whole composition — far below a pixel,
+    // and the alternative is emitting un-rounded coordinates to chase it.
+    const [vx, vy, vw, vh] = refViewBox().split(/\s+/).map(Number);
+    expect(vx + vw / 2, 'the viewBox centre moved in x').toBeCloseTo(REF_VIEW_W / 2, 0);
+    expect(vy + vh / 2, 'the viewBox centre moved in y').toBeCloseTo(REF_VIEW_H / 2, 0);
+    expect(vw / vh, 'the aspect changed, so `meet` will letterbox differently').toBeCloseTo(REF_VIEW_W / REF_VIEW_H, 3);
+  });
+
+  it('THEREFORE renders the source\'s authored widths at the reference\'s own CSS pixels', () => {
+    // This is the assertion that makes the coupling explicit. REF_STROKE_SCALE is 1 — the widths are the
+    // source's, unscaled — and that is only correct BECAUSE the zoom is right. Two earlier releases scaled the
+    // widths (0.4, then 0.6) to compensate for a drawing that was simply too big; with the zoom fixed, scaling
+    // them too would make them a third thinner than the reference. If someone retunes either dial alone, the
+    // apparent widths leave the reference's band and this fails.
+    const refScale = meetScale(REF_VIEW_W, REF_VIEW_H, REF_SHOT_W, REF_SHOT_H);
+    const F = refFamily(1, GATE_COUNT, true);
+    const vb = refViewBox().split(/\s+/).map(Number);
+    const siteScale = WINDOW_W / vb[2];
+
+    const thinnest = F[0].width * siteScale;
+    const thickest = F[F.length - 1].width * siteScale;
+    // The reference's own figures: its authored 0.5 and 1.55 at its own 2.108x.
+    expect(thinnest).toBeCloseTo(0.5 * refScale, 1);
+    expect(thickest).toBeCloseTo(1.55 * refScale, 1);
+    // Stated absolutely too, because these are the numbers the decision was argued in.
+    expect(thinnest).toBeGreaterThan(1.0);
+    expect(thinnest).toBeLessThan(1.1);
+    expect(thickest).toBeGreaterThan(3.2);
+    expect(thickest).toBeLessThan(3.35);
   });
 });

@@ -23,7 +23,7 @@ import { name, roles } from '../data/profile';
 import { GATE_COUNT, REF_POSITIONS, refFamily, refViewBox } from '../lib/gateRefPaths';
 import { parseTrack, visibleWindow } from '../lib/gateComets';
 // GATE_DRAWN_MIN and GATE_OPACITY_PEAK are handed to the inline script through define:vars rather than typed
-// into it. The script cannot import — it must run before first paint — but the two numbers that decide whether
+// into it. The script cannot import — it must run before first paint — but the four numbers that decide whether
 // strokes vanish are unit-tested in lib/gate.ts, and passing them keeps the test and the shipped behaviour on
 // one value. Everything else in there is restated prose-and-arithmetic, which is the standing trade.
 import {
@@ -39,7 +39,10 @@ import {
 
 // The two mirrored families stay SEPARATE, as two groups. The original renders <FloatingPaths position={1} />
 // and position={-1}; keeping that split is also what makes the motion affordable — a group is one composited
-// layer, so two groups is two transforms instead of 72 paint-bound path animations. See the CSS.
+// layer. Keeping the split is the source's own structure (it renders the component twice, at position +1 and
+// -1) and the script's seed strides across both groups in one pass. NOTE: there is no transform on either group
+// — an earlier version drifted them and was rejected as static, and this line still claimed "two transforms
+// instead of 72 paint-bound path animations" afterwards. What ships is 48 per-path dash writes from one rAF.
 // GATE_COUNT curves per family rather than the source's 36 ("less lines"), SMOOTHED at the join (the source
 // kinks up to 32.8 degrees there), and the viewBox pulled back to the reference's own apparent scale ("the
 // example i gave you zoomed out a bit compared to yours"). All three are gateRefPaths' business — see there.
@@ -81,7 +84,7 @@ const letters = [...`${name.first} ${name.last}`];
 
         NO vector-effect HERE ANY MORE, and that was a performance decision as much as a fidelity one. It pins
         the stroke to its authored CSS width regardless of scale, which made the lines hairline — but it also
-        defeats the renderer's stroke caching, and with 72 full-screen paths that is not free. The original does
+        defeats the renderer's stroke caching, and with 48 full-screen paths that is not free. The original does
         not use it either; `meet` already removed the ~24% of extra weight that `slice` was adding, so the
         widths below are the source's own and scale the way the source's do. */}
     {families.map((fam, f) => (
@@ -517,7 +520,7 @@ const letters = [...`${name.first} ${name.last}`];
         // layer and the motion is the approved one.
         //
         // `tri` is already 0 at t=0 and t=1 and 1 at the midpoint, so it IS the envelope; it only needed to be
-        // used as a multiplier instead of as an offset from 0.3. The peak is 0.72 rather than the source's 0.6
+        // used as a multiplier instead of as an offset from 0.3.
         // so the mid-cycle brightness survives starting from zero.
         // opacityAt() in lib/gate: ramps off zero over the first RAMP of the triangle, then holds. Zero at the
         // cycle boundary is the whole fix; the plateau is what stops the fix costing brightness.
