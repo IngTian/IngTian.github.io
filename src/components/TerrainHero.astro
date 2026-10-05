@@ -188,7 +188,16 @@ const bubbles = JSON.stringify([
 
     // Resize handler: canvas resize clears the backing store, so repaint the
     // static frame under reduced-motion (otherwise the animation loop repaints).
-    const onResize = () => { resize(); if (reduce) frame(0, false); };
+    // DEBOUNCED, at the same 160ms the Deck, FluidSky and DescentPath already use. `resize()` reassigns
+    // `cvs.width`/`cvs.height`, and reassigning either REALLOCATES the backing store of a full-bleed canvas
+    // at DPR up to 2 — that is the expensive part, not the getBoundingClientRect. Undebounced it ran once per
+    // resize event for the whole duration of a window drag. Three handlers in this codebase were already
+    // debounced and three were not; this was one of the three.
+    let resizeTimer = 0;
+    const onResize = () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => { resize(); if (reduce) frame(0, false); }, 160);
+    };
     window.addEventListener('resize', onResize);
 
     // Under reduced-motion we stop here (static frame is the finished state).
@@ -231,6 +240,9 @@ const bubbles = JSON.stringify([
     // pointing at the old canvas.
     teardown = () => {
       window.removeEventListener('resize', onResize);
+      // The debounce timer has to go too: a pending one would fire after the swap and call resize() against
+      // the canvas this instance captured, which ClientRouter has already replaced.
+      window.clearTimeout(resizeTimer);
       if (rafId) cancelAnimationFrame(rafId);
       io?.disconnect();
       if (revealed) document.removeEventListener(GATE_REVEAL_EVENT, revealed);

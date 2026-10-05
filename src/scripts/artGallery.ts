@@ -65,7 +65,16 @@ function buildRows() {
   });
 }
 buildRows();
-window.addEventListener('resize', buildRows, { passive: true });
+
+// DEBOUNCED, at the same 160ms the Deck, FluidSky and DescentPath already use. `buildRows` is a full DOM
+// teardown and rebuild — querySelectorAll over 42 tiles, a clientWidth read, every `.jrow` wrapper removed,
+// then all 42 <figure> re-appended into fresh rows — and it was running once per resize event for the whole
+// duration of a window drag. The first call above stays synchronous: the rows have to exist before paint.
+let rowsTimer = 0;
+window.addEventListener('resize', () => {
+  window.clearTimeout(rowsTimer);
+  rowsTimer = window.setTimeout(buildRows, 160);
+}, { passive: true });
 
 // ---------- placard controller ----------
 const placard = document.getElementById('art-placard');

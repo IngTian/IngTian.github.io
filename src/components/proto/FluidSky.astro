@@ -251,7 +251,12 @@ const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
     const reduce = prefersReducedMotion();
     let rafId = 0, running = false, last = 0, scrolling = false;
     function loop(now: number): void {
-      const budget = scrolling ? 0 : 32;
+      // 16, NOT 0, WHILE SCROLLING. A zero budget means "every rAF tick", which on a 120 Hz panel is 120
+      // full-viewport fragment-shader draws per second plus 16 `gl.uniform*` calls each — at exactly the
+      // moment the compositor is busiest, and `scrolling` is the state during every deck slide transition
+      // (it is set by onScroll and cleared on a 160ms idle timer). Capping at ~60fps halves the draws on a
+      // high-refresh display and changes nothing on a 60 Hz one. The idle 32 (~30fps) was already right.
+      const budget = scrolling ? 16 : 32;
       if (now - last >= budget) { draw(now); last = now; }
       rafId = requestAnimationFrame(loop);
     }
