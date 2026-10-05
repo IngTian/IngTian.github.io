@@ -251,12 +251,23 @@ const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
     const reduce = prefersReducedMotion();
     let rafId = 0, running = false, last = 0, scrolling = false;
     function loop(now: number): void {
-      // 16, NOT 0, WHILE SCROLLING. A zero budget means "every rAF tick", which on a 120 Hz panel is 120
-      // full-viewport fragment-shader draws per second plus 16 `gl.uniform*` calls each — at exactly the
-      // moment the compositor is busiest, and `scrolling` is the state during every deck slide transition
-      // (it is set by onScroll and cleared on a 160ms idle timer). Capping at ~60fps halves the draws on a
-      // high-refresh display and changes nothing on a 60 Hz one. The idle 32 (~30fps) was already right.
-      const budget = scrolling ? 16 : 32;
+      // ZERO WHILE SCROLLING — i.e. redraw on every rAF tick — AND DO NOT "OPTIMISE" THIS AGAIN.
+      //
+      // It was briefly 16 (~60fps), on the reasoning that a zero budget is 120 full-viewport shader draws
+      // per second on a 120 Hz panel at exactly the moment the compositor is busiest. The draw count did
+      // halve. The owner's report: the homepage and /art were "stucky as hell" compared to main.
+      //
+      // The mistake was measuring the wrong thing. Draw count is a COST; what matters for a full-screen
+      // background during a scroll is whether it updates IN STEP with the scroll. At 0 the sky is locked to
+      // the display refresh, so the background and the content move together. At 16 on a 120 Hz display the
+      // content scrolls at 120fps while the background behind it updates at 60 — and a half-rate background
+      // under full-rate content is perceived as the background dragging. Cheaper per frame, visibly worse.
+      //
+      // It is also unmeasurable in headless Chrome, which caps at 60 Hz: the trace reported a clean 60.2 fps
+      // with 2 dropped frames either way. The regression only exists on a high-refresh display, which is
+      // precisely the configuration the change claimed to help. If a future round really needs to spend less
+      // here, spend it on resolution or shader work per draw — not on the cadence.
+      const budget = scrolling ? 0 : 32;
       if (now - last >= budget) { draw(now); last = now; }
       rafId = requestAnimationFrame(loop);
     }
