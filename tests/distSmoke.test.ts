@@ -589,3 +589,61 @@ describe('the gate script, after the whole-branch review', () => {
     expect(script).toMatch(/document\.body\.children/);
   });
 });
+
+describe("/art's image payload, measured on the built output", () => {
+  // WHY A BYTE CEILING AND NOT A WIDTHS CHECK. The defect this pins was a `widths` array containing
+  // `w.src.width` — the image's NATIVE width — on an element that is also `fetchpriority="high"`. For
+  // `spring-couplet-stele` that is 1727w, a 1342 KB webp, and at 1440px/DPR2 the `40vw` slot needs 1152
+  // device px, so the browser picked the 1727w file as the page's high-priority LCP resource. The 900w
+  // variant is 139 KB. That is ~10x the LCP payload for a work rendered at 576 CSS px.
+  //
+  // Asserting the array would have been the weaker test: the array is a means, and what hurts a visitor is
+  // bytes on the critical path. So this reads the shipped srcset, resolves the file a browser would actually
+  // choose at the most common desktop configuration, and weighs it.
+  const artHtml = (): string => {
+    const p = join(DIST, 'art', 'index.html');
+    if (!existsSync(p)) throw new Error('dist/art/index.html missing — run `npm run build`');
+    return readFileSync(p, 'utf8');
+  };
+  const bytesOf = (url: string): number => {
+    const p = join(DIST, url.replace(/^\//, ''));
+    return existsSync(p) ? readFileSync(p).byteLength : -1;
+  };
+
+  it('keeps the eager, high-priority LCP image well under what it was', () => {
+    const tag = /<img[^>]*fetchpriority="high"[^>]*>/.exec(artHtml())?.[0] ?? '';
+    expect(tag, 'no fetchpriority="high" image on /art — has the LCP hint been dropped?').not.toBe('');
+
+    const srcset = /srcset="([^"]+)"/.exec(tag)?.[1] ?? '';
+    const candidates = srcset.split(',')
+      .map((s) => s.trim().split(/\s+/))
+      .map(([url, w]) => ({ url, w: Number(String(w).replace('w', '')), bytes: bytesOf(url) }))
+      .sort((a, b) => a.w - b.w);
+    expect(candidates.length, 'the LCP image has no srcset').toBeGreaterThan(1);
+    for (const c of candidates) {
+      expect(c.bytes, `a srcset candidate is missing from dist: ${c.url}`).toBeGreaterThan(0);
+    }
+
+    // 1440 CSS px at DPR 2, in the `40vw` branch of the sizes hint => 1152 device px.
+    const NEEDED = 1152;
+    const chosen = candidates.find((c) => c.w >= NEEDED) ?? candidates[candidates.length - 1];
+
+    // 387 KB today, down from 1342 KB. The ceiling leaves room to retune the cap, without being so loose
+    // that re-adding the native width would slip through.
+    expect(
+      chosen.bytes,
+      `the LCP candidate at ${NEEDED} device px is ${(chosen.bytes / 1024).toFixed(0)} KB (${chosen.w}w). `
+      + 'If this jumped, check whether a native image width got back into the `widths` array in art.astro.',
+    ).toBeLessThan(600 * 1024);
+  });
+
+  it('serves every lightbox source as a processed webp, not the untouched original', () => {
+    // `data-zoom` was `ImageMetadata.src`, the unprocessed file, which cost 0.6-2.2 MB of JPEG per open.
+    // The PIXELS are deliberate — artGallery.ts zooms to 6x, so capping the long edge would have quietly
+    // degraded the feature while the byte count looked better. The fix was the container, not the size.
+    const zooms = [...artHtml().matchAll(/data-zoom="([^"]+)"/g)].map((m) => m[1]);
+    expect(zooms.length, 'no data-zoom attributes on /art').toBeGreaterThan(10);
+    const notWebp = zooms.filter((z) => !z.endsWith('.webp'));
+    expect(notWebp, `lightbox sources that are not webp: ${notWebp.slice(0, 3).join(', ')}`).toEqual([]);
+  });
+});

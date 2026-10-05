@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import FluidSky from '../components/proto/FluidSky.astro';
-import { Image } from 'astro:assets';
+import { Image, getImage } from 'astro:assets';
 import { calligraphy, photography, photoDefault } from '../data/artworks';
 import SkyWash from '../components/SkyWash.astro';
 
@@ -39,6 +39,29 @@ const PHOTO_ROW_TARGET_H = 340;   // justifyRows' targetHeight — every non-fin
 const PHOTO_LAST_ROW_SLACK = 1.16; // justifyRows' cap on the final, unfilled row
 const photoSizes = (ar: number) =>
   `(max-width:1024px) 45vw, ${Math.ceil(ar * PHOTO_ROW_TARGET_H * PHOTO_LAST_ROW_SLACK)}px`;
+
+// ── THE LIGHTBOX'S SOURCE: NATIVE PIXELS, WEBP — not the untouched original. ──────────────────────
+//
+// `data-zoom` used to be `ImageMetadata.src`, i.e. the unprocessed file straight out of src/assets. That
+// shipped **40,525,788 bytes of JPEG (38.6 MB) in 44 files**, referenced from nowhere but these attributes,
+// and cost a visitor 0.6–2.2 MB per lightbox open.
+//
+// THE PIXELS ARE NOT THE PROBLEM AND MUST NOT BE REDUCED. `scripts/artGallery.ts` zooms the lightbox to
+// **6x** on wheel, which is the whole point of the room — you are meant to be able to go in and look at the
+// brushwork. Capping the long edge would have quietly made that feature worse while the byte count looked
+// better. So this keeps every native pixel and only changes the CONTAINER.
+//
+// It also turns waste into the fix. Astro's `<Image>` already emits a native-dimension variant for the `src`
+// attribute, independent of `widths` — and with `srcset` + `sizes` present a supporting browser never
+// requests it, so 42 of those files (18.6 MB) were pure build output. Asking `getImage` for the same
+// native-size webp hands back that already-emitted asset instead of a 43rd one, which means this single
+// change (a) stops referencing the originals, so they drop out of `dist` entirely, (b) makes the previously
+// unrequested native webp the thing that is actually used, and (c) serves zoom in webp rather than JPEG.
+const zoomSrc = async (src: ImageMetadata): Promise<string> =>
+  (await getImage({ src, format: 'webp' })).src;
+
+const calZoom = await Promise.all(calligraphy.map((w) => zoomSrc(w.src)));
+const photoZoom = await Promise.all(photography.map((p) => zoomSrc(p.src)));
 ---
 <BaseLayout
   title="An artist by night — Ing Tian"
@@ -79,13 +102,23 @@ const photoSizes = (ar: number) =>
         {calligraphy.map((w, i) => (
           <div class="cal-block" data-i={i}
                data-kicker={w.kicker} data-title={w.title} data-meta={w.medium} data-note={w.note}>
-            <figure class:list={["cal", w.treatment]} data-zoom={w.src.src} data-alt={w.alt}
+            <figure class:list={["cal", w.treatment]} data-zoom={calZoom[i]} data-alt={w.alt}
                     role="button" tabindex="0" aria-label={`View ${w.title} — full screen`}>
               {/* The first calligraphy work is the /art LCP — load it eagerly
                   with high priority; later works stay lazy. (Astro <Image>
                   defaults to loading="lazy", which previously deferred the
                   above-the-fold hero.) */}
-              <Image src={w.src} alt={w.alt} widths={[480, 900, w.src.width]} sizes="(max-width:1024px) 80vw, 40vw"
+              {/* WIDTHS ARE CAPPED, and the native width must never be a candidate again. `w.src.width` was
+                  in this list, which for `spring-couplet-stele` is 1727 — a 1342 KB webp. Displayed at
+                  `40vw`, a 1440px viewport at DPR 2 needs 1152 device px, so the browser picked that 1727w
+                  file as the page's `fetchpriority="high"` LCP resource. The 900w variant is 139 KB. That is
+                  ~10x the LCP payload for a work rendered at 576 CSS px.
+                    1200 is the smallest candidate that still covers the common 1152 device-px case without
+                  upscaling. The photo grid never had this bug — it caps at 900 (see photoSizes above) — and
+                  the calligraphy path simply never got the same treatment. The eager/high priority is
+                  CORRECT and stays: this really is the LCP element, it was only far too heavy. Full
+                  resolution is still one click away, in the lightbox — see zoomSrc. */}
+              <Image src={w.src} alt={w.alt} widths={[480, 900, 1200]} sizes="(max-width:1024px) 80vw, 40vw"
                      loading={i === 0 ? 'eager' : 'lazy'} fetchpriority={i === 0 ? 'high' : undefined} />
             </figure>
           </div>
@@ -98,7 +131,7 @@ const photoSizes = (ar: number) =>
         {photography.map((p, i) => (
           <figure class="tile" data-i={i}
                   data-ar={(p.src.width / p.src.height).toFixed(4)}
-                  data-zoom={p.src.src} data-alt={p.alt}
+                  data-zoom={photoZoom[i]} data-alt={p.alt}
                   data-title={p.title ?? ''} data-note={p.note ?? ''}
                   role="button" tabindex="0" aria-label={`View photograph${p.title ? ' — ' + p.title : ''} — full screen`}>
             {/* sizes is PER PHOTO, because a tile's width is its own aspect ratio times the row height —
