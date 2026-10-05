@@ -150,9 +150,13 @@ const roles = indexed.filter(({ entry }) => entry.kind === 'work');
      A single vertical thread with one node per entry; the first education node gets the
      indigo hollow ring that marks a flagship. The homepage version is tuned for the dark
      descent (paper at 0.22 alpha over --bg); this is a READING page with dark ink on a
-     luminous ground, so the thread and the dot fills use --rule / --reading-bg instead of
-     hardcoded paper alphas. Same mark, correct contrast — a copy-paste would have drawn a
-     near-white thread on cream and vanished. ── */
+     luminous ground, so the thread uses `rgba(var(--hairline-rgb), 0.32)` and the nodes use the local
+     `--dot-fill`. Same mark, correct contrast — a copy-paste would have drawn a near-white thread on cream
+     and vanished.
+       This paragraph used to name `--rule` and `--reading-bg`. Neither existed: `--reading-bg` still does
+     not, and `--rule` was referenced by two `border-bottom` rules below that consequently never drew
+     anything (see its definition in tokens.css). Stated here because a comment naming two tokens, one of
+     which is load-bearing-but-absent, is how that bug survived. ── */
   .spine { position: relative; margin-left: 6px; list-style: none; padding: 0; }
   .spine::before {
     content: ""; position: absolute; left: 5px; top: 8px; bottom: 8px; width: 1px;

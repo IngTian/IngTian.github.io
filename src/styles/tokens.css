@@ -26,6 +26,18 @@
      the palette instead of needing a hand-maintained :global override list. */
   --hairline-rgb: 90, 84, 74;
 
+  /* THE DEFAULT HAIRLINE, ready-mixed — for the common case that only wants "a divider" and does not need to
+     choose an alpha. It re-themes for free, because `--hairline-rgb` does.
+     It exists because `/experience` was already USING it. Two rules there declared
+     `border-bottom: 1px solid var(--rule)` against a custom property that was defined nowhere in the repo, so
+     by spec the whole shorthand was invalid at computed-value time and every longhand fell back to its
+     initial — `border-bottom-style: none`. Measured in a real engine: style `none`, width `0px` on all three
+     `/experience` group titles and every award row. The three section dividers on that page had simply never
+     drawn. 0.32 is the alpha that page's own spine already uses, so the page is internally consistent.
+     `tests/cssVars.test.ts` now fails the build on any `var(--x)` in the shipped CSS that nothing declares,
+     which is the class of bug rather than this instance of it. */
+  --rule: rgba(var(--hairline-rgb), 0.32);
+
   /* The Descent gradient, tokenized so the dark theme can redefine it wholesale. */
   --descent-grad: linear-gradient(
     180deg,
