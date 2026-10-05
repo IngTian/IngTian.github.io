@@ -404,63 +404,19 @@ describe('the first-visit gate, as shipped', () => {
     expect(home!.markup).not.toMatch(/class="[^"]*\bis-up\b/);
   });
 
-  it('IS AUTOMATIC: no control, nothing to focus, and not announced as a dialog', () => {
-    // THE INVERSE OF WHAT THIS FILE USED TO ASSERT. There was a test demanding a real <button> with an
-    // accessible name, because the overlay was a door and that button was the only way through it — trap 6 is
-    // the story of it going invisible twice. The entrance plays itself and lands in the hero, so there is no
-    // control at all: "the users wont click anything just seeing through the animation."
-    //
-    // Which means the a11y requirement inverts too. A `role="dialog" aria-modal="true"` with nothing to act on
-    // and no way to escape is worse than announcing nothing, so the whole overlay is aria-hidden and the real
-    // <h1> is the hero's underneath — which also retires the two-<h1> defect this component shipped once.
-    const gate = /<div class="gate"[^>]*>/.exec(home!.markup)?.[0] ?? '';
-    expect(gate, 'the gate element is gone or renamed').not.toBe('');
-    expect(gate, 'the overlay is announced as a dialog it cannot honour').not.toMatch(/role="dialog"/);
-    expect(gate, 'aria-modal on an overlay with nothing to interact with').not.toMatch(/aria-modal/);
-    expect(gate, 'the decorative overlay is not hidden from the a11y tree').toMatch(/aria-hidden="true"/);
-
-    // No interactive element inside it, so there is nothing to focus and no trap to maintain.
-    const body = home!.markup.slice(home!.markup.indexOf(gate));
-    const inner = body.slice(0, body.indexOf('</div>', body.indexOf('gate-text')));
-    expect(inner, 'an interactive control is back inside the entrance').not.toMatch(/<button|<a\s|tabindex=/);
-
-    // Exactly one <h1> on the page, and it is the hero's.
-    expect((home!.markup.match(/<h1[\s>]/g) ?? []).length, 'the page does not have exactly one <h1>').toBe(1);
+  it('gives the button a real element and an accessible name', () => {
+    const btn = home!.markup.match(/<button[^>]*data-gate-enter[^>]*>([\s\S]*?)<\/button>/);
+    expect(btn, 'the gate needs a real <button>').not.toBeNull();
+    expect(btn![1].replace(/<[^>]*>/g, '').trim().length).toBeGreaterThan(3);
   });
 
-  it('paints the HERO\'S OWN terrain on a canvas, and lands on its camera', () => {
-    // THE WHOLE POINT OF THE REDESIGN, so it is asserted against the build rather than trusted. The field used
-    // to be a ported 21st.dev line drawing that cross-faded into an unrelated hero; ten rounds of tuning it
-    // never shook "a little bit dull". It is now the hero's own loss field, painted by the same renderer, with
-    // the camera tweening to exactly the hero's zoom — so the overlay's last frame and the hero's first frame
-    // are the same picture and the removal cannot be seen.
-    expect(home!.markup, 'the field is not a canvas any more').toMatch(/<canvas[^>]*class="[^"]*gate-field/);
-    expect(home!.markup, 'an SVG stroke field is back').not.toMatch(/class="gate-trail"/);
-    // The separate ground layer is what lets the opaque backdrop clear before the landing frame; without it the
-    // removal flashes the real sky in.
-    expect(home!.markup, 'the fading ground layer is gone').toMatch(/data-gate-back/);
-
-    // BOTH PAINTERS MUST SHARE ONE RENDERER, asserted through the import graph rather than by looking for a
-    // function name — the chunks are minified, so `paintTerrain` is gone from the output. The import is the
-    // stronger claim anyway: if the entrance and the hero ever resolved to different copies of the renderer
-    // they could disagree about the picture, and the landing frame would stop matching.
-    const chunks = [...home!.html.matchAll(/<script[^>]*src="([^"]+)"/g)]
-      .map((m) => m[1])
-      .map((src) => ({ src, body: (() => {
-        const f = join(DIST, src.replace(/^\//, ''));
-        return existsSync(f) ? readFileSync(f, 'utf8') : '';
-      })() }));
-
-    const painter = chunks.find((c) => c.body.includes('data-gate-field'));
-    const heroChunk = chunks.find((c) => /TerrainHero/.test(c.src));
-    expect(painter, 'no shipped chunk queries the entrance canvas — the field is unpainted').toBeTruthy();
-    expect(heroChunk, 'the hero terrain chunk is gone').toBeTruthy();
-
-    const renderer = (body: string) => /from"\.\/(terrainRender\.[^"]+)"/.exec(body)?.[1];
-    const a = renderer(painter!.body);
-    const b = renderer(heroChunk!.body);
-    expect(a, 'the entrance does not import the terrain renderer at all').toBeTruthy();
-    expect(a, 'the entrance and the hero import DIFFERENT renderer chunks').toBe(b);
+  it('marks the decorative field aria-hidden and the dialog labelled', () => {
+    // An SVG, and it went back to being one: the canvas version was built on a misreading of "trails of
+    // asteroids" and the owner had already approved the SVG dash. What matters to a11y either way is that the
+    // decorative field is hidden from the tree.
+    expect(home!.markup).toMatch(/<svg[^>]*class="[^"]*gate-field[^"]*"[^>]*aria-hidden="true"/);
+    expect(home!.markup).toMatch(/aria-labelledby="gate-name"/);
+    expect(home!.markup).toMatch(/id="gate-name"/);
   });
 
   it('NOTHING ON THE GATE HAS AN INVISIBLE RESTING STATE', () => {
@@ -481,6 +437,101 @@ describe('the first-visit gate, as shipped', () => {
     }
   });
 
+  it('KEEPS THE APPROVED TRAVELLING DASH, AND FADES TO ZERO WHERE IT RESETS', () => {
+    // Two things, and the pair is the point.
+    //
+    // (1) THE MOTION IS THE APPROVED ONE. The owner reviewed this exact treatment — a dash travelling along each
+    //     curve, written in real user units from the arc length — and said "oh yeah perfect. now that's what im
+    //     talking about." Everything after it was fixing the ONE defect he reported against it, and two of those
+    //     attempts replaced the motion instead: a permanent faint stroke under the dash (which he read as "the
+    //     line leaves a trail behind"), then no dash at all (a static drawing), then a canvas of comet trails
+    //     from over-reading "like the trails of asteroids". So this pins the dash as present.
+    //
+    // (2) THE DEFECT IS FIXED AT ITS CAUSE. "entire lines go dark immediately" happened because the drawn length
+    //     is a sawtooth — it collapses from the whole arc to a 30% fragment at the curve's off-screen start once
+    //     per cycle — while the source's opacity envelope is 0.3, not 0, at that instant. The envelope now shares
+    //     the offset triangle and so is zero exactly there. The arithmetic is unit-tested in tests/gate.test.ts;
+    //     what this checks is that the SHIPPED script is driven by those same constants, because the inline
+    //     script cannot import and a hardcoded copy is exactly the kind of thing that drifts.
+    const paths = home!.markup.match(/<path[^>]*class="[^"]*gate-trail[^"]*"[^>]*>/g) ?? [];
+    expect(paths.length, 'the gate shipped no strokes at all').toBeGreaterThanOrEqual(1);
+    for (const p of paths) {
+      // vector-effect defeats the renderer's stroke caching across every full-screen path; measured as a real
+      // cost here, and the source does not use it either.
+      expect(p, `vector-effect is back on a gate stroke: ${p}`).not.toMatch(/vector-effect/);
+      expect(p, `the arc length no longer reaches the client, so the dash cannot be written: ${p}`)
+        .toMatch(/data-len="\d/);
+    }
+
+    // THE ON-SCREEN ARC WINDOW MUST SHIP. The entire fix for "entire lines go dark immediately" is that travel
+    // is clipped to [a, b] — the arc of each curve that is actually in frame, measured at build time because the
+    // driver is inline and cannot import. If these attributes stop being emitted the driver silently falls back
+    // to the whole arc (`data-b` defaults to the full length), which is exactly the 42%-blank defect, and
+    // nothing else in the suite would notice.
+    for (const p of paths) {
+      expect(p, `no on-screen window ships for this stroke: ${p}`).toMatch(/data-a="[\d.]+"/);
+      expect(p, `no on-screen window ships for this stroke: ${p}`).toMatch(/data-b="[\d.]+"/);
+    }
+
+    // No second permanently-drawn layer. That is what read as a trail, so it is worth a test rather than a note.
+    expect(home!.markup, 'a faint underlay is back — it will read as a trail behind every line')
+      .not.toMatch(/class="gate-(base|haze)"/);
+    expect(home!.markup, 'the field is a canvas again; the SVG dash is the approved treatment')
+      .not.toMatch(/<canvas[^>]*gate-field/);
+
+    // The script is inline (it has to beat first paint), so it is in the HTML itself rather than a module.
+    const html = home!.html;
+    expect(html, 'the script no longer writes a dash — the strokes cannot be travelling')
+      .toMatch(/strokeDasharray/);
+    // An additive floor is precisely what this guards against: the source's envelope sits at 0.3 rather than 0
+    // where the drawn length resets, which is what made the reset visible. The constants are asserted below by
+    // NAME rather than by value — a comment here quoting `const PEAK = 0.72` outlived two retunings of it (it is
+    // 0.45 now), which is exactly why the number is not written out again.
+    expect(html, 'the opacity envelope has an additive floor again, so the reset will be visible')
+      .not.toMatch(/style\.opacity\s*=\s*String\(\s*0?\.\d+\s*\+/);
+    // THE CLAIM IS "DRIVEN BY THE TESTED CONSTANTS", NOT "SPELLED THIS WAY".
+    //
+    // This assertion used to match the inline script's source character-for-character, down to the name of a
+    // loop local (`tri`). Renaming it, or hoisting the envelope into a helper, turned the test red with
+    // byte-identical output — which is why it had been rewritten once per redesign, and why pinning an
+    // expression's shape is the wrong instrument.
+    //
+    // What genuinely needs guarding is the seam: the driver is `is:inline` so it CANNOT import, and the four
+    // numbers that decide whether strokes vanish are unit-tested in lib/gate.ts. `define:vars` is what keeps
+    // the two on one value. So assert that the constants arrive that way and that the opacity write is computed
+    // from them — the arithmetic itself is proven in tests/gate.test.ts, where it belongs.
+    expect(html, 'GATE_OPACITY_PEAK is no longer handed to the script by define:vars')
+      .toMatch(/\bPEAK\s*=\s*0?\.\d+/);
+    expect(html, 'GATE_OPACITY_RAMP is no longer handed to the script by define:vars')
+      .toMatch(/\bRAMP\s*=\s*0?\.\d+/);
+    const opacityWrite = /\.opacity\s*=\s*([^;]{0,120});/.exec(html)?.[1] ?? '';
+    expect(opacityWrite, 'no opacity write found in the shipped script').not.toBe('');
+    expect(opacityWrite, 'the envelope ignores the tested peak — a hardcoded copy will drift')
+      .toMatch(/PEAK/);
+    expect(opacityWrite, 'the envelope ignores the tested ramp, so it peaks instead of plateauing')
+      .toMatch(/RAMP/);
+  });
+
+  it('gives a reduced-motion reader the same picture, held still', () => {
+    // SCOPED TO THE GATE'S OWN BLOCK, which this test did not used to be: it searched the entire homepage
+    // stylesheet for `prefers-reduced-motion` and `animation: none`, both of which the bundle has carried since
+    // BaseLayout was written. It passed regardless of what the gate did, and its name still said "drift" two
+    // commits after the drift was deleted.
+    //
+    // What matters is narrow: under reduced motion the strokes must be PINNED, not animated and not reset. The
+    // driver never runs (`if (!reduced())`), so no inline dash is ever written and there is nothing to undo —
+    // the one thing needed is the opacity pin, because the per-path `stroke-opacity` attribute ramps to 1.0 and
+    // without it a still reader sees the drawing at full strength: a different picture, not a still of this one.
+    const css = gateCss();
+    const blocks = [...css.matchAll(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{/g)];
+    expect(blocks.length, 'the gate CSS has no reduced-motion block').toBeGreaterThan(0);
+    // Take the stylesheet from each such block and keep the one that governs a gate stroke.
+    const governing = blocks
+      .map((m) => css.slice(m.index ?? 0, (m.index ?? 0) + 1200))
+      .filter((b) => /\.gate-trail/.test(b));
+    expect(governing.length, 'no reduced-motion rule reaches .gate-trail').toBeGreaterThan(0);
+    expect(governing[0], 'the strokes are not pinned for a reader with motion off').toMatch(/opacity:\s*0?\.\d/);
+  });
 });
 
 describe('the gate script, after the whole-branch review', () => {
@@ -537,56 +588,4 @@ describe('the gate script, after the whole-branch review', () => {
     // what claims to be a modal.
     expect(script).toMatch(/document\.body\.children/);
   });
-  it('ENDS BY ITSELF EVEN IF THE PAINTER NEVER RUNS', () => {
-    // THE WORST CASE OF AN AUTOMATIC OVERLAY, and the reason this is the headline assertion of the group.
-    //
-    // The old gate's nightmare was an invisible button (trap 6). This one's is an overlay that never leaves: the
-    // entrance ends when the painter's clock reaches the end, and the painter is a bundled module script. If it
-    // fails to load, throws on an old browser, or the canvas context is unavailable, nothing would dispatch the
-    // landing — and an opaque full-screen layer would sit over the site permanently. That is strictly worse
-    // than any defect this component has actually shipped.
-    //
-    // So the INLINE script, which cannot fail to run because it is parsed with the document, carries its own
-    // timeout backstop. This asserts the backstop exists and is bounded.
-    const t = /setTimeout\(\s*land\s*,\s*(\d+)\s*\)/.exec(script);
-    expect(t, 'the inline script has no backstop timer — a failed painter would strand the overlay').not.toBe(null);
-    expect(Number(t![1]), 'the backstop is too long to save a visitor from a stuck overlay').toBeLessThanOrEqual(4000);
-    expect(Number(t![1]), 'the backstop fires before the entrance can finish normally').toBeGreaterThan(2100);
-  });
-
-  it('LETS ANY GESTURE SKIP IT, which is what stops a forced wait being a toll booth', () => {
-    // Every surveyed intro that landed was skippable, and the most-discussed individual portfolio on HN is a
-    // cautionary tale about one that was not ("I've closed the tab before seeing anything because it looks
-    // broken"). The entrance is ~2.1s on a static page, which is short — but a reader who wants past it must
-    // get past it.
-    //
-    // The listeners that swallow input for trap 3 are the same ones that land the entrance, which is the
-    // property worth pinning: nothing is swallowed without doing something. A `swallow` that only called
-    // preventDefault would leave a visitor flicking at a screen that ignores them.
-    expect(script, 'wheel is not swallowed — one flick would scroll the deck behind the overlay')
-      .toMatch(/addEventListener\('wheel'/);
-    expect(script, 'no pointer gesture lands the entrance').toMatch(/addEventListener\('pointerdown'/);
-    expect(script, 'a phone has no way to skip — touchend is the only gesture it has')
-      .toMatch(/addEventListener\('touchend'/);
-    // The swallower must land, not merely cancel.
-    const swallow = /function swallow\(e\)\s*\{[^}]*\}/.exec(script)?.[0] ?? '';
-    expect(swallow, 'swallow() does not exist any more').not.toBe('');
-    expect(swallow, 'input is swallowed without landing the entrance — the reader is ignored')
-      .toMatch(/land\(\)/);
-  });
-
-  it('does not raise at all under reduced motion', () => {
-    // An entrance made ENTIRELY of motion has nothing to show a reader who asked for none. The alternative — a
-    // still frame of the hero's terrain with the name centred, held for two seconds — is a delay with no
-    // content, which is worse than no entrance. So the finished state the motion rule asks for is the homepage
-    // itself, and the inline script returns before raising.
-    expect(script, 'the entrance no longer checks the motion preference')
-      .toMatch(/prefers-reduced-motion:\s*reduce/);
-  });
-
-  // The reduced-motion assertion moved up into the group above and now checks the SCRIPT rather than the CSS:
-  // the entrance does not raise at all for a reader who asked for no motion, so there is no "still frame" to
-  // style. The old test looked for a `.gate-trail` opacity pin in a reduced-motion block — strokes that no
-  // longer exist.
-
 });
