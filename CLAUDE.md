@@ -986,12 +986,26 @@ Two invariants, both about the compositor and both easy to break:
    (hidden under 640px, under reduced motion, and at `strength=0`), and the class is
    additionally dropped on resize-to-hidden and on GL context loss.
 
-Perf: viewport-sized (scroll is a uniform), half internal resolution, **~30fps idle and ~60fps while
-scrolling**, paused on tab-hide, skipped on phones. The scrolling budget was **0** — i.e. every rAF tick,
-which on a 120 Hz panel is 120 full-viewport fragment-shader draws per second plus 16 `gl.uniform*` calls
-each, at exactly the moment the compositor is busiest and during every deck slide transition. It is 16ms now;
-the idle 32 was always right. The CSS
+Perf: viewport-sized (scroll is a uniform), half internal resolution, ~30fps idle and **every rAF tick while
+scrolling**, paused on tab-hide, skipped on phones. The CSS
 `--descent-grad` gradient remains underneath as the base and the no-WebGL state.
+
+**THE SCROLLING BUDGET IS 0 AND MUST STAY 0. DO NOT "OPTIMISE" IT.** It was briefly capped at 16ms (~60fps),
+on the reasoning that 0 means 120 full-viewport fragment-shader draws per second on a 120 Hz panel, plus 16
+`gl.uniform*` calls each, at exactly the moment the compositor is busiest and during every deck slide
+transition. The draw count did halve. The owner's report was that the homepage and `/art` became *"stucky as
+hell"* compared to `main`, and it was reverted.
+  **The mistake was measuring a cost instead of the experience.** What matters for a full-screen background
+during a scroll is not how many times it draws but whether it updates *in step with the scroll*. At 0 the sky
+is locked to the display refresh, so background and content move together; at 16ms on a 120 Hz display the
+content scrolls at 120fps while the background behind it updates at 60, and a half-rate background under
+full-rate content is perceived as the background dragging. So the change was worse precisely on the
+high-refresh hardware it was supposed to help.
+  **And it is invisible to this project's own verification path**, which is the part worth remembering:
+headless Chrome caps at 60 Hz, so a trace of a synthesized 2400px scroll reported 60.2 fps, 2 dropped frames
+and no long task on the capped build — indistinguishable from the good one. A cadence regression can only be
+seen on real hardware. If this genuinely needs to cost less, spend it on internal resolution or on shader
+work per draw, never on the cadence.
 
 ## Themes (light ⇄ dark)
 
