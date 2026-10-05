@@ -26,6 +26,14 @@
      the palette instead of needing a hand-maintained :global override list. */
   --hairline-rgb: 90, 84, 74;
 
+  /* THE SKY AT THE HEIGHTS — the 0% stop of --descent-grad below, as a flat colour.
+     It exists because the first-visit entrance paints the hero's terrain on its own full-screen layer and has
+     to read against the same ground the hero does. That is not cosmetic: the light theme's terrain is DARK
+     ink whose EDL spends its shade on value rather than opacity, so on a near-black ground (--bg) the whole
+     field nearly disappears — measured, the opening frame read as a faint smudge. Keep this equal to the
+     gradient's first stop; a second value here would be a slow drift nobody notices until the handover. */
+  --sky-top: #f4efe4;
+
   /* The Descent gradient, tokenized so the dark theme can redefine it wholesale. */
   --descent-grad: linear-gradient(
     180deg,
@@ -89,6 +97,8 @@ html[data-theme='dark'] {
   --bg: #08090b;
   --on-accent: #0b1410;  /* deep green-black for text on the phosphor accent */
   --hairline-rgb: 184, 177, 161;  /* cool light hairline on the dark ground (was the :global override literal) */
+
+  --sky-top: #16191d;    /* keep equal to the dark gradient's 0% stop below */
 
   --descent-grad: linear-gradient(
     180deg,

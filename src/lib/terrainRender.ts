@@ -10,6 +10,7 @@
 import {
   field, project, projectRaw, normal, computeEDL, litColor,
   colormap, RANGE, STEP, edlSpend,
+  TERRAIN_LIGHT, TERRAIN_TERMINAL,
   type TerrainRamp, type EDLParams, type LightParams, EDL_DEFAULTS, LIGHT_DEFAULTS, lightDir,
 } from './terrain';
 
@@ -41,6 +42,86 @@ export const TERRAIN_CONFIG_DEFAULTS: Omit<TerrainConfig, 'ramp' | 'darkness'> =
   zoom: 0.85,
   dotScale: 1,
 };
+
+/**
+ * THE BREATH'S ANGULAR FREQUENCY, IN RADIANS PER SECOND — NOT HERTZ, despite what the local that used to
+ * hold it was called.
+ *
+ * `paintTerrain` displaces each dot by `sin(tsec * BREATH_OMEGA + x*0.7 + y*0.6)`. There is no 2π in that
+ * expression, so the period is `2π / 0.4` = **15.71 seconds**, not 2.5. The old name (`breathHz`) read as
+ * 2.5s and that is a factor of 6.3 — enough to make "the field barely moves over a two-second intro" look
+ * like a bug in the amplitude when it is really the tempo.
+ *
+ * It is exported because it was restated in two places: here, and by hand in TerrainHero's walker pass, which
+ * has to re-apply the same displacement to keep a walker's feet on the surface. Anything that needs the
+ * breath's phase — including an intro that wants to land on the hero's exact phase — must derive it from
+ * this, never from a copy.
+ */
+export const BREATH_OMEGA = 0.4;
+
+/** One full breath, in seconds. Adding a whole number of these to `tsec` leaves the field's phase unchanged. */
+export const BREATH_PERIOD_S = (Math.PI * 2) / BREATH_OMEGA;
+
+/** The hero's live breath amplitude, and the static frame's. Shared so a second painter can land on them. */
+export const BREATH_AMP_LIVE = 0.04;
+export const BREATH_AMP_STILL = 0;
+
+/** Per-theme walker colours — the hero's flourish, kept beside the palette it belongs to. */
+export interface WalkerPalette {
+  glow: [number, number, number];
+  settled: [number, number, number];
+  trail: [number, number, number];
+}
+
+export interface TerrainPalette {
+  ramp: TerrainRamp;
+  walker: WalkerPalette;
+  darkness: number;
+  dotScale: number;
+}
+
+/**
+ * THE PER-THEME PICTURE, in one place because two painters now need it and a second copy would drift.
+ *
+ * This was a private `themePalette()` inside TerrainHero.astro. `dotScale` is the one that bites: it is
+ * **1.08 light / 1.18 dark**, while `TERRAIN_CONFIG_DEFAULTS.dotScale` is 1 — so a second painter that built
+ * a config from the defaults and forgot this would paint the whole field at 93% of the hero's dot weight and
+ * nothing would look obviously wrong until the two were composited.
+ */
+export function terrainPalette(dark: boolean): TerrainPalette {
+  return dark
+    ? {
+      ramp: TERRAIN_TERMINAL,
+      walker: { glow: [227, 242, 247], settled: [134, 188, 204], trail: [73, 127, 146] },
+      darkness: 1,
+      dotScale: 1.18,
+    }
+    : {
+      ramp: TERRAIN_LIGHT,
+      walker: { glow: [244, 239, 228], settled: [200, 163, 106], trail: [92, 108, 140] },
+      darkness: 0,
+      dotScale: 1.08,
+    };
+}
+
+/**
+ * The hero's exact config for a theme — the frame any second painter has to land on.
+ *
+ * Returns a FRESH object every call, deliberately. The intro mutates `zoom`, `light`, `edlSizeRange` and
+ * `elevEmphasis` on its own copy every frame; handing both painters one shared object would make the hero's
+ * picture follow the intro's camera.
+ */
+export function terrainConfig(dark: boolean): TerrainConfig {
+  const p = terrainPalette(dark);
+  return {
+    ...TERRAIN_CONFIG_DEFAULTS,
+    light: { ...LIGHT_DEFAULTS },
+    ramp: p.ramp,
+    darkness: p.darkness,
+    dotScale: p.dotScale,
+    starfield: p.darkness > 0.5,
+  };
+}
 
 export interface GridPoint { x: number; y: number; nx: number; ny: number; nz: number; edl: number }
 
@@ -128,7 +209,8 @@ export function paintTerrain(
   cfg: TerrainConfig,
   W: number, Hh: number, DPR: number, tsec: number, breathAmp: number,
 ): void {
-  const breathHz = 0.4;
+  // BREATH_OMEGA, not a local 0.4 — see its doc comment. It is radians/second, so the period is 15.71s, and
+  // the name `breathHz` that used to sit here read as 2.5s to everyone who found it.
   const lit = cfg.lighting;
   const [Lx, Ly, Lz] = lightDir(cfg.light);
 
@@ -136,7 +218,7 @@ export function paintTerrain(
   const rd: Dot[] = [];
   for (const g of grid) {
     let z = field(g.x, g.y);
-    z += breathAmp * Math.sin(tsec * breathHz + g.x * 0.7 + g.y * 0.6);
+    z += breathAmp * Math.sin(tsec * BREATH_OMEGA + g.x * 0.7 + g.y * 0.6);
     const [sx, sy, depth] = project(g.x, g.y, z, W, Hh, cfg.zoom);
     const ndl = lit ? g.nx * Lx + g.ny * Ly + g.nz * Lz : 0;
     rd.push({ sx, sy, depth, z, ndl, edl: g.edl, gx: g.x, gy: g.y });

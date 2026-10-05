@@ -23,7 +23,7 @@
  * reloads, the flag is already set, the gate does not raise, and the change appears not to have shipped. Bump
  * the suffix whenever the gate changes enough to want a second look.
  */
-export const GATE_SEEN_KEY = 'descent.gate.seen.v2';
+export const GATE_SEEN_KEY = 'descent.gate.seen.v3';
 
 /** Must match the CSS dismissal duration in Gate.astro. */
 export const GATE_DISMISS_MS = 600;
@@ -140,138 +140,126 @@ export function dismissMs(reducedMotion: boolean): number {
 }
 
 /**
- * ONE FRAME OF THE STROKE ANIMATION, as fractions — and the reason this is a tested function rather than three
- * lines inside the component's inline script.
+ * THE ENTRANCE — a fluid terrain field that settles into the hero.
  *
- * The owner approved this motion ("oh yeah perfect") and then reported one defect against it: *"there are lines
- * that vanish suddenly which is not good. entire lines go dark immediately."* The cause is a single interaction
- * between two of the three curves below, and it is the kind of thing a comment cannot hold:
+ * Every curve below exists to answer one question: at the landing frame, is the overlay painting EXACTLY the
+ * picture the hero's next frame will paint? If any axis misses, the handover is a visible jump of the whole
+ * field, because `zoom` is simultaneously position and dot radius and `breathAmp` displaces every dot by up
+ * to ±8.8 CSS px at the hero's measured box.
  *
- *   - `drawnFrac` is a SAWTOOTH. It climbs 0.3 -> 1 and resets, so at the cycle boundary the drawn window
- *     collapses from the whole arc to a 30% fragment sitting at the curve's start — which is off-screen, since
- *     the viewBox shows only about a quarter of each curve.
- *   - the source's opacity envelope is [0.3, 0.6, 0.3], i.e. NONZERO at that boundary. So the collapse happens
- *     in full view and a line that spanned the frame is gone in the next frame.
+ * WHY THE FIELD AND NOT A DRAWING. Two previous designs lost here. A ported line field was approved on sight
+ * and then rejected as "a little bit dull" after ten rounds of tuning, because it was a borrowed picture
+ * cross-fading into an unrelated hero — no dial inside it could fix that. The replacement cross-faded less but
+ * still staged a name flying across the screen, and the verdict was "that's horrible". The owner's own brief is
+ * the design: *"a fluid field moving using the terrain we have. and then this terrain transforms into the
+ * terrain location we have then seamlessly into the hero. the name and other stuff just fades in."*
  *
- * The fix is to take the envelope to zero exactly where the sawtooth breaks, so the discontinuity has nothing
- * visible to disrupt. `opacityAt` therefore shares the triangle with `offsetFrac`, which is already 0 at both
- * ends of the cycle. `tests/gate.test.ts` asserts that pairing directly — the envelope must vanish at the one t
- * where the drawn length is discontinuous — because the two are only correct TOGETHER and nothing else in the
- * codebase would notice if one of them were retuned alone.
- *
- * The component's inline script restates this arithmetic, for the same reason it restates the session policy
- * above: an inline script cannot import, and it has to run before first paint.
- *
- * Two alternatives were built and rejected, so they are not options: a faint full-length stroke under the dash
- * also removes the vanishing, but its uncovered stretch reads as *"the line leaves a trail behind"*; and
- * dropping the dash entirely leaves a static drawing.
+ * So there is no drawing and no text on this screen at all — the overlay paints the hero's own
+ * Gaussian-mixture field through the same renderer, and the hero's OWN name fades in underneath. That is what
+ * removes the whole class of defects the previous attempt generated: no stand-in copy, no FLIP, no
+ * ivory-to-ink colour crossover, no two-names-on-screen.
  */
-export const GATE_DRAWN_MIN = 0.3;
-/**
- * The envelope's plateau value, and how much of the offset triangle it takes to reach it.
- *
- * 0.45 is chosen to MATCH the brightness of the build the owner approved, not to improve on it. That build used
- * `0.3 + 0.3 * tri` and opened at t ~= 0.16, which is 0.40; the source's own peak is 0.60. Landing between them
- * keeps this commit's only visible change the one that was asked for.
- *
- * GATE_OPACITY_RAMP is why the envelope PLATEAUS instead of peaking. A bare `PEAK * tri` is zero at the cycle
- * boundary — which is the fix — but it is also near zero for a long stretch either side of it, so the strokes
- * spend much of the cycle dimmer than the approved build. Worse, `tri` peaks at the one moment nothing is
- * painted at all (see the note on `offsetFrac`). Ramping over the first 0.3 of the triangle and holding gives
- * full brightness across almost the whole cycle while still passing through zero exactly where the drawn length
- * resets.
- */
-export const GATE_OPACITY_PEAK = 0.45;
-export const GATE_OPACITY_RAMP = 0.3;
+export const ENTRANCE_MS = 2600;
 
-/** The drawn length as a fraction of the arc: the source's `pathLength` 0.3 -> 1, linear, resetting each cycle. */
-export function drawnFrac(t: number): number {
-  return GATE_DRAWN_MIN + (1 - GATE_DRAWN_MIN) * t;
+/**
+ * Eased progress, 0..1. Ease-OUT with a zero landing derivative, which both of the obvious curves lack.
+ *
+ * The derivative matters as much as the value: every axis below is `open + (hero - open) * progress`, so
+ * `progress'(1) = 0` is what makes each one *arrive* rather than still be moving when the overlay is removed.
+ * A linear ramp lands at full speed and the handover reads as a cut.
+ */
+export function entranceProgress(ms: number, total = ENTRANCE_MS): number {
+  const t = Math.min(1, Math.max(0, ms / total));
+  return 1 - Math.pow(1 - t, 3);
 }
 
 /**
- * The source's `pathOffset` [0, 1, 0] — a triangle, so it returns to its starting value and the dash's POSITION
- * is already continuous across the wrap. Only the length and the opacity were not.
+ * HOW FAR BACK THE CAMERA STARTS, as a multiple of the hero's zoom.
  *
- * WORTH KNOWING, because it is counter-intuitive and it cost a wrong fix: the dash pattern here is
- * `dasharray = "drawn len"` with `dashoffset = -tri * len`, so a point p is painted when
- * `((p - tri*len) mod (drawn + len)) < drawn`. Evaluate that across the cycle and the painted fraction of each
- * arc runs 0.30 -> 0.48 (t ~= 0.25) -> **0.00 at t = 0.5** -> 1.00 at t -> 1. The triangle's peak is therefore
- * the one instant when the dash has slid entirely off the path and the stroke paints NOTHING. An opening phase
- * of 0.5 looks like an empty screen, which is exactly what it rendered as when tried.
+ * Below 1 is pulled back — more of the field in frame, the surface further away — so the intro descends
+ * toward the hero's camera, which is the site's own motif rather than a generic zoom. The camera is a single
+ * uniform scale about a fixed centre (`project` in lib/terrain.ts has no pan and no rotate), so there is
+ * nothing to look at further out than about 0.5: the field just becomes a small object in a large empty
+ * screen, which reads as a logo.
  */
-export function offsetFrac(t: number): number {
-  return t < 0.5 ? t * 2 : (1 - t) * 2;
+export const ENTRANCE_ZOOM_FROM = 0.70;
+
+/**
+ * THE BREATH STARTS AS A SWELL AND CALMS TO THE HERO'S BREATH.
+ *
+ * `breathAmp` is the single biggest "is it alive" dial: the hero's 0.04 is ±8.8 CSS px of per-dot
+ * displacement, and the parameter survey's note is that 0.1+ reads as a swell rather than a breath. 0.30 is a
+ * deep heave; it lands on exactly `BREATH_AMP_LIVE`.
+ */
+export const ENTRANCE_BREATH_FROM = 0.16;
+
+/**
+ * HOW MANY WHOLE BREATH PERIODS OF EXTRA PHASE THE INTRO BURNS THROUGH — and why it must be a whole number.
+ *
+ * This is the one piece of arithmetic in the entrance that is not obvious, and it is what makes the field
+ * read as FLOWING rather than merely drifting.
+ *
+ * The breath is `sin(tsec * BREATH_OMEGA + x*0.7 + y*0.6)` with omega = 0.4 **radians per second** — so the
+ * period is 15.71s, not the 2.5s the old `breathHz` name suggested. Over a 2.6s intro the field would advance
+ * through 17% of one cycle: the dots would slide one way and stop. Not fluid, just drifting.
+ *
+ * So the intro runs the clock fast and lets it decelerate. But `tsec` must ALSO equal the hero's own
+ * `rAF timestamp / 1000` at the landing frame, or every dot is displaced differently than the hero's next
+ * frame. Those two requirements are only compatible if the extra phase is a WHOLE number of breath periods,
+ * because `sin` is periodic: burn exactly one period and the phase you land on is the phase you would have
+ * had without the detour.
+ *
+ * The spatial term spans about 2π across the painted footprint, so one temporal period also walks the wave
+ * one full wavelength across the field — a swell that crosses the landscape once and settles.
+ */
+export const ENTRANCE_BREATH_CYCLES = 1;
+
+/**
+ * The extra breath phase still owed at progress `p`, in seconds, as a quantity to SUBTRACT from the clock.
+ *
+ * `(1-p)^2` rather than `(1-p)`: both land at zero, but the squared form also has zero derivative there, so
+ * the clock's rate returns smoothly to 1x instead of stepping down from ~7x at the final frame.
+ *
+ * Subtracted, not added, so the clock runs FAST FORWARD and decelerates. Adding it would make the intro's
+ * clock run slower than real time — and with an offset this large, backwards.
+ */
+export function breathPhaseOffset(p: number, periodS: number): number {
+  const q = Math.min(1, Math.max(0, p));
+  return ENTRANCE_BREATH_CYCLES * periodS * (1 - q) * (1 - q);
 }
 
 /**
- * The envelope: ramps from zero over the first `GATE_OPACITY_RAMP` of the triangle, then holds.
+ * HOW FAR THE SUN SWINGS, in radians, before it lands on the hero's azimuth.
  *
- * Zero at t = 0 and t = 1 — the only property that matters for the defect — and flat for roughly the middle 85%
- * of the cycle, so the fix costs no brightness.
+ * `ndl` is recomputed every frame from the grid's stored normals, so the sun is free to move — it is the
+ * cheapest flow available, and unlike the breath it has no periodicity to respect: it just has to arrive.
+ * A swing of this size slides the warm/cool terminator across the relief, which is light travelling over the
+ * landscape rather than the landscape moving.
  */
-export function opacityAt(t: number): number {
-  return GATE_OPACITY_PEAK * Math.min(1, offsetFrac(t) / GATE_OPACITY_RAMP);
-}
+export const ENTRANCE_AZ_SWING = -1.15;
 
 /**
- * Where in its cycle a stroke starts when the gate opens.
+ * THE SILHOUETTE RESOLVES, rather than being there from the first frame.
  *
- * 0.16 is not a round number by accident: it is where the approved build happened to sit (it used a flat 4s lead
- * against the then-20-30s durations), and at that phase 41% of each arc is painted as a band across the middle of the
- * curve — which is the part of it the viewBox actually shows. Both neighbours are worse: 0 paints only the first
- * 30%, which is off the top-left corner, and 0.5 paints nothing at all.
+ * `edlSizeRange` is the dot-area spread (lit dots grow, shadowed shrink) and `elevEmphasis` makes the ridge
+ * carry the form while the valley recedes. Opening both low and raising them to the hero's values means the
+ * field arrives as a flattish scatter and *acquires* its relief — the shape emerges out of the fluid.
  *
- * It is a phase FRACTION rather than a millisecond lead because the durations differ per stroke, so a fixed lead
- * lands at a different point in every stroke's cycle.
+ * Both land on `TERRAIN_CONFIG_DEFAULTS`' values (0.75 / 0.20), which is what the hero paints.
  */
-export const GATE_OPEN_PHASE = 0.16;
+export const ENTRANCE_EDL_SIZE_FROM = 0.34;
+export const ENTRANCE_ELEV_EMPHASIS_FROM = 0.07;
 
 /**
- * HOW A STROKE'S WEIGHT AND COLOUR MOVE THROUGH ITS CYCLE.
+ * The event the two scripts hand the landing over with.
  *
- * The owner's ask: *"when you move across the screen maybe let the thickness vary"* and *"can we add a little
- * bit color variation to the lines when it moves"*.
+ * It is the ONLY channel between them and it has to be, because they cannot share a module: the policy script
+ * is `is:inline` (it must run before first paint) and the painter is bundled (it must import the renderer).
+ * The painter fires it when its clock reaches the end; the policy script fires it when a gesture or the
+ * backstop timer lands early, so the painter can snap to the hero's frame and stop rather than keep tweening
+ * under a dismissed overlay.
  *
- * Both are per-element and per-frame, which SVG can do — `stroke-width` and `stroke` are plain presentation
- * properties the driver already overwrites alongside the dash. What SVG CANNOT do is vary either ALONG one
- * stroke: a path has a single width and a single colour at any instant. Tapering a line from head to tail needs
- * per-pixel control, i.e. a canvas, and that was built and rejected (see the gate's rejection list). So the
- * variation is in TIME — a stroke thickens and cools as it crosses — which from the reader's side is much the
- * same impression, because what they are watching is whichever part of the curve is inside the frame.
- *
- * Both curves are continuous and PERIODIC: they return to their starting value at the cycle boundary, where
- * `drawnFrac` resets. Anything discontinuous there would reintroduce the pop the envelope exists to hide.
+ * Distinct from `GATE_REVEAL_EVENT`, which is the hero's cue to resume painting. Ordering between the two is
+ * load-bearing — see Gate.astro's `land()`.
  */
-
-/** Peak-to-trough weight swing, as a fraction of the stroke's own authored width. */
-export const GATE_WIDTH_SWING = 0.35;
-
-/**
- * Weight multiplier at cycle position `t`, for a stroke carrying its own `phase`.
- *
- * TWO cycles per traverse, not one: a single cycle across a whole traverse is too slow to read as variation in
- * the few seconds a gate is on screen. Worth knowing that this reasoning was stated here while the TRAVERSE it
- * rides on was still 20-30s, which made these curves 10-15s and the dash itself a tenth-of-a-journey per dwell.
- * The traverse is 6-9s now; the principle was right and the number it applied to was not. The per-stroke phase stops the family pulsing in unison, which would read as the
- * whole drawing breathing rather than as individual strokes having their own weight.
- */
-export function widthAt(t: number, phase = 0): number {
-  return 1 + GATE_WIDTH_SWING * Math.sin(2 * Math.PI * (2 * t + phase));
-}
-
-/**
- * WARM/COOL MIX at cycle position `t`, in [-1, 1]: negative leans cool, positive leans warm, zero is the base
- * ink. The caller owns which tokens those are — this decides only how far and in which direction.
- *
- * Why warm/cool rather than a hue rotation: the palette rule allows only the tokens in `tokens.css`, and in the
- * light theme the seal is the one saturated colour. Leaning a near-white stroke slightly toward ochre or indigo
- * keeps it near-white and stays inside the palette — and it is the same warm/cold broken colour `SkyWash`
- * already weaves over the sky, so the gate borrows the site's own idiom rather than introducing a new one.
- *
- * Offset from `widthAt` by a quarter cycle so weight and colour do not peak together; coinciding, they read as
- * one crude pulse instead of two independent properties.
- */
-export function tintAt(t: number, phase = 0): number {
-  return Math.sin(2 * Math.PI * (2 * t + phase + 0.25));
-}
+export const GATE_LAND_EVENT = 'descent:gate-land';

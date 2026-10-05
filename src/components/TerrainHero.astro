@@ -34,34 +34,22 @@ const bubbles = JSON.stringify([
 </style>
 
 <script>
-  import { field, runDescent, project, SPAWNS,
-           TERRAIN_LIGHT, TERRAIN_TERMINAL, type TerrainRamp } from '../lib/terrain';
-  import { buildGrid, paintTerrain, TERRAIN_CONFIG_DEFAULTS, type GridPoint } from '../lib/terrainRender';
+  import { field, runDescent, project, SPAWNS } from '../lib/terrain';
+  import {
+    BREATH_AMP_LIVE, BREATH_AMP_STILL, BREATH_OMEGA,
+    buildGrid, paintTerrain, terrainConfig, terrainPalette,
+    type GridPoint, type WalkerPalette,
+  } from '../lib/terrainRender';
   import { prefersReducedMotion } from '../lib/motion';
   import { GATE_REVEAL_EVENT, isCovered } from '../lib/gate';
 
-  // The canvas is JS-painted, so it can't inherit CSS tokens — pick the ramp +
-  // walker colors from the active theme (data-theme on <html>). Read fresh on
-  // each init so a View-Transition swap or a live theme toggle repaints correctly.
-  // Dark = the "terminal galaxy": cyan-blue "Glacier" ice dots read as a star
-  // field on the charcoal void; light = the shipped warm "Classic" ochre→indigo.
-  type WalkerPalette = { glow: [number,number,number]; settled: [number,number,number]; trail: [number,number,number] };
-  // `darkness` (0 = light, 1 = dark) drives the directional-light value/gain
-  // blend in the shared renderer so the relief reads on both the pale and the
-  // dark sky. `dotScale` is a per-theme radius bump — dark gets a touch more (its
-  // dots read as a fainter starfield on the void), light a little.
-  function themePalette(): { ramp: TerrainRamp; walker: WalkerPalette; darkness: number; dotScale: number } {
-    // Walker trios:
-    //   dark  = Glacier — frost glow, ice settle, recessive teal trail (screensaver)
-    //   light = Classic — the shipped paper glow, ochre settle, indigo trail
-    if (document.documentElement.dataset.theme === 'dark')
-      return { ramp: TERRAIN_TERMINAL, walker: { glow: [227,242,247], settled: [134,188,204], trail: [73,127,146] }, darkness: 1, dotScale: 1.18 };
-    // LIGHT dotScale trimmed 1.15 → 1.08. Light theme now spends its EDL shade on
-    // VALUE rather than opacity (see edlSpend in lib/terrain.ts), which by itself
-    // adds ink — and "heavier" is not the goal, "clearer" is. The radius trim
-    // offsets that ink increase while keeping visible presence on the ridge.
-    return { ramp: TERRAIN_LIGHT, walker: { glow: [244,239,228], settled: [200,163,106], trail: [92,108,140] }, darkness: 0, dotScale: 1.08 };
-  }
+  // THE PER-THEME PICTURE NOW LIVES IN lib/terrainRender.ts, and that move is the point rather than tidiness.
+  // It was a private `themePalette()` here, which was fine while this was the only painter of this field. The
+  // first-visit entrance paints the same field through the same renderer and has to land on this frame
+  // exactly, so a second copy that drifted by one number would turn a continuation into a visible jump. The
+  // easiest one to get wrong is `dotScale`: it is 1.08 light / 1.18 dark, while TERRAIN_CONFIG_DEFAULTS has 1.
+  // tests/terrainPalette.test.ts pins the values; `terrainConfig()` hands back a fresh object per call so the
+  // two painters cannot share one.
 
   // Teardown handle for the previous init — re-init runs on every page load AND
   // after each View Transition swap (astro:page-load), so we must dispose the
@@ -81,18 +69,18 @@ const bubbles = JSON.stringify([
     const ctx = cvs.getContext('2d')!;
     const reduce = prefersReducedMotion();
     const BUBBLES = JSON.parse(cvs.dataset.bubbles || '[]') as Array<null | { word?: string; mathml?: string }>;
-    const { ramp, walker, darkness, dotScale } = themePalette();
+    const dark = document.documentElement.dataset.theme === 'dark';
+    const walker: WalkerPalette = terrainPalette(dark).walker;
     const [gr, gg, gb] = walker.glow;      // walker head-glow
     const [sr, sg, sb] = walker.settled;   // settled-at-minimum accent
     const [tr, tg, tb] = walker.trail;      // descending trail
 
     // The static-per-camera terrain: dot grid + precomputed normals + EDL shade,
     // built once (EDL is O(n²); the camera is fixed so it never needs recompute).
-    // Config is the baked default (shape-reading on) plus this theme's ramp/darkness.
     // starfield: the dark theme's dots twinkle as temperature-tinted stars (its
     // whole conceit is that they read as a star field); light theme keeps the
-    // shipped warm relief untouched.
-    const cfg = { ...TERRAIN_CONFIG_DEFAULTS, ramp, darkness, dotScale, starfield: darkness > 0.5 };
+    // shipped warm relief untouched. All of that is `terrainConfig`'s job now.
+    const cfg = terrainConfig(dark);
     const ZOOM = cfg.zoom;                 // walkers must use the SAME zoom to stay on the surface
     let grid: GridPoint[] = buildGrid(cfg.edlParams);
 
@@ -123,8 +111,9 @@ const bubbles = JSON.stringify([
     function frame(ts: number, animate: boolean) {
       ctx.clearRect(0, 0, W, Hh);
       const tsec = ts / 1000;
-      const breathAmp = animate ? 0.04 : 0;
-      const breathHz = 0.4;
+      // Imported, not restated. These three were local literals (`0.04`, `0`, `0.4`) and the entrance has to
+      // land on the first two exactly and share the third's phase, so a copy here would be a silent drift.
+      const breathAmp = animate ? BREATH_AMP_LIVE : BREATH_AMP_STILL;
 
       // Terrain dots (shared renderer): elevation color → directional relief +
       // warm/cool tint → Eye-Dome Lighting + elevation emphasis → bottom fade.
@@ -144,7 +133,7 @@ const bubbles = JSON.stringify([
           let maxAlpha = 0;
           for (let i = 0; i < shown; i++) {
             const pt = wk.pts[i];
-            const z = field(pt.x, pt.y) + breathAmp * Math.sin(tsec * breathHz + pt.x * 0.7 + pt.y * 0.6);
+            const z = field(pt.x, pt.y) + breathAmp * Math.sin(tsec * BREATH_OMEGA + pt.x * 0.7 + pt.y * 0.6);
             const [sx, sy] = project(pt.x, pt.y, z + 0.06, W, Hh, ZOOM);
             const isLast = i === wk.pts.length - 1;
             const age = ts - (wk.born + i * STEP_MS);

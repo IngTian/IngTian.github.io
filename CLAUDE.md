@@ -136,11 +136,9 @@ src/
   lib/pageStops.ts                  # pure Stop trees: one tree per page drives BOTH its rail and its section ids — unit-tested
   lib/viewport.ts                   # PHONE_MAX_WIDTH = 640 + isPhone() — the one phone gate
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate
-  lib/gate.ts                       # the gate's POLICY (session flag, fresh-load test, dismissal timing, isCovered) AND every motion curve (drawnFrac/offsetFrac/opacityAt/widthAt/tintAt + the tuned numbers the inline script is handed) — unit-tested
-  lib/gateRefPaths.ts               # WHAT THE GATE DRAWS: the ported 21st.dev geometry, the Trail shape, each curve's arc length, the join smoothing, GATE_COUNT and the zoom — unit-tested
-  lib/gateComets.ts                 # d-string -> arc-length polyline + visibleWindow (which arc of a curve is ON SCREEN — the vanish fix). Two exports; it had six until the canvas gate was reverted — unit-tested
+  lib/gate.ts                       # the entrance's POLICY (session flag, fresh-load test, dismissal timing, isCovered, the two scripts' shared event names) AND its schedule (ENTRANCE_MS, entranceProgress, the per-axis open values, breathPhaseOffset) — unit-tested
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
-  lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter
+  lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter AND terrainConfig/terrainPalette/BREATH_* — the per-theme picture and the breath's tempo, shared by the hero and the entrance so they cannot disagree
   lib/descentPath.ts, trajectory.ts # the career descent graph's field and route
   lib/{bellman,factorModel,problemSize,complexity,policyPnl,scenario,split}.ts   # the explainer slides' real math
   lib/{justify,scrollspy,pixels,cowSpeech,knowledge,capability,paperMath,equations,signalRubric}.ts
@@ -148,7 +146,7 @@ src/
   sections/{Heights,Interlude,Choice,Rules,Solve,Story,Work}.astro   # the homepage, in scroll order — ALL of sections/, there is nothing else in it
   sections/Signature.astro          # links + seal — rendered INSIDE Work.astro, not as its own slide
   components/Deck.astro             # the deck's event plumbing (homepage only)
-  components/Gate.astro             # the first-visit gate (homepage only) — see "The first-visit gate" below
+  components/Gate.astro             # the first-visit ENTRANCE (homepage only) — two scripts, see "The first-visit entrance" below
   components/proto/FluidSky.astro   # the WebGL sky canvas — on all 8 content pages despite the proto/ path (only /proto-sketches omits it)
   components/SkyWash.astro          # woven warm/cold broken-color wash over the sky — pure CSS
   components/TerrainHero.astro      # the hero's terrain canvas (Heights only)
@@ -216,17 +214,20 @@ regenerates it.
 Every one of them is a plain Astro component or page with a bundled `<script>`,
 **not** an island (see *Stack*). The shared contract:
 
-**`Gate`'s script is `is:inline`, and that constraint shapes the component.** It has to run
-before first paint — it is what raises the gate — and an inline script cannot import. So
-everything it needs either gets *restated* in it (the session policy, which `lib/gate.ts`
-holds and unit-tests independently) or gets handed in through `define:vars` (the dash's
-tuned numbers: `GATE_DRAWN_MIN`, `GATE_OPACITY_PEAK`, `GATE_OPACITY_RAMP`,
-`GATE_OPEN_PHASE`). Prefer `define:vars` for anything numeric: a restated number drifts
-from its test silently, and these four decide whether strokes vanish.
-  Anything that can be computed at BUILD time should be, for the same reason — that is why
-each curve's on-screen arc window is a `data-` attribute rather than something the script
-works out (see the gate section). A bundled, importing second script was tried and is gone
-with the canvas field it painted.
+**`Gate` is TWO scripts, and the split is a constraint rather than a style.** The *policy* script is
+`is:inline` because it has to run before first paint — it is what raises the overlay, locks the scroll and
+inerts the siblings — and an inline script cannot import. The *painter* is an ordinary bundled module, because
+it needs `buildGrid`/`paintTerrain` and the entrance's schedule, and restating a renderer is not an option.
+So:
+- whatever the inline script needs is either *restated* in it (the session policy, which `lib/gate.ts` holds
+  and unit-tests independently) or handed in through `define:vars` (`GATE_SEEN_KEY`, `GATE_UP_ATTR`,
+  `GATE_DISMISS_MS`, `GATE_REVEAL_EVENT`, `GATE_LAND_EVENT`). **Prefer `define:vars` for anything numeric or
+  any string two files must agree on** — a restated constant drifts from its test silently.
+- the two talk through **one event name and nothing else**, because they cannot share a module. The painter
+  fires `GATE_LAND_EVENT` when its clock runs out; the policy script fires the same event when a gesture or
+  the backstop lands early, so the painter stops tweening. **Both halves must be wired** — the listener was
+  missing for one build and the entrance silently ran on the backstop instead of its own clock.
+- anything computable at BUILD time should be, for the same reason.
 
 - **Re-init on `astro:page-load`, with a teardown**, because `ClientRouter` is on
   and a View Transition replaces the DOM without a fresh page load. A script that
@@ -332,250 +333,153 @@ scroll."*
 - **It does not engage under reduced motion, and it does not engage on a phone.**
   Both fall back to an ordinary free scroll, which is a *finished* state.
 
-## The first-visit gate
+## The first-visit entrance
 
-`components/Gate.astro` + `lib/gate.ts` (policy, tested) + `lib/gateRefPaths.ts` (geometry,
-tested). On a **first visit in a session**, the homepage opens behind a dismissible
-full-screen gate: flowing curves, the name springing in letter by letter, and one button
-reading `enter the descent`. Homepage only — rendered from `index.astro`, **never
-`BaseLayout`**, because moving it up one file is the single edit that would hand a
-full-screen interstitial to all nine routes.
+On a **first visit in a session**, the homepage plays itself in: the hero's own terrain arrives pulled back
+and churning, settles into exactly the hero's framing, and the name, roles and bio fade up. Nothing is
+clicked. Homepage only — rendered from `index.astro`, **never `BaseLayout`**, because moving it up one file is
+the single edit that would hand a full-screen interstitial to all nine routes.
 
-**The lines are a PORT of the 21st.dev "BackgroundPaths" component, not this site's own
-mathematics, and that is a deliberate trade.** Five original treatments were built and looked
-at in `/proto-gate`; the owner's verdict was *"the original is the best... i mean itself is
-already good enough."* `lib/gateRefPaths.ts` transcribes its geometry exactly — 36 curves per
-family, two mirrored families, 72 paths — with tests asserting the `d`-strings byte-for-byte,
-because two of its properties are easy to misread and were misread twice here:
+The component is still called `Gate` and the session key is still `descent.gate.seen.v<n>`, because the
+*policy* (once per session, fresh load only, fail closed) did not change when the drawing did. What a visitor
+meets is an entrance, and that distinction is the whole point of this section.
 
-1. **The family CONVERGES.** The `5i` offset enters the two halves of each curve with OPPOSITE
-   sign, so the left end moves right while the right end moves left and each successive curve is
-   squeezed inward. It is not a translation. That nesting is where its interest comes from, and
-   it is the thing no field-based version could reproduce.
-2. **Its opacity ramps 0.1 → 1.0**, so most strokes recede and a reader picks out about eight
-   over a haze. That is why 72 of its lines read sparser than 30 of ours did at 0.10 → 0.55,
-   where nothing receded.
+`components/Gate.astro` (markup + both scripts) + `lib/gate.ts` (policy AND the entrance's schedule,
+unit-tested) + `lib/terrainRender.ts` (`terrainConfig` / `terrainPalette` / `BREATH_*`, shared with the hero).
 
-It is a borrowed drawing. **If it stays, it should carry a credit** — the provenance is written
-at the top of `gateRefPaths.ts` rather than left implicit, and the site's "real math, computed"
-rule exists partly to avoid exactly this.
+**THE FIELD IS THE HERO'S OWN TERRAIN, AND THERE IS NO TEXT ON THIS SCREEN.** The overlay paints the same
+Gaussian-mixture loss field the hero paints, through the same renderer, with a camera and a tempo that tween
+onto exactly the hero's. At the landing frame the two are the same picture, so the handover cannot be seen.
 
-**TWO deviations from the source, and only two. There were five, and the other three were each a
-defect** — together they produced *"your lines seem lifeless and some kids drew them in
-kindergarten"*. Both survivors are derived numbers, not preferences:
+**WHY, because two designs lost here first and the second one lost badly.** The field was a port of the
+21st.dev "BackgroundPaths" component — asked for by name, approved on sight (*"oh yeah perfect"*), tuned across
+about ten rounds, and then rejected for *"still seems a little bit dull"*. The fault was never in the drawing:
+it was a borrowed picture cross-faded into an unrelated hero, and no dial inside it could fix that. The
+replacement kept the cross-fade but staged a stand-in name flying across the screen to its hero position, and
+the verdict was *"that's horrible"* — it was reverted whole. The brief that replaced both is the owner's own:
+*"a fluid field moving using the terrain we have. and then this terrain transforms into the terrain location we
+have then seamlessly into the hero. the name and other stuff just fades in."*
 
-1. **`REF_ZOOM = 1.357`, and it is the correction that made two others unnecessary.** The source
-   hands its SVG `viewBox="0 0 696 316"` and lets `meet` fit it, so apparent zoom is purely a
-   function of container width: the owner's reference screenshot (1467×958) sits at **2.108×**, this
-   site was at **2.859×** on a 1990px window. Same geometry, 1.357× bigger on screen — "seems like
-   the example i gave you zoomed out a bit compared to yours". Widening the viewBox about its own
-   centre by that ratio puts the site at 2.107×; the build ships
-   `viewBox="-124.2 -56.4 944.5 428.8"`.
-   - **This is why `REF_STROKE_SCALE` went back to 1 — and why it is 0.7 today.** At 2.859× the
-     source's authored 0.5–1.55 renders 1.4–4.4 CSS px, genuinely heavier than the reference, and it
-     was reported as such twice; I scaled the widths to 0.4, then 0.6, when the drawing was simply
-     too big. Fixing the zoom put the authored widths at **1.05–3.27 px, the reference's own figure
-     to two decimals** — two dials had been compensating for a third. **When a drawing looks wrong
-     at one size, check the size before retuning what is in it.**
-     The scale then came *down* to **0.7**, which is a different kind of change: a deliberate
-     departure on the owner's request — *"let the line be a little bit thinner"* — rather than a
-     correction. Measured, the strokes now render **0.58–2.91 CSS px** against the reference's
-     1.05–3.27. The coupling test still compares the two, asserting the site renders at
-     `REF_STROKE_SCALE` of the reference's weight, so the zoom and the scale cannot drift apart
-     unnoticed; only the expected ratio moved.
-2. **The animation IS the source's travelling dash, with two corrections.** The dash's arithmetic is
-   faithful (verified against framer-motion's `buildSVGPath`, not inferred); what changed is that the
-   opacity envelope reaches zero where the drawn length resets, and the dash's travel is clipped to
-   the arc that is actually on screen. Both exist to fix *"entire lines go dark immediately"*, which
-   is a defect the reference has too. The section below is the whole argument — read it before
-   touching the motion, because four earlier attempts replaced the motion instead of fixing it.
+**"The name just fades in" is why this component has no name in it.** The HERO's name fades in, underneath. That
+one decision deletes the entire class of defects the previous attempt generated — no stand-in copy, no FLIP
+between two measured boxes, no ivory-to-ink colour crossover, no two-names-on-screen, no descender collision
+with the roles line. All of those were real, all were found by screenshot, and none of them can come back while
+the overlay carries no text. `tests/distSmoke.test.ts` asserts it carries none.
 
-Two further departures that are the owner's dials rather than fidelity decisions:
+### What moves, and why each axis lands exactly
 
-- **`GATE_COUNT = 24` per family**, not the source's 36 ("less lines"). It **subsamples**: every
-  per-curve number is indexed off `i` — the 5i/6i offsets, the `0.1 + 0.03i` opacity ramp, the
-  `0.5 + 0.03i` width ramp — so drawing the *first* 24 would also shrink the footprint to two
-  thirds and cap opacity at 0.79, which is three changes when one was asked for. Spreading the
-  indices over the original range keeps both ramps and the full spread: the same picture, fewer
-  strokes. `tests/gateRefPaths.test.ts` asserts that.
-- **The joins are smoothed** (`refFamily(..., smooth)`), because the source has a corner in every
-  curve but the first — see below.
-- **`REF_WIDTH_SPREAD = 0.22` wobbles each curve's weight off the ramp**, on the owner's ask that
-  *"different lines may have different thicknesses among them"*. The widths already varied — the
-  source ramps 0.5 → 1.55 with the index — but monotonically, so neighbours differ by 0.03 and the
-  family reads as one smooth gradient rather than as strokes of different weights. Breaking the
-  ordering locally is what makes the variation visible; the ramp's *trend* is left intact because
-  that is what carries depth. A test asserts both halves: the ordering must be broken somewhere,
-  and the top third must still outweigh the bottom third.
-  - **It is sized against the scale, not chosen alone.** At 0.3 against a 0.8 scale the heaviest
-    curve measured **3.45 px against the 3.27 it was supposed to come down from** — the wobble had
-    pushed the maximum *up*, so "a little bit thinner" was not delivered at the one place it shows
-    most. A test now bounds the widest stroke actually emitted, not just the ramp.
+Every axis is `open + (hero - open) * entranceProgress(ms)`, and `entranceProgress` reaches **1** with a zero
+derivative — it has to *arrive*, not still be moving when the overlay goes.
 
-**THE SOURCE HAS A MEASURABLE CORNER IN EVERY CURVE BUT THE FIRST.** Each curve is two cubics
-meeting at `(152 - dx, 343 - dy)`; the tangent arriving is `(464 - 2dx, 127)` and the tangent
-leaving is `(464, 127)`, equal only when `dx = 0`. So the join kinks progressively: **up to 32.8° at
-i = 35 on the `position = +1` side, and 6.4° on the mirror**, which is exactly why the owner's red
-box landed in the left half of the frame. He also worked out himself that it is in the reference
-("in the example i show you it's already like this but bc it's black and white it's less
-noticeable"). Smoothing points both control arms along their *average* direction and keeps their
-lengths, so the endpoints and the long sweep are untouched while the tangent becomes continuous.
-Reflecting one arm onto the other would also remove the kink but swings the second cubic — the big
-visible sweep — across the frame, which changes the drawing instead of repairing it. It is an opt-in
-argument so the byte-for-byte assertions still test the real port, and a test reads the kink back
-out of the emitted `d`-string: **>30° raw, <0.5° smoothed, with endpoints unmoved.**
+| axis | opens at | lands on | what it does |
+| --- | --- | --- | --- |
+| `cfg.zoom` | `0.70 x` hero | **hero's 0.85** | the camera descends into the hero's framing |
+| `breathAmp` | `0.16` | **`BREATH_AMP_LIVE` 0.04** | a swell calms to the hero's breath |
+| `cfg.light.az` | hero − 1.15 rad | **hero's −0.565** | the warm/cool terminator slides across the relief |
+| `cfg.edlSizeRange` | `0.34` | **hero's 0.75** | the silhouette resolves in dot *weight* |
+| `cfg.elevEmphasis` | `0.07` | **hero's 0.20** | the ridge takes the form off the valley |
+| `tsec` | hero's clock − 1 breath period | **hero's clock exactly** | the field flows, then settles |
 
-The three that were removed, because each is a way to get this wrong again:
+**`zoom` is the one that cannot be approximate**: it is simultaneously position *and* dot radius, so a near
+miss shifts every dot and resizes it. The painter does not trust the lerp at the landing frame — `heroFrame()`
+assigns the hero's values by identity. (A lerp through `p = 1` does not return its endpoint in IEEE-754:
+`0.30 + (0.04 - 0.30) * 1` is `0.03999999999999998`. Harmless at 1e-17, but the snap is why it is harmless.)
 
-- **Strokes were `--ochre`; the source draws `currentColor` under `dark:text-white`.** The opacity
-  ramp starts at 0.1, and a gold line at a tenth opacity over near-black has no luminance left to
-  carry where a near-white one still reads as light. They are `--paper` now — the site's ivory, not
-  pure `#fff`, so palette discipline holds.
-- **Only the strongest twelve per family animated**, leaving the rest frozen at full length. A frozen
-  stroke beside a travelling one does not read as depth, it reads as a stroke that failed, and the static
-  ones dominate because they are drawn end to end. **Every stroke animates**, and a trace measured
-  **60.0 fps** doing so back when 72 of them shipped, so the count was never the cost it was assumed to
-  be — 48 ship today (`GATE_COUNT` 24, two families).
-  (Twelve was a guess at the flashing — see trap 5 — so it fixed nothing and cost the motion. That line
-  used to read "after the full 72 flashed in practice", which is how a wrong lead survives: a number
-  changed next to a symptom that then persisted, written up as if it had worked. Note the second-order
-  version of the same failure, which this bullet itself committed: it went on quoting "48 of 72" after
-  the count dropped to 48 total. **Prefer naming the rule over the arithmetic** — "every stroke", not a
-  number that is downstream of a dial.)
-- **Dash PHASE was a live argument through three commits, and it is moot — not because the dash went (it is
-  back and shipping), but because the layer that made phase matter did not.**
-  Kept because the episode is the clearest example in this file of a correct decision becoming wrong
-  when something else changes underneath it. The source passes no delay, so all its paths move
-  together. Copying that was right while the dashed layer was the only layer. It became wrong the
-  moment a permanent layer went underneath, for a purely geometric reason: with every stroke at the
-  same phase, all 48 dashes *end* at the same point along their curves, and since the curves are a
-  nested family those ends line up into **one hard brightness front** sweeping the frame with only
-  haze behind it — *"why do we have these darker trails?"*. Measured, the spread was **4.1% of a
-  cycle**; scattering took it to **97.5%** and dissolved the front into unrelated ends. Then the
-  trail itself was rejected, the dash went, and the whole question evaporated. The lesson that
-  survives: **when a decision is copied from a reference, write down what it depends on**, because
-  the thing that invalidates it is usually a change somewhere else.
+**THE CLOCK IS THE SUBTLE ONE, AND THE BREATH IS SLOWER THAN ITS NAME SUGGESTED.** `paintTerrain` displaces
+each dot by `sin(tsec * BREATH_OMEGA + x*0.7 + y*0.6)` — there is no 2π in that expression, so with omega 0.4
+the period is **15.71 seconds**, not the 2.5 the old local `breathHz` read as. Over a 2.6s entrance an
+unwarped field advances through 17% of a cycle: it drifts, it does not flow. So the entrance runs the clock
+fast and lets it decelerate — but `tsec` must *also* equal the hero's `rAF timestamp / 1000` at the landing
+frame, or every dot sits up to ±8.8 CSS px away from where the hero's next frame will put it. Those two
+requirements are only compatible because `sin` is periodic: **burn a WHOLE number of breath periods and the
+phase you land on is the phase you would have had without the detour.** `breathPhaseOffset` is that, decaying
+as `(1-p)²` so the tempo returns to 1× smoothly rather than stepping down from ~7× at the final frame.
+`BREATH_OMEGA` is exported for this reason — it was restated in two places, here and in TerrainHero's walker
+pass.
 
-**THE FIELD IS AN SVG OF TRAVELLING DASHES — the approved treatment — AND THE TWO THINGS THAT WERE
-WRONG WITH IT ARE FIXED AT THEIR CAUSES.** The owner reviewed this exact motion and said *"oh yeah
-perfect. now that's what im talking about"*, then reported four follow-ups. Three of them (zoom,
-smoothing, count) are above. The fourth — *"there are lines that vanish suddenly which is not good.
-entire lines go dark immediately"* — took four wrong attempts, each of which replaced the motion
-instead of fixing it, so **read this before changing the animation**.
+### The handover, in order, because the order is counter-intuitive
 
-`components/Gate.astro` (markup + the inline driver) + `lib/gate.ts` (`drawnFrac` / `offsetFrac` /
-`opacityAt` / `GATE_OPEN_PHASE`, unit-tested) + `lib/gateComets.ts` (`parseTrack` / `visibleWindow`,
-unit-tested).
+1. The painter reaches `ENTRANCE_MS`, paints the hero-exact frame, and fires `GATE_LAND_EVENT`.
+2. **The policy script must be LISTENING for that, and the absence of that one line shipped.** Measured, the
+   entrance ran **4000ms instead of 2600** — it only ever ended via the backstop timer, with the terrain
+   sitting finished for a second and a half. Every other assertion passed through the bug (the backstop
+   existed, the order below was right, the markup was right) because none of them checked that the two halves
+   were *connected*. There is a test for it now.
+3. `data-gate-up` comes off **before** `GATE_REVEAL_EVENT` fires. The hero's `apply()` re-reads `isCovered()`,
+   which tests that attribute — fire first and it decides it is still covered and never resumes.
+4. `GATE_REVEAL_EVENT` is dispatched on **`document`**. That is the hero's channel; dispatching on `window` is
+   a separate one the hero never hears, and that is a bug this component shipped once.
+5. Only then the dismissal, a 600ms crossfade. Both canvases paint the same frame in the same box through that
+   window, so the only thing that visibly changes is the flat ground giving way to the warped sky, behind a
+   terrain that does not move — and the hero's text rises on the same clock.
 
-**First, the dash semantics, verified against framer-motion's source rather than inferred.**
-`buildSVGPath` sets `pathLength="1"` and writes `stroke-dasharray = "<L> <S>"` and
-`stroke-dashoffset = "<-O>"`, with `pathSpacing` defaulting to **1**. So the period is `L + 1`, which
-always exceeds the arc: **at most one dash is ever on the path, and it CLIPS at the end rather than
-wrapping.** The painted span is `[O, min(1, O + L))`, i.e. a dash whose leading edge sits at `O` and
-slides forward. Several earlier "fixes" here assumed it wrapped and reasoned in circles from that.
+### The pieces that are load-bearing
 
-**Second, the vanishing had TWO separate causes.** Fixing either alone leaves the complaint standing:
+- **GEOMETRY IS MEASURED, NEVER ASSUMED.** `project` scales by `min(W, Hh)` and centres at `0.46 * Hh`, and
+  `#heights` is **108vh**, so on most desktop windows the hero's basis is its *height* and a 100vh overlay at
+  the same `zoom` is a different picture in both scale and position. The overlay's canvas is positioned and
+  sized from the hero canvas's own `getBoundingClientRect()`, which also means a CSS change to `#heights`
+  cannot silently desynchronise them. Verified: both boxes measure identically.
+- **DPR must match in value AND treatment**: `min(2, devicePixelRatio)`, `round(rect.w * DPR)` into
+  `canvas.width`, CSS size in CSS px, and **no `ctx.scale`** — `paintTerrain` applies DPR to the dot radius
+  itself, so a painter that scaled the context would get half-size dots *and* a wrong scale basis.
+- **`buildGrid`, never a hand-rolled lattice.** Its loop accumulates floating point and stops at 2.52, giving
+  1089 points and an asymmetric footprint — and `computeEDL` normalises by the p80 of the response over the
+  *whole* set, so a "cleaner" lattice changes every dot's shade, not just the new ones.
+- **THE GROUND IS `--sky-top`, NOT `--bg`, and that is legibility rather than taste.** It was `--bg`
+  (near-black) for one build and the light theme's field nearly vanished: its terrain is dark ink whose
+  eye-dome shading spends itself on *value* rather than opacity, so it needs the luminous ground it has on the
+  hero. `--sky-top` is the descent gradient's own 0% stop, per theme, which also makes the dismissal crossfade
+  almost nothing. Keep the token equal to that stop.
+- **THE HERO'S TEXT IS PAUSED, NOT HIDDEN.** `.hero-rise` / `.hero-bio` / `.hero-doors-line` already rise in on
+  load — that IS the fade the brief asks for; the only problem was that it played while the overlay covered
+  it. `html[data-gate-up]` sets `animation-play-state: paused`, so they sit held at their `from` keyframe and
+  play through on their own stagger when the attribute comes off. **Not an `opacity: 0` override**: that would
+  make invisibility a property of the element, which is trap 6 — the defect that twice shipped an invisible
+  name on the first screen of this portfolio. Here the resting state in the stylesheet is the animation
+  running to opacity 1, so the entrance can only ever *delay* the text.
+- **ANY GESTURE SKIPS IT.** The listeners that swallow input for trap 3 are the same ones that land the
+  entrance, so nothing is swallowed without doing something. If you add a swallowing listener that does not
+  land, you have re-created the defect trap 3's sub-bullet describes.
+- **AND IT ENDS EVEN IF THE PAINTER NEVER RUNS.** The painter is a *bundled* module; if it fails to load,
+  throws, or cannot get a 2D context, nothing would reach the landing and an opaque full-screen layer would
+  sit over the site permanently — strictly worse than any defect this component has actually shipped. The
+  **inline** script cannot fail to run, so it carries a bounded `setTimeout` backstop.
+- **It does not raise under reduced motion at all.** An entrance made entirely of motion has nothing to show a
+  reader who asked for none, and a still frame of the hero's terrain held for two seconds is a delay with no
+  content. The finished state the motion rule asks for is the homepage itself.
+- **Not a dialog.** Nothing to focus, so `aria-hidden`, and the real `<h1>` is the hero's — which also retires
+  the two-`<h1>` defect this component shipped once.
 
-1. **A visible RESET.** `drawnFrac` is a sawtooth — it ends the cycle at the whole arc and begins the
-   next at 30% of it, parked at the curve's off-screen start — while the source's envelope is `0.3` at
-   that instant, not 0. So a line that spanned the frame was gone in the next frame. `opacityAt` now
-   takes the envelope to **zero exactly where the sawtooth breaks**, so the discontinuity has nothing
-   visible to disrupt. Measured: the collapse now happens at **alpha 0.0019**.
-   - It **plateaus** rather than peaking (`GATE_OPACITY_RAMP`), for two reasons. A bare `PEAK * tri`
-     is near zero for a long stretch either side of the boundary, which would dim most of the cycle;
-     and `tri` peaks at `t = 0.5`, which is the one moment **nothing is painted at all**.
-2. **A 42% BLANK.** Only part of each curve is ever in frame, so a dash sweeping the whole arc spends
-   most of its cycle outside the picture: measured, each stroke was **entirely absent for 25–59% of
-   its own cycle, mean 42%** — in the reference too. No opacity curve can reach this. `visibleWindow`
-   measures each curve's on-screen arc span at build time and ships it as `data-a`/`data-b`; the
-   driver sweeps the dash's leading edge over `[a + m - drawn, b - m]` instead of `0 → len`, so the
-   painted span always straddles the frame. Measured after: absence **0.5%** of the cycle (that
-   remainder is the deliberate zero above), minimum coverage never below **18%** of the window. A dash
-   END is on frame far more of the time, so it reads as *more* motion, not less.
-   - The window is computed against the **viewBox**, at build time, and both choices are deliberate.
-     Build time because the driver is inline and cannot import; the viewBox because `meet`
-     letterboxes and an SVG clips to its **element**, so the real visible region is a superset — the
-     shipped window is always *inside* what is on screen, which is the safe direction. A test pins
-     that monotonicity.
+**`terrainPalette` / `terrainConfig` are a two-places-must-agree seam.** The per-theme ramp, darkness, dot
+scale and walker trio were a private `themePalette()` inside `TerrainHero.astro`; the entrance paints the same
+field and must land on the hero's frame, so a second copy that drifted by one number would turn a continuation
+into a visible jump. The easiest one to get wrong is **`dotScale`: 1.08 light / 1.18 dark, while
+`TERRAIN_CONFIG_DEFAULTS.dotScale` is 1.** `terrainConfig()` returns a **fresh** object per call, deliberately
+— the entrance mutates `zoom`, `light`, `edlSizeRange` and `elevEmphasis` on its own copy every frame, and one
+shared object would make the hero's picture follow the overlay's camera.
 
-**WEIGHT AND COLOUR ALSO MOVE AS A STROKE TRAVELS** (`widthAt` / `tintAt` in `lib/gate.ts`), on the owner's
-ask for thickness variation *"when you move across the screen"* and *"a little bit color variation to the lines
-when it moves"*. Both are per-element, per-frame style writes alongside the dash, and both matter in a way worth
-stating:
+**Two things the parameter survey ruled out, so they are not options.** `BUMPS` (the field's Gaussian centres,
+weights and widths) is the most literally "fluid" axis — drifting the centres is a true moving field rather
+than a camera move — but it is a **shared mutable singleton**: `lib/knowledge.ts`, `lib/descentPath.ts`,
+`lib/trajectory.ts` and `lib/sketches/batch1.ts` all read `field`/`grad`, so the Rules slide, the Story descent
+graph and `/proto-sketches` would all change, and it invalidates every `GridPoint`'s precomputed normal and EDL
+shade. And **`cfg.darkness` is not a continuous cross-fade axis**: `litColor` and `edlSpend` blend smoothly but
+`paintTerrain`'s base alpha is a hard `> 0.5` branch, so tweening through 0.5 pops.
 
-- **SVG cannot vary either ALONG one stroke.** A path has a single width and a single colour at any instant, so
-  tapering head-to-tail would need per-pixel control — a canvas, which was built and rejected. The variation is
-  therefore in TIME: a stroke thickens and cools as it crosses. From the reader's side that is much the same
-  impression, because what they are watching is whichever part of the curve is inside the frame.
-- **Both curves are PERIODIC in `t`**, returning to their starting value at the cycle boundary. The envelope
-  goes to zero there to hide the drawn-length reset; a width or colour that jumped at the same instant would put
-  the discontinuity straight back on screen in another channel. A test pins that directly.
-- **Two cycles per traverse, not one**, and the TRAVERSE itself is **6–9s** rather than the source's 20–30s.
-  Weight and colour are offset by a quarter cycle so they do not peak together — coinciding, they read as one
-  crude pulse rather than two properties of the stroke.
-  - **THE RATE WAS THE ONE DIAL NEVER PULLED FAR ENOUGH TO MATTER, and it is the answer to "still seems a
-    little bit dull".** Measured: at 20–30s a stroke advances **8–12% of its traverse during a 2.5s dwell**, so
-    the thing the dash exists to do — lines travelling through the background — covered a tenth of its journey
-    while anyone was looking. At 6–9s a dwell covers **22–33%** and the sweep reads. The source can afford
-    20–30s because it is a landing page you sit on; a gate is dismissed in a gesture. That is the same
-    correction `GATE_OPEN_PHASE` makes for the opening frame, applied to the motion instead of the composition.
-  - Note the shape of the mistake, because it is a cheap one to repeat: `widthAt`'s own doc comment stated the
-    principle — "a single cycle over 20–30s is far too slow to read as variation in the few seconds a gate is on
-    screen" — and the traverse it rides on was left at exactly 20–30s. **A stated principle contradicted by the
-    constant next to it.**
+**THE PORTED GEOMETRY IS DELETED.** `lib/gateRefPaths.ts`, `lib/gateComets.ts`, their two specs and the dash
+half of `lib/gate.ts` (`drawnFrac`, `offsetFrac`, `opacityAt`, `widthAt`, `tintAt` and their constants) are
+gone — reachable only from their own specs once the entrance landed, which is exactly the coverage-theatre
+pattern the *Conventions* note on `noUnusedLocals` warns about. Deleted in the same commit as the entrance, so
+a single `git revert` restores the old gate whole; that is not theoretical, it is how the previous attempt was
+undone. The rejection list below carries what they taught.
 
-**CONTRAST IS NOT THE PROBLEM, and this is recorded so nobody "fixes" it.** The strokes' effective alpha runs
-**0.045–0.45** (per-path `stroke-opacity` 0.1→1.0 times the envelope's 0.45 plateau), which reads as alarming on
-paper and predicts that half the field is invisible. Measured against the real background — `--bg: #16140f`,
-L\* 6.37 — the 48 strokes land at **dL\* 4.2 to 42.5, with NONE below the just-noticeable difference and 46 of 48
-at dL\* ≥ 5.** L\* is steeply nonlinear near black, so a 4.5%-alpha ivory line over near-black still reads
-clearly. Raising the opacity or the widths would have been a fix for a defect that is not there — and would have
-undone the owner's own "let the line be a little bit thinner". **The arithmetic of an alpha says nothing about
-whether a stroke is visible; composite it over the actual background and take the L\* difference.**
-- **The colour leans WARM/COOL between palette tokens, and the script never names a colour.** `.gate-field`
-  declares `--trail-base`/`--trail-warm`/`--trail-cool` as `--paper`/`--ochre`/`--indigo`, and the driver reads
-  them once with `getComputedStyle`. That keeps palette discipline *and* re-themes for free: under dark,
-  `--ochre` is the phosphor emerald, which is exactly what a dark-theme stroke should warm toward. The lean is
-  small (0.22) because the strokes must stay near-ink — in the light theme the seal is the only saturated
-  colour — and because it is the same warm/cold broken colour `SkyWash` already weaves over the sky, so the gate
-  borrows the site's own idiom rather than inventing one.
-  - **The tokens are HEX, and that cost a silent no-op.** `getPropertyValue` on a custom property hands back the
-    authored string, so `--ochre` arrives as `#c8a36a`; an `rgb()`-only parser fell through to its default and
-    made warm and cool both equal the base. The animation ran every frame and changed nothing — 1 distinct
-    stroke colour across 48 strokes, found by measuring computed colours rather than by reading the code. It now
-    measures 27 distinct colours with all 48 changing over 2.6s.
+### Seven things were rejected here, each after looking at it
 
-Measured after all of it: **60.0 fps**, five style writes per stroke per frame instead of three.
-
-**`GATE_OPEN_PHASE = 0.16`** is where a stroke starts when the gate opens, and it is not arbitrary:
-integrating the painted fraction across the cycle gives 0.30 at `t=0`, a maximum near `t=0.25`, **zero
-at `t=0.5`**, and 1.00 as `t → 1`. Both obvious choices are wrong — phase 0 paints only the curve's
-first 30%, which is off the top-left corner (**the reference itself therefore opens on an empty
-frame**), and phase 0.5 paints nothing, which rendered as a blank screen when tried. 0.16 is where the
-approved build happened to sit, and it lands on the envelope's plateau so the gate does not open
-dimmer than it runs.
-
-**Four rejected attempts at this, so they are not options:**
-
-- a faint full-length stroke under the dash — stops the vanishing, but its uncovered stretch reads as
-  *"seems like the line leaves a trail behind. remove that trail."*;
-- no dash at all, with the groups drifting by transform — *"now it's just this"*, a static drawing;
-- a canvas of comet trails (`destination-out` tails over an empty field) — built from over-reading
-  *"like the trails of asteroids"* as literal comets; *"i think u misunderstood me."*;
-- scattering the dash phases — fine in itself, but it was a fix for the aligned-front artifact that
-  only existed because of the underlay.
-
-**There is also a v2 of the reference, and it is NOT what this ports.** The same author rewrote
-`background-paths` in June 2025: 37 generated sine waves in `viewBox="-2400 -800 4800 1600"` with
-`slice`, a purple→pink→blue gradient stroke, no dash, and the only motion a slow `y` bob. The owner's
-link is to **v1** — he described the reference as black and white, which v2 is not. If a future ask
-sounds like "gentle bobbing gradient waves", that is v2 and it is a different component.
-
-### Five things were rejected here, each after looking at it
-
-Do not rebuild them. All five were judged in `/proto-gate` — a route that has since been retired, so these
-notes are now the only record outside git. Note the shape of the list: every rejection was decided by LOOKING,
-and three of them were things that measured better than what won.
+Do not rebuild them. The first five were judged in `/proto-gate` — a route that has since been retired, so
+these notes are the only record outside git. The last two are the designs that shipped and lost: the ported
+line field, and the entrance that flew a name across the screen. Note the shape of the list: every rejection
+was decided by LOOKING, and three of them were things that measured better than what won.
 
 1. **Descent trails run to convergence** — the first version. Every stroke ends in one of the
    field's three basins, so 36 of them piled into 3 points: 71% of the set inside one cell of a
@@ -630,8 +534,59 @@ and three of them were things that measured better than what won.
      before being deleted: CLAUDE.md had never listed these four, so retiring `/proto-gate` would otherwise have
      erased the record of an entire rejected direction.
 
-The lesson across all five, worth more than any of them: **this gate was redesigned five times and
-every decision came from the owner looking at it in the real page at real size.** Not one came from a
+6. **The ported 21st.dev line field** (`lib/gateRefPaths.ts`, `lib/gateComets.ts`, both deleted) — asked
+   for by name (*"do u still have the background path ive given to u. it's already good enough"*), ported
+   byte-for-byte, approved on sight (*"oh yeah perfect. now that's what im talking about"*), tuned across
+   about ten rounds, then rejected whole for *"still seems a little bit dull"*. **The fault was never in the
+   drawing.** It was a borrowed picture cross-fading into an unrelated hero, and no dial inside it could fix
+   that. This entry is the record now that the modules are gone.
+   - **There is a v2 of the reference and it is NOT what was ported.** The same author rewrote
+     `background-paths` in June 2025: 37 generated sine waves in `viewBox="-2400 -800 4800 1600"` with
+     `slice`, a purple→pink→blue gradient, no dash, and a slow `y` bob. The owner's link was to **v1** — he
+     described it as black and white, which v2 is not. If a future ask sounds like "gentle bobbing gradient
+     waves", that is v2 and a different component.
+   - **Four dash treatments were each rejected after looking**, so they are not options either: a faint
+     full-length stroke under the dash (*"seems like the line leaves a trail behind. remove that trail."*);
+     no dash at all, groups drifting by transform (*"now it's just this"* — a static drawing); a canvas of
+     comet trails, built from over-reading *"like the trails of asteroids"* literally (*"i think u
+     misunderstood me."*); and scattering the dash phases, which was only ever a fix for an artifact the
+     underlay caused.
+   - **Four durable lessons, each of which cost a round:**
+     **(a)** When a drawing looks wrong at one size, **check the size before retuning what is in it** —
+     strokes were thinned twice for being "heavy" when the whole field was 1.357× oversized.
+     **(b)** The arithmetic of an alpha says nothing about visibility — **composite it over the real
+     background and take the L\* difference.** Effective alphas of 0.045–0.45 read as alarming and measured
+     dL\* 4.2–42.5 over `#16140f`, none below the just-noticeable difference, because L\* is steeply
+     nonlinear near black.
+     **(c)** `getPropertyValue` on a custom property returns the **authored** string, so `--ochre` arrives as
+     `#c8a36a`; an `rgb()`-only parser fell through to its default and made an animation that ran every frame
+     change nothing — 1 distinct colour across 48 strokes, found by measuring, not by reading the code.
+     **(d)** **A stated principle contradicted by the constant next to it**: a doc comment said a 20–30s
+     cycle is far too slow to read in the few seconds a gate is on screen, and the traverse it rode on was
+     left at exactly 20–30s.
+
+7. **An entrance that flew the NAME across the screen** — the first attempt at this brief, and it shipped to
+   the owner before losing: *"that's horrible. let's revert back."* It had the right idea (paint the hero's
+   own terrain, land on the hero's camera) and the wrong staging: a stand-in copy of the name FLIP-animated
+   from screen centre to the hero's name position while its ink crossed ivory→dark and the ground cleared
+   underneath it. Reverted whole in one commit.
+   - **Everything that went wrong with it came from the stand-in**, which is why the replacement has no text
+     at all. In order of discovery, every one found by looking at a frame rather than by reasoning: the
+     stand-in was `var(--ink-1)` on a dark ground, i.e. **invisible**; its colour then had to cross over, and
+     the crossover ran parallel to the ground's so the two **hugged** — composited, the moving name measured
+     **dL\* 6** mid-travel, the just-noticeable difference; its surname was roman where the hero's is italic,
+     so it **snapped** at the swap; the hero's own name showed through the clearing ground, putting **two
+     names on screen**; and the letters sprang up from below *through* the roles line for the whole 120–836ms
+     stagger.
+   - **The durable lesson is about where the complexity came from.** Each fix was correct and each one added a
+     mechanism — a halo curve, a two-ink tween, a theme-scaled glow, a `data-gate-up` visibility rule, a
+     reversed spring. Five mechanisms to make one borrowed element look like another element it was going to
+     be replaced by anyway. **When a feature keeps generating defects of the same shape, the feature is the
+     defect.** Deleting the stand-in removed all five at once, and the brief had said so all along: "the name
+     and other stuff just fades in."
+
+The lesson across all seven, worth more than any of them: **this screen was redesigned seven times and every
+decision came from the owner looking at it in the real page at real size.** Not one came from a
 metric, an argument, or a screenshot in a card. A `/proto-*` route exists for that, and a candidate that
 cannot be put in one at full size is not ready to be proposed — but build it, use it, and retire it when the
 question is answered, because an un-maintained prototype drifts into misinformation (see *Routes*).
@@ -654,12 +609,15 @@ the owner and cost five rounds between them. Do not reintroduce any of them.**
    mechanism — `window.scrollTo()` still works — so one flick scrolled the page behind the
    gate and dismissal revealed a later slide instead of the hero. Use
    `stopImmediatePropagation()`, and swallow the deck's keys too.
-   - **Swallowing `touchmove` left a phone with no way out but the button**, which is the defect that fix
-     created and nobody noticed for several releases: `onKey` exits only on Escape, a key a phone does not
-     have, so a visitor arriving from a link on a handset had one 44px target and no gesture. That is the
-     modal arrival path for anyone following a LinkedIn link. `touchend` now dismisses from anywhere on the
-     gate — `touchend` rather than `touchstart`, so a swallowed scroll attempt still counts as "let me in"
-     rather than firing before the finger has decided.
+   - **Swallowing `touchmove` once left a phone with no way out but the button**, and nobody noticed for
+     several releases: `onKey` exited only on Escape, a key a phone does not have, so a visitor arriving from
+     a link on a handset had one 44px target and no gesture — the arrival path for anyone following a
+     LinkedIn link. **The entrance closes that structurally, which is why the fix is worth more than the
+     bug:** the listeners that swallow input are the *same* listeners that land it, so nothing can be
+     swallowed without also doing something. `touchend` rather than `touchstart`, so a swallowed scroll
+     attempt still counts as "let me in" rather than firing before the finger has decided. **If you ever make
+     a swallowing listener here that does not land, re-read this bullet** — that is the exact shape of the
+     defect.
 4. **Window/document listeners outlive the gate's DOM.** `ClientRouter` replaces
    `document.body`, so without a teardown `swallow`/`onKey` keep calling `preventDefault`
    forever: wheel scrolling and Tab dead site-wide, with no gate on screen to explain it.
@@ -683,13 +641,21 @@ the owner and cost five rounds between them. Do not reintroduce any of them.**
      dash values loses precision on a ~1580-unit curve and stipples it, and **Chrome will not
      interpolate a `calc()` containing an unregistered custom property** — it snaps to the end
      value, so the keyframes silently did nothing.
-6. **NOTHING on this screen may rest at `opacity: 0`.** Three elements animated in from `opacity:
-   0` behind a `forwards` fade, and any element whose animation does not run or is interrupted is
-   then permanently invisible. What vanished was **the owner's name** on the first screen of his
-   portfolio, and on a later report the roles line together with the modal's **only button** — a
-   gate with no way through it. Everything now animates `transform` from a state that is already
-   legible. `tests/distSmoke.test.ts` asserts no `.gate-*` rule declares `opacity: 0`; the `.gate`
-   container is exempt, because that is trap 1's not-covering resting state.
+6. **NOTHING on this screen may rest INVISIBLE, and there are THREE routes to it — the guard catches
+   one.** Three elements once animated in from `opacity: 0` behind a `forwards` fade, and any element whose
+   animation does not run or is interrupted is then permanently invisible. What vanished was **the owner's
+   name** on the first screen of his portfolio, and on a later report the roles line together with the
+   then-modal's only button. `tests/distSmoke.test.ts` asserts no `.gate-*` rule declares `opacity: 0`; the
+   `.gate` container is exempt, because that is trap 1's not-covering resting state.
+   - **The second route is COLOUR, and the entrance shipped it to a frame:** a stand-in name set to
+     `var(--ink-1)` — the dark ink — on a dark ground. The guard greps for `opacity: 0` and **cannot see a
+     colour**. There is no cheap static check for "dark on dark"; the check is to look at the first frame.
+   - **The third route is holding another element's animation**, which is what the entrance does to the
+     hero's text today. It is safe *only* because it is written as `animation-play-state: paused` behind an
+     attribute: the resting state in the stylesheet is the animation running to opacity 1, so the entrance
+     can delay the text but never lose it, and the inline script's backstop guarantees the attribute comes
+     off. Written as an `opacity: 0` override under the same attribute it would be this trap again, one
+     failed script away from a blank hero. A test pins the `paused` spelling and forbids the `opacity` one.
 
 **The process lesson, which cost more than any single bug above:** every one of those five wrong
 diagnoses came from reading the markup and reasoning about what it should do. The two real causes
@@ -702,11 +668,14 @@ check that finally settled it samples total drawn ink four times 1.5s apart, bec
 (Toc links, CornerNav's page and mark links, the menu button, the theme toggle) render after
 `</main>`, so inerting the landmark alone leaves a "modal" you can tab behind.
 
-**Worth knowing before redesigning it:** the native `<dialog>.showModal()` gives real top-layer
-inertness, a cycling focus trap, Escape via `cancel`, a `::backdrop`, and closed-means-hidden
-for free — and this codebase already uses it for the `/art` lightbox
-(`art.astro` + `scripts/artGallery.ts`). Hand-rolling those was reviewed as the weakest part of
-this component. It would not have fixed traps 3 or 4.
+**`<dialog>` was the standing recommendation here, and the entrance made it the wrong one.** The note used
+to read: `showModal()` gives real top-layer inertness, a cycling focus trap, Escape via `cancel`, a
+`::backdrop` and closed-means-hidden for free; this codebase already uses it for the `/art` lightbox
+(`art.astro` + `scripts/artGallery.ts`); and hand-rolling those was the weakest part of the component. All of
+that was true **of a modal with a button in it.** The entrance has nothing to focus, nothing to trap and
+nothing to act on, so a focus trap is a cost rather than a feature and `aria-hidden` plus `inert` on the
+siblings is the whole requirement. If a future redesign puts an interactive control back on this screen, the
+`<dialog>` recommendation comes back with it — and it still would not have fixed traps 3 or 4.
 
 ## Phones
 
@@ -718,17 +687,22 @@ enough to engage the deck on a viewport whose styles think it's a phone).
 **The number lives in two places and they are synced BY HAND.** `@media
 (max-width: var(--x))` is not valid CSS, so there is no way to feed one value to
 both. **If you change `PHONE_MAX_WIDTH`, change every `@media (max-width: 640px)`
-block with it.** `grep -rn 'max-width: 640px' src` returns 16 hits in 13 files, and
-two of the 16 are the prose in `viewport.ts` itself, so there are **14 real CSS
-blocks**: `global.css` ×2, `experience` ×2, and one each in `CornerNav`, `Toc`,
-`DescentPath`, `ProjectCard`, `FluidSky`, `Heights`, `404`, `research`,
-`writing/[...slug]` and `Gate` (which halves its stroke count rather than changing
-layout). **Re-run the grep rather than trusting this sentence — it has now been wrong
-three times, in both directions.** "15 … 13" was right until `Gate.astro` added a
-fourteenth block; then "16 … 14" was right until the gate's field briefly became a
-canvas and dropped out; now the SVG field is back and so is its block. The sentence
-has never been wrong because someone miscounted — only because someone copied the
-number instead of re-measuring it. (This list used to include "the two proto sections". There are
+block with it.** `grep -rn 'max-width: 640px' src` returns 17 hits in 13 files, but
+**four of the 17 are prose ABOUT the breakpoint, not the breakpoint** — two in
+`viewport.ts`, one in a `global.css` comment, and one in `Gate.astro`, which explains
+that its own block exists to match the hero's phone opacity. So there are **13 real CSS
+blocks in 12 files**: `global.css` ×1, `experience` ×2, and one each in `CornerNav`,
+`Toc`, `DescentPath`, `ProjectCard`, `FluidSky`, `Heights` and `Gate` (both compound,
+`(max-width: 640px), (max-height: 520px)`), `404`, `research` and `writing/[...slug]`.
+**Read the hits, do not just count them** — and re-run the grep rather than trusting this
+sentence, which has now been wrong four times in both directions. "15 … 13" was right
+until `Gate.astro` added a block; "16 … 14" was right until the gate's field briefly
+became a canvas and dropped out; then the SVG field came back; now the entrance is a
+canvas again and `Gate.astro` carries a block for the *opposite* reason — it has to
+reproduce `#heights .terrain-canvas { opacity: 0.4 }`, because a second canvas does not
+inherit it and a phone would otherwise land a field 2.5× stronger than the hero. The
+sentence has never been wrong because someone miscounted — only because someone copied
+the number instead of re-measuring it. (This list used to include "the two proto sections". There are
 no proto *sections* — `src/sections/` holds only the seven homepage slides plus
 Signature — and the one surviving proto route, `/proto-sketches`, breaks at 820px,
 not 640: it is an internal gallery, so it is not part of the phone treatment.)
@@ -1124,15 +1098,15 @@ titles came to rest hard against the browser chrome — the lead is a number in
   themes (brightened to `#e0574a` for the dark ground).
 - **Motion:** animate only `transform` / `opacity`; NEVER animate `filter: blur`
   (bake it).
-  - **One exception, and it is the gate's strokes.** They animate `stroke-dasharray`,
-    `stroke-dashoffset`, `stroke-width` and `stroke` — all **paint** properties on DOM nodes,
-    exactly what this rule forbids — because a line that draws itself along its own length, and
-    varies its weight and hue as it travels, cannot be expressed as a transform or a fade. It is affordable because ONE rAF writes all 48 dashes, so a frame
-    costs one style/paint pass rather than 48 competing animations, and because the gate is
-    gone after a gesture. A canvas version that would have satisfied the rule was built and
-    rejected on looks, so the exception is the shipped design, not a shortcut. **Do not
-    generalise it to anything that persists while a page is being read**, and do not "fix"
-    the gate to comply. ALL motion is gated behind `@media (prefers-reduced-motion:
+  - **The one standing exception is GONE, and that is worth knowing because it was load-bearing
+    for several commits.** The gate's SVG strokes animated `stroke-dasharray`, `stroke-dashoffset`,
+    `stroke-width` and `stroke` — all **paint** properties on DOM nodes, exactly what this rule
+    forbids — and the exception was argued at length: one rAF wrote all 48, so a frame cost one
+    style/paint pass, and the gate was gone after a gesture. The entrance paints a canvas instead,
+    which this rule has never needed an exception for, so **there is no DOM paint animation left on
+    this site.** Keep it that way: the exception existed because a borrowed drawing could not be
+    expressed any other way, and that drawing is deleted.
+    ALL motion is gated behind `@media (prefers-reduced-motion:
   no-preference)` via `lib/motion.ts`. The no-motion state must look *finished* —
   it's also the Firefox fallback (`animation-timeline` isn't in Firefox yet), and
   it's what a reduced-motion reader gets instead of the deck.

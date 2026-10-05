@@ -260,6 +260,25 @@ for (const phrase of bio.strong) {
        It animates its OWN opacity, so it must not fight the parent's: .hero-rise finishes at opacity 1, and
        this starts after it. */
     .hero-doors-line { animation: hero-rise 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.62s both; }
+
+    /* THE OTHER HALF OF THE ENTRANCE: "the name and other stuff just fades in."
+       These three already rise in on page load — that IS the fade the owner asked for. The problem was only
+       that it played while the entrance's overlay covered the screen, so by the time the terrain landed the
+       text was simply already there. PAUSING is the whole fix: while `data-gate-up` is set the animations sit
+       held at their `from` keyframe, and the moment the entrance lands and the attribute comes off they play
+       through on their own designed stagger — name and bio, then the tagline.
+         `animation-play-state`, not an `opacity: 0` override, and that is deliberate. An override would make
+       the invisible state a property of the ELEMENT, which is trap 6 — the defect that twice shipped an
+       invisible name on the first screen of this portfolio. Here the resting state in the stylesheet is the
+       animation running normally to opacity 1, so a visitor whose JS never runs sees the text rise in as it
+       always did, and the entrance can only ever DELAY it. The attribute is removed by the inline policy
+       script, which also carries the backstop timer, so it cannot outlive the entrance even if the painter
+       dies.
+         Reduced motion needs no counterpart: these animations only exist inside this query, and the entrance
+       does not raise under reduced motion either. */
+    :global(html[data-gate-up]) .hero-rise,
+    :global(html[data-gate-up]) .hero-bio,
+    :global(html[data-gate-up]) .hero-doors-line { animation-play-state: paused; }
     .scroll-cue { animation: cue-bob 2.6s ease-in-out 1.4s infinite; }
     @keyframes cue-bob {
       0%, 100% { opacity: 0.5; transform: translate(-50%, 0); }

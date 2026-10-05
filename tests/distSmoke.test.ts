@@ -366,19 +366,39 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
    (storage that throws, reduced-motion dismissal, idempotency) — this file is the only place that can
    answer "and what actually went into the page".
    ================================================================================================ */
+/** The gate's CSS, from the emitted stylesheets AND the page — Astro's inlineStylesheets: 'auto' may put a
+ *  small scoped sheet in the <head> instead of emitting a file, and which one it picks is not this test's
+ *  subject. */
+const gateCss = (): string => {
+  const home = byRoute().get('/');
+  const files = existsSync(join(DIST, '_astro'))
+    ? readdirSync(join(DIST, '_astro')).filter((f) => f.endsWith('.css'))
+      .map((f) => readFileSync(join(DIST, '_astro', f), 'utf8'))
+    : [];
+  return [...files, home!.html].join('\n');
+};
+
+/**
+ * THE GATE'S OWN INLINE SCRIPT BLOCK, not "every script on the page".
+ *
+ * This used to be a lazy `/<script>[\s\S]*?data-gate[\s\S]*?<\/script>/`, which starts at the document's
+ * FIRST <script> — BaseLayout's theme resolver — and ends at the first </script> after the `data-gate` div:
+ * one match, 236KB, 14 blocks. Every assertion using it then meant "appears somewhere in the page's script",
+ * which is not what any of their comments claimed. Splitting on the tag and keeping the one block that
+ * mentions `[data-gate]` gives just the policy script.
+ *
+ * Hoisted here because BOTH gate describes need it now — the entrance's handshake and its backstop are
+ * properties of this script, while its markup and CSS are asserted in the other one.
+ */
+const gateScript = (): string => byRoute().get('/')!.html
+  .split(/<script\b[^>]*>/)
+  .map((b) => b.split('</script>')[0])
+  .filter((b) => b.includes('[data-gate]'))
+  .join('\n');
+
 describe('the first-visit gate, as shipped', () => {
   const home = byRoute().get('/');
-
-  /** The gate's CSS, from the emitted stylesheets AND the page — Astro's inlineStylesheets: 'auto' may put a
-   *  small scoped sheet in the <head> instead of emitting a file, and which one it picks is not this test's
-   *  subject. */
-  const gateCss = (): string => {
-    const files = existsSync(join(DIST, '_astro'))
-      ? readdirSync(join(DIST, '_astro')).filter((f) => f.endsWith('.css'))
-        .map((f) => readFileSync(join(DIST, '_astro', f), 'utf8'))
-      : [];
-    return [...files, home!.html].join('\n');
-  };
+  const script = gateScript();
 
   it('is on the homepage', () => {
     expect(home, 'no / in dist').toBeDefined();
@@ -404,19 +424,39 @@ describe('the first-visit gate, as shipped', () => {
     expect(home!.markup).not.toMatch(/class="[^"]*\bis-up\b/);
   });
 
-  it('gives the button a real element and an accessible name', () => {
-    const btn = home!.markup.match(/<button[^>]*data-gate-enter[^>]*>([\s\S]*?)<\/button>/);
-    expect(btn, 'the gate needs a real <button>').not.toBeNull();
-    expect(btn![1].replace(/<[^>]*>/g, '').trim().length).toBeGreaterThan(3);
+  it('IS AUTOMATIC: no control, nothing to focus, and not announced as a dialog', () => {
+    // THE INVERSE OF WHAT THIS FILE USED TO ASSERT. There was a test here demanding a real <button> with an
+    // accessible name, because the overlay was a door and that button was the only way through it — trap 6
+    // is the story of it going invisible twice. The entrance plays itself and settles into the hero, so
+    // there is no control at all: "the users wont click anything just seeing through the animation."
+    //
+    // Which inverts the a11y requirement too. A `role="dialog" aria-modal="true"` with nothing to act on and
+    // no way to escape is worse than announcing nothing, so the whole overlay is aria-hidden and the real
+    // <h1> is the hero's underneath — which also retires the two-<h1> defect this component shipped once.
+    const gate = /<div class="gate"[^>]*>/.exec(home!.markup)?.[0] ?? '';
+    expect(gate, 'the gate element is gone or renamed').not.toBe('');
+    expect(gate, 'announced as a dialog it cannot honour').not.toMatch(/role="dialog"/);
+    expect(gate, 'aria-modal on an overlay with nothing to interact with').not.toMatch(/aria-modal/);
+    expect(gate, 'the decorative overlay is not hidden from the a11y tree').toMatch(/aria-hidden="true"/);
+    expect(home!.markup, 'a control is back inside the entrance').not.toMatch(/data-gate-enter/);
+    expect((home!.markup.match(/<h1[\s>]/g) ?? []).length, 'the page needs exactly one <h1>').toBe(1);
   });
 
-  it('marks the decorative field aria-hidden and the dialog labelled', () => {
-    // An SVG, and it went back to being one: the canvas version was built on a misreading of "trails of
-    // asteroids" and the owner had already approved the SVG dash. What matters to a11y either way is that the
-    // decorative field is hidden from the tree.
-    expect(home!.markup).toMatch(/<svg[^>]*class="[^"]*gate-field[^"]*"[^>]*aria-hidden="true"/);
-    expect(home!.markup).toMatch(/aria-labelledby="gate-name"/);
-    expect(home!.markup).toMatch(/id="gate-name"/);
+  it('PAINTS THE HERO\'S OWN TERRAIN ON A CANVAS, and carries no text of its own', () => {
+    // THE WHOLE POINT OF THE REDESIGN, asserted against the build rather than trusted. The field was a
+    // ported 21st.dev line drawing that cross-faded into an unrelated hero; ten rounds of tuning it never
+    // shook "a little bit dull", and the replacement — which flew a stand-in name across the screen — got
+    // "that's horrible". It is now the hero's own loss field, painted by the same renderer, with the camera
+    // and the breath settling onto exactly the hero's values.
+    expect(home!.markup, 'the field is not a canvas').toMatch(/<canvas[^>]*class="[^"]*gate-field/);
+    expect(home!.markup, 'the decorative field is not hidden from the a11y tree')
+      .toMatch(/<canvas[^>]*class="[^"]*gate-field[^"]*"[^>]*aria-hidden="true"/);
+    expect(home!.markup, 'an SVG stroke field is back').not.toMatch(/gate-trail/);
+    // "the name and other stuff just fades in" — the HERO's name does that, so the overlay has no text.
+    // A stand-in copy is what produced two names on screen, a FLIP between two measured boxes, and an
+    // ivory-to-ink colour crossover. None of that can come back while this holds.
+    expect(home!.markup, 'the entrance has grown its own name again').not.toMatch(/gate-name|gate-letter/);
+    expect(home!.markup, 'the opaque ground layer is gone').toMatch(/class="gate-back"/);
   });
 
   it('NOTHING ON THE GATE HAS AN INVISIBLE RESTING STATE', () => {
@@ -437,119 +477,59 @@ describe('the first-visit gate, as shipped', () => {
     }
   });
 
-  it('KEEPS THE APPROVED TRAVELLING DASH, AND FADES TO ZERO WHERE IT RESETS', () => {
-    // Two things, and the pair is the point.
-    //
-    // (1) THE MOTION IS THE APPROVED ONE. The owner reviewed this exact treatment — a dash travelling along each
-    //     curve, written in real user units from the arc length — and said "oh yeah perfect. now that's what im
-    //     talking about." Everything after it was fixing the ONE defect he reported against it, and two of those
-    //     attempts replaced the motion instead: a permanent faint stroke under the dash (which he read as "the
-    //     line leaves a trail behind"), then no dash at all (a static drawing), then a canvas of comet trails
-    //     from over-reading "like the trails of asteroids". So this pins the dash as present.
-    //
-    // (2) THE DEFECT IS FIXED AT ITS CAUSE. "entire lines go dark immediately" happened because the drawn length
-    //     is a sawtooth — it collapses from the whole arc to a 30% fragment at the curve's off-screen start once
-    //     per cycle — while the source's opacity envelope is 0.3, not 0, at that instant. The envelope now shares
-    //     the offset triangle and so is zero exactly there. The arithmetic is unit-tested in tests/gate.test.ts;
-    //     what this checks is that the SHIPPED script is driven by those same constants, because the inline
-    //     script cannot import and a hardcoded copy is exactly the kind of thing that drifts.
-    const paths = home!.markup.match(/<path[^>]*class="[^"]*gate-trail[^"]*"[^>]*>/g) ?? [];
-    expect(paths.length, 'the gate shipped no strokes at all').toBeGreaterThanOrEqual(1);
-    for (const p of paths) {
-      // vector-effect defeats the renderer's stroke caching across every full-screen path; measured as a real
-      // cost here, and the source does not use it either.
-      expect(p, `vector-effect is back on a gate stroke: ${p}`).not.toMatch(/vector-effect/);
-      expect(p, `the arc length no longer reaches the client, so the dash cannot be written: ${p}`)
-        .toMatch(/data-len="\d/);
-    }
+  it('HANDS OVER ON ONE CHANNEL, AND ENDS EVEN IF THE PAINTER NEVER RUNS', () => {
+    // The painter is a BUNDLED module and the policy script is inline. If the painter fails to load, throws
+    // on an old browser, or cannot get a 2D context, nothing would ever reach the landing and an opaque
+    // full-screen layer would sit over the site permanently — strictly worse than any defect this component
+    // has actually shipped. The inline script cannot fail to run, so it carries the backstop.
+    // THE HANDSHAKE ITSELF, and this assertion exists because its absence shipped. The painter owns the clock
+    // and dispatches LAND when it runs out; the policy script has to be LISTENING or the entrance can only
+    // end by backstop. Measured before the fix: 4000ms instead of 2600, with the terrain sitting finished for
+    // a second and a half. Every other assertion in this file passed through that bug — the backstop existed,
+    // the order in land() was right, the markup was right — because none of them checked that the two halves
+    // were actually connected.
+    expect(script, 'the policy script does not listen for the painter\'s landing')
+      .toMatch(/addEventListener\(LAND,\s*land\)/);
 
-    // THE ON-SCREEN ARC WINDOW MUST SHIP. The entire fix for "entire lines go dark immediately" is that travel
-    // is clipped to [a, b] — the arc of each curve that is actually in frame, measured at build time because the
-    // driver is inline and cannot import. If these attributes stop being emitted the driver silently falls back
-    // to the whole arc (`data-b` defaults to the full length), which is exactly the 42%-blank defect, and
-    // nothing else in the suite would notice.
-    for (const p of paths) {
-      expect(p, `no on-screen window ships for this stroke: ${p}`).toMatch(/data-a="[\d.]+"/);
-      expect(p, `no on-screen window ships for this stroke: ${p}`).toMatch(/data-b="[\d.]+"/);
-    }
+    const t = /setTimeout\(\s*land\s*,\s*(\d+)\s*\)/.exec(script);
+    expect(t, 'no backstop timer — a failed painter would strand the overlay').not.toBe(null);
+    expect(Number(t![1]), 'the backstop is too long to save a visitor from a stuck overlay')
+      .toBeLessThanOrEqual(6000);
+    expect(Number(t![1]), 'the backstop fires before the entrance can finish normally').toBeGreaterThan(2600);
 
-    // No second permanently-drawn layer. That is what read as a trail, so it is worth a test rather than a note.
-    expect(home!.markup, 'a faint underlay is back — it will read as a trail behind every line')
-      .not.toMatch(/class="gate-(base|haze)"/);
-    expect(home!.markup, 'the field is a canvas again; the SVG dash is the approved treatment')
-      .not.toMatch(/<canvas[^>]*gate-field/);
-
-    // The script is inline (it has to beat first paint), so it is in the HTML itself rather than a module.
-    const html = home!.html;
-    expect(html, 'the script no longer writes a dash — the strokes cannot be travelling')
-      .toMatch(/strokeDasharray/);
-    // An additive floor is precisely what this guards against: the source's envelope sits at 0.3 rather than 0
-    // where the drawn length resets, which is what made the reset visible. The constants are asserted below by
-    // NAME rather than by value — a comment here quoting `const PEAK = 0.72` outlived two retunings of it (it is
-    // 0.45 now), which is exactly why the number is not written out again.
-    expect(html, 'the opacity envelope has an additive floor again, so the reset will be visible')
-      .not.toMatch(/style\.opacity\s*=\s*String\(\s*0?\.\d+\s*\+/);
-    // THE CLAIM IS "DRIVEN BY THE TESTED CONSTANTS", NOT "SPELLED THIS WAY".
-    //
-    // This assertion used to match the inline script's source character-for-character, down to the name of a
-    // loop local (`tri`). Renaming it, or hoisting the envelope into a helper, turned the test red with
-    // byte-identical output — which is why it had been rewritten once per redesign, and why pinning an
-    // expression's shape is the wrong instrument.
-    //
-    // What genuinely needs guarding is the seam: the driver is `is:inline` so it CANNOT import, and the four
-    // numbers that decide whether strokes vanish are unit-tested in lib/gate.ts. `define:vars` is what keeps
-    // the two on one value. So assert that the constants arrive that way and that the opacity write is computed
-    // from them — the arithmetic itself is proven in tests/gate.test.ts, where it belongs.
-    expect(html, 'GATE_OPACITY_PEAK is no longer handed to the script by define:vars')
-      .toMatch(/\bPEAK\s*=\s*0?\.\d+/);
-    expect(html, 'GATE_OPACITY_RAMP is no longer handed to the script by define:vars')
-      .toMatch(/\bRAMP\s*=\s*0?\.\d+/);
-    const opacityWrite = /\.opacity\s*=\s*([^;]{0,120});/.exec(html)?.[1] ?? '';
-    expect(opacityWrite, 'no opacity write found in the shipped script').not.toBe('');
-    expect(opacityWrite, 'the envelope ignores the tested peak — a hardcoded copy will drift')
-      .toMatch(/PEAK/);
-    expect(opacityWrite, 'the envelope ignores the tested ramp, so it peaks instead of plateauing')
-      .toMatch(/RAMP/);
+    // ORDER IS LOAD-BEARING and the opposite of the obvious one: the attribute must come OFF before REVEAL
+    // fires, because the hero's apply() re-reads isCovered() — fire first and it decides it is still
+    // covered and never resumes. And REVEAL goes on `document`; dispatching on `window` is a channel the
+    // hero does not listen to, which is a bug this component has already shipped once.
+    const landFn = /function land\(\)\s*\{[\s\S]*?\n    \}/.exec(script)?.[0] ?? '';
+    expect(landFn, 'land() is gone or renamed').not.toBe('');
+    expect(landFn).toMatch(/removeAttribute\(UP\)[\s\S]*dispatchEvent\(new Event\(REVEAL\)\)/);
+    expect(script, 'REVEAL must be dispatched on document, not window')
+      .toMatch(/document\.dispatchEvent\(new Event\(REVEAL\)\)/);
   });
 
-  it('gives a reduced-motion reader the same picture, held still', () => {
-    // SCOPED TO THE GATE'S OWN BLOCK, which this test did not used to be: it searched the entire homepage
-    // stylesheet for `prefers-reduced-motion` and `animation: none`, both of which the bundle has carried since
-    // BaseLayout was written. It passed regardless of what the gate did, and its name still said "drift" two
-    // commits after the drift was deleted.
-    //
-    // What matters is narrow: under reduced motion the strokes must be PINNED, not animated and not reset. The
-    // driver never runs (`if (!reduced())`), so no inline dash is ever written and there is nothing to undo —
-    // the one thing needed is the opacity pin, because the per-path `stroke-opacity` attribute ramps to 1.0 and
-    // without it a still reader sees the drawing at full strength: a different picture, not a still of this one.
+  it('DOES NOT RAISE AT ALL UNDER REDUCED MOTION, and holds the hero text rather than hiding it', () => {
+    // An entrance made entirely of motion has nothing to show a reader who asked for none, and a still frame
+    // of the hero's terrain held for two seconds is a delay with no content. The finished state the motion
+    // rule asks for is the homepage itself, so the inline script returns before raising.
+    expect(script, 'the entrance no longer checks the motion preference')
+      .toMatch(/prefers-reduced-motion:\s*reduce/);
+
+    // AND THE TEXT FADE IS A PAUSE, NOT AN OPACITY OVERRIDE. The hero's name/bio/tagline already rise in on
+    // load; the entrance only holds that animation while it covers them. Written as `animation-play-state`
+    // the resting state in the stylesheet is the animation running to opacity 1 — so a visitor whose JS
+    // never runs still sees the text. An `opacity: 0` override would make invisibility a property of the
+    // element, which is trap 6, the defect that twice shipped an invisible name on this very screen.
     const css = gateCss();
-    const blocks = [...css.matchAll(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{/g)];
-    expect(blocks.length, 'the gate CSS has no reduced-motion block').toBeGreaterThan(0);
-    // Take the stylesheet from each such block and keep the one that governs a gate stroke.
-    const governing = blocks
-      .map((m) => css.slice(m.index ?? 0, (m.index ?? 0) + 1200))
-      .filter((b) => /\.gate-trail/.test(b));
-    expect(governing.length, 'no reduced-motion rule reaches .gate-trail').toBeGreaterThan(0);
-    expect(governing[0], 'the strokes are not pinned for a reader with motion off').toMatch(/opacity:\s*0?\.\d/);
+    expect(css, 'the hero text is no longer held during the entrance')
+      .toMatch(/\[data-gate-up\][^{]*\.hero-rise[^{]*\{[^}]*animation-play-state:\s*paused/);
+    expect(css, 'the hero text is held by hiding it, which is trap 6')
+      .not.toMatch(/\[data-gate-up\][^{]*\.hero-rise[^{]*\{[^}]*opacity:\s*0[;}]/);
   });
 });
 
 describe('the gate script, after the whole-branch review', () => {
-  const home = byRoute().get('/')!;
-  /**
-   * THE GATE'S OWN SCRIPT BLOCK, not "every script on the page".
-   *
-   * This used to be a lazy `/<script>[\s\S]*?data-gate[\s\S]*?<\/script>/`, which starts at the document's FIRST
-   * <script> — BaseLayout's theme resolver — and ends at the first </script> after the `data-gate` div: one
-   * match, 236KB, 14 blocks. Every assertion below then meant "appears somewhere in the page's script", which
-   * is not what any of their comments claim. Splitting on the tag and keeping the one block that mentions
-   * `[data-gate]` gives the ~17KB that actually belongs to the gate.
-   */
-  const script = home.html
-    .split(/<script\b[^>]*>/)
-    .map((b) => b.split('</script>')[0])
-    .filter((b) => b.includes('[data-gate]'))
-    .join('\n');
+  const script = gateScript();
 
   it('captures the gate block and nothing else', () => {
     // Guards the capture itself, because every assertion in this describe is only as good as it. If the split

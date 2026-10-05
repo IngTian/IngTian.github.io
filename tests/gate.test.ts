@@ -4,27 +4,36 @@
 // regexes) and driving a browser is forbidden, so anything that must be proven has to be a pure function.
 import { describe, expect, it } from 'vitest';
 import {
+  ENTRANCE_AZ_SWING,
+  ENTRANCE_BREATH_CYCLES,
+  ENTRANCE_BREATH_FROM,
+  ENTRANCE_EDL_SIZE_FROM,
+  ENTRANCE_ELEV_EMPHASIS_FROM,
+  ENTRANCE_MS,
+  ENTRANCE_ZOOM_FROM,
   GATE_DISMISS_MS,
-  GATE_OPACITY_PEAK,
-  GATE_OPACITY_RAMP,
-  GATE_OPEN_PHASE,
+  GATE_LAND_EVENT,
   GATE_REVEAL_EVENT,
   GATE_SEEN_KEY,
   GATE_UP_ATTR,
-  GATE_WIDTH_SWING,
+  breathPhaseOffset,
   dismissMs,
-  drawnFrac,
+  entranceProgress,
   hasSeenGate,
   isCovered,
   isFreshLoad,
   markGateSeen,
-  offsetFrac,
-  opacityAt,
   shouldRaiseGate,
-  tintAt,
   type GateStore,
-  widthAt,
 } from '../src/lib/gate';
+import {
+  BREATH_AMP_LIVE,
+  BREATH_OMEGA,
+  BREATH_PERIOD_S,
+  TERRAIN_CONFIG_DEFAULTS,
+  terrainConfig,
+  terrainPalette,
+} from '../src/lib/terrainRender';
 
 const okStore = (seed: Record<string, string> = {}): GateStore => {
   const m = new Map(Object.entries(seed));
@@ -180,138 +189,163 @@ describe('isCovered — do not animate what nobody can see', () => {
   });
 });
 
-describe('the stroke animation, and the pairing that stops lines vanishing', () => {
-  it('reproduces the source: drawn length 0.3 -> 1, offset a 0 -> 1 -> 0 triangle', () => {
-    expect(drawnFrac(0)).toBeCloseTo(0.3, 6);
-    expect(drawnFrac(1)).toBeCloseTo(1, 6);
-    expect(offsetFrac(0)).toBeCloseTo(0, 6);
-    expect(offsetFrac(0.5)).toBeCloseTo(1, 6);
-    expect(offsetFrac(1)).toBeCloseTo(0, 6);
-    // Monotone between the ends, so a stroke never stutters or reverses mid-sweep.
-    for (let i = 1; i <= 50; i++) expect(drawnFrac(i / 50)).toBeGreaterThan(drawnFrac((i - 1) / 50));
-  });
+describe('the entrance lands on the HERO\'s frame, exactly', () => {
+  // THE ASSERTION THIS WHOLE FILE EXISTS FOR. The overlay and the hero paint the same field through the same
+  // renderer; the overlay is removed once its camera and tempo reach the hero's. `zoom` is simultaneously
+  // position AND dot radius, and `breathAmp` displaces every dot by up to ±8.8 CSS px at the hero's measured
+  // box — so an axis that lands at 0.98 of its target is a visible jump of the entire picture.
+  const hero = terrainConfig(false);
 
-  it('TAKES THE ENVELOPE TO ZERO EXACTLY WHERE THE DRAWN LENGTH JUMPS', () => {
-    // THE DEFECT THIS PINS, in the owner's words: "there are lines that vanish suddenly which is not good.
-    // entire lines go dark immediately."
+  it('every tweened axis reaches its hero value at the landing frame', () => {
+    const p = entranceProgress(ENTRANCE_MS);
+    // THIS one is exact, and it is the only one that can be. See below.
+    expect(p).toBe(1);
+
+    // Each axis is `open + (hero - open) * p`, so p === 1 is what makes all of them land. Spelled out per
+    // axis rather than asserted once, because the failure mode is one axis wired to a different curve.
     //
-    // drawnFrac is a sawtooth — it ends the cycle at 1 and begins the next at 0.3, with that fragment sitting
-    // at the curve's off-screen start. That discontinuity is unavoidable and is in the reference too. What made
-    // it VISIBLE was the source's envelope being 0.3 rather than 0 at the boundary. So the invariant is not
-    // "opacity is a triangle", nor the peak's value — either could be retuned — it is that the envelope is zero
-    // at the one t where the drawn length is discontinuous. The two are only correct together, and nothing else
-    // in the codebase would notice if one were changed alone.
-    const jump = Math.abs(drawnFrac(1) - drawnFrac(0));
-    expect(jump, 'the sawtooth is gone; this test is now asserting nothing').toBeGreaterThan(0.5);
-    expect(opacityAt(0), 'a stroke is visible at the instant its length snaps').toBeCloseTo(0, 6);
-    expect(opacityAt(1), 'a stroke is visible at the instant its length snaps').toBeCloseTo(0, 6);
+    // CLOSE, NOT EXACT, AND THAT IS NOT THE ASSERTION BEING LOOSENED TO PASS. `0.30 + (0.04 - 0.30) * 1`
+    // is 0.03999999999999998 in IEEE-754 — a lerp through p=1 does not return its endpoint for most pairs.
+    // The reason that never ships is that the painter does not rely on the lerp at the landing frame: its
+    // `heroFrame()` assigns `cfg.zoom = HERO_ZOOM` and friends outright, so the final paint uses the hero's
+    // own values by identity, not by arithmetic. What these assertions protect is the axis being wired to
+    // the right endpoint at all; the exactness is protected by the snap, which the dist smoke test pins.
+    const EPS = 1e-12;
+    expect(ENTRANCE_ZOOM_FROM + (1 - ENTRANCE_ZOOM_FROM) * p).toBeCloseTo(1, 12);
+    expect(ENTRANCE_BREATH_FROM + (BREATH_AMP_LIVE - ENTRANCE_BREATH_FROM) * p)
+      .toBeCloseTo(BREATH_AMP_LIVE, 12);
+    expect(Math.abs(hero.light.az + ENTRANCE_AZ_SWING * (1 - p) - hero.light.az)).toBeLessThan(EPS);
+    expect(ENTRANCE_EDL_SIZE_FROM + (hero.edlSizeRange - ENTRANCE_EDL_SIZE_FROM) * p)
+      .toBeCloseTo(hero.edlSizeRange, 12);
+    expect(ENTRANCE_ELEV_EMPHASIS_FROM + (hero.elevEmphasis - ENTRANCE_ELEV_EMPHASIS_FROM) * p)
+      .toBeCloseTo(hero.elevEmphasis, 12);
   });
 
-  it('PLATEAUS rather than peaking, so the fix costs no brightness', () => {
-    // The zero-crossing above is only half of it — an envelope that is zero everywhere also satisfies it. But
-    // the naive `PEAK * tri` that satisfies both is still wrong here, and this is the assertion that says why:
-    // it is near zero for a long stretch either side of the boundary, so most of the cycle would be dimmer than
-    // the build the owner approved. Worse, `tri` peaks at t = 0.5, which is the ONE moment the dash has slid
-    // entirely off the path and nothing is painted at all (see offsetFrac). So the envelope has to be flat
-    // across the cycle's middle, not pointed at it.
-    const mid = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8].map(opacityAt);
-    for (const v of mid) expect(v).toBeCloseTo(GATE_OPACITY_PEAK, 6);
-    // Flat over roughly the middle 85%: zero only in a narrow band at each end.
-    expect(opacityAt(GATE_OPACITY_RAMP / 2)).toBeCloseTo(GATE_OPACITY_PEAK, 6);
-    expect(opacityAt(0.02)).toBeLessThan(GATE_OPACITY_PEAK * 0.5);
+  it('arrives rather than still moving — the eased landing derivative is zero', () => {
+    // A linear ramp reaches the target at full speed and the handover reads as a cut. Measured as a finite
+    // difference over the last millisecond of the entrance.
+    const d = (entranceProgress(ENTRANCE_MS) - entranceProgress(ENTRANCE_MS - 1)) * 1000;
+    expect(d).toBeLessThan(0.02);
+  });
 
-    // The plateau is pinned to the approved build's brightness, NOT to a number I liked. That build used
-    // `0.3 + 0.3 * tri` and opened at t ~= 0.16, which evaluates to 0.40; the source's own peak is 0.60. An
-    // envelope outside that bracket is a brightness change the owner did not ask for.
-    expect(GATE_OPACITY_PEAK).toBeGreaterThanOrEqual(0.4);
-    expect(GATE_OPACITY_PEAK).toBeLessThanOrEqual(0.6);
+  it('opens pulled BACK, so the entrance descends toward the hero rather than pushing past it', () => {
+    expect(ENTRANCE_ZOOM_FROM).toBeLessThan(1);
+    // Not so far back that the field reads as a logo in an empty screen — the camera is a single uniform
+    // scale about a fixed centre, so there is nothing else out there to look at.
+    expect(ENTRANCE_ZOOM_FROM).toBeGreaterThanOrEqual(0.4);
+  });
 
-    // And it must approach zero smoothly rather than stepping, or the fade reads as a blink.
-    for (let i = 1; i <= 20; i++) {
-      expect(Math.abs(opacityAt(i / 400) - opacityAt((i - 1) / 400))).toBeLessThan(0.02);
+  it('opens as a swell and calms to the hero breath, not the other way round', () => {
+    // The parameter survey's note: 0.1+ reads as a swell rather than a breath. The intro has to start above
+    // that and end exactly on the hero's value.
+    expect(ENTRANCE_BREATH_FROM).toBeGreaterThan(0.1);
+    expect(ENTRANCE_BREATH_FROM).toBeGreaterThan(BREATH_AMP_LIVE);
+  });
+
+  it('resolves the silhouette upward — the relief is acquired, not present from frame one', () => {
+    expect(ENTRANCE_EDL_SIZE_FROM).toBeLessThan(hero.edlSizeRange);
+    expect(ENTRANCE_ELEV_EMPHASIS_FROM).toBeLessThan(hero.elevEmphasis);
+  });
+
+  it('is monotonic and clamped outside its window', () => {
+    // The painter is driven by a wall clock it does not control: a dropped frame, a backgrounded tab, or the
+    // gesture-skip path can all hand it a time outside [0, ENTRANCE_MS].
+    expect(entranceProgress(-500)).toBe(0);
+    expect(entranceProgress(ENTRANCE_MS * 3)).toBe(1);
+    let prev = -Infinity;
+    for (let ms = 0; ms <= ENTRANCE_MS; ms += 20) {
+      const v = entranceProgress(ms);
+      expect(v).toBeGreaterThanOrEqual(prev);
+      prev = v;
     }
-  });
-
-  it('opens where the arc is actually painted across the visible frame', () => {
-    // The painted fraction is NOT the drawn fraction: with dasharray "drawn len" and dashoffset -tri*len, a
-    // point p is painted when ((p - tri*len) mod (drawn+len)) < drawn. Integrating that across the cycle gives
-    // 0.30 at t=0, a maximum near t=0.25, ZERO at t=0.5, and 1.00 as t -> 1. So two otherwise-reasonable
-    // opening phases are both wrong: 0 paints only the curve's first 30%, which is off the top-left corner, and
-    // 0.5 paints nothing — it rendered as an empty screen when tried.
-    const paintedFrac = (t: number): number => {
-      const drawn = drawnFrac(t);
-      const period = drawn + 1;
-      const tri = offsetFrac(t);
-      let hit = 0;
-      const N = 2000;
-      for (let i = 0; i < N; i++) {
-        let ph = ((i / N) - tri) % period;
-        if (ph < 0) ph += period;
-        if (ph < drawn) hit++;
-      }
-      return hit / N;
-    };
-    expect(paintedFrac(0.5), 'the triangle peak paints nothing — never open there').toBeCloseTo(0, 2);
-    expect(paintedFrac(GATE_OPEN_PHASE), 'the opening phase paints too little of the arc').toBeGreaterThan(0.35);
-    // ...and the opening must land on the envelope's plateau, or the gate opens dimmer than it runs.
-    expect(opacityAt(GATE_OPEN_PHASE)).toBeCloseTo(GATE_OPACITY_PEAK, 6);
   });
 });
 
-describe('weight and colour varying as a stroke travels', () => {
-  it('both return to their starting value at the cycle boundary', () => {
-    // THE PROPERTY THAT MATTERS MOST, and the reason these are curves rather than ad-hoc arithmetic. The drawn
-    // length resets at t = 1, and the whole point of the opacity envelope is to hide that reset by reaching
-    // zero there. A width or colour that JUMPED at the same instant would put a visible discontinuity back on
-    // screen in a different channel — a stroke that fades out thin and warm must fade back in thin and warm.
-    for (const phase of [0, 0.17, 0.5, 0.83]) {
-      expect(widthAt(1, phase)).toBeCloseTo(widthAt(0, phase), 10);
-      expect(tintAt(1, phase)).toBeCloseTo(tintAt(0, phase), 10);
+describe('the breath phase offset is a WHOLE number of periods', () => {
+  // THE ONE NON-OBVIOUS PIECE OF ARITHMETIC IN THE ENTRANCE, and the reason it is a tested function.
+  //
+  // The field must read as FLOWING, which means running the breath clock fast — the real period is
+  // 2π/0.4 = 15.71s, so over a 2.6s intro the unwarped field advances through only 17% of a cycle and merely
+  // drifts. But `tsec` must ALSO equal the hero's `rAF timestamp / 1000` at the landing frame. Those are only
+  // compatible because `sin` is periodic: burn a whole number of periods and the phase landed on is the phase
+  // you would have had without the detour.
+  it('is zero at the landing, so the clock equals the hero\'s exactly', () => {
+    expect(breathPhaseOffset(1, BREATH_PERIOD_S)).toBe(0);
+  });
+
+  it('is a whole number of periods at the opening — any other size displaces every dot', () => {
+    const open = breathPhaseOffset(0, BREATH_PERIOD_S);
+    expect(open).toBeCloseTo(ENTRANCE_BREATH_CYCLES * BREATH_PERIOD_S, 10);
+    expect(Number.isInteger(ENTRANCE_BREATH_CYCLES)).toBe(true);
+    // The property that matters, stated directly: the breath term is unchanged by the opening offset.
+    const at = (t: number) => Math.sin(t * BREATH_OMEGA);
+    expect(at(1234.5 - open)).toBeCloseTo(at(1234.5), 10);
+  });
+
+  it('decays with a zero landing derivative, so the tempo returns smoothly to 1x', () => {
+    // `(1-p)` would also land at zero but would step the clock's rate down from ~7x at the final frame.
+    const d = (breathPhaseOffset(1, BREATH_PERIOD_S) - breathPhaseOffset(1 - 1e-4, BREATH_PERIOD_S)) / 1e-4;
+    expect(Math.abs(d)).toBeLessThan(0.02);
+  });
+
+  it('runs the clock FORWARD — it is subtracted, so it must be non-negative and shrinking', () => {
+    let prev = Infinity;
+    for (let p = 0; p <= 1.0001; p += 0.02) {
+      const v = breathPhaseOffset(p, BREATH_PERIOD_S);
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(prev + 1e-12);
+      prev = v;
     }
   });
 
-  it('stays within the stated swing, so a thin stroke never outweighs a heavy one', () => {
-    // The ramp across the family is what carries depth. If the per-frame swing were large enough to reorder
-    // two curves' weights, the depth would come and go — so the multiplier is bounded by the stated constant.
-    let lo = Infinity;
-    let hi = -Infinity;
-    for (let k = 0; k <= 400; k++) {
-      const v = widthAt(k / 400, 0.3);
-      lo = Math.min(lo, v);
-      hi = Math.max(hi, v);
-    }
-    expect(lo).toBeCloseTo(1 - GATE_WIDTH_SWING, 2);
-    expect(hi).toBeCloseTo(1 + GATE_WIDTH_SWING, 2);
-    expect(lo, 'a stroke must never invert to zero or negative width').toBeGreaterThan(0.3);
+  it('clamps, because progress is derived from that same uncontrolled clock', () => {
+    expect(breathPhaseOffset(-1, BREATH_PERIOD_S)).toBe(ENTRANCE_BREATH_CYCLES * BREATH_PERIOD_S);
+    expect(breathPhaseOffset(9, BREATH_PERIOD_S)).toBe(0);
+  });
+});
+
+describe('the two scripts agree on their one channel', () => {
+  // The policy script is `is:inline` (it must beat first paint) and the painter is bundled (it must import
+  // the renderer), so they cannot share a module — they share two EVENT NAMES, handed to the inline half
+  // through define:vars. Exported rather than written twice: a typo in either copy would break the handshake
+  // in the direction that leaves an overlay on screen, with each half still internally consistent.
+  it('exports both event names, and they are distinct', () => {
+    expect(GATE_LAND_EVENT).toMatch(/^descent:/);
+    expect(GATE_REVEAL_EVENT).toMatch(/^descent:/);
+    expect(GATE_LAND_EVENT).not.toBe(GATE_REVEAL_EVENT);
   });
 
-  it('leans both warm and cool, and passes through the base ink', () => {
-    // tintAt is a mix factor, not a colour: negative leans cool, positive warm, zero is the token as authored.
-    // All three have to occur, or the "colour variation" is a one-way tint rather than a shimmer.
-    const vals = Array.from({ length: 400 }, (_, k) => tintAt(k / 400, 0));
-    expect(Math.min(...vals)).toBeLessThan(-0.9);
-    expect(Math.max(...vals)).toBeGreaterThan(0.9);
-    expect(Math.min(...vals.map(Math.abs)), 'never passes through the base ink').toBeLessThan(0.05);
+  it('the session key is versioned, so a redesign is visible on reload', () => {
+    // During a run of design iterations an unversioned key is actively misleading: the owner reloads, the
+    // flag is already set, and the change looks like it did not ship.
+    expect(GATE_SEEN_KEY).toMatch(/\.v\d+$/);
+  });
+});
+
+describe('the per-theme picture is shared, not copied', () => {
+  // `terrainPalette`/`terrainConfig` moved out of TerrainHero's private `themePalette()` because the entrance
+  // paints the same field and must land on the hero's frame. A second copy that drifted by one number would
+  // turn a continuation into a visible jump.
+  it('dotScale is per-theme and is NOT the config default — the easiest one to get wrong', () => {
+    expect(terrainPalette(false).dotScale).toBeCloseTo(1.08, 6);
+    expect(terrainPalette(true).dotScale).toBeCloseTo(1.18, 6);
+    expect(TERRAIN_CONFIG_DEFAULTS.dotScale).toBe(1);
   });
 
-  it('does not peak together with the weight', () => {
-    // Offset by a quarter cycle on purpose. Coinciding, thickening and warming read as one crude pulse rather
-    // than as two independent properties of the stroke.
-    const n = 512;
-    const w = Array.from({ length: n }, (_, k) => widthAt(k / n, 0) - 1);
-    const c = Array.from({ length: n }, (_, k) => tintAt(k / n, 0));
-    const dot = w.reduce((a, v, i) => a + v * c[i], 0);
-    const norm = Math.sqrt(w.reduce((a, v) => a + v * v, 0) * c.reduce((a, v) => a + v * v, 0));
-    expect(Math.abs(dot / norm), 'weight and colour move together').toBeLessThan(0.1);
+  it('hands back a FRESH object per call, so two painters cannot share one camera', () => {
+    // The entrance mutates zoom/light/edlSizeRange/elevEmphasis on its own copy every frame.
+    const a = terrainConfig(false);
+    const b = terrainConfig(false);
+    expect(a).not.toBe(b);
+    expect(a.light).not.toBe(b.light);
+    a.zoom = 0.1;
+    a.light.az = 99;
+    expect(b.zoom).toBe(TERRAIN_CONFIG_DEFAULTS.zoom);
+    expect(b.light.az).not.toBe(99);
   });
 
-  it('varies fast enough to be seen while the gate is on screen', () => {
-    // A gate lives a few seconds against a 20-30s dash cycle, so one weight cycle per traverse would be
-    // invisible. Two cycles per traverse puts a full swing inside about 10s of a 20s stroke.
-    const period = 1 / 2;   // two cycles over t in [0,1)
-    expect(widthAt(period / 2, 0)).toBeCloseTo(widthAt(period * 1.5, 0), 6);
-    // Over the first 15% of a cycle — roughly 3s of a 20s stroke — the weight must already have moved.
-    const moved = Math.abs(widthAt(0.15, 0) - widthAt(0, 0));
-    expect(moved, 'the weight barely moves in the time a gate is actually looked at').toBeGreaterThan(0.2);
+  it('starfield follows darkness, which is the dark theme\'s whole conceit', () => {
+    expect(terrainConfig(true).starfield).toBe(true);
+    expect(terrainConfig(false).starfield).toBe(false);
   });
 });

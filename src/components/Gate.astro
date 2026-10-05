@@ -1,392 +1,186 @@
 ---
-// THE FIRST-VISIT GATE. Rendered from index.astro ONLY — never BaseLayout, so no other route can inherit a
-// full-screen interstitial. See docs/superpowers/specs/2026-10-01-first-visit-gate-design.md.
+// THE FIRST-VISIT ENTRANCE. Rendered from index.astro ONLY — never BaseLayout, so no other route can inherit
+// a full-screen overlay. Moving it up one file is the single edit that would hand this to all nine routes.
 //
-// THE ONE INVARIANT THAT MATTERS: this ships NOT COVERING, and JS raises it. The static HTML carries the gate
-// in its dismissed state and an inline script adds .is-up. A click-gate that defaulted to covering would lock
-// out every visitor whose JS failed, and would also hide the page from anything that does not run scripts.
-// The page's full markup is in the HTML either way, so this is an overlay, not a content gate — which is what
-// keeps it crawlable. Same trick as BaseLayout's descent-veil, which parks itself off-screen by default.
-// tests/distSmoke.test.ts asserts the shipped HTML carries no covering class, so the invariant is checked
-// against the build rather than trusted.
-import { name, roles } from '../data/profile';
-// THE LINES ARE THE ORIGINAL 21st.dev GEOMETRY, ported. Six candidates were built as real full-screen gates in
-// /proto-gate — descent trails, combed contours of the hero's own field, and four black-hole readings — and the
-// owner's verdict was "the original is the best". It is a BORROWED drawing rather than one this site derived,
-// which is a real cost and is written up in lib/gateRefPaths.ts; it should carry a credit if it stays.
+// THE FIELD IS THE HERO'S OWN TERRAIN, AND THERE IS NO TEXT ON THIS SCREEN. The overlay paints the same
+// Gaussian-mixture loss field the hero paints, through the same renderer, with a camera and a tempo that
+// settle onto exactly the hero's. The owner's brief is the design: "a fluid field moving using the terrain we
+// have. and then this terrain transforms into the terrain location we have then seamlessly into the hero. the
+// name and other stuff just fades in."
 //
-// What makes it work, and what every original attempt here failed to reproduce: the family CONVERGES (the
-// offset enters the two halves of each curve with opposite sign, so the left end moves right while the right
-// end moves left) and its opacity ramps all the way 0.1 -> 1.0, so most strokes recede and a reader picks out
-// about eight over a haze. Our combed version structurally could not do the first part — its no-knot guarantee
-// needs a tilt that exceeds the field's maximum gradient, which forces the strokes parallel.
-import { GATE_COUNT, REF_POSITIONS, refFamily, refViewBox } from '../lib/gateRefPaths';
-import { parseTrack, visibleWindow } from '../lib/gateComets';
-// GATE_DRAWN_MIN and GATE_OPACITY_PEAK are handed to the inline script through define:vars rather than typed
-// into it. The script cannot import — it must run before first paint — but the four numbers that decide whether
-// strokes vanish are unit-tested in lib/gate.ts, and passing them keeps the test and the shipped behaviour on
-// one value. Everything else in there is restated prose-and-arithmetic, which is the standing trade.
+// "The name just fades in" is why this component has no name in it. The HERO'S name fades in, underneath —
+// which is what deletes the entire class of defects the previous attempt produced (a stand-in copy, a FLIP
+// between two measured boxes, an ivory-to-ink colour crossover, two names on screen at once). The only thing
+// this file owns is a canvas and the policy around it.
+//
+// THE ONE INVARIANT THAT MATTERS: this ships NOT COVERING, and JS raises it. The static HTML carries the
+// overlay in its dismissed state and the inline script adds .is-up. An overlay that defaulted to covering
+// would lock out every visitor whose JS failed and hide the page from anything that does not run scripts. The
+// page's full markup is in the HTML either way, so this is a decoration, not a content gate — which is what
+// keeps it crawlable. tests/distSmoke.test.ts asserts the shipped HTML carries no covering class.
 import {
   GATE_DISMISS_MS,
-  GATE_DRAWN_MIN,
-  GATE_OPACITY_PEAK,
-  GATE_OPACITY_RAMP,
-  GATE_OPEN_PHASE,
+  GATE_LAND_EVENT,
   GATE_REVEAL_EVENT,
   GATE_SEEN_KEY,
   GATE_UP_ATTR,
 } from '../lib/gate';
-
-// The two mirrored families stay SEPARATE, as two groups. The original renders <FloatingPaths position={1} />
-// and position={-1}; keeping that split is also what makes the motion affordable — a group is one composited
-// layer. Keeping the split is the source's own structure (it renders the component twice, at position +1 and
-// -1) and the script's seed strides across both groups in one pass. NOTE: there is no transform on either group
-// — an earlier version drifted them and was rejected as static, and this line still claimed "two transforms
-// instead of 72 paint-bound path animations" afterwards. What ships is 48 per-path dash writes from one rAF.
-// GATE_COUNT curves per family rather than the source's 36 ("less lines"), SMOOTHED at the join (the source
-// kinks up to 32.8 degrees there), and the viewBox pulled back to the reference's own apparent scale ("the
-// example i gave you zoomed out a bit compared to yours"). All three are gateRefPaths' business — see there.
-const families = REF_POSITIONS.map((p) => refFamily(p, GATE_COUNT, true));
-const viewBox = refViewBox();
-const vb = viewBox.split(/\s+/).map(Number) as [number, number, number, number];
-
-/**
- * EACH CURVE'S ON-SCREEN ARC WINDOW, computed here at build time and shipped per path.
- *
- * This is the other half of "entire lines go dark immediately", and the half no opacity curve can reach. Only
- * about a quarter of each curve is inside the frame, so a dash sweeping the WHOLE arc is off-picture for most of
- * its cycle: measured across the family, every stroke is entirely absent for 25-59% of its own cycle, mean 42%.
- * That is in the reference too — the owner spotted it himself and said it was less noticeable there.
- *
- * Clipping the dash's travel to this window fixes it at the cause while changing nothing else about the motion.
- * It is computed at BUILD time because the driver is inline (it must beat first paint) and so cannot import
- * lib/gateComets, and against the viewBox rather than the viewport because that is the conservative direction —
- * `meet` plus element clipping always leaves MORE visible than the box, so a dash held inside this window is
- * always on screen.
- */
-const windows = families.map((fam) => fam.map((t) => visibleWindow(parseTrack(t.d), vb)));
-const letters = [...`${name.first} ${name.last}`];
 ---
 
-<div class="gate" data-gate role="dialog" aria-modal="true" aria-labelledby="gate-name">
-  <svg
-    class="gate-field"
-    viewBox={viewBox}
-    preserveAspectRatio="xMidYMid meet"
-    aria-hidden="true"
-    focusable="false"
-  >
-    {/* MEET, NOT SLICE — which is also the thickness fix. The original leaves preserveAspectRatio at its
-        default, and that default is meet. On a 1920x1080 screen meet scales the 696-wide box by 2.76 where
-        slice scales by 3.42, so slice was drawing every stroke about 24% thicker than the source does at the
-        same authored width. meet still fills the screen, because the geometry runs far outside the viewBox
-        (y -189..875) and an SVG clips to its element rather than to its viewBox.
-
-        NO vector-effect HERE ANY MORE, and that was a performance decision as much as a fidelity one. It pins
-        the stroke to its authored CSS width regardless of scale, which made the lines hairline — but it also
-        defeats the renderer's stroke caching, and with 48 full-screen paths that is not free. The original does
-        not use it either; `meet` already removed the ~24% of extra weight that `slice` was adding, so the
-        widths below are the source's own and scale the way the source's do. */}
-    {families.map((fam, f) => (
-      <g class="gate-fam" data-fam={f}>
-        {/* data-len carries the curve's measured arc length in user units. The script below reads it and
-            writes the dash itself, so nothing here depends on pathLength normalisation or on CSS being able
-            to interpolate a two-value dasharray. With no JS the path is simply drawn whole. */}
-        {fam.map((t, i) => (
-          <path
-            class="gate-trail"
-            d={t.d}
-            data-len={t.len}
-            data-a={Math.round(windows[f][i].a * 10) / 10}
-            data-b={Math.round(windows[f][i].b * 10) / 10}
-            stroke-opacity={t.opacity}
-            stroke-width={t.width}
-          />
-        ))}
-      </g>
-    ))}
-  </svg>
-
-  <div class="gate-text">
-    {/* A <p>, NOT an <h1>, and that is a correctness fix rather than a style choice. The gate shipped with
-        an <h1> first and tests/distSmoke.test.ts caught it immediately: "index.html has 2 <h1> elements; a
-        document gets exactly one". The hero's name is the homepage's real heading and this is a loader on
-        top of it, so the second <h1> was a duplicate outline, not a second section — and the a11y bar here
-        is 100. The dialog keeps its accessible name because aria-labelledby may point at ANY element, so
-        nothing about the announcement changes. */}
-    <p class="gate-name" id="gate-name">
-      {letters.map((ch, i) => (
-        ch === ' '
-          ? <span class="gate-space"> </span>
-          : <span class="gate-letter" style={`--l:${i}`}>{ch}</span>
-      ))}
-    </p>
-    <p class="gate-roles">{roles}</p>
-    <button class="gate-enter" type="button" data-gate-enter>
-      enter the descent <span aria-hidden="true">→</span>
-    </button>
-  </div>
+{/* aria-hidden, and NOT a dialog. It was `role="dialog" aria-modal="true"` while a button existed to focus;
+    with nothing to interact with, announcing a modal a reader can neither act on nor escape is worse than
+    announcing nothing. The real <h1> is the hero's, underneath — which also retires the two-<h1> defect this
+    component shipped once. */}
+<div class="gate" data-gate aria-hidden="true">
+  {/* The opaque ground. A SEPARATE element from the canvas rather than a background on `.gate`, because the
+      canvas is positioned to the hero's measured box while the ground must cover the whole viewport. */}
+  <div class="gate-back"></div>
+  {/* Positioned and sized from the HERO CANVAS'S OWN rect by the painter — never from the viewport. `project`
+      scales by `min(W, Hh)` and centres at `0.46 * Hh`, and `#heights` is 108vh, so on most desktop windows
+      the hero's basis is its height and a 100vh overlay at the same `zoom` is a different picture in both
+      scale and position. Measuring the rect also means a CSS change to `#heights` cannot silently
+      desynchronise the two. */}
+  <canvas class="gate-field" data-gate-field aria-hidden="true"></canvas>
 </div>
 
 <style>
-  /* PARKED, NOT COVERING. Default state is fully dismissed: no JS means no gate. */
   .gate {
     position: fixed;
     inset: 0;
-    z-index: 10000; /* above .descent-veil's 9999 — if both ever raise, the gate owns the screen */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg);
+    z-index: 100;
+    /* THE DISMISSED STATE IS THE RESTING STATE — trap 1. Shipping `is-up` in the markup would lock out any
+       visitor whose JS failed. */
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
   }
+
   .gate.is-up {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
   }
 
-  .gate-field { position: absolute; inset: 0; width: 100%; height: 100%; }
-  /* THE STROKES ARE PAPER, NOT OCHRE, because the source draws them in `currentColor` under
-     `dark:text-white` — white threads on a near-black ground. Ochre was my substitution and it is most of why
-     the field read as muddy: the opacity ramp starts at 0.1, and a GOLD line at a tenth opacity over near-black
-     has almost no luminance left to carry, where a near-white one still reads as light. `--paper` is the site's
-     ivory rather than pure #fff, which keeps palette discipline without losing the original's effect. */
-  /* THE THREE TOKENS THE STROKES MAY LEAN BETWEEN, declared here so the script can read them with
-     getComputedStyle and never names a colour itself. That matters twice over: the palette rule allows only
-     tokens from tokens.css, and these resolve per THEME — in dark, `--ochre` is the phosphor emerald, which is
-     exactly what a dark-theme stroke should warm toward. The script reads them once at init; the theme toggle
-     is `inert` behind the gate, so it cannot change under the animation. */
+  /* The ground the field is read against. Opaque for the whole entrance: the dots are ink-on-ink here, and
+     the handover to the luminous sky happens during the DISMISSAL crossfade, with the terrain steady on top
+     of it. That ordering is deliberate — see the note on `land()` in the painter. */
+  .gate-back {
+    position: absolute;
+    inset: 0;
+    /* THE SKY AT THE HEIGHTS, not `--bg`, and the difference is the whole legibility of the screen.
+       This was `--bg` (near-black) for one build and the light theme's field nearly vanished: its terrain is
+       DARK ink whose eye-dome shading spends itself on value rather than opacity, so it needs a luminous
+       ground exactly as it has on the hero. `--sky-top` is the gradient's own 0% stop, which also makes the
+       dismissal crossfade almost nothing — a flat ground giving way to the same colour with the sky's warp
+       in it, behind a terrain that does not move. */
+    background: var(--sky-top);
+  }
+
   .gate-field {
-    --trail-base: var(--paper);
-    --trail-warm: var(--ochre);
-    --trail-cool: var(--indigo);
-  }
-  .gate-trail { fill: none; stroke: var(--trail-base); stroke-linecap: round; }
-
-  .gate-text { position: relative; text-align: center; padding: 0 7vw; }
-
-  .gate-name {
-    font-family: var(--font-display), Georgia, serif;
-    color: var(--paper);
-    font-size: clamp(44px, 9vw, 116px);
-    line-height: 0.95;
-    letter-spacing: -0.02em;
-    margin: 0;
-  }
-  .gate-letter, .gate-space { display: inline-block; }
-  .gate-space { width: 0.3em; }
-
-  .gate-roles {
-    /* Display italic, matching Heights.astro's treatment of the same string — the dissolve only reads as
-       one screen if the words land in the same voice as well as the same place. The spec said mono; the
-       hero reserves mono for the line BELOW this one, so matching the hero wins. */
-    font-family: var(--font-display), Georgia, serif;
-    font-style: italic;
-    color: color-mix(in srgb, var(--paper) 62%, transparent);
-    font-size: clamp(15px, 2.2vw, 21px);
-    margin: 18px 0 0;
+    position: absolute;
+    /* top/left/width/height are written by the painter from the hero canvas's rect. */
+    display: block;
+    pointer-events: none;
   }
 
-  .gate-enter {
-    /* The site's existing chip treatment (see sections/Signature.astro), not the reference's glassmorphic
-       panel. There is no such vocabulary here and adding one for a single button is what the taste rules
-       exist to prevent. */
-    margin-top: 34px;
-    font-size: 12.5px;
-    padding: 10px 18px;
-    border-radius: 9999px;
-    background: transparent;
-    /* A TOKEN, NOT A HARDCODED RGBA. This was rgba(239,233,221,0.8) — the LIGHT theme's --paper, frozen —
-       while :hover below resolves var(--paper) live, so in dark theme the label changed hue on hover
-       (#efe9dd -> #dfe3df). Signature.astro, the model this chip is borrowed from, uses text-paper/80,
-       which follows the theme. Palette discipline is a taste rule here, not a preference. */
-    color: color-mix(in srgb, var(--paper) 80%, transparent);
-    border: 1px solid color-mix(in srgb, var(--ochre) 25%, transparent);
-    cursor: pointer;
-    transition: color 0.2s ease, border-color 0.2s ease;
+  /* MATCH THE HERO'S PHONE TREATMENT. `#heights .terrain-canvas` drops to `opacity: 0.4` under this same
+     query, and a second canvas does not inherit that — without this, a phone's entrance paints a field 2.5x
+     stronger than the hero it lands on. (This is one of the hand-synced `max-width: 640px` blocks CLAUDE.md
+     counts; if PHONE_MAX_WIDTH changes, change this with it.) */
+  @media (max-width: 640px), (max-height: 520px) {
+    .gate-field { opacity: 0.4; }
   }
-  .gate-enter:hover { color: var(--paper); border-color: var(--ochre); }
-  /* :focus AS WELL AS :focus-visible. The script focuses this button programmatically, and Chrome does not
-     match :focus-visible on a programmatic focus with no prior keyboard interaction — so the only control
-     in a modal dialog had no visible focus indicator until the visitor happened to press a key. */
-  .gate-enter:focus,
-  .gate-enter:focus-visible { outline: 2px solid var(--ochre); outline-offset: 3px; }
 
   @media (prefers-reduced-motion: no-preference) {
     .gate { transition: opacity 600ms ease, visibility 600ms ease; }
-
-    /* NO CSS ANIMATION ON THE STROKES — the dash is driven from the script below, the way the source does it.
-       Four CSS translations of framer-motion's pathLength/pathOffset shipped here first and each produced its own
-       artifact: a sub-unit stipple, an offset that never interpolated, a fixed-length dash that slid in and out
-       of frame. Keep it in JS.
-         VECTOR-EFFECT MUST STAY OFF, which is the one durable finding from the round where this "flashed".
-       `vector-effect="non-scaling-stroke"` stops the renderer caching stroked geometry, so every full-screen path
-       is re-stroked at device resolution every frame. It arrived in the same commit as the dash, which is how it
-       escaped blame for a while — the source animates a dash on just as many paths and runs fine without it.
-       tests/distSmoke.test.ts asserts it stays off.
-         The resting opacity below is what a visitor sees with JS off or under reduced motion.
-
-       This block used to carry ~20 lines of narrative about three earlier attempts, ending in a standing
-       instruction to "animate the strongest dozen and leave the haze static" if the problem came back. Both of
-       those were then built and rejected — the frozen strokes read as failed ones, and the haze underlay read as
-       a trail behind every line, which distSmoke now forbids outright. A comment that prescribes a rejected fix
-       is worse than no comment, so the prescription is gone and the history now lives in CLAUDE.md where the
-       rest of the rejections are. */
-    .gate.is-up .gate-fam .gate-trail { opacity: 0.45; }
-
-    /* THE LETTERS FAIL VISIBLE, and that is the fix for the name arriving incomplete TWICE — "I g T n" and
-       then "ng Ti", a different set of letters missing each time.
-         What was wrong: the rule set `opacity: 0` as the resting state and relied on a `forwards` animation to
-       bring each letter back. Any letter whose animation does not run, or gets interrupted and never restarts,
-       is then permanently invisible — and the thing it takes with it is the owner's NAME, on the first screen
-       of his portfolio. My earlier explanation for this (frame starvation) was wrong on its own terms: CSS
-       animations are driven by the document timeline, so dropped frames make them jerky, never unfinished.
-       Whatever the real trigger is, the failure mode was only possible because the resting state was invisible.
-         So nothing here starts at opacity 0 any more. The spring animates TRANSFORM only, and a letter whose
-       animation never runs simply sits in its final position, fully legible. The same asymmetry as isCovered()
-       and hasSeenGate(): decide which direction the unknown case should fail in, and make that the default. */
-    .gate.is-up .gate-letter {
-      animation: gate-letter 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-      animation-delay: calc(150ms + var(--l) * 30ms);
-    }
-    @keyframes gate-letter {
-      from { transform: translateY(36px); }
-      to   { transform: none; }
-    }
-
-    /* THESE FAIL VISIBLE TOO. They had `opacity: 0` with a `forwards` fade, which is the same hazard the
-       letters had — and it bit for the same reason: a screenshot arrived with the name present but the roles
-       line AND the button both missing, on a modal whose only control is that button. Nothing on this screen
-       may have an invisible resting state. They rise instead, from a state that is already legible. */
-    .gate.is-up .gate-roles,
-    .gate.is-up .gate-enter {
-      animation: gate-rise 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-    }
-    .gate.is-up .gate-roles { animation-delay: 400ms; }
-    .gate.is-up .gate-enter { animation-delay: 700ms; }
-    @keyframes gate-rise {
-      from { transform: translateY(14px); }
-      to   { transform: none; }
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    /* THE FINISHED STATE, and it needs exactly one declaration.
-         The driver is never built under reduced motion (`if (!reduced())` below), so no stroke ever receives an
-       inline dash and there is nothing to clear — a `stroke-dasharray: none` reset used to sit here and reset
-       nothing. What IS needed is the opacity pin: the per-path `stroke-opacity` attribute ramps to 1.0, so
-       without this a reader with motion off gets the drawing at full strength, which is a different picture
-       rather than a still of the same one. 0.45 is the envelope's plateau, i.e. where a moving reader spends
-       most of the cycle.
-         Two contradictory comment blocks used to be stacked here, one saying there was no dash to reset and the
-       next saying the reset was back, each written in a different round and neither deleting the other. Between
-       them they asserted a drift/breathe animation, a `0.3 0.7` keyframe and a 72-path count — none of which
-       exist (48 strokes ship, and the only keyframes in this file are `gate-letter` and `gate-rise`). */
-    .gate-trail { opacity: 0.45; }
-    .gate-letter, .gate-roles, .gate-enter { opacity: 1; transform: none; }
-  }
-
-  /* Phones get half the strokes — 24 of the 48, every other curve in each family. The content is the same
-     (phone work here is parity plus bug fixes), but 48 full-screen strokes animating a dash offset forever is a
-     real paint cost on a handset, and at that width the thinning is invisible.
-       The counts in this comment said 36 of 72 until GATE_COUNT dropped to 24 per family. Prefer describing the
-     RULE ("every other curve") over the arithmetic, since the arithmetic is downstream of a dial. */
-  @media (max-width: 640px) {
-    .gate-trail:nth-child(2n) { display: none; }
   }
 </style>
 
-<script is:inline define:vars={{ KEY: GATE_SEEN_KEY, MS: GATE_DISMISS_MS, UP: GATE_UP_ATTR, REVEAL: GATE_REVEAL_EVENT, DRAWN_MIN: GATE_DRAWN_MIN, PEAK: GATE_OPACITY_PEAK, RAMP: GATE_OPACITY_RAMP, OPEN_PHASE: GATE_OPEN_PHASE }}>
-  // Synchronous, so a first visit covers before first paint with no flash of homepage-then-gate. Mirrors
-  // BaseLayout's veil script, which is inline for the same reason.
-  //
-  // The policy this duplicates lives in lib/gate.ts and is unit-tested there. It is restated inline rather
-  // than imported because a module script cannot run before first paint, and the whole value of the gate's
-  // no-flash behaviour depends on running early. The two must agree: KEY and MS are injected from the same
-  // constants, and lib/gate.ts's tests are what pin the semantics (fail closed, timer not transitionend,
-  // idempotent). If you change the rule, change it there first.
+<script
+  is:inline
+  define:vars={{
+    KEY: GATE_SEEN_KEY,
+    MS: GATE_DISMISS_MS,
+    UP: GATE_UP_ATTR,
+    REVEAL: GATE_REVEAL_EVENT,
+    LAND: GATE_LAND_EVENT,
+  }}
+>
+  // POLICY ONLY — this script paints nothing. It is `is:inline` because it has to run before first paint:
+  // that is what makes the entrance the first thing on screen rather than a flash of homepage followed by an
+  // overlay. An inline script cannot import, so the rules it enforces are RESTATED here and unit-tested in
+  // lib/gate.ts rather than shared, and every string or number it needs comes through define:vars, because a
+  // restated constant drifts from its test silently.
   (function () {
     var gate = document.querySelector('[data-gate]');
     if (!gate) return;
 
-    // FRESH LOAD ONLY. An inline script runs during parse, so readyState is 'loading'; when ClientRouter
-    // re-executes it after a View Transition the document is already 'complete'. Without this the gate
-    // raised mid-session: the script lives only in /'s HTML, so a visitor whose entry page was /research
-    // (the indexed, linkable entry) is not carrying it in Astro's `scriptsAlreadyRan`, and clicking "home"
-    // executed it for the first time — a full-screen interstitial over a page they were already going to.
-    // BaseLayout's veil has guarded the identical hazard since it was written (`__descentVeilInit`,
-    // "first load only"). isFreshLoad() in lib/gate.ts owns this rule and is tested there.
+    // FRESH LOAD ONLY. An inline script runs during parse, so readyState is 'loading' on a genuine
+    // navigation; when ClientRouter re-executes this after a View Transition the document is already
+    // 'complete'. Without the guard the overlay raised mid-session, over a homepage the visitor was already
+    // going to. isFreshLoad() in lib/gate.ts owns this rule.
     if (document.readyState !== 'loading') return;
 
     var store = null;
     try { store = window.sessionStorage; } catch (e) { store = null; }
 
-    // FAIL CLOSED: no store, or a store that throws, means do not raise. See lib/gate.ts.
+    // FAIL CLOSED: no store, or a store that throws, means do not raise. A visitor in a locked-down browser
+    // gets the site, not a decoration they cannot dismiss.
     var seen = true;
     if (store) {
       try { seen = store.getItem(KEY) !== null; } catch (e) { seen = true; }
     }
     if (seen) return;
 
-    var done = false;
-    var btn = gate.querySelector('[data-gate-enter]');
-
     function reduced() {
-      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
     }
+
+    // AN ENTRANCE MADE ENTIRELY OF MOTION HAS NOTHING TO SHOW A READER WHO ASKED FOR NONE, so it does not
+    // raise at all under reduced motion. The alternative — a still frame of the hero's terrain held for two
+    // seconds — is a delay with no content, which is worse than no entrance. The "finished state" the motion
+    // rule asks for is the homepage itself.
+    if (reduced()) return;
+
+    var done = false;
+    var landed = false;
+    var autoTimer = 0;
 
     // STOPIMMEDIATEPROPAGATION, NOT JUST PREVENTDEFAULT — and the difference is the whole bug this fixes.
     // preventDefault() cancels the browser's own scrolling; it does nothing to a SIBLING listener. Deck.astro
     // also listens on window for wheel, and its onWheel does NOT check e.defaultPrevented (it checks it for
-    // keydown, at Deck.astro:243, but not for wheel). So one flick while the gate was up ran the deck's
-    // tween — window.scrollTo() still works under `overflow: hidden`, which by spec suppresses only the
-    // USER's scrolling mechanism and leaves programmatic scrolling intact — and the visitor clicked "enter
-    // the descent" to arrive in the middle of a later slide, never seeing the hero the gate exists to
-    // introduce. This listener is registered at parse time and the deck's at astro:page-load, so the gate's
-    // runs first and stopImmediatePropagation keeps the deck from ever seeing the event.
+    // keydown, but not for wheel). So one flick while the overlay was up ran the deck's tween —
+    // window.scrollTo() still works under `overflow: hidden`, which by spec suppresses only the USER's
+    // scrolling mechanism — and the reveal landed in the middle of a later slide, never showing the hero the
+    // entrance exists to introduce.
+    //
+    // AND IT LANDS, rather than only swallowing. Every surveyed intro that landed well was skippable, and a
+    // swallower that did not land would leave a reader flicking at a screen that ignores them. The listeners
+    // that suppress input are the same ones that end the entrance, so nothing is swallowed without also
+    // doing something. If you ever add a swallowing listener here that does not land, re-read this.
     function swallow(e) {
       if (done) return;
       e.preventDefault();
       e.stopImmediatePropagation();
+      land();
     }
 
-    // The deck's keys have to be swallowed for the same reason, and the previous version let every one of
-    // them through: it handled Escape and Tab and returned, so ArrowDown/PageDown/space/Home/End reached
-    // Deck.onKey and paged the document behind the gate.
-    var DECK_KEYS = [
-      'ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' ', 'Spacebar',
-    ];
+    // The deck's keys have to be swallowed for the same reason. An earlier version handled Escape and Tab and
+    // returned, so ArrowDown/PageDown/space/Home/End reached Deck.onKey and paged the document behind it.
+    var DECK_KEYS = ['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' ', 'Spacebar'];
 
     function onKey(e) {
-      if (e.key === 'Escape') { dismiss(); return; }
-      if (e.key === 'Tab') {
-        // A REAL TRAP, NOT A FREEZE. Blanket-blocking Tab looked like a trap but was one: clicking the
-        // gate's background blurs the button to <body>, and from there a blocked Tab left a keyboard
-        // visitor unable to reach the only control, with Escape the undocumented sole exit. Put focus back
-        // on the button instead, so Tab cycles where there is one stop.
+      if (done) return;
+      if (e.key === 'Escape' || DECK_KEYS.indexOf(e.key) !== -1) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        if (btn) btn.focus();
-        return;
-      }
-      if (e.key === 'Enter' || e.key === 'Spacebar' || e.key === ' ') {
-        // Let the button's own activation through, but never the deck's page-down on space.
-        if (e.target === btn) return;
-      }
-      if (DECK_KEYS.indexOf(e.key) !== -1) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
+        land();
       }
     }
 
-    // EVERY BODY CHILD EXCEPT THE GATE, not just <main>. `inert` on main alone left 18 focusable elements
-    // reachable — measured against dist: 7 Toc links, 5 CornerNav page links, 4 CornerNav mark links
-    // (GitHub / mailto / cv.pdf / LinkedIn), the nav menu button and the theme toggle, all of which render
-    // AFTER </main>. The old comment claimed "the only focusable thing is the button", which was true of
-    // the gate and false of the document, so the trap rested entirely on blanket-blocking Tab.
+    // EVERY BODY CHILD EXCEPT THE OVERLAY, not just <main>. `inert` on main alone left 18 focusable elements
+    // reachable — 7 Toc links, 5 CornerNav page links, 4 CornerNav mark links, the nav menu button and the
+    // theme toggle, all of which render AFTER </main>.
     var inerted = [];
     function setInert(on) {
       if (on) {
@@ -403,234 +197,246 @@ const letters = [...`${name.first} ${name.last}`];
       }
     }
 
+    /**
+     * THE LANDING. Called by the painter when its clock runs out, by any gesture, by Escape, and by the
+     * backstop timer — whichever comes first. Idempotent.
+     *
+     * ORDER IS LOAD-BEARING, and it is the opposite of the obvious one:
+     *
+     *   1. Tell the painter to land. It snaps its camera to the hero's exact config and keeps mirroring it,
+     *      so whatever is on the overlay's canvas from here on is the hero's own frame.
+     *   2. Clear `data-gate-up` BEFORE firing REVEAL. The hero's `apply()` re-reads `isCovered()`, which
+     *      tests that attribute — fire first and it computes "still covered" and does not resume.
+     *   3. Fire REVEAL on `document`. That is the hero's channel (it listens on `document`, not `window` —
+     *      dispatching on `window` is a separate channel and the hero never hears it). `last = 0` on resume
+     *      means its first frame paints immediately.
+     *   4. Only then start the dismissal, which crossfades the overlay out over 600ms. Both canvases are
+     *      painting the same frame in the same box through that window, so the only thing that visibly changes
+     *      is the ground giving way to the sky — the terrain is continuous across the seam, and the hero's
+     *      name and bio fade up on the same clock.
+     */
+    function land() {
+      if (landed) return;
+      landed = true;
+      if (autoTimer) { window.clearTimeout(autoTimer); autoTimer = 0; }
+      window.dispatchEvent(new Event(LAND));
+      document.documentElement.removeAttribute(UP);
+      document.dispatchEvent(new Event(REVEAL));
+      dismiss();
+    }
+
     function dismiss() {
-      if (done) return;            // idempotent: Escape then click must not run this twice
+      if (done) return;            // idempotent: a gesture then the timer must not run this twice
       done = true;
       try { if (store) store.setItem(KEY, '1'); } catch (e) { /* denied; it reappears next load */ }
 
       gate.classList.remove('is-up');
-      // The flow has nothing left to draw on once the gate is down, and a rAF loop painting a hidden overlay
-      // is exactly the waste the data-gate-up flag exists to prevent elsewhere.
-      if (flowRaf) { cancelAnimationFrame(flowRaf); flowRaf = 0; }
       document.documentElement.style.overflow = '';
-      // Let the hero and the sky start animating: they held off while nothing they drew could be seen.
-      // Order matters — clear the flag BEFORE firing, so a listener that re-reads it sees the new state.
       document.documentElement.removeAttribute(UP);
-      document.dispatchEvent(new Event(REVEAL));
       setInert(false);
       window.removeEventListener('wheel', swallow, { passive: false });
       window.removeEventListener('touchmove', swallow, { passive: false });
+      window.removeEventListener('touchend', swallow);
+      window.removeEventListener('pointerdown', swallow);
       document.removeEventListener('keydown', onKey, true);
-      document.removeEventListener('astro:before-swap', dismiss);
+      window.removeEventListener(LAND, land);
+      document.removeEventListener('astro:before-swap', land);
 
       // A TIMER, never transitionend — under reduced motion no transition fires and this would never run,
       // leaving the page scroll-locked forever. dismissMs() in lib/gate.ts owns this number.
       window.setTimeout(function () {
         // The deck measured its stops while the document was scroll-locked; make it re-measure.
         window.dispatchEvent(new Event('resize'));
-      }, reduced() ? 0 : MS);
+      }, MS);
     }
-
-    // ── THE FLOW, DRIVEN HERE RATHER THAN IN CSS ────────────────────────────────────────────────────
-    // The source's per-path animation, which this reproduces:
-    //     pathLength 0.3 -> 1          the drawn dash grows from 30% of the arc to all of it, then RESETS
-    //     pathOffset 0 -> 1 -> 0       the dash's leading edge travels forward, then back
-    //     opacity    0.3 -> 0.6 -> 0.3 the element pulses
-    //     duration   20-30s, linear, repeating forever, no delay
-    //
-    // THE DASH DOES NOT WRAP — IT CLIPS, and this is the detail everything else here depends on. framer-motion
-    // sets pathLength="1" and writes `stroke-dasharray = "<L> <S>"` with pathSpacing defaulting to 1, so the
-    // period is L+1 and always exceeds the arc: at most ONE dash is ever on the path, and the painted span is
-    // [O, min(1, O+L)). Earlier rounds here assumed it tiled and reasoned in circles from that.
-    //
-    // EVERY path animates, and every path starts at the same point in its cycle — both are the source, and
-    // deviating from either produced "lifeless ... some kids drew them in kindergarten". Animating only a subset
-    // leaves the rest frozen at full length, which reads as strokes that failed rather than as depth; scattering
-    // the phases replaces the source's coherent sweep with unrelated strokes caught mid-stride.
-    //
-    // TWO CORRECTIONS to the source, both for "entire lines go dark immediately", both at their own cause:
-    //   1. the opacity envelope reaches ZERO where the drawn length resets, so the sawtooth's discontinuity has
-    //      nothing visible to disrupt (opacityAt in lib/gate.ts);
-    //   2. travel is CLIPPED to the arc that is actually on screen, so a stroke is never off-frame for most of
-    //      its cycle (the data-a/data-b window, measured by visibleWindow at build time).
-    // One substitution: durations come from a deterministic LCG rather than Math.random(), because a drawing
-    // that differs between builds is against the house rule the Rules slide's seeded walk follows.
-    //
-    // This header previously asserted that a fixed-length dash flashes and that growth is what prevents it, and
-    // that the field opens on a 4-second lead. Neither is true — the first was a wrong generalisation that went
-    // on to justify two rejected schemes, and the second was superseded by the phase fraction below while the
-    // old text stayed. The rejections now live in CLAUDE.md, in one place.
-    // WHERE A STROKE STARTS, and the envelope, both come from lib/gate.ts via define:vars — see GATE_OPEN_PHASE
-    // and opacityAt there for why 0.16 and why the envelope plateaus instead of peaking. Both are unit-tested,
-    // and both are numbers this script must not be allowed to drift from.
-    // HOW FAR A STROKE MAY LEAN toward warm or cool. Deliberately small: the strokes must stay near-ink, both
-    // because the palette rule keeps the seal the only saturated colour in the light theme and because the point
-    // is a shimmer a reader notices without being able to name.
-    var TINT = 0.22;
-    var SWING = 0.35;        // GATE_WIDTH_SWING in lib/gate.ts
-    var TAU = Math.PI * 2;
-
-    /**
-     * A CSS colour -> [r, g, b]. HEX FIRST, and that is not defensive coding — the palette in tokens.css is
-     * written in hex (`--ochre: #c8a36a`) and getPropertyValue on a custom property hands the authored string
-     * straight back rather than a resolved rgb(). An rgb()-only parser silently fell through to the default
-     * here, which made warm and cool both equal the base: the colour animation ran every frame and changed
-     * nothing. It cost one measurement to find and would never have been visible in review.
-     */
-    function rgb(v) {
-      var t = String(v).trim();
-      var hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(t);
-      if (hex) {
-        var h = hex[1];
-        if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
-        return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
-      }
-      var m = t.match(/-?[\d.]+/g);
-      return m && m.length >= 3 ? [+m[0], +m[1], +m[2]] : [239, 233, 221];
-    }
-    var field = gate.querySelector('.gate-field');
-    var fieldCs = field ? getComputedStyle(field) : null;
-    var base = rgb(fieldCs ? fieldCs.getPropertyValue('--trail-base') : '');
-    var warm = rgb(fieldCs ? fieldCs.getPropertyValue('--trail-warm') : '');
-    var cool = rgb(fieldCs ? fieldCs.getPropertyValue('--trail-cool') : '');
-
-    var flowing = [];
-    if (!reduced()) {
-      var fams = gate.querySelectorAll('.gate-fam');
-      for (var fi = 0; fi < fams.length; fi++) {
-        var ps = fams[fi].querySelectorAll('.gate-trail');
-        for (var k = 0; k < ps.length; k++) {
-          var len = parseFloat(ps[k].getAttribute('data-len') || '0');
-          var wa = parseFloat(ps[k].getAttribute('data-a') || '0');
-          var wb = parseFloat(ps[k].getAttribute('data-b') || String(len));
-          // The authored width, kept so the per-frame multiplier has something to multiply. Reading it back
-          // from the attribute avoids restating the ramp here: gateRefPaths owns it.
-          var w0 = parseFloat(ps[k].getAttribute('stroke-width') || '1');
-          var seed = (fi * 36 + k) * 9301 + 49297;
-          // 6-9s PER TRAVERSE, not the source's 20-30s, and this is the one number that was never pulled far
-          // enough to matter. Measured: at 20-30s a stroke advances 8-12% of its traverse during a 2.5s dwell,
-          // so the thing the whole dash exists to do — "lines travelling through the background" — covered a
-          // tenth of its journey while anyone was looking. At 6-9s a dwell covers 28-42% and the sweep reads.
-          // The source can afford 20-30s because it is a LANDING page you sit on; a gate is dismissed in a
-          // gesture, which is the same correction GATE_OPEN_PHASE makes for the opening frame.
-          var dur = 6000 + ((seed % 233280) / 233280) * 3000;
-          // A per-stroke phase for the weight and tint curves, from the same deterministic stream the
-          // durations use. Without it the whole family would thicken and warm in unison, which reads as the
-          // drawing breathing rather than as strokes each having their own weight.
-          var cph = ((seed * 7919) % 1000) / 1000;
-          if (len > 0) {
-            flowing.push({ el: ps[k], len: len, dur: dur, ph: OPEN_PHASE, a: wa, b: wb, w0: w0, cph: cph });
-          }
-        }
-      }
-    }
-
-    var flowRaf = 0;
-    function flow(now) {
-      for (var n = 0; n < flowing.length; n++) {
-        var f = flowing[n];
-        var t = (((now / f.dur) + f.ph) % 1);
-        var drawn = (DRAWN_MIN + (1 - DRAWN_MIN) * t) * f.len;   // pathLength 0.3 -> 1 (drawnFrac in lib/gate)
-        var tri = t < 0.5 ? t * 2 : (1 - t) * 2;          // pathOffset 0 -> 1 -> 0
-        // THE GAP IS A WHOLE PATH LENGTH, NOT THE REMAINDER. framer-motion's `pathSpacing` defaults to 1, and
-        // its units are normalised path lengths — so the source's gap is the FULL arc, making the pattern
-        // period `drawn + len`. Writing the remainder instead makes the period exactly `len`, so the pattern
-        // tiles the path perfectly and whatever slides off the end immediately re-enters at the start. That is
-        // a second stroke segment that the source does not draw, on every curve, for the whole cycle — the
-        // scattering of short disconnected ends that read as "some kids drew them in kindergarten".
-        // ── TRAVEL IS CLIPPED TO THE ARC THAT IS ON SCREEN ──────────────────────────────────────────────
-        // The dash does NOT wrap, and getting that wrong is what made the earlier reasoning here circular. Its
-        // period is `drawn + len`, which always exceeds the arc, so at most one dash lies on the path: the
-        // leading edge sits at `s` and the painted span is [s, min(len, s + drawn)], CLIPPED at the end rather
-        // than re-entering at the start.
-        //
-        // So the sweep only has to keep that span overlapping [a, b] — the measured on-screen window. Sweeping
-        // `s` from `a + m - drawn` to `b - m` does exactly that: at one extreme the dash's trailing end sits
-        // just inside `a`, at the other its leading edge sits just inside `b`, and everywhere between it covers
-        // more. The dash never leaves the picture, so the 42%-of-every-cycle blank is gone — and because a dash
-        // END is on frame far more of the time, it reads as MORE motion, not less.
-        //
-        // Unclipped, `s` swept 0 -> len, and both ends of that are off-screen: the source's own opening state
-        // (the first 30% of the arc) ends at 0.30 while the earliest on-screen point is 0.396, which is why the
-        // reference itself starts on an empty frame.
-        var m = 0.18 * (f.b - f.a);
-        var lo = f.a + m - drawn;
-        var hi = f.b - m;
-        f.el.style.strokeDasharray = drawn + ' ' + f.len;
-        f.el.style.strokeDashoffset = String(-(lo + (hi - lo) * tri));
-        // ── THE ONE CHANGE THAT FIXES "entire lines go dark immediately" ────────────────────────────────
-        // The source's envelope is opacity [0.3, 0.6, 0.3] — nonzero at BOTH ends of the cycle. That is the
-        // whole defect: `drawn` is a sawtooth, so at the wrap it snaps from the entire arc back to a 30%
-        // fragment sitting at the curve's off-screen start, and because the stroke is still at 0.3 opacity when
-        // that happens the snap is fully visible. A line that was drawn across the frame is simply gone in the
-        // next frame.
-        //
-        // Taking the envelope to ZERO at the cycle boundary moves the discontinuity to where nothing is on
-        // screen to see it. Nothing else changes: same dash, same travel, same durations, same coherence. A
-        // stroke now fades in, sweeps across the frame, and fades out — which is also the thing the owner was
-        // reaching for with "lines travelling through the background like the trails of asteroids".
-        //
-        // WHY NOT THE ALTERNATIVES, since both were built and rejected: a faint full-length stroke underneath
-        // stops the vanishing too, but its uncovered stretch reads as "the line leaves a trail behind"; and
-        // removing the dash altogether leaves a static drawing. This touches neither — there is no second
-        // layer and the motion is the approved one.
-        //
-        // `tri` is already 0 at t=0 and t=1 and 1 at the midpoint, so it IS the envelope; it only needed to be
-        // used as a multiplier instead of as an offset from 0.3.
-        // so the mid-cycle brightness survives starting from zero.
-        // opacityAt() in lib/gate: ramps off zero over the first RAMP of the triangle, then holds. Zero at the
-        // cycle boundary is the whole fix; the plateau is what stops the fix costing brightness.
-        f.el.style.opacity = String(PEAK * Math.min(1, tri / RAMP));
-
-        // ── WEIGHT AND COLOUR VARY AS THE STROKE TRAVELS ────────────────────────────────────────────────
-        // widthAt / tintAt in lib/gate.ts own both curves and are unit-tested there; what is restated here is
-        // only their arithmetic, because this script cannot import. Both are periodic in t, so neither adds a
-        // discontinuity at the cycle boundary the envelope is hiding.
-        //
-        // SVG gives one width and one colour per path per frame, so this is variation in TIME, not along the
-        // stroke. Tapering head-to-tail would need a canvas, which was built and rejected.
-        f.el.style.strokeWidth = String(f.w0 * (1 + SWING * Math.sin(TAU * (2 * t + f.cph))));
-        var tint = Math.sin(TAU * (2 * t + f.cph + 0.25));
-        var mix = tint > 0 ? warm : cool;
-        var amt = Math.abs(tint) * TINT;
-        f.el.style.stroke = 'rgb(' + Math.round(base[0] + (mix[0] - base[0]) * amt) + ','
-          + Math.round(base[1] + (mix[1] - base[1]) * amt) + ','
-          + Math.round(base[2] + (mix[2] - base[2]) * amt) + ')';
-      }
-      flowRaf = requestAnimationFrame(flow);
-    }
-    if (flowing.length) flowRaf = requestAnimationFrame(flow);
 
     gate.classList.add('is-up');
     document.documentElement.style.overflow = 'hidden';
-    // Raised BEFORE the canvases initialise, because this script is inline and parse-time while theirs run on
-    // astro:page-load — so they see the flag on their very first check and never start a loop at all, rather
-    // than starting one and being stopped a moment later.
+    // Tells the hero and the sky to hold off while nothing they paint can be seen, and tells Heights to hold
+    // the name, bio and roles at zero so they have something to fade IN from. Both jobs want exactly the same
+    // lifetime, so they share one flag rather than racing two.
     document.documentElement.setAttribute(UP, '');
     setInert(true);
     window.addEventListener('wheel', swallow, { passive: false });
     window.addEventListener('touchmove', swallow, { passive: false });
-    // A TOUCH ANYWHERE DISMISSES, because otherwise a phone has no way out but one button.
-    //
-    // `touchmove` above is swallowed (trap 3: it would otherwise reach Deck.astro's sibling listener and scroll
-    // the page behind the gate), and onKey only exits on Escape — a key a phone does not have. So a visitor
-    // following a link on a phone, which is the arrival path for anyone coming from LinkedIn, had exactly one
-    // 44px target and no gesture. `touchend` rather than `touchstart` so a scroll attempt that gets swallowed
-    // still counts as "let me in" rather than firing before the finger has decided.
-    window.addEventListener('touchend', dismiss, { passive: true });
+    window.addEventListener('touchend', swallow, { passive: true });
+    window.addEventListener('pointerdown', swallow, { passive: true });
     document.addEventListener('keydown', onKey, true);
+    // THE PAINTER'S SIDE OF THE HANDSHAKE, and leaving it out is a bug this shipped once: the painter runs
+    // the clock and dispatches LAND when it reaches the end, so without this listener the entrance only ever
+    // ended via the backstop timer — measured, it ran 4000ms instead of 2600 and the terrain sat finished for
+    // a second and a half. The channel is bidirectional on purpose (land() dispatches LAND to tell the
+    // painter to stop tweening), and the `landed` guard is what keeps the self-dispatch from recursing.
+    window.addEventListener(LAND, land);
+    // Window/document listeners outlive the overlay's DOM: ClientRouter replaces document.body, so without
+    // this `swallow`/`onKey` would keep calling preventDefault forever — wheel scrolling and Tab dead
+    // site-wide with nothing on screen to explain it.
+    document.addEventListener('astro:before-swap', land);
 
-    // LEAVING THE PAGE IS A DISMISSAL, and without this the listeners outlived the element they belong to.
-    // ClientRouter replaces document.body on a navigation, so the gate's DOM disappears while `swallow` and
-    // `onKey` — bound to window and document, which survive the swap — keep calling preventDefault forever:
-    // wheel and trackpad scrolling dead on every page, Tab dead site-wide, for the rest of the session, with
-    // no gate on screen to explain it. The visitor concludes their mouse broke. CLAUDE.md's Interactivity
-    // contract has required "re-init on astro:page-load, WITH A TEARDOWN" all along; this is the teardown.
-    document.addEventListener('astro:before-swap', dismiss);
-
-    if (btn) {
-      btn.addEventListener('click', dismiss);
-      try { btn.focus({ preventScroll: true }); } catch (e) { btn.focus(); }
-    }
+    // AND IT ENDS EVEN IF THE PAINTER NEVER RUNS. This is the worst case of an automatic overlay and it is
+    // worse than anything the click gate could do: the entrance normally ends when the painter's clock runs
+    // out, and the painter is a BUNDLED module. If it fails to load, throws on an old browser, or the canvas
+    // context is unavailable, nothing would ever land and an opaque full-screen layer would sit over the site
+    // permanently. This script cannot fail to run — it is parsed with the document — so it carries the
+    // backstop. tests/distSmoke.test.ts asserts it exists and is bounded.
+    autoTimer = window.setTimeout(land, 4000);
   })();
+</script>
+
+<script>
+  // THE PAINTER. A bundled module, because it needs the terrain renderer and the entrance's schedule and
+  // restating either would be the drift this whole design exists to avoid. It may arrive a frame late — the
+  // overlay is already up and opaque by then, raised by the inline script above.
+  import {
+    BREATH_AMP_LIVE,
+    BREATH_PERIOD_S,
+    buildGrid,
+    paintTerrain,
+    terrainConfig,
+    type GridPoint,
+  } from '../lib/terrainRender';
+  import {
+    ENTRANCE_AZ_SWING,
+    ENTRANCE_BREATH_FROM,
+    ENTRANCE_EDL_SIZE_FROM,
+    ENTRANCE_ELEV_EMPHASIS_FROM,
+    ENTRANCE_MS,
+    ENTRANCE_ZOOM_FROM,
+    GATE_LAND_EVENT,
+    breathPhaseOffset,
+    entranceProgress,
+  } from '../lib/gate';
+
+  let teardown: (() => void) | null = null;
+
+  function initEntrance(): void {
+    teardown?.();
+    teardown = null;
+
+    const maybeCanvas = document.querySelector<HTMLCanvasElement>('[data-gate-field]');
+    const maybeGate = document.querySelector<HTMLElement>('[data-gate]');
+    // Only paint when the inline script actually raised the overlay. On a second visit in a session, on a
+    // reduced-motion reader, or on any route but `/`, there is nothing to paint and no clock to run.
+    if (!maybeCanvas || !maybeGate || !maybeGate.classList.contains('is-up')) return;
+    const cvs = maybeCanvas;
+
+    const maybeCtx = cvs.getContext('2d');
+    if (!maybeCtx) return;
+    const ctx = maybeCtx;
+
+    // The hero's canvas is the geometry reference, not the viewport. If it is not in the document there is
+    // no frame to land on, so do not start — the inline script's backstop still ends the entrance.
+    const maybeHero = document.querySelector<HTMLCanvasElement>('#terrain');
+    if (!maybeHero) return;
+    const hero = maybeHero;
+
+    // A FRESH CONFIG, never shared with the hero. The tween mutates zoom/light/edl on this object every
+    // frame; one shared object would make the hero's picture follow the overlay's camera.
+    const dark = document.documentElement.dataset.theme === 'dark';
+    const cfg = terrainConfig(dark);
+    const HERO_ZOOM = cfg.zoom;
+    const HERO_AZ = cfg.light.az;
+    const HERO_EDL_SIZE = cfg.edlSizeRange;
+    const HERO_ELEV = cfg.elevEmphasis;
+
+    // buildGrid, never a hand-rolled lattice: its loop accumulates floating point and stops at 2.52, giving
+    // 1089 points and an asymmetric footprint, and `computeEDL` normalises by the p80 of the response over
+    // the WHOLE set — so a "cleaner" lattice changes every dot's shade, not just the new ones.
+    const grid: GridPoint[] = buildGrid(cfg.edlParams);
+
+    let DPR = 1;
+    let W = 0;
+    let Hh = 0;
+
+    /** Match the hero's canvas exactly: its box, its DPR, and its no-ctx.scale convention. */
+    function layout(): void {
+      const r = hero.getBoundingClientRect();
+      cvs.style.top = `${r.top}px`;
+      cvs.style.left = `${r.left}px`;
+      cvs.style.width = `${r.width}px`;
+      cvs.style.height = `${r.height}px`;
+      DPR = Math.min(2, window.devicePixelRatio || 1);
+      W = cvs.width = Math.round(r.width * DPR);
+      Hh = cvs.height = Math.round(r.height * DPR);
+      // No ctx.scale(DPR, DPR): paintTerrain works in device pixels and applies DPR to the dot radius
+      // itself, so scaling the context and passing CSS dimensions would give both half-size dots and a
+      // wrong scale basis.
+    }
+
+    let raf = 0;
+    let t0 = 0;
+    let landed = false;
+
+    /** The hero's exact frame. Everything the tween touches is put back to the value the hero paints. */
+    function heroFrame(tsec: number): void {
+      cfg.zoom = HERO_ZOOM;
+      cfg.light.az = HERO_AZ;
+      cfg.edlSizeRange = HERO_EDL_SIZE;
+      cfg.elevEmphasis = HERO_ELEV;
+      ctx.clearRect(0, 0, W, Hh);
+      paintTerrain(ctx, grid, cfg, W, Hh, DPR, tsec, BREATH_AMP_LIVE);
+    }
+
+    function frame(now: number): void {
+      if (!t0) t0 = now;
+      const ms = now - t0;
+
+      if (landed || ms >= ENTRANCE_MS) {
+        // MIRROR MODE. Past the landing the overlay keeps painting the hero's own frame on the hero's own
+        // clock, so the 600ms dismissal crossfade is between two identical pictures and the only thing that
+        // changes is the ground giving way to the sky.
+        heroFrame(now / 1000);
+        if (!landed) {
+          landed = true;
+          window.dispatchEvent(new Event(GATE_LAND_EVENT));
+        }
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+
+      const p = entranceProgress(ms);
+      cfg.zoom = (ENTRANCE_ZOOM_FROM + (1 - ENTRANCE_ZOOM_FROM) * p) * HERO_ZOOM;
+      cfg.light.az = HERO_AZ + ENTRANCE_AZ_SWING * (1 - p);
+      cfg.edlSizeRange = ENTRANCE_EDL_SIZE_FROM + (HERO_EDL_SIZE - ENTRANCE_EDL_SIZE_FROM) * p;
+      cfg.elevEmphasis = ENTRANCE_ELEV_EMPHASIS_FROM + (HERO_ELEV - ENTRANCE_ELEV_EMPHASIS_FROM) * p;
+      const breathAmp = ENTRANCE_BREATH_FROM + (BREATH_AMP_LIVE - ENTRANCE_BREATH_FROM) * p;
+
+      // THE CLOCK IS THE HERO'S, MINUS A WHOLE NUMBER OF BREATH PERIODS' WORTH OF PHASE.
+      // The hero passes `rAF timestamp / 1000`, i.e. time since navigation start, and the two share an
+      // origin with performance.now(). Subtracting a decaying offset runs the field fast-forward and lets it
+      // decelerate; because the offset is a WHOLE number of periods it is invisible in `sin`, so the moment
+      // it reaches zero the overlay is on the hero's exact phase. An offset of any other size would leave
+      // every dot displaced by up to ±8.8 CSS px relative to the hero's next frame.
+      const tsec = now / 1000 - breathPhaseOffset(p, BREATH_PERIOD_S);
+
+      ctx.clearRect(0, 0, W, Hh);
+      paintTerrain(ctx, grid, cfg, W, Hh, DPR, tsec, breathAmp);
+      raf = requestAnimationFrame(frame);
+    }
+
+    // A land from the policy script (a gesture, Escape, or the backstop) finishes the picture immediately.
+    function onLand(): void {
+      landed = true;
+    }
+
+    const onResize = (): void => { layout(); };
+
+    layout();
+    window.addEventListener('resize', onResize);
+    window.addEventListener(GATE_LAND_EVENT, onLand);
+    raf = requestAnimationFrame(frame);
+
+    teardown = () => {
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener(GATE_LAND_EVENT, onLand);
+    };
+    document.addEventListener('astro:before-swap', () => { teardown?.(); teardown = null; }, { once: true });
+  }
+
+  // THE THEME CAN FLIP MID-ENTRANCE. The toggle fires `theme:change`, and a painter that read the palette
+  // once at start would keep the old ramp, darkness and dotScale and land on a differently-coloured hero.
+  document.addEventListener('theme:change', initEntrance);
+  document.addEventListener('astro:page-load', initEntrance);
+  initEntrance();
 </script>
