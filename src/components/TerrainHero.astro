@@ -105,6 +105,12 @@ const bubbles = JSON.stringify([
     }
     resize();
 
+    /** The live breath amplitude, in world-z. The static frame uses 0 — see `frame`'s note on `breathIn`. */
+    const BREATH_AMP = 0.04;
+    /** How long the breath takes to come up from the still frame. Long enough to read as settling rather
+     *  than as a correction; short enough that a reader who arrives mid-ramp sees a living hero. */
+    const BREATH_IN_MS = 900;
+
     // descent walkers
     interface Walker { pts: Array<{x:number;y:number}>; born: number; done: boolean; retire: boolean; bubble: null | {word?:string;mathml?:string}; }
     const walkers: Walker[] = [];
@@ -120,10 +126,30 @@ const bubbles = JSON.stringify([
       nextSpawnAt = ts + 4200 + (spawnIx % 3) * 900;
     }
 
-    function frame(ts: number, animate: boolean) {
+    /**
+     * `breathIn` is the fix for a reported discontinuity: *"when transiting from the gate to the hero,
+     * the hero's dots got shifted by a tiny bit into its correct location."*
+     *
+     * The static frame and the animated frame disagreed about exactly one parameter. `frame(0, false)`
+     * paints with `breathAmp = 0`; the loop paints with `breathAmp = 0.04`. So the instant the loop
+     * starts, every dot's elevation gains `0.04 * sin(tsec * 0.4 + x*0.7 + y*0.6)` in one frame — and
+     * because `project` scales by `min(W, Hh) * 0.34 * zoom`, that is up to **±8.8 CSS px** of vertical
+     * displacement per dot at the hero's measured box. Not a fade, not a slide: a jump.
+     *
+     * It is NOT specific to the gate. The same jump happens on every ordinary page load — the static
+     * frame is painted for instant LCP and the loop starts a moment later — and on every resume from
+     * offscreen. The gate just makes it easy to see, because the overlay holds the still frame in front
+     * of you for two seconds first.
+     *
+     * Ramping the AMPLITUDE rather than the clock is what makes this exact. At `breathAmp = 0` the
+     * elevation is `field(x, y)` regardless of `tsec`, so the ramp's first frame reproduces the static
+     * frame byte for byte whatever time the loop happens to start at — there is nothing to synchronise.
+     * Easing the clock instead would have required knowing the phase the still frame was painted at.
+     */
+    function frame(ts: number, animate: boolean, breathIn = 1) {
       ctx.clearRect(0, 0, W, Hh);
       const tsec = ts / 1000;
-      const breathAmp = animate ? 0.04 : 0;
+      const breathAmp = animate ? BREATH_AMP * breathIn : 0;
       const breathHz = 0.4;
 
       // Terrain dots (shared renderer): elevation color → directional relief +
@@ -207,9 +233,15 @@ const bubbles = JSON.stringify([
     let io: IntersectionObserver | null = null;
     let revealed: (() => void) | null = null;
     if (!reduce) {
-      let running = false, last = 0;
+      let running = false, last = 0, breathFrom = 0;
       const loop = (ts: number) => {
-        if (ts - last > 33) { frame(ts, true); last = ts; }
+        // `breathFrom` is set to 0 on each resume and stamped on the first frame after, so the ramp is
+        // measured from when the loop actually started rather than from navigation start.
+        if (!breathFrom) breathFrom = ts;
+        if (ts - last > 33) {
+          frame(ts, true, Math.min(1, (ts - breathFrom) / BREATH_IN_MS));
+          last = ts;
+        }
         rafId = requestAnimationFrame(loop);
       };
       // OCCLUSION IS INVISIBLE TO AN INTERSECTION OBSERVER, which is why the gate has to say so explicitly.
@@ -222,7 +254,9 @@ const bubbles = JSON.stringify([
       // blank or cold — it is the finished still frame, which is also the reduced-motion state.
       const apply = (visible: boolean) => {
         const show = visible && !isCovered(document.documentElement);
-        if (show && !running) { running = true; last = 0; rafId = requestAnimationFrame(loop); }
+        // `breathFrom = 0` re-arms the ramp, so resuming from offscreen or from behind the gate comes back
+        // up from the still frame instead of snapping to full breath.
+        if (show && !running) { running = true; last = 0; breathFrom = 0; rafId = requestAnimationFrame(loop); }
         else if (!show && running) { running = false; cancelAnimationFrame(rafId); }
       };
       let onscreen = false;

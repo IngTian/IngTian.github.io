@@ -12,6 +12,7 @@ import {
   REF_VIEW_H,
   REF_VIEW_W,
   REF_WIDTH_SPREAD,
+  REF_PAN_X,
   REF_ZOOM,
   refFamily,
   refTrails,
@@ -234,18 +235,41 @@ describe('the zoom and the stroke scale, which are COUPLED and had no test at al
     expect(WINDOW_W / vb[2], 'the shipped viewBox no longer matches the reference scale').toBeCloseTo(refScale, 2);
   });
 
-  it('widens the viewBox about its own CENTRE, so the composition does not slide', () => {
+  it('widens the viewBox about its own CENTRE — the ZOOM must not slide the composition', () => {
     // Widening from the origin instead would shift every curve up and left by half the added size — the same
-    // apparent scale, a different picture.
+    // apparent scale, a different picture. That is what this guards, and it is tested at panX = 0 so the
+    // deliberate pan below cannot mask an accidental slide introduced by the zoom.
     //
     // Tolerance is half a user unit, not a tenth, and that is a real finding rather than a loosened bound: the
     // viewBox is emitted rounded to one decimal (944.47 -> 944.5), so the centre lands at 348.05 against a true
     // 348. At the shipped 2.107x that is 0.1 CSS px of drift across the whole composition — far below a pixel,
     // and the alternative is emitting un-rounded coordinates to chase it.
-    const [vx, vy, vw, vh] = refViewBox().split(/\s+/).map(Number);
+    const [vx, vy, vw, vh] = refViewBox(REF_ZOOM, 0).split(/\s+/).map(Number);
     expect(vx + vw / 2, 'the viewBox centre moved in x').toBeCloseTo(REF_VIEW_W / 2, 0);
     expect(vy + vh / 2, 'the viewBox centre moved in y').toBeCloseTo(REF_VIEW_H / 2, 0);
     expect(vw / vh, 'the aspect changed, so `meet` will letterbox differently').toBeCloseTo(REF_VIEW_W / REF_VIEW_H, 3);
+  });
+
+  it('pans the WINDOW right, which moves the DRAWING left — and only in x', () => {
+    // The owner's ask: "move the moving lines to the left a little bit." The sign is the easy thing to get
+    // wrong, so it is asserted: a POSITIVE pan must INCREASE the viewBox's min-x, because moving the window
+    // right over a fixed drawing shows the part further right, i.e. the drawing appears to move left.
+    const [px, py, pw, ph] = refViewBox(REF_ZOOM, REF_PAN_X).split(/\s+/).map(Number);
+    const [zx, zy, zw, zh] = refViewBox(REF_ZOOM, 0).split(/\s+/).map(Number);
+
+    expect(REF_PAN_X, 'the pan is meant to be a nudge, not a recomposition').toBeLessThan(0.12);
+    expect(REF_PAN_X).toBeGreaterThan(0);
+    expect(px, 'a positive pan must move the window RIGHT (drawing left)').toBeGreaterThan(zx);
+    // Precision 0 (within 0.5 user units), for the same reason the centring test above uses it: the viewBox
+    // is emitted rounded to one decimal, so a DIFFERENCE of two separately-rounded coordinates carries up to
+    // ±0.1 — measured here as 37.7 against a true 37.78. At the shipped 2.107x that is 0.2 CSS px.
+    expect(px - zx, 'the shift is a fraction of the WIDTH, not a literal').toBeCloseTo(zw * REF_PAN_X, 0);
+
+    // Nothing else may move. The pan must not touch the size, the aspect, or the vertical placement —
+    // changing the size would change the apparent scale, which is REF_ZOOM's job and nothing else's.
+    expect(pw, 'the pan changed the width, so it changed the apparent scale').toBeCloseTo(zw, 6);
+    expect(ph, 'the pan changed the height').toBeCloseTo(zh, 6);
+    expect(py, 'the pan moved the composition vertically').toBeCloseTo(zy, 6);
   });
 
   it('THEREFORE renders the source\'s authored widths at the reference\'s own CSS pixels', () => {

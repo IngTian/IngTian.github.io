@@ -669,7 +669,33 @@ import { WAYPOINTS } from '../lib/trajectory';
         // appears at all. Its arrival is exactly 1, so (reveal - arrival) is 0 at the end of the walk and the
         // fade would rest at 0 forever: the newest, most important name on the graph, invisible. It also breaks
         // the reduced-motion path, which sets reveal = 1 and draws a single finished frame.
-        const fade = reveal >= 1 ? 1 : Math.min(1, Math.max(0, (reveal - arrival) / WP_FADE));
+        // THE LAST WAYPOINT'S FADE WINDOW IS PULLED BACK so it COMPLETES at reveal 1 instead of starting
+        // there, and that is a reported bug rather than a refinement: *"the descent's last tag, the PhD,
+        // jumped out a few hundred milliseconds after the path ends, and it also shifted the path a bit."*
+        //
+        // Three things combined to produce it, and only the third is the defect:
+        //   1. the last waypoint's `arrival` is exactly 1, because arrivals are `i / (n - 1)`;
+        //   2. `ease` is smootherstep, which has ZERO velocity at the end — measured, `reveal` is already
+        //      ≥ 0.99 at raw 0.853, so the final 941ms of a 6400ms walk moves the trail by about 1% and the
+        //      path looks finished long before it is;
+        //   3. so for that whole 941ms `(reveal - 1)` was negative, the fade clamped to 0, and the label was
+        //      invisible — until `reveal >= 1` flipped it to full opacity in one frame. A boolean gate on a
+        //      continuous value is a discontinuity by construction.
+        // Worse, `markStops` rounds `reveal * 7 + 1`, so the readout said "stop 8/8" for most of that
+        // window: the page claimed the eighth stop had arrived while its name did not exist.
+        //
+        // Clamping the window's START to `1 - WP_FADE` fixes it without touching any other arrival (every
+        // other one is ≤ 6/7 = 0.857, comfortably below 0.945, so their timing is unchanged). The last name
+        // now fades up as the trail covers its final stretch and lands exactly when the walk does.
+        // Its fade spans more wall-clock time than the others — about 1.5s against ~350ms — and that is the
+        // flat tail of the easing, not a second bug; the alternative is arrivals that stop short of 1, which
+        // makes the dot appear BEFORE the trail reaches it, the exact "label catching up with a dot" problem
+        // the note above this loop exists to prevent.
+        const start = Math.min(arrival, 1 - WP_FADE);
+        // `reveal >= 1` is kept, and it is now belt-and-braces rather than load-bearing: with the clamp the
+        // expression already reaches 1 at reveal 1. It still guards the reduced-motion path, which sets
+        // `reveal = 1` and draws one finished frame, against any future change to WP_FADE.
+        const fade = reveal >= 1 ? 1 : Math.min(1, Math.max(0, (reveal - start) / WP_FADE));
         const [px, py] = project(wp.x, wp.y, v);
         const isBasin = wp.phase === 'basin';
         const prevAlpha = ctx.globalAlpha;

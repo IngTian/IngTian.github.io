@@ -507,13 +507,19 @@ const letters = [...`${name.first} ${name.last}`];
           // from the attribute avoids restating the ramp here: gateRefPaths owns it.
           var w0 = parseFloat(ps[k].getAttribute('stroke-width') || '1');
           var seed = (fi * 36 + k) * 9301 + 49297;
-          // 6-9s PER TRAVERSE, not the source's 20-30s, and this is the one number that was never pulled far
-          // enough to matter. Measured: at 20-30s a stroke advances 8-12% of its traverse during a 2.5s dwell,
-          // so the thing the whole dash exists to do — "lines travelling through the background" — covered a
-          // tenth of its journey while anyone was looking. At 6-9s a dwell covers 28-42% and the sweep reads.
-          // The source can afford 20-30s because it is a LANDING page you sit on; a gate is dismissed in a
-          // gesture, which is the same correction GATE_OPEN_PHASE makes for the opening frame.
-          var dur = 6000 + ((seed % 233280) / 233280) * 3000;
+          // 10-15s PER TRAVERSE. This number has now been set three times and the history is the useful part.
+          //
+          // The source uses 20-30s. That was measured as too slow HERE: at 20-30s a stroke advances only
+          // 8-12% of its traverse during a 2.5s dwell, so the thing the dash exists to do — "lines travelling
+          // through the background" — covered a tenth of its journey while anyone was looking. A landing page
+          // you sit on can afford it; a gate dismissed in a gesture cannot. So it went to 6-9s, where a dwell
+          // covers 28-42%.
+          //
+          // 6-9s then read as too fast on the owner's own look: *"let the motion be slower."* 10-15s is the
+          // band between the two — a 2.5s dwell now covers 17-25%, so the sweep still reads as travel rather
+          // than drift, at roughly 0.6x the previous rate. Keep it between those two measured bounds; below
+          // ~6s nothing was ever asked for, and at 20s+ the motion stops registering at all.
+          var dur = 10000 + ((seed % 233280) / 233280) * 5000;
           // A per-stroke phase for the weight and tint curves, from the same deterministic stream the
           // durations use. Without it the whole family would thicken and warm in unison, which reads as the
           // drawing breathing rather than as strokes each having their own weight.

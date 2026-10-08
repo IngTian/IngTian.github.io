@@ -132,10 +132,28 @@ const r1 = (v: number): number => Math.round(v * 10) / 10;
  * The viewBox, pulled back by `zoom` about the centre of the source's own. Exported rather than written into
  * the component so the zoom and the stroke widths cannot be retuned independently again.
  */
-export function refViewBox(zoom = REF_ZOOM): string {
+/**
+ * HOW FAR THE DRAWING SITS LEFT OF CENTRE, as a fraction of the viewBox width.
+ *
+ * The owner's ask: *"it might be better to move the moving lines to the left a little bit."* Panning the
+ * viewBox WINDOW right by this much moves the DRAWING left by the same amount — the sign is the thing to
+ * get wrong here, so it is stated rather than left to be re-derived.
+ *
+ * It is a fraction, not a pixel count, because `preserveAspectRatio="xMidYMid meet"` means apparent scale
+ * is purely a function of container width (that is the whole lesson behind `REF_ZOOM`): a literal offset
+ * would move the drawing a different distance on every window. At 0.04 of a 944.5-wide box the shift is
+ * 37.8 user units, which at the reference's 2.107x is about **80 CSS px** on a 1990px window.
+ *
+ * Panning is safe in a way zooming is not: the source's geometry already runs far outside the frame on
+ * every side (y from -189 to 875 against a 316-tall box), so moving the window exposes more real curve
+ * rather than empty space. Nothing about stroke width or opacity changes with it.
+ */
+export const REF_PAN_X = 0.04;
+
+export function refViewBox(zoom = REF_ZOOM, panX = REF_PAN_X): string {
   const w = REF_VIEW_W * zoom;
   const h = REF_VIEW_H * zoom;
-  return `${r1((REF_VIEW_W - w) / 2)} ${r1((REF_VIEW_H - h) / 2)} ${r1(w)} ${r1(h)}`;
+  return `${r1((REF_VIEW_W - w) / 2 + w * panX)} ${r1((REF_VIEW_H - h) / 2)} ${r1(w)} ${r1(h)}`;
 }
 
 /** A point, for the arc-length flattening below. */
