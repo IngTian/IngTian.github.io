@@ -70,11 +70,18 @@ buildRows();
 // teardown and rebuild — querySelectorAll over 42 tiles, a clientWidth read, every `.jrow` wrapper removed,
 // then all 42 <figure> re-appended into fresh rows — and it was running once per resize event for the whole
 // duration of a window drag. The first call above stays synchronous: the rows have to exist before paint.
+//
+// NAMED, because the teardown has to be able to remove it. Debouncing this originally replaced a direct
+// `buildRows` listener with an anonymous arrow and left the teardown removing `buildRows` — a function that
+// was no longer the listener — so every navigation to /art leaked one resize handler and its timer closure.
+// After n visits a single window drag ran n rebuilds of 42 tiles each. An anonymous listener with a named
+// teardown is always this bug; `removeEventListener` matches on identity.
 let rowsTimer = 0;
-window.addEventListener('resize', () => {
+const onRowsResize = (): void => {
   window.clearTimeout(rowsTimer);
   rowsTimer = window.setTimeout(buildRows, 160);
-}, { passive: true });
+};
+window.addEventListener('resize', onRowsResize, { passive: true });
 
 // ---------- placard controller ----------
 const placard = document.getElementById('art-placard');
@@ -245,7 +252,11 @@ lbImg?.addEventListener('pointerup', () => { drag = false; });
   // Dispose window-level listeners on the next swap (element listeners go away
   // with the swapped-out DOM, so only these need removing).
   galleryTeardown = () => {
-    window.removeEventListener('resize', buildRows);
+    // `onRowsResize`, not `buildRows` — removeEventListener matches on identity, and the debounced wrapper
+    // is what was attached. Removing `buildRows` silently removed nothing and leaked one handler per visit.
+    window.removeEventListener('resize', onRowsResize);
+    // And the pending timer, or it fires after the swap and rebuilds rows inside a detached document.
+    window.clearTimeout(rowsTimer);
     window.removeEventListener('scroll', onScroll);
     window.removeEventListener('resize', onScroll);
   };

@@ -259,3 +259,42 @@ export function unknownAttractor(): { x: number; y: number; depth: number } {
 }
 
 export type { Waypoint };
+
+/**
+ * WHEN A WAYPOINT'S NAME IS DRAWN, AND AT WHAT OPACITY.
+ *
+ * Pure, and in `lib/` for a specific reason: this rule has now produced two separate bugs in the
+ * component, both invisible to the test suite because the arithmetic lived inside a canvas draw loop.
+ *
+ *   1. The owner reported the last tag — "PhD · Operations Research" — appearing a few hundred ms after
+ *      the path finished. Cause: arrivals are `i / (n - 1)`, so the last one is exactly 1, and the fade
+ *      was `(reveal - arrival) / WP_FADE`. That is negative for every `reveal < 1`, so the label was
+ *      invisible until a `reveal >= 1` short-circuit flipped it to full opacity in ONE frame. Compounded
+ *      by the easing: smootherstep has zero end-velocity, so `reveal` is already ≥ 0.99 at 85% of the
+ *      walk and the path looks finished ~941ms before it is.
+ *   2. The first fix clamped the window's start — and put the clamp BELOW an early return that bailed on
+ *      `arrival > reveal`. For the one waypoint the fix existed for, the function returned before the
+ *      fade was ever evaluated. It shipped as dead code and the label went on popping.
+ *
+ * Both are arithmetic, and arithmetic belongs where a spec can reach it. `tests/descentFade.test.ts`
+ * pins the window, the monotonicity, and that no other waypoint's timing moved.
+ *
+ * @param i       waypoint index
+ * @param n       total waypoints
+ * @param reveal  0..1, how much of the trail is drawn (already eased)
+ * @param width   fade length in REVEAL units, not ms, so it stays in step however the walk is paced
+ * @returns 0 = do not draw at all, otherwise the alpha to draw the dot and its name at
+ */
+export function waypointFade(i: number, n: number, reveal: number, width: number): number {
+  const arrival = n > 1 ? i / (n - 1) : 0;
+  // THE WINDOW'S START, CLAMPED SO IT ALWAYS LEAVES ROOM TO FADE. For every waypoint but the last this is
+  // just `arrival` (the last-but-one arrives at (n-2)/(n-1), comfortably below 1 - width for any sane
+  // width), so their timing is untouched. For the last it pulls the window back so the fade COMPLETES at
+  // reveal 1 instead of starting there — it lands with the trail rather than after it.
+  const start = Math.min(arrival, 1 - width);
+  // Gate on START, not arrival. Gating on arrival is bug (2): it hides the very waypoint the clamp exists
+  // for, for the entire walk.
+  if (start > reveal + 1e-6) return 0;
+  if (reveal >= 1) return 1;
+  return Math.min(1, Math.max(0, (reveal - start) / width));
+}
