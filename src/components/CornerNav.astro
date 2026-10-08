@@ -543,6 +543,8 @@ const items: Item[] = [
       // interleaved getBoundingClientRect() and getComputedStyle(). Hoisting it out of the SCROLL path was
       // the important fix and it was done; the resize path was simply never given the same treatment, so a
       // window drag thrashed layout once per event.
+      // Declared here but cleared in the teardown below — a pending 160ms callback that fires after a
+      // View Transition would run measureBackdrops() against a document ClientRouter has already replaced.
       let navResizeTimer = 0;
       onResize = () => {
         window.clearTimeout(navResizeTimer);
@@ -660,6 +662,7 @@ const items: Item[] = [
     teardown = () => {
       if (onScroll) window.removeEventListener('scroll', onScroll);
       if (onResize) window.removeEventListener('resize', onResize);
+      window.clearTimeout(navResizeTimer);
       zoneRO?.disconnect();
       toggle?.removeEventListener('click', onToggle);
       menu?.removeEventListener('click', onMenu);

@@ -420,6 +420,10 @@ const letters = [...`${name.first} ${name.last}`];
       setInert(false);
       window.removeEventListener('wheel', swallow, { passive: false });
       window.removeEventListener('touchmove', swallow, { passive: false });
+      // `touchend` too. It was added beside the other three (the phone's only way out, see trap 3) and
+      // never removed, so the handler — and through its closure the gate's whole DOM — was retained for the
+      // rest of the session on any device that fired it.
+      window.removeEventListener('touchend', dismiss);
       document.removeEventListener('keydown', onKey, true);
       document.removeEventListener('astro:before-swap', dismiss);
 

@@ -211,14 +211,30 @@ const lb = document.getElementById('art-lightbox') as HTMLDialogElement | null;
 const lbImg = document.getElementById('lb-img') as HTMLImageElement | null;
 let zx = 0, zy = 0, zs = 1, drag = false, px = 0, py = 0;
 function tf() { if (lbImg) lbImg.style.transform = `translate(${zx}px,${zy}px) scale(${zs})`; }
-function openLB(src: string, alt: string) {
+function openLB(src: string, alt: string, w?: number, h?: number) {
   if (!lb || !lbImg) return;
-  lbImg.src = src; lbImg.alt = alt; zs = 1; zx = 0; zy = 0; tf();
+  // RESERVE THE BOX FROM THE NATIVE DIMENSIONS. `#lb-img` is `max-width:94vw; max-height:94vh` with no
+  // intrinsic size until the image decodes, so the dialog opened at zero and then jumped to full size.
+  // The dimensions are known at build time (the same getImage() call that produces data-zoom), so they are
+  // emitted beside it rather than measured.
+  if (w && h) { lbImg.width = w; lbImg.height = h; }
+  // BLANK IT FIRST — this is the bug, not a nicety. Setting `src` and calling showModal() in the same tick
+  // leaves the browser painting the PREVIOUS decoded image until the new one arrives, so every open after
+  // the first showed the wrong photograph for the length of a 0.5-1.4 MB fetch. Removing the attribute
+  // renders nothing, which is honest; the reserved box above keeps that from being a layout shift.
+  // Deliberately NOT done with `opacity: 0` — an element whose resting state is invisible is the defect
+  // trap 6 in CLAUDE.md is about, and a failed decode would leave the lightbox permanently blank.
+  lbImg.removeAttribute('src');
+  lbImg.alt = alt; zs = 1; zx = 0; zy = 0; tf();
   lb.showModal();
+  lbImg.src = src;
 }
 function closeLB() { lb?.close(); }
 document.querySelectorAll<HTMLElement>('[data-zoom]').forEach((el) => {
-  const open = () => openLB(el.dataset.zoom || '', el.dataset.alt || '');
+  const open = () => openLB(
+    el.dataset.zoom || '', el.dataset.alt || '',
+    Number(el.dataset.zw) || undefined, Number(el.dataset.zh) || undefined,
+  );
   el.addEventListener('click', open);
   // keyboard: the figures are role="button" tabindex="0", so Enter/Space must
   // open the lightbox too (mouse-only was an a11y gap). Native <dialog>

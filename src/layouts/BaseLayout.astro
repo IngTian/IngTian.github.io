@@ -25,12 +25,21 @@ interface Props {
   /** Set on non-content routes (404): emit robots=noindex and skip canonical. */
   noindex?: boolean;
   /**
-   * Does THIS page actually render text in the accent face (Fraunces)? If it
-   * does, say so and the two Fraunces files get `rel=preload`. See the long
-   * note next to <Font> below for why this is a per-page decision rather than
-   * a global one — and why the answer is not "just drop the preload".
+   * Does THIS page actually render text in the accent face (Fraunces), and in WHICH style?
+   *
+   * `true` preloads both Fraunces files; `'italic'` preloads only the italic one. See the long note next to
+   * <Font> below for why this is a per-page decision rather than a global one — and why the answer is not
+   * "just drop the preload".
+   *
+   * THE STYLE MATTERS BECAUSE THE TWO FILES ARE SEPARATE AND BOTH ARE BIG. Fraunces ships as
+   * normal (36,560 B) and italic (45,624 B), and `preload={true}` force-downloads BOTH at high priority.
+   * Measured: `/research` and `/writing/<slug>` opted in with `true`, and every Fraunces rule on either page
+   * is `font-style: italic` (research.astro's `.card-takeaway`, and the slug page's `.prose blockquote` /
+   * `.prose em`) — so 36,560 B of a face no selector on those pages can ever match was being fetched on the
+   * critical path. `/` is the one page that genuinely needs both: Work.astro:255 is non-italic at weight 500
+   * and :286 is italic.
    */
-  preloadAccent?: boolean;
+  preloadAccent?: boolean | 'italic';
 }
 
 const {
@@ -164,7 +173,14 @@ const personLd = {
         normally). Only the <link rel=preload> tags are conditional. Verified from dist: the three opted-in
         routes carry two preload links each, the other six carry zero, and all nine still carry the Fraunces
         @font-face block. */}
-    <Font cssVariable="--ff-fraunces" preload={preloadAccent} />
+    {/* `'italic'` narrows the preload to the one file the page can actually use. Astro's filter takes a
+        list of variant predicates (see filterPreloads in astro/dist/assets/fonts/core/), so this emits one
+        <link> instead of two and still leaves the full @font-face block in place — a page that later grows a
+        non-italic accent rule renders it, just discovered normally rather than preloaded. */}
+    <Font
+      cssVariable="--ff-fraunces"
+      preload={preloadAccent === 'italic' ? [{ style: 'italic' as const }] : preloadAccent}
+    />
     <Font cssVariable="--ff-jetbrains" />
     <ClientRouter />
     <title>{title}</title>
@@ -232,7 +248,18 @@ const personLd = {
        the bottom; fill-mode forwards holds it cleared. */
     .descent-veil.is-playing {
       transform: translateY(0);
-      animation: descent-veil-wipe 1.1s cubic-bezier(0.7, 0, 0.2, 1) forwards;
+      /* THE FIRST CONTROL POINT IS 0.2, NOT 0.7, AND THAT IS THE "STUCK" THE OWNER FELT.
+         Reported: *"i sometimes feel a little bit of stuck transiting among tabs."*
+         The silhouette is unchanged — same 1.1s, same ease-out landing, same gesture. What changed is how
+         long the destination stays hidden at the START. Solved over the old curve: the page was 0.6%
+         uncovered at 100ms, 3.0% at 200ms, 8.3% at 300ms, and did not reach half revealed until 509ms. A
+         deliberate 1.1s loader is fine; a third of a second at under 10% revealed is what reads as the
+         click not having registered.
+         With 0.2 the wipe leaves immediately instead of sitting still first: 50% uncovered at ~302ms
+         against 509ms, while the tail keeps the same slow settle so it still lands rather than snaps.
+         Shortening the DURATION was the other option and is worse — it compresses the second half into a
+         snap without fixing the dead time at the front, which is the part that was felt. */
+      animation: descent-veil-wipe 1.1s cubic-bezier(0.2, 0, 0.2, 1) forwards;
     }
     .descent-veil.is-playing .descent-veil__line {
       animation: descent-veil-fade 0.55s ease forwards;

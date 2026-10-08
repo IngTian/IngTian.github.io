@@ -220,7 +220,17 @@ const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
       mVh = Math.max(1, window.innerHeight);
       mDocH = Math.max(1, document.documentElement.scrollHeight);
     }
-    const t0 = performance.now();
+    // AN ACCUMULATED CLOCK, NOT WALL TIME SINCE INIT — because the loop stops and wall time does not.
+    //
+    // `uTime` was `(nowMs - t0) / 1000`, measured from init. The loop is stopped on `visibilitychange`
+    // (and while the gate covers the page), so a tab left for two minutes came back with uTime two minutes
+    // further on while the last painted frame was from before: the entire domain warp teleported to an
+    // unrelated phase in one frame. The longer the tab was away, the bigger the jump.
+    //
+    // Accumulating only while the loop actually runs makes the sky's time its OWN time. The per-frame delta
+    // is clamped to 50ms so a long stall advances the warp by one frame's worth rather than by the stall.
+    let uTimeSec = 0;
+    let lastNow = 0;
     function draw(nowMs: number): void {
       sizeTo();
       uploadRamp();
@@ -241,7 +251,9 @@ const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
       gl!.uniform1f(U.uTintCap, budget.cap);
       gl!.uniform1f(U.uViscousFloor, budget.viscousFloor);
       gl!.uniform1f(U.uNebulaCeiling, nebulaCeiling());
-      gl!.uniform1f(U.uTime, (nowMs - t0) / 1000);
+      if (lastNow) uTimeSec += Math.min(0.05, (nowMs - lastNow) / 1000);
+      lastNow = nowMs;
+      gl!.uniform1f(U.uTime, uTimeSec);
       gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
     }
 
@@ -273,7 +285,9 @@ const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
     }
     function start(): void {
       if (running || reduce || document.hidden) return;
-      running = true; last = 0; rafId = requestAnimationFrame(loop);
+      // `lastNow = 0` so the first frame after a resume contributes nothing to uTimeSec. The 50ms clamp in
+      // draw() already bounds it, but zeroing here means the warp picks up exactly where it stopped.
+      running = true; last = 0; lastNow = 0; rafId = requestAnimationFrame(loop);
     }
     function stop(): void {
       if (!running) return;

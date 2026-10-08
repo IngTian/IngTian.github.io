@@ -102,7 +102,8 @@ const photoZoom = await Promise.all(photography.map((p) => zoomSrc(p.src)));
         {calligraphy.map((w, i) => (
           <div class="cal-block" data-i={i}
                data-kicker={w.kicker} data-title={w.title} data-meta={w.medium} data-note={w.note}>
-            <figure class:list={["cal", w.treatment]} data-zoom={calZoom[i]} data-alt={w.alt}
+            <figure class:list={["cal", w.treatment]} data-zoom={calZoom[i]}
+                    data-zw={w.src.width} data-zh={w.src.height} data-alt={w.alt}
                     role="button" tabindex="0" aria-label={`View ${w.title} — full screen`}>
               {/* The first calligraphy work is the /art LCP — load it eagerly
                   with high priority; later works stay lazy. (Astro <Image>
@@ -131,7 +132,9 @@ const photoZoom = await Promise.all(photography.map((p) => zoomSrc(p.src)));
         {photography.map((p, i) => (
           <figure class="tile" data-i={i}
                   data-ar={(p.src.width / p.src.height).toFixed(4)}
-                  data-zoom={photoZoom[i]} data-alt={p.alt}
+                  data-zoom={photoZoom[i]}
+                  {/* native dims so the lightbox can reserve its box before the image decodes */}
+                  data-zw={p.src.width} data-zh={p.src.height} data-alt={p.alt}
                   data-title={p.title ?? ''} data-note={p.note ?? ''}
                   role="button" tabindex="0" aria-label={`View photograph${p.title ? ' — ' + p.title : ''} — full screen`}>
             {/* sizes is PER PHOTO, because a tile's width is its own aspect ratio times the row height —

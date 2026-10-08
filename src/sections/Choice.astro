@@ -453,12 +453,14 @@ const allBeats = [...BEATS, BEAT4];
   .ch-seg--1 { background: var(--c-h1); }
   .ch-seg--2 { background: var(--c-h2); }
   .ch-seg--3 { background: var(--c-h3); }
-  @media (prefers-reduced-motion: no-preference) {
-    /* The bar re-dividing between months is the visual of "choosing again", so the segments move rather than
-       cut. Transform-only would be ideal but left/width on an absolutely-positioned child does not reflow
-       anything outside the bar, so it stays cheap. */
-    .ch-seg { transition: left .6s cubic-bezier(.2,.7,.3,1), width .6s cubic-bezier(.2,.7,.3,1); }
-  }
+  /* THERE IS NO TRANSITION ON .ch-seg, AND THE COMMENT THAT USED TO BE HERE DESCRIBED ONE THAT COULD NEVER
+     FIRE. It read: "the bar re-dividing between months is the visual of choosing again, so the segments move
+     rather than cut", with `transition: left .6s, width .6s`. But every segment's `left`/`width` is a
+     BUILD-TIME inline style (see the panels at :139/:172/:182/:207) and no script ever writes either — each
+     month is a separate panel that crossfades in, so no segment's geometry ever changes and the transition
+     had nothing to interpolate. Deleted rather than made true: making it real means one persistent bar whose
+     segments are re-measured per month, which is a different slide. The panels crossfade; that is the
+     design. */
 
   .ch-legend {
     list-style: none; margin: clamp(12px, 1.8vh, 18px) 0 0; padding: 0;
