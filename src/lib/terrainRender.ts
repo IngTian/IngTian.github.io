@@ -141,7 +141,14 @@ export function buildGrid(edlParams: EDLParams = EDL_DEFAULTS): GridPoint[] {
 // alongside the ramp and the walker palette it picks the same way. That is deliberate: dark mode is a chosen
 // look, not a luminance calculation, and the emerald "stars" are a palette decision no formula would produce.
 // An automatic derivation sitting next to the hand-set value invites someone to switch to it and quietly lose
-// the choice. luminance01 stays in lib/terrain.ts, where it is tested and has real callers.
+// the choice.
+//
+// `luminance01` stays in lib/terrain.ts, where it is TESTED — and that is the whole of its justification.
+// This line used to add "and has real callers", which is not true: it has no production caller either, and
+// claiming one made it look load-bearing to anyone deciding whether to keep it. It is kept because
+// tests/terrain.test.ts asserts the ramp's perceptual ordering through it, which is a real invariant on live
+// palette data, in the same category as `sumsToWhole` in lib/split.ts and `bellmanResidual` in lib/bellman.ts.
+// If that spec ever goes, so does this.
 
 const ZR = 1.55; // elevation → [0,1] normalization half-range (matches the hero)
 

@@ -4,9 +4,17 @@
 // The owner's brief: "for projects, they are less important for a quant. So we will spend one tab
 // listing my writings (coming next) and my projects."
 //
-// The writing does not exist yet, and this says so. That is deliberate rather than a placeholder: the
-// site states the PhD as "incoming" everywhere for the same reason — honesty over flourish. Naming what
-// the writing will cover is useful to a reader; inventing three fake essay titles would not be.
+// THIS FILE IS NOW THE EMPTY STATE, NOT THE CURRENT STATE. It used to say "the writing does not exist yet,
+// and this says so" — true when it was written, false since `src/content/writing/favourite-quotes.md` was
+// published. Work.astro no longer reads these constants to decide whether writing exists; it derives that
+// from `getCollection('writing')` filtered on `!draft`, which is the same seam /writing uses, so the two
+// pages cannot disagree. See the long note at Work.astro:23 for why that mattered — the homepage spent a
+// release telling visitors there was no writing while a piece was live in the nav.
+//
+// What is below is therefore reached only when the collection is genuinely empty. That branch is kept on
+// purpose and is not dead code: it is the same policy /writing applies to an empty kind — show the section
+// with copy that names what is coming, because a silently-missing section is less honest than an empty one.
+// Naming what the writing will cover is useful to a reader; inventing three fake essay titles would not be.
 
 // MAKING_INTRO USED TO OPEN THIS FILE — "The research is the work. These are the things around it — notes I
 // intend to write, and software that already runs." A good sentence, and it has never been on the site: the

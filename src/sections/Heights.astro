@@ -241,7 +241,18 @@ for (const phrase of bio.strong) {
         transparent 100%
       );
     }
-    #heights .terrain-canvas { opacity: 0.4; }
+    /* :global() ON THE CANVAS, because it belongs to another component and this rule did nothing without it.
+       `.terrain-canvas` is declared in TerrainHero.astro, so the element carries TerrainHero's scope hash
+       (fgzhofvv) and not Heights' (b4o3h2vg) — Astro compiled this to
+       `#heights[data-astro-cid-b4o3h2vg] .terrain-canvas[data-astro-cid-b4o3h2vg]`, which matched zero
+       elements on every route. The phone dim had never applied: the dotted terrain has been painting at full
+       opacity behind the name, the bio and the 11px incoming-PhD line on the first screen every phone
+       visitor sees, 2.5x more present than designed.
+       Not a contrast bug, as it happens — the paper legibility band below was measured at >= 4.5:1 with the
+       canvas already undimmed, because the dim was never in effect when it was tuned. It is a density bug.
+       The sibling `.hero-legibility` rule in this same block DOES match, which is why the breakage was not
+       obvious: half the phone treatment worked. */
+    #heights :global(.terrain-canvas) { opacity: 0.4; }
   }
 
   @media (prefers-reduced-motion: no-preference) {

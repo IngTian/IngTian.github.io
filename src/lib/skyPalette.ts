@@ -5,7 +5,7 @@
 // properties per-stop; tests/skyPalette.test.ts asserts the properties that
 // matter so drift is caught rather than assumed away.
 
-import { wcagLuminance, type SkyVariant } from './skyLegibility';
+import { type SkyVariant } from './skyLegibility';
 
 export type RampStop = readonly [number, string];
 export type Theme = 'light' | 'dark';
@@ -36,23 +36,4 @@ const READING_DARK: readonly RampStop[] = [
 export function rampFor(variant: SkyVariant, theme: Theme): readonly RampStop[] {
   if (variant === 'reading') return theme === 'dark' ? READING_DARK : READING_LIGHT;
   return theme === 'dark' ? DESCENT_DARK : DESCENT_LIGHT;
-}
-
-/**
- * Luminance span of a ramp.
- *
- * This is the quantity that decides which mechanism a variant can use at all:
- * the effect works by displacing WHERE along a ramp a pixel samples, so a ramp
- * with almost no span has nothing to reveal and needs an additive treatment
- * instead. Both the reading ramp and the dark descent ramp are in that category.
- */
-export function luminanceRange(stops: readonly RampStop[]): {
-  min: number; max: number; span: number;
-} {
-  const ys = stops.map(([, hex]) => wcagLuminance([
-    parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16),
-  ]));
-  const min = Math.min(...ys);
-  const max = Math.max(...ys);
-  return { min, max, span: max - min };
 }

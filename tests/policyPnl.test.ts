@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  WEEKLY, WEEKS, MONTHS, COST, FINANCING, MAINTENANCE, QUARTER_MARKS,
-  runPolicy, statsOf, pnlBounds, project, gross, annualisedVol,
-  type Player, type PlayerContext,
-} from '../src/lib/policyPnl';
+import { WEEKLY, WEEKS, MONTHS, COST, FINANCING, MAINTENANCE, QUARTER_MARKS, runPolicy, statsOf, pnlBounds, project, gross, annualisedVol, type Player, type PlayerContext } from '../src/lib/policyPnl';
 import { POLICIES, HOLDINGS, BEAT4 } from '../src/data/define';
 
 const results = POLICIES.map((p) => runPolicy(p));

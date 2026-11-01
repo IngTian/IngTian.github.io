@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  deckStops, nextStop, currentStop, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide,
-} from '../src/lib/deck';
+import { deckStops, nextStop, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide } from '../src/lib/deck';
 
 // The real homepage geometry, measured in Chrome at 1700x1050. These numbers are the reason the deck
 // is not CSS scroll-snap: every gap between slides is 1.8x-7.3x a single ~320px wheel gesture, so
@@ -238,21 +236,6 @@ describe('deckStops with a lead (breathing air above the stop)', () => {
 
   it('defaults to no lead when the field is absent', () => {
     expect(deckStops([{ top: 800, height: 400 }], 1000, 5000)).toEqual([800]);
-  });
-});
-
-describe('currentStop', () => {
-  const stops = [0, 1134, 1953];
-
-  it('reports the nearest stop', () => {
-    expect(currentStop(stops, 1130)).toBe(1134);
-    expect(currentStop(stops, 400)).toBe(0);      // 400 from 0, 734 from 1134
-    expect(currentStop(stops, 600)).toBe(1134);   // 600 from 0, 534 from 1134 — nearer the later stop
-    expect(currentStop(stops, 1900)).toBe(1953);
-  });
-
-  it('returns null with no stops', () => {
-    expect(currentStop([], 0)).toBeNull();
   });
 });
 

@@ -5,9 +5,7 @@
 // a violation should be a red test rather than something spotted on screen.
 
 import { describe, it, expect } from 'vitest';
-import {
-  FACTORS, FAN, periodYears, signals, loadings, fanBeams, beamQuad, expressionTerms,
-} from '../src/lib/factorModel';
+import { FACTORS, FAN, periodYears, signals, loadings, fanBeams, beamQuad, expressionTerms } from '../src/lib/factorModel';
 import { timeline, publications, projects, awards, researchInterests } from '../src/data/profile';
 
 describe('periodYears — parses every real shape in profile.ts', () => {

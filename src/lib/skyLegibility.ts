@@ -30,23 +30,6 @@ export function contrastRatio(a: number, b: number): number {
 /** WCAG AA floor for body text. */
 export const AA_BODY = 4.5;
 
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
-
-/**
- * How fully the legibility rules apply at a given page depth.
- *
- * A reading page is text from top to bottom, so the rules apply everywhere. A
- * descent page has an open sky above its content, so they ramp in at the
- * content boundary and leave the hero unconstrained.
- */
-export function zoneAt(depth: number, gateTop: number, variant: SkyVariant): number {
-  if (variant === 'reading') return 1;
-  return smoothstep(gateTop, gateTop + 0.1, depth);
-}
-
 /**
  * Per-direction multipliers on the sky's excursion along its palette ramp.
  * The permissive direction stays near 1 so the ink keeps its character; the
@@ -61,16 +44,6 @@ export function gateFor(zone: number, variant: SkyVariant): { dark: number; ligh
   return variant === 'reading'
     ? { dark: 1 - CLAMPED_DARK * zone, light: 1 - FREE * zone }
     : { dark: 1 - FREE * zone,          light: 1 - CLAMPED_LIGHT * zone };
-}
-
-/**
- * The largest darkward move the field can produce, in ramp units.
- *
- * Any cap on that move must be compared against this: a cap set above it never
- * binds and is therefore not a guarantee, however it is documented.
- */
-export function maxDarkwardExcursion(amp: number, displacement: number): number {
-  return displacement * amp * 0.5;   // (f - 0.5) peaks at 0.5
 }
 
 /**

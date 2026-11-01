@@ -197,29 +197,6 @@ export function trajPoints(
 
 // ── BEAT 4: THE SIZE OF THE QUESTION ─────────────────────────────────────────────────────────────────────
 
-/**
- * How many numbers the fund actually has to choose: one weight per name per rebalance.
- *
- * The point of stating it is that this is the EASY part — it is merely large. The hard part is that each of
- * those numbers must be chosen without knowing the future, under rules that refer to each other.
- */
-export function decisionVariables(tickers: number, periods: number): number {
-  return tickers * periods;
-}
-
-/**
- * Leaves of a scenario tree with `branches` outcomes per period.
- *
- * Deliberately crude, and the slide says so: nobody models the future with a 3-way tree. It is the honest
- * lower bound on "how many futures are there", and even at three outcomes over 24 rebalances it is 2.8e11 —
- * which is the number that makes the beat land. Returns Infinity rather than overflowing silently.
- */
-export function scenarioLeaves(branches: number, periods: number): number {
-  if (branches <= 0 || periods < 0) return 0;
-  const n = branches ** periods;
-  return Number.isFinite(n) ? n : Infinity;
-}
-
 /** Order of magnitude, for copy that says "one in 10^n" rather than printing a wall of digits. */
 export function magnitude(x: number): number {
   if (!Number.isFinite(x) || x <= 0) return 0;
