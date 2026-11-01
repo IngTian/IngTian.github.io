@@ -437,6 +437,11 @@ const items: Item[] = [
     // Hoisted to the teardown's scope, not the branch's: the re-measure listener and the content observer must
     // be removable, or every View Transition would stack another observer on the same <main>.
     let onResize: (() => void) | null = null;
+    // Declared OUT here, beside onResize, because the teardown that clears it runs in this scope. It was
+    // declared inside the block that builds the handlers, which typechecks as `Cannot find name` at the
+    // teardown — caught by CI, not locally, because the local check was grepping for "error ts" against
+    // colourised output where ANSI escapes sit between the two words.
+    let navResizeTimer = 0;
     let zoneRO: ResizeObserver | null = null;
     if (mode === 'light' || !descent) {
       nav.dataset.zone = 'light';
@@ -545,7 +550,6 @@ const items: Item[] = [
       // window drag thrashed layout once per event.
       // Declared here but cleared in the teardown below — a pending 160ms callback that fires after a
       // View Transition would run measureBackdrops() against a document ClientRouter has already replaced.
-      let navResizeTimer = 0;
       onResize = () => {
         window.clearTimeout(navResizeTimer);
         navResizeTimer = window.setTimeout(() => { measureBackdrops(); onScroll?.(); }, 160);

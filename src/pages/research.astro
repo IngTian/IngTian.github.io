@@ -17,15 +17,18 @@ const stops = researchStops(publications, researchInterests);
 ---
 {/* preloadAccent: .card-takeaway (further down this file) is the one Fraunces rule on /research, so this
      page opts into the two preload links. The six routes that render no accent text no longer pay 82KB at
-     highest priority for a face they never use — see the note next to <Font> in BaseLayout. */}
+     highest priority for a face they never use — see the note next to <Font> in BaseLayout.
+     AND ONLY THE ITALIC FILE IS PRELOADED. Every Fraunces rule on this page is `font-style: italic`,
+     while `preloadAccent={true}` force-downloads BOTH faces — so 36,560 B of Fraunces normal that no
+     selector here can ever match was being fetched on the critical path. `"italic"` narrows it to one
+     <link>; the @font-face block is untouched, so a future non-italic accent rule still renders, just
+     discovered normally rather than preloaded. */}
 <BaseLayout
   title="Research — Ing Tian"
   description="Selected research by Ing Tian (Zeying Tian) — portfolio optimization and machine learning. Featuring RL-BHRP, a reinforcement-learning-embedded Bayesian Hierarchical Risk Parity approach to adaptive allocation."
   veilLine="a researcher by day"
   veilOnLoad={true}
   navZone="light"
-  {/* "italic", not true: .card-takeaway is italic, so only the italic file is preloadable — `true` also
-      force-downloaded 36,560 B of Fraunces normal that no selector here can match. */}
   preloadAccent="italic"
 >
   {/* Marks the document JS-capable before anything paints, so the CSS can present the cards as

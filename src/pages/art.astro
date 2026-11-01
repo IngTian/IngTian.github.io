@@ -60,6 +60,14 @@ const photoSizes = (ar: number) =>
 const zoomSrc = async (src: ImageMetadata): Promise<string> =>
   (await getImage({ src, format: 'webp' })).src;
 
+// Each figure also carries `data-zw`/`data-zh` — the NATIVE dimensions — so the lightbox can reserve its
+// box before the image decodes; without them the dialog opens at zero size and jumps to full. They come
+// from the same getImage() call as `data-zoom`, so they cannot disagree with the file being loaded.
+//
+// WHERE TO PUT A NOTE LIKE THIS, since getting it wrong broke the parse in three files in a row: an Astro
+// `{/* */}` is a JSX expression. It is legal BETWEEN elements, illegal between a component's attributes,
+// and not accepted inside a `.map()` arrow body either (Astro parses that as template, not JS). The
+// frontmatter always works, and it is where the code being described lives anyway.
 const calZoom = await Promise.all(calligraphy.map((w) => zoomSrc(w.src)));
 const photoZoom = await Promise.all(photography.map((p) => zoomSrc(p.src)));
 ---
@@ -133,7 +141,6 @@ const photoZoom = await Promise.all(photography.map((p) => zoomSrc(p.src)));
           <figure class="tile" data-i={i}
                   data-ar={(p.src.width / p.src.height).toFixed(4)}
                   data-zoom={photoZoom[i]}
-                  {/* native dims so the lightbox can reserve its box before the image decodes */}
                   data-zw={p.src.width} data-zh={p.src.height} data-alt={p.alt}
                   data-title={p.title ?? ''} data-note={p.note ?? ''}
                   role="button" tabindex="0" aria-label={`View photograph${p.title ? ' — ' + p.title : ''} — full screen`}>

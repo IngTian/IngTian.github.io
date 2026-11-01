@@ -40,15 +40,18 @@ const updatedLong =
 {/* preloadAccent: a piece renders Fraunces in three places — .prose blockquote, every .prose em, and the
      closing line — and blockquotes in particular are the shape of the pieces published so far, so the italic
      is on screen immediately. The index at /writing has no accent rule and does not opt in. See the note
-     next to <Font> in BaseLayout for why the preload is per page rather than global or gone. */}
+     next to <Font> in BaseLayout for why the preload is per page rather than global or gone.
+     AND ONLY THE ITALIC FILE IS PRELOADED. Every Fraunces rule on this page is `font-style: italic`,
+     while `preloadAccent={true}` force-downloads BOTH faces — so 36,560 B of Fraunces normal that no
+     selector here can ever match was being fetched on the critical path. `"italic"` narrows it to one
+     <link>; the @font-face block is untouched, so a future non-italic accent rule still renders, just
+     discovered normally rather than preloaded. */}
 <BaseLayout
   title={`${entry.data.title} — Ing Tian`}
   description={entry.data.blurb}
   veilLine="a thinker in the margins"
   veilOnLoad={true}
   navZone="light"
-  {/* "italic", not true: .prose blockquote and .prose em are both italic — `true` also
-      force-downloaded 36,560 B of Fraunces normal that no selector here can match. */}
   preloadAccent="italic"
 >
   <main class="piece descent is-fluid">
