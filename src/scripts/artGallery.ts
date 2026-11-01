@@ -213,11 +213,34 @@ let zx = 0, zy = 0, zs = 1, drag = false, px = 0, py = 0;
 function tf() { if (lbImg) lbImg.style.transform = `translate(${zx}px,${zy}px) scale(${zs})`; }
 function openLB(src: string, alt: string, w?: number, h?: number) {
   if (!lb || !lbImg) return;
-  // RESERVE THE BOX FROM THE NATIVE DIMENSIONS. `#lb-img` is `max-width:94vw; max-height:94vh` with no
-  // intrinsic size until the image decodes, so the dialog opened at zero and then jumped to full size.
-  // The dimensions are known at build time (the same getImage() call that produces data-zoom), so they are
-  // emitted beside it rather than measured.
-  if (w && h) { lbImg.width = w; lbImg.height = h; }
+  // RESERVE THE BOX FROM THE NATIVE DIMENSIONS, AS A RATIO AND A WIDTH — NOT as width/height attributes.
+  //
+  // `#lb-img` is `max-width:94vw; max-height:94vh` with no intrinsic size until the image decodes, so the
+  // dialog opened at zero and then jumped to full size. The dimensions are known at build time (the same
+  // getImage() call that produces data-zoom), so they are emitted beside it rather than measured.
+  //
+  // THE OBVIOUS FIX — `lbImg.width = w; lbImg.height = h` — SHIPPED AND WAS WRONG, so it is written up here
+  // rather than left as a trap. Those setters reflect to the width/height CONTENT attributes, which are
+  // *presentational hints*, and presentational hints lose to author declarations: Tailwind preflight's
+  // `img,video{max-width:100%;height:auto}` overrides the height hint while nothing overrides the width one.
+  // That leaves width definite and height auto — the one configuration where the ratio-preserving replaced-
+  // element rules (CSS2.2 §10.7, which need BOTH auto) do not apply, so `max-height:94vh` clamps the height
+  // alone and the aspect ratio is simply lost. Measured at 1440x900: the 1727x3422 stele drew 1353.6x846,
+  // a ratio of 1.600 against a true 0.505 — a **3.17x horizontal stretch**, magnified further by the 6x
+  // wheel zoom, in the one feature of this page whose purpose is looking at brushwork. Every work, every
+  // desktop open; nothing on a phone, where the clamp only binds past h/w = 2.16 and the tallest work is 1.98.
+  //
+  // `aspect-ratio` + a capped width is the version that holds. Width stays definite, so the box still exists
+  // before decode; height comes from the author ratio rather than from a hint that gets overridden; and
+  // `max-height` can never bind, because `min()` caps the width at exactly the point where the height would
+  // reach 94vh. It also re-fits if the window is resized while the lightbox is open, which pixel attributes
+  // never did. Setting `width:auto;height:auto` instead would NOT work: with no decoded image an attribute
+  // ratio gives only a ratio, so CSS Images 3's default object size (300x150) applies and the box jumps on
+  // decode — the original bug back.
+  if (w && h) {
+    lbImg.style.aspectRatio = `${w}/${h}`;
+    lbImg.style.width = `min(94vw, ${((94 * w) / h).toFixed(3)}vh)`;
+  }
   // BLANK IT FIRST — this is the bug, not a nicety. Setting `src` and calling showModal() in the same tick
   // leaves the browser painting the PREVIOUS decoded image until the new one arrives, so every open after
   // the first showed the wrong photograph for the length of a 0.5-1.4 MB fetch. Removing the attribute

@@ -40,6 +40,38 @@ const PHOTO_LAST_ROW_SLACK = 1.16; // justifyRows' cap on the final, unfilled ro
 const photoSizes = (ar: number) =>
   `(max-width:1024px) 45vw, ${Math.ceil(ar * PHOTO_ROW_TARGET_H * PHOTO_LAST_ROW_SLACK)}px`;
 
+// ── THE CALLIGRAPHY HINT — same shape, same reason, and it took two passes to get right. ──────────
+//
+// `.cal :global(img)` in the <style> block below is `width: auto; max-width: 100%; max-height: min(82vh,
+// 820px)`. For a tall work the HEIGHT cap is what binds, not the width: for spring-couplet-stele (1727x3422)
+// the max-h/h ratio is 738/3422 = 0.216 against a max-w/w of 0.607, so the height constraint is far tighter
+// and `width: auto` then derives the width from it. That makes the rendered width `cap * aspectRatio`, and
+// since `min(82vh, 820px) <= 820px` at any window height, `820 * ar` is a STRUCTURAL ceiling — 414 CSS px
+// for the stele. Like the photo grid, nothing about it scales with vw.
+//
+// THE HINT USED TO SAY `40vw`, WHICH WAS THE SAME MISTAKE THE PHOTO NOTE ABOVE DESCRIBES, in the other
+// gallery, left in place by the commit that fixed `widths`. Capping `widths` at 1200 removed the 1342 KB
+// native candidate and that part was real — but `40vw` declares 512-1536 CSS px for an element that renders
+// at 298-414, so at DPR 2 it still asked for >=1024 device px and still picked the 1200w variant (396,030 B)
+// on every desktop viewport, where the 828 device px actually needed is covered by 900w (142,128 B). The
+// over-fetch left on the table was 253,902 B of a `fetchpriority="high"` LCP resource — 64% of it — and the
+// arithmetic that justified it ("needs 1152 device px", "rendered at 576 CSS px") was wrong because it
+// reasoned from the viewport instead of from the cap that actually sizes the element. Measured over a
+// 13-viewport sweep from 1024 to 3840 wide, the laid-out width never exceeds 413.8 CSS px, and the declared/
+// actual ratio with the bound below is never under 1.00, so it cannot under-declare.
+//
+// `widths` STAYS [480, 900, 1200]: a DPR-3 phone at ~346 CSS px genuinely needs ~1038 device px.
+//
+// THE <=1024px BRANCH IS LEFT ALONE at 80vw, for the same reason the photo grid's 45vw is: below that width
+// .art-wrap is a narrow centred column, `max-width: 100%` takes over from the height cap, and the fluid hint
+// is the one that describes the layout there.
+//
+// CAL_MAX_H IS DUPLICATED FROM THE CSS, so it is a hand-synced pair — tolerable here only because
+// tests/artSizes.test.ts reads the <style> block as text and fails on the drift, the same arrangement the
+// two photo constants above have.
+const CAL_MAX_H = 820; // the px arm of `.cal :global(img)`'s `max-height: min(82vh, 820px)`
+const calSizes = (ar: number) => `(max-width:1024px) 80vw, ${Math.ceil(ar * CAL_MAX_H)}px`;
+
 // ── THE LIGHTBOX'S SOURCE: NATIVE PIXELS, WEBP — not the untouched original. ──────────────────────
 //
 // `data-zoom` used to be `ImageMetadata.src`, i.e. the unprocessed file straight out of src/assets. That
@@ -55,8 +87,16 @@ const photoSizes = (ar: number) =>
 // attribute, independent of `widths` — and with `srcset` + `sizes` present a supporting browser never
 // requests it, so 42 of those files (18.6 MB) were pure build output. Asking `getImage` for the same
 // native-size webp hands back that already-emitted asset instead of a 43rd one, which means this single
-// change (a) stops referencing the originals, so they drop out of `dist` entirely, (b) makes the previously
-// unrequested native webp the thing that is actually used, and (c) serves zoom in webp rather than JPEG.
+// change (a) stops the PAGE from referencing the originals, (b) makes the previously unrequested native webp
+// the thing that is actually used, and (c) serves zoom in webp rather than JPEG.
+//
+// WHAT IT DOES NOT DO — and this line claimed it did, which is why the claim is now spelled out instead:
+// the originals DO NOT drop out of `dist`. All 44 are still emitted (40,525,788 B / 38.65 MiB, 55.4% of a
+// 73.2 MB artifact) and `grep` across every .html/.css/.js/.xml/.json in `dist` finds **zero** references to
+// any of them. The cause is upstream of this file: `data/artworks.ts` globs the photos with
+// `{ eager: true }`, and an eagerly imported `ImageMetadata` bakes a URL to the original into the module, so
+// Vite cannot prove it unused — 42 photos (36.34 MiB) arrive that way and the 2 calligraphy masters
+// (2,420,696 B) by static import. Costs deploy artifact size and zero visitor bytes; tracked as issue #60.
 const zoomSrc = async (src: ImageMetadata): Promise<string> =>
   (await getImage({ src, format: 'webp' })).src;
 
@@ -118,16 +158,16 @@ const photoZoom = await Promise.all(photography.map((p) => zoomSrc(p.src)));
                   defaults to loading="lazy", which previously deferred the
                   above-the-fold hero.) */}
               {/* WIDTHS ARE CAPPED, and the native width must never be a candidate again. `w.src.width` was
-                  in this list, which for `spring-couplet-stele` is 1727 — a 1342 KB webp. Displayed at
-                  `40vw`, a 1440px viewport at DPR 2 needs 1152 device px, so the browser picked that 1727w
-                  file as the page's `fetchpriority="high"` LCP resource. The 900w variant is 139 KB. That is
-                  ~10x the LCP payload for a work rendered at 576 CSS px.
-                    1200 is the smallest candidate that still covers the common 1152 device-px case without
-                  upscaling. The photo grid never had this bug — it caps at 900 (see photoSizes above) — and
-                  the calligraphy path simply never got the same treatment. The eager/high priority is
-                  CORRECT and stays: this really is the LCP element, it was only far too heavy. Full
-                  resolution is still one click away, in the lightbox — see zoomSrc. */}
-              <Image src={w.src} alt={w.alt} widths={[480, 900, 1200]} sizes="(max-width:1024px) 80vw, 40vw"
+                  in this list, which for `spring-couplet-stele` is 1727 — a 1342 KB webp — on the element
+                  that is also `fetchpriority="high"`, so it became the page's LCP resource.
+                    `sizes` matters as much as `widths` here, and only fixing one of them is what left two
+                  thirds of the over-fetch in place for a release: see the long note above calSizes() for the
+                  arithmetic. Both bounds now come from the CSS cap that actually sizes the element rather
+                  than from the viewport.
+                    The eager/high priority is CORRECT and stays: this really is the LCP element, it was only
+                  far too heavy. Full resolution is still one click away, in the lightbox — see zoomSrc. */}
+              <Image src={w.src} alt={w.alt} widths={[480, 900, 1200]}
+                     sizes={calSizes(w.src.width / w.src.height)}
                      loading={i === 0 ? 'eager' : 'lazy'} fetchpriority={i === 0 ? 'high' : undefined} />
             </figure>
           </div>
@@ -147,9 +187,20 @@ const photoZoom = await Promise.all(photography.map((p) => zoomSrc(p.src)));
             {/* sizes is PER PHOTO, because a tile's width is its own aspect ratio times the row height —
                 see photoSizes() and the long note above it. The rendered size does not change; only which
                 srcset variant the browser chooses to fill it. */}
+            {/* EVERY PHOTOGRAPH IS LAZY. This used to be `i < 9 ? 'eager' : 'lazy'`, which eagerly fetched
+                the first nine — and not one of them can be in the first viewport. The grid starts below two
+                calligraphy blocks, each of which is as tall as `max-height: min(82vh, 820px)` allows, plus
+                two section labels and the page header: measured, the first tile's top is ~2,100px down, more
+                than two screens. Those nine were 754,378 B of the 896,506 B /art fetched on first load —
+                84% of its image payload, for content nobody had scrolled to.
+                  Deferring them is safe because the layout never depended on them: `buildRows()` in
+                scripts/artGallery.ts solves each row from the build-time `data-ar` attribute, not from a
+                decoded image, so the geometry is identical and there is no CLS. The shimmer placeholder in
+                `.tile` is already the designed waiting state, and `markLoaded()` fades each tile in on its
+                own `load` event, so a lazy tile behaves exactly like an eager one that arrived late. */}
             <Image src={p.src} alt={p.alt} widths={[300, 600, 900]}
                    sizes={photoSizes(p.src.width / p.src.height)}
-                   loading={i < 9 ? 'eager' : 'lazy'} decoding="async" />
+                   loading="lazy" decoding="async" />
           </figure>
         ))}
       </div>

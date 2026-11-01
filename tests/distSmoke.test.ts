@@ -362,13 +362,20 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
 describe("/art's image payload, measured on the built output", () => {
   // WHY A BYTE CEILING AND NOT A WIDTHS CHECK. The defect this pins was a `widths` array containing
   // `w.src.width` — the image's NATIVE width — on an element that is also `fetchpriority="high"`. For
-  // `spring-couplet-stele` that is 1727w, a 1342 KB webp, and at 1440px/DPR2 the `40vw` slot needs 1152
-  // device px, so the browser picked the 1727w file as the page's high-priority LCP resource. The 900w
-  // variant is 139 KB. That is ~10x the LCP payload for a work rendered at 576 CSS px.
+  // `spring-couplet-stele` that is 1727w, a 1342 KB webp, so the browser picked it as the page's
+  // high-priority LCP resource where the 900w variant (139 KB) covers the element.
   //
   // Asserting the array would have been the weaker test: the array is a means, and what hurts a visitor is
   // bytes on the critical path. So this reads the shipped srcset, resolves the file a browser would actually
-  // choose at the most common desktop configuration, and weighs it.
+  // choose, and weighs it.
+  //
+  // AND THE DEVICE-PX FIGURE IS DERIVED FROM THE SHIPPED `sizes`, NOT HARD-CODED. This test first wrote
+  // `const NEEDED = 1152` with the comment "1440 CSS px at DPR 2, in the `40vw` branch" — which was the very
+  // arithmetic that was wrong: the element is height-capped by `max-height: min(82vh, 820px)` and renders at
+  // 298–414 CSS px, never the 576 that `40vw` implies. Hard-coding it meant the test agreed with the bug and
+  // would have gone on agreeing after the hint was corrected. Parsing the real hint makes this test follow
+  // the page instead of a number somebody typed. (Whether the hint itself is *right* is artSizes.test.ts's
+  // job — it pins CAL_MAX_H against the CSS cap. These two together are what close the hole.)
   const artHtml = (): string => {
     const p = join(DIST, 'art', 'index.html');
     if (!existsSync(p)) throw new Error('dist/art/index.html missing — run `npm run build`');
@@ -393,17 +400,30 @@ describe("/art's image payload, measured on the built output", () => {
       expect(c.bytes, `a srcset candidate is missing from dist: ${c.url}`).toBeGreaterThan(0);
     }
 
-    // 1440 CSS px at DPR 2, in the `40vw` branch of the sizes hint => 1152 device px.
-    const NEEDED = 1152;
+    // Resolve the DESKTOP branch of the shipped `sizes` — the trailing, media-conditionless entry — and read
+    // the device px a DPR-2 display asks for from it. A `vw` unit here is itself the regression (the element
+    // is height-capped, so its width does not scale with the viewport), which is why that case fails loudly
+    // rather than picking a viewport to multiply by.
+    const sizes = /sizes="([^"]+)"/.exec(tag)?.[1] ?? '';
+    const desktopBranch = sizes.split(',').map((s) => s.trim()).pop() ?? '';
+    expect(
+      desktopBranch,
+      `/art's LCP hint has no px desktop branch — got "${sizes}". A vw bound here means the fluid hint is `
+      + 'back; see the note above calSizes() in art.astro and the pair pinned in artSizes.test.ts.',
+    ).toMatch(/^\d+(\.\d+)?px$/);
+    const NEEDED = Math.ceil(parseFloat(desktopBranch) * 2);
+
     const chosen = candidates.find((c) => c.w >= NEEDED) ?? candidates[candidates.length - 1];
 
-    // 387 KB today, down from 1342 KB. The ceiling leaves room to retune the cap, without being so loose
-    // that re-adding the native width would slip through.
+    // 139 KB today (the 900w variant at 828 device px), down from 1342 KB native and from the 387 KB that
+    // capping `widths` alone still fetched. The ceiling leaves room to retune the cap without being so loose
+    // that either regression slips back through.
     expect(
       chosen.bytes,
       `the LCP candidate at ${NEEDED} device px is ${(chosen.bytes / 1024).toFixed(0)} KB (${chosen.w}w). `
-      + 'If this jumped, check whether a native image width got back into the `widths` array in art.astro.',
-    ).toBeLessThan(600 * 1024);
+      + 'If this jumped, check whether a native image width got back into `widths`, or whether `sizes` went '
+      + 'back to a viewport fraction, in art.astro.',
+    ).toBeLessThan(250 * 1024);
   });
 
   it('serves every lightbox source as a processed webp, not the untouched original', () => {

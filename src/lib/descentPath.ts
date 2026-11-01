@@ -95,8 +95,10 @@ export function project(x: number, y: number, view: View): [number, number] {
 }
 
 /** Contour polylines of the field, as world-space point runs. Marching squares proper, so the
- *  result is連 continuous lines rather than the disconnected 1px stubs an earlier sketch drew —
- *  which is why its contours were invisible. */
+ *  result is continuous lines rather than the disconnected 1px stubs an earlier sketch drew —
+ *  which is why its contours were invisible.
+ *
+ *  Prefer `contoursFor()` below for anything that runs more than once — this is the uncached kernel. */
 export function contours(level: number, res = 150): [number, number][][] {
   const b = storyBounds();
   const runs: [number, number][][] = [];
@@ -160,6 +162,45 @@ export function contours(level: number, res = 150): [number, number][][] {
     if (run.length > 3) runs.push(run);
   }
   return runs;
+}
+
+/**
+ * THE MEMOISED CONTOURS — and the reason this lives in `lib/` rather than in the component.
+ *
+ * `contours()` is the single most expensive thing the descent graph does: the full set for
+ * `contourLevels(11)` is 190 polylines / 2962 points and costs **53-67 ms of synchronous main thread**,
+ * measured over 8 runs on node 24. `DescentPath.astro` binds its init to BOTH `astro:page-load` and
+ * `theme:change`, so without a cache that cost landed on every return to `/` and every theme flip, inside
+ * the view transition.
+ *
+ * The cache was first written as a `Map` at the top of the component's `<script>`. That worked, but **no
+ * test in this repo reads `DescentPath.astro`** (`grep -rln DescentPath tests/` → nothing), so moving the
+ * Map back inside `init()` would have silently reverted the largest perf fix on the branch with all 631
+ * tests green. Here it is one line to pin — which is the same conclusion `gridCache`/`buildGrid` in
+ * `lib/terrainRender.ts` already reached, and this is deliberately the same shape as that.
+ *
+ * Hoisting is provably safe rather than hopefully safe: `contours()` depends only on `storyBounds()`
+ * (itself module-memoised) and `field()`, both pure with no hidden input.
+ *
+ * Keyed on the level AND the resolution, not the level alone: a key that ignores an argument is a cache that
+ * returns the wrong answer the moment someone adds a second call site, which is a class of bug this file has
+ * been bitten by before. `toFixed(4)` rather than the raw float so two levels that differ below the drawing
+ * resolution share an entry.
+ *
+ * THE RETURNED ARRAY IS SHARED AND READ-ONLY BY CONTRACT. Callers draw from it; nothing may mutate it.
+ * Retains ~2962 points for the life of the page — negligible, and the same data the previous code held for
+ * as long as a page lived anyway.
+ */
+const contourCache = new Map<string, [number, number][][]>();
+
+export function contoursFor(level: number, res = 150): [number, number][][] {
+  const key = `${level.toFixed(4)}|${res}`;
+  let c = contourCache.get(key);
+  if (!c) {
+    c = contours(level, res);
+    contourCache.set(key, c);
+  }
+  return c;
 }
 
 /** Contour levels spanning the story's actual height range, so no level is wasted off-frame. */

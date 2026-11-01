@@ -170,9 +170,10 @@ const personLd = {
 
         The @font-face rules themselves are NOT gated — <Font> always emits data.css, so --ff-fraunces stays
         resolvable everywhere and any page that later grows an accent rule still renders it (just discovered
-        normally). Only the <link rel=preload> tags are conditional. Verified from dist: the three opted-in
-        routes carry two preload links each, the other six carry zero, and all nine still carry the Fraunces
-        @font-face block. */}
+        normally). Only the <link rel=preload> tags are conditional. Verified from dist: of the three opted-in
+        routes, `/` carries two preload links (it passes `true` — the Work slide uses both the roman and the
+        italic) while /research and /writing/<slug> carry ONE each (they pass `'italic'`, see just below); the
+        other six carry zero, and all nine still carry the Fraunces @font-face block. */}
     {/* `'italic'` narrows the preload to the one file the page can actually use. Astro's filter takes a
         list of variant predicates (see filterPreloads in astro/dist/assets/fonts/core/), so this emits one
         <link> instead of two and still leaves the full @font-face block in place — a page that later grows a
@@ -205,10 +206,9 @@ const personLd = {
         below said "only /art opts in" — both were written when that was true and
         neither was updated when five more routes joined.
 
-        The homepage's fresh load is covered by components/Gate.astro instead —
-        a first-visit-only gate, rendered from index.astro. The two cannot collide:
-        the gate fires only on a fresh load with its session flag unset, and the
-        veil's fresh-load branch is off for / anyway. */}
+        `/` HAS NO FRESH-LOAD TREATMENT, deliberately and for now: its hero paints
+        a finished static terrain frame immediately, which is the instant-LCP state,
+        so there is nothing to cover. Do not read the absence as an oversight. */}
     <div
       class="descent-veil"
       aria-hidden="true"

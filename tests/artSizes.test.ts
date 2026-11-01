@@ -89,3 +89,68 @@ describe('/art photo `sizes` hint', () => {
     expect(artPage).toContain('(max-width:1024px) 45vw,');
   });
 });
+
+/**
+ * THE CALLIGRAPHY HINT IS THE SAME KIND OF PAIR, and it got the same kind of wrong.
+ *
+ * The first pass at /art's LCP capped `widths` at 1200 — which removed the 1342 KB native candidate and was
+ * real — but left `sizes` at `40vw`, a fluid hint for an element whose width is a constant. `.cal :global(img)`
+ * is `width: auto; max-width: 100%; max-height: min(82vh, 820px)`, so for a tall work the HEIGHT cap binds and
+ * the width is `cap * aspectRatio`, bounded by `820 * ar` at any window height — 414 CSS px for the
+ * 1727x3422 stele against the 512–1536 that `40vw` declares. At DPR 2 that still selected the 1200w variant
+ * (396,030 B) where 900w (142,128 B) covers it: 253,902 B of a `fetchpriority="high"` resource.
+ *
+ * So CAL_MAX_H in art.astro's frontmatter and the `820px` in its own <style> block are a hand-synced pair,
+ * and this is the test that makes the drift fail rather than quietly re-inflate the LCP.
+ */
+describe('/art calligraphy `sizes` hint', () => {
+  const calMaxH = /CAL_MAX_H\s*=\s*(\d+(?:\.\d+)?)/.exec(artPage);
+  /** The CSS cap the constant mirrors: `max-height: min(82vh, 820px)`. */
+  const cssCap = /max-height:\s*min\(\s*\d+(?:\.\d+)?vh\s*,\s*(\d+(?:\.\d+)?)px\s*\)/.exec(artPage);
+
+  it('finds both halves of the pair at all', () => {
+    // Same guard as above: if either regex stops matching, every assertion below would pass vacuously.
+    expect(calMaxH, 'CAL_MAX_H in src/pages/art.astro').not.toBeNull();
+    expect(cssCap, '`max-height: min(..vh, ..px)` in art.astro\'s <style>').not.toBeNull();
+  });
+
+  it('derives the hint from the SAME px cap the CSS applies', () => {
+    // If this fails: CAL_MAX_H and `.cal :global(img)`'s max-height have drifted. Change both, same commit.
+    expect(Number(calMaxH![1])).toBe(Number(cssCap![1]));
+  });
+
+  it('hints a px bound, not a viewport fraction, on the desktop branch', () => {
+    // The specific regression this file now blocks. `40vw` must never come back: it describes a fluid width
+    // this element does not have, and it is the reason the LCP stayed 2.8x heavier than it needed to be
+    // through the release that "fixed" it.
+    expect(artPage).toContain('calSizes(w.src.width / w.src.height)');
+    expect(artPage).not.toContain('(max-width:1024px) 80vw, 40vw');
+  });
+
+  it('never under-declares, at any viewport or window height', () => {
+    // The hint's claim is `renderedWidth <= ceil(ar * CAL_MAX_H)`. The rendered width is
+    // `min(containerWidth, min(0.82 * vh, CAL_MAX_H) * ar)`, so the cap arm alone is a structural ceiling —
+    // but the arithmetic is asserted over a real sweep rather than argued, because the argued version is what
+    // was wrong last time.
+    const cap = Number(calMaxH![1]);
+    const ars = [1727 / 3422, 2400 / 1807]; // the two works that ship: the tall stele and the wider poem
+    let worst = 0;
+    for (const ar of ars) {
+      const hinted = Math.ceil(ar * cap);
+      for (let vh = 560; vh <= 2160; vh += 11) {
+        for (let container = 300; container <= 3000; container += 13) {
+          const rendered = Math.min(container, Math.min(0.82 * vh, cap) * ar);
+          worst = Math.max(worst, rendered / hinted);
+        }
+      }
+    }
+    // <= 1 means the hint can only ever cost bytes, never sharpness — the same bar the photo grid is held to.
+    expect(worst).toBeLessThanOrEqual(1);
+  });
+
+  it('keeps 1200 in widths, because a DPR-3 phone really does need it', () => {
+    // The mobile branch stays fluid (80vw), and on a 390px phone at DPR 3 the stele asks for ~1038 device px.
+    // Dropping the 1200w candidate to "match" the desktop bound would make the phone the blurry one.
+    expect(artPage).toContain('widths={[480, 900, 1200]}');
+  });
+});

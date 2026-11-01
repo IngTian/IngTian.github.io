@@ -10,13 +10,40 @@
 //
 // So the rule is in `lib/` now and this is its spec. The assertions are about the SHAPE of the window, not
 // about pixels.
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { waypointFade } from '../src/lib/descentPath';
 import { WAYPOINTS } from '../src/lib/trajectory';
 
-/** What the component passes. Kept here so a change there has to come past this file. */
-const WP_FADE = 0.055;
+/**
+ * WP_FADE IS READ OUT OF THE COMPONENT, not re-typed here.
+ *
+ * This line used to be `const WP_FADE = 0.055;` under the comment "kept here so a change there has to come
+ * past this file" — which was exactly backwards. A local copy means the component's value can drift to
+ * anything at all and every assertion below keeps passing against the stale number, testing a window the
+ * graph no longer draws. The comment asserted the guarantee instead of providing it.
+ *
+ * Read as TEXT because DescentPath.astro is an Astro component whose `<script>` touches `document` at module
+ * scope, so it cannot be imported here — the same arrangement, for the same reason, as artSizes.test.ts and
+ * protoNoindex.test.ts. The regex not matching is itself a failure (asserted first, below), since otherwise
+ * every spec in this file would pass vacuously.
+ */
+const component = readFileSync(new URL('../src/components/DescentPath.astro', import.meta.url), 'utf8');
+const wpFadeMatch = /const\s+WP_FADE\s*=\s*(\d*\.?\d+)\s*;/.exec(component);
+const WP_FADE = Number(wpFadeMatch?.[1]);
 const N = WAYPOINTS.length;
+
+describe('the fade width this spec is written against', () => {
+  it('is the one the component actually passes', () => {
+    expect(wpFadeMatch, 'WP_FADE declaration in src/components/DescentPath.astro').not.toBeNull();
+    expect(Number.isFinite(WP_FADE), 'WP_FADE did not parse as a number').toBe(true);
+    // A sanity band, not a pin: the point is that the value is REAL, not that it is 0.055. If the owner
+    // retunes the fade, this spec retunes with it — but a fade wider than the gap between two arrivals, or
+    // narrower than a couple of frames, breaks assumptions the assertions below do rely on.
+    expect(WP_FADE).toBeGreaterThan(0.001);
+    expect(WP_FADE).toBeLessThan(1 / (N - 1));
+  });
+});
 
 describe('waypointFade — the last waypoint must fade, not pop', () => {
   it('the last waypoint IS the PhD, so this is the tag the owner reported', () => {
@@ -75,15 +102,29 @@ describe('waypointFade — no other waypoint moved', () => {
     }
   });
 
-  it('the first waypoint is present from the very first frame', () => {
-    expect(waypointFade(0, N, 0, WP_FADE)).toBeGreaterThanOrEqual(0);
+  it('the first waypoint starts its fade at frame zero and finishes one window later', () => {
+    // The first assertion here used to be `toBeGreaterThanOrEqual(0)`, which the function's own final
+    // `Math.max(0, …)` makes true for every input — it could not fail and so was not a test. What is
+    // actually claimed about waypoint 0 is that its arrival is 0, so at reveal 0 it is exactly at the
+    // START of its fade (not yet visible, but not gated out either) and it reaches full opacity after one
+    // window rather than after 1/(n-1).
+    expect(waypointFade(0, N, 0, WP_FADE)).toBe(0);
+    expect(waypointFade(0, N, WP_FADE / 2, WP_FADE)).toBeCloseTo(0.5, 6);
     expect(waypointFade(0, N, WP_FADE, WP_FADE)).toBe(1);
   });
 
   it('two names never fade at once, which is what WP_FADE is sized for', () => {
     // Arrivals are 1/(n-1) apart; the fade must finish inside that gap or the graph reads as a wash of
-    // type arriving rather than as one stop at a time.
+    // type arriving rather than as one stop at a time. Meaningful only because WP_FADE is now read out of
+    // the component — against a local copy this asserted a property of this file's own constant.
     expect(WP_FADE).toBeLessThan(1 / (N - 1));
+    // And the consequence, on the function rather than on the constant: when waypoint i is mid-fade, i+1
+    // must be dark. Checked at the worst point, the instant i reaches full opacity.
+    for (let i = 0; i < N - 1; i++) {
+      const arrival = i / (N - 1);
+      expect(waypointFade(i + 1, N, arrival + WP_FADE, WP_FADE), `waypoint ${i + 1} fades alongside ${i}`)
+        .toBe(0);
+    }
   });
 });
 
