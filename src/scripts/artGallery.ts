@@ -65,7 +65,23 @@ function buildRows() {
   });
 }
 buildRows();
-window.addEventListener('resize', buildRows, { passive: true });
+
+// DEBOUNCED, at the same 160ms the Deck, FluidSky and DescentPath already use. `buildRows` is a full DOM
+// teardown and rebuild — querySelectorAll over 42 tiles, a clientWidth read, every `.jrow` wrapper removed,
+// then all 42 <figure> re-appended into fresh rows — and it was running once per resize event for the whole
+// duration of a window drag. The first call above stays synchronous: the rows have to exist before paint.
+//
+// NAMED, because the teardown has to be able to remove it. Debouncing this originally replaced a direct
+// `buildRows` listener with an anonymous arrow and left the teardown removing `buildRows` — a function that
+// was no longer the listener — so every navigation to /art leaked one resize handler and its timer closure.
+// After n visits a single window drag ran n rebuilds of 42 tiles each. An anonymous listener with a named
+// teardown is always this bug; `removeEventListener` matches on identity.
+let rowsTimer = 0;
+const onRowsResize = (): void => {
+  window.clearTimeout(rowsTimer);
+  rowsTimer = window.setTimeout(buildRows, 160);
+};
+window.addEventListener('resize', onRowsResize, { passive: true });
 
 // ---------- placard controller ----------
 const placard = document.getElementById('art-placard');
@@ -195,14 +211,53 @@ const lb = document.getElementById('art-lightbox') as HTMLDialogElement | null;
 const lbImg = document.getElementById('lb-img') as HTMLImageElement | null;
 let zx = 0, zy = 0, zs = 1, drag = false, px = 0, py = 0;
 function tf() { if (lbImg) lbImg.style.transform = `translate(${zx}px,${zy}px) scale(${zs})`; }
-function openLB(src: string, alt: string) {
+function openLB(src: string, alt: string, w?: number, h?: number) {
   if (!lb || !lbImg) return;
-  lbImg.src = src; lbImg.alt = alt; zs = 1; zx = 0; zy = 0; tf();
+  // RESERVE THE BOX FROM THE NATIVE DIMENSIONS, AS A RATIO AND A WIDTH — NOT as width/height attributes.
+  //
+  // `#lb-img` is `max-width:94vw; max-height:94vh` with no intrinsic size until the image decodes, so the
+  // dialog opened at zero and then jumped to full size. The dimensions are known at build time (the same
+  // getImage() call that produces data-zoom), so they are emitted beside it rather than measured.
+  //
+  // THE OBVIOUS FIX — `lbImg.width = w; lbImg.height = h` — SHIPPED AND WAS WRONG, so it is written up here
+  // rather than left as a trap. Those setters reflect to the width/height CONTENT attributes, which are
+  // *presentational hints*, and presentational hints lose to author declarations: Tailwind preflight's
+  // `img,video{max-width:100%;height:auto}` overrides the height hint while nothing overrides the width one.
+  // That leaves width definite and height auto — the one configuration where the ratio-preserving replaced-
+  // element rules (CSS2.2 §10.7, which need BOTH auto) do not apply, so `max-height:94vh` clamps the height
+  // alone and the aspect ratio is simply lost. Measured at 1440x900: the 1727x3422 stele drew 1353.6x846,
+  // a ratio of 1.600 against a true 0.505 — a **3.17x horizontal stretch**, magnified further by the 6x
+  // wheel zoom, in the one feature of this page whose purpose is looking at brushwork. Every work, every
+  // desktop open; nothing on a phone, where the clamp only binds past h/w = 2.16 and the tallest work is 1.98.
+  //
+  // `aspect-ratio` + a capped width is the version that holds. Width stays definite, so the box still exists
+  // before decode; height comes from the author ratio rather than from a hint that gets overridden; and
+  // `max-height` can never bind, because `min()` caps the width at exactly the point where the height would
+  // reach 94vh. It also re-fits if the window is resized while the lightbox is open, which pixel attributes
+  // never did. Setting `width:auto;height:auto` instead would NOT work: with no decoded image an attribute
+  // ratio gives only a ratio, so CSS Images 3's default object size (300x150) applies and the box jumps on
+  // decode — the original bug back.
+  if (w && h) {
+    lbImg.style.aspectRatio = `${w}/${h}`;
+    lbImg.style.width = `min(94vw, ${((94 * w) / h).toFixed(3)}vh)`;
+  }
+  // BLANK IT FIRST — this is the bug, not a nicety. Setting `src` and calling showModal() in the same tick
+  // leaves the browser painting the PREVIOUS decoded image until the new one arrives, so every open after
+  // the first showed the wrong photograph for the length of a 0.5-1.4 MB fetch. Removing the attribute
+  // renders nothing, which is honest; the reserved box above keeps that from being a layout shift.
+  // Deliberately NOT done with `opacity: 0` — an element whose resting state is invisible is the defect
+  // trap 6 in CLAUDE.md is about, and a failed decode would leave the lightbox permanently blank.
+  lbImg.removeAttribute('src');
+  lbImg.alt = alt; zs = 1; zx = 0; zy = 0; tf();
   lb.showModal();
+  lbImg.src = src;
 }
 function closeLB() { lb?.close(); }
 document.querySelectorAll<HTMLElement>('[data-zoom]').forEach((el) => {
-  const open = () => openLB(el.dataset.zoom || '', el.dataset.alt || '');
+  const open = () => openLB(
+    el.dataset.zoom || '', el.dataset.alt || '',
+    Number(el.dataset.zw) || undefined, Number(el.dataset.zh) || undefined,
+  );
   el.addEventListener('click', open);
   // keyboard: the figures are role="button" tabindex="0", so Enter/Space must
   // open the lightbox too (mouse-only was an a11y gap). Native <dialog>
@@ -236,7 +291,11 @@ lbImg?.addEventListener('pointerup', () => { drag = false; });
   // Dispose window-level listeners on the next swap (element listeners go away
   // with the swapped-out DOM, so only these need removing).
   galleryTeardown = () => {
-    window.removeEventListener('resize', buildRows);
+    // `onRowsResize`, not `buildRows` — removeEventListener matches on identity, and the debounced wrapper
+    // is what was attached. Removing `buildRows` silently removed nothing and leaked one handler per visit.
+    window.removeEventListener('resize', onRowsResize);
+    // And the pending timer, or it fires after the swap and rebuilds rows inside a detached document.
+    window.clearTimeout(rowsTimer);
     window.removeEventListener('scroll', onScroll);
     window.removeEventListener('resize', onScroll);
   };

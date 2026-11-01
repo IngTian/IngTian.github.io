@@ -110,6 +110,25 @@ When in doubt, remove rather than add.
   `lib/equations.ts` holds the same guarantee for build-time equations in `.astro`,
   and `tests/equations.test.ts` asserts it.
 - `astro:assets` optimizes gallery images (responsive `widths`, webp/avif).
+  - **NEVER put a native image width in a `widths` array.** `/art`'s calligraphy asked for
+    `widths={[480, 900, w.src.width]}` — 1727 for `spring-couplet-stele`, a **1342 KB** webp — on the element
+    that is also `fetchpriority="high"`. At `40vw`, a 1440px viewport at DPR 2 needs 1152 device px, so that
+    file became the page's high-priority LCP resource; the 900w variant is 139 KB. Capped at
+    `[480, 900, 1200]`, the chosen candidate is **387 KB**. The photo grid never had the bug — it caps at 900
+    via `photoSizes()`, pinned by `tests/artSizes.test.ts`.
+  - **The lightbox's source is a processed webp at NATIVE pixels, via `getImage()` — not `ImageMetadata.src`.**
+    It was the untouched original: 38.6 MB of JPEG across 44 works, 0.6–2.2 MB per open. The pixels are
+    deliberate and must stay — `scripts/artGallery.ts` zooms to **6×**, so capping the long edge would quietly
+    degrade the feature while the byte count improved. Only the container changed.
+    It also turned waste into the fix: `<Image>` already emitted a native-dimension variant for the `src`
+    attribute independent of `widths`, which a browser with `srcset` never requests — 18.6 MB of pure build
+    output, now the thing actually being used. `tests/distSmoke.test.ts` weighs the file a browser would
+    *choose* at 1152 device px rather than checking the array, because the array is a means and bytes on the
+    critical path are what hurt.
+  - **Still true and not fixed:** 42 original JPEGs (36.3 MB) are emitted into `dist` that nothing
+    references. `data/artworks.ts` globs the photos with `{ eager: true }`, and an eagerly imported
+    `ImageMetadata` bakes a URL to the original, so Vite cannot prove it unused. Costs deploy artifact size
+    and zero visitor bytes; see issue #60.
 - `site: 'https://ingtian.github.io'`, no `base` (user site at root).
 
 ## Layout
@@ -137,7 +156,7 @@ src/
   lib/viewport.ts                   # PHONE_MAX_WIDTH = 640 + isPhone() — the one phone gate
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
-  lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter
+  lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter AND the memoised grid cache
   lib/descentPath.ts, trajectory.ts # the career descent graph's field and route
   lib/{bellman,factorModel,problemSize,complexity,policyPnl,scenario,split}.ts   # the explainer slides' real math
   lib/{justify,scrollspy,pixels,cowSpeech,knowledge,capability,paperMath,equations,signalRubric}.ts
@@ -501,7 +520,9 @@ the stationarity condition) or "Moo!".
   gradient descent; ∇f=0 is the unconstrained stationarity condition. Misstated
   math undercuts the whole point of the piece. The same rule governs the explainer
   slides and the descent graph.
-- Perf: rAF loop paused offscreen (IntersectionObserver) + ~30fps throttle +
+- Perf: rAF loop paused offscreen (IntersectionObserver) + ~30fps throttle + a **160ms debounced**
+  resize (reassigning `cvs.width`/`height` reallocates a full-bleed backing store at DPR 2, and the pending
+  timer is cleared in teardown or it fires against a canvas `ClientRouter` already replaced) +
   DPR≤2; a finished static frame is painted first (instant LCP) and is the
   reduced-motion / no-JS state.
 
@@ -530,8 +551,28 @@ Two invariants, both about the compositor and both easy to break:
    (hidden under 640px, under reduced motion, and at `strength=0`), and the class is
    additionally dropped on resize-to-hidden and on GL context loss.
 
-Perf: viewport-sized (scroll is a uniform), half internal resolution, ~30fps idle
-and full rate while scrolling, paused on tab-hide, skipped on phones. The CSS
+Perf: viewport-sized (scroll is a uniform), half internal resolution, ~30fps idle and **every rAF tick while
+scrolling**, paused on tab-hide, skipped on phones. The CSS
+`--descent-grad` gradient remains underneath as the base and the no-WebGL state.
+
+**THE SCROLLING BUDGET IS 0 AND MUST STAY 0. DO NOT "OPTIMISE" IT.** It was briefly capped at 16ms (~60fps),
+on the reasoning that 0 means 120 full-viewport fragment-shader draws per second on a 120 Hz panel, plus 16
+`gl.uniform*` calls each, at exactly the moment the compositor is busiest and during every deck slide
+transition. The draw count did halve. The owner's report was that the homepage and `/art` became *"stucky as
+hell"* compared to `main`, and it was reverted.
+  **The mistake was measuring a cost instead of the experience.** What matters for a full-screen background
+during a scroll is not how many times it draws but whether it updates *in step with the scroll*. At 0 the sky
+is locked to the display refresh, so background and content move together; at 16ms on a 120 Hz display the
+content scrolls at 120fps while the background behind it updates at 60, and a half-rate background under
+full-rate content is perceived as the background dragging. So the change was worse precisely on the
+high-refresh hardware it was supposed to help.
+  **And it is invisible to this project's own verification path**, which is the part worth remembering:
+headless Chrome caps at 60 Hz, so a trace of a synthesized 2400px scroll reported 60.2 fps, 2 dropped frames
+and no long task on the capped build — indistinguishable from the good one. A cadence regression can only be
+seen on real hardware. If this genuinely needs to cost less, spend it on internal resolution or on shader
+work per draw, never on the cadence.
+
+The CSS
 `--descent-grad` gradient remains underneath as the base and the no-WebGL state.
 
 ## Themes (light ⇄ dark)
@@ -671,7 +712,23 @@ titles came to rest hard against the browser chrome — the lead is a number in
 ## Taste rules (these define the look — hold the line)
 
 - **Palette discipline:** ONLY the tokens in `tokens.css` (paper, ink-1..5,
-  ochre, indigo, seal). In the **light** theme the vermilion **seal**
+  ochre, indigo, seal, plus the derived `--hairline-rgb` and `--rule`).
+  - **`--rule` exists because `/experience` was already using it.** Two rules there declared
+    `border-bottom: 1px solid var(--rule)` against a property defined nowhere, which by spec makes the whole
+    shorthand invalid at computed-value time — every longhand falls back to its initial, and
+    `border-bottom-style`'s initial is `none`. Measured: `none` / `0px` on all three group titles and every
+    award row. Three section dividers had never drawn. It is now
+    `rgba(var(--hairline-rgb), 0.32)`, so it re-themes for free.
+    **`tests/cssVars.test.ts` now fails the build on any `var(--x)` without a fallback that nothing
+    declares** — nothing else could catch it: the build is happy (it is valid syntax), `astro check` and
+    `tsc` do not read CSS, and a missing border looks like a design choice. Collecting declarations needs
+    three sources, and a CSS-only scan reports false positives: stylesheets, inline `style="--l:0"`
+    attributes, and runtime `el.style.setProperty()` (`sections/Rules.astro` sets `--len` and `--i` from
+    measured geometry). Note that Rules.astro *documents* an unset `--len` as acceptable — the real
+    distinction is not whether a var resolves but whether the initial-value fallback is a state someone
+    chose.
+  In the **light** theme the vermilion **seal**
+  In the **light** theme the vermilion **seal**
   (`--seal #b23a2e`) is the ONLY saturated color. Never pure `#fff` / `#f00`.
   **Deliberate exception — the dark theme.** `html[data-theme='dark']` is the
   "terminal galaxy": it intentionally swaps the ochre accent for a phosphor

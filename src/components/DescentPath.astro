@@ -24,6 +24,7 @@
 // claims about a career. trajectoryFacts() is still used inside the drawing (it locates the basins), but
 // nothing it returns is printed as text any more.
 import { WAYPOINTS } from '../lib/trajectory';
+import { STORY_CODA } from '../data/story';
 ---
 <section id="descent-path" class="dp" aria-labelledby="dp-heading">
   <header class="dp-head">
@@ -60,10 +61,11 @@ import { WAYPOINTS } from '../lib/trajectory';
          So it lives in the drawing's empty quadrant and fades in once the walk has actually discovered the
          deeper basin — the line only makes sense after that. HTML rather than canvas text, so the display
          italic renders properly and a screen reader can read it. */}
-    <p class="dp-coda" data-dp-coda>
-      The deepest point on that surface is not marked, because I do not know where it is. What I know is the
-      direction, and that the descent is still running.
-    </p>
+    {/* STORY_CODA, not a copy of it. This sentence was hardcoded here AND exported from data/story.ts with
+        a byte-identical value, which is the "two places must agree" shape this project keeps getting bitten
+        by — and the export had no other consumer, so it read as dead while actually being the source of
+        record for a string rendered somewhere else. One copy now. */}
+    <p class="dp-coda" data-dp-coda>{STORY_CODA}</p>
     <p class="dp-fallback" data-dp-fallback>
       A contour map of a non-convex loss surface with a career path crossing a ridge between two
       basins. The list below carries the same information.
@@ -123,7 +125,12 @@ import { WAYPOINTS } from '../lib/trajectory';
   }
 
   .dp-readout {
-    margin: 14px 0 0; min-height: 1.5em;
+    /* TWO LINES RESERVED, not one. The box was `min-height: 1.5em` and the discovery string — "stop 8/8 ·
+       a deeper basin is now visible — it was there the whole time" — wraps to two lines in a 412-610px
+       viewport band, so partway through the walk the readout grew and pushed the canvas down 13.7px. A
+       layout shift mid-animation, in the element directly above the thing being animated. Reserving the
+       second line costs 14px of the header's overlay space, which is empty there anyway. */
+    margin: 14px 0 0; min-height: 3em;
     font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; color: var(--dp-quiet);
   }
   /* :global ON THE CHILD, and it is load-bearing rather than a style preference. The readout's contents are
@@ -321,7 +328,7 @@ import { WAYPOINTS } from '../lib/trajectory';
 
 <script>
   import {
-    project, contours, contourLevels, trail, climbSpan, unknownAttractor, storyBounds,
+    project, contoursFor, contourLevels, trail, climbSpan, unknownAttractor, storyBounds, waypointFade,
     type Projection, type View,
   } from '../lib/descentPath';
   import { WAYPOINTS, trajectoryFacts, DEEP_SIDE_LABEL } from '../lib/trajectory';
@@ -332,6 +339,23 @@ import { WAYPOINTS } from '../lib/trajectory';
   import { prefersReducedMotion } from '../lib/motion';
 
   const teardowns: Array<() => void> = [];
+
+  /**
+   * THE CONTOURS ARE MEMOISED IN `lib/descentPath.ts`, not here, and that is a measured 53–67ms per
+   * navigation.
+   *
+   * The cache was originally a `const` inside `init()`, so it died with every teardown — and `initAll()` is
+   * bound to BOTH `astro:page-load` and `theme:change`. Every return to `/` and every theme flip therefore
+   * re-ran the marching squares for all 11 levels from scratch: **190 runs / 2962 points, 59.5ms cold,
+   * 54–55ms warm**, which on a phone's 4–6x CPU penalty is 240–360ms of synchronous main thread landing
+   * inside the view transition — the largest single item in the whole re-init path, producing a result
+   * byte-identical to the one just thrown away.
+   *
+   * It then spent one revision as a `Map` at the top of THIS script, which worked and was untestable: no
+   * test in this repo reads `DescentPath.astro`, so moving it back inside `init()` would have reverted the
+   * branch's largest perf fix with every test green. `contoursFor()` lives in `lib/` for that reason and is
+   * pinned by `tests/descentPath.test.ts`. Keep the cache there; this file should only ever call it.
+   */
 
   function initAll(): void {
     while (teardowns.length) teardowns.pop()!();
@@ -376,13 +400,9 @@ import { WAYPOINTS } from '../lib/trajectory';
     const facts = trajectoryFacts();
     const attractor = unknownAttractor();
     const levels = contourLevels(11);
-    const contourCache = new Map<string, [number, number][][]>();
-    const contoursFor = (lv: number) => {
-      const key = lv.toFixed(4);
-      let c = contourCache.get(key);
-      if (!c) { c = contours(lv, 150); contourCache.set(key, c); }
-      return c;
-    };
+    // Memoised in lib/descentPath.ts — see the note at the top of this script for the 53-67ms it saves per
+    // navigation, and the note on contoursFor() itself for why the cache cannot live in this file.
+    const CONTOUR_RES = 150;
 
     // PALETTE CACHE. tok() called getComputedStyle() and it ran SIX TIMES PER DRAW — six forced
     // style recalculations per animation frame. Measured before this fix: 0.6 fps, mean 1758ms per
@@ -521,7 +541,7 @@ import { WAYPOINTS } from '../lib/trajectory';
       // repeating the hero's object.
       ctx.lineCap = 'round';
       levels.forEach((lv, i) => {
-        const runs = contoursFor(lv);
+        const runs = contoursFor(lv, CONTOUR_RES);
         const deep = 1 - i / (levels.length - 1);          // 1 at the deepest level
         ctx.strokeStyle = ink5;
         ctx.lineWidth = 1.7 + deep * 1.3;
@@ -549,7 +569,7 @@ import { WAYPOINTS } from '../lib/trajectory';
       // real bowl is a loop whose last point returns to its first.
       const washLevels = levels.slice(0, 5);
       washLevels.forEach((lv, i) => {
-        const runs = contoursFor(lv);
+        const runs = contoursFor(lv, CONTOUR_RES);
         ctx.fillStyle = ochre;
         ctx.globalAlpha = 0.034 - i * 0.005;
         for (const run of runs) {
@@ -663,13 +683,12 @@ import { WAYPOINTS } from '../lib/trajectory';
       // type would look like a label catching up with a dot that was already there.
       const WP_FADE = 0.055;
       WAYPOINTS.forEach((wp, i) => {
-        const arrival = i / (WAYPOINTS.length - 1);
-        if (arrival > reveal + 1e-6) return;
-        // `reveal >= 1` short-circuits, and it is not belt-and-braces — without it the LAST waypoint never
-        // appears at all. Its arrival is exactly 1, so (reveal - arrival) is 0 at the end of the walk and the
-        // fade would rest at 0 forever: the newest, most important name on the graph, invisible. It also breaks
-        // the reduced-motion path, which sets reveal = 1 and draws a single finished frame.
-        const fade = reveal >= 1 ? 1 : Math.min(1, Math.max(0, (reveal - arrival) / WP_FADE));
+        // ONE CALL, because this arithmetic is now in lib/ with a spec — see waypointFade's own note for
+        // the two bugs it produced while it lived inline here, and tests/descentFade.test.ts for the window,
+        // the monotonicity, and the assertion that no other waypoint's timing moved.
+        // 0 means "not yet", so it doubles as the early return this loop used to do by hand.
+        const fade = waypointFade(i, WAYPOINTS.length, reveal, WP_FADE);
+        if (fade <= 0) return;
         const [px, py] = project(wp.x, wp.y, v);
         const isBasin = wp.phase === 'basin';
         const prevAlpha = ctx.globalAlpha;
@@ -683,7 +702,14 @@ import { WAYPOINTS } from '../lib/trajectory';
         const isLast = i === WAYPOINTS.length - 1;
         if (isCompact()) {
           /* no in-frame type on a phone — see COMPACT_MAX_W */
-        } else if (isLast) label(ctx, px - 6, py - 14, wp.label, 15, paper);
+        // THE LAST LABEL SITS ABOVE-RIGHT, NOT ABOVE-LEFT, and that is the other half of the owner's report:
+        // *"it also shifted the path a bit."* At `px - 6` the text starts six pixels LEFT of its own dot and
+        // runs right across it, so "PhD · Operations Research" painted over roughly 44px of the path's own
+        // final descending leg — the trail appeared to bend or move as the type arrived on top of it.
+        // `px + 14` is the same offset the other seven labels use, so it clears the incoming curve entirely
+        // while `py - 14` still keeps it clear of the deep-side name 80px below (which is the collision the
+        // original `px - 6` was placed to avoid — it solved one overlap by creating another).
+        } else if (isLast) label(ctx, px + 14, py - 14, wp.label, 15, paper);
         else label(ctx, px + 14, py + 5, wp.label, 15, ink3);
         // Restore rather than assign 1: the climb callout below sets its own alpha, and a hardcoded reset here
         // would silently become wrong the moment this loop is drawn inside another alpha.
@@ -766,6 +792,9 @@ import { WAYPOINTS } from '../lib/trajectory';
       raf = requestAnimationFrame(step);
     }
 
+    /** The last readout string written, so an unchanged frame does not re-announce it. See markStops. */
+    let lastReadout = '';
+
     /** Light up the stop cards as the trail reaches them, so the graph and the list are one thing. */
     function markStops(): void {
       // The visible stop cards are gone (the graph labels them), so this only drives the readout now.
@@ -780,10 +809,19 @@ import { WAYPOINTS } from '../lib/trajectory';
       // it beside real job titles invited it to be read as a fact about the career. The stop counter
       // stays — those ARE the real waypoints — and so does the discovery line, which is the point of the
       // whole device and is a statement rather than a measurement.
-      readout.innerHTML = found
+      // WRITTEN ONLY WHEN IT CHANGES, and the reason is accessibility before performance. `markStops()` runs
+      // from every rAF step of the 6.4s reveal, so this assigned innerHTML ~385 times per walk for **9
+      // distinct strings** — 376 of those writes byte-identical to the frame before. On a plain element that
+      // is just wasted parses; this element is `aria-live="polite"`, so every write is a candidate
+      // announcement and a screen reader was being handed the same sentence hundreds of times.
+      const next = found
         ? `stop <b>${kShown}/${WAYPOINTS.length}</b> · ` +
           `<i>a deeper basin is now visible</i> — it was there the whole time`
         : `stop <b>${kShown}/${WAYPOINTS.length}</b> · nothing deeper is visible from here`;
+      if (next !== lastReadout) {
+        lastReadout = next;
+        readout.innerHTML = next;
+      }
 
       // THE CODA APPEARS ON DISCOVERY, not on a timer: the line is about not knowing where the deepest
       // point is, so it only means anything once the walk can see there IS a deeper side. Toggled rather

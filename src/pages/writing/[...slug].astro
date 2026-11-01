@@ -37,17 +37,26 @@ const longDate = fmt(entry.data.date);
 const updatedLong =
   entry.data.updated && entry.data.updated !== entry.data.date ? fmt(entry.data.updated) : null;
 ---
-{/* preloadAccent: a piece renders Fraunces in three places — .prose blockquote, every .prose em, and the
-     closing line — and blockquotes in particular are the shape of the pieces published so far, so the italic
-     is on screen immediately. The index at /writing has no accent rule and does not opt in. See the note
-     next to <Font> in BaseLayout for why the preload is per page rather than global or gone. */}
+{/* preloadAccent: a piece renders Fraunces in exactly three places — `.prose h3`, `.prose em` and
+     `.prose figcaption` — so the italic can be on screen before it is discovered. The index at /writing has
+     no accent rule and does not opt in. See the note next to <Font> in BaseLayout for why the preload is per
+     page rather than global or gone.
+     NOT `.prose blockquote`, which an earlier version of this comment named as the headline case: that rule
+     is `var(--font-display)`, i.e. Georgia, which downloads nothing. The quote styling on this page is
+     entirely Georgia + mono, and getting that wrong does not change the conclusion below but would send the
+     next reader to the wrong selector.
+     AND ONLY THE ITALIC FILE IS PRELOADED. All three rules above are `font-style: italic`, while
+     `preloadAccent={true}` force-downloads BOTH faces — so 36,560 B of Fraunces normal that no selector here
+     can ever match was being fetched on the critical path. `"italic"` narrows it to one <link>; the
+     @font-face block is untouched, so a future non-italic accent rule still renders, just discovered
+     normally rather than preloaded. */}
 <BaseLayout
   title={`${entry.data.title} — Ing Tian`}
   description={entry.data.blurb}
   veilLine="a thinker in the margins"
   veilOnLoad={true}
   navZone="light"
-  preloadAccent={true}
+  preloadAccent="italic"
 >
   <main class="piece descent is-fluid">
     <FluidSky strength={3} variant="reading" />

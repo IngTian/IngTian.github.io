@@ -358,3 +358,81 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
      gone, so check 1 covers the proto routes directly and this was a strict subset of it — with a worse
      failure message, since it reported one dead anchor per run instead of the whole family at once.) */
 });
+
+describe("/art's image payload, measured on the built output", () => {
+  // WHY A BYTE CEILING AND NOT A WIDTHS CHECK. The defect this pins was a `widths` array containing
+  // `w.src.width` — the image's NATIVE width — on an element that is also `fetchpriority="high"`. For
+  // `spring-couplet-stele` that is 1727w, a 1342 KB webp, so the browser picked it as the page's
+  // high-priority LCP resource where the 900w variant (139 KB) covers the element.
+  //
+  // Asserting the array would have been the weaker test: the array is a means, and what hurts a visitor is
+  // bytes on the critical path. So this reads the shipped srcset, resolves the file a browser would actually
+  // choose, and weighs it.
+  //
+  // AND THE DEVICE-PX FIGURE IS DERIVED FROM THE SHIPPED `sizes`, NOT HARD-CODED. This test first wrote
+  // `const NEEDED = 1152` with the comment "1440 CSS px at DPR 2, in the `40vw` branch" — which was the very
+  // arithmetic that was wrong: the element is height-capped by `max-height: min(82vh, 820px)` and renders at
+  // 298–414 CSS px, never the 576 that `40vw` implies. Hard-coding it meant the test agreed with the bug and
+  // would have gone on agreeing after the hint was corrected. Parsing the real hint makes this test follow
+  // the page instead of a number somebody typed. (Whether the hint itself is *right* is artSizes.test.ts's
+  // job — it pins CAL_MAX_H against the CSS cap. These two together are what close the hole.)
+  const artHtml = (): string => {
+    const p = join(DIST, 'art', 'index.html');
+    if (!existsSync(p)) throw new Error('dist/art/index.html missing — run `npm run build`');
+    return readFileSync(p, 'utf8');
+  };
+  const bytesOf = (url: string): number => {
+    const p = join(DIST, url.replace(/^\//, ''));
+    return existsSync(p) ? readFileSync(p).byteLength : -1;
+  };
+
+  it('keeps the eager, high-priority LCP image well under what it was', () => {
+    const tag = /<img[^>]*fetchpriority="high"[^>]*>/.exec(artHtml())?.[0] ?? '';
+    expect(tag, 'no fetchpriority="high" image on /art — has the LCP hint been dropped?').not.toBe('');
+
+    const srcset = /srcset="([^"]+)"/.exec(tag)?.[1] ?? '';
+    const candidates = srcset.split(',')
+      .map((s) => s.trim().split(/\s+/))
+      .map(([url, w]) => ({ url, w: Number(String(w).replace('w', '')), bytes: bytesOf(url) }))
+      .sort((a, b) => a.w - b.w);
+    expect(candidates.length, 'the LCP image has no srcset').toBeGreaterThan(1);
+    for (const c of candidates) {
+      expect(c.bytes, `a srcset candidate is missing from dist: ${c.url}`).toBeGreaterThan(0);
+    }
+
+    // Resolve the DESKTOP branch of the shipped `sizes` — the trailing, media-conditionless entry — and read
+    // the device px a DPR-2 display asks for from it. A `vw` unit here is itself the regression (the element
+    // is height-capped, so its width does not scale with the viewport), which is why that case fails loudly
+    // rather than picking a viewport to multiply by.
+    const sizes = /sizes="([^"]+)"/.exec(tag)?.[1] ?? '';
+    const desktopBranch = sizes.split(',').map((s) => s.trim()).pop() ?? '';
+    expect(
+      desktopBranch,
+      `/art's LCP hint has no px desktop branch — got "${sizes}". A vw bound here means the fluid hint is `
+      + 'back; see the note above calSizes() in art.astro and the pair pinned in artSizes.test.ts.',
+    ).toMatch(/^\d+(\.\d+)?px$/);
+    const NEEDED = Math.ceil(parseFloat(desktopBranch) * 2);
+
+    const chosen = candidates.find((c) => c.w >= NEEDED) ?? candidates[candidates.length - 1];
+
+    // 139 KB today (the 900w variant at 828 device px), down from 1342 KB native and from the 387 KB that
+    // capping `widths` alone still fetched. The ceiling leaves room to retune the cap without being so loose
+    // that either regression slips back through.
+    expect(
+      chosen.bytes,
+      `the LCP candidate at ${NEEDED} device px is ${(chosen.bytes / 1024).toFixed(0)} KB (${chosen.w}w). `
+      + 'If this jumped, check whether a native image width got back into `widths`, or whether `sizes` went '
+      + 'back to a viewport fraction, in art.astro.',
+    ).toBeLessThan(250 * 1024);
+  });
+
+  it('serves every lightbox source as a processed webp, not the untouched original', () => {
+    // `data-zoom` was `ImageMetadata.src`, the unprocessed file, which cost 0.6-2.2 MB of JPEG per open.
+    // The PIXELS are deliberate — artGallery.ts zooms to 6x, so capping the long edge would have quietly
+    // degraded the feature while the byte count looked better. The fix was the container, not the size.
+    const zooms = [...artHtml().matchAll(/data-zoom="([^"]+)"/g)].map((m) => m[1]);
+    expect(zooms.length, 'no data-zoom attributes on /art').toBeGreaterThan(10);
+    const notWebp = zooms.filter((z) => !z.endsWith('.webp'));
+    expect(notWebp, `lightbox sources that are not webp: ${notWebp.slice(0, 3).join(', ')}`).toEqual([]);
+  });
+});

@@ -437,6 +437,11 @@ const items: Item[] = [
     // Hoisted to the teardown's scope, not the branch's: the re-measure listener and the content observer must
     // be removable, or every View Transition would stack another observer on the same <main>.
     let onResize: (() => void) | null = null;
+    // Declared OUT here, beside onResize, because the teardown that clears it runs in this scope. It was
+    // declared inside the block that builds the handlers, which typechecks as `Cannot find name` at the
+    // teardown — caught by CI, not locally, because the local check was grepping for "error ts" against
+    // colourised output where ANSI escapes sit between the two words.
+    let navResizeTimer = 0;
     let zoneRO: ResizeObserver | null = null;
     if (mode === 'light' || !descent) {
       nav.dataset.zone = 'light';
@@ -538,7 +543,17 @@ const items: Item[] = [
       };
       // RESIZE RE-MEASURES; SCROLL DOES NOT. Previously both events ran the same handler, which is how the
       // measurement ended up in the scroll path in the first place.
-      onResize = () => { measureBackdrops(); onScroll?.(); };
+      // AND IT IS DEBOUNCED, at the 160ms this codebase already uses elsewhere. `measureBackdrops()` is what
+      // the comment at its own definition calls "the textbook layout-thrash pattern" — querySelectorAll, then
+      // interleaved getBoundingClientRect() and getComputedStyle(). Hoisting it out of the SCROLL path was
+      // the important fix and it was done; the resize path was simply never given the same treatment, so a
+      // window drag thrashed layout once per event.
+      // Declared here but cleared in the teardown below — a pending 160ms callback that fires after a
+      // View Transition would run measureBackdrops() against a document ClientRouter has already replaced.
+      onResize = () => {
+        window.clearTimeout(navResizeTimer);
+        navResizeTimer = window.setTimeout(() => { measureBackdrops(); onScroll?.(); }, 160);
+      };
       window.addEventListener('scroll', onScroll, { passive: true });
       window.addEventListener('resize', onResize, { passive: true });
       // The document also changes height WITHOUT a resize — the terrain canvas and images settle after first
@@ -651,6 +666,7 @@ const items: Item[] = [
     teardown = () => {
       if (onScroll) window.removeEventListener('scroll', onScroll);
       if (onResize) window.removeEventListener('resize', onResize);
+      window.clearTimeout(navResizeTimer);
       zoneRO?.disconnect();
       toggle?.removeEventListener('click', onToggle);
       menu?.removeEventListener('click', onMenu);

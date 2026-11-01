@@ -95,8 +95,10 @@ export function project(x: number, y: number, view: View): [number, number] {
 }
 
 /** Contour polylines of the field, as world-space point runs. Marching squares proper, so the
- *  result is連 continuous lines rather than the disconnected 1px stubs an earlier sketch drew —
- *  which is why its contours were invisible. */
+ *  result is continuous lines rather than the disconnected 1px stubs an earlier sketch drew —
+ *  which is why its contours were invisible.
+ *
+ *  Prefer `contoursFor()` below for anything that runs more than once — this is the uncached kernel. */
 export function contours(level: number, res = 150): [number, number][][] {
   const b = storyBounds();
   const runs: [number, number][][] = [];
@@ -160,6 +162,45 @@ export function contours(level: number, res = 150): [number, number][][] {
     if (run.length > 3) runs.push(run);
   }
   return runs;
+}
+
+/**
+ * THE MEMOISED CONTOURS — and the reason this lives in `lib/` rather than in the component.
+ *
+ * `contours()` is the single most expensive thing the descent graph does: the full set for
+ * `contourLevels(11)` is 190 polylines / 2962 points and costs **53-67 ms of synchronous main thread**,
+ * measured over 8 runs on node 24. `DescentPath.astro` binds its init to BOTH `astro:page-load` and
+ * `theme:change`, so without a cache that cost landed on every return to `/` and every theme flip, inside
+ * the view transition.
+ *
+ * The cache was first written as a `Map` at the top of the component's `<script>`. That worked, but **no
+ * test in this repo reads `DescentPath.astro`** (`grep -rln DescentPath tests/` → nothing), so moving the
+ * Map back inside `init()` would have silently reverted the largest perf fix on the branch with all 631
+ * tests green. Here it is one line to pin — which is the same conclusion `gridCache`/`buildGrid` in
+ * `lib/terrainRender.ts` already reached, and this is deliberately the same shape as that.
+ *
+ * Hoisting is provably safe rather than hopefully safe: `contours()` depends only on `storyBounds()`
+ * (itself module-memoised) and `field()`, both pure with no hidden input.
+ *
+ * Keyed on the level AND the resolution, not the level alone: a key that ignores an argument is a cache that
+ * returns the wrong answer the moment someone adds a second call site, which is a class of bug this file has
+ * been bitten by before. `toFixed(4)` rather than the raw float so two levels that differ below the drawing
+ * resolution share an entry.
+ *
+ * THE RETURNED ARRAY IS SHARED AND READ-ONLY BY CONTRACT. Callers draw from it; nothing may mutate it.
+ * Retains ~2962 points for the life of the page — negligible, and the same data the previous code held for
+ * as long as a page lived anyway.
+ */
+const contourCache = new Map<string, [number, number][][]>();
+
+export function contoursFor(level: number, res = 150): [number, number][][] {
+  const key = `${level.toFixed(4)}|${res}`;
+  let c = contourCache.get(key);
+  if (!c) {
+    c = contours(level, res);
+    contourCache.set(key, c);
+  }
+  return c;
 }
 
 /** Contour levels spanning the story's actual height range, so no level is wasted off-frame. */
@@ -259,3 +300,42 @@ export function unknownAttractor(): { x: number; y: number; depth: number } {
 }
 
 export type { Waypoint };
+
+/**
+ * WHEN A WAYPOINT'S NAME IS DRAWN, AND AT WHAT OPACITY.
+ *
+ * Pure, and in `lib/` for a specific reason: this rule has now produced two separate bugs in the
+ * component, both invisible to the test suite because the arithmetic lived inside a canvas draw loop.
+ *
+ *   1. The owner reported the last tag — "PhD · Operations Research" — appearing a few hundred ms after
+ *      the path finished. Cause: arrivals are `i / (n - 1)`, so the last one is exactly 1, and the fade
+ *      was `(reveal - arrival) / WP_FADE`. That is negative for every `reveal < 1`, so the label was
+ *      invisible until a `reveal >= 1` short-circuit flipped it to full opacity in ONE frame. Compounded
+ *      by the easing: smootherstep has zero end-velocity, so `reveal` is already ≥ 0.99 at 85% of the
+ *      walk and the path looks finished ~941ms before it is.
+ *   2. The first fix clamped the window's start — and put the clamp BELOW an early return that bailed on
+ *      `arrival > reveal`. For the one waypoint the fix existed for, the function returned before the
+ *      fade was ever evaluated. It shipped as dead code and the label went on popping.
+ *
+ * Both are arithmetic, and arithmetic belongs where a spec can reach it. `tests/descentFade.test.ts`
+ * pins the window, the monotonicity, and that no other waypoint's timing moved.
+ *
+ * @param i       waypoint index
+ * @param n       total waypoints
+ * @param reveal  0..1, how much of the trail is drawn (already eased)
+ * @param width   fade length in REVEAL units, not ms, so it stays in step however the walk is paced
+ * @returns 0 = do not draw at all, otherwise the alpha to draw the dot and its name at
+ */
+export function waypointFade(i: number, n: number, reveal: number, width: number): number {
+  const arrival = n > 1 ? i / (n - 1) : 0;
+  // THE WINDOW'S START, CLAMPED SO IT ALWAYS LEAVES ROOM TO FADE. For every waypoint but the last this is
+  // just `arrival` (the last-but-one arrives at (n-2)/(n-1), comfortably below 1 - width for any sane
+  // width), so their timing is untouched. For the last it pulls the window back so the fade COMPLETES at
+  // reveal 1 instead of starting there — it lands with the trail rather than after it.
+  const start = Math.min(arrival, 1 - width);
+  // Gate on START, not arrival. Gating on arrival is bug (2): it hides the very waypoint the clamp exists
+  // for, for the entire walk.
+  if (start > reveal + 1e-6) return 0;
+  if (reveal >= 1) return 1;
+  return Math.min(1, Math.max(0, (reveal - start) / width));
+}
