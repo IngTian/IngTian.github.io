@@ -117,7 +117,7 @@ export function contours(level: number, res = 150): [number, number][][] {
  * THE MEMOISED CONTOURS — and the reason this lives in `lib/` rather than in the component.
  *
  * `contours()` is the single most expensive thing the descent graph does: the full set for
- * `contourLevels(11)` is 190 polylines / 2962 points and costs **53-67 ms of synchronous main thread**,
+ * `contourLevels(11)` is 17 polylines / 2838 points and costs **53-67 ms of synchronous main thread**,
  * measured over 8 runs on node 24. `DescentPath.astro` binds its init to BOTH `astro:page-load` and
  * `theme:change`, so without a cache that cost landed on every return to `/` and every theme flip, inside
  * the view transition.

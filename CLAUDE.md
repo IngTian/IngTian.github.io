@@ -573,9 +573,15 @@ once more as "still boring" — for blocking the page behind a button and for be
 
 - **THE CAMERA NEVER MOVES.** The one animated quantity is elevation: `z = field(x, y) * lift`. That is
   what makes the lines and the dots read as one surface drawn twice rather than two animations stapled
-  together — and it is why the EDL shade precomputed in `buildGrid` stays valid, since it is a function
-  of the fixed projection. An animated `YAW`/`TILT` would invalidate that shade and the depth sort for
-  the whole intro. `lift` is **global**: one scalar per frame, no per-point front.
+  together. `lift` is **global**: one scalar per frame, no per-point front. An animated `YAW`/`TILT`
+  would invalidate the precomputed EDL shade and the depth sort for the whole intro.
+  - **The EDL shade is NOT camera-only, and this file said it was.** `computeEDL` projects each dot at
+    FULL elevation and reads screen-space depth differences between neighbours, so it depends on the
+    fixed camera *and* on the finished geometry — it is exact only at `lift === 1`. During the rise the
+    flat plane wears the finished relief's shade, as a density/size ghost with uniform colour (`hn`
+    collapses to 0.5). That is accepted — it reads as a shaded-relief map, which is what a survey is —
+    and the landing frame is still byte-exact. The false version of this claim would have sent the next
+    reader looking for camera animation as the only thing that could break it.
 - Code: `lib/introTimeline.ts` (the schedule — pure, and the `t=1` landing is an assertion, because the
   live breath ramp is only the right continuation if the intro finished where the static frame is),
   `lib/terrainContours.ts` + `lib/marchingSquares.ts` (the survey geometry), and plumbing in
@@ -591,12 +597,17 @@ once more as "still boring" — for blocking the page behind a button and for be
   rather than the *nearest*, and since true neighbours are coincident to floating-point noise it grabbed
   segments further along the curve and orphaned the real ones, which were then dropped as sub-4-point
   noise. A circle at res 60 returned runs of `[50, 7, 63, 3, 2, 2, 2, 3]` — three kept pieces of one
-  loop and four thrown away, i.e. visible gaps. Nearest-first returns one run of 125 points.
+  loop and **five** fragments thrown away, i.e. visible gaps. Nearest-first returns one run of **124**
+  points. (Both of those numbers were wrong on first writing — 125 and "four" — which is the same
+  transcribe-rather-than-measure habit this file keeps warning about.)
 - **The hero text is NOT part of this animation and must stay that way.** It keeps its own tuned arrival
-  — `.hero-rise` 1400/0, `.hero-bio` 1400/250, `.hero-doors-line` 1100/620 — so the intro adds **zero**
-  milliseconds to the first thing a visitor came to read. Measured: **the LCP element on `/` is the H1
-  text, not the canvas**, and the intro costs it **+12ms** (412 vs 400 under Fast 4G, intro path vs
-  no-intro path on the same build). That independence is what makes a 3.6s animation affordable at all;
+  — `.hero-rise` 1400/0, `.hero-bio` 1400/250, `.hero-doors-line` 1100/620 — so the intro adds nothing
+  to the arrival of the first thing a visitor came to read. Measured: **the LCP element on `/` is the H1
+  text, not the canvas**. A first pass measured the intro costing it **+12ms** and that was real, not
+  noise: the first frame built the whole contour geometry (10.6ms) and then stroked zero paths, because
+  `contourAlpha` is 1 at t=0 while `survey` is still 0. Guarding the survey pass on `survey > 0` — and
+  the dot pass on `dots > 0.004` — moved that work off the first-paint path, which is what the design
+  asked for in the first place. That independence is what makes a 3.6s animation affordable at all;
   if the text is ever folded in, the duration must come down with it. A comment in `Heights.astro`
   records that the tagline's separate beat was once lost and the owner noticed.
 - **Walkers are suppressed until it lands** (the intro paints with `animate: false`, and `nextSpawnAt` is

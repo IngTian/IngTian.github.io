@@ -43,8 +43,16 @@ export const INTRO_DUR_MAX_MS = 20000;
 export const INTRO_PHASES = {
   /** The contour map finishes drawing. */
   surveyEnd: 0.40,
-  /** The surface begins to rise out of the map — before the survey has quite finished. */
-  liftStart: 0.36,
+  /**
+   * The surface begins to rise out of the map — WELL before the survey finishes, which is the point.
+   *
+   * This was 0.36, giving a 0.04 overlap, and that was too little: the survey's eased-out tail and the
+   * lift's eased-in toe were both at their flattest in the same window, so the animation came to a
+   * near-stop around t=0.33. Measured, the quietest 150ms window moved **0.00005** — a frozen frame for
+   * a fifth of the animation. 0.28 puts the lift's toe against a part of the survey that is still
+   * moving, and the quietest window becomes 0.017.
+   */
+  liftStart: 0.28,
   /** Full elevation. */
   liftEnd: 0.88,
   /** The dots begin to resolve. */
@@ -56,6 +64,23 @@ export const INTRO_PHASES = {
   /** The isolines are gone — before t=1, so the last frame is clean. */
   fadeEnd: 0.96,
 } as const;
+
+/**
+ * How far apart consecutive contour levels start, as a fraction of the survey phase.
+ *
+ * The map draws as a sequence of passes rather than nine lines appearing together, which is what reads
+ * as "surveyed". With nine levels at 0.05 the last one starts at 0.40 of the phase and gets the
+ * remaining 0.60 to finish, so every level lands exactly at `surveyEnd` — see `surveyProgress`.
+ *
+ * THIS USED TO BE THREE INLINE LITERALS IN TerrainHero'S DRAW CALL (0.05, 0.45 and a 1.6 alpha ramp),
+ * which broke two project rules at once and shipped a visible bug. It put phase boundaries somewhere
+ * the spec's tunability requirement forbids ("no phase boundary is an inline literal buried in a draw
+ * call") and somewhere no test could reach — so when the schedule made the survey finish at t≈0.19
+ * instead of 0.40, leaving a ~620ms frozen frame before the lift became perceptible, this module's own
+ * `survey` channel went on rising innocently and the suite saw nothing. The no-plateau test now
+ * measures what is actually drawn.
+ */
+export const INTRO_SURVEY_STAGGER = 0.05;
 
 /** The four channels the painter needs for one frame. */
 export interface IntroFrame {
@@ -80,10 +105,10 @@ const smoother = (t: number): number => {
   return u * u * u * (u * (6 * u - 15) + 10);
 };
 
-/** Out-cubic: fast start, eased finish — a pen drawing a line, not a surface settling. */
-const outCubic = (t: number): number => {
+/** Out-quad: fast start, gently eased finish — a pen drawing a line, not a surface settling. */
+const outQuad = (t: number): number => {
   const u = clamp01(t);
-  return 1 - (1 - u) ** 3;
+  return 1 - (1 - u) ** 2;
 };
 
 /**
@@ -98,11 +123,58 @@ const outCubic = (t: number): number => {
 export function introFrame(t: number): IntroFrame {
   const u = clamp01(t);
   return {
-    survey: outCubic(phase(u, 0, INTRO_PHASES.surveyEnd)),
+    // LINEAR phase progress, not eased. The easing belongs to `surveyProgress`, applied per level —
+    // easing here and clamping again there is what produced the plateau.
+    survey: phase(u, 0, INTRO_PHASES.surveyEnd),
     lift: smoother(phase(u, INTRO_PHASES.liftStart, INTRO_PHASES.liftEnd)),
     dots: smoother(phase(u, INTRO_PHASES.dotsStart, INTRO_PHASES.dotsEnd)),
-    contourAlpha: 1 - outCubic(phase(u, INTRO_PHASES.fadeStart, INTRO_PHASES.fadeEnd)),
+    // smootherstep, not out-cubic. Out-cubic's maximum velocity is exactly AT the join, so the lines
+    // went from perfectly steady to shedding opacity fast in a single frame — a derivative
+    // discontinuity, invisible to a step test and inconsistent with the zero-velocity-at-both-ends
+    // reasoning that governs `lift` and `dots`.
+    contourAlpha: 1 - smoother(phase(u, INTRO_PHASES.fadeStart, INTRO_PHASES.fadeEnd)),
   };
+}
+
+/**
+ * How much of one contour level is stroked, given the frame's linear `survey` progress.
+ *
+ * Levels start `INTRO_SURVEY_STAGGER` apart and each gets whatever is left, so the LAST level finishes
+ * exactly at `surveyEnd` and `surveyEnd` means what its name says. The easing is applied here, per
+ * level, to that level's own window — not to the phase as a whole before this clamp, which is the
+ * mistake that made the whole map finish in the first fifth of its phase.
+ */
+export function surveyProgress(survey: number, levelIndex: number, levelCount: number): number {
+  const start = levelCount > 1 ? levelIndex * INTRO_SURVEY_STAGGER : 0;
+  const width = 1 - (levelCount > 1 ? (levelCount - 1) * INTRO_SURVEY_STAGGER : 0);
+  if (width <= 0) return clamp01(survey) >= 1 ? 1 : 0;   // degenerate stagger; fail visible, not NaN
+  // outQuad, not outCubic. A pen finishing a stroke may decelerate, but out-cubic's tail is flat
+  // enough that combined with the lift's smootherstep toe it produced a dead patch between the two
+  // phases. Quadratic keeps the line moving into its own finish.
+  return outQuad((clamp01(survey) - start) / width);
+}
+
+/**
+ * Is an intro that began at `startedAt` still in flight?
+ *
+ * `TerrainHero` re-inits on `theme:change`, which can land mid-animation. Without this the re-init
+ * asked `shouldPlayIntro`, found the flag already set (it is set at START), and painted the FINISHED
+ * terrain instantly over a half-risen surface — a snap. With `?intro=1` present it was worse: the flag
+ * no longer applied, so the intro restarted from the flat plane, a backwards collapse into the spec's
+ * own "second discontinuity" anti-goal, during the owner's tuning loop. Carrying the clock across the
+ * re-init resumes the animation instead, in both cases.
+ *
+ * A negative elapsed reads as NOT running: `performance.now()` is monotonic per document, but a re-init
+ * after a View Transition swap reads a fresh one, and a backwards clock must not mean "running forever".
+ */
+export function introStillRunning(
+  startedAt: number | null,
+  now: number,
+  durationMs: number,
+): boolean {
+  if (startedAt === null) return false;
+  const elapsed = now - startedAt;
+  return elapsed >= 0 && elapsed < durationMs;
 }
 
 /**

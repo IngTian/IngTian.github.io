@@ -93,7 +93,7 @@ export function isoRuns(
   //
   // Measured on a plain circle at res 60: the old stitch returned runs of [50, 7, 63, 3, 2, 2, 2, 3],
   // i.e. three kept pieces of one closed loop and four fragments thrown away — visible gaps in a line
-  // that should be continuous. Nearest-first returns a single run of 125 points, as it should.
+  // that should be continuous. Nearest-first returns a single run of 124 points, as it should.
   //
   // The tolerance stays at `dx * 1.2` so a field with genuinely gappy crossings still stitches; what
   // changed is only WHICH candidate inside it wins. And the naive O(n²) scan stays — see the note on

@@ -13,8 +13,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   INTRO_DURATION_MS, INTRO_DUR_MIN_MS, INTRO_DUR_MAX_MS, INTRO_PHASES,
-  introFrame, introDurationFrom, shouldPlayIntro,
+  INTRO_SURVEY_STAGGER,
+  introFrame, introDurationFrom, shouldPlayIntro, surveyProgress, introStillRunning,
 } from '../src/lib/introTimeline';
+
+/** How much of the contour map is stroked overall — the mean of the per-level schedules. */
+const drawn = (t: number, n = 9): number => {
+  const s = introFrame(t).survey;
+  let total = 0;
+  for (let i = 0; i < n; i++) total += surveyProgress(s, i, n);
+  return total / n;
+};
 
 describe('introFrame — the landing', () => {
   it('lands EXACTLY on the hero at t=1', () => {
@@ -92,8 +101,16 @@ describe('introFrame — the shape of the motion', () => {
   it('surveys before it lifts', () => {
     // The design's sequence: a map is drawn, THEN the ground rises out of it. If the lift leads, the
     // lines are deforming a surface the viewer never saw flat, and the idea is lost.
-    const atLift = introFrame(INTRO_PHASES.liftStart);
-    expect(atLift.survey).toBeGreaterThan(0.8);
+    //
+    // ASSERTED ON WHAT IS DRAWN, not on the linear phase progress. The first version of this test read
+    // `introFrame(liftStart).survey > 0.8` — the phase clock — which measures how far through the
+    // survey's ALLOTTED TIME we are, not how much map is on screen. Those differ by the per-level
+    // schedule, which is the whole mechanism. When `liftStart` moved from 0.36 to 0.28 to kill a dead
+    // patch, the phase reading dropped to 0.70 and the test failed while the thing it cares about got
+    // slightly stronger: 93% of the map is stroked when the ground starts to move.
+    expect(drawn(INTRO_PHASES.liftStart)).toBeGreaterThan(0.85);
+    // and the ground really has not moved yet
+    expect(introFrame(INTRO_PHASES.liftStart).lift).toBe(0);
   });
 
   it('lifts at least halfway before the lines begin to fade', () => {
@@ -114,6 +131,92 @@ describe('introFrame — the shape of the motion', () => {
   it('finishes the fade before the end, so the final frame is clean', () => {
     expect(INTRO_PHASES.fadeEnd).toBeLessThanOrEqual(1);
     expect(introFrame(INTRO_PHASES.fadeEnd).contourAlpha).toBe(0);
+  });
+
+  it('NEVER PLATEAUS — no 150ms window where nothing visible moves', () => {
+    // THE BUG THIS EXISTS FOR, found by review and not by this suite's first version. The per-level
+    // survey schedule used to live as three inline literals in TerrainHero's draw call, re-clamping the
+    // already-eased `survey` through its own 0.45-wide window. The last level therefore finished at
+    // t≈0.19 while `lift` did not become perceptible until t≈0.42 — a ~620ms FROZEN FRAME in the middle
+    // of a 3600ms animation, roughly a fifth of it. The spec's stated reason for overlapping the phases
+    // is "so there is no beat of stillness between them"; the shipped version had exactly that beat.
+    //
+    // The module's own `survey` channel kept moving (0.855 → 0.999) across the plateau, so nothing here
+    // could see it. This assertion measures what is actually DRAWN — the mean per-level progress — plus
+    // the other three channels, which is the quantity a viewer perceives.
+    //
+    // This is the mirror of the no-step test above: a step is motion with no time, a plateau is time
+    // with no motion, and both read as broken.
+    const WINDOW = 150 / INTRO_DURATION_MS;   // 150ms expressed in normalised time
+    const EPS = 0.004;
+    let worst = 1, worstAt = '';
+    for (let t = 0; t + WINDOW <= INTRO_PHASES.fadeEnd; t += WINDOW / 3) {
+      const a = introFrame(t), b = introFrame(t + WINDOW);
+      const moved = Math.max(
+        Math.abs(drawn(t + WINDOW) - drawn(t)),
+        Math.abs(b.lift - a.lift),
+        Math.abs(b.dots - a.dots),
+        Math.abs(b.contourAlpha - a.contourAlpha),
+      );
+      if (moved < worst) { worst = moved; worstAt = `t=${t.toFixed(3)}`; }
+    }
+    expect(worst, `quietest 150ms window moved only ${worst.toFixed(5)} at ${worstAt}`)
+      .toBeGreaterThan(EPS);
+  });
+
+  it('finishes the contour map exactly at surveyEnd, not a fifth of the way in', () => {
+    // `surveyEnd` is documented as "the contour map finishes drawing" and must mean it, or the owner
+    // tuning that constant gets a confusing response. The last level is the one that decides.
+    const n = 9;
+    expect(surveyProgress(introFrame(INTRO_PHASES.surveyEnd).survey, n - 1, n)).toBe(1);
+    expect(surveyProgress(introFrame(INTRO_PHASES.surveyEnd * 0.9).survey, n - 1, n)).toBeLessThan(1);
+    expect(drawn(INTRO_PHASES.surveyEnd)).toBe(1);
+  });
+
+  it('staggers the levels so the map draws as passes, not all at once', () => {
+    const n = 9;
+    const mid = introFrame(INTRO_PHASES.surveyEnd * 0.5).survey;
+    const first = surveyProgress(mid, 0, n);
+    const last = surveyProgress(mid, n - 1, n);
+    expect(first).toBeGreaterThan(last);
+    expect(INTRO_SURVEY_STAGGER).toBeGreaterThan(0);
+    // and the stagger must leave room for a window: (n-1)*stagger < 1
+    expect((n - 1) * INTRO_SURVEY_STAGGER).toBeLessThan(1);
+  });
+
+  it('gives every level a monotone 0→1 schedule', () => {
+    const n = 9;
+    for (let i = 0; i < n; i++) {
+      let prev = -1;
+      for (let k = 0; k <= 200; k++) {
+        const v = surveyProgress(k / 200, i, n);
+        expect(v).toBeGreaterThanOrEqual(prev);
+        expect(v).toBeGreaterThanOrEqual(0);
+        expect(v).toBeLessThanOrEqual(1);
+        prev = v;
+      }
+      expect(surveyProgress(0, i, n)).toBe(i === 0 ? 0 : 0);
+      expect(surveyProgress(1, i, n)).toBe(1);
+    }
+  });
+
+  it('is safe for a single level', () => {
+    expect(surveyProgress(0, 0, 1)).toBe(0);
+    expect(surveyProgress(1, 0, 1)).toBe(1);
+    expect(Number.isFinite(surveyProgress(0.5, 0, 1))).toBe(true);
+  });
+
+  it('eases the contour fade out with zero velocity at BOTH ends', () => {
+    // The lines went from perfectly steady to losing ~1.2% opacity per millisecond in one frame,
+    // because the fade used out-cubic — maximum velocity exactly AT the join. Not a step, so the
+    // no-step test could not see it; a derivative discontinuity in opacity. Inconsistent with the
+    // reason smootherstep is used for lift and dots ("zero velocity at both ends"), so it now matches.
+    const d = (t: number) => {
+      const h = 1e-4;
+      return (introFrame(t + h).contourAlpha - introFrame(t - h).contourAlpha) / (2 * h);
+    };
+    expect(Math.abs(d(INTRO_PHASES.fadeStart + 1e-3))).toBeLessThan(0.35);
+    expect(Math.abs(d(INTRO_PHASES.fadeEnd - 1e-3))).toBeLessThan(0.35);
   });
 
   it('overlaps its phases rather than running them in strict sequence', () => {
@@ -178,6 +281,33 @@ describe('introDurationFrom', () => {
 
   it('defaults to 3600ms — the pace the owner judged', () => {
     expect(INTRO_DURATION_MS).toBe(3600);
+  });
+});
+
+describe('introStillRunning — surviving a re-init', () => {
+  it('is false before anything has started', () => {
+    expect(introStillRunning(null, 1000, 3600)).toBe(false);
+  });
+
+  it('is true while an intro is mid-flight', () => {
+    // THE BUG THIS EXISTS FOR: `theme:change` re-inits the whole component, and it can land mid-intro.
+    // The session flag is set at START, so the re-init asked `shouldPlayIntro`, got false, and painted
+    // the FINISHED terrain instantly over a half-risen surface — a snap, which Review Focus 3 said must
+    // not happen. With `?intro=1` present it was worse: the flag no longer applied, so the intro
+    // RESTARTED from the flat plane, a backwards collapse. Carrying the clock across the re-init makes
+    // the animation resume where it was in both cases.
+    expect(introStillRunning(1000, 2500, 3600)).toBe(true);
+  });
+
+  it('is false once the duration has elapsed', () => {
+    expect(introStillRunning(1000, 4600, 3600)).toBe(false);
+    expect(introStillRunning(1000, 1000 + 3600, 3600)).toBe(false);
+  });
+
+  it('is false for a clock that has gone backwards', () => {
+    // performance.now() is monotonic per document, but a re-init reads a fresh document after a View
+    // Transition swap. A negative elapsed must not read as "still running forever".
+    expect(introStillRunning(5000, 1000, 3600)).toBe(false);
   });
 });
 

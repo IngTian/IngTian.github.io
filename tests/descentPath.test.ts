@@ -2,7 +2,7 @@
 // THE CONTOUR MEMO — the largest single performance fix on the perf branch, and for one revision the only
 // one with nothing holding it in place.
 //
-// `contours()` for the eleven levels the descent graph draws is 190 polylines / 2962 points and costs
+// `contours()` for the eleven levels the descent graph draws is 17 polylines / 2838 points and costs
 // 53–67ms of synchronous main thread. `DescentPath.astro` binds its init to BOTH `astro:page-load` and
 // `theme:change`, so uncached that ran on every return to `/` and every theme flip, inside the view
 // transition. The cache was first written as a `Map` at the top of the component's `<script>`, where it
@@ -93,6 +93,72 @@ describe('contours — the kernel the memo wraps', () => {
         expect(x).toBeLessThanOrEqual(b.x1 + 1e-6);
         expect(y).toBeGreaterThanOrEqual(b.y0 - 1e-6);
         expect(y).toBeLessThanOrEqual(b.y1 + 1e-6);
+      }
+    }
+  });
+});
+
+describe('the basin wash\'s eligible loops — an invariant between two files', () => {
+  // WHY THIS EXISTS, and it is not a hypothetical. The marching-squares kernel was extracted and its
+  // stitch fixed (first-match → nearest), which is strictly better geometry: it retains MORE segments
+  // (2821 vs 2772 at res 150) and stops dropping contour fragments. But it changes the RUN STRUCTURE —
+  // 190 runs became 17 — and `DescentPath.astro`'s basin wash is run-structure sensitive: it fills only
+  // runs of ≥12 points whose endpoints are within 0.08, at a per-level opacity of `0.034 - i*0.005`.
+  //
+  // Measured across that change, the fill count stayed at 3 but MOVED LEVELS: lv1×1 + lv2×2 before,
+  // lv0×1 + lv3×1 + lv4×1 after — including a new fill on lv0, the deepest level and the strongest
+  // opacity, which previously got none. The Story slide now washes different basins at different
+  // strengths than the version the owner approved.
+  //
+  // Nothing in this file could see that. The specs above pin the memo, determinism, `length > 3` and
+  // the bounds — all of which pass identically at 190 runs and at 17. So this is the guard the
+  // refactor's own plan claimed to have and did not: the exact predicate the renderer applies,
+  // asserted on the geometry, in the category CLAUDE.md calls "an invariant between two files".
+  const RES = 150;          // CONTOUR_RES in DescentPath.astro
+  const MIN_PTS = 12;       // `run.length < 12` → skip
+  const CLOSE_TOL = 0.08;   // endpoints within 0.08 → a closed loop
+
+  /** The renderer's own eligibility test, applied to one level's runs. */
+  const eligible = (runs: [number, number][][]): number => runs.filter((run) => {
+    if (run.length < MIN_PTS) return false;
+    const a = run[0], z = run[run.length - 1];
+    return Math.hypot(a[0] - z[0], a[1] - z[1]) < CLOSE_TOL;
+  }).length;
+
+  it('fills a stable set of closed loops across the five washed levels', () => {
+    // `levels.slice(0, 5)` is what the wash iterates.
+    const perLevel = contourLevels(11).slice(0, 5).map((lv) => eligible(contoursFor(lv, RES)));
+    // Pinned as a whole so a change anywhere in the stitch, the levels or the bounds shows up here
+    // rather than as a differently-shaded Story slide nobody diffed.
+    expect(perLevel).toEqual([1, 0, 0, 1, 1]);
+  });
+
+  it('keeps the wash to a handful of loops, never a slab', () => {
+    // The guard exists because an OPEN run clipped by the frame, closed with closePath(), draws a chord
+    // across the frame and fills a rectangular slab — the bug the `closed` test was added for. If a
+    // future stitch starts emitting long open runs that happen to begin and end near each other, this
+    // catches the count explosion before anyone sees the slab.
+    const total = contourLevels(11).slice(0, 5)
+      .reduce((n, lv) => n + eligible(contoursFor(lv, RES)), 0);
+    expect(total).toBeGreaterThan(0);
+    expect(total).toBeLessThan(8);
+  });
+
+  it('every eligible loop really is a loop, not a near-miss', () => {
+    for (const lv of contourLevels(11).slice(0, 5)) {
+      for (const run of contoursFor(lv, RES)) {
+        if (run.length < MIN_PTS) continue;
+        const a = run[0], z = run[run.length - 1];
+        const gap = Math.hypot(a[0] - z[0], a[1] - z[1]);
+        if (gap >= CLOSE_TOL) continue;
+        // a closed loop of ≥12 points should enclose real area, not be a hairpin
+        let area = 0;
+        for (let k = 0; k < run.length; k++) {
+          const p = run[k], q = run[(k + 1) % run.length];
+          area += p[0] * q[1] - q[0] * p[1];
+        }
+        expect(Math.abs(area) / 2, `a filled loop at level ${lv} encloses no area`)
+          .toBeGreaterThan(0.001);
       }
     }
   });

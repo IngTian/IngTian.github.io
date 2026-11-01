@@ -55,9 +55,10 @@ const bubbles = JSON.stringify([
   import { buildGrid, paintTerrain, TERRAIN_CONFIG_DEFAULTS, type GridPoint } from '../lib/terrainRender';
   import { prefersReducedMotion } from '../lib/motion';
   import {
-    introFrame, introDurationFrom, shouldPlayIntro, type IntroFrame,
+    introFrame, introDurationFrom, shouldPlayIntro, surveyProgress, introStillRunning,
+    type IntroFrame,
   } from '../lib/introTimeline';
-  import { introContours } from '../lib/terrainContours';
+  import { introContours, terrainLevels } from '../lib/terrainContours';
 
   // The canvas is JS-painted, so it can't inherit CSS tokens — pick the ramp +
   // walker colors from the active theme (data-theme on <html>). Read fresh on
@@ -94,6 +95,16 @@ const bubbles = JSON.stringify([
   // navigations and reference a stale (swapped-out) canvas. Without this, the
   // bowl field renders blank when you navigate back to home.
   let teardown: (() => void) | null = null;
+
+  // MODULE SCOPE, so it SURVIVES a re-init — which is the whole point of it being here.
+  //
+  // `theme:change` re-inits this component, and it can land mid-intro. With the clock inside init, the
+  // re-init decided afresh: the session flag was already set (it is set at start), so it painted the
+  // FINISHED terrain instantly over a half-risen surface — a snap. And with `?intro=1` in the URL the
+  // flag no longer applied, so the intro RESTARTED from the flat plane: a backwards collapse, during
+  // the owner's own tuning loop, and exactly the "second discontinuity" the design lists as an
+  // anti-goal. Carrying the start time across the re-init resumes the animation where it was instead.
+  let introStartedAt: number | null = null;
 
   function initTerrain() {
     teardown?.();
@@ -138,18 +149,28 @@ const bubbles = JSON.stringify([
     //
     // THE CAMERA NEVER MOVES. The one animated quantity is elevation — `paintTerrain`'s `lift`, and the
     // same factor applied to the contour points below. That is what makes the lines and the dots read as
-    // ONE surface drawn twice instead of two animations stapled together, and it is also why the EDL
-    // shade precomputed in `buildGrid` stays valid throughout: it is a function of the fixed projection.
+    // ONE surface drawn twice instead of two animations stapled together.
+    //
+    // ON THE PRECOMPUTED EDL SHADE, because an earlier version of this comment got it wrong: it is NOT
+    // camera-only. `computeEDL` projects each dot at FULL elevation and derives its shade from
+    // screen-space depth differences between neighbours, so it is a function of the fixed camera AND of
+    // the finished geometry. It is therefore exact only at `lift === 1`. During the rise the flat plane
+    // carries the finished relief's shade — a density-and-size ghost of the mountain, with colour
+    // uniform because `hn` collapses — which is accepted: it reads as a shaded-relief map, which is what
+    // the survey is. The landing frame is still byte-exact, which is the property that matters.
+    // (What WOULD break it is animating the camera. Do not.)
     //
     // Versioned key, namespaced so it cannot collide with the theme key BaseLayout's resolver reads.
     // Bump the suffix when the animation changes enough to want a second look mid-session — otherwise a
     // reload during a design pass shows nothing and the change appears not to have shipped.
     const INTRO_KEY = 'descent.intro.seen.v1';
     const INTRO_MS = introDurationFrom(location.search);
-    const playIntro = !reduce && shouldPlayIntro(
+    // An intro already in flight RESUMES across a re-init; otherwise the flag and `?intro=1` decide.
+    const resuming = introStillRunning(introStartedAt, performance.now(), INTRO_MS);
+    const playIntro = !reduce && (resuming || shouldPlayIntro(
       { get: () => sessionStorage.getItem(INTRO_KEY) },
       location.search,
-    );
+    ));
     // SET AT START, not on completion: "first open" is the semantics, and setting it at the end means a
     // visitor who reloads repeatedly sees the animation every time. `?intro=1` overrides the flag, which
     // is what makes a tuning pass one reload rather than a storage purge.
@@ -172,16 +193,27 @@ const bubbles = JSON.stringify([
       ctx.lineJoin = 'round';
       ctx.lineWidth = 1.15 * DPR;
       const levels = introContours();
+      const lv = terrainLevels();
       for (let li = 0; li < levels.length; li++) {
-        const prog = Math.max(0, Math.min(1, (surveyT - li * 0.05) / 0.45));
+        // The per-level schedule lives in lib/introTimeline.ts. It was three inline literals here, which
+        // put phase boundaries in a draw call where no test could reach them — and the schedule was
+        // wrong, finishing the whole map in the first fifth of its phase and leaving a frozen frame.
+        const prog = surveyProgress(surveyT, li, levels.length);
         if (prog <= 0) continue;
         ctx.strokeStyle = `rgba(${ir},${ig},${ib},${(0.46 * alpha * Math.min(1, prog * 1.6)).toFixed(3)})`;
+        // A CONTOUR POINT'S ELEVATION *IS* ITS LEVEL — that is what makes it a contour. So the height
+        // is `lv[li] * lift` and `field()` must not be called here: it would evaluate five Gaussians per
+        // point, ~6,200 `exp()` calls per frame on an unthrottled loop, to recompute a number we already
+        // know. It is also strictly MORE accurate: the points are linear interpolations along cell
+        // edges, so `field()` returns the level plus O(cell²) error, which would sit the line slightly
+        // off its own isoline.
+        const z = lv[li] * lift;
         for (const run of levels[li]) {
           const n = Math.max(2, Math.ceil(run.length * prog));
           ctx.beginPath();
           for (let k = 0; k < n; k++) {
             const [x, y] = run[k];
-            const [sx, sy] = project(x, y, field(x, y) * lift, W, Hh, ZOOM);
+            const [sx, sy] = project(x, y, z, W, Hh, ZOOM);
             if (k === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
           }
           ctx.stroke();
@@ -237,9 +269,14 @@ const bubbles = JSON.stringify([
       const breathHz = 0.4;
       const lift = intro ? intro.lift : 1;
 
-      // The intro's survey, behind everything. At `intro.contourAlpha === 0` — which is where the
-      // timeline lands at t=1 — this costs nothing and draws nothing.
-      if (intro && intro.contourAlpha > 0.002) {
+      // The intro's survey, behind everything.
+      //
+      // THE `intro.survey > 0` GUARD IS NOT COSMETIC. Without it, the very first frame — which has
+      // contourAlpha 1 and survey 0 — called `introContours()`, paid the full 10.6ms marching-squares
+      // build, and then stroked exactly ZERO paths. The spec said in so many words to compute that
+      // geometry on the first animation tick rather than synchronously before first paint; this guard
+      // is what makes that true. Measured: it was the whole of the +12ms this feature cost the LCP.
+      if (intro && intro.contourAlpha > 0.002 && intro.survey > 0) {
         strokeSurvey(intro.survey, intro.contourAlpha, lift);
       }
 
@@ -252,9 +289,13 @@ const bubbles = JSON.stringify([
       // `paintTerrain`. The painter composes its own per-dot alpha from elevation and EDL, and
       // globalAlpha multiplies the lot — which is exactly the semantics wanted, for free. Always reset:
       // the walker and bubble passes below must not inherit it.
-      if (intro) ctx.globalAlpha = intro.dots;
-      paintTerrain(ctx, grid, cfg, W, Hh, DPR, tsec, breathAmp, lift);
-      if (intro) ctx.globalAlpha = 1;
+      // Skipped entirely while the dots are still invisible: at globalAlpha 0 this issued 987
+      // arc+fill pairs that painted nothing, every frame, for the first 1008ms of an UNTHROTTLED loop.
+      if (!intro || intro.dots > 0.004) {
+        if (intro) ctx.globalAlpha = intro.dots;
+        paintTerrain(ctx, grid, cfg, W, Hh, DPR, tsec, breathAmp, lift);
+        if (intro) ctx.globalAlpha = 1;
+      }
 
       // walkers (only when animating; static frame shows terrain only)
       let anyBubble: null | { x:number; y:number; b:{word?:string;mathml?:string} } = null;
@@ -315,8 +356,15 @@ const bubbles = JSON.stringify([
     // run on that path. An earlier draft of the design had it paint the finished terrain first and then
     // start the intro, which means the visitor watches the landscape COLLAPSE to a plane — a backwards
     // jump, and exactly the discontinuity this whole feature is supposed to avoid.
-    if (playIntro) frame(0, false, 1, introFrame(0));
-    else frame(0, false);
+    //
+    // When RESUMING across a re-init (a theme flip mid-intro), paint the frame the animation is
+    // actually at, not t=0 — otherwise the fix for the snap would itself be a backwards jump.
+    if (playIntro) {
+      const t0 = resuming && introStartedAt !== null
+        ? Math.min(1, (performance.now() - introStartedAt) / INTRO_MS)
+        : 0;
+      frame(0, false, 1, introFrame(t0));
+    } else frame(0, false);
 
     // Resize handler: canvas resize clears the backing store, so repaint the
     // static frame under reduced-motion (otherwise the animation loop repaints).
@@ -342,7 +390,12 @@ const bubbles = JSON.stringify([
       const loop = (ts: number) => {
         // ── The intro, while it lasts ────────────────────────────────────────────────────────────
         if (!introDone) {
-          if (!introFrom) introFrom = ts;
+          // The clock is stamped at module scope on the first frame of the FIRST init, and reused by
+          // any re-init that lands while the intro is still running — so a theme flip resumes.
+          if (!introFrom) {
+            if (resuming && introStartedAt !== null) introFrom = introStartedAt;
+            else introFrom = introStartedAt = ts;
+          }
           const t = Math.min(1, (ts - introFrom) / INTRO_MS);
           // `animate: false` so no walker spawns or draws during the intro — a comet descending a flat
           // plane is meaningless, and at partial lift it would hang in mid-air above the surface,

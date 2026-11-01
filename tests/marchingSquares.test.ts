@@ -94,6 +94,29 @@ describe('isoRuns', () => {
     expect(fine).toBeGreaterThan(coarse);
   });
 
+  it('stitches correctly on ANISOTROPIC bounds, where dx and dy differ', () => {
+    // `bounds` is a parameter, so this kernel is general — but the stitch tolerance was derived from the
+    // x spacing alone. For `storyBounds()` (dx 0.0308, dy 0.0242) that already makes TOL 0.0369, SMALLER
+    // than the cell diagonal 0.0392; bounds with dy much larger than dx would make it loose instead. It
+    // happens not to bite at either shipped parameter set because true neighbours are coincident, but a
+    // shared helper should not carry an axis asymmetry waiting for a third caller.
+    const wide: IsoBounds = { x0: -4, y0: -0.5, x1: 4, y1: 0.5 };
+    const tall: IsoBounds = { x0: -0.5, y0: -4, x1: 0.5, y1: 4 };
+    for (const b of [wide, tall]) {
+      const runs = isoRuns(circles, b, 0.16, 48);
+      expect(runs.length, `no runs on ${JSON.stringify(b)}`).toBeGreaterThan(0);
+      const dx = (b.x1 - b.x0) / 48, dy = (b.y1 - b.y0) / 48;
+      const diag = Math.hypot(dx, dy);
+      for (const run of runs) {
+        for (let k = 1; k < run.length; k++) {
+          const d = Math.hypot(run[k][0] - run[k - 1][0], run[k][1] - run[k - 1][1]);
+          expect(d, `run jumps ${d.toFixed(4)} against a cell diagonal of ${diag.toFixed(4)}`)
+            .toBeLessThan(diag * 2.2);
+        }
+      }
+    }
+  });
+
   it('finds both branches of a level set that is two separate loops', () => {
     // Marching squares must not assume one contour per level. Two bumps, two loops.
     const twoWells = (x: number, y: number): number =>

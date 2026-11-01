@@ -48,6 +48,8 @@ let levelsCache: { n: number; v: number[] } | null = null;
  * guarantees every level draws something. `tests/terrainContours.test.ts` asserts each one is strictly
  * inside the range, which is what makes "no pass is silently blank" a test rather than a hope.
  */
+/** THE RETURNED ARRAY IS SHARED AND READ-ONLY BY CONTRACT, like `terrainContoursFor`'s and
+ *  `buildGrid`'s. It is cached, and the intro reads it once per level per frame. */
 export function terrainLevels(n: number = INTRO_CONTOUR_LEVELS): number[] {
   if (levelsCache && levelsCache.n === n) return levelsCache.v;
   let lo = Infinity, hi = -Infinity;

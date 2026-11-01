@@ -187,8 +187,9 @@ describe('paintTerrain — the intro\'s elevation lift', () => {
   };
 
   it('defaults lift to 1, so every existing caller is unaffected', () => {
-    // The whole reason the parameter is optional. TerrainHero, the proto route and every pre-existing
-    // test in this file call paintTerrain with eight arguments; none may change behaviour.
+    // The whole reason the parameter is optional. `grep -rn 'paintTerrain(' src` returns exactly ONE
+    // production caller (TerrainHero) — the proto routes that used it were retired — and every
+    // pre-existing test in this file calls it with eight arguments. None may change behaviour.
     const implicit = paint();
     const explicit = paint(1);
     expect(explicit.length).toBe(implicit.length);
