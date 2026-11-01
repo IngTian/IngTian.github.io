@@ -29,8 +29,18 @@ const bubbles = JSON.stringify([
   }
   .terrain-bubble.show { opacity: 1; transform: none; }
   .terrain-bubble.word { font-family: var(--font-display); font-style: italic; font-size: 16px; }
-  .terrain-bubble .m { color: color-mix(in oklab, var(--on-accent) 70%, var(--indigo)); font-style: normal; }
-  .terrain-bubble math { color: var(--on-accent); font-size: 1.05em; }
+  /* :global() ON THE DESCENDANTS, because the script creates them and scoped rules cannot reach them.
+     Both `.m` and `math` come from `bubbleEl.innerHTML = b.word || b.mathml` below, out of the data-bubbles
+     JSON built in the frontmatter — so neither node is in this component's template and neither can carry
+     its scope hash. Astro compiled these to `.terrain-bubble[cid] .m[cid]` and `.terrain-bubble[cid]
+     math[cid]`, which match nothing in dist on any route: the Moo glyph has been unstyled (wrong colour,
+     still italic from `.terrain-bubble.word`) and the three MathML bubbles have had neither their colour nor
+     their 1.05em.
+     DescentPath.astro:136-148 documents this exact failure for its own script-created emphasis nodes and
+     fixes it the same way; this is the instance that was missed. The parent stays scoped because the bubble
+     div IS in the template — going global on the whole selector would leak. */
+  .terrain-bubble :global(.m) { color: color-mix(in oklab, var(--on-accent) 70%, var(--indigo)); font-style: normal; }
+  .terrain-bubble :global(math) { color: var(--on-accent); font-size: 1.05em; }
 </style>
 
 <script>

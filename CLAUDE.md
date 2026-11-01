@@ -109,7 +109,10 @@ When in doubt, remove rather than add.
   zero fonts. `katex` is a **devDependency** and stays one; only its output ships.
   `lib/equations.ts` holds the same guarantee for build-time equations in `.astro`,
   and `tests/equations.test.ts` asserts it.
-- `astro:assets` optimizes gallery images (responsive `widths`, webp/avif).
+- `astro:assets` optimizes gallery images (responsive `widths`, **webp — not avif**). This line said
+  "webp/avif" for a long time; `ls dist/_astro/*.avif` is empty and nothing in `astro.config.mjs` asks
+  for avif, so no page has ever shipped one. Either add the format deliberately or leave it — but do
+  not read this line as evidence it is already happening.
   - **NEVER put a native image width in a `widths` array.** `/art`'s calligraphy asked for
     `widths={[480, 900, w.src.width]}` — 1727 for `spring-couplet-stele`, a **1342 KB** webp — on the element
     that is also `fetchpriority="high"`. At `40vw`, a 1440px viewport at DPR 2 needs 1152 device px, so that
@@ -123,12 +126,32 @@ When in doubt, remove rather than add.
     It also turned waste into the fix: `<Image>` already emitted a native-dimension variant for the `src`
     attribute independent of `widths`, which a browser with `srcset` never requests — 18.6 MB of pure build
     output, now the thing actually being used. `tests/distSmoke.test.ts` weighs the file a browser would
-    *choose* at 1152 device px rather than checking the array, because the array is a means and bytes on the
-    critical path are what hurt.
-  - **Still true and not fixed:** 42 original JPEGs (36.3 MB) are emitted into `dist` that nothing
-    references. `data/artworks.ts` globs the photos with `{ eager: true }`, and an eagerly imported
-    `ImageMetadata` bakes a URL to the original, so Vite cannot prove it unused. Costs deploy artifact size
-    and zero visitor bytes; see issue #60.
+    *choose* rather than checking the array, because the array is a means and bytes on the critical path
+    are what hurt — and it derives the device-px figure from the shipped `sizes` instead of hard-coding it,
+    after a first version hard-coded the wrong one (see the next bullet).
+  - **`sizes` MATTERS AS MUCH AS `widths`, and fixing only one left two thirds of the over-fetch.** The
+    calligraphy hint was `40vw` — a fluid bound for an element whose width is a CONSTANT. `.cal :global(img)`
+    is `width: auto; max-width: 100%; max-height: min(82vh, 820px)`, so for a tall work the HEIGHT cap binds
+    and the width is `cap * ar`, bounded by `820 * ar` at any window height: **414 CSS px** for the stele,
+    against the 512–1536 that `40vw` declares. So DPR 2 still chose the 1200w variant (396,030 B) where
+    900w (142,128 B) covers the 828 device px actually needed. The arithmetic that justified it ("needs 1152
+    device px", "rendered at 576 CSS px") reasoned from the viewport rather than from the cap, and had been
+    written down five times — including into a test — which is the strongest form of "this will stop the next
+    reader from looking". `calSizes()` now derives it from the cap, and `tests/artSizes.test.ts` pins
+    `CAL_MAX_H` against the `820px` in the stylesheet so the pair cannot drift.
+  - **Nothing below the fold is eager.** The photo grid used `i < 9 ? 'eager' : 'lazy'`, and the grid starts
+    ~2,100px down — past two calligraphy blocks, each as tall as `min(82vh, 820px)` allows. Those nine were
+    **754,378 B of the 896,506 B** `/art` fetched on first load, 84% of its image payload, for content nobody
+    had scrolled to. First-load image bytes are now 142,128. Deferring was safe because the layout never used
+    them: `buildRows()` solves each row from the build-time `data-ar`, not from a decoded image.
+  - **Still true and not fixed:** **44** original JPEGs (**38.65 MiB**, 55% of a 73 MB artifact) are emitted
+    into `dist` that nothing references — `grep` across every .html/.css/.js/.xml in `dist` finds zero hits
+    for any of them. 42 are photos: `data/artworks.ts` globs them with `{ eager: true }`, and an eagerly
+    imported `ImageMetadata` bakes a URL to the original, so Vite cannot prove it unused. The other 2 are the
+    calligraphy masters, which arrive by static import. (This bullet said "42 / 36.3 MB" — correct for the
+    photos it named, but it omitted the calligraphy pair, and a comment in `art.astro` separately claimed the
+    originals "drop out of `dist` entirely", which was simply false.) Costs deploy artifact size and zero
+    visitor bytes; see issue #60.
 - `site: 'https://ingtian.github.io'`, no `base` (user site at root).
 
 ## Layout
@@ -145,7 +168,7 @@ src/
   layouts/BaseLayout.astro          # head, astro:fonts, meta/OG/JSON-LD, favicons, the page-load veil, CornerNav, ClientRouter
   content.config.ts                 # the `writing` collection + its frontmatter schema (the ONLY content collection)
   content/writing/*.md              # the pieces themselves — a new one is a FILE, not a code change
-  data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, timeline, publications, projects, awards, links
+  data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline, publications, projects, awards, links
   data/nav.ts                       # PAGES — the canonical page set (see Navigation)
   data/writing.ts                   # the writing TAXONOMY (KINDS) + buildKinds(), the one seam to the markdown
   data/artworks.ts                  # gallery: calligraphy entries + globbed photos (+ photoNotes.ts for per-photo copy)
@@ -165,7 +188,7 @@ src/
   sections/Signature.astro          # links + seal — rendered INSIDE Work.astro, not as its own slide
   components/Deck.astro             # the deck's event plumbing (homepage only)
   components/proto/FluidSky.astro   # the WebGL sky canvas — on all 8 content pages despite the proto/ path (only /proto-sketches omits it)
-  components/SkyWash.astro          # woven warm/cold broken-color wash over the sky — pure CSS
+  components/SkyWash.astro          # woven warm/cold broken-color wash over the sky — CSS + a small script (it is in the Interactivity list below; this line used to say "pure CSS")
   components/TerrainHero.astro      # the hero's terrain canvas (Heights only)
   components/DescentPath.astro      # the career descent graph (inside Story)
   components/SideRail.astro         # the reading pages' marginal rail, driven by a Stop tree
@@ -335,14 +358,23 @@ enough to engage the deck on a viewport whose styles think it's a phone).
 **The number lives in two places and they are synced BY HAND.** `@media
 (max-width: var(--x))` is not valid CSS, so there is no way to feed one value to
 both. **If you change `PHONE_MAX_WIDTH`, change every `@media (max-width: 640px)`
-block with it.** `grep -rn 'max-width: 640px' src` returns 15 hits in 12 files, and
-two of the 15 are the prose in `viewport.ts` itself, so there are **13 real CSS
-blocks**: `global.css` ×2, `experience` ×2, and one each in `CornerNav`, `Toc`,
-`DescentPath`, `ProjectCard`, `FluidSky`, `Heights`, `404`, `research` and
-`writing/[...slug]`. (This list used to include "the two proto sections". There are
-no proto *sections* — `src/sections/` holds only the seven homepage slides plus
-Signature — and the one surviving proto route, `/proto-sketches`, breaks at 820px,
-not 640: it is an internal gallery, so it is not part of the phone treatment.)
+block with it.** `grep -rn 'max-width: *640px' src` returns **16 hits in 12 files**,
+and **four of the 16 are prose, not rules** — `viewport.ts` ×2 (its own doc
+comments) plus `global.css:166` and `global.css:315`, which describe the
+breakpoint in comments rather than declaring it. So there are **12 real CSS
+blocks across 11 files**: `experience` ×2, and one each in `global.css`,
+`CornerNav`, `Toc`, `DescentPath`, `ProjectCard`, `FluidSky`, `Heights`, `404`,
+`research` and `writing/[...slug]`.
+  Two notes on how this count has gone wrong before, because it keeps doing so.
+It read "15 hits … 13 real blocks … `global.css` ×2" — overcounting `global.css`
+because one of its two prose mentions is `max-width:640px` with **no space**,
+which the documented `grep -rn 'max-width: 640px' src` silently misses while a
+careless re-count catches it as a rule. Use the pattern above, with the `*`, and
+classify each hit rather than subtracting a remembered number of prose lines.
+Earlier still it listed "the two proto sections": there are no proto *sections* —
+`src/sections/` holds only the seven homepage slides plus Signature — and the one
+surviving proto route, `/proto-sketches`, breaks at 820px, not 640, because it is
+an internal gallery and not part of the phone treatment.
 `tests/viewport.test.ts` pins the value so a silent drift shows up as a failure
 rather than as a phone with half a treatment.
 
@@ -593,7 +625,10 @@ galaxy). The whole system is **token override**, not per-component branching:
   wholesale per theme).
 - **Surfaces that can't inherit CSS tokens** (handle per-theme by hand):
   the **terrain canvas** (JS-painted — `TerrainHero.astro` picks a `TerrainRamp`
-  + walker palette off `data-theme`; dark = green "stars"), the **fluid sky**
+  + walker palette off `data-theme`; dark = the cyan-blue **"Glacier"** ramp,
+  `TERRAIN_TERMINAL` in `lib/terrain.ts` — NOT green, which this line claimed for
+  a long time; the green phosphor is the fluid sky's and the accent token's, not
+  the terrain's), the **fluid sky**
   (`skyPalette`/`skyShader` switch to a phosphor nebula with stars behind the
   line), the **SkyWash** + `.descent::before/::after` washes (raw rgba — dark
   nearly kills the warm Monet strokes), the **hero legibility halo** (paper→dark
@@ -613,19 +648,55 @@ galaxy). The whole system is **token override**, not per-component branching:
   light-theme reader read it as a **bug**, not as emphasis. All four paper slides
   now share one palette and follow the theme.
 
-## Two CSS traps that have each shipped a bug here
+## Three Astro traps that have each shipped a bug here
 
 1. **Astro scoped styles rewrite selectors with `[data-astro-cid-…]`,** which
    changes specificity **and what the selector can reach.** A scoped rule **cannot**
-   reach markdown rendered by `<Content />`, slotted content, or nodes a script
-   created at runtime — `.prose blockquote` becomes `.prose[cid] blockquote[cid]`
-   and matches nothing, silently. This is why `/writing/<slug>`'s prose styles are
-   in an `is:global` block (nested under `.prose` so going global cannot leak), and
-   why several component rules use `:global(...)`. When a rule "does nothing" and the
-   markup is clearly right, check this first.
+   reach markdown rendered by `<Content />`, slotted content, nodes a script
+   created at runtime, **or an element declared in a different component** —
+   `.prose blockquote` becomes `.prose[cid] blockquote[cid]` and matches nothing,
+   silently. This is why `/writing/<slug>`'s prose styles are in an `is:global`
+   block (nested under `.prose` so going global cannot leak), and why several
+   component rules use `:global(...)`. When a rule "does nothing" and the markup is
+   clearly right, check this first.
+   - **Four real instances, three of them found by audit rather than by looking.**
+     `DescentPath` hit it with its script-created `b`/`i` emphasis nodes and fixed
+     it. `TerrainHero`'s `.terrain-bubble .m` and `.terrain-bubble math` had the
+     same bug — both descendants come from `bubbleEl.innerHTML`, so the Moo glyph
+     rendered unstyled and the three MathML bubbles never got their colour or
+     size. And `Heights` wrote `#heights .terrain-canvas { opacity: 0.4 }` for the
+     phone dim, but `.terrain-canvas` is declared in `TerrainHero.astro`, so it
+     carries *that* component's hash: the rule compiled to
+     `#heights[cid-A] .terrain-canvas[cid-A]` and matched zero elements on every
+     route. The dim had never once applied.
+   - **The cheap check is in `dist`, not in review.** Parse every
+     `X[data-astro-cid-N]` fragment out of `dist/_astro/*.css` and assert some
+     element in `dist` carries that hash *and* that tag/class. 128 fragments
+     today, 5 of them dead. Be aware this cannot be a blind gate: one of the 5 is
+     a legitimate empty-state branch in `Work.astro` that simply never renders
+     while a writing piece is published, and its signature is identical to a real
+     bug. An allowlist would be needed, which is why it is a tool to run and not a
+     test that exists.
 2. **At equal specificity, SOURCE ORDER decides.** Put an override **after** the
    rule it overrides. A phone override placed above the desktop rule it was meant to
    beat has shipped here more than once.
+3. **`{/* … */}` IS A JSX EXPRESSION, SO WHERE IT GOES IS LOAD-BEARING.** It is
+   legal **between elements** and in the frontmatter. It is **illegal between a
+   component's attributes**, and it is **not accepted inside a `.map()` arrow
+   body** either, because Astro parses that position as template rather than as JS.
+   Getting this wrong breaks the build with a parse error that points at the
+   element, not at the comment.
+   - This is written down because it cost **three broken builds in one session**:
+     the same mistake was made in `research.astro`, `writing/[...slug].astro` and
+     `art.astro`, and the fix for the third put the comment in the `.map()` body,
+     which took the error count from 8 to 19. **If a note belongs to a specific
+     attribute, put it above the element or in the frontmatter** — never among the
+     attributes.
+   - And the reason all three reached CI: the local check was
+     `npm run typecheck | grep -cE "error ts"`, which reads 0 forever because
+     Astro colourises its output and ANSI escapes sit between "error" and "ts".
+     **Read the `Result (N files): - N errors` summary line instead.** See
+     *Conventions* below.
 
 Related: `scroll-margin-top` is only honoured by `scrollIntoView()`. The deck moves
 with `window.scrollTo()`, so a CSS rule looked correct, did nothing, and panel
@@ -706,8 +777,39 @@ titles came to rest hard against the browser chrome — the lead is a number in
   so does every *invariant between two files* (`nav.test.ts`: every nav href is a
   real route; `writingContent.test.ts`: the schema enum matches `KINDS`;
   `pageStops.test.ts`: no stop points at an id the page won't emit;
-  `viewport.test.ts`: the breakpoint still says 640). They're the only automated
-  safety net, and they're where "two places must agree" is actually enforced.
+  `viewport.test.ts`: the breakpoint still says 640; `artSizes.test.ts`: both
+  `sizes` hints still describe the layout that decides them). They're the only
+  automated safety net, and they're where "two places must agree" is actually
+  enforced.
+- **A TEST IS NOT A CONSUMER. `noUnusedLocals` cannot see a dead export,** so
+  `lib/` accumulates functions whose only caller is their own spec, and the spec
+  makes them look alive. A sweep removed **13 such exports and ~470 lines**
+  (`discoveryOf`, `perceivedField`, `walkerKnownness`, `currentStop`,
+  `luminanceRange`, `bestConstant`, `scenarioLeaves`, `decisionVariables`,
+  `zoneAt`, `maxDarkwardExcursion`, `GLOBAL_MIN_IS_KNOWN`, `PATH_END`, `phases`).
+  The check is a grep for `\bname\b` over comment-stripped `src/**/*.{ts,astro}`,
+  counting `src` and `tests` separately — **not** `tsc`, which is blind to it.
+  - **THE EXCEPTION, and it is a real one: a function written so a test can assert
+    an invariant on live production data.** Those stay, and they say so in their
+    own doc comment — `sumsToWhole` ("used by tests to catch a hand-edited split
+    that no longer sums to the whole"), `bellmanResidual` ("exposed so the TEST can
+    check the algorithm rather than the test re-implementing it"), `contrastRatio`,
+    `luminance01`, `inBounds`. Deleting one of these does not remove dead code, it
+    removes a check. **If you add one, document why in the declaration** — that
+    comment is the only thing separating it from the 13 above.
+  - **What is NOT an exception: a "printer".** `tests/factorInspect.test.ts` and
+    `tests/perfDiag.test.ts` were 115 lines with **two assertions between them**,
+    console-logging a table for a human to read, and they were the sole reason two
+    exports stayed alive. Both deleted. If per-frame cost is worth watching, assert
+    a budget and point it at a function production actually calls.
+  - **Two cautions learned doing this**, because both nearly shipped a bug. A
+    brace-matcher that starts counting at the declaration line is wrong — a
+    multi-line signature containing an inline object type
+    (`pathAt: (t: number) => { x: number; y: number }`) balances to zero *inside the
+    signature* and cuts the function in half; match from the brace that is last on
+    its line. And a bare `\bname\b` grep over tests gives false positives:
+    `starIdentity.test.ts` has a local `const phases = new Set()` about dot pulsing
+    that has nothing to do with `trajectory.phases()`. **Read each hit.**
 
 ## Taste rules (these define the look — hold the line)
 
@@ -754,6 +856,18 @@ titles came to rest hard against the browser chrome — the lead is a number in
   *raster* favicon, so PNG fallbacks (48/32/180/192/512) + a webmanifest +
   `og:image` ship from `public/`. Regenerate them from `favicon.svg` if the seal
   changes (sharp rasterizes SVG→PNG).
+- **`public/` in full, since two of its twelve files are easy to be surprised by:**
+  `favicon.svg`, `favicon-32.png`, `favicon-48.png`, `apple-touch-icon.png`,
+  `icon-192.png`, `icon-512.png`, `og-card.png`, `site.webmanifest`, `robots.txt`,
+  `cv.pdf`, `google39d8e886995c3420.html` (a Search Console verification file — do
+  not delete it as junk) and **`sitemap.xml`**.
+  - **`public/sitemap.xml` is hand-maintained and is NOT the generated one.**
+    `@astrojs/sitemap` emits `sitemap-index.xml` + `sitemap-0.xml`; this third file
+    is a static alias that sits beside them with no generator and no test. It is
+    exactly the shape of thing that goes stale silently — if you add or remove a
+    route, it does not update itself. Tracked in issue #67.
+  - `og-card.png` is **2400×1260**, while `BaseLayout` declares `og:image:width`
+    1200 and `height` 630. Also #67.
 
 ## Rejected — do not rebuild
 

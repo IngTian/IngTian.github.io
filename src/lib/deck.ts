@@ -144,14 +144,6 @@ export function nextStop(
   return null;
 }
 
-/** The stop the page is currently resting on (or closest to). Used to report position, not to move. */
-export function currentStop(stops: readonly number[], y: number): number | null {
-  if (!stops.length) return null;
-  let best = stops[0];
-  for (const s of stops) if (Math.abs(s - y) < Math.abs(best - y)) best = s;
-  return best;
-}
-
 /**
  * How long one slide transition takes, in ms.
  *

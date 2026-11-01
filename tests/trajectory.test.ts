@@ -5,10 +5,7 @@
 // stops being true, that must be a red test rather than a metaphor quietly becoming a lie.
 
 import { describe, it, expect } from 'vitest';
-import {
-  WAYPOINTS, settle, distinctBasins, barrier, trajectoryFacts, phases,
-  PATH_END, GLOBAL_MIN_IS_KNOWN,
-} from '../src/lib/trajectory';
+import { WAYPOINTS, settle, distinctBasins, barrier, trajectoryFacts } from '../src/lib/trajectory';
 import { field, RANGE } from '../src/lib/terrain';
 import { timeline } from '../src/data/profile';
 
@@ -89,18 +86,6 @@ describe('the declared waypoints', () => {
     expect(settle(swe.x, swe.y).depth).toBeCloseTo(f.localBasin.depth, 3);
   });
 
-  it('does NOT place the PhD at the global minimum — arrival is not claimed', () => {
-    // The honesty fix. An earlier version put the PhD exactly at the field's global minimum, which
-    // asserts he has reached the optimum. His own words: "I have no idea where the global min is.
-    // Maybe a future quant researcher." So the path stops SHORT of the deepest point, on the right
-    // side of the barrier and heading down, and the deepest point stays unlabelled.
-    const f = trajectoryFacts();
-    const phd = WAYPOINTS.find((w) => w.label.includes('PhD'))!;
-    const d = Math.hypot(phd.x - f.globalBasin.x, phd.y - f.globalBasin.y);
-    expect(GLOBAL_MIN_IS_KNOWN).toBe(false);
-    expect(d, 'PhD must be short of the global min').toBeGreaterThan(0.3);
-  });
-
   it('puts the PhD past the barrier, inside the global basin\'s catchment', () => {
     // Short of the optimum, but committed: a plain descent from the PhD must now reach the DEEP
     // basin, not fall back into the shallow one. Direction is the claim, not arrival.
@@ -121,17 +106,6 @@ describe('the declared waypoints', () => {
     for (const w of WAYPOINTS) {
       expect(w.learned.length, w.label).toBeGreaterThan(25);
     }
-  });
-
-  it('covers all four phases in order', () => {
-    const p = phases();
-    expect(p.map((x) => x.phase)).toEqual(['approach', 'basin', 'escape', 'descent']);
-    for (const g of p) expect(g.stops.length, g.phase).toBeGreaterThan(0);
-  });
-
-  it('ends the path at the PhD, with everything past it unknown', () => {
-    expect(PATH_END.label).toContain('PhD');
-    expect(PATH_END.phase).toBe('descent');
   });
 
   it('uses each timeline period at most once', () => {

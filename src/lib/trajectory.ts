@@ -89,26 +89,20 @@ export const WAYPOINTS: Waypoint[] = [
   },
 ];
 
-/** Where the path stops today. Everything past this is unknown, and the picture says so. */
-export const PATH_END = WAYPOINTS[WAYPOINTS.length - 1];
-
 /** What lies on the deeper side. NOT a claim of arrival — the label names the DIRECTION the descent
- *  is running in, which is the honest version of "I have no idea where the global min is". */
+ *  is running in, which is the honest version of "I have no idea where the global min is".
+ *
+ *  THE GLOBAL MINIMUM IS NOT A WAYPOINT, AND THAT IS THE POINT — the reasoning is here because it is
+ *  what this label is for, and it used to hang off a `GLOBAL_MIN_IS_KNOWN = false` constant that
+ *  nothing ever read. An earlier version put the PhD exactly at (-1.46, -0.64), the field's true
+ *  global minimum, which claims he has arrived at the optimum. He has not, and saying so was the
+ *  self-flattery a reviewer caught: "escaping costs a 1.26 climb" reads as a brag when the
+ *  destination is also declared to be the best possible one. His own correction: "I have no idea
+ *  where the global min is. Maybe a future quant researcher." So the deepest point stays UNLABELLED
+ *  and the path stops short of it — enforced by WAYPOINTS ending where it does and by
+ *  `unknownAttractor()` in lib/descentPath.ts, not by a boolean. The honest claim is direction, not
+ *  arrival: the descent is still running. */
 export const DEEP_SIDE_LABEL = 'Quantitative Researcher';
-
-/**
- * The global minimum is NOT a waypoint, and that is the point.
- *
- * An earlier version put the PhD exactly at (-1.46, -0.64) — the field's true global minimum —
- * which claims he has arrived at the optimum. He has not, and saying so was the self-flattery a
- * reviewer caught: "escaping costs a 1.26 climb" reads as a brag when the destination is also
- * declared to be the best possible one.
- *
- * His own correction: "I have no idea where the global min is. Maybe a future quant researcher."
- * So the deepest point stays UNLABELLED and the path stops short of it. The honest claim is
- * direction, not arrival: the descent is still running.
- */
-export const GLOBAL_MIN_IS_KNOWN = false;
 
 /** The two basins the story turns on, found by descent rather than declared. */
 export interface Basin { x: number; y: number; depth: number }
@@ -181,8 +175,3 @@ export function trajectoryFacts(): TrajectoryFacts {
   };
 }
 
-/** Waypoints grouped by phase, in path order, for staged reveal. */
-export function phases(): { phase: Waypoint['phase']; stops: Waypoint[] }[] {
-  const order: Waypoint['phase'][] = ['approach', 'basin', 'escape', 'descent'];
-  return order.map((phase) => ({ phase, stops: WAYPOINTS.filter((w) => w.phase === phase) }));
-}

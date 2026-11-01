@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  SPREAD_BPS, SIGMA_DAILY, IMPACT_K, DAILY_VOLUME, TRAJ_COUNT, TRAJ_WEEKS,
-  slippageBps, slippageCost, sizeLadder, trajectories, trajBounds, trajPoints,
-  decisionVariables, scenarioLeaves, magnitude, rulePairs, conflictWeb, rulePoint,
-} from '../src/lib/complexity';
+import { SPREAD_BPS, SIGMA_DAILY, IMPACT_K, DAILY_VOLUME, TRAJ_COUNT, TRAJ_WEEKS, slippageBps, slippageCost, sizeLadder, trajectories, trajBounds, trajPoints, magnitude, rulePairs, conflictWeb, rulePoint } from '../src/lib/complexity';
 import { FUND } from '../src/data/desk';
 
 // THE POINT OF THIS FILE. The slide's job is to state a SCALE, and every number it states has to be either
@@ -195,25 +191,6 @@ describe('trajBounds and trajPoints', () => {
 });
 
 describe('the size of the question — beat four', () => {
-  it('counts one weight per name per rebalance', () => {
-    expect(decisionVariables(3000, 24)).toBe(72_000);
-    expect(decisionVariables(FUND.tickers, FUND.periods)).toBeGreaterThan(50_000);
-  });
-
-  it('explodes the scenario tree, which is the number that makes the beat land', () => {
-    expect(scenarioLeaves(3, 24)).toBeGreaterThan(1e11);
-    expect(magnitude(scenarioLeaves(3, FUND.periods))).toBeGreaterThanOrEqual(11);
-  });
-
-  it('grows in the exponent, not the base — the definition of the problem being hard', () => {
-    expect(scenarioLeaves(2, 24) * 1e3).toBeLessThan(scenarioLeaves(3, 24));
-  });
-
-  it('degrades safely rather than overflowing silently', () => {
-    expect(scenarioLeaves(0, 5)).toBe(0);
-    expect(scenarioLeaves(3, 0)).toBe(1);
-    expect(scenarioLeaves(10, 400)).toBe(Infinity);
-  });
 
   it('reads magnitudes the way the copy states them', () => {
     expect(magnitude(1)).toBe(0);

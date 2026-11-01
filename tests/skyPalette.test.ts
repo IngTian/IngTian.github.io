@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
-import { rampFor, luminanceRange, type RampStop, type Theme } from '../src/lib/skyPalette';
+import { rampFor, type RampStop, type Theme } from '../src/lib/skyPalette';
 import { wcagLuminance, contrastRatio, AA_BODY, type SkyVariant } from '../src/lib/skyLegibility';
 
 const hexToRgb = (h: string): [number, number, number] => [
@@ -40,20 +40,6 @@ describe('rampFor — variant selection', () => {
         }
       }
     }
-  });
-});
-
-describe('luminanceRange — why the two variants need different mechanisms', () => {
-  it('shows the reading ramp is far flatter, so displacement alone cannot show on it', () => {
-    const d = luminanceRange(rampFor('descent', 'light'));
-    const r = luminanceRange(rampFor('reading', 'light'));
-    expect(d.span).toBeGreaterThan(0.85);
-    expect(r.span).toBeLessThan(0.20);
-    expect(d.span / r.span).toBeGreaterThan(4.4);
-  });
-
-  it('shows the dark descent ramp is also flat — hence its additive nebula', () => {
-    expect(luminanceRange(rampFor('descent', 'dark')).span).toBeLessThan(0.01);
   });
 });
 

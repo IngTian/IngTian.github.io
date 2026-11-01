@@ -138,14 +138,6 @@ export function knownnessFn(
   };
 }
 
-/** Convenience wrapper. Correct but SLOW — it rebuilds the frontier per call, so never use it inside
- *  a render loop. Kept for tests and one-off queries. */
-export function walkerKnownness(
-  x: number, y: number, u: number, pathAt: (t: number) => { x: number; y: number },
-): number {
-  return knownnessFn(u, pathAt)(x, y);
-}
-
 /** Is a world point inside anything you have learned after `k` stops? */
 export function isKnown(x: number, y: number, k: number): boolean {
   return knownAfter(k).some((d) => Math.hypot(x - d.x, y - d.y) <= d.r);
@@ -181,48 +173,6 @@ export interface Discovery {
   blindStops: number;
   /** The closest miss before discovery: distance minus radius at the previous stop. */
   nearMiss: number;
-}
-
-/**
- * When the deeper basin is discovered, and how nearly it was missed.
- *
- * This is the number the page should state, because it is the story: the better optimum existed the
- * whole time and was not visible. Nothing about the field changed — only what could be seen of it.
- */
-export function discoveryOf(x: number, y: number): Discovery | null {
-  const stop = discoveredAt(x, y);
-  if (stop < 0) return null;
-  const prev = stop - 1;
-  let nearMiss = Infinity;
-  if (prev >= 1) {
-    for (const d of knownAfter(prev)) {
-      const miss = Math.hypot(x - d.x, y - d.y) - d.r;
-      if (miss < nearMiss) nearMiss = miss;
-    }
-  }
-  return {
-    stop,
-    label: WAYPOINTS[stop - 1].label,
-    blindStops: stop - 1,
-    nearMiss: Number.isFinite(nearMiss) ? nearMiss : 0,
-  };
-}
-
-/**
- * The SENSITIVITY FUNCTION: the field as currently understood.
- *
- * Where you have been, this is the true field. Where you have not, it is your prior — and the prior
- * is deliberately flat and slightly optimistic-of-nothing: an unexplored region is assumed to be
- * unremarkable, which is exactly the mistake that keeps people in a local minimum. Blending toward
- * that prior is what makes the deep basin literally invisible until it is reached.
- *
- * `prior` defaults to the mean height of the KNOWN region, so the unknown looks like "more of what
- * I have seen" rather than like a special value someone chose.
- */
-export function perceivedField(x: number, y: number, k: number, prior?: number): number {
-  const w = knownness(x, y, k);
-  const p = prior ?? knownMean(k);
-  return field(x, y) * w + p * (1 - w);
 }
 
 /** Mean true height over the known discs — the honest default prior. */
