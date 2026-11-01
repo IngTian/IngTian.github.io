@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  researchStops, projectStops, paperSectionId, paperAnchorId, projectSectionId,
-  experienceStops, railLabel, homeStops,
-  flattenStops, type Stop,
-} from '../src/lib/pageStops';
+import { researchStops, projectStops, paperSectionId, paperAnchorId, projectSectionId, experienceStops, railLabel, homeStops, flattenStops, type Stop } from '../src/lib/pageStops';
 import { mathFor } from '../src/lib/paperMath';
 import type { Publication, Project, TimelineEntry } from '../src/data/profile';
 import { publications, researchInterests, projects, timeline } from '../src/data/profile';

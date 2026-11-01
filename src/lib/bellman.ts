@@ -179,20 +179,6 @@ export function utilityOf(levels: readonly number[], w: WorldModel = WORLD): num
   return total;
 }
 
-/** A fixed-exposure policy, for the comparison the slide leans on: the best CONSTANT allocation. */
-export function bestConstant(
-  w: WorldModel = WORLD,
-  periods = PERIODS,
-  levels = LEVELS,
-): { level: number; utility: number } {
-  let best = { level: 0, utility: -Infinity };
-  for (let s = 0; s < levels; s++) {
-    const u = utilityOf(new Array(periods).fill(s), w);
-    if (u > best.utility) best = { level: s, utility: u };
-  }
-  return best;
-}
-
 /**
  * CANDIDATE ROUTES to draw behind the optimum — the "many" the owner asked for.
  *

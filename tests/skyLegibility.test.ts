@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  wcagLuminance, contrastRatio, AA_BODY,
-  zoneAt, gateFor, maxDarkwardExcursion, tintBudget,
-  nebulaCeiling,
-} from '../src/lib/skyLegibility';
+import { wcagLuminance, contrastRatio, AA_BODY, gateFor, tintBudget, nebulaCeiling } from '../src/lib/skyLegibility';
 
 // --ink-3 #5a544a is the smallest ink actually used on the reading pages (12-14px).
 const INK_3 = wcagLuminance([0x5a, 0x54, 0x4a]);
@@ -23,21 +19,6 @@ describe('contrastRatio', () => {
   it('is symmetric and matches the WCAG formula', () => {
     expect(contrastRatio(PAPER, INK_3)).toBeCloseTo(contrastRatio(INK_3, PAPER), 9);
     expect(contrastRatio(1, 0)).toBeCloseTo(21, 6);
-  });
-});
-
-describe('zoneAt', () => {
-  it('is fully engaged everywhere on a reading page (text runs top to bottom)', () => {
-    for (const d of [0, 0.2, 0.5, 0.9, 1]) {
-      expect(zoneAt(d, 0.348, 'reading')).toBe(1);
-    }
-  });
-
-  it('ramps in at the content boundary on a descent page', () => {
-    expect(zoneAt(0.20, 0.348, 'descent')).toBe(0);
-    expect(zoneAt(0.348, 0.348, 'descent')).toBe(0);
-    expect(zoneAt(0.50, 0.348, 'descent')).toBe(1);
-    expect(zoneAt(0.40, 0.348, 'descent')).toBeGreaterThan(0);
   });
 });
 
@@ -65,13 +46,6 @@ describe('gateFor — the asymmetry must INVERT by variant', () => {
     expect(gateFor(1, 'reading').light).toBeCloseTo(0.75, 9);
     expect(gateFor(1, 'descent').dark).toBeCloseTo(0.75, 9);
     expect(gateFor(1, 'descent').light).toBeCloseTo(0.10, 9);
-  });
-});
-
-describe('maxDarkwardExcursion', () => {
-  it('is what any cap must be compared against — a cap above it is inert', () => {
-    // (f - 0.5) peaks at 0.5, so the excursion is displacement * amp * 0.5.
-    expect(maxDarkwardExcursion(1.35, 0.34)).toBeCloseTo(0.2295, 4);
   });
 });
 

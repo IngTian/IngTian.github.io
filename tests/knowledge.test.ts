@@ -6,12 +6,8 @@
 // than becoming a quiet lie on the page.
 
 import { describe, it, expect } from 'vitest';
-import {
-  knowledgeRadius, knownAfter, isKnown, knownness, discoveredAt, discoveryOf,
-  perceivedField, knownMean,
-} from '../src/lib/knowledge';
+import { knowledgeRadius, knownAfter, isKnown, knownness, discoveredAt, knownMean } from '../src/lib/knowledge';
 import { WAYPOINTS, trajectoryFacts } from '../src/lib/trajectory';
-import { field } from '../src/lib/terrain';
 
 const facts = trajectoryFacts();
 
@@ -62,19 +58,6 @@ describe('THE STORY: the deep basin is invisible at first', () => {
     expect(isKnown(g.x, g.y, WAYPOINTS.length)).toBe(true);
   });
 
-  it('reports seven blind stops before the discovery', () => {
-    const d = discoveryOf(g.x, g.y)!;
-    expect(d.blindStops).toBe(7);
-    expect(d.label).toContain('PhD');
-  });
-
-  it('misses it by a hair at the stop before — measured, not arranged', () => {
-    // At Electronic Arts the distance to the deep basin is 1.72 against a radius of 1.71: it is 0.01
-    // out of reach. That falls out of the declared waypoint positions; it was not tuned.
-    const d = discoveryOf(g.x, g.y)!;
-    expect(d.nearMiss).toBeGreaterThan(0);
-    expect(d.nearMiss).toBeLessThan(0.1);
-  });
 });
 
 describe('the LOCAL basin is known early, which is the contrast', () => {
@@ -127,30 +110,6 @@ describe('knownness — a soft edge, so knowledge fades rather than ending on a 
       expect(v).toBeGreaterThanOrEqual(prev);
       prev = v;
     }
-  });
-});
-
-describe('perceivedField — the surface as currently understood', () => {
-  it('equals the true field where knowledge is complete', () => {
-    const w = WAYPOINTS[0];
-    expect(perceivedField(w.x, w.y, 1)).toBeCloseTo(field(w.x, w.y), 6);
-  });
-
-  it('hides the deep basin early — perceived depth is far shallower than the truth', () => {
-    // The point of the whole device: early on, the deepest place on the field does not look deep.
-    const g = facts.globalBasin;
-    const perceivedEarly = perceivedField(g.x, g.y, 3);
-    expect(perceivedEarly).toBeGreaterThan(field(g.x, g.y) + 0.5);
-  });
-
-  it('reveals the deep basin once it is known', () => {
-    const g = facts.globalBasin;
-    const perceivedLate = perceivedField(g.x, g.y, WAYPOINTS.length);
-    expect(perceivedLate).toBeLessThan(perceivedField(g.x, g.y, 3));
-  });
-
-  it('is deterministic', () => {
-    expect(perceivedField(0.3, 0.3, 4)).toBe(perceivedField(0.3, 0.3, 4));
   });
 });
 

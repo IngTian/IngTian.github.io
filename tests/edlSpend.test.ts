@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  edlSpend, EDL_VALUE_FLOOR, EDL_ALPHA_FLOOR_LIGHT,
-  colormap, luminance01, TERRAIN_LIGHT, TERRAIN_TERMINAL,
-} from '../src/lib/terrain';
+import { edlSpend, EDL_VALUE_FLOOR, EDL_ALPHA_FLOOR_LIGHT, colormap, luminance01, TERRAIN_LIGHT, TERRAIN_TERMINAL } from '../src/lib/terrain';
 import { wcagLuminance } from '../src/lib/skyLegibility';
 
 // Guards for the fix to "the light-theme terrain dots blend into the fluid sky".

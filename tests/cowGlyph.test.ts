@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  COW_BODY, COW_PATCH, COW_MUZZLE, COW_HORN, COW_OUTLINE, COW_W, COW_H,
-  COW_MOO, COW_TAIL_FILL, COW_TAIL_INK, COW_TAIL_W, COW_TAIL_H,
-  COW_LINES, COW_LINES_404, COW_LINES_WRITING,
-} from '../src/data/cowGlyph';
+import { COW_BODY, COW_PATCH, COW_MUZZLE, COW_HORN, COW_OUTLINE, COW_W, COW_H, COW_MOO, COW_TAIL_FILL, COW_TAIL_INK, COW_TAIL_W, COW_TAIL_H, COW_LINES, COW_LINES_404, COW_LINES_WRITING } from '../src/data/cowGlyph';
 import { inBounds } from '../src/lib/pixels';
 
 // FIVE ATTEMPTS FAILED before the owner supplied a grid — "looks like a dragon", then a robot, then "doesn't read

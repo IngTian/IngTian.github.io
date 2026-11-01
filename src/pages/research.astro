@@ -697,6 +697,31 @@ const stops = researchStops(publications, researchInterests);
       // The anchor has no real position until the panel is laid out.
       requestAnimationFrame(() => target.scrollIntoView({ block: 'start', behavior: 'auto' }));
     }
+    // RE-ASSERT `inert` ON EVERY INIT, because the inline snippet that first set it runs ONCE PER SESSION.
+    //
+    // Astro's router holds `scriptsAlreadyRan` at module scope, keyed by the script's own textContent, and
+    // `deselectScripts()` stamps any repeat with `data-astro-exec` so the router skips it. The snippet in the
+    // markup above therefore does not run on a client-side navigation — so on the second and later visits to
+    // /research in a session, every collapsed panel arrived with NO `inert` and NO `aria-hidden`. That left a
+    // ~9.4KB panel (the idea, four MathML equations, an eleven-row results table) in the accessibility tree
+    // with two focusable arxiv links in the tab order, inside a zero-height `overflow: hidden` box, while the
+    // button beside it reported `aria-expanded="false"`. Exactly the keyboard trap the snippet's own comment
+    // exists to prevent, and invisible to Lighthouse, which only ever measures a fresh load.
+    //
+    // This function already re-runs on `astro:page-load` and already owns these attributes in `setOpen`, so
+    // asserting them here is the smallest fix and a no-op on a fresh load. It must come BEFORE
+    // revealFromHash(), which calls setOpen() and removes them again for a deep-linked panel.
+    //
+    // BaseLayout hit the identical dedup problem with `data-theme` and solved it with an `astro:after-swap`
+    // listener registered on first load; this page is the one that had not used the pattern. Doing it in the
+    // init rather than with `data-astro-rerun` on the inline tag is deliberate — `data-astro-rerun` covers
+    // only the swap path, and this covers both.
+    for (const d of document.querySelectorAll<HTMLElement>('[data-paper-detail]')) {
+      if (d.classList.contains('is-open')) continue;
+      d.setAttribute('inert', '');
+      d.setAttribute('aria-hidden', 'true');
+    }
+
     window.addEventListener('hashchange', revealFromHash);
     revealFromHash();
 
@@ -713,6 +738,23 @@ const stops = researchStops(publications, researchInterests);
   }
 
   let papersTeardown: (() => void) | null = null;
+
+  // `paper-js` IS RE-ADDED AT after-swap, NOT ONLY AT page-load, and the ordering is the whole point.
+  //
+  // Astro's `swapRootAttributes()` copies the incoming document's `<html>` attributes over the live ones, and
+  // all this site ships is `<html lang="en">` — so `class="paper-js"` is STRIPPED on every client-side
+  // navigation. The head snippet at the top of this file does not run again (the router dedupes inline
+  // scripts by textContent), and `initPapers()` does not run until `astro:page-load`, which fires AFTER
+  // `astro:after-swap`. In that window `html:not(.paper-js) .paper-body { max-height: none }` is live, which
+  // is the no-JS fallback: every paper fully expanded.
+  //
+  // after-swap runs before the browser paints the swapped document, so re-adding the class here closes the
+  // window rather than racing it. initPapers() still adds it too — harmless, and it keeps the fresh-load
+  // path independent of this listener.
+  document.addEventListener('astro:after-swap', () => {
+    document.documentElement.classList.add('paper-js');
+  });
+
   document.addEventListener('astro:page-load', () => {
     papersTeardown?.();
     papersTeardown = initPapers();

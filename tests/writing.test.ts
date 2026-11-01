@@ -1,10 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import {
-  KINDS, sorted, totalEntries, kindSectionId, entrySectionId,
-  type WritingKind, type WritingEntry,
-} from '../src/data/writing';
+import { KINDS, sorted, totalEntries, kindSectionId, entrySectionId, type WritingKind, type WritingEntry } from '../src/data/writing';
 import { writingStops, flattenStops } from '../src/lib/pageStops';
 import { PAGES } from '../src/data/nav';
 

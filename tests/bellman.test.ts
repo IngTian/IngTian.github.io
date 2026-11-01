@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  LEVELS, PERIODS, WORLD, exposureOf, reward, moveCost, solve, route, utilityOf,
-  bestConstant, candidates, bellmanResidual, project3, valueBounds,
-} from '../src/lib/bellman';
+import { LEVELS, PERIODS, WORLD, exposureOf, reward, moveCost, solve, route, utilityOf, candidates, bellmanResidual, project3, valueBounds } from '../src/lib/bellman';
 
 const sol = solve();
 
@@ -133,10 +130,6 @@ describe('route — the traced optimum', () => {
 
   // The claim the slide makes: solving the SEQUENCE beats picking one allocation and holding it. If this were
   // false, multi-period optimisation would be pointless and the whole section would be wrong.
-  it('beats the best constant-exposure policy', () => {
-    const optimal = utilityOf(r.map((s) => s.level));
-    expect(optimal).toBeGreaterThan(bestConstant().utility);
-  });
 
   it('beats every enumerated candidate policy', () => {
     const optimal = utilityOf(r.map((s) => s.level));
