@@ -359,6 +359,58 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
      failure message, since it reported one dead anchor per run instead of the whole family at once.) */
 });
 
+describe('the homepage intro ships on / and ONLY on /', () => {
+  // MOVING THE INTRO UP INTO BaseLayout IS THE ONE EDIT that would hand a 3.6-second construction
+  // animation to all nine routes — including /404 and the proto gallery. The retired first-visit gate
+  // verified the equivalent property by reading built HTML ("5 data-gate references on /, zero on the
+  // other eight"), and this is that check for its replacement.
+  //
+  // The marker is `data-intro` on the terrain canvas. It is an attribute rather than a class because a
+  // class would be a styling hook nobody styles, and nothing in the page reads it — it exists so this
+  // assertion can exist. `TerrainHero` renders only via `Heights`, which renders only on the homepage,
+  // so today this is one attribute and one regex; the point is that it stays that way.
+  const pages = htmlFiles(DIST);
+
+  it('finds the built pages at all', () => {
+    // Without this the two assertions below would pass vacuously over an empty list — the exact failure
+    // mode a dist-reading test has to rule out first.
+    expect(pages.length, 'no built HTML found — run `npm run build`').toBeGreaterThan(5);
+  });
+
+  it('marks the intro on the homepage', () => {
+    const home = join(DIST, 'index.html');
+    expect(existsSync(home)).toBe(true);
+    expect(readFileSync(home, 'utf8')).toMatch(/<canvas[^>]*\bdata-intro\b/);
+  });
+
+  it('marks it nowhere else', () => {
+    const leaked = pages
+      .filter((p) => p !== join(DIST, 'index.html'))
+      .filter((p) => /\bdata-intro\b/.test(readFileSync(p, 'utf8')))
+      .map((p) => p.slice(DIST.length));
+    expect(leaked, `the intro leaked onto ${leaked.join(', ')} — has it moved into BaseLayout?`)
+      .toEqual([]);
+  });
+
+  it('does not ship the tuning override anywhere a visitor could reach it', () => {
+    // `?intro=1` and `?dur=` exist so the owner can tune on the real page. They are an affordance, not
+    // a feature: no link, no sitemap entry, nothing discoverable. If one ever appears in an href the
+    // animation becomes reachable as a destination, which is not what it is for.
+    const offenders: string[] = [];
+    for (const p of pages) {
+      const html = readFileSync(p, 'utf8');
+      for (const m of html.matchAll(/(?:href|src)="([^"]*(?:[?&](?:intro|dur)=)[^"]*)"/g)) {
+        offenders.push(`${p.slice(DIST.length)} → ${m[1]}`);
+      }
+    }
+    expect(offenders, offenders.join(' | ')).toEqual([]);
+    const sitemap = join(DIST, 'sitemap-0.xml');
+    if (existsSync(sitemap)) {
+      expect(readFileSync(sitemap, 'utf8')).not.toMatch(/[?&](intro|dur)=/);
+    }
+  });
+});
+
 describe("/art's image payload, measured on the built output", () => {
   // WHY A BYTE CEILING AND NOT A WIDTHS CHECK. The defect this pins was a `widths` array containing
   // `w.src.width` — the image's NATIVE width — on an element that is also `fetchpriority="high"`. For

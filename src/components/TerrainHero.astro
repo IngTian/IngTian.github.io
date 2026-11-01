@@ -9,7 +9,13 @@ const bubbles = JSON.stringify([
   { mathml: EQUATIONS.kkt },
 ]);
 ---
-<canvas id="terrain" class="terrain-canvas" aria-hidden="true" data-bubbles={bubbles}></canvas>
+{/* `data-intro` marks the surface that carries the first-open animation. Nothing in the page reads it:
+    it exists so tests/distSmoke.test.ts can assert the intro ships on `/` and ONLY on `/`. Moving this
+    component — or BaseLayout growing its own copy — is the single edit that would hand a 3.6-second
+    construction animation to all nine routes, /404 and the proto gallery included, and that assertion
+    is the thing that would notice. An attribute rather than a class, because a class would read as a
+    styling hook that nothing styles. */}
+<canvas id="terrain" class="terrain-canvas" aria-hidden="true" data-intro data-bubbles={bubbles}></canvas>
 <div class="terrain-bubble" id="terrain-bubble" aria-hidden="true"></div>
 
 <style>
