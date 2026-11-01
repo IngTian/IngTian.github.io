@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  field, grad, runDescent, colormap, BUMPS, RANGE, STEP,
-  normal, projectRaw, project, computeEDL, lightDir, litColor, luminance01,
-} from '../src/lib/terrain';
+import { BUMPS, RANGE, STEP, colormap, computeEDL, field, grad, lightDir, litColor, luminance01, normal, project, projectRaw, runDescent } from '../src/lib/terrain';
 
 describe('terrain math', () => {
   it('field is a finite number and reflects the bumps', () => {
@@ -110,5 +107,34 @@ describe('terrain shape-reading (EDL + lighting)', () => {
     expect(luminance01([255, 255, 255])).toBeCloseTo(1, 6);
     expect(luminance01([0, 0, 0])).toBeCloseTo(0, 6);
     expect(luminance01([200, 200, 200])).toBeGreaterThan(luminance01([40, 40, 40]));
+  });
+});
+
+describe("the hero field's steepest slope, measured over the whole footprint", () => {
+  it('peaks at 1.8668', () => {
+    // RESCUED FROM A DELETED TEST, which is why it arrives looking like a stranger.
+    //
+    // This bound lived in tests/gateLines.test.ts, because the gate's combed-contour candidate needed it: that
+    // design's no-knot property was a theorem resting on a tilt exceeding max|grad field|, so the tilt had to be
+    // chosen against this number. The candidate was rejected and the module is now deleted — but the assertion
+    // was never really about the comb. It pins a property of `grad` in THIS module, and it was the only test
+    // that did so across the full domain: the gradient check above is local, at one minimum. Deleting the comb
+    // would have quietly taken the site's only measurement of its own steepest slope with it.
+    //
+    // 1.8668 occurs at (-0.82, 0.14), on the flank of the deep valley, where a Gaussian's slope peaks at r = s.
+    // The grid is deliberately finer than anything the renderer samples, so it cannot miss a spike.
+    //
+    // What did NOT come across: a companion assertion that the comb's tilt of 2.6 stayed above this. That bound
+    // belonged to the deleted design, and keeping it would mean asserting a constraint nothing is under.
+    let maxGrad = 0;
+    for (let i = 0; i <= 400; i++) {
+      for (let j = 0; j <= 400; j++) {
+        const x = -RANGE + (2 * RANGE * i) / 400;
+        const y = -RANGE + (2 * RANGE * j) / 400;
+        const [gx, gy] = grad(x, y);
+        maxGrad = Math.max(maxGrad, Math.hypot(gx, gy));
+      }
+    }
+    expect(maxGrad).toBeCloseTo(1.8668, 3);
   });
 });

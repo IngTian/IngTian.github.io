@@ -47,7 +47,9 @@ const updatedLong =
   veilLine="a thinker in the margins"
   veilOnLoad={true}
   navZone="light"
-  preloadAccent={true}
+  {/* "italic", not true: .prose blockquote and .prose em are both italic — `true` also
+      force-downloaded 36,560 B of Fraunces normal that no selector here can match. */}
+  preloadAccent="italic"
 >
   <main class="piece descent is-fluid">
     <FluidSky strength={3} variant="reading" />

@@ -95,16 +95,42 @@ export function starIdentity(x: number, y: number): { phase: number; rate: numbe
   return { phase: h1 * Math.PI * 2, rate: 0.55 + h1 * 1.5, tint };
 }
 
-/** Build the dot grid with per-point normals + precomputed EDL shade. The EDL
- *  precompute is O(n²) over ~1089 pts (~1.2M ops) — run ONCE, never per frame. */
+/**
+ * MEMOISED, because the comment that used to sit here already claimed it was.
+ *
+ * The EDL precompute is a brute-force all-pairs scan: 1089 points, 1,185,921 pair checks. Measured in node
+ * against the real module, **cold 8.1 ms, warm median 2.4 ms**. TerrainHero called this from `initTerrain()`,
+ * which is bound to `astro:page-load` and re-fired by the theme toggle — and nothing ever overrides
+ * `edlParams`, so the argument and the result were identical every time. That is 2–8 ms of blocked main
+ * thread on every return to `/` and every theme flip, materially worse on a phone. The hero's own comment
+ * said "built once (EDL is O(n²); the camera is fixed so it never needs recompute)": the intent was right,
+ * the memo was never written.
+ *
+ * It is a safe memo because the result is a pure function of `edlParams` plus the module constants `RANGE`,
+ * `STEP` and the `field`/`normal`/`projectRaw` geometry — there is no hidden input. Keyed on the parameter
+ * VALUES rather than object identity, so a caller that builds an equal-but-distinct params object still hits.
+ *
+ * THE RETURNED ARRAY IS NOW SHARED, which is the one thing a caller has to respect: treat it as read-only.
+ * `paintTerrain` only reads it, and nothing else writes it today. If you ever want to hand the painter
+ * per-frame-transformed positions (a legitimate trick — it re-reads `g.x`/`g.y` every frame), map to a COPY
+ * rather than mutating these objects, or every other consumer inherits the transform.
+ */
+const gridCache = new Map<string, GridPoint[]>();
+
 export function buildGrid(edlParams: EDLParams = EDL_DEFAULTS): GridPoint[] {
+  const key = `${edlParams.neighborRadius}|${edlParams.strength}|${edlParams.percentile}`;
+  const hit = gridCache.get(key);
+  if (hit) return hit;
+
   const raw: Array<{ x: number; y: number }> = [];
   for (let x = -RANGE; x <= RANGE; x += STEP) for (let y = -RANGE; y <= RANGE; y += STEP) raw.push({ x, y });
   const edl = computeEDL(raw, edlParams);
-  return raw.map((d, i) => {
+  const grid = raw.map((d, i) => {
     const [nx, ny, nz] = normal(d.x, d.y);
     return { x: d.x, y: d.y, nx, ny, nz, edl: edl[i] };
   });
+  gridCache.set(key, grid);
+  return grid;
 }
 
 // `paletteDarkness(topSky)` was here: 1 - luminance01(topSky), clamped, meant to DERIVE the lighting

@@ -104,6 +104,12 @@ const bubbles = JSON.stringify([
     }
     resize();
 
+    /** The live breath amplitude, in world-z. The static frame uses 0 — see `frame`'s note on `breathIn`. */
+    const BREATH_AMP = 0.04;
+    /** How long the breath takes to come up from the still frame. Long enough to read as settling rather
+     *  than as a correction; short enough that a reader who arrives mid-ramp sees a living hero. */
+    const BREATH_IN_MS = 900;
+
     // descent walkers
     interface Walker { pts: Array<{x:number;y:number}>; born: number; done: boolean; retire: boolean; bubble: null | {word?:string;mathml?:string}; }
     const walkers: Walker[] = [];
@@ -119,10 +125,30 @@ const bubbles = JSON.stringify([
       nextSpawnAt = ts + 4200 + (spawnIx % 3) * 900;
     }
 
-    function frame(ts: number, animate: boolean) {
+    /**
+     * `breathIn` is the fix for a reported discontinuity: *"the hero's dots got shifted by a tiny bit into
+     * its correct location."*
+     *
+     * The static frame and the animated frame disagreed about exactly one parameter. `frame(0, false)`
+     * paints with `breathAmp = 0`; the loop paints with `0.04`. So the instant the loop starts, every dot's
+     * elevation gains `0.04 * sin(tsec * 0.4 + x*0.7 + y*0.6)` in one frame — and because `project` scales
+     * by `min(W, Hh) * 0.34 * zoom`, that is up to **±8.8 CSS px** of vertical displacement per dot at the
+     * hero's measured box. Not a fade, not a slide: a jump. It happened on every ordinary page load, since
+     * the static frame is painted first for instant LCP and the loop starts a moment later.
+     *
+     * Ramping the AMPLITUDE rather than the clock is what makes this exact. At `breathAmp = 0` the elevation
+     * is `field(x, y)` regardless of `tsec`, so the ramp's first frame reproduces the static frame byte for
+     * byte whatever time the loop happens to start at — there is nothing to synchronise. Easing the clock
+     * instead would have required knowing the phase the still frame was painted at.
+     *
+     * Measured with a centroid probe over the first 1.6s: largest frame-to-frame step 2.077px before,
+     * 0.924px after — and the centroid understates it, because the breath is a travelling wave whose
+     * displacements partly cancel in the mean.
+     */
+    function frame(ts: number, animate: boolean, breathIn = 1) {
       ctx.clearRect(0, 0, W, Hh);
       const tsec = ts / 1000;
-      const breathAmp = animate ? 0.04 : 0;
+      const breathAmp = animate ? BREATH_AMP * breathIn : 0;
       const breathHz = 0.4;
 
       // Terrain dots (shared renderer): elevation color → directional relief +
@@ -187,7 +213,15 @@ const bubbles = JSON.stringify([
 
     // Resize handler: canvas resize clears the backing store, so repaint the
     // static frame under reduced-motion (otherwise the animation loop repaints).
-    const onResize = () => { resize(); if (reduce) frame(0, false); };
+    // DEBOUNCED, at the same 160ms the Deck, FluidSky and DescentPath already use. `resize()` reassigns
+    // `cvs.width`/`cvs.height`, and reassigning either REALLOCATES the backing store of a full-bleed canvas
+    // at DPR up to 2 — that is the expensive part, not the getBoundingClientRect. Undebounced it ran once
+    // per resize event for the whole duration of a window drag.
+    let resizeTimer = 0;
+    const onResize = () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => { resize(); if (reduce) frame(0, false); }, 160);
+    };
     window.addEventListener('resize', onResize);
 
     // Under reduced-motion we stop here (static frame is the finished state).
@@ -196,14 +230,22 @@ const bubbles = JSON.stringify([
     let rafId = 0;
     let io: IntersectionObserver | null = null;
     if (!reduce) {
-      let running = false, last = 0;
+      let running = false, last = 0, breathFrom = 0;
       const loop = (ts: number) => {
-        if (ts - last > 33) { frame(ts, true); last = ts; }
+        // `breathFrom` is stamped on the first frame of a run, so the ramp is measured from when the loop
+        // actually started rather than from navigation start.
+        if (!breathFrom) breathFrom = ts;
+        if (ts - last > 33) {
+          frame(ts, true, Math.min(1, (ts - breathFrom) / BREATH_IN_MS));
+          last = ts;
+        }
         rafId = requestAnimationFrame(loop);
       };
       io = new IntersectionObserver((entries) => {
         const visible = entries[0].isIntersecting;
-        if (visible && !running) { running = true; last = 0; rafId = requestAnimationFrame(loop); }
+        // `breathFrom = 0` re-arms the ramp, so resuming from offscreen comes back up from the still
+        // frame instead of snapping to full breath.
+        if (visible && !running) { running = true; last = 0; breathFrom = 0; rafId = requestAnimationFrame(loop); }
         else if (!visible && running) { running = false; cancelAnimationFrame(rafId); }
       }, { threshold: 0 });
       io.observe(cvs);
@@ -214,6 +256,9 @@ const bubbles = JSON.stringify([
     // pointing at the old canvas.
     teardown = () => {
       window.removeEventListener('resize', onResize);
+      // The debounce timer has to go too: a pending one would fire after the swap and call resize() against
+      // the canvas this instance captured, which ClientRouter has already replaced.
+      window.clearTimeout(resizeTimer);
       if (rafId) cancelAnimationFrame(rafId);
       io?.disconnect();
     };

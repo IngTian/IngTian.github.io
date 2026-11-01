@@ -24,7 +24,9 @@ const stops = researchStops(publications, researchInterests);
   veilLine="a researcher by day"
   veilOnLoad={true}
   navZone="light"
-  preloadAccent={true}
+  {/* "italic", not true: .card-takeaway is italic, so only the italic file is preloadable — `true` also
+      force-downloaded 36,560 B of Fraunces normal that no selector here can match. */}
+  preloadAccent="italic"
 >
   {/* Marks the document JS-capable before anything paints, so the CSS can present the cards as
        interactive only when something can respond. The collapse itself happens in the snippet AFTER
