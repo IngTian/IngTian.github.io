@@ -68,6 +68,18 @@ body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body)
    per-section backgrounds. Reads top→bottom: dawn paper → warming
    ochre → cool indigo dusk → grey ink mountains → near-black ground.
    ============================================================ */
+/* THE INTRO'S FLAT BACKDROP — beat 1 of the homepage intro.
+   `--descent-grad` is the sky's base AND its no-WebGL state, and it is the FINISHED colours — so for
+   the ~300ms before the WebGL canvas first draws, a visitor saw the real sky, then the canvas replaced
+   it with the intro's flat tone, then it resolved back. Warm → flat → warm: a state shown and then
+   un-shown, which is the same defect class as the terrain painting a finished frame before collapsing
+   to a plane. The class is set by the `is:inline` decider in index.astro, before first paint, so the
+   very first frame is already flat and there is nothing to correct. The canvas is opaque and covers
+   this the moment it draws; TerrainHero drops the class when the intro lands. */
+html.intro-flat .descent {
+  background: var(--intro-flat-tone, var(--descent-grad));
+}
+
 .descent {
   position: relative;
   z-index: 0;                /* stacking context so ::after can sit behind content */
@@ -370,14 +382,14 @@ html[data-theme='dark'] .descent::after {
    rasterisation the GPU-backed canvases are absent from those snapshots. So for half a second the
    page showed --descent-grad alone — warm paper blending to near-black, i.e. a flat grey wash — with
    no sky and no terrain dots on it, on all eight routes that carry the sky.
-   Confirmed from a screen recording (hero dots absent for the whole transition, back at ~0.63s,
-   exactly when the 0.5s fade ends) against a probe showing the LIVE canvas never blanks (ink steady
-   118 -> 133 px). It did NOT reproduce in headless Chrome, where software rendering does capture
-   canvases into snapshots — which is why it survived two investigations from this machine.
-   The flip is instant now and clean, because both canvases read their palette every frame: measured,
-   text, sky and terrain all cross within one frame of each other. If the dissolve is wanted back,
-   lerp the canvases' ramps in JS alongside the CSS; do not reach for a view transition on a page
-   whose background is a canvas. ── */
+   Confirmed from a screen recording (dots absent for the whole transition, back at ~0.63s, exactly
+   when the 0.5s fade ends) against a probe showing the live canvas never blanks. It did NOT reproduce
+   in headless Chrome, where software rendering does capture canvases — which is why it survived two
+   investigations.
+   The flip is instant now and clean, because both canvases read their palette every frame: text, sky
+   and terrain all cross within one frame of each other. If the dissolve is wanted back, lerp the
+   canvases' ramps in JS alongside the CSS; do not reach for a view transition on a page whose
+   background is a canvas. ── */
 
 /* slow drift — transform/opacity only, never blur. The static state above is
    the finished composition (also the Firefox / reduced-motion fallback). */

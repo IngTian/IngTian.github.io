@@ -180,6 +180,9 @@ src/
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
   lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter AND the memoised grid cache
+  lib/marchingSquares.ts            # isoRuns(fn, bounds, level, res) — ONE marching-squares kernel; descentPath and terrainContours are both callers
+  lib/terrainContours.ts            # the hero field's isolines + levels, memoised — the intro's survey pass
+  lib/introTimeline.ts              # the homepage intro's schedule, duration override and should-it-play decision — all pure
   lib/descentPath.ts, trajectory.ts # the career descent graph's field and route
   lib/{bellman,factorModel,problemSize,complexity,policyPnl,scenario,split}.ts   # the explainer slides' real math
   lib/{justify,scrollspy,pixels,cowSpeech,knowledge,capability,paperMath,equations,signalRubric}.ts
@@ -557,6 +560,141 @@ the stationarity condition) or "Moo!".
   timer is cleared in teardown or it fires against a canvas `ClientRouter` already replaced) +
   DPR≤2; a finished static frame is painted first (instant LCP) and is the
   reduced-motion / no-JS state.
+
+### The first-open intro — "the map becomes the territory"
+
+On a **first open of `/`** the hero arrives rather than simply being there: isolines of the same
+`field()` stroke themselves onto a **flat plane**, the surface **rises out of that map** carrying the
+lines up with it so they deform into the terrain they were describing, and the dots resolve as the lines
+fade. **5200ms**, landing on exactly the frame the hero paints at rest. No click, no overlay, nothing to
+dismiss. Replaces the first-visit gate, which was built twice and rejected twice — once as a design, and
+once more as "still boring" — for blocking the page behind a button and for being decorative. Design doc:
+`docs/superpowers/specs/2026-11-01-intro-animation-design.md` (local; `docs/` is gitignored).
+
+**FOUR BEATS IN SEQUENCE, AND THE SEQUENCE IS THE OWNER'S CORRECTION.** `INTRO_PHASES` in
+`lib/introTimeline.ts` reads: **ground** (0 -> 0.20 — the sky resolves from one flat tone to its full
+gradient, alone, nothing else moving) -> **lines** (0.17 -> 0.62) -> **relief** (0.52 -> 0.90) ->
+**substance** (0.62 -> 0.96, the dots), with the isolines leaving over 0.74 -> 0.97 so the last frame is
+clean. The first version fused all of it into one gesture, on the reasoning that a strict sequence had
+read as three disconnected events; seen on the real page the verdict was the opposite — *"give it a clear
+phase to draw the background. then we draw the line, and so on"* — and separating the beats is also what
+took the duration from 3600 to 5200ms, because each beat then needed room. The handoffs still **overlap**
+by a few hundredths: distinct beats must not mean dead air, and `tests/introTimeline.test.ts` enforces
+both ends (the no-plateau test fails if any 150ms window goes quiet; the ordering tests fail if a beat
+starts before the one it follows).
+
+**Beat 1 reaches the SKY, which is the one part of this that is not the terrain canvas.** `introFrame(t)`
+returns a fifth channel, `sky`, and `FluidSky` multiplies its `uFlatten` uniform by it — at 1 the shader
+resolves to a single colour sampled from the ramp itself, which is also the CSS `--descent-grad` state
+the no-WebGL path shows, so it costs no extra draw work. Three other background levers were built and
+compared live on the page, and all three are **deleted, not left behind a flag**: ramping the warp
+amplitude (`uAmp` — measured imperceptible, because it moves the warp's *displacement*, which is
+textural, while the sky's visible presence is its colours), drifting the pattern into place, and fading
+the `SkyWash` layer.
+
+- **THE CAMERA NEVER MOVES.** The one animated quantity is elevation: `z = field(x, y) * lift`. That is
+  what makes the lines and the dots read as one surface drawn twice rather than two animations stapled
+  together. `lift` is **global**: one scalar per frame, no per-point front. An animated `YAW`/`TILT`
+  would invalidate the precomputed EDL shade and the depth sort for the whole intro.
+  - **The EDL shade is NOT camera-only, and this file said it was.** `computeEDL` projects each dot at
+    FULL elevation and reads screen-space depth differences between neighbours, so it depends on the
+    fixed camera *and* on the finished geometry — it is exact only at `lift === 1`. During the rise the
+    flat plane wears the finished relief's shade, as a density/size ghost with uniform colour (`hn`
+    collapses to 0.5). That is accepted — it reads as a shaded-relief map, which is what a survey is —
+    and the landing frame is still byte-exact. The false version of this claim would have sent the next
+    reader looking for camera animation as the only thing that could break it.
+- **THE DECISION IS MADE IN AN `is:inline` SCRIPT AT THE TOP OF `pages/index.astro`, BEFORE FIRST PAINT,
+  AND THAT IS NOT A STYLE CHOICE.** `--descent-grad` is the sky's base layer *and* its no-WebGL state and
+  it holds the FINISHED colours, so with the decision in a component script a visitor saw the real sky for
+  ~300ms, then the canvas's first draw replaced it with the intro's flat tone, then it resolved back:
+  warm -> flat -> warm, reported as *"renders to our normal stuff and suddenly goes blank"*. A bundled
+  `<script>` cannot fix that — Astro defers it until after parse. `is:inline` parses in document order,
+  so it runs before anything below it paints; `BaseLayout` already uses the same mechanism twice (the
+  no-FOUC theme resolver and the veil). **This is Astro's answer to the problem, not an Astro limitation**
+  — worth stating plainly, because the first diagnosis here wrongly concluded the framework couldn't do it.
+  - `define:vars` passes `INTRO_SEEN_KEY`, the duration and both clamp bounds in from `lib/`, so what is
+    duplicated in raw JS is the decision *expression*, never the policy. `lib/introSession.ts` then
+    **reads** what that script published on `<html>` rather than deciding again — one decider, so the two
+    cannot disagree. A module read also removes a race: `FluidSky` draws synchronously during its own
+    init, and when each component read the DOM itself the sky could render finished and then snap flat.
+  - **It is also the reason three well-tested functions were deleted.** `introStillRunning`,
+    `introDurationFrom` and `shouldPlayIntro` had 97 lines of specs and, after the move, zero production
+    callers — a green suite over code nothing ran. `tests/distSmoke.test.ts` now reads the built
+    `index.html` and asserts the shipped constants equal the `lib/` ones and that the script precedes the
+    canvas it gates. **Assert the policy where it ships; a parallel implementation kept alive to host
+    assertions is worse than no test.**
+- Code: `lib/introTimeline.ts` (the schedule — pure, and the `t=1` landing is an assertion, because the
+  live breath ramp is only the right continuation if the intro finished where the static frame is),
+  `lib/terrainContours.ts` + `lib/marchingSquares.ts` (the survey geometry), and plumbing in
+  `TerrainHero.astro`. `paintTerrain` takes an optional `lift` defaulting to 1; the dot fade-in rides on
+  `ctx.globalAlpha`, and the survey is a separate stroke pass — widening the painter for elevation was
+  right, widening it for a different kind of mark would not be.
+- **Contour cost is measured, and the parameters are a perf decision:** 9 levels at res 74 is **10.0ms**
+  median (13 runs / 1245 points), against 21.0ms at res 110 and 47.1ms at the descent graph's res 150.
+  Memoised, so it is paid once per page. `tests/terrainContours.test.ts` fails above 40ms.
+  - **The memo has ONE slot and no key, deliberately.** `terrainLevels(n)` and
+    `terrainContoursFor(level, res)` were parameterised, with a `level|res` cache key and four specs
+    exercising it — and production never passed either argument: one call site, using the constants
+    declared above it. The parameters' only callers were the tests of the parameters, which is this repo's
+    documented *"a test is not a consumer"* trap.
+  - **And the 40ms ceiling was not measuring anything.** The cold-build test called
+    `terrainContoursFor(l + 1e-7, ...)` with a comment saying the offset kept the memo from being warm —
+    but the key was `level.toFixed(4)`, and 1e-7 does not survive four decimals. Measured: **9 of 9 offset
+    keys hashed identically** to the warm ones, so it timed nine `Map` hits and passed at ~0ms. It now
+    resets the module registry and times a real build, **with a lower bound as well as an upper one** so
+    it cannot go vacuous again. A perf ceiling that cannot fail is worse than none: it reads as covered.
+- **Do not "optimise" the stitch in `marchingSquares.ts`.** A hashed endpoint-bucketing stitch was
+  written and measured: **slower** (10.9 vs 10.0ms) *and wrong*, fragmenting 13 polylines into 32.
+  Separately, the original stitch had a real bug — it attached the *first* segment within `dx * 1.2`
+  rather than the *nearest*, and since true neighbours are coincident to floating-point noise it grabbed
+  segments further along the curve and orphaned the real ones, which were then dropped as sub-4-point
+  noise. A circle at res 60 returned runs of `[50, 7, 63, 3, 2, 2, 2, 3]` — three kept pieces of one
+  loop and **five** fragments thrown away, i.e. visible gaps. Nearest-first returns one run of **124**
+  points. (Both of those numbers were wrong on first writing — 125 and "four" — which is the same
+  transcribe-rather-than-measure habit this file keeps warning about.)
+- **The hero text is NOT part of this animation and must stay that way.** It keeps its own tuned arrival
+  — `.hero-rise` 1400/0, `.hero-bio` 1400/250, `.hero-doors-line` 1100/620 — so the intro adds nothing
+  to the arrival of the first thing a visitor came to read. Measured: **the LCP element on `/` is the H1
+  text, not the canvas**. A first pass measured the intro costing it **+12ms** and that was real, not
+  noise: the first frame built the whole contour geometry (10.6ms) and then stroked zero paths, because
+  `contourAlpha` is 1 at t=0 while `survey` is still 0. Guarding the survey pass on `survey > 0` — and
+  the dot pass on `dots > 0.004` — moved that work off the first-paint path, which is what the design
+  asked for in the first place. That independence is what makes a 5.2s animation affordable at all;
+  if the text is ever folded in, the duration must come down with it. A comment in `Heights.astro`
+  records that the tagline's separate beat was once lost and the owner noticed.
+  - **A `?seq=1` spike that held the text until the landing was built and DELETED, and the reason is the
+    arithmetic above.** It came from a real note — *"it might be wiser for the texts to enter after the
+    hero mountain animation... otherwise, everything is competing for the same attention"* — and it
+    worked, by pausing the hero's three text animations at `opacity: 0` until `TerrainHero` dropped the
+    class. But the H1 inside that block is `/`'s measured LCP element, so it moved LCP from ~450ms to the
+    end of the intro: a Lighthouse Perf hit against a stated >=99 bar, traded for a sequencing preference.
+    **If the sequencing is wanted, shorten the intro — do not pause the LCP.** Notes sit in
+    `Heights.astro` and `index.astro` so this is not rediscovered as a missing feature.
+- **Walkers are suppressed until it lands** (the intro paints with `animate: false`, and `nextSpawnAt` is
+  re-seeded 600ms after). A comet descending a flat plane is meaningless, and at partial lift it would
+  hang in mid-air — walker points are projected at full elevation and know nothing about `lift`.
+- **An unseen intro is consumed, not deferred.** A reload at a restored scroll position leaves the hero
+  offscreen; keeping it pending would play a 5.2s construction animation on a scroll-back minutes later,
+  in front of someone already reading. Same rule if the deck carries them off mid-intro.
+- **It runs unthrottled**, unlike the live loop's 33ms. 5.2s once per session, and the first thing anyone
+  sees; the FluidSky lesson below is that perceived smoothness is cadence locked to the refresh rate, not
+  draw count.
+- **Session key** `descent.intro.seen.v1`, **set at START** (so repeated reloads do not replay it) and
+  versioned — bump the suffix when the animation changes enough to want a second look mid-session, or a
+  reload during a design pass shows nothing and the change looks unshipped. Storage access **can throw**
+  (private mode), and a throw means *play it*, never *break the hero*.
+- **TUNING IS A URL PARAMETER, and the timing is expected to change.** `?intro=1` replays past the flag;
+  `?dur=3000` overrides the duration, clamped to 400–20000 with a fallback on anything unparseable
+  (`t = elapsed / 0` is `Infinity` and would paint a blank hero). Phase boundaries are **fractions of the
+  total**, so retuning is one number. The override is an affordance, not a feature: it appears in no
+  link, no sitemap, and `tests/distSmoke.test.ts` asserts that.
+  - **ANSWERED, AND THE MOCKUP'S INSTINCT WAS BACKWARDS.** This bullet used to read "still open: 3600ms
+    was judged on 320px prototypes, a full-bleed hero is a larger object and large objects read slower, so
+    this may want ~3000ms." Judged on the real page at full viewport it went the other way, to **5200ms**:
+    once the beats were separated each one needed room. Keep the habit (`?dur=` on the real page, not a
+    mockup) and distrust the prediction.
+- `tests/distSmoke.test.ts` pins `data-intro` to `/` and nowhere else. Moving this component, or
+  BaseLayout growing its own copy, is the single edit that would hand the animation to all nine routes.
 
 ## The fluid sky
 

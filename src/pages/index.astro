@@ -13,12 +13,104 @@ import Rules from '../sections/Rules.astro';
 import Solve from '../sections/Solve.astro';
 import Appendix from '../sections/Work.astro';
 import Deck from '../components/Deck.astro';
+import {
+  INTRO_DURATION_MS, INTRO_DUR_MIN_MS, INTRO_DUR_MAX_MS,
+} from '../lib/introTimeline';
+import { INTRO_SEEN_KEY } from '../lib/introSession';
+import { rampFor } from '../lib/skyPalette';
+
+// The tone the intro's first beat flattens the sky to, read from the SAME ramp data the shader samples
+// so the CSS backdrop and the canvas cannot disagree about what "flat" looks like.
+//
+// POSITION IS PER THEME, and these two numbers must match `flatAt` in lib/skyShader.ts. Light takes the
+// ramp's top (paper) and dark its lower middle (near-black). Both originally took the midpoint, which
+// in light is #565660 — a mid grey of almost exactly the contour ink's luminance, so the survey lines
+// vanished into it and the opening read, in the owner's words, "dull as hell".
+const FLAT_AT = { light: 0.04, dark: 0.55 } as const;
+
+/** Sample a ramp at `at`, interpolating between its two bracketing stops. */
+const rampAt = (theme: 'light' | 'dark') => {
+  const at = FLAT_AT[theme];
+  const stops = rampFor('descent', theme);
+  let lo = stops[0], hi = stops[stops.length - 1];
+  for (const st of stops) {
+    if (st[0] <= at && st[0] >= lo[0]) lo = st;
+    if (st[0] >= at && st[0] <= hi[0]) hi = st;
+  }
+  const span = hi[0] - lo[0];
+  const f = span > 0 ? (at - lo[0]) / span : 0;
+  const ch = (c: string, i: number) => parseInt(c.slice(1 + i * 2, 3 + i * 2), 16);
+  const mix = (i: number) => Math.round(ch(lo[1], i) + (ch(hi[1], i) - ch(lo[1], i)) * f);
+  return `rgb(${mix(0)}, ${mix(1)}, ${mix(2)})`;
+};
+const introVars = {
+  KEY: INTRO_SEEN_KEY,
+  DEF: INTRO_DURATION_MS,
+  MIN: INTRO_DUR_MIN_MS,
+  MAX: INTRO_DUR_MAX_MS,
+  TONE_LIGHT: rampAt('light'),
+  TONE_DARK: rampAt('dark'),
+};
 ---
 
 {/* preloadAccent: the Work slide's sub-headlines and its italic editorial line are the homepage's only
      Fraunces, and they are also the measurement that put this preload back (FCP 1956 -> 2333ms without it,
      three runs on a production build). See the note next to <Font> in BaseLayout. */}
 <BaseLayout veilLine="a researcher by day" veilOnLoad={false} preloadAccent={true}>
+  {/* THE INTRO IS DECIDED HERE, BEFORE FIRST PAINT, and that timing is the whole point.
+
+      The reported symptom was the sky flashing warm → flat → warm: `--descent-grad` is the base layer
+      and the no-WebGL state and it holds the FINISHED colours, so the real sky was on screen for ~300ms
+      before the canvas's first draw replaced it with the intro's flat tone. A state shown, then
+      un-shown — the owner's words were "renders to our normal stuff and suddenly goes blank".
+
+      A bundled `<script>` cannot fix that: Astro defers it, so it runs after parse, by which point the
+      first paint has already happened. `is:inline` parses in document order and therefore before
+      anything below it paints — the same mechanism, and the same reason, as the two inline scripts
+      already in BaseLayout (the no-FOUC theme resolver and the veil). This is not an Astro limitation;
+      it is Astro's answer to exactly this problem.
+
+      `define:vars` keeps every constant single-sourced from lib/, so what is duplicated here is only
+      the decision expression, not the policy. This script is the ONE decider: `introSession()` reads
+      what it publishes rather than deciding again, so the two cannot disagree.
+
+      THE HERO TEXT IS DELIBERATELY NOT HELD. A `?seq=1` spike did hold it — the owner's note was that
+      otherwise "everything is competing for the same attention" — and it is deleted rather than
+      shipped, because the H1 is this page's measured LCP element and pausing it for the intro's
+      duration makes the animation's cost the headline's cost. The text keeps its own tuned arrival
+      (see Heights.astro), which is also why a 5.2s animation is affordable at all. If the sequencing
+      is wanted, the honest version is a shorter intro, not a paused LCP. */}
+  <script is:inline define:vars={introVars}>
+    (function () {
+      try {
+        var p = new URLSearchParams(location.search);
+        var root = document.documentElement;
+        var seen = null;
+        try { seen = sessionStorage.getItem(KEY); } catch (e) { seen = null; }
+        // `?intro=1` overrides the flag; a storage throw reads as "not seen", i.e. play it.
+        if (p.get('intro') !== '1' && seen !== null) return;
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
+
+        var raw = p.get('dur');
+        var n = raw === null || raw.trim() === '' ? NaN : Number(raw);
+        var ms = isFinite(n) ? Math.min(MAX, Math.max(MIN, n)) : DEF;
+        root.dataset.introAt = String(performance.now());
+        root.dataset.introMs = String(ms);
+
+        // BEAT 1's backdrop, set here rather than by the canvas, because `--descent-grad` is the base
+        // layer AND the no-WebGL state and it holds the FINISHED colours. Left to the canvas's first
+        // draw, the real sky was on screen for ~300ms and then snapped flat: warm → flat → warm, which
+        // is what the owner saw as "renders to our normal stuff and suddenly goes blank".
+        root.classList.add('intro-flat');
+        root.style.setProperty('--intro-flatten', '1');
+        root.style.setProperty(
+          '--intro-flat-tone',
+          root.dataset.theme === 'dark' ? TONE_DARK : TONE_LIGHT,
+        );
+      } catch (e) { /* never let the hero fail to render over this */ }
+    })();
+  </script>
   {/* is-slides turns the homepage into the deck: the scroll rests at slide edges instead of anywhere.
        THE MECHANISM IS EXPLICIT JS, NOT CSS SCROLL-SNAP, and this comment used to claim the opposite —
        which is worth correcting loudly, because this is the first thing anyone reads before adding a

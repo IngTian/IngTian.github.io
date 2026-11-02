@@ -80,6 +80,8 @@ const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
   import { VERTEX_SHADER, fragmentShader, SKY_UNIFORMS } from '../../lib/skyShader';
   import { gateFor, tintBudget, nebulaCeiling, type SkyVariant } from '../../lib/skyLegibility';
   import { rampFor, type Theme } from '../../lib/skyPalette';
+  import { introProgress } from '../../lib/introSession';
+  import { introFrame } from '../../lib/introTimeline';
 
   const VERT = VERTEX_SHADER;
   const FRAG = fragmentShader();
@@ -230,11 +232,51 @@ const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
     // is clamped to 50ms so a long stall advances the warp by one frame's worth rather than by the stall.
     let uTimeSec = 0;
     let lastNow = 0;
+
+    // THE SKY SETTLES IN WITH THE HERO'S INTRO — one tone resolving into the full gradient, as the
+    // ground's own opening beat. `uFlatten` is the lever: it already scales nothing else, and at 1 the
+    // shader resolves to a single colour sampled from the ramp itself.
+    //
+    // THREE OTHER CANDIDATES WERE BUILT AND REJECTED, and are deleted rather than left behind a flag:
+    // ramping the warp AMPLITUDE (measured imperceptible — `uAmp` moves the warp's displacement, which
+    // is textural, while the sky's visible presence is its colours), DRIFTING the pattern into place,
+    // and fading the SkyWash layer. All three were compared live on the real page; the owner chose this
+    // one. A rejected option left in the tree reads as a supported one to the next reader.
+    //
+    // WHAT THIS DELIBERATELY DOES NOT TOUCH: the frame cadence. CLAUDE.md records that capping the
+    // scroll budget at 16ms made the homepage "stucky as hell" and was reverted, with a standing rule
+    // that the budget is 0 and stays 0. Scaling a uniform is not a cadence change.
+    //
+    // AND THE EASING LIVES IN lib/introTimeline.ts, not here. The rejected levers each carried their own
+    // local smootherstep, which is how three surfaces came to be easing the same intro three ways.
+    function introFlatten(nowMs: number): number {
+      const t = introProgress(nowMs);
+      const root = document.documentElement;
+      if (t === null) {
+        // CLEAR IT rather than just returning 0: the pre-paint decider in index.astro sets this to 1, so
+        // an early return would leave a stale 1 on <html>. Not load-bearing for correctness — Heights
+        // gates the halos on `html.intro-flat`, which TerrainHero always removes, precisely because this
+        // function does not run at all when `getContext('webgl')` comes back null.
+        root.style.removeProperty('--intro-flatten');
+        return 0;
+      }
+      // BEAT 1 drives this, not the whole intro: `introFrame(t).sky` is 1 at t=0 and 0 once the ground
+      // has resolved, so the background finishes its own phase before the survey is really underway.
+      const v = introFrame(t).sky;
+      // PUBLISHED so the hero's legibility halo can hide behind it. Those halos are near-white paper
+      // fades, invisible against the warm sky and glaring against a flat one — and they have nothing to
+      // do while the sky is flat, since a halo protects text from a VARIED backdrop. A custom property
+      // on the root, which does not invalidate layout.
+      root.style.setProperty('--intro-flatten', v.toFixed(3));
+      return v;
+    }
+
     function draw(nowMs: number): void {
       sizeTo();
       uploadRamp();
       const vw = mVw, vh = mVh, docH = mDocH;
       gl!.uniform1f(U.uYOffset, window.scrollY / vw + yStart);
+      gl!.uniform1f(U.uFlatten, introFlatten(nowMs));
       gl!.uniform1f(U.uYSpan, vh / vw);
       gl!.uniform1f(U.uDepth0, window.scrollY / docH);
       gl!.uniform1f(U.uDepthSpan, vh / docH);

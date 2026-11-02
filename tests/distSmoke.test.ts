@@ -3,6 +3,10 @@ import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { PAGES } from '../src/data/nav';
+import {
+  INTRO_DURATION_MS, INTRO_DUR_MIN_MS, INTRO_DUR_MAX_MS,
+} from '../src/lib/introTimeline';
+import { INTRO_SEEN_KEY } from '../src/lib/introSession';
 
 /* ================================================================================================
    THE FIRST TEST THAT LOOKS AT WHAT THE SITE ACTUALLY SHIPS.
@@ -357,6 +361,92 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
      make the `isProto` exclusion in check 1 a visible gap rather than a silent filter; the exclusion is
      gone, so check 1 covers the proto routes directly and this was a strict subset of it — with a worse
      failure message, since it reported one dead anchor per run instead of the whole family at once.) */
+});
+
+describe('the homepage intro ships on / and ONLY on /', () => {
+  // MOVING THE INTRO UP INTO BaseLayout IS THE ONE EDIT that would hand a 5.2-second construction
+  // animation to all nine routes — including /404 and the proto gallery. The retired first-visit gate
+  // verified the equivalent property by reading built HTML ("5 data-gate references on /, zero on the
+  // other eight"), and this is that check for its replacement.
+  //
+  // The marker is `data-intro` on the terrain canvas. It is an attribute rather than a class because a
+  // class would be a styling hook nobody styles, and nothing in the page reads it — it exists so this
+  // assertion can exist. `TerrainHero` renders only via `Heights`, which renders only on the homepage,
+  // so today this is one attribute and one regex; the point is that it stays that way.
+  const pages = htmlFiles(DIST);
+
+  it('finds the built pages at all', () => {
+    // Without this the two assertions below would pass vacuously over an empty list — the exact failure
+    // mode a dist-reading test has to rule out first.
+    expect(pages.length, 'no built HTML found — run `npm run build`').toBeGreaterThan(5);
+  });
+
+  it('marks the intro on the homepage', () => {
+    const home = join(DIST, 'index.html');
+    expect(existsSync(home)).toBe(true);
+    expect(readFileSync(home, 'utf8')).toMatch(/<canvas[^>]*\bdata-intro\b/);
+  });
+
+  it('marks it nowhere else', () => {
+    const leaked = pages
+      .filter((p) => p !== join(DIST, 'index.html'))
+      .filter((p) => /\bdata-intro\b/.test(readFileSync(p, 'utf8')))
+      .map((p) => p.slice(DIST.length));
+    expect(leaked, `the intro leaked onto ${leaked.join(', ')} — has it moved into BaseLayout?`)
+      .toEqual([]);
+  });
+
+  it('ships the decision INLINE, before the hero, with the constants from lib/', () => {
+    // THIS TEST EXISTS BECAUSE THE WELL-TESTED VERSION OF THIS POLICY WAS THE WRONG ONE.
+    //
+    // `introStillRunning`, `introDurationFrom` and `shouldPlayIntro` lived in lib/introTimeline.ts with
+    // 97 lines of specs. Then the decision moved into an `is:inline` script, because only an inline
+    // script parses before first paint — and an inline script cannot `import`, so it re-implements the
+    // parse and the clamp in raw JS. The three exports lost every production caller while their tests
+    // went on passing: a green suite over code nothing ran. They are deleted, and this is the check that
+    // replaces them, because it reads the code that actually ships.
+    //
+    // Two properties, and both have already broken once:
+    //   1. INLINE AND BEFORE THE HERO. A bundled `<script>` is deferred and runs after parse, which is
+    //      what made the sky flash warm → flat → warm for ~300ms.
+    //   2. THE CONSTANTS AGREE WITH lib/. They are passed through `define:vars` precisely so there is one
+    //      source; this fails if someone hand-types a number into the inline body.
+    const html = readFileSync(join(DIST, 'index.html'), 'utf8');
+    const m = html.match(/<script>((?:(?!<\/script>)[\s\S])*?descent\.intro\.seen[\s\S]*?)<\/script>/);
+    expect(m, 'no inline intro decider in dist/index.html').not.toBeNull();
+    const body = m![1];
+
+    // 1 — inline (the regex only matches a bare `<script>`, so no src), and ahead of the canvas it gates.
+    expect(html.indexOf(m![0]), 'the decider must precede the terrain canvas it gates')
+      .toBeLessThan(html.search(/<canvas[^>]*\bdata-intro\b/));
+
+    // 2 — the emitted values, against the modules they are supposed to come from.
+    const num = (name: string) => Number(body.match(new RegExp(`\\b${name}\\s*=\\s*(-?[\\d.]+)`))?.[1]);
+    expect(body).toContain(`"${INTRO_SEEN_KEY}"`);
+    expect(num('DEF')).toBe(INTRO_DURATION_MS);
+    expect(num('MIN')).toBe(INTRO_DUR_MIN_MS);
+    expect(num('MAX')).toBe(INTRO_DUR_MAX_MS);
+    // And that the clamp is applied at all — the constants are worthless if nothing uses them.
+    expect(body).toMatch(/Math\.min\(\s*MAX\s*,\s*Math\.max\(\s*MIN\s*,/);
+  });
+
+  it('does not ship the tuning override anywhere a visitor could reach it', () => {
+    // `?intro=1` and `?dur=` exist so the owner can tune on the real page. They are an affordance, not
+    // a feature: no link, no sitemap entry, nothing discoverable. If one ever appears in an href the
+    // animation becomes reachable as a destination, which is not what it is for.
+    const offenders: string[] = [];
+    for (const p of pages) {
+      const html = readFileSync(p, 'utf8');
+      for (const m of html.matchAll(/(?:href|src)="([^"]*(?:[?&](?:intro|dur)=)[^"]*)"/g)) {
+        offenders.push(`${p.slice(DIST.length)} → ${m[1]}`);
+      }
+    }
+    expect(offenders, offenders.join(' | ')).toEqual([]);
+    const sitemap = join(DIST, 'sitemap-0.xml');
+    if (existsSync(sitemap)) {
+      expect(readFileSync(sitemap, 'utf8')).not.toMatch(/[?&](intro|dur)=/);
+    }
+  });
 });
 
 describe("/art's image payload, measured on the built output", () => {

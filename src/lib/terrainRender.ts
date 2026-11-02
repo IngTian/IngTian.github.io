@@ -160,6 +160,7 @@ export function paintTerrain(
   grid: GridPoint[],
   cfg: TerrainConfig,
   W: number, Hh: number, DPR: number, tsec: number, breathAmp: number,
+  lift: number = 1,
 ): void {
   const breathHz = 0.4;
   const lit = cfg.lighting;
@@ -168,7 +169,18 @@ export function paintTerrain(
   interface Dot { sx: number; sy: number; depth: number; z: number; ndl: number; edl: number; gx: number; gy: number }
   const rd: Dot[] = [];
   for (const g of grid) {
-    let z = field(g.x, g.y);
+    // `lift` SCALES ELEVATION, and it is the homepage intro's one animated quantity: 0 is a flat plane,
+    // 1 is the hero. It defaults to 1 so every pre-existing caller is unchanged by construction.
+    //
+    // It has to be applied HERE rather than passed in through the grid, because this function computes
+    // `field(g.x, g.y)` itself — the grid carries positions and precomputed shading, not elevation. The
+    // alternative, writing lifted values back into the grid points, would corrupt the memoised array
+    // that `buildGrid` shares with every other consumer; there is a test asserting we do not.
+    //
+    // Breath is deliberately NOT scaled by lift. It is a separate amplitude, already ramped from zero by
+    // the component's own `breathIn`, and at the intro's final frame `breathAmp` is 0 anyway — which is
+    // exactly why the handoff from the intro to the live loop needs no blending.
+    let z = field(g.x, g.y) * lift;
     z += breathAmp * Math.sin(tsec * breathHz + g.x * 0.7 + g.y * 0.6);
     const [sx, sy, depth] = project(g.x, g.y, z, W, Hh, cfg.zoom);
     const ndl = lit ? g.nx * Lx + g.ny * Ly + g.nz * Lz : 0;

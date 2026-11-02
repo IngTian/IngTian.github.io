@@ -172,6 +172,26 @@ for (const phrase of bio.strong) {
       radial-gradient(34% 24% at 82% 22%, color-mix(in oklab, var(--bg) 46%, transparent), transparent 74%);
   }
 
+  /* THE HALOS FADE IN WITH THE SKY'S COLOUR, through the intro's first beat — and the rule is GATED ON
+     THE CLASS, not on the custom property alone, which is a correctness requirement rather than a style.
+     These halos are near-white paper radial fades: they disappear into the warm sky and stand out badly
+     against a flat one. The owner's report was "the two big light backgrounds behind the text, that's
+     super weird" — a box drawn round the name. They are also unnecessary while the sky is flat, since a
+     halo protects text from a VARIED backdrop and one tone is not varied.
+       `--intro-flatten` runs 1 -> 0 across beat 1. index.astro's pre-paint script sets it to 1 and
+     FluidSky updates it per frame, as a root custom property, which costs no layout.
+       WHY THE CLASS MATTERS: the property has a writer that can fail to run. FluidSky bails before its
+     first draw when `getContext('webgl')` returns null, so on a browser without WebGL — exactly the case
+     where the CSS gradient IS the sky — nothing ever lowers the property from 1, and `calc(1 - 1)` would
+     have held these halos at opacity 0 for the entire session. `html.intro-flat` is removed by
+     TerrainHero at the landing on EVERY path, because the terrain is a 2D canvas and always runs, so
+     gating on it makes the recovery independent of the sky. `:global()` because <html> carries no
+     component hash — a bare `html.intro-flat` here compiles to `html.intro-flat[cid]` and matches
+     nothing, which is this project's most-shipped Astro trap. */
+  :global(html.intro-flat) .hero-legibility {
+    opacity: calc(1 - var(--intro-flatten, 0));
+  }
+
   /* Mobile: a diagonal can't hold — collapse to a single LEFT-aligned stack
      (bio under the name), never re-centered. Static flow replaces the absolute
      positioning below the sm breakpoint. */
@@ -254,6 +274,13 @@ for (const phrase of bio.strong) {
        obvious: half the phone treatment worked. */
     #heights :global(.terrain-canvas) { opacity: 0.4; }
   }
+
+  /* A `?seq=1` SPIKE USED TO LIVE HERE, holding every hero text animation (paused + opacity 0) until
+     TerrainHero removed the class at the intro's landing. Built on the owner's note that otherwise
+     "everything is competing for the same attention", and deleted rather than shipped: the H1 in this
+     block is `/`'s measured LCP element, so pausing it for the intro's 5.2s makes the animation's
+     duration the headline's LCP. The intro is affordable precisely because the text is independent of
+     it. If the sequencing is wanted later, shorten the intro — do not pause the LCP. */
 
   @media (prefers-reduced-motion: no-preference) {
     .hero-rise { animation: hero-rise 1.4s cubic-bezier(0.22, 1, 0.36, 1) both; }

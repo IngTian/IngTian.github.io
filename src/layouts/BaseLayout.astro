@@ -206,9 +206,13 @@ const personLd = {
         below said "only /art opts in" — both were written when that was true and
         neither was updated when five more routes joined.
 
-        `/` HAS NO FRESH-LOAD TREATMENT, deliberately and for now: its hero paints
-        a finished static terrain frame immediately, which is the instant-LCP state,
-        so there is nothing to cover. Do not read the absence as an oversight. */}
+        `/` DOES NOT USE THE VEIL, and now has its own treatment instead: on a
+        first open the hero's terrain surveys itself as a contour map and rises out
+        of it — see "The first-open intro" in CLAUDE.md and the note in
+        TerrainHero.astro. That animation is the canvas's own first paint, not a
+        layer over the page, which is exactly why it does not belong here: the veil
+        covers a whole document, the intro IS the content arriving. Nothing to
+        reconcile between them, and no reason for / to opt into `veilOnLoad`. */}
     <div
       class="descent-veil"
       aria-hidden="true"
