@@ -2,6 +2,7 @@
 // /projects' computed pictures. Each is drawn at build time from its project's OWN output, vendored with its
 // provenance (src/data/vendor), and every number it prints must come from that output — the homepage's rule
 // that a number in prose comes from the data it describes. These pin the drawings to their data.
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { projects } from '../src/data/profile';
 import { visualFor } from '../src/data/projectVisuals';
@@ -12,7 +13,8 @@ import { witnessFacets } from '../src/data/vendor/witnessFacets';
 import { expandingPercentile, shareOf } from '../src/lib/positioning';
 import { facetsSvg, medianSeed, positioningSvg, sectionsSvg, wealthSvg } from '../src/lib/projectVisuals';
 
-const unescape = (s: string) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+const unescape = (s: string) =>
+  s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 
 /** Every <text> element's lines: its <tspan>s, or its whole content when it has none. */
 function texts(svg: string): string[][] {
@@ -28,6 +30,43 @@ const pts = (attr: string): [number, number][] =>
 const attrsOf = (svg: string, tag: string) =>
   [...svg.matchAll(new RegExp(`<${tag}\\b([^>]*)>`, 'g'))].map((m) => m[1]);
 const attr = (attrs: string, name: string) => attrs.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1] ?? '';
+
+interface Box { what: string; x0: number; x1: number; y0: number; y1: number }
+const size = (attrs: string) => Number(attr(attrs, 'style').match(/font-size:([\d.]+)px/)?.[1] ?? NaN);
+/** Every run of text as a box, by JetBrains Mono's metrics: 0.6em advance, 1.02em ascent, 0.3em descent. */
+function textBoxes(svg: string): Box[] {
+  const out: Box[] = [];
+  for (const [, a, body] of svg.matchAll(/<text\b([^>]*)>([\s\S]*?)<\/text>/g)) {
+    const spans = [...body.matchAll(/<tspan\b([^>]*)>([\s\S]*?)<\/tspan>/g)].map(([, sa, s]) => ({ a: sa, s }));
+    const anchor = attr(a, 'text-anchor') || 'start';
+    let x = Number(attr(a, 'x')), y = Number(attr(a, 'y'));
+    for (const p of spans.length ? spans : [{ a, s: body }]) {
+      if (attr(p.a, 'x')) x = Number(attr(p.a, 'x'));
+      if (attr(p.a, 'y')) y = Number(attr(p.a, 'y'));
+      const s = size(p.a) || size(a), str = unescape(p.s), w = str.length * 0.6 * s;
+      const x0 = anchor === 'end' ? x - w : anchor === 'middle' ? x - w / 2 : x;
+      out.push({ what: `text "${str}"`, x0, x1: x0 + w, y0: y - 1.02 * s, y1: y + 0.3 * s });
+      x = x0 + w;
+    }
+  }
+  return out;
+}
+/** Every mark that is not text, as a box: rects, lines, circles, and each vertex of a polyline, polygon or path. */
+function markBoxes(svg: string): Box[] {
+  const n = (a: string, k: string) => Number(attr(a, k));
+  const pt = (what: string) => ([x, y]: number[]): Box => ({ what, x0: x, x1: x, y0: y, y1: y });
+  return [
+    ...attrsOf(svg, 'rect').map((a) => ({ what: 'rect', x0: n(a, 'x'), x1: n(a, 'x') + n(a, 'width'), y0: n(a, 'y'), y1: n(a, 'y') + n(a, 'height') })),
+    ...attrsOf(svg, 'line').map((a) => ({ what: 'line', x0: Math.min(n(a, 'x1'), n(a, 'x2')), x1: Math.max(n(a, 'x1'), n(a, 'x2')), y0: Math.min(n(a, 'y1'), n(a, 'y2')), y1: Math.max(n(a, 'y1'), n(a, 'y2')) })),
+    ...attrsOf(svg, 'circle').map((a) => ({ what: 'circle', x0: n(a, 'cx') - n(a, 'r'), x1: n(a, 'cx') + n(a, 'r'), y0: n(a, 'cy') - n(a, 'r'), y1: n(a, 'cy') + n(a, 'r') })),
+    ...['polyline', 'polygon'].flatMap((t) => attrsOf(svg, t).flatMap((a) => pts(attr(a, 'points')).map(pt(t)))),
+    ...attrsOf(svg, 'path').flatMap((a) => (attr(a, 'd').match(/-?[\d.]+/g) ?? []).map(Number)
+      .flatMap((v, i, all) => (i % 2 ? [] : [[v, all[i + 1]]])).map(pt('path'))),
+  ];
+}
+const overlaps = (a: Box, z: Omit<Box, 'what'>) => a.x0 < z.x1 && a.x1 > z.x0 && a.y0 < z.y1 && a.y1 > z.y0;
+const numbers = (s: string) => new Set(s.match(/\d+(?:\.\d+)?/g) ?? []);
+const label = (svg: string) => unescape(svg.match(/^<svg\b[^>]*\baria-label="([^"]*)"/)?.[1] ?? '');
 
 const wealth = (r: readonly number[]) => r.reduce((w, x) => w * (1 + x), 1);
 /** Coordinates are printed to 0.1, and a value checked against a frame read back from other printed
@@ -49,8 +88,28 @@ describe('every computed picture', () => {
         expect(svg.endsWith('</svg>')).toBe(true);
       });
 
+      it('is framed to fit, never to fill: no container crops it, so everything inside the viewBox is seen', () => {
+        // A workshop thumb is 170px tall at any width from 300px (1.75:1 to 3.6:1); `slice` there cut text off.
+        const root = svg.match(/^<svg\b[^>]*>/)![0];
+        expect(attr(root, 'preserveAspectRatio') || 'xMidYMid meet').toMatch(/^x\w+Y\w+ meet$/);
+        // the ground is the svg's own background, so the room `meet` leaves around the drawing is the same tone
+        expect(attr(root, 'style')).toContain('background:var(--draft-ph)');
+        const out = textBoxes(svg).filter((b) => b.x0 < 8 || b.x1 > 342 || b.y0 < 8 || b.y1 > 212);
+        expect(out.map((b) => b.what)).toEqual([]);
+      });
+
+      it('is an image named by its own figures, so they reach a screen reader', () => {
+        const root = svg.match(/^<svg\b[^>]*>/)![0];
+        expect(attr(root, 'role')).toBe('img');
+        expect(root).not.toMatch(/aria-hidden/);
+        expect(label(svg).length).toBeGreaterThan(40);
+        // every number the picture prints is in its name, which is built from the same values
+        const named = numbers(label(svg));
+        expect([...numbers(printed(svg))].filter((n) => !named.has(n))).toEqual([]);
+      });
+
       it('colours only through CSS variables or currentColor, so it re-themes', () => {
-        const paints = [...svg.matchAll(/\b(?:fill|stroke)\s*[:=]\s*"?([^;"]+)/g)].map((m) => m[1].trim());
+        const paints = [...svg.matchAll(/\b(?:fill|stroke|background)\s*[:=]\s*"?([^;"]+)/g)].map((m) => m[1].trim());
         expect(paints.length).toBeGreaterThan(0);
         expect(paints.filter((p) => !/var\(--|^currentColor$|^none$/.test(p))).toEqual([]);
         expect(svg).not.toMatch(/#[0-9a-f]{3,8}\b/i);
@@ -70,6 +129,40 @@ describe('every computed picture', () => {
         // the class tests/projectsListing.test.ts reads from the vendored woff2's cmap — no arrows, no emoji
         expect(printed(svg)).toMatch(/^[\x20-\x7e\xa0-\xff–—‘’“”•…\n]*$/);
       });
+    });
+  }
+});
+
+describe('the gallery\'s name tag covers nothing', () => {
+  // The tag over a gallery card's bottom-left (the mockup's `.shot .tag`): 10px in from the card's left and bottom,
+  // 10.5px mono in capitals with .1em tracking, 4px 7px of padding. JetBrains Mono advances 0.6em, and its normal
+  // line height is 1.32em (ascent 1020 + descent 300 per 1000), which Chrome rounds to whole px. Checked once in
+  // headless Chrome against the real tag: 65.45x22.00px for RL-BHRP, 72.81x22.00px for OFFCHART, as modelled.
+  const TAG = { inset: 10, size: 10.5, tracking: 0.1, padX: 7, padY: 4, lineHeight: 1.32 };
+  // A gallery card is 330x220, or 240x160 on a phone, with a 1px border; Tailwind's preflight makes it border-box.
+  const CARDS = [[330, 220], [240, 160]] as const;
+  // The computed pictures among the gallery's six (every project but macboot, which is a workshop card only).
+  const GALLERY_SVGS = ['rl-bhrp', 'offchart', 'witness'];
+
+  /** The tag's box in the picture's own units: the svg fills the card inside its border, framed by `meet`. */
+  function tagZone(name: string, [w, h]: readonly [number, number]) {
+    const iw = w - 2, ih = h - 2;
+    const s = Math.min(iw / 350, ih / 220), ox = (iw - 350 * s) / 2, oy = (ih - 220 * s) / 2;
+    const tw = name.length * TAG.size * (0.6 + TAG.tracking) + 2 * TAG.padX;
+    const th = Math.round(TAG.size * TAG.lineHeight) + 2 * TAG.padY;
+    return { x0: (TAG.inset - ox) / s, x1: (TAG.inset + tw - ox) / s, y0: (ih - TAG.inset - th - oy) / s, y1: (ih - TAG.inset - oy) / s };
+  }
+
+  for (const slug of GALLERY_SVGS) {
+    it(`${slug}: no word or mark of its picture sits under its tag, on either card size`, () => {
+      const v = visualFor(slug);
+      if (v.kind !== 'svg') throw new Error(`${slug} is a computed picture`);
+      for (const card of CARDS) {
+        const z = tagZone(slug, card);
+        expect(z.y0).toBeLessThan(200);   // the zone is real: the band the old year labels sat in
+        const under = [...textBoxes(v.svg), ...markBoxes(v.svg)].filter((b) => overlaps(b, z));
+        expect(under.map((b) => `${card.join('x')}: ${b.what}`)).toEqual([]);
+      }
     });
   }
 });
@@ -170,6 +263,11 @@ describe('positioningSvg (offchart)', () => {
     // one caption, set on two lines at its separator — at 10px the whole sentence is wider than the picture
     expect(texts(svg)[0].join(' · ')).toBe('Hedge funds, 10-year Treasury futures · CFTC data, offchart\'s method');
   });
+
+  it('names its latest reading, the dot a sighted reader sees at the right end', () => {
+    expect(label(svg)).toContain(`Latest, ${d.weeks.at(-1)}: percentile ${Math.round(pct.at(-1)!)}.`);
+    expect(label(svg)).toContain('Hedge funds, 10-year Treasury futures');
+  });
 });
 
 describe('facetsSvg (witness)', () => {
@@ -192,6 +290,13 @@ describe('facetsSvg (witness)', () => {
       expect(text).toContain(f.confidence.toFixed(2));
     }
   });
+
+  it('names each facet in words a screen reader can say, with its count and confidence', () => {
+    for (const f of witnessFacets.top) {
+      expect(label(ALL.facetsSvg)).toContain(
+        `${f.name.replace(/_/g, ' ')}, ${f.observations} observations, confidence ${f.confidence.toFixed(2)}`);
+    }
+  });
 });
 
 describe('sectionsSvg (macboot)', () => {
@@ -204,6 +309,12 @@ describe('sectionsSvg (macboot)', () => {
     });
     const three = sectionsSvg({ rows: macbootSections.rows.slice(0, 3) });
     expect(texts(three).filter((t) => t.length === 3)).toHaveLength(3);
+  });
+
+  it('names every section in full, though the picture shortens the third column', () => {
+    for (const [sec, category, what] of macbootSections.rows) {
+      expect(label(ALL.sectionsSvg)).toContain(`§${sec} ${category}: ${what}`);
+    }
   });
 
   it('escapes the README\'s ampersands', () => {
@@ -232,11 +343,29 @@ describe('visualFor', () => {
     });
   });
 
-  it('gives manifold its still as the poster and its motion as two MP4 URLs', () => {
+  it('gives manifold a still per theme, each its own video\'s first frame, and its motion as two MP4 URLs', () => {
     const v = visualFor('manifold');
     if (v.kind !== 'image') throw new Error('manifold is a capture');
-    expect(v.poster).toBeDefined();
     expect(v.motion).toEqual({ dark: '/projects/manifold-saver-dark.mp4', light: '/projects/manifold-saver-light.mp4' });
+    // A light still, so the light theme never shows a dark poster that turns light when the motion swaps in.
+    expect(JSON.stringify(v.dark)).toContain('manifold-saver-dark.png');
+    expect(JSON.stringify(v.light)).toContain('manifold-saver-light.png');
+    // Each still is the size of its video's frame (PNG IHDR against the MP4's track header): the repo's 600x376
+    // thumbnail, which read "Lorem Ipsum", could not pass.
+    for (const t of ['dark', 'light']) {
+      const png = readFileSync(new URL(`../src/assets/projects/manifold-saver-${t}.png`, import.meta.url));
+      const mp4 = readFileSync(new URL(`../public/projects/manifold-saver-${t}.mp4`, import.meta.url));
+      const box = mp4.indexOf('tkhd') - 4, end = box + mp4.readUInt32BE(box);
+      expect([png.readUInt32BE(16), png.readUInt32BE(20)])
+        .toEqual([mp4.readUInt32BE(end - 8) / 65536, mp4.readUInt32BE(end - 4) / 65536]);
+    }
+  });
+
+  it('gives every capture a text alternative', () => {
+    for (const p of projects) {
+      const v = visualFor(p.slug);
+      if (v.kind === 'image') expect(v.alt).toMatch(new RegExp(`^${p.slug}\\b.{30,}`));
+    }
   });
 
   it('throws on a slug with no picture rather than rendering an empty card', () => {

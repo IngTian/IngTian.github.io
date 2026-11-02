@@ -6,14 +6,17 @@
 // commit, and writes:
 //   - src/data/vendor/{rlBhrpWealth,offchartPositioning,witnessFacets,macbootSections}.ts, each headed by its
 //     source URL, commit, fetch date and this command;
-//   - three raster captures into src/assets/projects/ (served through astro:assets as webp);
+//   - two raster captures into src/assets/projects/ (served through astro:assets as webp);
 //   - manifold's two screensaver GIFs as MP4s into public/projects/ (the GIFs are deleted: they are 1.0-1.2 MB
-//     each and a video is not an image), plus src/assets/projects/SOURCES.txt, the binaries' provenance.
+//     each and a video is not an image), each MP4's first frame beside the captures as that theme's still, plus
+//     src/assets/projects/SOURCES.txt, the binaries' provenance.
 //
 // It FAILS rather than writes when a source is not what the page assumes — a CFTC series offchart's own rule
-// would split, a table that lost its header, a character the site's mono subset cannot draw.
+// would split, a table that lost its header, a character the site's mono subset cannot draw, a recording that
+// is not the one the motto box below was measured on.
 // Needs: `gh` authenticated as the owner (macboot is private), and `ffmpeg` on PATH.
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -227,6 +230,17 @@ function macboot() {
 
 // ── the binaries: captures and manifold's motion ─────────────────────────────────────────────────────────────
 
+/** manifold's motto, the small line under its clock: a user setting ("leave empty to hide", its README) that both
+ *  recordings set to CJK, which this site never renders. The DRAWABLE guard reads text, not pixels, so the line is
+ *  painted out here with ffmpeg's delogo over the box it holds in the 520x322 frame (glyphs at x 381-395, y 203-210
+ *  in every frame, plus two pixels), leaving the documented empty-motto state. That box is true only for these
+ *  exact recordings, so any other bytes are refused: a re-recorded GIF must be looked at and the box re-measured. */
+const MOTTO = 'delogo=x=379:y=201:w=19:h=12';
+const SAVER_BLOBS = { dark: '61c04ecf8927d3c681e7c8b035a1bc18b8e3c4ff', light: '184204984315aa44ed67a242de93542528688007' };
+/** git's blob id of some bytes, the `sha` that `gh api repos/.../contents/<path>` reports for a file. */
+const blobSha = (buf) => createHash('sha1').update(`blob ${buf.length}\0`).update(buf).digest('hex');
+const VIDEO_FILTER = `${MOTTO},scale=trunc(iw/2)*2:trunc(ih/2)*2`;
+
 function binaries() {
   const tmp = mkdtempSync(join(tmpdir(), 'vendor-projects-'));
   const sources = [];
@@ -240,7 +254,6 @@ function binaries() {
   for (const [repo, path, name] of [
     ['trading-desk', 'assets/dashboard.png', 'trading-desk-dashboard.png'],
     ['daylogs', 'assets/body.png', 'daylogs-body.png'],
-    ['manifold', 'Resources/thumbnail@2x.png', 'manifold-thumbnail.png'],
   ]) {
     const out = join(ASSETS, name);
     writeFileSync(out, fileAt(repo, sha(repo), path));
@@ -249,12 +262,19 @@ function binaries() {
   for (const theme of ['dark', 'light']) {
     const path = `docs/saver-${theme}.gif`;
     const gif = join(tmp, `saver-${theme}.gif`);
-    writeFileSync(gif, fileAt('manifold', sha('manifold'), path));
+    const bytes = fileAt('manifold', sha('manifold'), path);
+    if (blobSha(bytes) !== SAVER_BLOBS[theme]) fail(`${path} is not the recording the motto box was measured on`);
+    writeFileSync(gif, bytes);
     console.log(`  ${path} (deleted after conversion)  ${statSync(gif).size} B`);
     const out = join(PUBLIC, `manifold-saver-${theme}.mp4`);
     execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', gif, '-movflags', '+faststart', '-pix_fmt', 'yuv420p',
-      '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', out], { stdio: 'inherit' });
+      '-vf', VIDEO_FILTER, out], { stdio: 'inherit' });
     written.push(record(out, 'manifold', path));
+    // The theme's still is its video's own first frame: the swap to motion shows no jump, the light theme gets a
+    // light still, and reduced motion keeps a real frame (the repo's thumbnail still read "Lorem Ipsum").
+    const still = join(ASSETS, `manifold-saver-${theme}.png`);
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', out, '-frames:v', '1', still], { stdio: 'inherit' });
+    written.push(record(still, 'manifold', path));
   }
   rmSync(tmp, { recursive: true, force: true });
   const txt = join(ASSETS, 'SOURCES.txt');
@@ -263,7 +283,9 @@ function binaries() {
     `fetched: ${TODAY}`,
     `command: ${COMMAND}`,
     'The MP4s are the GIFs converted with: ffmpeg -i in.gif -movflags +faststart -pix_fmt yuv420p '
-      + '-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" out.mp4',
+      + `-vf "${VIDEO_FILTER}" out.mp4`,
+    '(delogo paints out the motto line under the clock, a user setting both recordings set to CJK; see MOTTO.)',
+    'Each manifold PNG is its MP4\'s first frame: ffmpeg -i out.mp4 -frames:v 1 out.png',
     '',
     ...sources,
     '',
