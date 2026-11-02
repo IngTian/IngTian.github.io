@@ -526,3 +526,30 @@ describe("/art's image payload, measured on the built output", () => {
     expect(notWebp, `lightbox sources that are not webp: ${notWebp.slice(0, 3).join(', ')}`).toEqual([]);
   });
 });
+
+describe("BaseLayout's per-page hooks ship on /projects and ONLY on /projects", () => {
+  // `page` puts `data-page` on <html>, the scope tokens.css hangs the drafting palette from; `veil={false}` drops
+  // the descent veil, because /projects' boot is its entrance and two entrances back to back would put readable
+  // text ~4.4s away. Both are props, so what this guards is a default changing under every other route.
+  // Read from `markup` (scripts stripped): the veil's own inline script names `[data-veil]` on every page.
+  const veilEl = /<div\b[^>]*\sdata-veil\b/;
+  const page = (route: string): Page => {
+    const p = byRoute().get(route);
+    if (!p) throw new Error(`no built page for ${route} — run \`npm run build\``);
+    return p;
+  };
+
+  // `.test()` rather than `toMatch` so a failure names the defect instead of printing the whole page.
+  it('marks /projects as the drafting page, on <html>, and renders it no veil', () => {
+    const { markup } = page('/projects');
+    expect(/<html\b[^>]*\sdata-page="drafting"/.test(markup), '<html> on /projects lacks data-page="drafting"')
+      .toBe(true);
+    expect(veilEl.test(markup), '/projects renders a [data-veil] element').toBe(false);
+  });
+
+  it('leaves every other page unmarked, and /research its veil', () => {
+    expect(veilEl.test(page('/research').markup), '/research lost its [data-veil] element').toBe(true);
+    const marked = pages().filter((p) => p.route !== '/projects' && /\sdata-page=/.test(p.markup)).map((p) => p.route);
+    expect(marked).toEqual([]);
+  });
+});

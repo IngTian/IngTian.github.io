@@ -13,6 +13,18 @@ interface Props {
   /** Play the veil on a FRESH load of this page? (Transitions always play it.) */
   veilOnLoad?: boolean;
   /**
+   * Render the veil at all? `false` emits no `[data-veil]` element, so neither the fresh-load script nor the
+   * after-swap listener finds one to play. For a page whose own entrance replaces it — /projects' boot: two
+   * entrances back to back would put readable text seconds further away.
+   */
+  veil?: boolean;
+  /**
+   * A page with a register of its own: sets `data-page` on <html>, and tokens.css scopes that page's palette
+   * from it by overriding the role tokens, so the shared components reskin there with no edit. ClientRouter
+   * copies <html>'s attributes from the incoming page, so the attribute leaves with the page.
+   */
+  page?: 'drafting';
+  /**
    * How the corner nav picks its (light-theme) text color:
    *  - 'scroll' (default): flip dark→paper by the descent fraction behind it
    *    (home & /art ride the full dawn→night gradient).
@@ -47,6 +59,8 @@ const {
   description = 'Ing Tian (Zeying Tian) — quant researcher in portfolio optimization and incoming Operations Research PhD at the University of Toronto. Also a full-stack software and ML engineer. Toronto.',
   veilLine = 'a researcher by day',
   veilOnLoad = false,
+  veil = true,
+  page,
   navZone = 'scroll',
   noindex = false,
   preloadAccent = false,
@@ -78,7 +92,7 @@ const personLd = {
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" data-page={page}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -194,17 +208,19 @@ const personLd = {
         navZone tells it how to pick light-theme text color per page. */}
     <CornerNav navZone={navZone} />
     {/* "The Descent" loader: a night veil covering the page wipes DOWNWARD off
-        the bottom to reveal it. It plays on EVERY client-side navigation (the
-        after-swap listener at the bottom of this file, in both directions), and
-        on a fresh load only when the destination opts in via veilOnLoad.
-        Each page carries its own line. transform/opacity only; gated behind
-        prefers-reduced-motion (finished state = uncovered page).
+        the bottom to reveal it. It plays on EVERY client-side navigation into a
+        page that renders one (the after-swap listener at the bottom of this
+        file, in both directions), and on a fresh load only when the destination
+        opts in via veilOnLoad. Each page carries its own line. transform/opacity
+        only; gated behind prefers-reduced-motion (finished state = uncovered page).
 
-        SIX OF THE NINE ROUTES OPT IN: /art, /experience, /projects, /research,
-        /writing and /writing/<slug>. The three that do not are /, /404 and
-        /proto-sketches. This paragraph used to say "the gallery", and the script
-        below said "only /art opts in" — both were written when that was true and
-        neither was updated when five more routes joined.
+        FIVE OF THE NINE ROUTES OPT IN: /art, /experience, /research, /writing
+        and /writing/<slug>. /, /404 and /proto-sketches render the veil but do
+        not play it on load. /projects is the one route with NO veil at all
+        (`veil={false}`): its boot is its entrance, on load and on navigation in,
+        and a veil wiping off first would put its text ~4.4s away. This paragraph
+        used to say "the gallery", then "six routes" — each written when it was
+        true and not updated when the set changed.
 
         `/` DOES NOT USE THE VEIL, and now has its own treatment instead: on a
         first open the hero's terrain surveys itself as a contour map and rises out
@@ -213,14 +229,16 @@ const personLd = {
         layer over the page, which is exactly why it does not belong here: the veil
         covers a whole document, the intro IS the content arriving. Nothing to
         reconcile between them, and no reason for / to opt into `veilOnLoad`. */}
-    <div
-      class="descent-veil"
-      aria-hidden="true"
-      data-veil
-      data-veil-on-load={veilOnLoad ? 'true' : 'false'}
-    >
-      <span class="descent-veil__line">{veilLine}</span>
-    </div>
+    {veil && (
+      <div
+        class="descent-veil"
+        aria-hidden="true"
+        data-veil
+        data-veil-on-load={veilOnLoad ? 'true' : 'false'}
+      >
+        <span class="descent-veil__line">{veilLine}</span>
+      </div>
+    )}
   </body>
 </html>
 
@@ -300,7 +318,7 @@ const personLd = {
     if (!window.__descentVeilInit) {
       window.__descentVeilInit = true; // first load only
       var v = document.querySelector('[data-veil]');
-      if (v && v.dataset.veilOnLoad === 'true') play(); // six routes opt in; / does not (see above)
+      if (v && v.dataset.veilOnLoad === 'true') play(); // five routes opt in; / does not (see above)
     }
     // else: a transition re-run — the after-swap listener handles it.
   })();
