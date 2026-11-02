@@ -12,11 +12,13 @@
 //   3. draw the trajectories the names might take — thousands of them, a legible subset drawn
 //   4. so: how do you account for a stochastic future, obey every rule, and still optimise?
 //
-// WHY THE PREVIOUS DRAWINGS WENT. The triangle (lib/feasible) and the path lattice (lib/pathspace) are both real
-// and exact, and both answer "what is the feasible set" — a question a reader who has never been told no does
-// not have. They also both shrink something, which reads as tidying up rather than as difficulty. The point is
-// the opposite: the problem gets BIGGER the closer you look. Both modules are kept, unreferenced, so nothing
-// verified is lost and either can come back.
+// WHY THE PREVIOUS DRAWINGS WENT. The triangle and the path lattice were both real and exact, and both answer
+// "what is the feasible set" — a question a reader who has never been told no does not have. They also both
+// shrink something, which reads as tidying up rather than as difficulty. The point is the opposite: the problem
+// gets BIGGER the closer you look.
+//   Both modules are DELETED, with their specs. This said "kept, unreferenced, so nothing verified is lost and
+// either can come back"; it was not true, and the same false claim sat in sections/Rules.astro — see the longer
+// note there.
 //
 // EVERYTHING HERE IS EITHER CITED OR COMPUTED:
 //   * the 5% ownership-disclosure threshold is the real SEC 13D/G number

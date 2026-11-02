@@ -182,7 +182,7 @@ src/
   lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter AND the memoised grid cache
   lib/marchingSquares.ts            # isoRuns(fn, bounds, level, res) — ONE marching-squares kernel; descentPath and terrainContours are both callers
   lib/terrainContours.ts            # the hero field's isolines + levels, memoised — the intro's survey pass
-  lib/introTimeline.ts              # the homepage intro's schedule, duration override and should-it-play decision — all pure
+  lib/introTimeline.ts              # the homepage intro's SCHEDULE only — pure. The decision and the ?dur= clamp live in pages/index.astro's is:inline script (it must run before first paint, so it cannot import); lib/introSession.ts reads what that publishes
   lib/descentPath.ts, trajectory.ts # the career descent graph's field and route
   lib/{bellman,factorModel,problemSize,complexity,policyPnl,scenario,split}.ts   # the explainer slides' real math
   lib/{justify,scrollspy,pixels,cowSpeech,knowledge,capability,paperMath,equations,signalRubric}.ts
@@ -242,10 +242,23 @@ indexed one is a real leak, not an untidiness.
 
 `Deck`, `Toc`, `SideRail`, `CornerNav`, `TerrainHero`, `FluidSky`, `SkyWash`,
 `DescentPath`, `PlushCow`, the three explainer slides (`Choice`, `Rules`, `Solve`),
-`BaseLayout`'s no-FOUC theme resolver, and the `/art` and `/research` pages all
-need JS — that is the whole list, and `grep -rln '<script' src` regenerates it.
-Every one of them is a plain Astro component or page with a bundled `<script>`,
-**not** an island (see *Stack*). The shared contract:
+`BaseLayout`'s no-FOUC theme resolver and veil, `pages/index.astro`'s intro decider,
+and the `/art` and `/research` pages all need JS — that is the whole list. Every one
+is a plain Astro component or page with a `<script>`, **not** an island (see *Stack*).
+
+**Two corrections to how this list is checked, because the obvious check misleads.**
+`grep -rln '<script' src` returns **19 files** against the 16 surfaces above, and the
+difference is not all drift: `lib/introTimeline.ts`, `lib/motion.ts` and
+`lib/descentPath.ts` match on the string `<script>` inside their own COMMENTS. Filter
+to `src/{components,sections,pages,layouts}` before trusting a count. The real gap this
+caught was `pages/index.astro`, which the list had never named.
+
+**And `index.astro` is the one surface that does NOT keep the contract below, on
+purpose.** Its intro decider is `is:inline`, so it runs at parse time and exactly once
+— no `astro:page-load`, no teardown. That is the whole reason it exists: a bundled
+script is deferred until after parse, by which point the sky has already painted its
+finished colours, which is the flash it was written to remove. `BaseLayout`'s two
+inline scripts are the same exception for the same reason. Everything else here:
 
 - **Re-init on `astro:page-load`, with a teardown**, because `ClientRouter` is on
   and a View Transition replaces the DOM without a fresh page load. A script that
@@ -742,9 +755,6 @@ and no long task on the capped build — indistinguishable from the good one. A 
 seen on real hardware. If this genuinely needs to cost less, spend it on internal resolution or on shader
 work per draw, never on the cadence.
 
-The CSS
-`--descent-grad` gradient remains underneath as the base and the no-WebGL state.
-
 ## Themes (light ⇄ dark)
 
 Two themes, driven by `html[data-theme]` (absent = light, `'dark'` = terminal
@@ -919,6 +929,25 @@ titles came to rest hard against the browser chrome — the lead is a number in
   `sizes` hints still describe the layout that decides them). They're the only
   automated safety net, and they're where "two places must agree" is actually
   enforced.
+  - **`commentPaths.test.ts` extends that to PROSE, and it is the newest member of
+    this family for a specific reason: this file's own policy created the gap.**
+    Comments here are load-bearing by design, which also makes them *references* —
+    and references rot on every delete, silently, because nothing reads them.
+    `astro check` and `tsc` do not parse a comment; a stale path looks exactly like
+    a true one. An audit found six live cases, the worst being `Rules.astro` and
+    `complexity.ts` both promising that the two retired Rules drawings "stay in the
+    tree, unreferenced and still fully tested … either can return" — about modules
+    deleted along with their specs, and listed in *Rejected — do not rebuild* right
+    here. That sentence aimed the next agent at the exact work this file exists to
+    prevent. The same class had already been swept by hand twice.
+  - It asks "does a comment claim a path is HERE", not "does every path exist" —
+    because the rule above (*say what is true rather than only deleting the false
+    part*) means deletions get written down on purpose, and `index.astro` naming the
+    terminal's deleted `data/script.ts` is the opposite of rot. A deletion marker
+    near the mention passes. **What no gate can catch is a false claim about LIVE
+    code** — the same audit found `Toc.astro` asserting "the Solve slide is dark in
+    both themes", false since that design was rejected, and a real legibility defect.
+    That half is still a human reading carefully.
 - **A TEST IS NOT A CONSUMER. `noUnusedLocals` cannot see a dead export,** so
   `lib/` accumulates functions whose only caller is their own spec, and the spec
   makes them look alive. A sweep removed **13 such exports and ~470 lines**
@@ -967,7 +996,6 @@ titles came to rest hard against the browser chrome — the lead is a number in
     measured geometry). Note that Rules.astro *documents* an unset `--len` as acceptable — the real
     distinction is not whether a var resolves but whether the initial-value fallback is a state someone
     chose.
-  In the **light** theme the vermilion **seal**
   In the **light** theme the vermilion **seal**
   (`--seal #b23a2e`) is the ONLY saturated color. Never pure `#fff` / `#f00`.
   **Deliberate exception — the dark theme.** `html[data-theme='dark']` is the

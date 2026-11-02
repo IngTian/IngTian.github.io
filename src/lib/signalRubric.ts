@@ -16,10 +16,18 @@
 // WHY SCORES ARE A COMMITTED ARTEFACT AND NOT A BUILD-TIME CALL:
 // An LLM call at build time would make two builds of identical content produce different
 // betas — breaking the site's determinism rule, drifting the numbers between deploys for no
-// content reason, and putting an API key in the deploy path. Instead `npm run score` writes
-// src/data/signalWeights.ts, that file is committed and reviewed like any other change, and
-// the build only ever reads it. A PR then shows the score diff, so a moved beta is visible
-// BEFORE it ships.
+// content reason, and putting an API key in the deploy path. So src/data/signalWeights.ts is
+// committed and reviewed like any other change, and the build only ever reads it. A PR then
+// shows the score diff, so a moved beta is visible BEFORE it ships. That part is sound.
+//
+// THERE IS NO `npm run score`, AND THIS COMMENT CLAIMED THERE WAS — twice, here and on
+// `staleSignals` below. Scoring is a MANUAL operation: run the RUBRIC_PROMPT below against the
+// live items by hand, then hand-edit signalWeights.ts. Nothing in the repo automates it —
+// there is no `scripts/` directory, package.json has no `score` entry, and no file writes
+// signalWeights.ts. Naming a command that does not exist is worse than naming none: it reads
+// as "the procedure is covered" to the next person who finds `staleSignals` red, and they then
+// go looking for a script instead of doing the work. If this is worth automating, write the
+// script and restore the name in the same commit.
 
 /** The scale. Deliberately coarse: an LLM asked for 1-100 invents precision it does not
  *  have, and a five-point scale with named anchors is reproducible enough that two runs
@@ -95,7 +103,11 @@ export function hashContent(parts: readonly string[]): string {
 }
 
 /** Which scored ids no longer match the live content, and which live items are unscored.
- *  Either condition means `npm run score` needs re-running. */
+ *
+ *  Either condition means the scores need redoing — BY HAND. See the header: there is no `score` script,
+ *  which is what this doc comment used to send you looking for. `tests/signalWeights.test.ts` calls this to
+ *  assert the committed artefact has not drifted from live profile.ts, which is the documented exception for
+ *  an export whose only caller is a spec: it exists so the test can check an invariant on production data. */
 export function staleSignals(
   live: readonly { id: string; label: string }[],
   scored: readonly ScoredSignal[],

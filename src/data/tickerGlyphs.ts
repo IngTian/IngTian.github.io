@@ -1,8 +1,9 @@
 // src/data/tickerGlyphs.ts
 // PIXEL MARKS FOR THE CONCRETE INSTRUMENTS — 11x11, compiled from character matrices.
 //
-// Same discipline as data/assetGlyphs.ts: a glyph IS a matrix of filled cells, so it is data, and turning
-// data into geometry is the thing this codebase does well. Nothing traced, nothing freehand — three
+// Same discipline as data/cowGlyph.ts: a glyph IS a matrix of filled cells, so it is data, and turning
+// data into geometry is the thing this codebase does well. (This cited a `data/assetGlyphs.ts` that has been
+// deleted; cowGlyph is the living example of the same rule, and it is pinned by tests/cowGlyph.test.ts.) Nothing traced, nothing freehand — three
 // attempts at hand-authored illustration were rejected on this project, and a drawn Apple logo would be a
 // fourth (and a trademark problem besides).
 //
