@@ -11,74 +11,48 @@
 // nearby, your reading improves with experience, and a better optimum can exist for years without
 // being visible.
 //
-// So knowledge is modelled as coverage: a disc of known field around every place you have stood,
-// whose radius GROWS with experience — you do not just stand in more places, you get better at
-// reading each one. Everything outside the union of those discs is genuinely unknown and is drawn
-// as unknown.
+// So knowledge is modelled as coverage: a disc of known field around every place the WALKER has been
+// along the curve, whose radius GROWS with experience — you do not just stand in more places, you get
+// better at reading each one. Everything outside the union of those discs is genuinely unknown and is
+// drawn as unknown.
 //
-// MEASURED, not asserted. With the real waypoints and the real basins:
+// MEASURED ON THE MODEL THE PAGE RUNS — `knownnessFn` over `trail()`, with the readout's own 0.02
+// threshold. Deep-basin knownness at each stop the readout prints:
 //
-//     stop                  r     dist to deep basin   visible?
-//     B.Eng McGill       0.75                   4.54        no
-//     SDE TikTok         0.91                   4.09        no
-//     SDE Amazon         1.07                   3.85        no
-//     Ericsson           1.23                   3.71        no
-//     Senior SWE TikTok  1.39                   3.53        no
-//     Independent quant  1.55                   2.64        no
-//     Electronic Arts    1.71                   1.72        no      <- 0.01 short
-//     PhD OR             1.87                   0.58       YES
+//     stop                       u      deep basin   readout
+//     1  B.Eng · McGill        0.000      0.0000      nothing deeper is visible
+//     2  SDE Intern · TikTok   0.143      0.0000      nothing deeper is visible
+//     3  SDE Intern · Amazon   0.286      0.0000      nothing deeper is visible
+//     4  Ericsson AI Lab       0.429      0.0000      nothing deeper is visible
+//     5  Senior SWE · TikTok   0.571      0.0000      nothing deeper is visible
+//     6  Electronic Arts       0.714      0.0000      nothing deeper is visible
+//     7  Independent quant     0.857      0.0000      nothing deeper is visible
+//     8  PhD · OR              1.000      0.6906      a deeper basin is now visible
 //
-// The deep basin is invisible for SEVEN of eight stops and is discovered at the last one — and at
-// Electronic Arts it misses by 0.01, which is as close to "almost saw it" as arithmetic gets. None
-// of that was tuned to come out that way; it falls out of the declared positions.
+// It first crosses 0.02 at u = 0.865 — just past Independent quant, with the walker 0.05 from that
+// waypoint — so the readout's first "a deeper basin is now visible" prints on "stop 7/8". The local
+// basin is known from u = 0.115, before the second stop. None of that was tuned to come out that way.
+//
+// THIS TABLE WAS WRONG IN TWO WAYS UNTIL IT WAS RE-MEASURED, and both are worth knowing. It was a
+// measurement of a DIFFERENT model — discs at each waypoint, keyed to stop count — that the walker
+// model below superseded and that has since been deleted; under it the basin appeared only at the
+// last stop. And it listed Independent quant BEFORE Electronic Arts, while the waypoints run the other
+// way. Both errors were invisible because the table is prose. tests/knowledge.test.ts now asserts the
+// story against the live function and the page's own path, so a retune that changes it goes red.
 
-import { field } from './terrain';
 import { WAYPOINTS } from './trajectory';
 
-/** How far you can read the field from your k-th position.
+/** How far you can read the field, at a given amount of experience (in stop-equivalents).
  *
  *  Grows linearly with experience: the base is what one position teaches you, the increment is
  *  getting better at reading. Deliberately simple — a fancier law would be unfalsifiable, and the
  *  claim only needs to be "your reach improves". */
-export function knowledgeRadius(stopIndex: number, base = 0.75, growth = 0.16): number {
-  return base + stopIndex * growth;
+export function knowledgeRadius(experience: number, base = 0.75, growth = 0.16): number {
+  return base + experience * growth;
 }
 
-export interface KnownDisc {
-  x: number;
-  y: number;
-  r: number;
-  /** Which waypoint this disc came from. */
-  index: number;
-  label: string;
-}
-
-/** The discs of known field after walking `k` stops.
- *
- *  `k` is CONTINUOUS, not an integer count. A fractional k means the walker is between two stops,
- *  and the newest disc grows in from zero rather than popping into existence at full size.
- *
- *  WHY THIS MATTERS: the first version floored k, so knowledge advanced in seven discrete jumps.
- *  Nothing changed for ~740ms and then the whole surface lurched — which reads as "stuck, then
- *  extreme" rather than as learning. Continuity is the entire fix. */
-export function knownAfter(k: number): KnownDisc[] {
-  const kk = Math.max(0, k);
-  const full = Math.floor(kk);
-  const frac = kk - full;
-  const out: KnownDisc[] = [];
-  for (let i = 0; i < Math.min(full, WAYPOINTS.length); i++) {
-    const w = WAYPOINTS[i];
-    out.push({ x: w.x, y: w.y, r: knowledgeRadius(i), index: i, label: w.label });
-  }
-  // The disc currently being learned: its radius eases in, so arriving somewhere expands what you
-  // can see smoothly instead of instantly.
-  if (full < WAYPOINTS.length && frac > 0) {
-    const w = WAYPOINTS[full];
-    const ease = frac * frac * (3 - 2 * frac);        // smoothstep
-    out.push({ x: w.x, y: w.y, r: knowledgeRadius(full) * ease, index: full, label: w.label });
-  }
-  return out;
-}
+/** One disc of known field: a place the walker has been, and how far it could read from there. */
+interface KnownDisc { x: number; y: number; r: number }
 
 /**
  * Knowledge as a function of WHERE THE WALKER IS, not of how many stops it has ticked past.
@@ -92,7 +66,7 @@ export function knownAfter(k: number): KnownDisc[] {
  * The radius still grows with experience, because that part of the claim is real: you get better at
  * reading the field as you cover more of it.
  */
-export function walkerKnowledge(
+function walkerKnowledge(
   u: number, pathAt: (t: number) => { x: number; y: number },
   trailSamples = 96,
 ): KnownDisc[] {
@@ -103,16 +77,19 @@ export function walkerKnowledge(
     const t = (i / trailSamples);
     if (t > uu + 1e-9) break;
     const p = pathAt(t);
-    // Experience at this point of the walk, expressed in stop-equivalents so the radius law is the
-    // same one the tests already lock.
-    const exp = t * (WAYPOINTS.length - 1);
-    out.push({ x: p.x, y: p.y, r: knowledgeRadius(exp), index: i, label: '' });
+    // Experience at this point of the walk, in stop-equivalents, so the radius law reads the same way
+    // whether you think in stops or in distance along the curve.
+    out.push({ x: p.x, y: p.y, r: knowledgeRadius(t * (WAYPOINTS.length - 1)) });
   }
   return out;
 }
 
 /**
  * A knownness FUNCTION for a fixed frontier — build once per frame, call thousands of times.
+ *
+ * Returns 0 outside everything known, rising toward 1 at a disc's centre. SMOOTH RATHER THAN BINARY so
+ * the drawn surface can fade in at the edge of knowledge instead of ending on a hard circle — a hard
+ * edge reads as a rendering artefact, while a soft one reads as the limit of what you can see.
  *
  * THE PERFORMANCE BUG THIS FIXES, because it made the animation a slideshow: the previous
  * walkerKnownness(x, y, u, pathAt) rebuilt the entire frontier on EVERY CALL. At full reveal that is
@@ -122,6 +99,11 @@ export function walkerKnowledge(
  *
  * Hoisting the frontier out of the inner loop is the whole fix. The caller builds this once per frame
  * and then the per-point cost is just a distance test against a fixed array.
+ *
+ * THE ONLY EXPORT THE PAGE USES. Five more used to sit below it — `knownAfter`, `isKnown`, `knownness`,
+ * `discoveredAt`, `knownMean` — the per-stop model of the same feature, which this replaced and which
+ * nothing on the site had called since. Their spec was the only thing that made them look alive, and it
+ * was also the only thing asserting the discovery story; it now asserts it against this.
  */
 export function knownnessFn(
   u: number, pathAt: (t: number) => { x: number; y: number },
@@ -136,59 +118,4 @@ export function knownnessFn(
     }
     return best < 0 ? 0 : best > 1 ? 1 : best;
   };
-}
-
-/** Is a world point inside anything you have learned after `k` stops? */
-export function isKnown(x: number, y: number, k: number): boolean {
-  return knownAfter(k).some((d) => Math.hypot(x - d.x, y - d.y) <= d.r);
-}
-
-/** How well a point is known: 0 outside everything, rising toward 1 at a disc's centre.
- *
- *  Smooth rather than binary so the drawn surface can FADE in at the edge of knowledge instead of
- *  ending on a hard circle — a hard edge reads as a rendering artefact, while a soft one reads as
- *  the limit of what you can see. */
-export function knownness(x: number, y: number, k: number): number {
-  let best = 0;
-  for (const d of knownAfter(k)) {
-    const t = 1 - Math.hypot(x - d.x, y - d.y) / d.r;
-    if (t > best) best = t;
-  }
-  return Math.max(0, Math.min(1, best));
-}
-
-/** At which stop does a given world point first come into view? -1 if it never does. */
-export function discoveredAt(x: number, y: number): number {
-  for (let k = 1; k <= WAYPOINTS.length; k++) {
-    if (isKnown(x, y, k)) return k;
-  }
-  return -1;
-}
-
-export interface Discovery {
-  /** 1-based stop count at which the deep basin first becomes visible. */
-  stop: number;
-  label: string;
-  /** How many stops were walked blind. */
-  blindStops: number;
-  /** The closest miss before discovery: distance minus radius at the previous stop. */
-  nearMiss: number;
-}
-
-/** Mean true height over the known discs — the honest default prior. */
-export function knownMean(k: number, samples = 12): number {
-  const discs = knownAfter(k);
-  if (!discs.length) return 0;
-  let sum = 0;
-  let n = 0;
-  for (const d of discs) {
-    for (let i = 0; i < samples; i++) {
-      const a = (i / samples) * Math.PI * 2;
-      for (const rr of [0.25, 0.6, 0.9]) {
-        sum += field(d.x + Math.cos(a) * d.r * rr, d.y + Math.sin(a) * d.r * rr);
-        n++;
-      }
-    }
-  }
-  return n ? sum / n : 0;
 }

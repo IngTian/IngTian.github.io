@@ -328,8 +328,8 @@ import { STORY_CODA } from '../data/story';
 
 <script>
   import {
-    project, contoursFor, contourLevels, trail, climbSpan, unknownAttractor, storyBounds, waypointFade,
-    type Projection, type View,
+    project, contoursFor, contourLevels, trail, trailSampler, climbSpan, unknownAttractor, storyBounds,
+    waypointFade, type Projection, type View,
   } from '../lib/descentPath';
   import { WAYPOINTS, trajectoryFacts, DEEP_SIDE_LABEL } from '../lib/trajectory';
   // knowledgeRadius is NOT imported any more: it only ever fed the readout's "reach" figure, which was
@@ -497,23 +497,23 @@ import { STORY_CODA } from '../data/story';
       return { w: W, h: H, projection, pad };
     }
 
-    /** How much experience the walker has at the current reveal, as a CONTINUOUS quantity.
+    /** How much experience the walker has at the current reveal, as a CONTINUOUS quantity — now only
+     *  the readout's stop counter, which rounds it.
      *
      *  Was Math.floor(...) + 1, which quantised knowledge into seven discrete jumps: nothing changed
      *  for ~740ms and then the whole surface lurched. That is exactly the "too extreme, almost seems
-     *  stuck" the owner reported — a quantisation artefact, not a duration problem. knownAfter()
-     *  accepts a fractional value and eases the newest disc in from zero. */
+     *  stuck" the owner reported — a quantisation artefact, not a duration problem. This comment then
+     *  said `knownAfter()` accepts the fractional value and eases the newest disc in; that per-stop model
+     *  is deleted. Knowledge no longer reads stop count at all — it follows the walker's position along
+     *  the curve (`knownnessFn`, below), which is the stronger version of the same fix. */
     function experience(): number {
       return reveal * (WAYPOINTS.length - 1) + 1;
     }
 
     /** Position on the spline at parameter t — the walker's own location, used to advance the
-     *  knowledge frontier continuously rather than in per-stop instalments. */
-    function pathAt(t: number): { x: number; y: number } {
-      const idx = Math.min(pts.length - 1, Math.max(0, Math.round(t * (pts.length - 1))));
-      const p = pts[idx];
-      return { x: p.x, y: p.y };
-    }
+     *  knowledge frontier continuously rather than in per-stop instalments. From lib/ so that
+     *  tests/knowledge.test.ts walks exactly this path when it checks the readout's discovery claim. */
+    const pathAt = trailSampler(pts);
 
     /** How well a world point is understood right now. Driven by where the walker HAS BEEN along the
      *  curve, so the left half of the field fades in smoothly as the descent proceeds.
@@ -764,7 +764,19 @@ import { STORY_CODA } from '../data/story';
     const reduce = prefersReducedMotion();
     function animate(): void {
       cancelAnimationFrame(raf);
-      if (reduce) { reveal = 1; draw(); return; }
+      // markStops() TOO, not just draw() — and AFTER it. Two bugs, found one after the other.
+      //
+      // This branch used to be `reveal = 1; draw(); return;`, so under reduced motion the graph showed the
+      // finished walk — deep basin revealed — while the aria-live readout stayed on what the initial
+      // markStops() wrote at reveal 0: "stop 1/8 · nothing deeper is visible from here". The picture and its
+      // own caption contradicted each other, for exactly the readers most likely to be relying on the
+      // caption. CLAUDE.md's rule is that the no-motion state must look FINISHED; the readout is part of it.
+      //
+      // Adding markStops() BEFORE draw() then printed "stop 8/8 · nothing deeper is visible" — right stop,
+      // wrong discovery. markStops() reads `known()`, and the frontier behind it is only rebuilt by
+      // refreshKnown() at the top of draw(), so called first it reads the PREVIOUS reveal's knowledge. Hence
+      // draw, then markStops — here and in the animated step below, which had the same one-frame lag.
+      if (reduce) { reveal = 1; draw(); markStops(); return; }
       // Drive the reveal from ELAPSED TIME, not from an accumulated per-frame delta.
       //
       // The accumulator version ran ~5x too slow and looked frozen. Measured: 3 of 8 stops after
@@ -785,8 +797,8 @@ import { STORY_CODA } from '../data/story';
       const step = (now: number) => {
         const raw = Math.min(1, (now - t0) / DURATION_MS);
         reveal = ease(raw);
+        draw();         // first: it rebuilds the knowledge frontier markStops() reads (see the note above)
         markStops();
-        draw();
         if (raw < 1) raf = requestAnimationFrame(step);
       };
       raf = requestAnimationFrame(step);
