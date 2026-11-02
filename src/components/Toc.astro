@@ -173,10 +173,13 @@ for (const s of stops) {
     .toc :where(.sub) a:not(.is-active):not(.is-ancestor):hover { opacity: 0.68; }
   }
 
-  /* ── OVER THE PAPER SLIDE. Set by the script whenever the story panel is behind the rail. The
-     panel is opaque and inverts between themes — light paper in light, near-black slate in dark — so
-     the rail's ink inverts with it. This overrides the per-stop zone for every label at once, which
-     is the point: a fixed rail cannot use its stops' page positions to know what is behind it. */
+  /* ── OVER A PAPER SLIDE. Set by the script whenever ANY of the five opaque panels is behind the rail
+     — Choice, Rules, Solve, Story, Work, which all declare the same two backgrounds. (This said "the
+     story panel", singular, which was the state two fixes ago; the script's own comment records both
+     widenings, the second of them adding Solve.) The panel is opaque and inverts between themes —
+     light paper in light, near-black slate in dark — so the rail's ink inverts with it. This overrides
+     the per-stop zone for every label at once, which is the point: a fixed rail cannot use its stops'
+     page positions to know what is behind it. */
   .toc.over-paper a { color: #2a251c; }
   .toc.over-paper a.is-active { color: #12100b; }
   :global(html[data-theme='dark']) .toc.over-paper a { color: #b9c0b9; }
@@ -269,10 +272,24 @@ for (const s of stops) {
     // ALL of them, not just the first: the page now has three paper panels in a row (the career story,
     // the research question, the writing/projects slide). Testing only #story meant the rail reverted to
     // light sky ink over the other two, where it is nearly invisible against the panel.
-    // The opaque LIGHT panels. .so-paper is deliberately absent: the Solve slide is dark in both themes, so the
-    // rail wants its normal light-on-dark ink there rather than the dark-on-paper override.
+    // ALL FIVE opaque panels, .so-paper included — and that inclusion is a fix, not a tidy-up.
+    //
+    // This list used to end at .wk-paper, with the comment "`.so-paper` is deliberately absent: the Solve
+    // slide is dark in both themes, so the rail wants its normal light-on-dark ink there." That was true when
+    // written and stopped being true when the dark-panel design was rejected: Solve.astro now declares
+    // `--s-bg: #c4b7a1` in light and `#14161a` in dark, byte-identical to the other four, and its own comment
+    // says so ("a light-theme reader read that as a bug, not as emphasis"). The exclusion outlived its reason
+    // by exactly one design decision, which is the shape this codebase keeps getting bitten by.
+    //
+    // MEASURED, because the effect is real but smaller than it looks and the honest number matters more than
+    // the alarm. Idle labels sit at opacity 0.4, so against the panel they go 1.61:1 -> 2.07:1 in light and
+    // 1.95:1 -> 2.59:1 in dark. The ACTIVE label was never affected: 9.32:1 before, 9.63:1 after. So this is
+    // not "the rail was invisible over Solve" — it is "Solve's rail was 23% dimmer than the four identical
+    // panels next to it, for no chosen reason". Both idle figures are below 3:1 by design, which is what a
+    // deliberately-dimmed margin rail is; the point here is consistency across five surfaces that are the
+    // same surface.
     const paperPanels = Array.from(
-      document.querySelectorAll<HTMLElement>('.story-paper, .ch-paper, .ru-paper, .wk-paper'),
+      document.querySelectorAll<HTMLElement>('.story-paper, .ch-paper, .ru-paper, .wk-paper, .so-paper'),
     );
 
     function update() {
