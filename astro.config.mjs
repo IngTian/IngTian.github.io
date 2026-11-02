@@ -58,9 +58,12 @@ export default defineConfig({
     {
       provider: fontProviders.local(), name: 'JetBrains Mono', cssVariable: '--ff-jetbrains',
       fallbacks: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+      // The range must reach the heaviest weight any mono rule asks for (the nav's current link, 600). A face
+      // declared only to 500 makes every engine clamp to 500 and fake the bold on top, so the label shipped smeared
+      // while the file itself runs wght 400-800. Same file either way, so widening it costs no bytes.
       options: {
         variants: [
-          { weight: '400 500', style: 'normal', src: ['./src/assets/fonts/jetbrains-mono-latin-var.woff2'] },
+          { weight: '400 600', style: 'normal', src: ['./src/assets/fonts/jetbrains-mono-latin-var.woff2'] },
         ],
       },
     },

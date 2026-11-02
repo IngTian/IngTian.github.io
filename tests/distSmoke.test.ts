@@ -552,4 +552,24 @@ describe("BaseLayout's per-page hooks ship on /projects and ONLY on /projects", 
     const marked = pages().filter((p) => p.route !== '/projects' && /\sdata-page=/.test(p.markup)).map((p) => p.route);
     expect(marked).toEqual([]);
   });
+
+  // The drafting ink is sized for the drafting ground (tests/draftingPalette.test.ts), not for the reading sky:
+  // light --ink-3 over --reading-grad's lower stops measured 4.20 and 3.89. So the page must not paint a sky.
+  it('paints /projects no fluid sky and no sky wash, so its ink sits on the ground it was measured on', () => {
+    const { markup } = page('/projects');
+    expect(/class="fluid-sky"/.test(markup), '/projects renders the fluid-sky canvas').toBe(false);
+    expect(/class="sky-wash"/.test(markup), '/projects renders the SkyWash layer').toBe(false);
+  });
+
+  // A face declared below the weight a rule asks for gets a FAKE bold (the engine clamps, then emboldens), and a
+  // computed style cannot show that: it reads 600 either way. So compare the request with the declared face.
+  it("declares JetBrains Mono up to the nav's current-page weight, so that weight is real, not synthesised", () => {
+    const css = readdirSync(join(DIST, '_astro')).filter((f) => f.endsWith('.css'))
+      .map((f) => readFileSync(join(DIST, '_astro', f), 'utf8')).join('\n');
+    const want = /aria-current=page\][^{]*\{font-weight:(\d+)/.exec(css);
+    const face = /@font-face\{font-family:"JetBrains Mono-[^"]*";[^}]*font-weight:(\d+) (\d+)/.exec(page('/research').html);
+    expect(want, "no font-weight rule for the nav's current link in dist/_astro/*.css").not.toBeNull();
+    expect(face, 'no JetBrains Mono @font-face with a weight range on /research').not.toBeNull();
+    expect(Number(want![1])).toBeLessThanOrEqual(Number(face![2]));
+  });
 });

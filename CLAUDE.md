@@ -32,7 +32,8 @@ tagline carry the soul.
 
 The homepage is the descent. Around it are the **reading pages** — /research,
 /writing, /writing/&lt;slug&gt;, /projects, /experience — and **/art**, a quiet museum
-room for calligraphy and photography. Every route rides the same sky, and the
+room for calligraphy and photography. Every route except /projects rides the same sky
+(/projects sits on the plain drafting ground its `data-page` palette is measured on), and the
 reading pages deliberately share one margin, one measure and one back-link
 treatment: pages that each guessed their own layout would read as several sites.
 Borrow composition from the neighbouring page rather than inventing it.
@@ -190,7 +191,7 @@ src/
   sections/{Heights,Interlude,Choice,Rules,Solve,Story,Work}.astro   # the homepage, in scroll order — ALL of sections/, there is nothing else in it
   sections/Signature.astro          # links + seal — rendered INSIDE Work.astro, not as its own slide
   components/Deck.astro             # the deck's event plumbing (homepage only)
-  components/proto/FluidSky.astro   # the WebGL sky canvas — on all 8 content pages despite the proto/ path (only /proto-sketches omits it)
+  components/proto/FluidSky.astro   # the WebGL sky canvas — on 7 content pages despite the proto/ path (/projects and /proto-sketches omit it)
   components/SkyWash.astro          # woven warm/cold broken-color wash over the sky — CSS + a small script (it is in the Interactivity list below; this line used to say "pure CSS")
   components/TerrainHero.astro      # the hero's terrain canvas (Heights only)
   components/DescentPath.astro      # the career descent graph (inside Story)
@@ -724,8 +725,10 @@ the `SkyWash` layer.
 
 ## The fluid sky
 
-`components/proto/FluidSky.astro` is the sky on **every page a visitor reaches** —
-all eight content routes, the 404 included. The only page without it is
+`components/proto/FluidSky.astro` is the sky on **every page a visitor reaches except `/projects`** —
+seven content routes, the 404 included. `/projects` dropped it because its drafting
+palette's ink is sized for the drafting ground, not the reading sky (light `--ink-3`
+over `--reading-grad` measured 3.89:1). The other page without it is
 `/proto-sketches`, which also has no `.descent` element at all (`<main class="sk">`):
 it is an internal gallery, deliberately outside the sky's system so a candidate frame
 is judged against a plain ground. (The `proto/` path is where the component was born,

@@ -1,13 +1,13 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import FluidSky from '../components/proto/FluidSky.astro';
-import SkyWash from '../components/SkyWash.astro';
 import SideRail from '../components/SideRail.astro';
 import { projects, inProgress } from '../data/profile';
 import { projectStops, projectSectionId } from '../lib/pageStops';
 
 // TEMPORARY: a plain list of every project's name and idea, standing in until the /projects redesign
 // replaces this page. Its sections carry the ids projectStops() points at, so the rail still lands.
+// No FluidSky and no SkyWash (both removed here): page="drafting" swaps in the drafting ink, which is sized for
+// the drafting ground, and over the reading sky light --ink-3 fell to 3.89:1.
 const stops = projectStops(projects);
 const groups = [
   { id: 'p-selected', title: 'Selected', items: projects.filter((p) => p.tier === 'selected') },
@@ -21,10 +21,7 @@ const groups = [
   veil={false}
   navZone="light"
 >
-  <main class="projects descent is-fluid">
-    <FluidSky strength={4} variant="reading" yStart={1.15} />
-    <SkyWash />
-
+  <main class="projects">
     <SideRail stops={stops} id="projects-toc" />
 
     <div class="projects-block">
@@ -62,7 +59,6 @@ const groups = [
 
 <style>
   .projects { position: relative; z-index: 0; min-height: 100vh; }
-  .projects.descent { background: var(--reading-grad); }
   .projects-block {
     width: min(64%, 860px);
     margin-left: 34%;
