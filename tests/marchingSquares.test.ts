@@ -162,10 +162,17 @@ describe('isoSegments', () => {
     expect(n).toBe(0);
   });
 
-  it('splits a saddle cell into two segments — the only case the circle never reaches', () => {
-    // corners a (top-left) and c (bottom-right) above the level: case 5. Grid order is a, b / d, c.
+  // The bowl reaches cases 0-4, 6-9 and 11-15; the two saddles are the cases it never reaches, so each gets its own
+  // cell. Grid order is a, b / d, c. Each pair must cut off the two above-level corners, never cross the cell.
+  it('splits saddle case 5 (a and c above) into the two segments that cut off a and c', () => {
     const segs: number[][] = [];
     isoSegments(new Float32Array([1, 0, 0, 1]), 1, 1, 0.5, CELL, (...s) => segs.push(s));
     expect(segs).toEqual([[0, 5, 5, 0], [10, 5, 5, 10]]);
+  });
+
+  it('splits saddle case 10 (b and d above) into the two segments that cut off b and d', () => {
+    const segs: number[][] = [];
+    isoSegments(new Float32Array([0, 1, 1, 0]), 1, 1, 0.5, CELL, (...s) => segs.push(s));
+    expect(segs).toEqual([[5, 0, 10, 5], [5, 10, 0, 5]]);
   });
 });

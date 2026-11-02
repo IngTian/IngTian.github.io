@@ -39,12 +39,18 @@ export function centersAt(tSec: number): [number, number, number, number][] {
   ]);
 }
 
-/** The field's elevation at (x, y): a faint ripple plus one Gaussian per centre. */
+/**
+ * The field's elevation at (x, y): a faint ripple plus one Gaussian per centre.
+ *
+ * An indexed loop on purpose: this runs ~16,500 times a frame at 2000x1100, and `for (const [cx, cy, a, w] of
+ * centers)` measured 1.66 ms for the grid against 1.05 ms indexed (Node 24, median of 80 frames) — about +1% of a
+ * core at 15fps, against a quiet-drift budget of 6%.
+ */
 export function fieldAt(x: number, y: number, tSec: number, centers: ReturnType<typeof centersAt>): number {
   let v = 0.05 * Math.sin(1.7 * x + tSec * 0.05) * Math.cos(1.3 * y);
-  for (const [cx, cy, a, w] of centers) {
-    const dx = x - cx, dy = y - cy;
-    v += a * Math.exp(-(dx * dx + dy * dy) / (2 * w * w));
+  for (let i = 0; i < centers.length; i++) {
+    const c = centers[i], dx = x - c[0], dy = y - c[1];
+    v += c[2] * Math.exp(-(dx * dx + dy * dy) / (2 * c[3] * c[3]));
   }
   return v;
 }
@@ -75,6 +81,18 @@ export function sampleGrid(widthPx: number, heightPx: number, tSec: number): { g
 export interface Ring { x: number; y: number; t0: number }
 
 /**
+ * A ping starting now from one of the field's BASINS — a centre with negative amplitude — drifted to `tSec`.
+ * `u` in [0, 1) picks which (pass `Math.random()`). The spec says the pings "spread from basins"; the mockup
+ * picked any of the six centres, and four of those are peaks.
+ */
+export function pingAt(tSec: number, widthPx: number, heightPx: number, u: number): Ring {
+  const basins = centersAt(tSec).filter((c) => c[2] < 0);
+  const [cx, cy] = basins[Math.min(basins.length - 1, Math.floor(u * basins.length))];
+  const { sx, y0 } = scale(widthPx, heightPx);
+  return { x: (cx - FIELD_X0) / sx, y: (cy - y0) / sx, t0: tSec };
+}
+
+/**
  * A ping's radius (px) and how much of it is left (1 → 0), or null once it has spread past `maxR`. A frame
  * stamped a moment before `t0` — a rAF timestamp predates the timer that started the ping — reads as radius 0.
  */
@@ -101,12 +119,23 @@ function fixed2(v: number): string {
   return s === '-0.00' ? '0.00' : s;
 }
 
-/** 9 x ticks at 60 + k(W-120)/8 and 6 y ticks at 40 + k(H-80)/5, labelled in field coordinates (y up). */
+/**
+ * Narrowest x-tick spacing that still labels every tick. A label is at most five characters ("-3.20") of 10px mono
+ * at a 0.6em advance, so 30px, plus a 10px gap. Below it (W < 440: every phone) only every other tick is labelled —
+ * at 320px the spacing is 25px and the mockup's nine labels overlapped.
+ */
+const TICK_LABEL_MIN_PX = 40;
+
+/**
+ * 9 x ticks at 60 + k(W-120)/8 and 6 y ticks at 40 + k(H-80)/5, labelled in field coordinates (y up). An x tick
+ * whose label would collide with its neighbour's carries an empty label; the tick mark itself is always drawn.
+ */
 export function axisTicks(widthPx: number, heightPx: number): { x: { px: number; label: string }[]; y: { px: number; label: string }[] } {
   const { sx, y0 } = scale(widthPx, heightPx);
+  const every = (widthPx - 120) / 8 < TICK_LABEL_MIN_PX ? 2 : 1;
   const x = Array.from({ length: 9 }, (_, k) => {
     const px = 60 + (k * (widthPx - 120)) / 8;
-    return { px, label: fixed2(FIELD_X0 + px * sx) };
+    return { px, label: k % every === 0 ? fixed2(FIELD_X0 + px * sx) : '' };
   });
   const y = Array.from({ length: 6 }, (_, k) => {
     const px = 40 + (k * (heightPx - 80)) / 5;

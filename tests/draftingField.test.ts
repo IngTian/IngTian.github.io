@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   FIELD_BASE, FIELD_CELL, FIELD_LEVELS, FIELD_SPAN, FIELD_X0, FRAME_MS, PING_SPEED,
-  axisTicks, centersAt, fieldAt, frameInterval, litByRing, probeLabel, ringState, sampleGrid,
+  axisTicks, centersAt, fieldAt, frameInterval, litByRing, pingAt, probeLabel, ringState, sampleGrid,
 } from '../src/lib/draftingField';
 
 describe('centersAt — the drift', () => {
@@ -89,6 +89,23 @@ describe('pings', () => {
     expect(litByRing(r.x + 260, r.y, s, r)).toBe(false);
   });
 
+  it('starts every ping in a basin, never on a peak, and can reach both basins', () => {
+    // Spec §3: the pings "spread from basins". Four of the six centres are peaks (a > 0).
+    const W = 1440, H = 900, t = 12.3, sx = FIELD_SPAN / W, y0 = -(H * sx) / 2;
+    const basins = centersAt(t).filter((c) => c[2] < 0);
+    expect(basins).toHaveLength(2);
+    const hits = new Set<number>();
+    for (const u of [0, 0.25, 0.49, 0.5, 0.75, 0.999999, 1]) {
+      const p = pingAt(t, W, H, u);
+      expect(p.t0).toBe(t);
+      const i = basins.findIndex(([cx, cy]) => Math.abs(FIELD_X0 + p.x * sx - cx) < 1e-9 && Math.abs(y0 + p.y * sx - cy) < 1e-9);
+      expect(i, `u=${u}`).toBeGreaterThanOrEqual(0);
+      expect(fieldAt(FIELD_X0 + p.x * sx, y0 + p.y * sx, t, centersAt(t))).toBeLessThan(0);
+      hits.add(i);
+    }
+    expect(hits.size).toBe(2);
+  });
+
   it('draws at ~15fps while drifting and ~30fps while a ping travels', () => {
     expect(frameInterval(0)).toBe(66);
     expect(frameInterval(1)).toBe(33);
@@ -106,6 +123,21 @@ describe('axisTicks and probes', () => {
     expect(t.x[8].px).toBeCloseTo(1440 - 60, 9);
     expect(t.y[0]).toEqual({ px: 40, label: (-(y0 + 40 * sx)).toFixed(2) });
     expect(t.y[5].px).toBeCloseTo(900 - 40, 9);
+  });
+
+  it('never lets two x labels collide — a phone labels every other tick, and keeps all nine marks', () => {
+    // 10px mono at a 0.6em advance: 6px a character, plus a 10px gap between neighbouring labels.
+    for (let W = 320; W <= 3840; W++) {
+      const x = axisTicks(W, 700).x;
+      expect(x).toHaveLength(9);
+      const lab = x.filter((t) => t.label);
+      expect(lab[0].px).toBe(60);
+      for (let k = 1; k < lab.length; k++) {
+        expect(lab[k].px - lab[k - 1].px, `W=${W}`).toBeGreaterThanOrEqual(lab[k - 1].label.length * 6 + 10);
+      }
+    }
+    expect(axisTicks(320, 700).x.map((t) => t.label)).toEqual(['-2.00', '', '-1.00', '', '0.00', '', '1.00', '', '2.00']);
+    expect(axisTicks(440, 700).x.every((t) => t.label)).toBe(true);
   });
 
   it('never prints a negative zero — the centre tick at 1470px is 0.00', () => {
