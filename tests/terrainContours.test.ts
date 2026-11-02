@@ -91,7 +91,7 @@ describe('introContours', () => {
     });
   });
 
-  it('costs under 40ms to build at the shipped parameters', () => {
+  it('does the real work, within a deterministic bound', () => {
     // MEASURED THROUGH THE UNCACHED KERNEL, which is the only way to time this honestly — and getting
     // that wrong twice is why the reasoning is written down.
     //
@@ -108,22 +108,43 @@ describe('introContours', () => {
     // intro's actual first frame. Cold CACHE, warm JIT — model both, or the budget describes nothing
     // that ships.
     //
-    // So: call the kernel `introContours` calls, at the shipped parameters, after the tests above have
-    // warmed the field. No cache to defeat and nothing to go vacuous. Loose enough not to flake on a
-    // loaded CI box, tight enough to fail if someone raises the resolution toward descentPath's 150,
-    // which measured 47.1ms.
+    // THEN THE WALL-CLOCK VERSION WENT RED ON CI AT 57.1ms, against a ceiling of 40 whose own comment
+    // claimed it was "deliberately loose enough not to flake on a loaded CI box". It was never tested
+    // against a real measurement — the ceiling was set while the measurement was fake, so its looseness
+    // was guesswork. A GitHub runner is 2 shared vCPUs; the same loop is ~11ms here and 57ms there.
+    //
+    // SO THE TIME BUDGET IS GONE, AND THAT IS THE RIGHT ANSWER RATHER THAN A BIGGER NUMBER. Raising the
+    // ceiling to fit the slowest runner makes it stop discriminating; lowering it makes it flake; and
+    // either way wall-clock on a shared runner is not a measurable quantity. This repo already has that
+    // lesson one layer up — CLAUDE.md records that a frame-cadence regression was invisible to headless
+    // Chrome and could only be seen on real hardware. A per-run timing assertion is the same category
+    // error: it reports the runner, not the code.
+    //
+    // WHAT ACTUALLY GUARDS THE INTRO'S FIRST FRAME IS DETERMINISTIC, and it is the two constants. The
+    // cost here is (levels x (res+1)^2) field evaluations plus the stitch, so the only way to make the
+    // build expensive is to raise one of them — and `INTRO_CONTOUR_LEVELS === 9` / `INTRO_CONTOUR_RES
+    // === 74` are pinned by the test below. Raising res to descentPath's 150 fails that pin immediately,
+    // on any machine, in any load, which is strictly better than failing a stopwatch sometimes. The
+    // measured figures live in terrainContours.ts's header where a tuner will read them: 4.9ms at res
+    // 60, 10.0ms at 74, 21.0ms at 110, 47.1ms at 150, and 10.6ms in a real browser on the intro's first
+    // frame.
+    //
+    // What remains here is the half that CAN be asserted: that the kernel does the work at all. A
+    // regression that made `isoRuns` return nothing would have passed the old stopwatch at ~0ms.
     const bounds = { x0: -RANGE, y0: -RANGE, x1: RANGE, y1: RANGE };
-    const t0 = performance.now();
     let points = 0;
+    let runs = 0;
     for (const l of terrainLevels()) {
-      for (const run of isoRuns(field, bounds, l, INTRO_CONTOUR_RES)) points += run.length;
+      for (const run of isoRuns(field, bounds, l, INTRO_CONTOUR_RES)) { runs++; points += run.length; }
     }
-    const ms = performance.now() - t0;
-    expect(ms, `contour build took ${ms.toFixed(1)}ms`).toBeLessThan(40);
-    // And prove it did the work: ~1245 points across 13 runs at the shipped parameters. A kernel that
-    // silently returned nothing would otherwise time at 0ms and pass.
+    // ~1245 points across 13 runs at the shipped parameters, measured.
     expect(points, 'the build produced almost no geometry — did isoRuns stop finding runs?')
       .toBeGreaterThan(800);
+    expect(runs, 'expected roughly one polyline per level, plus the split basins').toBeGreaterThan(8);
+    // And the work bound itself, stated as an assertion rather than as a stopwatch: the field is
+    // evaluated once per lattice corner per level. 9 x 75^2 = 50,625. If this ever needs to grow, grow
+    // it deliberately and move the number — do not discover it as a janky first frame.
+    expect(INTRO_CONTOUR_LEVELS * (INTRO_CONTOUR_RES + 1) ** 2).toBeLessThanOrEqual(55_000);
   });
 
   it('ships 9 levels at res 74 — the measured parameters', () => {

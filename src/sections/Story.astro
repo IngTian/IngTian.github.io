@@ -23,9 +23,10 @@
 // behind it is done by the panel being opaque, not by touching the fluid layer: the sky keeps
 // running above and below, and this slide simply sits on paper.
 // The figure row is deleted (see below), so the measurement imports go with it — curvature(),
-// discoveryOf() and trajectoryFacts() were only ever called here to fill those three numbers. The
-// modules stay: lib/sensitivity and lib/knowledge are what the GRAPH is drawn from, and they keep their
-// own specs.
+// discoveryOf() and trajectoryFacts() were only ever called here to fill those three numbers.
+// What the GRAPH is drawn from is lib/descentPath.ts and lib/knowledge.ts, both of which keep their own
+// specs. This line used to name a `lib/sensitivity` as the source; no module of that name exists, or did
+// under that name — the curvature work it refers to lives in descentPath.
 import { STORY } from '../data/story';
 ---
 <section id="story" class="story" aria-labelledby="story-heading">
