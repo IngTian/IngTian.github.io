@@ -29,6 +29,7 @@
 // career graph does its own optimisation, which is the one thing about this file that would be worth
 // knowing and is false. Dropped when noUnusedLocals went on.
 import { field, RANGE } from './terrain';
+import { isoRuns } from './marchingSquares';
 import { WAYPOINTS, trajectoryFacts, type Waypoint } from './trajectory';
 
 export type Projection = '2d' | '3d';
@@ -100,75 +101,23 @@ export function project(x: number, y: number, view: View): [number, number] {
  *
  *  Prefer `contoursFor()` below for anything that runs more than once — this is the uncached kernel. */
 export function contours(level: number, res = 150): [number, number][][] {
-  const b = storyBounds();
-  const runs: [number, number][][] = [];
-  const dx = (b.x1 - b.x0) / res;
-  const dy = (b.y1 - b.y0) / res;
-
-  // Collect line segments per cell, then stitch them into runs by matching endpoints.
-  const segs: [[number, number], [number, number]][] = [];
-  const interp = (
-    xa: number, ya: number, va: number, xb: number, yb: number, vb: number,
-  ): [number, number] => {
-    const t = (level - va) / (vb - va);
-    return [xa + (xb - xa) * t, ya + (yb - ya) * t];
-  };
-
-  for (let i = 0; i < res; i++) {
-    for (let j = 0; j < res; j++) {
-      const x0 = b.x0 + i * dx, y0 = b.y0 + j * dy;
-      const x1 = x0 + dx, y1 = y0 + dy;
-      const v00 = field(x0, y0), v10 = field(x1, y0), v11 = field(x1, y1), v01 = field(x0, y1);
-      // Which corners are above the level: standard marching-squares case index.
-      const code = (v00 > level ? 1 : 0) | (v10 > level ? 2 : 0) | (v11 > level ? 4 : 0) | (v01 > level ? 8 : 0);
-      if (code === 0 || code === 15) continue;
-      const bottom = () => interp(x0, y0, v00, x1, y0, v10);
-      const right = () => interp(x1, y0, v10, x1, y1, v11);
-      const top = () => interp(x1, y1, v11, x0, y1, v01);
-      const left = () => interp(x0, y1, v01, x0, y0, v00);
-      const push = (a: [number, number], c: [number, number]) => segs.push([a, c]);
-      switch (code) {
-        case 1: case 14: push(left(), bottom()); break;
-        case 2: case 13: push(bottom(), right()); break;
-        case 3: case 12: push(left(), right()); break;
-        case 4: case 11: push(right(), top()); break;
-        case 5: push(left(), top()); push(bottom(), right()); break;
-        case 6: case 9: push(bottom(), top()); break;
-        case 7: case 8: push(left(), top()); break;
-        case 10: push(left(), bottom()); push(right(), top()); break;
-      }
-    }
-  }
-
-  // Stitch: greedily extend a run while some segment starts near its end.
-  const used = new Array(segs.length).fill(false);
-  const near = (a: [number, number], c: [number, number]) => Math.hypot(a[0] - c[0], a[1] - c[1]) < dx * 1.2;
-  for (let s = 0; s < segs.length; s++) {
-    if (used[s]) continue;
-    used[s] = true;
-    const run: [number, number][] = [segs[s][0], segs[s][1]];
-    let extended = true;
-    while (extended) {
-      extended = false;
-      for (let k = 0; k < segs.length; k++) {
-        if (used[k]) continue;
-        const [a, c] = segs[k];
-        if (near(run[run.length - 1], a)) { run.push(c); used[k] = true; extended = true; }
-        else if (near(run[run.length - 1], c)) { run.push(a); used[k] = true; extended = true; }
-        else if (near(run[0], c)) { run.unshift(a); used[k] = true; extended = true; }
-        else if (near(run[0], a)) { run.unshift(c); used[k] = true; extended = true; }
-      }
-    }
-    if (run.length > 3) runs.push(run);
-  }
-  return runs;
+  // The marching squares itself now lives in lib/marchingSquares.ts, because the homepage intro needs
+  // isolines of the SAME `field()` over different bounds — `RANGE` instead of `storyBounds()` — and that
+  // was the only difference between the two. One kernel, two callers; this function's signature and
+  // behaviour are unchanged, and this file's own specs are what prove that.
+  //
+  // One thing DID change, and for the better: the extracted stitch attaches the nearest candidate rather
+  // than the first within tolerance, which fixes a latent bug that silently dropped fragments of a
+  // contour. See the long note in marchingSquares.ts. For this field it means fewer, longer runs
+  // covering the same geometry.
+  return isoRuns(field, storyBounds(), level, res);
 }
 
 /**
  * THE MEMOISED CONTOURS — and the reason this lives in `lib/` rather than in the component.
  *
  * `contours()` is the single most expensive thing the descent graph does: the full set for
- * `contourLevels(11)` is 190 polylines / 2962 points and costs **53-67 ms of synchronous main thread**,
+ * `contourLevels(11)` is 17 polylines / 2838 points and costs **53-67 ms of synchronous main thread**,
  * measured over 8 runs on node 24. `DescentPath.astro` binds its init to BOTH `astro:page-load` and
  * `theme:change`, so without a cache that cost landed on every return to `/` and every theme flip, inside
  * the view transition.
