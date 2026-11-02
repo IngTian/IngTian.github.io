@@ -69,6 +69,9 @@ export interface Project {
   idea: string;            // the one-line idea — rows, cards, pop-up, homepage appendix
   short: string;           // the ls listing's description (≤ 44 chars)
   proof: string[];         // chips; proof[0] is the highlighted one
+  // The README's own line, verbatim and runnable — never abbreviated. manifold's holds a 74-char URL with no
+  // break opportunity (~510px of 11.5px mono in a ~240px card), so a renderer must wrap it
+  // (`overflow-wrap: anywhere`); the card clips its overflow, so an unwrapped line is cut off silently.
   install?: { text: string; prompt?: boolean };   // prompt: shown without a leading "$ "
   visibility: 'public' | 'private';
   registry?: 'pypi' | 'npm';
@@ -192,7 +195,9 @@ export const projects: Project[] = [
     slug: 'trading-desk', name: 'trading-desk', tier: 'selected', kind: 'tool', year: '2026',
     idea: 'A trading book in the terminal that gets P&L right across currencies and refuses to record a state that contradicts itself.',
     short: "a trading book that can't contradict itself",
-    proof: ['on PyPI', '~270 tests'],
+    // ~300, not the spec's ~270: at trading-desk 1e60108 pytest collects 323, of which test_book.py's 24 skip
+    // without a book — so CI runs 299. The README states no count.
+    proof: ['on PyPI', '~300 tests'],
     visibility: 'public', registry: 'pypi', ci: true,
   },
   {

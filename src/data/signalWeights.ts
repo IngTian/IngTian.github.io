@@ -29,11 +29,31 @@
 // Nothing may exceed 4 without external validation. arXiv is verifiable, not peer-reviewed.
 //
 // SECOND PASS — Claude Opus 5.5, 2026-11-02 — for the five projects added by the /projects redesign
-// (rl-bhrp, offchart, trading-desk, daylogs, macboot). Three independent raters, each given RUBRIC_PROMPT
-// and the five records' text; each committed score is the per-project MEDIAN, and each `because` is the
-// median rater's sentence, verbatim. 5 items · 5 exact agreement · 0 disputes. The `model` and
-// `scoredAt` fields below still describe the first pass, which scored the other twenty. Project ids are
-// keyed by slug (`projects:witness`), not by index, so adding a project does not reshuffle these scores.
+// (rl-bhrp, offchart, trading-desk, daylogs, macboot). The `model` and `scoredAt` fields below still
+// describe the first pass, which scored the other twenty.
+//
+// WHAT THE RATERS WERE GIVEN: RUBRIC_PROMPT and SCALE, this file (to calibrate against witness and manifold,
+// both 2), and each project's RECORD text from profile.ts — NOT its README. One item per project: its
+// visibility, its `idea` in quotes, then its `proof` chips joined by "; ". macboot's item opened "PRIVATE
+// repo, no public link", which is the scoring prompt's wording for `visibility: 'private'`, not record text.
+// The plan asked for the five READMEs; record text is what ran. It is also what the first pass scored: the
+// item a reader of this site sees, under RUBRIC_PROMPT's "score only what the text says".
+//
+// Three raters, run concurrently; each read only the rubric and this file, and none saw another's output.
+// Unlike the first pass they had no assigned stances — all three got the same prompt. Their scores:
+//              rl-bhrp  offchart  trading-desk  daylogs  macboot
+//   rater 1       4        3           2           2        1
+//   rater 2       4        3           2           2        1
+//   rater 3       4        3           2           2        1
+// 5 items · 5 exact agreement · 0 disputes, so each committed MEDIAN is unanimous, and each `because` is
+// rater 2's sentence verbatim (all three tied, so the middle rater) — with ONE later edit. trading-desk's
+// chip was scored as "~270 tests" and then corrected to "~300 tests" (323 collected, 299 run without a
+// book), and its quote follows the chip. It was not re-scored: all three raters read the count only as
+// "public and checkable" and capped the item on "bookkeeping", so the count did not set the 2.
+// tests/signalWeights.test.ts checks that every quoted span in a project's `because` is still in its item.
+//
+// Project ids are keyed by slug (`projects:witness`), not by index, so adding a project does not reshuffle
+// these scores.
 
 import type { SignalWeights } from '../lib/signalRubric';
 
@@ -134,7 +154,7 @@ export const SIGNAL_WEIGHTS: SignalWeights = {
     {
       id: 'projects:trading-desk', factor: 'projects', score: 2,
       label: 'trading-desk',
-      because: 'Public and checkable ("on PyPI; ~270 tests"), but "a trading book in the terminal" that "gets P&L right across currencies" is bookkeeping software. The tests show engineering correctness, not modelling or research.',
+      because: 'Public and checkable ("on PyPI; ~300 tests"), but "a trading book in the terminal" that "gets P&L right across currencies" is bookkeeping software. The tests show engineering correctness, not modelling or research.',
     },
     {
       id: 'projects:witness', factor: 'projects', score: 2,

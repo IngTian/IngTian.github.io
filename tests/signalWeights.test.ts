@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
 import { SIGNAL_WEIGHTS } from '../src/data/signalWeights';
 import { staleSignals, SCALE } from '../src/lib/signalRubric';
 import { identifiedSignals, loadings, FACTORS } from '../src/lib/factorModel';
+import { projects, type Project } from '../src/data/profile';
 
 describe('the committed scores match the live content', () => {
   const live = identifiedSignals();
@@ -115,5 +116,25 @@ describe('the model, weighted by evidence', () => {
       return Math.abs(a - b) < 1e-9;
     });
     expect(same).toBe(false);
+  });
+});
+
+describe('a project score quotes its own item', () => {
+  // A project's label is its NAME, so `staleSignals` above sees a rename and nothing else: correct a proof
+  // chip and the `because` beside it goes on quoting words the item no longer says (that happened to
+  // trading-desk's "~270 tests"). `item` is the text the second pass actually scored — see the header of
+  // src/data/signalWeights.ts — and every "quoted span" in a project's `because` must still be in it.
+  const item = (p: Project) => (
+    `${p.visibility === 'private' ? 'PRIVATE repo, no public link' : `public repo github.com/IngTian/${p.slug}`}. ` +
+    `"${p.idea}" ${p.proof.join('; ')}`
+  ).toLowerCase();
+
+  it('quotes only words the item still says', () => {
+    for (const p of projects) {
+      const s = SIGNAL_WEIGHTS.signals.find((x) => x.id === `projects:${p.slug}`)!;
+      for (const [, q] of s.because.matchAll(/"([^"]+)"/g)) {
+        expect(item(p), `${s.id} quotes "${q}"`).toContain(q.toLowerCase());
+      }
+    }
   });
 });
