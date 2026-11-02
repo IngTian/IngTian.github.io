@@ -5,8 +5,9 @@
 // probe crosshairs reading out the live elevation, and two sonar pings when the boot finishes. After the pings,
 // nothing but the drift, "so that readers can read quietly."
 //
-// Every value here is the approved mockup's, copied rather than retuned. The component that paints it owns the
-// canvas, the clock and the colours; this module owns what the numbers are, so they can be tested.
+// Every value here is the approved mockup's, copied rather than retuned — with one deliberate exception, the
+// framing on a PORTRAIT screen (see `scale`). The component that paints it owns the canvas, the clock and the
+// colours; this module owns what the numbers are, so they can be tested.
 
 /** [x, y, amplitude, width, drift-x, drift-y, period (s), phase] — the mockup's `BASE`. */
 export const FIELD_BASE: readonly [x: number, y: number, a: number, w: number, dx: number, dy: number, period: number, phase: number][] = [
@@ -15,8 +16,8 @@ export const FIELD_BASE: readonly [x: number, y: number, a: number, w: number, d
   [-2.4, 1.1, -0.55, 0.7, 0.3, 0.2, 63, 2.3], [0.4, 1.3, 0.45, 0.55, 0.25, 0.32, 44, 4.4],
 ];
 
-/** The viewport always spans FIELD_SPAN field units across, starting at FIELD_X0; one sample every FIELD_CELL px. */
-export const FIELD_X0 = -3.2, FIELD_SPAN = 6.4, FIELD_CELL = 12;
+/** The viewport's longer side spans FIELD_SPAN field units, centred on the origin; one sample every FIELD_CELL px. */
+export const FIELD_SPAN = 6.4, FIELD_CELL = 12;
 
 /** k * 0.085 for k = -8..15. */
 export const FIELD_LEVELS: readonly number[] = Array.from({ length: 24 }, (_, i) => (i - 8) * 0.085);
@@ -55,10 +56,21 @@ export function fieldAt(x: number, y: number, tSec: number, centers: ReturnType<
   return v;
 }
 
-/** Field units per px, and the field y at the top edge — the frame is vertically centred on y = 0. */
-function scale(widthPx: number, heightPx: number): { sx: number; y0: number } {
-  const sx = FIELD_SPAN / widthPx;
-  return { sx, y0: -(heightPx * sx) / 2 };
+/**
+ * Field units per px, and the field coordinates of the top-left corner. The frame is centred on the origin, and
+ * FIELD_SPAN covers the viewport's LONGER side.
+ *
+ * On a landscape screen that is the width, which is exactly the mockup's framing (x from -3.2 to 3.2) — every
+ * desktop frame is unchanged by this rule. The mockup fitted the width on every screen, and it was only ever judged
+ * on a desktop. On a portrait phone that reached y = ±6.93 at 390x844, far past the Gaussians, where only the 0.05
+ * ripple is left: no level but 0 crosses it, and its zero set is the straight lines x = nπ/1.7 and
+ * y = (π/2 + nπ)/1.3 — a rectangular lattice, on 60% of the rows (12 px samples where every Gaussian is under
+ * 0.02). Fitting the longer side keeps |y| <= 3.2 on any screen, which brings that down to 13%, and the ripple's
+ * zero lines are then 244 px apart, too far apart to read as a grid.
+ */
+function scale(widthPx: number, heightPx: number): { sx: number; x0: number; y0: number } {
+  const sx = FIELD_SPAN / Math.max(widthPx, heightPx);
+  return { sx, x0: -(widthPx * sx) / 2, y0: -(heightPx * sx) / 2 };
 }
 
 /**
@@ -66,15 +78,15 @@ function scale(widthPx: number, heightPx: number): { sx: number; y0: number } {
  * cols+1, sample (i, j) at px (i * FIELD_CELL, j * FIELD_CELL) — the layout `isoSegments` reads. A fresh buffer
  * on every call.
  */
-export function sampleGrid(widthPx: number, heightPx: number, tSec: number): { grid: Float32Array; cols: number; rows: number; sx: number; y0: number } {
-  const { sx, y0 } = scale(widthPx, heightPx);
+export function sampleGrid(widthPx: number, heightPx: number, tSec: number): { grid: Float32Array; cols: number; rows: number; sx: number; x0: number; y0: number } {
+  const { sx, x0, y0 } = scale(widthPx, heightPx);
   const cols = Math.ceil(widthPx / FIELD_CELL), rows = Math.ceil(heightPx / FIELD_CELL), stride = cols + 1;
   const centers = centersAt(tSec);
   const grid = new Float32Array(stride * (rows + 1));
   for (let j = 0; j <= rows; j++) {
-    for (let i = 0; i <= cols; i++) grid[j * stride + i] = fieldAt(FIELD_X0 + i * FIELD_CELL * sx, y0 + j * FIELD_CELL * sx, tSec, centers);
+    for (let i = 0; i <= cols; i++) grid[j * stride + i] = fieldAt(x0 + i * FIELD_CELL * sx, y0 + j * FIELD_CELL * sx, tSec, centers);
   }
-  return { grid, cols, rows, sx, y0 };
+  return { grid, cols, rows, sx, x0, y0 };
 }
 
 /** A ping: where it started, in px, and when, in the same seconds the frame clock uses. */
@@ -88,8 +100,8 @@ export interface Ring { x: number; y: number; t0: number }
 export function pingAt(tSec: number, widthPx: number, heightPx: number, u: number): Ring {
   const basins = centersAt(tSec).filter((c) => c[2] < 0);
   const [cx, cy] = basins[Math.min(basins.length - 1, Math.floor(u * basins.length))];
-  const { sx, y0 } = scale(widthPx, heightPx);
-  return { x: (cx - FIELD_X0) / sx, y: (cy - y0) / sx, t0: tSec };
+  const { sx, x0, y0 } = scale(widthPx, heightPx);
+  return { x: (cx - x0) / sx, y: (cy - y0) / sx, t0: tSec };
 }
 
 /**
@@ -131,11 +143,11 @@ const TICK_LABEL_MIN_PX = 40;
  * whose label would collide with its neighbour's carries an empty label; the tick mark itself is always drawn.
  */
 export function axisTicks(widthPx: number, heightPx: number): { x: { px: number; label: string }[]; y: { px: number; label: string }[] } {
-  const { sx, y0 } = scale(widthPx, heightPx);
+  const { sx, x0, y0 } = scale(widthPx, heightPx);
   const every = (widthPx - 120) / 8 < TICK_LABEL_MIN_PX ? 2 : 1;
   const x = Array.from({ length: 9 }, (_, k) => {
     const px = 60 + (k * (widthPx - 120)) / 8;
-    return { px, label: k % every === 0 ? fixed2(FIELD_X0 + px * sx) : '' };
+    return { px, label: k % every === 0 ? fixed2(x0 + px * sx) : '' };
   });
   const y = Array.from({ length: 6 }, (_, k) => {
     const px = 40 + (k * (heightPx - 80)) / 5;

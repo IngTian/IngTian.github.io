@@ -55,8 +55,19 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
 </BaseLayout>
 
 <style>
-  /* Above the field (z 0). The right gutter from 1180px is the cow's column, mirroring the rail on the left. */
-  .projects-page { position: relative; z-index: 1; max-width: 1500px; padding: 0 6vw 180px; }
+  /* Above the field (z 0). The right gutter from 1180px is the cow's column, mirroring the rail on the left.
+     THE LABEL KNOCKOUT: every glyph on the page wears a 1px ring of the bare ground, the way a drafting sheet clears
+     the contours around a label. main has no background, so its text sits straight on the field's strokes, and a
+     stroke under a glyph takes light --ink-3 from 5.00:1 to 4.10 (minor line), 3.03 (major) and 1.34 (a fresh lit
+     ping) — the 4.5:1 rule held only between strokes. With the ring, the pixels touching a glyph are the ground the
+     palette was measured on (tests/draftingPalette.test.ts). Offsets with no blur, so the ring is opaque; eight of
+     them so the diagonals are closed too. A component with its own opaque ground should set `text-shadow: none`. */
+  .projects-page {
+    position: relative; z-index: 1; max-width: 1500px; padding: 0 6vw 180px;
+    --knock: var(--draft-ground);
+    text-shadow: -1px -1px 0 var(--knock), 0 -1px 0 var(--knock), 1px -1px 0 var(--knock), -1px 0 0 var(--knock),
+      1px 0 0 var(--knock), -1px 1px 0 var(--knock), 0 1px 0 var(--knock), 1px 1px 0 var(--knock);
+  }
   /* Clears SideRail where it shows (it hides at ≤1100px). Measured with every row active, so every rule drawn:
      its right edge is at x=139 at 1101px and x=151 at 2000px, against content starting at 190 and 230. */
   @media (min-width: 1101px) { .projects-page { padding-left: clamp(190px, 13vw, 230px); } }

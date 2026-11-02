@@ -609,4 +609,48 @@ describe('/projects — the page shell on the drafting field', () => {
     expect(/\saria-hidden="true"/.test(canvases[0]), 'the field canvas is not aria-hidden').toBe(true);
     expect(/<main\b[^>]*\sclass="[^"]*\bprojects-page\b/.test(markup), 'no <main class="projects-page">').toBe(true);
   });
+
+  // The shipped CSS, scoped hashes stripped, so a rule reads the way it was written. Astro inlines this page's
+  // styles into the HTML; the bundled sheets are included in case it ever stops doing so.
+  const shippedCss = (): string => {
+    const inline = [...projectsPage().html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]);
+    const bundled = readdirSync(join(DIST, '_astro')).filter((f) => f.endsWith('.css'))
+      .map((f) => readFileSync(join(DIST, '_astro', f), 'utf8'));
+    return [...inline, ...bundled].join('\n').replace(/\[data-astro-cid-[\w-]+\]/g, '');
+  };
+
+  // The mockup's always-on edge vignette (projects-b4.html `.ov-vig`): a layer of its own after the canvas, so it
+  // paints over the field and under <main> (z 1), and it draws the --draft-vig token.
+  it('lays the edge vignette over the field, after the canvas, aria-hidden, drawing --draft-vig', () => {
+    const { markup } = projectsPage();
+    const m = /<canvas\b[^>]*data-drafting-field[^>]*><\/canvas>\s*(<div\b[^>]*>)/.exec(markup);
+    expect(m, 'no element straight after the field canvas').not.toBeNull();
+    expect(/\sclass="[^"]*\bdrafting-vig\b/.test(m![1]), `the element after the canvas is ${m![1]}`).toBe(true);
+    expect(/\saria-hidden="true"/.test(m![1]), 'the vignette is not aria-hidden').toBe(true);
+    expect(shippedCss()).toMatch(/\.drafting-vig\{background:radial-gradient\([^)]*var\(--draft-vig\)\)\}/);
+  });
+
+  // 100vh is the LARGE viewport, so the box holds still while a phone's toolbar collapses: at `height: 100%` the
+  // bitmap stretched and every isoline jumped by half the toolbar on each change of scroll direction (T4-F2).
+  it("sizes the field's box to the large viewport, so a mobile toolbar cannot move the drawing", () => {
+    const rule = /\.drafting-field,\.drafting-vig\{([^}]*)\}/.exec(shippedCss());
+    expect(rule, 'no shared .drafting-field,.drafting-vig rule').not.toBeNull();
+    expect(rule![1]).toMatch(/(^|;)height:100(l?)vh(;|$)/);
+    expect(rule![1]).toMatch(/(^|;)position:fixed(;|$)/);
+  });
+
+  // main has no background, so its text sits straight on the field's strokes. The knockout gives every glyph an
+  // opaque 1px ring of the ground: eight offsets, none blurred, in the ground colour (T4-F5).
+  it("rings every glyph in <main> with the bare ground, so no stroke touches the page's text", () => {
+    const rule = /\.projects-page\{([^}]*text-shadow:[^}]*)\}/.exec(shippedCss());
+    expect(rule, 'no text-shadow on .projects-page').not.toBeNull();
+    expect(rule![1]).toMatch(/--knock:\s*var\(--draft-ground\)/);
+    const shadows = /text-shadow:([^;}]*)/.exec(rule![1])![1].split(/,(?![^(]*\))/).map((s) => s.trim());
+    const offsets = shadows.map((s) => {
+      const p = /^(-?\d+)(?:px)? (-?\d+)(?:px)? 0(?:px)? var\(--knock\)$/.exec(s);
+      expect(p, `"${s}" is not an unblurred offset in var(--knock)`).not.toBeNull();
+      return `${Number(p![1])},${Number(p![2])}`;
+    });
+    expect(new Set(offsets)).toEqual(new Set(['-1,-1', '0,-1', '1,-1', '-1,0', '1,0', '-1,1', '0,1', '1,1']));
+  });
 });

@@ -4,7 +4,7 @@
 // assertions on what a reader actually sees moving behind the page.
 import { describe, expect, it } from 'vitest';
 import {
-  FIELD_BASE, FIELD_CELL, FIELD_LEVELS, FIELD_SPAN, FIELD_X0, FRAME_MS, PING_SPEED,
+  FIELD_BASE, FIELD_CELL, FIELD_LEVELS, FIELD_SPAN, FRAME_MS, PING_SPEED,
   axisTicks, centersAt, fieldAt, frameInterval, litByRing, pingAt, probeLabel, ringState, sampleGrid,
 } from '../src/lib/draftingField';
 
@@ -44,11 +44,12 @@ describe('sampleGrid', () => {
     expect(s.rows).toBe(75);
     expect(s.grid).toHaveLength(121 * 76);
     expect(s.sx).toBeCloseTo(FIELD_SPAN / 1440, 15);
-    // the frame is vertically centred on y = 0: the top edge sits at -(H * sx) / 2
+    // the frame is centred on the origin: on a landscape screen x runs from the mockup's -3.2 to 3.2
+    expect(s.x0).toBeCloseTo(-3.2, 12);
     expect(s.y0).toBeCloseTo(-(900 * s.sx) / 2, 15);
     const c = centersAt(0);
     for (const [i, j] of [[0, 0], [120, 75], [37, 12]]) {
-      const want = fieldAt(FIELD_X0 + i * FIELD_CELL * s.sx, s.y0 + j * FIELD_CELL * s.sx, 0, c);
+      const want = fieldAt(s.x0 + i * FIELD_CELL * s.sx, s.y0 + j * FIELD_CELL * s.sx, 0, c);
       expect(s.grid[j * (s.cols + 1) + i]).toBe(Math.fround(want));
     }
   });
@@ -57,6 +58,48 @@ describe('sampleGrid', () => {
     const a = sampleGrid(1440, 900, 0), b = sampleGrid(1440, 900, 0);
     expect(b.grid).not.toBe(a.grid);
     expect(b).toEqual(a);
+  });
+});
+
+describe('the framing — FIELD_SPAN covers the longer side', () => {
+  it("is the mockup's fit-to-width on every landscape screen", () => {
+    for (const [W, H] of [[1440, 900], [2000, 1100], [1100, 800], [1280, 1024], [1000, 1000]]) {
+      const s = sampleGrid(W, H, 0);
+      expect(s.sx, `${W}x${H}`).toBeCloseTo(FIELD_SPAN / W, 15);
+      expect(s.x0, `${W}x${H}`).toBeCloseTo(-FIELD_SPAN / 2, 12);
+    }
+  });
+
+  it('fits the height on a portrait screen, so the frame never reaches past |y| = 3.2', () => {
+    for (const [W, H] of [[390, 844], [320, 568], [820, 1180]]) {
+      const s = sampleGrid(W, H, 0);
+      expect(s.sx, `${W}x${H}`).toBeCloseTo(FIELD_SPAN / H, 15);
+      expect(s.y0, `${W}x${H}`).toBeCloseTo(-FIELD_SPAN / 2, 12);
+      expect(s.x0, `${W}x${H}`).toBeCloseTo(-(W * s.sx) / 2, 12);
+    }
+  });
+
+  // THE DEFECT THIS RULE FIXES, measured rather than described. Where every Gaussian is below 0.02 only the 0.05
+  // ripple is left, no level but 0 crosses it, and its zero set is a rectangular lattice. Fitting the width put that
+  // under 60% of a 390x844 phone's rows (51% at 320x568, 39% on an iPad in portrait); fitting the longer side, 13%.
+  it('keeps the bare-ripple lattice off a portrait screen: at most 15% of the rows are ripple alone', () => {
+    const c = centersAt(0);
+    const ripple = (W: number, H: number): number => {
+      const { sx, x0, y0, cols, rows } = sampleGrid(W, H, 0);
+      let flat = 0;
+      for (let j = 0; j <= rows; j++) {
+        const y = y0 + j * FIELD_CELL * sx;
+        let bare = true;
+        for (let i = 0; i <= cols && bare; i++) {
+          const x = x0 + i * FIELD_CELL * sx;
+          bare = c.every(([cx, cy, a, w]) => Math.abs(a) * Math.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (2 * w * w)) < 0.02);
+        }
+        if (bare) flat++;
+      }
+      return flat / (rows + 1);
+    };
+    for (const [W, H] of [[390, 844], [320, 568], [820, 1180]]) expect(ripple(W, H), `${W}x${H}`).toBeLessThanOrEqual(0.15);
+    for (const [W, H] of [[1440, 900], [2000, 1100]]) expect(ripple(W, H), `${W}x${H}`).toBe(0);
   });
 });
 
@@ -89,21 +132,24 @@ describe('pings', () => {
     expect(litByRing(r.x + 260, r.y, s, r)).toBe(false);
   });
 
-  it('starts every ping in a basin, never on a peak, and can reach both basins', () => {
+  it('starts every ping in a basin, never on a peak, and can reach both basins — on either framing', () => {
     // Spec §3: the pings "spread from basins". Four of the six centres are peaks (a > 0).
-    const W = 1440, H = 900, t = 12.3, sx = FIELD_SPAN / W, y0 = -(H * sx) / 2;
+    const t = 12.3;
     const basins = centersAt(t).filter((c) => c[2] < 0);
     expect(basins).toHaveLength(2);
-    const hits = new Set<number>();
-    for (const u of [0, 0.25, 0.49, 0.5, 0.75, 0.999999, 1]) {
-      const p = pingAt(t, W, H, u);
-      expect(p.t0).toBe(t);
-      const i = basins.findIndex(([cx, cy]) => Math.abs(FIELD_X0 + p.x * sx - cx) < 1e-9 && Math.abs(y0 + p.y * sx - cy) < 1e-9);
-      expect(i, `u=${u}`).toBeGreaterThanOrEqual(0);
-      expect(fieldAt(FIELD_X0 + p.x * sx, y0 + p.y * sx, t, centersAt(t))).toBeLessThan(0);
-      hits.add(i);
+    for (const [W, H] of [[1440, 900], [820, 1180]]) {
+      const { sx, x0, y0 } = sampleGrid(W, H, t);
+      const hits = new Set<number>();
+      for (const u of [0, 0.25, 0.49, 0.5, 0.75, 0.999999, 1]) {
+        const p = pingAt(t, W, H, u);
+        expect(p.t0).toBe(t);
+        const i = basins.findIndex(([cx, cy]) => Math.abs(x0 + p.x * sx - cx) < 1e-9 && Math.abs(y0 + p.y * sx - cy) < 1e-9);
+        expect(i, `${W}x${H} u=${u}`).toBeGreaterThanOrEqual(0);
+        expect(fieldAt(x0 + p.x * sx, y0 + p.y * sx, t, centersAt(t))).toBeLessThan(0);
+        hits.add(i);
+      }
+      expect(hits.size).toBe(2);
     }
-    expect(hits.size).toBe(2);
   });
 
   it('draws at ~15fps while drifting and ~30fps while a ping travels', () => {
@@ -136,7 +182,8 @@ describe('axisTicks and probes', () => {
         expect(lab[k].px - lab[k - 1].px, `W=${W}`).toBeGreaterThanOrEqual(lab[k - 1].label.length * 6 + 10);
       }
     }
-    expect(axisTicks(320, 700).x.map((t) => t.label)).toEqual(['-2.00', '', '-1.00', '', '0.00', '', '1.00', '', '2.00']);
+    // 320x700 is portrait, so the height spans FIELD_SPAN and x runs ±1.46 (see 'the framing' above)
+    expect(axisTicks(320, 700).x.map((t) => t.label)).toEqual(['-0.91', '', '-0.46', '', '0.00', '', '0.46', '', '0.91']);
     expect(axisTicks(440, 700).x.every((t) => t.label)).toBe(true);
   });
 

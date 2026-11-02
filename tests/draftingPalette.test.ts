@@ -22,6 +22,8 @@ function tokens(sel: string): Record<string, string> {
   return Object.fromEntries([...body.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
 }
 
+const fieldSrc = readFileSync(new URL('../src/components/projects/DraftingField.astro', import.meta.url), 'utf8');
+
 const lum = (hex: string): number => {
   expect(hex, `${hex} is not a #rrggbb literal`).toMatch(/^#[0-9a-f]{6}$/i);
   return wcagLuminance([1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number]);
@@ -75,6 +77,26 @@ describe('the drafting palette (tokens.css)', () => {
           expect(ratio(tk[ink], t.ground)).toBeGreaterThanOrEqual(AA_BODY);
         });
       }
+
+      // The vignette sits over the field and UNDER the page's text, so wherever it is drawn the ground the text reads
+      // against is the ground with the vignette composited on. In light theme that is darker than the bare ground,
+      // so it costs contrast. Its darkest point is a corner (the farthest point of the box from the gradient's
+      // centre); the geometry is read from the component that ships it, so the two cannot drift apart.
+      it('every text ink clears AA at the darkest point of the edge vignette', () => {
+        const g = /radial-gradient\((\d+)% (\d+)% at (\d+)% (\d+)%, transparent (\d+)%, var\(--draft-vig\)\)/.exec(fieldSrc);
+        expect(g, 'DraftingField.astro has no radial-gradient(… var(--draft-vig)) vignette').not.toBeNull();
+        const [rx, ry, cx, cy, stop] = g!.slice(1).map((n) => Number(n) / 100);
+        const d = Math.hypot(Math.max(cx, 1 - cx) / rx, Math.max(cy, 1 - cy) / ry);
+        const share = Math.min(1, Math.max(0, (d - stop) / (1 - stop)));
+        const v = /^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/.exec(tk['--draft-vig']);
+        expect(v, `--draft-vig is not an rgba(): ${tk['--draft-vig']}`).not.toBeNull();
+        const a = Number(v![4]) * share;
+        const ground = [1, 3, 5].map((i) => parseInt(t.ground.slice(i, i + 2), 16));
+        const under = ground.map((c, i) => c * (1 - a) + Number(v![i + 1]) * a) as [number, number, number];
+        for (const ink of ['--ink-1', '--ink-3', '--ink-4', '--ochre']) {
+          expect(contrastRatio(lum(tk[ink]), wcagLuminance(under)), `${ink} under the vignette`).toBeGreaterThanOrEqual(AA_BODY);
+        }
+      });
 
       it('--on-accent clears AA on the accent (the nav pill on hover)', () => {
         expect(ratio(tk['--on-accent'], tk['--ochre'])).toBeGreaterThanOrEqual(AA_BODY);

@@ -1,7 +1,8 @@
 ---
 // /projects' background: the drafting field (lib/draftingField.ts) painted on one fixed 2D canvas — isoline
 // hairlines, axis ticks, three probe crosshairs with their live elevation, and two seal-red pings once the page
-// is booted. The numbers live in the module; this file owns the canvas, the clock and the colours.
+// is booted — under the mockup's edge vignette. The numbers live in the module; this file owns the canvas, the
+// clock and the colours.
 //
 // COST, which is what every choice below is for (spec §7, budget: quiet drift ≤ 6% of a core at 2000x1100 DPR 2):
 // the backing store is capped at 1.5x density, colours are read on init and on `theme:change` rather than per
@@ -9,16 +10,27 @@
 // the tab is hidden. Phones and reduced motion get ONE frame and no loop, no pings.
 ---
 <canvas class="drafting-field" aria-hidden="true" data-drafting-field></canvas>
+<div class="drafting-vig" aria-hidden="true"></div>
 
 <style>
-  /* A canvas is a replaced element, so `inset: 0` alone would leave it at its backing-store size — the explicit
-     100% is what pins it to the viewport. The script sizes the backing store from this box. */
-  .drafting-field { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; pointer-events: none; }
+  /* A canvas is a replaced element, so `top`/`left` alone would leave it at its backing-store size — the explicit
+     size is what pins it to the viewport. The script sizes the backing store from this box.
+     HEIGHT IS 100vh, NOT 100%, AND THAT IS THE PHONE FIX. 100vh is the LARGE viewport (CSS Values 4 makes the
+     UA-default units the large ones, as iOS Safari and Chrome Android have done for years), so the box keeps its
+     height while a mobile toolbar collapses and expands. A fixed box at `height: 100%` can follow the toolbar
+     instead: the bitmap stretches for the 160 ms debounce, then every isoline jumps by half the toolbar's height,
+     because the frame is centred on the box. The cost is that the bottom ticks can sit under an expanded toolbar,
+     as any full-bleed background does. The vignette shares the box, so the two always line up. */
+  .drafting-field, .drafting-vig { position: fixed; top: 0; left: 0; width: 100%; height: 100vh; z-index: 0; pointer-events: none; }
+  .drafting-field { display: block; }
+  /* The mockup's always-on edge vignette, over the field and under the page (main is z 1): it dims the edge
+     furniture and the outer isolines, most at the bottom corners. Static: it is painted once, not per frame. */
+  .drafting-vig { background: radial-gradient(120% 90% at 50% 40%, transparent 55%, var(--draft-vig)); }
 </style>
 
 <script>
   import {
-    FIELD_CELL, FIELD_LEVELS, FIELD_X0, PING_DELAYS_MS, PROBES,
+    FIELD_CELL, FIELD_LEVELS, PING_DELAYS_MS, PROBES,
     axisTicks, centersAt, fieldAt, frameInterval, litByRing, pingAt, probeLabel, ringState, sampleGrid,
     type Ring,
   } from '../../lib/draftingField';
@@ -59,7 +71,7 @@
 
     const rings: Ring[] = [];
     function draw(t: number): void {
-      const { grid, cols, rows, sx, y0 } = sampleGrid(W, H, t);
+      const { grid, cols, rows, sx, x0, y0 } = sampleGrid(W, H, t);
       const maxR = Math.hypot(W, H) * 0.75;
       const live: { r: Ring; s: { R: number; fade: number } }[] = [];
       for (let i = rings.length - 1; i >= 0; i--) {
@@ -96,7 +108,7 @@
       const centers = centersAt(t);
       for (const [u, v] of PROBES) {
         const px = u * W, py = v * H;
-        ctx.fillText(probeLabel(fieldAt(FIELD_X0 + px * sx, y0 + py * sx, t, centers)), px + 7, py - 6);
+        ctx.fillText(probeLabel(fieldAt(x0 + px * sx, y0 + py * sx, t, centers)), px + 7, py - 6);
         ctx.fillRect(px - 4, py, 9, 1); ctx.fillRect(px, py - 4, 1, 9);
       }
     }
