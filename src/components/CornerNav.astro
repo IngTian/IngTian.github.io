@@ -391,7 +391,6 @@ const items: Item[] = [
 </style>
 
 <script>
-  import { prefersReducedMotion } from '../lib/motion';
 
   // Zone the nav by the gradient fraction painted directly behind it. The
   // .descent gradient spans the full content height, so the sky color at the
@@ -596,10 +595,15 @@ const items: Item[] = [
       syncToggle();
     }
 
-    // The expensive half, deliberately OUTSIDE the transition. The JS-painted surfaces (terrain, descent graph,
-    // fluid sky) read their palette off data-theme once per init, so they still need a re-init to repaint — it
-    // just must not happen while the page is held. The trade is that a canvas settles into its new palette a beat
-    // after the crossfade rather than during it, which is far cheaper than a third of a second of frozen page.
+    // Dispatched IMMEDIATELY now. This used to be deferred until after the View Transition finished, on
+    // the reasoning that a re-init must not happen "while the page is held" — a trade that cost a beat of
+    // stale palette and was measured against a 357ms long task from re-firing astro:page-load across
+    // fifteen scripts. Both halves of that have since gone: the event reaches three scripts, not fifteen,
+    // and a PerformanceObserver check across a flip now reports NO long task at all (worst rAF gap 34ms,
+    // one frame of the hero's own 30fps throttle). There is no transition left to stay outside of.
+    //
+    // TerrainHero and FluidSky no longer depend on this for correctness either, since both read the
+    // palette per frame. DescentPath still reads per init, so this is what repaints the Story slide.
     function repaintForTheme() {
       // A DEDICATED EVENT, not astro:page-load. Fifteen scripts listen for page-load and only three paint from JS
       // and read the palette (TerrainHero, DescentPath, FluidSky) — the rest re-measure the deck's seven slides,
@@ -610,25 +614,32 @@ const items: Item[] = [
     }
 
     function onToggle() {
-      // Animate the change as a full-page crossfade via the View Transitions
-      // API — the whole site (gradient, text, canvas) dissolves from one theme
-      // to the other. Falls back to an instant flip where the API is missing
-      // (Firefox) or the user prefers reduced motion. The ::view-transition
-      // fade timing is themed in global.css and gated on reduced-motion there.
-      const startVT = (document as any).startViewTransition?.bind(document);
-      if (startVT && !prefersReducedMotion()) {
-        document.documentElement.classList.add('theme-vt');
-        const t = startVT(flipTheme);
-        t.finished.finally(() => {
-          document.documentElement.classList.remove('theme-vt');
-          // After the crossfade, never inside it. requestAnimationFrame so the repaint starts on a fresh frame
-          // rather than tacked onto the one that just finished animating.
-          requestAnimationFrame(repaintForTheme);
-        });
-      } else {
-        flipTheme();
-        requestAnimationFrame(repaintForTheme);
-      }
+      // AN INSTANT FLIP, DELIBERATELY — the View Transition this used to wrap was the glitch.
+      //
+      // It read: "the whole site (gradient, text, canvas) dissolves from one theme to the other." The
+      // canvas half was never true. During a View Transition the compositor shows SNAPSHOT
+      // pseudo-elements rather than the live page, and in real Chrome with GPU rasterisation the
+      // GPU-backed canvases do not make it into those snapshots. So for 500ms the page showed the
+      // --descent-grad gradient ALONE — a warm-paper gradient blending to a near-black one passes
+      // through a flat grey — with no sky and no terrain dots over it. The owner's screen recording
+      // shows the hero's dots absent for the whole transition and returning at ~0.63s, which is exactly
+      // when the 0.5s crossfade ends.
+      //
+      // Three things make the diagnosis solid rather than a guess: that timing coincidence; a per-frame
+      // probe showing the LIVE canvas never blanks across a flip (ink steady at 118 -> 133 px), so what
+      // was on screen was never the canvas; and the fact that it reproduces on main but NOT headless,
+      // where software rendering does capture canvases into snapshots. That last point is why two
+      // earlier investigations from this machine found nothing.
+      //
+      // The flip is clean without it because both canvases now read their palette EVERY FRAME —
+      // FluidSky always did (uDark off dataset.theme) and TerrainHero was changed to. Measured: text,
+      // sky and terrain all cross at +29ms, spread 0ms.
+      //
+      // IF THE DISSOLVE IS WANTED BACK, do it as a JS palette crossfade — lerp both canvases' ramps
+      // over ~500ms alongside the CSS — which per-frame reading makes possible and a snapshot never did.
+      // Do not reach for startViewTransition again on a page whose background is a canvas.
+      flipTheme();
+      repaintForTheme();
     }
     toggle?.addEventListener('click', onToggle);
 
