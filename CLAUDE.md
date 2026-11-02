@@ -973,6 +973,23 @@ titles came to rest hard against the browser chrome — the lead is a number in
   `zoneAt`, `maxDarkwardExcursion`, `GLOBAL_MIN_IS_KNOWN`, `PATH_END`, `phases`).
   The check is a grep for `\bname\b` over comment-stripped `src/**/*.{ts,astro}`,
   counting `src` and `tests` separately — **not** `tsc`, which is blind to it.
+  - **That grep has a blind spot, and a second sweep found ~600 more lines in it:**
+    an export whose only caller is *another export in the same file*. Counting
+    `src` hits outside the module misses it, and counting inside the module sees a
+    caller. `lib/factorModel.ts` was a live file with a dead half — the whole fan
+    (`fanBeams`, `beamQuad`, `expressionTerms`, `FAN`), orphaned when
+    `FactorFan.astro` went — and `lib/knowledge.ts` held a complete superseded
+    model (`knownAfter`, `isKnown`, `knownness`, `discoveredAt`, `knownMean`)
+    beside the one the page runs. **Trace the call graph from what `src` imports**,
+    not from each export's name.
+  - **When the dead half has the spec, re-point the spec before deleting it.**
+    `knowledge.test.ts` was the ONLY guard on the sentence the Story slide prints —
+    *"a deeper basin is now visible — it was there the whole time"* — and it was
+    asserting it against the dead model. The two models disagree: the dead one
+    found the basin at the last stop, the live one just past the seventh. The
+    printed claim was unguarded while the suite was green. It now walks the page's
+    own path via `trailSampler()` (moved into `lib/descentPath.ts` for exactly this),
+    and a radius retune that reveals the basin early fails two tests.
   - **THE EXCEPTION, and it is a real one: a function written so a test can assert
     an invariant on live production data.** Those stay, and they say so in their
     own doc comment — `sumsToWhole` ("used by tests to catch a hand-edited split

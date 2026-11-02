@@ -234,6 +234,23 @@ export function trail(samples = 360): TrailPoint[] {
 // if a second consumer ever appears, put the helper back and change DescentPath.astro at the same time. One
 // place or the other, never both.
 
+/**
+ * Position on the trail at parameter t in [0, 1] — the walker's own location, which advances the knowledge
+ * frontier in lib/knowledge.ts.
+ *
+ * NEAREST SAMPLE, not interpolated: the trail is already 361 points, so the step is ~0.3% of the path and
+ * the frontier cannot see it. Lives here rather than inside DescentPath's `<script>` for one reason: the
+ * discovery story ("the deeper basin is invisible at every stop until the last stretch") is a claim the page
+ * PRINTS, and tests/knowledge.test.ts can only hold it to that if it walks the exact path the page walks. A
+ * copy of this in the test would be a hand-synced pair, which is the failure this repo keeps documenting.
+ */
+export function trailSampler(pts: readonly { x: number; y: number }[]): (t: number) => { x: number; y: number } {
+  return (t) => {
+    const p = pts[Math.min(pts.length - 1, Math.max(0, Math.round(t * (pts.length - 1))))];
+    return { x: p.x, y: p.y };
+  };
+}
+
 /** Where the trail turns upward, as a t-range — for calling out the escape. */
 export function climbSpan(pts: readonly TrailPoint[]): { t0: number; t1: number } | null {
   const climbing = pts.filter((p) => p.climbing);
