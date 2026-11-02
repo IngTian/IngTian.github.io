@@ -7,8 +7,9 @@ import {
   INTRO_DURATION_MS, INTRO_DUR_MIN_MS, INTRO_DUR_MAX_MS,
 } from '../src/lib/introTimeline';
 import { INTRO_SEEN_KEY } from '../src/lib/introSession';
-import { projects } from '../src/data/profile';
+import { inProgress, projects } from '../src/data/profile';
 import { flattenStops, projectSectionId, projectStops } from '../src/lib/pageStops';
+import { listingLines } from '../src/lib/projectsListing';
 
 /* ================================================================================================
    THE FIRST TEST THAT LOOKS AT WHAT THE SITE ACTUALLY SHIPS.
@@ -612,12 +613,44 @@ describe('/projects — the page shell on the drafting field', () => {
 
   // The shipped CSS, scoped hashes stripped, so a rule reads the way it was written. Astro inlines this page's
   // styles into the HTML; the bundled sheets are included in case it ever stops doing so.
-  const shippedCss = (): string => {
+  const rawCss = (): string => {
     const inline = [...projectsPage().html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]);
     const bundled = readdirSync(join(DIST, '_astro')).filter((f) => f.endsWith('.css'))
       .map((f) => readFileSync(join(DIST, '_astro', f), 'utf8'));
-    return [...inline, ...bundled].join('\n').replace(/\[data-astro-cid-[\w-]+\]/g, '');
+    return [...inline, ...bundled].join('\n');
   };
+  const shippedCss = (): string => rawCss().replace(/\[data-astro-cid-[\w-]+\]/g, '');
+
+  // Every jump target lands clear of the fixed corner nav — and the scope hashes are the point here, so this reads
+  // the RAW selectors. The rule lives on the page, the targets are partly rendered by child components, and a
+  // scoped selector cannot reach a child's elements: #p-index (TerminalHeader's) once compiled out of reach and sat
+  // flush under the nav (T5-F1). Each selector is matched against the target's own opening tag; a selector this
+  // cannot parse (pseudo-classes, `>`) counts as not reaching, so the test can fail spuriously but never pass so.
+  it('gives every jump target a scroll-margin-top whose selector actually reaches it', () => {
+    const { markup } = projectsPage();
+    const main = /<main\b[^>]*>/.exec(markup)![0];
+    const inMain = markup.slice(markup.indexOf(main), markup.indexOf('</main>'));
+    const matches = (compound: string, tag: string): boolean => {
+      const m = /^([a-z][\w-]*)?((?:\.[\w-]+|\[[^\]]+\])*)$/i.exec(compound);
+      if (!m || (m[1] && !new RegExp(`^<${m[1]}\\b`, 'i').test(tag))) return false;
+      const classes = (/\sclass="([^"]*)"/.exec(tag)?.[1] ?? '').split(/\s+/);
+      return [...m[2].matchAll(/\.([\w-]+)|\[([\w-]+)(?:="([^"]*)")?\]/g)].every(([, cls, attr, val]) =>
+        cls ? classes.includes(cls) : new RegExp(`\\s${attr}${val === undefined ? '(=|\\s|>)' : `="${val}"`}`).test(tag));
+    };
+    const selectors = [...rawCss().matchAll(/([^{}]+)\{[^{}]*scroll-margin-top:[^{}]*\}/g)]
+      .flatMap((m) => m[1].split(',')).map((s) => s.trim().split(/\s+/));
+    const targets = new Set([
+      ...flattenStops(projectStops(projects)).map((s) => s.target),
+      ...listingLines(projects, inProgress).map((l) => l.href.slice(1)),
+    ]);
+    const stranded = [...targets].filter((id) => {
+      const tag = new RegExp(`<[a-z][\\w-]*\\b[^>]*\\sid="${id}"[^>]*>`).exec(markup)?.[0];
+      if (!tag) return true;
+      return !selectors.some((parts) => matches(parts.at(-1)!, tag) &&
+        parts.slice(0, -1).every((p) => matches(p, main)) && (parts.length === 1 || inMain.includes(tag)));
+    });
+    expect(stranded).toEqual([]);
+  });
 
   // The mockup's always-on edge vignette (projects-b4.html `.ov-vig`): a layer of its own after the canvas, so it
   // paints over the field and under <main> (z 1), and it draws the --draft-vig token.

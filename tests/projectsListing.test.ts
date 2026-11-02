@@ -25,6 +25,15 @@ describe('listingLines', () => {
     expect(lines.slice(0, -1).every((l) => l.perm === 'drwxr-xr-x' && !l.wip)).toBe(true);
   });
 
+  // The listing is set in JetBrains Mono, vendored as a latin subset. A character outside it falls back to the
+  // system mono at another size (witness's short line had a →, T5-F7). The class is a conservative slice of the
+  // subset's cmap, read from src/assets/fonts/jetbrains-mono-latin-var.woff2: no arrow is in it.
+  it('uses only characters the mono subset can draw', () => {
+    const drawable = /^[\x20-\x7e\xa0-\xff\u2013\u2014\u2018\u2019\u201c\u201d\u2022\u2026]*$/;
+    const off = lines.flatMap((l) => [l.perm, l.name, l.kind, l.short]).filter((s) => !drawable.test(s));
+    expect(off).toEqual([]);
+  });
+
   it('closes on the wip line, which jumps to In progress', () => {
     expect(lines.at(-1)).toEqual({
       perm: 'drwxr-x---', name: 'ai-mentor-core/', kind: 'wip', short: 'in progress', href: '#p-in-progress', wip: true,

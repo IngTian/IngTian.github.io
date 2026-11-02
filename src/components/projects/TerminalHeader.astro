@@ -21,9 +21,10 @@ const n = summaryCounts(projects);
   <h1 class="sr-only" id="p-index-h">Projects</h1>
   {/* The paint is a gradient across 1.5x the banner's width, because the mockup's ran across its 980px box while
       the letters covered about two thirds of it — so the last letters end short of the pure line colour.
-      crispEdges because every cell is its own rect: anti-aliased, each shared edge between two blocks drew as a
-      faint seam, so the letters showed their cell grid. Every edge here is axis-aligned, so snapping costs no
-      smoothness. */}
+      crispEdges for the BLOCKS, because every cell is its own rect: anti-aliased, each shared edge between two
+      blocks drew as a faint seam, so the letters showed their cell grid. The box strokes are not crisp — bannerSvg
+      marks its shade groups geometricPrecision, since a stroke thinner than a device pixel snapped to 0, 1 or 2px
+      by position — and they overlap their neighbours by half a stroke, so anti-aliasing leaves no seam there. */}
   <svg class="banner" viewBox={`0 0 ${W} ${H}`} width={`${W / 100}em`} height={`${H / 100}em`} aria-hidden="true" focusable="false">
     <defs>
       <linearGradient id="projects-banner-ink" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={W * 1.5} y2="0">
@@ -67,7 +68,9 @@ const n = summaryCounts(projects);
   /* 18px, not 10: the mockup laid these out in a flex column, where the comment's 8px and the listing's 10px do
      not collapse into one margin. */
   .ls { list-style: none; margin: 18px 0 0; padding: 0; }
-  .ls li { display: grid; grid-template-columns: 104px 150px 96px 1fr; gap: 14px; padding: 1px 0; white-space: nowrap; }
+  /* 2px, not the mockup's 1: each link is one 20.9px line, so 1px put the next link 22.9px away and axe's
+     target-size (scored in Lighthouse's A11y) failed it — a target under 24px needs 24px to its neighbour. */
+  .ls li { display: grid; grid-template-columns: 104px 150px 96px 1fr; gap: 14px; padding: 2px 0; white-space: nowrap; }
   /* CONTRAST, measured against the ground and against the vignette's darkest point: the mockup's .65 on the
      permissions took --ink-3 to 2.57:1 (light) and its .4 on the wip line took the seal to 1.85:1. Raising the
      opacity until each cleared 4.5:1 landed at 0.98 (ink-3) and 0.95 (seal) in light theme, so there was nothing

@@ -67,7 +67,7 @@ export interface Project {
   kind: ProjectKind;
   year: string;
   idea: string;            // the one-line idea — rows, cards, pop-up, homepage appendix
-  short: string;           // the ls listing's description (≤ 44 chars)
+  short: string;           // the ls listing's description (≤ 44 chars), set in mono — no → or ↗, which its latin subset lacks
   proof: string[];         // chips; proof[0] is the highlighted one
   // The README's own line, verbatim and runnable — never abbreviated. manifold's holds a 74-char URL with no
   // break opportunity (~510px of 11.5px mono in a ~240px card), so a renderer must wrap it
@@ -203,7 +203,7 @@ export const projects: Project[] = [
   {
     slug: 'witness', name: 'witness', tier: 'selected', kind: 'engine', year: '2026',
     idea: 'Turns any text stream — market news, research, coding sessions — into a dated history of what changed, and why.',
-    short: 'text stream → dated history of change',
+    short: 'text stream to dated history of change',
     proof: ['29 releases', 'cross-platform binaries', 'npm'],
     visibility: 'public', registry: 'npm', ci: true,
     releases: { count: 29, asOf: '2026-11-02' },

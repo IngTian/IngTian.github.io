@@ -9,8 +9,8 @@ import { ANSI_SHADOW, bannerRows, bannerSvg } from '../src/lib/asciiBanner';
 const ROWS = bannerRows('PROJECTS');
 const count = (s: string, re: RegExp): number => (s.match(re) ?? []).length;
 /** The SVG with every shade group cut out, so what is left is the blocks. A shade group holds only rects. */
-const blocksOnly = (svg: string): string => svg.replace(/<g class="shade">[\s\S]*?<\/g>/g, '');
-const shadeOnly = (svg: string): string => [...svg.matchAll(/<g class="shade">([\s\S]*?)<\/g>/g)].map((m) => m[1]).join('');
+const blocksOnly = (svg: string): string => svg.replace(/<g class="shade"[^>]*>[\s\S]*?<\/g>/g, '');
+const shadeOnly = (svg: string): string => [...svg.matchAll(/<g class="shade"[^>]*>([\s\S]*?)<\/g>/g)].map((m) => m[1]).join('');
 /** Every rect as [x, y, width, height]. */
 const rects = (svg: string): number[][] =>
   [...svg.matchAll(/<rect x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)"\/>/g)]
@@ -74,23 +74,49 @@ describe('bannerSvg', () => {
     expect(rects(bannerSvg([' █'], 6, 10.4))).toEqual([[6, 0, 6, 10.4]]);
   });
 
-  // On a 10 x 10 cell: strokes 0.16 cell thick, the two lines of a double stroke 0.18 cell either side of the centre.
+  // On a 10 x 10 cell: strokes 0.16 cell thick, the two lines of a double stroke 0.18 cell either side of the
+  // centre, and every stroke running half a stroke (0.8) past each of its ends — past the cell edge into the
+  // neighbour, so anti-aliased neighbours overlap rather than abut.
   it('draws ═ and ║ as two strokes 0.16 cell thick, 0.18 cell either side of the centre line', () => {
-    expect(rects(bannerSvg(['═'], 10, 10))).toEqual([[0, 2.4, 10, 1.6], [0, 6, 10, 1.6]]);
-    expect(rects(bannerSvg(['║'], 10, 10))).toEqual([[2.4, 0, 1.6, 10], [6, 0, 1.6, 10]]);
+    expect(rects(bannerSvg(['═'], 10, 10))).toEqual([[-0.8, 2.4, 11.6, 1.6], [-0.8, 6, 11.6, 1.6]]);
+    expect(rects(bannerSvg(['║'], 10, 10))).toEqual([[2.4, -0.8, 1.6, 11.6], [6, -0.8, 1.6, 11.6]]);
   });
 
-  it('closes a corner: each pair of strokes meets at the corner and runs out to the edges it points at', () => {
-    // ╔ points right and down. Outer pair meets at (2.4, 2.4), inner pair at (6, 6).
+  it('closes a corner: each pair of strokes meets at the corner and runs out past the edges it points at', () => {
+    // ╔ points right and down. Outer pair meets at (2.4, 2.4), inner pair at (6, 6); both run on to 10.8.
     expect(rects(bannerSvg(['╔'], 10, 10))).toEqual([
-      [2.4, 2.4, 7.6, 1.6], [2.4, 2.4, 1.6, 7.6],
-      [6, 6, 4, 1.6], [6, 6, 1.6, 4],
+      [2.4, 2.4, 8.4, 1.6], [2.4, 2.4, 1.6, 8.4],
+      [6, 6, 4.8, 1.6], [6, 6, 1.6, 4.8],
     ]);
-    // ╝ points left and up — the mirror image, so its strokes run to x = 0 and y = 0.
+    // ╝ points left and up — the mirror image, so its strokes run on to x = -0.8 and y = -0.8.
     expect(rects(bannerSvg(['╝'], 10, 10))).toEqual([
-      [0, 6, 7.6, 1.6], [6, 0, 1.6, 7.6],
-      [0, 2.4, 4, 1.6], [2.4, 0, 1.6, 4],
+      [-0.8, 6, 8.4, 1.6], [6, -0.8, 1.6, 8.4],
+      [-0.8, 2.4, 4.8, 1.6], [2.4, -0.8, 1.6, 4.8],
     ]);
+  });
+
+  // The strokes are anti-aliased, because under crispEdges a 0.86px stroke rounds to 0, 1 or 2 device px by where
+  // it starts (T5-F5, F6). The blocks are left to the caller, which keeps them crisp: AA blocks seam.
+  it('anti-aliases every shade group', () => {
+    const groups = [...svg.matchAll(/<g class="shade"([^>]*)>/g)].map((m) => m[1]);
+    expect(groups).toHaveLength(6);
+    expect(groups.every((a) => a === ' shape-rendering="geometricPrecision"')).toBe(true);
+  });
+
+  // What makes the overshoot safe: a stroke that runs out of its cell always lands on ink — a block, or a box
+  // character whose strokes run back into this cell on the same lines — never on blank or across another stroke.
+  it('runs every stroke out of its cell into a block or a stroke that joins it, never into blank', () => {
+    const EXITS: Record<string, string> = { '═': 'LR', '║': 'UD', '╔': 'RD', '╗': 'LD', '╚': 'RU', '╝': 'LU' };
+    const STEP: Record<string, [number, number, string]> = { L: [-1, 0, 'R'], R: [1, 0, 'L'], U: [0, -1, 'D'], D: [0, 1, 'U'] };
+    const loose: string[] = [];
+    ROWS.forEach((row, r) => [...row].forEach((ch, c) => {
+      for (const e of EXITS[ch] ?? '') {
+        const [dc, dr, back] = STEP[e];
+        const n = ROWS[r + dr]?.[c + dc];
+        if (n !== '█' && !(EXITS[n ?? ''] ?? '').includes(back)) loose.push(`${ch} at row ${r} col ${c} exits ${e} onto "${n}"`);
+      }
+    }));
+    expect(loose).toEqual([]);
   });
 
   it('refuses a character it cannot draw', () => {

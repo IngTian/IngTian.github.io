@@ -72,7 +72,10 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
   @media (min-width: 1101px) { .projects-page { padding-left: clamp(190px, 13vw, 230px); } }
   @media (min-width: 1180px) { .projects-page { padding-right: calc(4vw + 210px); } }
 
-  section[id], li[id] { scroll-margin-top: 110px; }
+  /* Every jump target lands 110px down, clear of the fixed corner nav. :global because the targets are rendered by
+     child components too (#p-index is TerminalHeader's): scoped, this compiled to section[cid-of-this-page][id] and
+     silently missed them — CLAUDE.md's scoped-style trap. Anchored under .projects-page so it cannot leak. */
+  .projects-page :global(section[id]), .projects-page :global(li[id]) { scroll-margin-top: 110px; }
 
   .back { display: inline-block; margin-top: 140px; font: 12px var(--font-mono); color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
   .back:hover { color: var(--ochre); }
