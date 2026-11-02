@@ -363,23 +363,21 @@ html[data-theme='dark'] .descent::after {
    its own correction to a later pass is only worth as much as that pass happening. The page count is dropped
    for the same reason — it said "eleven" and the build prints nine.) */
 
-/* ── Theme-toggle crossfade (View Transitions API). The toggle wraps the
-   attribute flip in document.startViewTransition() and adds .theme-vt to <html>
-   for the duration, so ONLY the theme change animates as a full-page dissolve —
-   page navigations (also VT-driven, via ClientRouter) keep their own veil.
-   Old theme fades out over the new: a soft ~0.5s crossfade of the whole site
-   (gradient, text, canvas snapshot). Opacity only. ── */
-@media (prefers-reduced-motion: no-preference) {
-  html.theme-vt::view-transition-old(root),
-  html.theme-vt::view-transition-new(root) {
-    animation-duration: 0.5s;
-    animation-timing-function: ease;
-  }
-  html.theme-vt::view-transition-old(root) { animation-name: theme-fade-out; }
-  html.theme-vt::view-transition-new(root) { animation-name: theme-fade-in; }
-  @keyframes theme-fade-out { from { opacity: 1; } to { opacity: 0; } }
-  @keyframes theme-fade-in  { from { opacity: 0; } to { opacity: 1; } }
-}
+/* ── THE THEME-TOGGLE CROSSFADE IS GONE, and this note is why nobody should add it back.
+   It wrapped the flip in document.startViewTransition() for a ~0.5s dissolve and claimed to fade
+   "the whole site (gradient, text, canvas snapshot)". The canvas half was never true: a View
+   Transition shows SNAPSHOT pseudo-elements instead of the live page, and in real Chrome with GPU
+   rasterisation the GPU-backed canvases are absent from those snapshots. So for half a second the
+   page showed --descent-grad alone — warm paper blending to near-black, i.e. a flat grey wash — with
+   no sky and no terrain dots on it, on all eight routes that carry the sky.
+   Confirmed from a screen recording (hero dots absent for the whole transition, back at ~0.63s,
+   exactly when the 0.5s fade ends) against a probe showing the LIVE canvas never blanks (ink steady
+   118 -> 133 px). It did NOT reproduce in headless Chrome, where software rendering does capture
+   canvases into snapshots — which is why it survived two investigations from this machine.
+   The flip is instant now and clean, because both canvases read their palette every frame: measured,
+   text, sky and terrain all cross within one frame of each other. If the dissolve is wanted back,
+   lerp the canvases' ramps in JS alongside the CSS; do not reach for a view transition on a page
+   whose background is a canvas. ── */
 
 /* slow drift — transform/opacity only, never blur. The static state above is
    the finished composition (also the Firefox / reduced-motion fallback). */
