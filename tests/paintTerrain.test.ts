@@ -3,17 +3,18 @@ import { buildGrid, paintTerrain, TERRAIN_CONFIG_DEFAULTS } from '../src/lib/ter
 import { TERRAIN_LIGHT, TERRAIN_TERMINAL, EDL_DEFAULTS } from '../src/lib/terrain';
 import { wcagLuminance } from '../src/lib/skyLegibility';
 
-/** Minimal 2D-context recorder: paintTerrain only needs arc/fill/fillStyle/clearRect. */
+/** Minimal 2D-context recorder: paintTerrain only needs arc/fill/fillStyle/clearRect.
+ *  Records POSITION as well as radius, because the `lift` tests below assert where dots land. */
 function recordingCtx() {
-  const calls: Array<{ r: number; fill: string }> = [];
-  let pending = 0;
+  const calls: Array<{ x: number; y: number; r: number; fill: string }> = [];
+  let pending = { x: 0, y: 0, r: 0 };
   return {
     calls,
     ctx: {
       clearRect() {},
       beginPath() {},
-      arc(_x: number, _y: number, r: number) { pending = r; },
-      set fillStyle(v: string) { calls.push({ r: pending, fill: v }); },
+      arc(x: number, y: number, r: number) { pending = { x, y, r }; },
+      set fillStyle(v: string) { calls.push({ ...pending, fill: v }); },
       get fillStyle() { return ''; },
       fill() {},
     } as unknown as CanvasRenderingContext2D,
@@ -170,5 +171,103 @@ describe('buildGrid is memoised, and the memo is the point', () => {
     // consumer, including the hero.
     const g = buildGrid(EDL_DEFAULTS);
     expect(buildGrid(EDL_DEFAULTS)[0]).toBe(g[0]);
+  });
+});
+
+describe('paintTerrain — the intro\'s elevation lift', () => {
+  const grid = buildGrid();
+  const cfg = { ...TERRAIN_CONFIG_DEFAULTS, ramp: TERRAIN_LIGHT, darkness: 0, dotScale: 1 };
+
+  /** Paint one frame and return the recorded dot calls. Omitting `lift` exercises the default. */
+  const paint = (lift?: number) => {
+    const { ctx, calls } = recordingCtx();
+    if (lift === undefined) paintTerrain(ctx, grid, cfg, 1440, 900, 1, 0, 0);
+    else paintTerrain(ctx, grid, cfg, 1440, 900, 1, 0, 0, lift);
+    return calls;
+  };
+
+  it('defaults lift to 1, so every existing caller is unaffected', () => {
+    // The whole reason the parameter is optional. `grep -rn 'paintTerrain(' src` returns exactly ONE
+    // production caller (TerrainHero) — the proto routes that used it were retired — and every
+    // pre-existing test in this file calls it with eight arguments. None may change behaviour.
+    const implicit = paint();
+    const explicit = paint(1);
+    expect(explicit.length).toBe(implicit.length);
+    for (let i = 0; i < implicit.length; i++) {
+      expect(explicit[i].x).toBeCloseTo(implicit[i].x, 10);
+      expect(explicit[i].y).toBeCloseTo(implicit[i].y, 10);
+      expect(explicit[i].fill).toBe(implicit[i].fill);
+    }
+  });
+
+  it('flattens the terrain toward one plane at lift=0', () => {
+    // The intro's first frame. With z = 0 everywhere the projection is affine in (x, y) alone, so the
+    // relief is gone — observable as a strictly smaller spread of screen y than at full elevation.
+    const flat = paint(0);
+    const full = paint(1);
+    const spread = (cs: typeof flat) => {
+      const ys = cs.map((c) => c.y);
+      return Math.max(...ys) - Math.min(...ys);
+    };
+    expect(flat.length).toBeGreaterThan(200);
+    expect(spread(flat)).toBeLessThan(spread(full));
+  });
+
+  it('scales elevation linearly in lift', () => {
+    // `project` is affine in z, so a dot's screen y at lift=0.5 must sit exactly midway between its y
+    // at 0 and at 1. This is what makes the timeline's eased `lift` produce eased MOTION rather than
+    // something subtly non-linear layered on top of the easing.
+    //
+    // ZOOMED OUT SO NOTHING IS CULLED, and that is the point of this setup rather than an arbitrary
+    // choice. `paintTerrain` skips dots outside the viewport, and whether a dot is outside DEPENDS ON
+    // LIFT — flattening the terrain pulls the high ground back on screen. A first version of this test
+    // compared the three runs at the shipped zoom and failed on count (982 vs 956), which looked like a
+    // linearity bug and was really the cull doing its job. At zoom 0.2 the whole field fits, every dot
+    // is drawn at every lift, and the distributions are comparable.
+    //
+    // ASSERTED ON THE MEAN, because the mean is the order-independent linear statistic and dot identity
+    // is not recoverable from the recorder. Per dot, screen y is `c(x,y) + field(x,y)·lift·sinT·sc` —
+    // affine in lift — so the mean over all dots is affine in lift too, and a mean is unaffected by the
+    // painter's depth sort. Sorted distributions are NOT: the i-th smallest y at lift 0.5 need not be
+    // the midpoint of the i-th smallest at 0 and 1, because which dot is i-th changes with lift. A
+    // version of this test that compared sorted arrays failed by 0.37px for exactly that reason, which
+    // is a property of sorting rather than a bug in the lift.
+    const wide = { ...cfg, zoom: 0.2 };
+    const meanY = (lift: number) => {
+      const { ctx, calls } = recordingCtx();
+      paintTerrain(ctx, grid, wide, 1400, 1400, 1, 0, 0, lift);
+      expect(calls.length).toBe(grid.length); // zoomed out so nothing is culled
+      return calls.reduce((s, c) => s + c.y, 0) / calls.length;
+    };
+    const m0 = meanY(0), m1 = meanY(1);
+    // the midpoint, and a quarter point, so `z * lift²` or `z + lift` cannot both pass
+    expect(meanY(0.5)).toBeCloseTo((m0 + m1) / 2, 6);
+    expect(meanY(0.25)).toBeCloseTo(m0 + (m1 - m0) * 0.25, 6);
+    // and lift genuinely moves the terrain, so the above is not two identities
+    expect(Math.abs(m1 - m0)).toBeGreaterThan(1);
+  });
+
+  it('composes with breathAmp without producing NaN', () => {
+    const { ctx, calls } = recordingCtx();
+    paintTerrain(ctx, grid, cfg, 1440, 900, 1, 1.7, 0.04, 0.35);
+    expect(calls.length).toBeGreaterThan(200);
+    for (const c of calls) {
+      expect(Number.isFinite(c.x)).toBe(true);
+      expect(Number.isFinite(c.y)).toBe(true);
+      expect(Number.isFinite(c.r)).toBe(true);
+      expect(c.fill).toMatch(/^rgba\(/);
+    }
+  });
+
+  it('does not mutate the shared grid', () => {
+    // buildGrid's result is memoised and shared BY CONTRACT — the file says so. A lift implemented by
+    // writing back into the grid points would corrupt every other consumer, including the hero's very
+    // next frame, and the corruption would compound.
+    const before = grid.map((g) => ({ x: g.x, y: g.y }));
+    paint(0.4);
+    for (let i = 0; i < grid.length; i++) {
+      expect(grid[i].x).toBe(before[i].x);
+      expect(grid[i].y).toBe(before[i].y);
+    }
   });
 });

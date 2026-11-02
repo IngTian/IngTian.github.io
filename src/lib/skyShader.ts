@@ -20,6 +20,7 @@ export function fragmentShader(): string {
     varying vec2 vUv;
 
     uniform sampler2D uRamp;
+    uniform float uFlatten;   // SPIKE: 0 = normal sky, 1 = one flat tone
     uniform float uAmp;
     uniform float uTime;
     uniform float uYOffset;        // scroll, in viewport widths
@@ -210,13 +211,33 @@ export function fragmentShader(): string {
         col -= mix(warmTint, coolTint, pick) * amt;
       }
 
+      // SPIKE (uFlatten): collapse the whole sky toward ONE tone, then let the gradient resolve in.
+      // 0 = normal sky, 1 = one flat tone. Alpha stays 1.0: the canvas is opaque by invariant and must
+      // not become a blended layer.
+      //
+      // THE REFERENCE POSITION IS PER THEME, and getting that wrong made the light theme "dull as
+      // hell". It was the ramp's MIDPOINT in both themes, which in light is #565660 — a mid grey whose
+      // luminance is almost exactly the contour ink's (ink-3, #5a544a: 6.20:1 against paper, but about
+      // 1:1 against this). So the survey lines, the whole point of the opening, disappeared into the
+      // background. Dark theme looked right purely by luck: its midpoint is near-black, so light lines
+      // popped. NOTE: no backticks in here — this comment lives inside a template literal, and putting
+      // one in it terminated the shader source and produced five bogus TypeScript errors.
+      //
+      // So light flattens toward the ramp's TOP — paper — and dark toward its lower middle. Both then
+      // read as a drawing on a surface, with the lines at full contrast against it, which is also the
+      // reading the site's own calligraphy identity wants: ink on paper, chalk on slate.
+      if (uFlatten > 0.001) {
+        float flatAt = mix(0.04, 0.55, uDark);
+        col = mix(col, texture2D(uRamp, vec2(0.5, flatAt)).rgb, clamp(uFlatten, 0.0, 1.0));
+      }
+
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `;
 }
 
 export const SKY_UNIFORMS = [
-  'uRamp', 'uAmp', 'uTime', 'uYOffset', 'uYSpan', 'uDepth0', 'uDepthSpan',
+  'uRamp', 'uAmp', 'uFlatten', 'uTime', 'uYOffset', 'uYSpan', 'uDepth0', 'uDepthSpan',
   'uGateTop', 'uGateDark', 'uGateLight', 'uDark', 'uNebula', 'uReading',
   'uTintCap', 'uViscousFloor', 'uNebulaCeiling',
 ] as const;
