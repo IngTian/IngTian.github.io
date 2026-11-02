@@ -42,8 +42,20 @@ export const SCALE = [
 
 export type Score = 1 | 2 | 3 | 4 | 5;
 
-/** The instruction the model is given, verbatim. Exported so the page can print it: the
- *  reader sees exactly what was asked, not a paraphrase. */
+/**
+ * The instruction the model is given, verbatim.
+ *
+ * KEPT AS PROVENANCE, NOT FOR A RENDERER — and this doc used to claim the opposite ("exported so the
+ * page can print it: the reader sees exactly what was asked, not a paraphrase"). No page prints it; a
+ * grep over comment-stripped `src` finds zero references outside this file. The intent was real and may
+ * come back, but the sentence described a surface that does not exist.
+ *
+ * It stays because the betas in data/signalWeights.ts are a committed judgement, and this is the only
+ * record of what was actually asked to produce them — delete it and the numbers become unexplained,
+ * which is the thing this module's header says it exists to prevent. `tests/signalRubric.test.ts` is
+ * therefore its only caller, deliberately: this is the documented "exists so a test can assert an
+ * invariant on production data" case, and the spec checks the prompt still names the scale it ships.
+ */
 export const RUBRIC_PROMPT = `
 Score how strongly each item EVIDENCES quantitative-research capability, on this scale:
 
@@ -80,27 +92,24 @@ export interface SignalWeights {
   model: string;
   /** ISO date the scoring ran. Passed in, never generated at import time (determinism). */
   scoredAt: string;
-  /** Hash of the scored content. A mismatch means profile.ts moved on and the scores are
-   *  stale — asserted by a test, so staleness is a red build rather than a quiet lie. */
-  contentHash: string;
   signals: ScoredSignal[];
 }
 
-/** A small, stable string hash. Not cryptographic — it only has to change when the content
- *  changes, and be identical across machines and Node versions. */
-export function hashContent(parts: readonly string[]): string {
-  let h1 = 0x811c9dc5;
-  let h2 = 0x01000193;
-  for (const p of parts) {
-    for (let i = 0; i < p.length; i++) {
-      const c = p.charCodeAt(i);
-      h1 = ((h1 ^ c) * 0x01000193) >>> 0;
-      h2 = ((h2 + c) * 0x85ebca6b) >>> 0;
-    }
-    h1 = (h1 ^ 0x2f) >>> 0;
-  }
-  return (h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0'));
-}
+// A `hashContent` FUNCTION AND A `contentHash` FIELD USED TO LIVE HERE, and they are deleted rather
+// than finished, because the thing they promised already exists and works.
+//
+// The field's doc read: "A mismatch means profile.ts moved on and the scores are stale — asserted by a
+// test, so staleness is a red build rather than a quiet lie." None of that was happening. Its value in
+// the only record that exists was the literal string 'PENDING'; nothing read the field; and no test
+// asserted it, so the red build it promised could not occur. `hashContent`'s only caller was its own
+// spec — five assertions about a hash nobody computed.
+//
+// `staleSignals` below answers the same question and is wired up: it compares every scored id's label
+// against the live one, and tests/signalWeights.test.ts calls it, so an edited profile.ts entry really
+// does turn the suite red. Two mechanisms for one question, one finished and one abandoned half-way,
+// with the comment claiming the guarantee attached to the abandoned one. If a hash is ever wanted — it
+// would catch a reordering that label-matching misses — add it with its producer and its assertion in
+// the same change.
 
 /** Which scored ids no longer match the live content, and which live items are unscored.
  *

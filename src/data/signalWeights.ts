@@ -33,7 +33,6 @@ import type { SignalWeights } from '../lib/signalRubric';
 export const SIGNAL_WEIGHTS: SignalWeights = {
   model: 'claude-opus-5 (3 raters, median)',
   scoredAt: '2026-08-08',
-  contentHash: 'PENDING',
   signals: [
     // ── Experience ──────────────────────────────────────────────────────────
     {
