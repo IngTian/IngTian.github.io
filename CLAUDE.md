@@ -1056,11 +1056,13 @@ titles came to rest hard against the browser chrome — the lead is a number in
   *raster* favicon, so PNG fallbacks (48/32/180/192/512) + a webmanifest +
   `og:image` ship from `public/`. Regenerate them from `favicon.svg` if the seal
   changes (sharp rasterizes SVG→PNG).
-- **`public/` in full, since two of its twelve files are easy to be surprised by:**
+- **`public/` in full, since two of its twelve top-level files are easy to be surprised by:**
   `favicon.svg`, `favicon-32.png`, `favicon-48.png`, `apple-touch-icon.png`,
   `icon-192.png`, `icon-512.png`, `og-card.png`, `site.webmanifest`, `robots.txt`,
   `cv.pdf`, `google39d8e886995c3420.html` (a Search Console verification file — do
-  not delete it as junk) and **`sitemap.xml`**.
+  not delete it as junk) and **`sitemap.xml`** — plus one directory, `public/projects/`:
+  manifold's two screensaver MP4s for /projects, written by `tools/vendor-projects.mjs`
+  (a video is not an image, so it is served by URL rather than through `astro:assets`).
   - **`public/sitemap.xml` is hand-maintained and is NOT the generated one.**
     `@astrojs/sitemap` emits `sitemap-index.xml` + `sitemap-0.xml`; this third file
     is a static alias that sits beside them with no generator and no test. It is

@@ -98,6 +98,14 @@ describe('the drafting palette (tokens.css)', () => {
         }
       });
 
+      // The computed pictures (lib/projectVisuals.ts) print their words in ink-1 and ink-3 on --draft-ph, not on
+      // the ground — tests/projectVisuals.test.ts holds them to those two inks.
+      for (const ink of ['--ink-1', '--ink-3']) {
+        it(`${ink} clears AA on a picture's ground (--draft-ph)`, () => {
+          expect(ratio(tk[ink], tk['--draft-ph'])).toBeGreaterThanOrEqual(AA_BODY);
+        });
+      }
+
       it('--on-accent clears AA on the accent (the nav pill on hover)', () => {
         expect(ratio(tk['--on-accent'], tk['--ochre'])).toBeGreaterThanOrEqual(AA_BODY);
       });
