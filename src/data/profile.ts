@@ -55,21 +55,28 @@ export interface ResearchInterest {
   gloss: string;
 }
 
-export interface ProjectLink {
-  label: string;         // e.g. 'GitHub', 'Live', 'Writeup'
-  href: string;
+export type ProjectTier = 'selected' | 'workshop';
+export type ProjectKind = 'research' | 'data' | 'tool' | 'engine' | 'art' | 'guide';
+
+// Images are deliberately NOT on the record: vitest runs without Astro's vite, so a test importing this
+// file could not import an image. They are keyed by slug in their own module.
+export interface Project {
+  slug: string;            // the GitHub repo name; also the section id and the signal id
+  name: string;
+  tier: ProjectTier;
+  kind: ProjectKind;
+  year: string;
+  idea: string;            // the one-line idea — rows, cards, pop-up, homepage appendix
+  short: string;           // the ls listing's description (≤ 44 chars)
+  proof: string[];         // chips; proof[0] is the highlighted one
+  install?: { text: string; prompt?: boolean };   // prompt: shown without a leading "$ "
+  visibility: 'public' | 'private';
+  registry?: 'pypi' | 'npm';
+  ci: boolean;
+  releases?: { count: number; asOf: string };     // hand-maintained, YYYY-MM-DD — not fetched at build time
 }
 
-export interface Project {
-  name: string;
-  year: string;          // e.g. '2026' or '2025 —'
-  tagline: string;       // one line, shown on the card + as the homepage teaser
-  blurb: string;         // 2-3 sentences, shown on the /projects page
-  stack: string[];       // tech tags, e.g. ['Go', 'MCP', 'SQLite']
-  links: ProjectLink[];  // repo / live / writeup
-  highlights?: string[]; // a few notable points, surfaced on the /projects page
-  featured?: boolean;    // gets the full treatment on /projects
-}
+export interface InProgressItem { name: string; idea: string; repo?: string }   // repo: set only once the repo exists
 
 export const name = { first: 'Ing', last: 'Tian' } as const;
 
@@ -162,43 +169,83 @@ export const awards: Award[] = [
   { year: '2020', title: 'Rio Tinto–Richards Evans Exchange Award · McGill' },
 ];
 
-// Selected projects — shipped artifacts with links (distinct from Experience
-// = roles, and Selected writing = papers). Shown as a teaser on the homepage
-// and in full on /projects. Engineering output: kept a clear second to the
-// research signal in the site's identity hierarchy.
+// Every notable project, in VALUE order: the selected (quant) tier first, then the workshop of personal tools.
+// Records, not prose, because they render in many shapes — the ls listing, the gallery, a row or a card, the
+// pop-up, the homepage appendix, and the summary line's counts, which are computed from these fields rather
+// than typed. Held back: rebal ("not for release yet") and argmin (one script, no tests or output).
 export const projects: Project[] = [
   {
-    name: 'witness',
-    year: '2026',
-    tagline: 'A Claude Code / OpenCode plugin that keeps a person-centric archive of how you think and grow — not what your code did.',
-    blurb:
-      'A coach-oriented (not clone-oriented) memory layer: it quietly mines each coding session for evidence-anchored observations about how you reason, get stuck, and change — then synthesizes them into evolving, bi-temporal "facets" that keep their own history, so the archive answers "how did I change," not just "who am I now." Collect-only and local-first: it captures and serves the archive over MCP but never injects anything into a session.',
-    stack: ['Go', 'MCP', 'SQLite', 'Local embeddings', 'Claude Code · OpenCode'],
-    links: [{ label: 'GitHub', href: 'https://github.com/IngTian/witness' }],
-    highlights: [
-      'Four-layer archive — verbatim raw turns → mined observations → bi-temporal facets (with change history) → a regenerable narrative profile.',
-      'Single self-contained Go binary: no Python, no external services, no vector DB, no cloud key.',
-      'Pure-Go local multilingual (EN + ZH) embeddings via GoMLX (CGO_ENABLED=0) — verified to match ONNX Runtime exactly.',
-      'Pluggable "lenses" (a markdown EXTRACT/REVIEW prompt pair) let you track any domain — coding, math — through the same engine.',
-    ],
-    featured: true,
+    slug: 'rl-bhrp', name: 'rl-bhrp', tier: 'selected', kind: 'research', year: '2026',
+    idea: "My published portfolio allocator, rebuilt from the paper alone — with a plain report of which numbers reproduce and which don't.",
+    short: 'my paper, rebuilt from the paper alone',
+    proof: ["tests tied to the paper's theorems", 'results committed'],
+    visibility: 'public', ci: false,
   },
   {
-    name: 'manifold',
-    year: '2026',
-    tagline: "This site's hero terrain, ported to a native macOS screen saver and live wallpaper — a mountain rendered as breathing points of light.",
-    blurb:
-      'A faithful Swift port of the homepage\'s math-generative terrain: a Gaussian-bump elevation field sampled on a 33×33 grid, projected through a fixed rotation and drawn as ~1000 elevation-colored dots that breathe, with glowing "walker" particles that periodically trace gradient-descent paths downhill and settle. The name is literal — the terrain is a 2-manifold — and nods to manifold optimization and to many-folded mountain ranges. Two builds share one renderer: a screen saver with a clock on the golden section, and a menu-bar live wallpaper with no clock — just the mountain breathing behind your icons, cross-fading between light and dark. Everything is sized as a fraction of the view, so it scales cleanly from 16:9 to 32:9 ultrawide.',
-    stack: ['Swift', 'Core Graphics', 'AppKit', 'macOS'],
-    links: [{ label: 'GitHub', href: 'https://github.com/IngTian/manifold' }],
-    highlights: [
-      'Two builds, one shared renderer: a screen saver (.saver, in System Settings) and a "Manifold Wallpaper.app" live desktop wallpaper (menu-bar app, no clock) — pinned at the desktop level since macOS exposes no public API for animated wallpapers.',
-      'Builds locally with swiftc into universal (arm64 + x86_64) bundles — no Xcode, no Apple Developer account; local builds skip Gatekeeper quarantine, so install is one curl command.',
-      'The wallpaper is battery-aware: 30fps normally, 15fps on battery / Low Power Mode, and fully pauses whenever the desktop is covered, the display sleeps, or the screen is locked.',
-      'Colors are the exact light/dark values from the site, and switching themes cross-fades smoothly — a slow dawn/dusk transition — rather than snapping.',
-    ],
+    slug: 'offchart', name: 'offchart', tier: 'selected', kind: 'data', year: '2026',
+    idea: "Public positioning and survey data — CFTC Commitments of Traders, UMich expectations — in one database that can't see the future.",
+    short: 'CFTC + survey data, look-ahead-free',
+    proof: ['daily CI against the live CFTC feed', 'CFTC data back to 1986'],
+    visibility: 'public', ci: true,
+  },
+  {
+    slug: 'trading-desk', name: 'trading-desk', tier: 'selected', kind: 'tool', year: '2026',
+    idea: 'A trading book in the terminal that gets P&L right across currencies and refuses to record a state that contradicts itself.',
+    short: "a trading book that can't contradict itself",
+    proof: ['on PyPI', '~270 tests'],
+    visibility: 'public', registry: 'pypi', ci: true,
+  },
+  {
+    slug: 'witness', name: 'witness', tier: 'selected', kind: 'engine', year: '2026',
+    idea: 'Turns any text stream — market news, research, coding sessions — into a dated history of what changed, and why.',
+    short: 'text stream → dated history of change',
+    proof: ['29 releases', 'cross-platform binaries', 'npm'],
+    visibility: 'public', registry: 'npm', ci: true,
+    releases: { count: 29, asOf: '2026-11-02' },
+  },
+  {
+    slug: 'daylogs', name: 'daylogs', tier: 'workshop', kind: 'tool', year: '2026',
+    idea: 'Weight, food and spending, typed by hand in one line each — plus one short daily read.',
+    short: 'weight, food, spending — by hand',
+    proof: ['on PyPI, 5 releases'],
+    install: { text: 'uv tool install daylogs' },
+    visibility: 'public', registry: 'pypi', ci: true,
+  },
+  {
+    slug: 'manifold', name: 'manifold', tier: 'workshop', kind: 'art', year: '2026',
+    idea: 'A macOS screensaver: a mountain of light where gradient-descent walkers roll down real optimization surfaces.',
+    short: 'a macOS screensaver of real descent',
+    proof: ['gradients checked against finite differences in CI'],
+    install: { text: 'curl -fsSL https://raw.githubusercontent.com/IngTian/manifold/main/scripts/install.sh | bash' },
+    visibility: 'public', ci: true,
+  },
+  {
+    // Private, so there is nothing to clone: the card shows the prompt its README hands to Claude Code instead.
+    slug: 'macboot', name: 'macboot', tier: 'workshop', kind: 'guide', year: '2026',
+    idea: 'My Mac setup as one document an AI agent runs: it looks before it changes anything, skips what is already there, and hands me only the steps a person should do.',
+    short: 'a Mac setup an agent runs, from one README',
+    proof: ['one README', 'run by Claude Code', 'was 4,700 lines of bash'],
+    install: { text: '> Set up this Mac from README.md. Look before you change anything.', prompt: true },
+    visibility: 'private', ci: false,
   },
 ];
+
+export const inProgress: InProgressItem[] = [
+  { name: 'ai-mentor-core', repo: 'ai-mentor-core', idea: 'Study vaults that share one mentoring framework, so an improvement reaches every vault without hand-copying.' },
+  { name: 'a new AI-learning repo', idea: 'Not started yet.' },
+];
+
+/** The repo's GitHub page, or null when it is private — a private repo has nothing a reader can open. */
+export function repoUrl(p: Project): string | null {
+  return p.visibility === 'public' ? `https://github.com/IngTian/${p.slug}` : null;
+}
+
+/** The homepage appendix's two rows, chosen by tier rather than array order: the first two selected projects
+ *  that are not research-kind, since RL-BHRP already sits in the Publications column beside them. Two, because
+ *  the slide's balance with the writing column depends on it. */
+export function appendixProjects(ps: readonly Project[]): Project[] {
+  return ps.filter((p) => p.tier === 'selected' && p.kind !== 'research').slice(0, 2);
+}
 
 export const links: { label: string; href: string; primary?: boolean }[] = [
   { label: 'Download CV', href: '/cv.pdf', primary: true },

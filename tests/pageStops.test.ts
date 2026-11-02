@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { researchStops, projectStops, paperSectionId, paperAnchorId, projectSectionId, experienceStops, railLabel, homeStops, flattenStops, type Stop } from '../src/lib/pageStops';
 import { mathFor } from '../src/lib/paperMath';
-import type { Publication, Project, TimelineEntry } from '../src/data/profile';
+import type { Publication, TimelineEntry } from '../src/data/profile';
 import { publications, researchInterests, projects, timeline } from '../src/data/profile';
 
 // A minimal featured paper carrying all three section-bearing fields.
@@ -119,19 +119,22 @@ describe('researchStops — always names the paper', () => {
 });
 
 describe('projectStops', () => {
-  it('is one flat stop per project, labelled by name', () => {
-    const ps = [{ name: 'a' }, { name: 'b' }] as Project[];
-    const stops = projectStops(ps);
-    expect(stops.some((s) => !!s.children?.length)).toBe(false);
-    expect(stops).toEqual([
-      { label: 'a', target: projectSectionId(0) },
-      { label: 'b', target: projectSectionId(1) },
+  it('is Index / Selected (one child per selected project, by slug) / The workshop / In progress', () => {
+    expect(projectStops(projects)).toEqual([
+      { label: 'Index', target: 'p-index' },
+      {
+        label: 'Selected', target: 'p-selected',
+        children: ['rl-bhrp', 'offchart', 'trading-desk', 'witness'].map((slug) => ({
+          label: slug, target: projectSectionId(slug),
+        })),
+      },
+      { label: 'The workshop', target: 'p-workshop' },
+      { label: 'In progress', target: 'p-in-progress' },
     ]);
   });
 
-  it('has unique targets', () => {
-    const stops = projectStops([{ name: 'x' }, { name: 'x' }] as Project[]);
-    expect(new Set(targets(stops)).size).toBe(2);
+  it('spells a project section id from its slug', () => {
+    expect(projectSectionId('witness')).toBe('p-witness');
   });
 });
 
@@ -248,8 +251,13 @@ describe('the REAL site data', () => {
     expect(new Set(all).size).toBe(all.length);
   });
 
-  it('gives /projects a stop per project', () => {
-    expect(projectStops(projects)).toHaveLength(projects.length);
+  it('gives /projects a rail stop per selected project, with unique targets', () => {
+    const stops = projectStops(projects);
+    const selected = stops.find((s) => s.target === 'p-selected')!;
+    expect(selected.children!.map((c) => c.label))
+      .toEqual(projects.filter((p) => p.tier === 'selected').map((p) => p.slug));
+    const all = targets(stops);
+    expect(new Set(all).size).toBe(all.length);
   });
 
   /* A ONE-CHARACTER TYPO IN profile.ts CAN DELETE A SECTION OF /research, SILENTLY. That is the hole

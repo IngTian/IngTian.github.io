@@ -10,7 +10,7 @@
 // reverse-chronological — and claims authorization. This lists ARTEFACTS and where to read them. The
 // distinction is that every row here is a thing a reader can go and check.
 import { getCollection } from 'astro:content';
-import { publications, projects } from '../data/profile';
+import { publications, projects, appendixProjects } from '../data/profile';
 import { WRITINGS_PROMISE, WRITINGS_TOPICS } from '../data/making';
 import { KINDS } from '../data/writing';
 import PlushCow from '../components/PlushCow.astro';
@@ -18,7 +18,7 @@ import Signature from './Signature.astro';
 
 const featured = publications.find((p) => p.featured);
 const others = publications.filter((p) => !p.featured);
-const shownProjects = projects.slice(0, 2);
+const shownProjects = appendixProjects(projects);
 
 // ── THE WRITING COLUMN IS DERIVED, NOT PROMISED. This column said "coming" and carried
 // WRITINGS_PROMISE while /writing/favourite-quotes/ was published, in the nav and live — the homepage was
@@ -153,7 +153,7 @@ const sharpe = featured?.metrics?.rows.find((r) => /sharpe/i.test(r.metric));
           {shownProjects.map((p) => (
             <div class="wk-item">
               <p class="wk-item-name">{p.name}</p>
-              <p class="wk-item-line">{p.tagline}</p>
+              <p class="wk-item-line">{p.idea}</p>
             </div>
           ))}
           <a class="wk-link" href="/projects">All projects<span class="wk-arrow" aria-hidden="true">→</span></a>

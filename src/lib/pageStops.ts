@@ -113,20 +113,30 @@ export function researchStops(
   return stops;
 }
 
-/** Project section id — one speller, same reason as paperSectionId. */
-export function projectSectionId(index: number): string {
-  return `p-${index}`;
+/** Project section id — one speller, same reason as paperSectionId. Keyed by slug, not index, so
+ *  `/projects#p-witness` keeps pointing at witness when a project is added above it. */
+export function projectSectionId(slug: string): string {
+  return `p-${slug}`;
 }
 
 /**
- * The /projects rail: one stop per project, flat.
+ * The /projects rail: the page's four sections, with the selected projects nested under theirs.
  *
- * Flat and literal rather than invented section labels ("Overview / Projects /
- * Archive") — the rail's job is navigation, and fake structure on a page that IS
- * projects would be padding. Two stops today; it grows with the list.
+ * Only the selected tier gets per-project stops: those are the large rows a reader scans for, while the
+ * workshop is a grid of cards read at a glance. Labels are slugs — bookmarks, not sentences.
  */
 export function projectStops(projects: readonly Project[]): Stop[] {
-  return projects.map((p, i) => ({ label: p.name, target: projectSectionId(i) }));
+  return [
+    { label: 'Index', target: 'p-index' },
+    {
+      label: 'Selected', target: 'p-selected',
+      children: projects
+        .filter((p) => p.tier === 'selected')
+        .map((p) => ({ label: p.slug, target: projectSectionId(p.slug) })),
+    },
+    { label: 'The workshop', target: 'p-workshop' },
+    { label: 'In progress', target: 'p-in-progress' },
+  ];
 }
 
 /** Experience section id — one speller, same reason as paperSectionId. */
@@ -137,7 +147,7 @@ export function experienceSectionId(index: number): string {
 /**
  * The /experience rail: two groups, roles and education, each with its entries nested.
  *
- * Grouped rather than flat (unlike /projects) because the timeline mixes two KINDS and the
+ * Grouped rather than flat because the timeline mixes two KINDS and the
  * site's identity hierarchy is load-bearing — education carries the incoming PhD, which
  * must not be buried among nine jobs. The rail's two parents point at their group headings;
  * the leaves point at individual entries.

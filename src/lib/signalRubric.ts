@@ -75,8 +75,8 @@ Rules:
 
 /** A single scored item, as written into the committed artefact. */
 export interface ScoredSignal {
-  /** Stable id: '<collection>:<index>'. Survives reordering within a collection only if the
-   *  label also matches — see `staleSignals`. */
+  /** Stable id: '<collection>:<index>', or '<collection>:<slug>' for projects. An index id survives
+   *  reordering within a collection only if the label also matches — see `staleSignals`. */
   id: string;
   /** The item's own text, stored so a later edit is DETECTABLE rather than silent. */
   label: string;

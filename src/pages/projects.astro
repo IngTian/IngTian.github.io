@@ -2,13 +2,17 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import FluidSky from '../components/proto/FluidSky.astro';
 import SkyWash from '../components/SkyWash.astro';
-import ProjectCard from '../components/ProjectCard.astro';
 import SideRail from '../components/SideRail.astro';
-import { projects } from '../data/profile';
+import { projects, inProgress } from '../data/profile';
 import { projectStops, projectSectionId } from '../lib/pageStops';
 
-// One rail stop per project — flat and literal. See lib/pageStops.ts.
+// TEMPORARY: a plain list of every project's name and idea, standing in until the /projects redesign
+// replaces this page. Its sections carry the ids projectStops() points at, so the rail still lands.
 const stops = projectStops(projects);
+const groups = [
+  { id: 'p-selected', title: 'Selected', items: projects.filter((p) => p.tier === 'selected') },
+  { id: 'p-workshop', title: 'The workshop', items: projects.filter((p) => p.tier === 'workshop') },
+];
 ---
 <BaseLayout
   title="Projects — Ing Tian"
@@ -24,19 +28,32 @@ const stops = projectStops(projects);
     <SideRail stops={stops} id="projects-toc" />
 
     <div class="projects-block">
-      <header class="projects-head">
+      <header class="projects-head" id="p-index">
         <a class="back" href="/">← back</a>
         <h1>Projects</h1>
-        <p class="lede">Shipped tools and systems — built end to end. Fewer, but finished; each one solves a problem I actually had.</p>
       </header>
 
-      <div class="project-list">
-        {projects.map((p, i) => (
-          <div class="project-slot" id={projectSectionId(i)}>
-            <ProjectCard project={p} variant="full" headingLevel={2} />
+      {groups.map((g) => (
+        <section class="group" id={g.id}>
+          <h2>{g.title}</h2>
+          {g.items.map((p) => (
+            <div class="item" id={projectSectionId(p.slug)}>
+              <h3>{p.name}</h3>
+              <p>{p.idea}</p>
+            </div>
+          ))}
+        </section>
+      ))}
+
+      <section class="group" id="p-in-progress">
+        <h2>In progress</h2>
+        {inProgress.map((w) => (
+          <div class="item">
+            <h3>{w.name}</h3>
+            <p>{w.idea}</p>
           </div>
         ))}
-      </div>
+      </section>
 
       <footer class="projects-foot"><a class="back" href="/">← back to the descent</a></footer>
     </div>
@@ -45,52 +62,28 @@ const stops = projectStops(projects);
 
 <style>
   .projects { position: relative; z-index: 0; min-height: 100vh; }
-
-  /* Like /research, this is a READING page — it uses the shared --reading-grad
-     token (tokens.css), which holds the luminous range top-to-bottom (light)
-     and an even charcoal (dark) so text stays legible. Shared with /research so
-     the two reading pages stay identical instead of drifting. */
   .projects.descent { background: var(--reading-grad); }
-
-  /* Same composition as /research — identical left margin and right gutter, so
-     the two reading pages read as one system instead of two guesses. The measure
-     caps at 860px rather than /research's 1180px because these cards hold prose
-     and a 1180px card reads as stretched; the paper page needs the extra width
-     for its two-column body. A percentage left margin (not a clamp, which caps
-     out and drifts left on wide monitors) keeps ~34% as the rail's margin. */
   .projects-block {
     width: min(64%, 860px);
     margin-left: 34%;
     margin-right: clamp(24px, 4vw, 90px);
     box-sizing: border-box;
   }
-
   .projects-head { padding: 14vh 0 5vh; }
   .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
   .back:hover { color: var(--seal); }
   .projects h1 {
     font-family: var(--font-display); font-weight: 500; font-size: clamp(38px, 5vw, 58px);
-    line-height: 1.04; letter-spacing: -0.01em; font-variation-settings: 'SOFT' 60; margin-top: 16px; color: var(--ink-1);
+    line-height: 1.04; letter-spacing: -0.01em; margin-top: 16px; color: var(--ink-1);
   }
-  .lede { font-size: 14px; color: var(--ink-3); margin-top: 16px; line-height: 1.7; max-width: 54ch; }
-
-  .project-list { display: grid; gap: 22px; }
-  /* Anchor wrapper for the rail, offset so a jumped-to card isn't glued to the
-     viewport's top edge. A REAL box, not display:contents — a contents element
-     generates no box, so getBoundingClientRect() returns zeros and every rail
-     stop would report top:0, pinning the scrollspy to the last stop forever. */
-  .project-slot { scroll-margin-top: 12vh; }
-
+  .group { padding-bottom: 5vh; scroll-margin-top: 12vh; }
+  .group h2 { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 18px; }
+  .item { margin-bottom: 22px; scroll-margin-top: 12vh; }
+  .item h3 { font-family: var(--font-display); font-weight: 500; font-size: 22px; color: var(--ink-1); }
+  .item p { font-size: 14px; line-height: 1.7; color: var(--ink-2); margin-top: 6px; max-width: 60ch; }
   .projects-foot { padding: 10vh 0 16vh; }
 
-  /* Narrow / tablet: the rail hides itself (same 1100px breakpoint as SideRail);
-     the column re-centers at the reading measure. */
   @media (max-width: 1100px) {
     .projects-block { width: auto; margin: 0 auto; padding: 0 24px; max-width: 760px; }
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .project-list :global(.pcard) { animation: projects-in 0.7s ease both; }
-    @keyframes projects-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
   }
 </style>

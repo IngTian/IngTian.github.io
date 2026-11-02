@@ -168,7 +168,7 @@ src/
   layouts/BaseLayout.astro          # head, astro:fonts, meta/OG/JSON-LD, favicons, the page-load veil, CornerNav, ClientRouter
   content.config.ts                 # the `writing` collection + its frontmatter schema (the ONLY content collection)
   content/writing/*.md              # the pieces themselves — a new one is a FILE, not a code change
-  data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline, publications, projects, awards, links
+  data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline, publications, projects + inProgress, awards, links
   data/nav.ts                       # PAGES — the canonical page set (see Navigation)
   data/writing.ts                   # the writing TAXONOMY (KINDS) + buildKinds(), the one seam to the markdown
   data/artworks.ts                  # gallery: calligraphy entries + globbed photos (+ photoNotes.ts for per-photo copy)
@@ -198,7 +198,7 @@ src/
   components/Toc.astro              # the homepage's thin left-margin TOC, driven by homeStops()
   components/CornerNav.astro        # the always-visible glass nav + theme toggle
   components/PlushCow.astro         # the cow, at three scales, with a pixel speech bubble
-  components/{SealMark,Grain,ProjectCard}.astro
+  components/{SealMark,Grain}.astro
   scripts/artGallery.ts             # the /art page behavior (justified rows, placard, scrollspy, lightbox)
 tests/*.test.ts                     # vitest — every pure lib module, the data/route invariants, the content seam
 ```
@@ -330,15 +330,10 @@ were written while it existed: `lib/skyShader.ts` and `components/proto/FluidSky
 each explain an amplitude decision in terms of where Mountains used to sit, which is
 a historical note on a live decision and is fine to leave.
 
-**One live loose end it left behind, so nobody rediscovers it as a bug.**
-`components/ProjectCard.astro` has two variants, `'teaser'` and `'full'`, and
-`'teaser'` is still the *default* — but its only reason to exist was the homepage
-Mountains section, and the only place that renders a card now is `/projects`, which
-passes `variant="full"` explicitly. So the teaser branch and its "light-on-dark,
-tuned for the dark Mountains gradient" styling are unreachable, and its comments
-describe a surface that no longer exists. Not urgent, and not a rendering bug — but
-don't spend time tuning that branch, and don't trust its comments as a description
-of the site.
+The loose end it left behind — `ProjectCard.astro`'s unreachable `'teaser'` variant,
+tuned for the dark Mountains gradient — is gone with the card itself: the component
+was **deleted** by the /projects redesign, whose data model dropped every field it
+rendered (`tagline`, `blurb`, `highlights`, `stack`, `links`).
 
 ### THE DECK — one gesture, one slide
 
@@ -374,13 +369,14 @@ enough to engage the deck on a viewport whose styles think it's a phone).
 **The number lives in two places and they are synced BY HAND.** `@media
 (max-width: var(--x))` is not valid CSS, so there is no way to feed one value to
 both. **If you change `PHONE_MAX_WIDTH`, change every `@media (max-width: 640px)`
-block with it.** `grep -rn 'max-width: *640px' src` returns **16 hits in 12 files**,
-and **four of the 16 are prose, not rules** — `viewport.ts` ×2 (its own doc
+block with it.** `grep -rn 'max-width: *640px' src` returns **15 hits in 11 files**,
+and **four of the 15 are prose, not rules** — `viewport.ts` ×2 (its own doc
 comments) plus `global.css:166` and `global.css:315`, which describe the
-breakpoint in comments rather than declaring it. So there are **12 real CSS
-blocks across 11 files**: `experience` ×2, and one each in `global.css`,
-`CornerNav`, `Toc`, `DescentPath`, `ProjectCard`, `FluidSky`, `Heights`, `404`,
-`research` and `writing/[...slug]`.
+breakpoint in comments rather than declaring it. So there are **11 real CSS
+blocks across 10 files**: `experience` ×2, and one each in `global.css`,
+`CornerNav`, `Toc`, `DescentPath`, `FluidSky`, `Heights`, `404`,
+`research` and `writing/[...slug]`. (It was 16 / 12 until `ProjectCard.astro`,
+which carried one, was deleted with the /projects redesign.)
   Two notes on how this count has gone wrong before, because it keeps doing so.
 It read "15 hits … 13 real blocks … `global.css` ×2" — overcounting `global.css`
 because one of its two prose mentions is `max-width:640px` with **no space**,

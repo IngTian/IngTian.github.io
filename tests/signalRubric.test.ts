@@ -139,7 +139,8 @@ describe('identifiedSignals', () => {
   });
 
   it('namespaces ids by collection, so two collections cannot collide', () => {
-    for (const l of live) expect(l.id).toMatch(/^[a-z]+:\d+$/);
+    // Indexes for most collections, slugs for projects (so a new project cannot reshuffle the scores).
+    for (const l of live) expect(l.id).toMatch(/^[a-z]+:[a-z0-9-]+$/);
   });
 
   it('carries a non-empty label for every signal', () => {

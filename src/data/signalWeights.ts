@@ -27,6 +27,13 @@
 // scored 1 unanimously — they are declared interests, not artefacts.
 //
 // Nothing may exceed 4 without external validation. arXiv is verifiable, not peer-reviewed.
+//
+// SECOND PASS — Claude Opus 5.5, 2026-11-02 — for the five projects added by the /projects redesign
+// (rl-bhrp, offchart, trading-desk, daylogs, macboot). Three independent raters, each given RUBRIC_PROMPT
+// and the five records' text; each committed score is the per-project MEDIAN, and each `because` is the
+// median rater's sentence, verbatim. 5 items · 5 exact agreement · 0 disputes. The `model` and
+// `scoredAt` fields below still describe the first pass, which scored the other twenty. Project ids are
+// keyed by slug (`projects:witness`), not by index, so adding a project does not reshuffle these scores.
 
 import type { SignalWeights } from '../lib/signalRubric';
 
@@ -115,14 +122,39 @@ export const SIGNAL_WEIGHTS: SignalWeights = {
 
     // ── Projects ────────────────────────────────────────────────────────────
     {
-      id: 'projects:0', factor: 'projects', score: 2,
+      id: 'projects:rl-bhrp', factor: 'projects', score: 4,
+      label: 'rl-bhrp',
+      because: 'A public repo that rebuilds "my published portfolio allocator" from the paper, with "tests tied to the paper\'s theorems" and "results committed", is checkable and squarely on the quant axis. It is still the author reproducing his own work, though, so nobody else has checked it yet.',
+    },
+    {
+      id: 'projects:offchart', factor: 'projects', score: 3,
+      label: 'offchart',
+      because: 'Named datasets ("CFTC Commitments of Traders, UMich expectations") in a public repo, plus "can\'t see the future", show point-in-time discipline that matters for research. But it is data infrastructure, and the text names no signal, model or result built on it.',
+    },
+    {
+      id: 'projects:trading-desk', factor: 'projects', score: 2,
+      label: 'trading-desk',
+      because: 'Public and checkable ("on PyPI; ~270 tests"), but "a trading book in the terminal" that "gets P&L right across currencies" is bookkeeping software. The tests show engineering correctness, not modelling or research.',
+    },
+    {
+      id: 'projects:witness', factor: 'projects', score: 2,
       label: 'witness',
       because: 'A public, checkable artefact, but developer tooling with no statistics, optimisation or modelling in it.',
     },
     {
-      id: 'projects:1', factor: 'projects', score: 2,
+      id: 'projects:daylogs', factor: 'projects', score: 2,
+      label: 'daylogs',
+      because: 'Public and checkable ("on PyPI, 5 releases"), but tracking "weight, food and spending" is a personal logging tool with no statistics, optimisation or modelling in it, the same off-axis band as witness.',
+    },
+    {
+      id: 'projects:manifold', factor: 'projects', score: 2,
       label: 'manifold',
       because: 'Public and checkable, and it does implement a Gaussian-bump field with gradient-descent walkers — but it visualises maths rather than researching it.',
+    },
+    {
+      id: 'projects:macboot', factor: 'projects', score: 1,
+      label: 'macboot',
+      because: 'A "PRIVATE repo, no public link", so a reader can check nothing. "Mac setup" run "by Claude Code" and "was 4,700 lines of bash" describe machine provisioning, with no quantitative content.',
     },
 
     // ── Craft ───────────────────────────────────────────────────────────────

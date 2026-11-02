@@ -71,7 +71,8 @@ export const FACTORS: Factor[] = [
  * `research`, and so on. That is the honest mapping — pretending an algorithm discovered which of a
  * person's jobs is "research" would be the same overclaiming that sank the seriation concept.
  *
- * The id is '<collection>:<index>' and the label is carried alongside, so an edited item is DETECTED
+ * The id is '<collection>:<index>' — '<collection>:<slug>' for projects, so adding one does not reshuffle
+ * the committed scores — and the label is carried alongside, so an edited item is DETECTED
  * (label mismatch) rather than silently keeping a stale score.
  *
  * EVERY SIGNAL WEIGHS 1 BY DEFAULT — one declared artefact, one unit — AND THAT IS A MEASURED DECISION,
@@ -91,7 +92,7 @@ export function identifiedSignals(): { id: string; label: string; factor: string
   timeline.forEach((t, i) => out.push({ id: `timeline:${i}`, label: t.title, factor: 'experience' }));
   publications.forEach((p, i) => out.push({ id: `publications:${i}`, label: p.title, factor: 'research' }));
   researchInterests.forEach((r, i) => out.push({ id: `interests:${i}`, label: r.label, factor: 'research' }));
-  projects.forEach((p, i) => out.push({ id: `projects:${i}`, label: p.name, factor: 'projects' }));
+  projects.forEach((p) => out.push({ id: `projects:${p.slug}`, label: p.name, factor: 'projects' }));
   awards.forEach((a, i) => out.push({ id: `awards:${i}`, label: a.title, factor: 'craft' }));
   return out;
 }
