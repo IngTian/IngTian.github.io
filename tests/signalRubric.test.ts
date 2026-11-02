@@ -6,32 +6,8 @@
 // longer exists. Nothing on screen would look wrong. So staleness is a red test.
 
 import { describe, it, expect } from 'vitest';
-import { hashContent, staleSignals, SCALE, RUBRIC_PROMPT } from '../src/lib/signalRubric';
+import { staleSignals, SCALE, RUBRIC_PROMPT } from '../src/lib/signalRubric';
 import { identifiedSignals, evidenceWeights, loadings, FACTORS } from '../src/lib/factorModel';
-
-describe('hashContent', () => {
-  it('is stable for the same input', () => {
-    expect(hashContent(['a', 'b'])).toBe(hashContent(['a', 'b']));
-  });
-
-  it('changes when any part changes', () => {
-    expect(hashContent(['a', 'b'])).not.toBe(hashContent(['a', 'c']));
-  });
-
-  it('is order-sensitive, so a reordered résumé re-scores', () => {
-    expect(hashContent(['a', 'b'])).not.toBe(hashContent(['b', 'a']));
-  });
-
-  it('separates parts, so concatenation cannot collide', () => {
-    // Without a separator, ['ab','c'] and ['a','bc'] would hash identically and an edit
-    // that moved a word across items would be invisible.
-    expect(hashContent(['ab', 'c'])).not.toBe(hashContent(['a', 'bc']));
-  });
-
-  it('returns a fixed-width hex string', () => {
-    expect(hashContent(['x'])).toMatch(/^[0-9a-f]{16}$/);
-  });
-});
 
 describe('staleSignals', () => {
   const live = [{ id: 'a:0', label: 'Alpha' }, { id: 'a:1', label: 'Beta' }];

@@ -64,75 +64,28 @@ export const FACTORS: Factor[] = [
   },
 ];
 
-/** A single observable that loads onto a factor.
- *
- *  EVERY SIGNAL WEIGHS 1 — one declared artefact, one unit. An earlier version weighted
- *  timeline entries by DURATION while everything else counted as one artefact, which put two
- *  different units in one denominator: nine roles summing 16 job-years swamped six research
- *  items summing 6, and the model reported Experience 0.59 / Research 0.22. That is not a
- *  fact about the record, it is an artefact of mixing years with counts. One unit, no
- *  mixing, and the ratio means something. */
-export interface Signal {
-  factor: string;
-  label: string;
-  /** Always 1. Kept as a field so the arithmetic in `loadings` stays explicit and so a
-   *  future weighting scheme has somewhere honest to live. */
-  weight: 1;
-}
-
-/** Parse a period string from profile.ts into a span in years.
- *
- *  Handles every real shape in the file: '2023 — 25', '2026 —' (open), 'Fall 2027 —',
- *  '2021', "'21–'22". An open range is measured to NOW_YEAR rather than to infinity, so a
- *  current role does not dominate the model. */
-export function periodYears(period: string, nowYear = 2026): number {
-  const years = [...period.matchAll(/(\d{2,4})/g)].map((m) => {
-    const raw = m[1];
-    const n = Number(raw);
-    if (raw.length === 4) return n;
-    // Two-digit years in this data are all 2000s ('21 -> 2021, 25 -> 2025).
-    return 2000 + n;
-  });
-  if (years.length === 0) return 1;
-  const start = years[0];
-  const open = /—\s*$|–\s*$|-\s*$/.test(period.trim());
-  const end = open ? Math.max(nowYear, start) : (years[1] ?? start);
-  // A single year (e.g. '2021', an internship) counts as one year, not zero.
-  return Math.max(1, end - start);
-}
-
 /**
- * Every signal in the model, drawn from profile.ts.
+ * EVERY SIGNAL IN THE MODEL, drawn from profile.ts, with stable ids.
  *
- * Membership is DECLARED, not inferred: a timeline entry loads on `experience`, a
- * publication on `research`, and so on. That is the honest mapping — pretending an
- * algorithm discovered which of a person's jobs is "research" would be the same
- * overclaiming that sank the seriation concept.
+ * Membership is DECLARED, not inferred: a timeline entry loads on `experience`, a publication on
+ * `research`, and so on. That is the honest mapping — pretending an algorithm discovered which of a
+ * person's jobs is "research" would be the same overclaiming that sank the seriation concept.
+ *
+ * The id is '<collection>:<index>' and the label is carried alongside, so an edited item is DETECTED
+ * (label mismatch) rather than silently keeping a stale score.
+ *
+ * EVERY SIGNAL WEIGHS 1 BY DEFAULT — one declared artefact, one unit — AND THAT IS A MEASURED DECISION,
+ * not a simplification. This note used to live on a `Signal` interface that has since been deleted along
+ * with the rest of the fan; it is kept here because it is the only record of the result. An earlier
+ * version weighted timeline entries by DURATION while everything else counted as one artefact, which put
+ * two different units in one denominator: nine roles summing 16 job-years swamped six research items
+ * summing 6, and the model reported **Experience 0.59 / Research 0.22**. That is not a fact about the
+ * record, it is an artefact of mixing years with counts. One unit, no mixing, and the ratio means
+ * something. `evidenceWeights` below is where a real weighting scheme belongs if one ever lands.
+ *
+ * WRITING AND MARKETS CARRY NO SIGNALS YET, and the model must show that truthfully rather than invent a
+ * loading for work that does not exist — `tests/factorModel.test.ts` asserts it.
  */
-export function signals(): Signal[] {
-  const out: Signal[] = [];
-
-  // One declared artefact, one unit — see the note on Signal.weight for why duration was
-  // removed. `periodYears` is still exported and tested because the fan labels a role's span
-  // on hover; it just no longer feeds the loadings.
-  for (const t of timeline) out.push({ factor: 'experience', label: t.title, weight: 1 });
-  // Research: the paper, plus the declared research interests.
-  for (const p of publications) out.push({ factor: 'research', label: p.title, weight: 1 });
-  for (const r of researchInterests) out.push({ factor: 'research', label: r.label, weight: 1 });
-  // Projects: shipped artefacts.
-  for (const p of projects) out.push({ factor: 'projects', label: p.name, weight: 1 });
-  // Craft: recognition sits here as evidence of the wider record.
-  for (const a of awards) out.push({ factor: 'craft', label: a.title, weight: 1 });
-
-  // Writing and Market reports carry NO signals yet, and the model must show that
-  // truthfully — a beam at zero, labelled "coming". Inventing a loading for work that does
-  // not exist is exactly the dishonesty this module is built to prevent.
-  return out;
-}
-
-/** The same signal list with stable ids, for matching against committed LLM scores. The id
- *  is '<collection>:<index>' and the label is carried alongside, so an edited item is
- *  DETECTED (label mismatch) rather than silently keeping a stale score. */
 export function identifiedSignals(): { id: string; label: string; factor: string }[] {
   const out: { id: string; label: string; factor: string }[] = [];
   timeline.forEach((t, i) => out.push({ id: `timeline:${i}`, label: t.title, factor: 'experience' }));
@@ -190,8 +143,9 @@ export interface Loading {
  * beta_k = (summed weight of signals declared on factor k) / (total summed weight).
  *
  * That single line is the model's entire claim, and it is what the on-screen caption says.
- * Betas are shares, so they are non-negative and sum to 1 — which is also why the fan can
- * use beam area to encode them without misleading anyone.
+ * Betas are shares, so they are non-negative and sum to 1 — which is what lets any renderer encode one
+ * as a length, an area or a share of a bar without misleading anyone. (This clause used to say "which is
+ * also why the fan can use beam area"; that fan is deleted, but the property is the reason, not the fan.)
  */
 export function loadings(
   scored: readonly { id: string; label: string; score: number }[] | null = null,
@@ -204,173 +158,4 @@ export function loadings(
     const raw = mine.reduce((s, l) => s + weightFor(l.id), 0);
     return { factor, raw, beta: raw / total, count: mine.length, basis };
   });
-}
-
-// ── The fan, in 3D ──────────────────────────────────────────────────────────
-// Stage two of the owner's idea: the expression EXPANDS into a fan. Each `β_k f_k` term in
-// the equation becomes one beam radiating from the asset at the origin, so the picture is
-// the equation's terms laid out in space — the maths stays visible as the thing the object
-// came from.
-
-export interface Vec3 { x: number; y: number; z: number }
-
-/** One beam: a tapered wedge from the origin out to its tip. */
-export interface Beam {
-  factor: Factor;
-  beta: number;
-  /** Azimuth around the vertical axis, radians. */
-  azimuth: number;
-  /** Elevation above the horizontal plane, radians. */
-  elevation: number;
-  /** Tip position in world space. */
-  tip: Vec3;
-  /** Unit direction of the beam axis, independent of its length. */
-  dir: Vec3;
-  /** Half-width of the wedge at the tip; proportional to beta. */
-  halfWidth: number;
-  /** Length from origin to tip. */
-  length: number;
-}
-
-/** Fan geometry constants. Kept here (not in the painter) so the layout is testable and so
- *  the DOM overlay and the renderer read the same numbers. */
-export const FAN = {
-  /** Beams spread across a FULL circle.
-   *
-   *  Was 150°, chosen back when the fan was a flat SVG still and every tip had to face the
-   *  camera to be labelled. That constraint died with the still frame: the object now rotates,
-   *  so a beam pointing away is not a problem — it is the reason to turn the thing. And 150°
-   *  left the object reading as a spray of wedges in one hemisphere with dead space around it.
-   *  360° makes it a DIAL: six exposures around a full compass, which is both a fuller
-   *  composition and the honest shape for a factor decomposition. */
-  spreadDeg: 360,
-  /** A single CONSTANT tilt for every beam, so the fan is a shallow cone rather than a flat
-   *  star — enough to read as 3D, and identical across beams.
-   *
-   *  WHY CONSTANT, and this is the fix for the beams visibly interleaving:
-   *  elevation used to RISE with azimuth (26°, later 52°, scaled by distance from centre).
-   *  Horizontal reach goes as cos(elevation), so a short, steeply-lifted outer beam reached
-   *  LESS far across the screen than a long, flat inner one — and the on-screen order stopped
-   *  matching the azimuth order. Measured at the time:
-   *      craft   az −45°  →  screen x 515
-   *      writing az −75°  →  screen x 595   ← outermost beam, but drawn INSIDE craft
-   *      exp     az −15°  →  screen x 624
-   *  Three coupled variables (β → length, β → width, azimuth → elevation) guaranteed
-   *  crossings. Now decoupled: azimuth alone sets angular position, elevation is the same for
-   *  all, and β drives length and width only. Screen order then always follows azimuth. */
-  liftDeg: 16,
-  /** Length of a beam at beta = 0, and the extra length per unit beta. A zero-loading
-   *  factor still gets a visible stub, because "no signal yet" is information. */
-  minLength: 0.55,
-  lengthGain: 2.6,
-  /** Wedge half-width per unit beta, plus a floor so a stub is still a wedge. */
-  minHalfWidth: 0.035,
-  widthGain: 0.62,
-} as const;
-
-/**
- * Lay the beams out.
- *
- * Ordering is by DESCENDING beta, so the largest exposure sits at the fan's centre and the
- * eye reads magnitude by position as well as by size. Ties break on the declared factor
- * order, which keeps the layout deterministic (a Map/Set iteration leak here would produce
- * a different picture per build).
- */
-export function fanBeams(): Beam[] {
-  const ls = [...loadings()].sort((a, b) => {
-    if (b.beta !== a.beta) return b.beta - a.beta;
-    return FACTORS.indexOf(a.factor) - FACTORS.indexOf(b.factor);
-  });
-
-  const n = ls.length;
-  const spread = (FAN.spreadDeg * Math.PI) / 180;
-  const lift = (FAN.liftDeg * Math.PI) / 180;
-  // A full circle wraps, so the last beam must not land on top of the first: divide by n, not
-  // by (n - 1). At 360° with n = 6 that is a clean 60° pitch.
-  const full = FAN.spreadDeg >= 359.5;
-
-  // Assign the sorted betas to slots alternating outward from the middle, so the largest
-  // exposure lands centrally and the smallest at the edges.
-  //
-  // Done by PERMUTING the real slot indices 0..n-1 rather than by arithmetic around the
-  // midpoint: `mid ± k` with a half-integer midpoint produced slots outside the range,
-  // which pushed a beam past the declared spread and swung another behind the viewer
-  // (negative z, where its label could never be read). Caught by the spread and
-  // positive-z tests.
-  const centreOut: number[] = [];
-  {
-    let lo = Math.floor((n - 1) / 2);
-    let hi = lo + 1;
-    let takeLow = true;
-    while (centreOut.length < n) {
-      if (takeLow && lo >= 0) centreOut.push(lo--);
-      else if (hi < n) centreOut.push(hi++);
-      else if (lo >= 0) centreOut.push(lo--);
-      takeLow = !takeLow;
-    }
-  }
-  const slotOrder = centreOut;
-
-  return ls.map((l, i) => {
-    const slot = slotOrder[i];
-    const t = n === 1 ? 0.5 : slot / (full ? n : n - 1);   // 0..1 across the fan
-    const azimuth = -spread / 2 + t * spread;
-    // ONE elevation for every beam — see FAN.liftDeg for why a varying lift made the beams
-    // cross on screen.
-    const elevation = lift;
-    const length = FAN.minLength + l.beta * FAN.lengthGain;
-    const halfWidth = FAN.minHalfWidth + l.beta * FAN.widthGain;
-
-    return {
-      factor: l.factor,
-      beta: l.beta,
-      azimuth,
-      elevation,
-      length,
-      halfWidth,
-      // The tip's ANGULAR position is fixed by azimuth, and beta sets how far along that
-      // ray the beam reaches. Note this still leaves tip.x proportional to length, so a long
-      // inner beam can out-reach a short outer one in raw x — that is honest 3D and is why
-      // the fan must ROTATE to be read properly. What must never happen is two beams sharing
-      // angular space, which even spacing plus one shared elevation guarantees.
-      tip: {
-        x: Math.sin(azimuth) * Math.cos(elevation) * length,
-        y: Math.sin(elevation) * length,
-        z: Math.cos(azimuth) * Math.cos(elevation) * length,
-      },
-      /** Unit direction of the beam's axis — the thing that is strictly ordered by azimuth,
-       *  independent of beta. Used by tests and by label placement, so "which beam is further
-       *  left" never depends on how strong it is. */
-      dir: {
-        x: Math.sin(azimuth) * Math.cos(elevation),
-        y: Math.sin(elevation),
-        z: Math.cos(azimuth) * Math.cos(elevation),
-      },
-    };
-  });
-}
-
-/** The four world-space corners of a beam's wedge: two at the origin (narrow), two at the
- *  tip (wide). The wedge lies in the plane containing the beam axis and the world up, so
- *  every beam presents its face to a viewer in front of the fan. */
-export function beamQuad(b: Beam): [Vec3, Vec3, Vec3, Vec3] {
-  // A horizontal vector perpendicular to the beam's azimuth.
-  const px = Math.cos(b.azimuth);
-  const pz = -Math.sin(b.azimuth);
-  const root = FAN.minHalfWidth * 0.5;
-  return [
-    { x: -px * root, y: 0, z: -pz * root },
-    { x: b.tip.x - px * b.halfWidth, y: b.tip.y, z: b.tip.z - pz * b.halfWidth },
-    { x: b.tip.x + px * b.halfWidth, y: b.tip.y, z: b.tip.z + pz * b.halfWidth },
-    { x: px * root, y: 0, z: pz * root },
-  ];
-}
-
-/** The expression's terms, in the fan's own order, for rendering the equation so its terms
- *  line up left-to-right with the beams. */
-export function expressionTerms(): { symbol: string; beta: number; label: string }[] {
-  return fanBeams()
-    .slice()
-    .sort((a, b) => a.azimuth - b.azimuth)
-    .map((b) => ({ symbol: b.factor.symbol, beta: b.beta, label: b.factor.label }));
 }
