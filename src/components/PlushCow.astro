@@ -22,20 +22,29 @@ import {
 import { splitAll, widestHalf } from '../lib/cowSpeech';
 
 interface Props {
-  /** 'mark' is the quiet corner mark on the Work slide; 'small' is a footer-scale cow; 'large' is the page's subject. */
-  size?: 'mark' | 'small' | 'large';
+  /**
+   * 'mark' is the quiet corner mark on the Work slide; 'large' is the page's subject on /404 and /writing.
+   *
+   * REQUIRED, with no default. There used to be a third size, 'small' — "a footer-scale cow" — and it was the
+   * default, while all three call sites passed a size explicitly. So the default arm of every ternary below
+   * and two CSS rules were unreachable; the dist scan confirmed `.cow-wrap--small` matched zero elements on
+   * all nine pages. It survived because a default is invisible: nothing ever asked for it, and nothing could
+   * notice it was never asked for. Required means the next call site that forgets is a type error rather
+   * than a cow at whatever size happens to be default.
+   */
+  size: 'mark' | 'large';
   /** Override what it says. Defaults to the homepage lines. */
   lines?: readonly string[];
   /** Accessible name — worth tailoring, since on /404 and /writing the cow is the main thing on the page. */
   label?: string;
 }
 
-const { size = 'small', lines = COW_LINES, label = 'A cow. Press it.' } = Astro.props;
+const { size, lines = COW_LINES, label = 'A cow. Press it.' } = Astro.props;
 
 // The cow grew with the bubble. At 2px cells (44x52) it was a speck beside a 270px bubble — the pair has to
 // read as one object. 'mark' is the smallest: the owner picked it for the Work slide so the pair reads as a
 // margin note rather than a fourth panel.
-const CELL = size === 'large' ? 8 : size === 'mark' ? 3 : 5;
+const CELL = size === 'large' ? 8 : 3;
 // One cell, shared by the border, the MOO type and the tail. 10px was the owner's pick at footer scale; the
 // mark halves it, which keeps the pixel grid intact because every dimension is a multiple of the cell.
 const MOO_CELL = size === 'mark' ? 5 : 10;
@@ -253,8 +262,6 @@ const measure = widestHalf(lines.slice(0, 1)) + 1;
   }
   /* Quiet enough to be missed while reading, visible enough to be found while looking — but no longer the 0.5
      it was when it had no bubble to belong to: half-opacity beside a full-strength bubble read as unfinished. */
-  .cow-wrap--small .cow { opacity: 0.8; }
-  .cow-wrap--small .cow:hover, .cow-wrap--small .cow:focus-visible { opacity: 1; }
   .cow-wrap--large .cow { opacity: 0.9; }
   .cow-wrap--large .cow:hover, .cow-wrap--large .cow:focus-visible { opacity: 1; }
   .cow:focus-visible { outline: 2px solid currentColor; outline-offset: 6px; }
@@ -321,7 +328,6 @@ const measure = widestHalf(lines.slice(0, 1)) + 1;
   @media (max-width: 620px) {
     .cow-wrap { --moo-cell: 8px; flex-direction: column; align-items: flex-end; }
     .cow-wrap--large { --moo-cell: 9px; }
-    .cow-wrap--small .cow-art { width: 88px; height: auto; }
     .cow-wrap--large .cow-art { width: min(100%, 210px); height: auto; }
   }
   /* SMALLEST PHONES. The bubble's box is set by its COPY now (--moo-measure, in ch), so the lever that keeps it
