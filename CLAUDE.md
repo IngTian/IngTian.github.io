@@ -644,18 +644,35 @@ the `SkyWash` layer.
   right, widening it for a different kind of mark would not be.
 - **Contour cost is measured, and the parameters are a perf decision:** 9 levels at res 74 is **10.0ms**
   median (13 runs / 1245 points), against 21.0ms at res 110 and 47.1ms at the descent graph's res 150.
-  Memoised, so it is paid once per page. `tests/terrainContours.test.ts` fails above 40ms.
+  Memoised, so it is paid once per page. `tests/terrainContours.test.ts` pins both parameters and bounds
+  the work; it does **not** time the build — see below.
   - **The memo has ONE slot and no key, deliberately.** `terrainLevels(n)` and
     `terrainContoursFor(level, res)` were parameterised, with a `level|res` cache key and four specs
     exercising it — and production never passed either argument: one call site, using the constants
     declared above it. The parameters' only callers were the tests of the parameters, which is this repo's
     documented *"a test is not a consumer"* trap.
-  - **And the 40ms ceiling was not measuring anything.** The cold-build test called
-    `terrainContoursFor(l + 1e-7, ...)` with a comment saying the offset kept the memo from being warm —
-    but the key was `level.toFixed(4)`, and 1e-7 does not survive four decimals. Measured: **9 of 9 offset
-    keys hashed identically** to the warm ones, so it timed nine `Map` hits and passed at ~0ms. It now
-    resets the module registry and times a real build, **with a lower bound as well as an upper one** so
-    it cannot go vacuous again. A perf ceiling that cannot fail is worse than none: it reads as covered.
+  - **The 40ms ceiling was not measuring anything, and then it was measuring the wrong machine.** Worth
+    the whole arc, because each step looked like the fix and the third one is the lesson.
+    1. The cold-build test called `terrainContoursFor(l + 1e-7, ...)`, with a comment saying the offset
+       kept the memo from being warm. The key was `level.toFixed(4)`, and 1e-7 does not survive four
+       decimals: **9 of 9 offset keys hashed identically** to the warm ones, so it timed nine `Map` hits
+       and passed at ~0ms. A perf ceiling that cannot fail is worse than none — it reads as covered.
+    2. `vi.resetModules()` plus a dynamic import gave genuinely empty caches and measured **44.9ms**,
+       red. Real, but not production's number: re-importing re-evaluates `terrain.ts`, so `field` loses
+       its JIT feedback, while on a real first open the static frame has already run it tens of thousands
+       of times. **Cold cache, warm JIT** — model both or the budget describes nothing that ships.
+    3. Timing the kernel directly with a warm field passed locally at ~11ms and **went red on CI at
+       57.1ms**, against a ceiling whose own comment claimed it was "deliberately loose enough not to
+       flake on a loaded CI box". It had never been tested against a real measurement, because the
+       measurement was fake when the ceiling was chosen.
+    - **So there is no time budget, and that is the answer rather than a bigger number.** A ceiling loose
+      enough for the slowest 2-vCPU runner stops discriminating; a tight one flakes. This is the same
+      category error as the cadence lesson in *The fluid sky* below — a per-run stopwatch reports the
+      runner, not the code. What guards the first frame instead is **deterministic**: cost is
+      `levels x (res+1)^2` field evaluations, so the only way to make it expensive is to raise a
+      constant, and the spec pins `9` and `74` and asserts the product stays under 55,000. Mutating res
+      to descentPath's 150 fails both immediately, on any machine — 205,209 against the bound. The
+      measured times live in `lib/terrainContours.ts`'s header for whoever retunes it.
 - **Do not "optimise" the stitch in `marchingSquares.ts`.** A hashed endpoint-bucketing stitch was
   written and measured: **slower** (10.9 vs 10.0ms) *and wrong*, fragmenting 13 polylines into 32.
   Separately, the original stitch had a real bug — it attached the *first* segment within `dx * 1.2`
