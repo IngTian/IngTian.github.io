@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import SideRail from '../components/SideRail.astro';
 import DraftingField from '../components/projects/DraftingField.astro';
+import TerminalHeader from '../components/projects/TerminalHeader.astro';
 import { projects, inProgress } from '../data/profile';
 import { projectStops, projectSectionId } from '../lib/pageStops';
 
@@ -21,9 +22,7 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
   <main class="projects-page">
     <a class="back" href="/">← back</a>
 
-    <section class="index" id="p-index" aria-labelledby="p-index-h">
-      <h1 id="p-index-h">Projects</h1>
-    </section>
+    <TerminalHeader />
 
     <section class="sec" id="p-selected" aria-labelledby="p-selected-h">
       <div class="sec-h"><span class="n">01</span><h2 id="p-selected-h">Selected work</h2><span class="s">quant · research · data</span></div>
@@ -77,8 +76,6 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
 
   .back { display: inline-block; margin-top: 140px; font: 12px var(--font-mono); color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
   .back:hover { color: var(--ochre); }
-
-  .index h1 { margin-top: 22px; font: 600 clamp(28px, 3vw, 40px)/1.1 var(--font-mono); letter-spacing: 0.02em; color: var(--ink-1); }
 
   .sec { margin-top: 120px; }
   .sec-h { display: flex; align-items: baseline; gap: 16px; border-bottom: 1px solid rgba(var(--draft-line-rgb), 0.2); padding-bottom: 14px; }

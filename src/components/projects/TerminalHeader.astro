@@ -1,0 +1,102 @@
+---
+// /projects' header, as a terminal session: the PROJECTS login banner, the prompt `~/projects $ ls --shipped`, its
+// output — the `# ideas…` comment, an `ls -l` listing of every project and a summary line of counts — and an idle
+// prompt. The listing stays on the page as its index: each name jumps to that project.
+//
+// This is the FINISHED state, which is also what reduced motion and no-JS get. The order on screen is the DOM
+// order, banner first (the approved mockup lifted it with `order: -1`; here it is simply written first).
+// Every number in the summary comes from summaryCounts(), and every listing line from listingLines().
+import { inProgress, projects } from '../../data/profile';
+import { bannerRows, bannerSvg } from '../../lib/asciiBanner';
+import { listingLines, summaryCounts } from '../../lib/projectsListing';
+
+// Banner geometry in hundredths of an em: a mono cell is 0.6em wide, and the mockup set the rows at line-height 1.04.
+const ROWS = bannerRows('PROJECTS');
+const CELL_W = 60, CELL_H = 104;
+const W = ROWS[0].length * CELL_W, H = ROWS.length * CELL_H;
+const lines = listingLines(projects, inProgress);
+const n = summaryCounts(projects);
+---
+<section class="term" id="p-index" aria-labelledby="p-index-h">
+  <h1 class="sr-only" id="p-index-h">Projects</h1>
+  {/* The paint is a gradient across 1.5x the banner's width, because the mockup's ran across its 980px box while
+      the letters covered about two thirds of it — so the last letters end short of the pure line colour.
+      crispEdges because every cell is its own rect: anti-aliased, each shared edge between two blocks drew as a
+      faint seam, so the letters showed their cell grid. Every edge here is axis-aligned, so snapping costs no
+      smoothness. */}
+  <svg class="banner" viewBox={`0 0 ${W} ${H}`} width={`${W / 100}em`} height={`${H / 100}em`} aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="projects-banner-ink" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={W * 1.5} y2="0">
+        <stop offset="0" class="ink-hi" />
+        <stop offset="0.45" class="ink-acc" />
+        <stop offset="1" class="ink-line" />
+      </linearGradient>
+    </defs>
+    <g fill="url(#projects-banner-ink)" shape-rendering="crispEdges" set:html={bannerSvg(ROWS, CELL_W, CELL_H)} />
+  </svg>
+  <div class="tline"><span class="ps">~/projects $</span> <span class="cmd">ls --shipped</span></div>
+  <p class="tc"># ideas I turned into things that run</p>
+  <ul class="ls">
+    {lines.map((l) => (
+      <li class:list={{ wip: l.wip }}>
+        <span class="perm" aria-hidden="true">{l.perm}</span><a href={l.href}>{l.name}</a><span class="k">{l.kind}</span><span class="d">{l.short}</span>
+      </li>
+    ))}
+  </ul>
+  <p class="tsum">
+    <b>{n.shipped}</b> shipped · <b>{n.pypi}</b> on PyPI · <b>{n.npm}</b> on npm{n.witnessReleases !== null && (
+      <> · <b>{n.witnessReleases}</b> releases of witness</>
+    )} · CI on <b>{n.ci}</b> of <b>{n.shipped}</b>
+  </p>
+  <div class="tline idle" aria-hidden="true"><span class="ps">~/projects $</span> <span class="cur"></span></div>
+</section>
+
+<style>
+  .term { margin-top: 22px; max-width: 980px; font: 13.5px/1.55 var(--font-mono); color: var(--ink-1); }
+
+  /* 0.6em per cell, so the letters are as wide as the mockup's text banner at the same clamp; the SVG scales down
+     before it can overflow a phone. Its glow is a static drop-shadow, never animated. */
+  .banner { display: block; font-size: clamp(9px, 1.02vw, 15px); max-width: 100%; height: auto; margin: 0 0 14px;
+    filter: drop-shadow(0 0 14px rgba(var(--draft-hi-rgb), 0.22)); }
+  .ink-hi { stop-color: rgb(var(--draft-hi-rgb)); }
+  .ink-acc { stop-color: var(--ochre); }
+  .ink-line { stop-color: rgb(var(--draft-line-rgb)); }
+
+  .ps { color: var(--ochre); }
+  .tc { color: var(--ink-3); }
+  /* 18px, not 10: the mockup laid these out in a flex column, where the comment's 8px and the listing's 10px do
+     not collapse into one margin. */
+  .ls { list-style: none; margin: 18px 0 0; padding: 0; }
+  .ls li { display: grid; grid-template-columns: 104px 150px 96px 1fr; gap: 14px; padding: 1px 0; white-space: nowrap; }
+  /* CONTRAST, measured against the ground and against the vignette's darkest point: the mockup's .65 on the
+     permissions took --ink-3 to 2.57:1 (light) and its .4 on the wip line took the seal to 1.85:1. Raising the
+     opacity until each cleared 4.5:1 landed at 0.98 (ink-3) and 0.95 (seal) in light theme, so there was nothing
+     left to dim with. So both are solid: --ink-3 and the seal, which tests/draftingPalette.test.ts holds to AA at
+     that vignette point, and the wip line reads as dim by wearing --ink-3 throughout rather than by fading. Solid
+     also keeps the label knockout opaque — an element at opacity < 1 lets the field's strokes back through its
+     ring. The description is --ink-2 (between ink-1 and ink-3, so above both floors), which is the mockup's ink at
+     .78 without the opacity. */
+  .ls .perm { color: var(--ink-3); }
+  .ls a { color: var(--ochre); text-decoration: none; }
+  .ls a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .ls .k { color: var(--ink-3); }
+  .ls .d { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; }
+  .ls .wip a, .ls .wip .d { color: var(--ink-3); }
+
+  .tsum { margin-top: 12px; }
+  .tsum b { color: var(--ochre); font-weight: 600; }
+  .idle { margin-top: 12px; }
+  .cur { display: inline-block; width: 0.62em; height: 1.05em; margin-left: 2px; vertical-align: -3px; background: var(--ochre); }
+  @media (prefers-reduced-motion: no-preference) {
+    .cur { animation: term-blink 1.05s steps(1) infinite; }
+    @keyframes term-blink { 50% { opacity: 0; } }
+  }
+
+  /* Phones: the same content, wrapped rather than hidden (the mockup hid kind and description under 760px; the
+     site's phone rule is same content). The description takes its own full-width line under each entry: under the
+     name alone it had ~30 characters at 390px, so every description broke in two. */
+  @media (max-width: 640px) {
+    .ls li { grid-template-columns: 10ch minmax(0, 1fr) auto; gap: 0 1.5ch; padding: 4px 0; white-space: normal; }
+    .ls .d { grid-column: 1 / -1; }
+  }
+</style>
