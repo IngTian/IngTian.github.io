@@ -137,7 +137,7 @@ describe('isoSegments', () => {
 
   it('emits segments whose every endpoint lies within one cell of the true circle', () => {
     const pts: [number, number][] = [];
-    isoSegments(bowl, N, N, 0.5, CELL, (x0, y0, x1, y1) => pts.push([x0, y0], [x1, y1]));
+    isoSegments(bowl, N, N, [0.5], CELL, (_li, x0, y0, x1, y1) => pts.push([x0, y0], [x1, y1]));
     expect(pts.length).toBeGreaterThan(0);
     const centre = (N / 2) * CELL, radius = (R / Math.SQRT2) * CELL;
     for (const [x, y] of pts) expect(Math.abs(Math.hypot(x - centre, y - centre) - radius)).toBeLessThan(CELL);
@@ -151,14 +151,28 @@ describe('isoSegments', () => {
     // crossing at a corner is legitimately shared by every cell that touches it).
     const seen = new Map<string, number>();
     const hit = (x: number, y: number) => seen.set(`${x},${y}`, (seen.get(`${x},${y}`) ?? 0) + 1);
-    isoSegments(bowl, N, N, 0.51, CELL, (x0, y0, x1, y1) => { hit(x0, y0); hit(x1, y1); });
+    isoSegments(bowl, N, N, [0.51], CELL, (_li, x0, y0, x1, y1) => { hit(x0, y0); hit(x1, y1); });
     expect(seen.size).toBeGreaterThan(0);
     for (const [p, n] of seen) expect(n, `endpoint ${p}`).toBe(2);
   });
 
+  it('runs every level in one pass, emitting exactly what each level does alone, tagged with its index', () => {
+    // Levels 0.05 apart against cell ranges of up to ~0.19 near the rim, so many cells cross several levels; -1
+    // sits below every sample and 3 above, so the pass must skip past the first and stop before the last.
+    const levels = [-1, 0.5, 0.55, 0.6, 3];
+    const together: number[][][] = levels.map(() => []);
+    isoSegments(bowl, N, N, levels, CELL, (li, ...s) => together[li].push(s));
+    expect(together.map((t) => t.length > 0)).toEqual([false, true, true, true, false]);
+    levels.forEach((lv, k) => {
+      const alone: number[][] = [];
+      isoSegments(bowl, N, N, [lv], CELL, (_li, ...s) => alone.push(s));
+      expect(together[k]).toEqual(alone);
+    });
+  });
+
   it('emits nothing for a constant grid', () => {
     let n = 0;
-    isoSegments(new Float32Array((N + 1) * (N + 1)).fill(0.5), N, N, 0.5, CELL, () => n++);
+    isoSegments(new Float32Array((N + 1) * (N + 1)).fill(0.5), N, N, [0.5], CELL, () => n++);
     expect(n).toBe(0);
   });
 
@@ -166,13 +180,13 @@ describe('isoSegments', () => {
   // cell. Grid order is a, b / d, c. Each pair must cut off the two above-level corners, never cross the cell.
   it('splits saddle case 5 (a and c above) into the two segments that cut off a and c', () => {
     const segs: number[][] = [];
-    isoSegments(new Float32Array([1, 0, 0, 1]), 1, 1, 0.5, CELL, (...s) => segs.push(s));
+    isoSegments(new Float32Array([1, 0, 0, 1]), 1, 1, [0.5], CELL, (_li, ...s) => segs.push(s));
     expect(segs).toEqual([[0, 5, 5, 0], [10, 5, 5, 10]]);
   });
 
   it('splits saddle case 10 (b and d above) into the two segments that cut off b and d', () => {
     const segs: number[][] = [];
-    isoSegments(new Float32Array([0, 1, 1, 0]), 1, 1, 0.5, CELL, (...s) => segs.push(s));
+    isoSegments(new Float32Array([0, 1, 1, 0]), 1, 1, [0.5], CELL, (_li, ...s) => segs.push(s));
     expect(segs).toEqual([[5, 0, 10, 5], [5, 10, 0, 5]]);
   });
 });

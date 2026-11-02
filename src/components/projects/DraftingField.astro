@@ -1,0 +1,152 @@
+---
+// /projects' background: the drafting field (lib/draftingField.ts) painted on one fixed 2D canvas — isoline
+// hairlines, axis ticks, three probe crosshairs with their live elevation, and two seal-red pings once the page
+// is booted. The numbers live in the module; this file owns the canvas, the clock and the colours.
+//
+// COST, which is what every choice below is for (spec §7, budget: quiet drift ≤ 6% of a core at 2000x1100 DPR 2):
+// the backing store is capped at 1.5x density, colours are read on init and on `theme:change` rather than per
+// frame, the loop runs at `frameInterval()` (~15fps drifting, ~30fps only while a ping travels) and stops while
+// the tab is hidden. Phones and reduced motion get ONE frame and no loop, no pings.
+---
+<canvas class="drafting-field" aria-hidden="true" data-drafting-field></canvas>
+
+<style>
+  /* A canvas is a replaced element, so `inset: 0` alone would leave it at its backing-store size — the explicit
+     100% is what pins it to the viewport. The script sizes the backing store from this box. */
+  .drafting-field { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; pointer-events: none; }
+</style>
+
+<script>
+  import {
+    FIELD_CELL, FIELD_LEVELS, FIELD_X0, PING_DELAYS_MS, PROBES,
+    axisTicks, centersAt, fieldAt, frameInterval, litByRing, pingAt, probeLabel, ringState, sampleGrid,
+    type Ring,
+  } from '../../lib/draftingField';
+  import { isoSegments } from '../../lib/marchingSquares';
+  import { prefersReducedMotion } from '../../lib/motion';
+  import { isPhone } from '../../lib/viewport';
+
+  let teardown: (() => void) | null = null;
+
+  function init(): void {
+    teardown?.();
+    teardown = null;
+    const maybeCvs = document.querySelector<HTMLCanvasElement>('[data-drafting-field]');
+    const maybeCtx = maybeCvs?.getContext('2d');
+    if (!maybeCvs || !maybeCtx) return;
+    // Non-null aliases: TypeScript does not carry the guard's narrowing into the hoisted functions below.
+    const cvs = maybeCvs, ctx = maybeCtx;
+    const root = document.documentElement;
+    const animate = !prefersReducedMotion() && !isPhone();
+    // The still frame is always t = 0, so a resize or a theme flip repaints the same picture, not a jump.
+    const clock = (): number => (animate ? performance.now() / 1000 : 0);
+
+    let W = 0, H = 0;
+    function size(): void {
+      const dpr = Math.min(1.5, devicePixelRatio || 1);
+      W = cvs.clientWidth; H = cvs.clientHeight;
+      cvs.width = Math.round(W * dpr); cvs.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    let line = '', hi = '', light = true;
+    function colours(): void {
+      const cs = getComputedStyle(root);
+      line = cs.getPropertyValue('--draft-line-rgb').trim();
+      hi = cs.getPropertyValue('--draft-hi-rgb').trim();
+      light = root.dataset.theme !== 'dark';
+    }
+
+    const rings: Ring[] = [];
+    function draw(t: number): void {
+      const { grid, cols, rows, sx, y0 } = sampleGrid(W, H, t);
+      const maxR = Math.hypot(W, H) * 0.75;
+      const live: { r: Ring; s: { R: number; fade: number } }[] = [];
+      for (let i = rings.length - 1; i >= 0; i--) {
+        const s = ringState(rings[i], t, maxR);
+        if (s) live.push({ r: rings[i], s }); else rings.splice(i, 1);
+      }
+
+      ctx.clearRect(0, 0, W, H);
+      // Every fifth level is a major line.
+      const minor = new Path2D(), major = new Path2D(), lit = new Path2D();
+      let litN = 0;
+      isoSegments(grid, cols, rows, FIELD_LEVELS, FIELD_CELL, (li, ax, ay, bx, by) => {
+        let target = li % 5 === 0 ? major : minor;
+        if (live.length) {
+          const mx = (ax + bx) / 2, my = (ay + by) / 2;
+          for (const { r, s } of live) if (litByRing(mx, my, s, r)) { target = lit; litN++; break; }
+        }
+        target.moveTo(ax, ay); target.lineTo(bx, by);
+      });
+      const [minorA, majorA] = light ? [0.1, 0.24] : [0.07, 0.18];
+      ctx.lineWidth = 0.7; ctx.strokeStyle = `rgba(${line},${minorA})`; ctx.stroke(minor);
+      ctx.lineWidth = 1.1; ctx.strokeStyle = `rgba(${line},${majorA})`; ctx.stroke(major);
+      if (litN) {
+        const fade = Math.max(...live.map((l) => l.s.fade));
+        ctx.lineWidth = 1.5; ctx.strokeStyle = `rgba(${hi},${0.25 + 0.55 * fade})`; ctx.stroke(lit);
+      }
+
+      // The drafting furniture: canvas text inside an aria-hidden picture, at the mockup's quiet alphas.
+      ctx.font = '10px ui-monospace, Menlo, monospace';
+      ctx.fillStyle = `rgba(${line},${light ? 0.42 : 0.34})`;
+      const ticks = axisTicks(W, H);
+      for (const { px, label } of ticks.x) { if (label) ctx.fillText(label, px, H - 14); ctx.fillRect(px, H - 30, 1, 8); }
+      for (const { px, label } of ticks.y) { ctx.fillText(label, W - 46, px); ctx.fillRect(W - 12, px - 4, 8, 1); }
+      const centers = centersAt(t);
+      for (const [u, v] of PROBES) {
+        const px = u * W, py = v * H;
+        ctx.fillText(probeLabel(fieldAt(FIELD_X0 + px * sx, y0 + py * sx, t, centers)), px + 7, py - 6);
+        ctx.fillRect(px - 4, py, 9, 1); ctx.fillRect(px, py - 4, 1, 9);
+      }
+    }
+
+    let raf = 0, last = 0;
+    function loop(now: number): void {
+      if (now - last > frameInterval(rings.length)) { draw(now / 1000); last = now; }
+      raf = requestAnimationFrame(loop);
+    }
+    function start(): void { if (animate && !raf && !document.hidden) { last = 0; raf = requestAnimationFrame(loop); } }
+    function stop(): void { cancelAnimationFrame(raf); raf = 0; }
+    const onVis = (): void => { if (document.hidden) stop(); else start(); };
+
+    // Setting width/height clears the bitmap, and with no loop running (phone, reduced motion) nothing else
+    // would repaint it — so the resize draws once itself.
+    let resizeT = 0;
+    const onResize = (): void => {
+      window.clearTimeout(resizeT);
+      resizeT = window.setTimeout(() => { size(); draw(clock()); }, 160);
+    };
+    const onTheme = (): void => { colours(); draw(clock()); };
+
+    // "Booted" is a STATE: with no `projects-boot` class on <html> the page is already booted, so the pings are
+    // scheduled now; otherwise they wait for the boot's `projects:booted`.
+    const pingTimers: number[] = [];
+    const ping = (): void => { rings.push(pingAt(performance.now() / 1000, W, H, Math.random())); };
+    const schedulePings = (): void => { for (const ms of PING_DELAYS_MS) pingTimers.push(window.setTimeout(ping, ms)); };
+
+    size(); colours(); draw(clock());
+    if (animate) {
+      if (root.classList.contains('projects-boot')) window.addEventListener('projects:booted', schedulePings, { once: true });
+      else schedulePings();
+    }
+    start();
+    document.addEventListener('visibilitychange', onVis);
+    document.addEventListener('theme:change', onTheme);
+    window.addEventListener('resize', onResize);
+
+    teardown = () => {
+      stop();
+      window.clearTimeout(resizeT);
+      pingTimers.forEach((id) => window.clearTimeout(id));
+      window.removeEventListener('projects:booted', schedulePings);
+      document.removeEventListener('visibilitychange', onVis);
+      document.removeEventListener('theme:change', onTheme);
+      window.removeEventListener('resize', onResize);
+    };
+  }
+
+  // Every page load, including a View Transition swap: a page without the canvas just tears the last one down,
+  // which is what stops the loop when a reader leaves /projects.
+  document.addEventListener('astro:page-load', init);
+</script>

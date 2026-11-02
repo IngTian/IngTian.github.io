@@ -1,85 +1,82 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import SideRail from '../components/SideRail.astro';
+import DraftingField from '../components/projects/DraftingField.astro';
 import { projects, inProgress } from '../data/profile';
 import { projectStops, projectSectionId } from '../lib/pageStops';
 
-// TEMPORARY: a plain list of every project's name and idea, standing in until the /projects redesign
-// replaces this page. Its sections carry the ids projectStops() points at, so the rail still lands.
-// No FluidSky and no SkyWash (both removed here): page="drafting" swaps in the drafting ink, which is sized for
-// the drafting ground, and over the reading sky light --ink-3 fell to 3.89:1.
+// /projects on its own register: the drafting field behind it (no FluidSky, no SkyWash — `page="drafting"` swaps
+// in ink sized for the drafting ground) and no descent veil, because the page's boot is its entrance.
+// Every section and every project carries the id projectStops() points at, so the rail always lands.
 const stops = projectStops(projects);
-const groups = [
-  { id: 'p-selected', title: 'Selected', items: projects.filter((p) => p.tier === 'selected') },
-  { id: 'p-workshop', title: 'The workshop', items: projects.filter((p) => p.tier === 'workshop') },
-];
+const selected = projects.filter((p) => p.tier === 'selected');
+const workshop = projects.filter((p) => p.tier === 'workshop');
+const names = selected.map((p) => p.name);
+const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into things that run: ${names.slice(0, -1).join(', ')} and ${names.at(-1)}, plus the tools he built for himself and kept using.`;
 ---
-<BaseLayout
-  title="Projects — Ing Tian"
-  description="Selected projects by Ing Tian (Zeying Tian) — shipped tools and systems. Featuring witness, a Go plugin that keeps a person-centric archive of how you think and grow as you code."
-  page="drafting"
-  veil={false}
-  navZone="light"
->
-  <main class="projects">
-    <SideRail stops={stops} id="projects-toc" />
+<BaseLayout title="Projects — Ing Tian" description={description} page="drafting" veil={false} navZone="light">
+  <DraftingField />
+  <SideRail stops={stops} id="projects-toc" />
 
-    <div class="projects-block">
-      <header class="projects-head" id="p-index">
-        <a class="back" href="/">← back</a>
-        <h1>Projects</h1>
-      </header>
+  <main class="projects-page">
+    <a class="back" href="/">← back</a>
 
-      {groups.map((g) => (
-        <section class="group" id={g.id}>
-          <h2>{g.title}</h2>
-          {g.items.map((p) => (
-            <div class="item" id={projectSectionId(p.slug)}>
-              <h3>{p.name}</h3>
-              <p>{p.idea}</p>
-            </div>
-          ))}
-        </section>
-      ))}
+    <section class="index" id="p-index" aria-labelledby="p-index-h">
+      <h1 id="p-index-h">Projects</h1>
+    </section>
 
-      <section class="group" id="p-in-progress">
-        <h2>In progress</h2>
-        {inProgress.map((w) => (
-          <div class="item">
-            <h3>{w.name}</h3>
-            <p>{w.idea}</p>
-          </div>
+    <section class="sec" id="p-selected" aria-labelledby="p-selected-h">
+      <div class="sec-h"><span class="n">01</span><h2 id="p-selected-h">Selected work</h2><span class="s">quant · research · data</span></div>
+      <ul class="items">
+        {selected.map((p) => (
+          <li id={projectSectionId(p.slug)}><span class="nm">{p.name}</span><p>{p.idea}</p></li>
         ))}
-      </section>
+      </ul>
+    </section>
 
-      <footer class="projects-foot"><a class="back" href="/">← back to the descent</a></footer>
-    </div>
+    <section class="sec" id="p-workshop" aria-labelledby="p-workshop-h">
+      <div class="sec-h"><span class="n">02</span><h2 id="p-workshop-h">The workshop</h2><span class="s">tools I built for myself and kept using</span></div>
+      <ul class="items">
+        {workshop.map((p) => (
+          <li id={projectSectionId(p.slug)}><span class="nm">{p.name}</span><p>{p.idea}</p></li>
+        ))}
+      </ul>
+    </section>
+
+    <section class="sec" id="p-in-progress" aria-labelledby="p-in-progress-h">
+      <div class="sec-h"><span class="n">03</span><h2 id="p-in-progress-h">In progress</h2><span class="s">what is coming</span></div>
+      <ul class="items">
+        {inProgress.map((w) => (
+          <li><span class="nm">{w.name}</span><p>{w.idea}</p></li>
+        ))}
+      </ul>
+    </section>
   </main>
 </BaseLayout>
 
 <style>
-  .projects { position: relative; z-index: 0; min-height: 100vh; }
-  .projects-block {
-    width: min(64%, 860px);
-    margin-left: 34%;
-    margin-right: clamp(24px, 4vw, 90px);
-    box-sizing: border-box;
-  }
-  .projects-head { padding: 14vh 0 5vh; }
-  .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
-  .back:hover { color: var(--seal); }
-  .projects h1 {
-    font-family: var(--font-display); font-weight: 500; font-size: clamp(38px, 5vw, 58px);
-    line-height: 1.04; letter-spacing: -0.01em; margin-top: 16px; color: var(--ink-1);
-  }
-  .group { padding-bottom: 5vh; scroll-margin-top: 12vh; }
-  .group h2 { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 18px; }
-  .item { margin-bottom: 22px; scroll-margin-top: 12vh; }
-  .item h3 { font-family: var(--font-display); font-weight: 500; font-size: 22px; color: var(--ink-1); }
-  .item p { font-size: 14px; line-height: 1.7; color: var(--ink-2); margin-top: 6px; max-width: 60ch; }
-  .projects-foot { padding: 10vh 0 16vh; }
+  /* Above the field (z 0). The right gutter from 1180px is the cow's column, mirroring the rail on the left. */
+  .projects-page { position: relative; z-index: 1; max-width: 1500px; padding: 0 6vw 180px; }
+  /* Clears SideRail where it shows (it hides at ≤1100px). Measured with every row active, so every rule drawn:
+     its right edge is at x=139 at 1101px and x=151 at 2000px, against content starting at 190 and 230. */
+  @media (min-width: 1101px) { .projects-page { padding-left: clamp(190px, 13vw, 230px); } }
+  @media (min-width: 1180px) { .projects-page { padding-right: calc(4vw + 210px); } }
 
-  @media (max-width: 1100px) {
-    .projects-block { width: auto; margin: 0 auto; padding: 0 24px; max-width: 760px; }
-  }
+  section[id], li[id] { scroll-margin-top: 110px; }
+
+  .back { display: inline-block; margin-top: 140px; font: 12px var(--font-mono); color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
+  .back:hover { color: var(--ochre); }
+
+  .index h1 { margin-top: 22px; font: 600 clamp(28px, 3vw, 40px)/1.1 var(--font-mono); letter-spacing: 0.02em; color: var(--ink-1); }
+
+  .sec { margin-top: 120px; }
+  .sec-h { display: flex; align-items: baseline; gap: 16px; border-bottom: 1px solid rgba(var(--draft-line-rgb), 0.2); padding-bottom: 14px; }
+  .sec-h .n { font: 12px var(--font-mono); color: var(--ochre); }
+  .sec-h h2 { font: 600 13px var(--font-mono); letter-spacing: 0.24em; text-transform: uppercase; margin: 0; color: var(--ink-1); }
+  .sec-h .s { margin-left: auto; font: 11.5px var(--font-mono); color: var(--ink-3); }
+
+  .items { list-style: none; margin: 0; padding: 0; }
+  .items li { padding: 22px 8px; border-bottom: 1px solid rgba(var(--draft-line-rgb), 0.12); }
+  .items .nm { font: 600 17px var(--font-mono); color: var(--ink-1); }
+  .items p { margin: 6px 0 0; max-width: 64ch; font-size: 15px; line-height: 1.5; color: var(--ink-3); }
 </style>

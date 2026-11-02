@@ -7,6 +7,8 @@ import {
   INTRO_DURATION_MS, INTRO_DUR_MIN_MS, INTRO_DUR_MAX_MS,
 } from '../src/lib/introTimeline';
 import { INTRO_SEEN_KEY } from '../src/lib/introSession';
+import { projects } from '../src/data/profile';
+import { flattenStops, projectSectionId, projectStops } from '../src/lib/pageStops';
 
 /* ================================================================================================
    THE FIRST TEST THAT LOOKS AT WHAT THE SITE ACTUALLY SHIPS.
@@ -571,5 +573,40 @@ describe("BaseLayout's per-page hooks ship on /projects and ONLY on /projects", 
     expect(want, "no font-weight rule for the nav's current link in dist/_astro/*.css").not.toBeNull();
     expect(face, 'no JetBrains Mono @font-face with a weight range on /research').not.toBeNull();
     expect(Number(want![1])).toBeLessThanOrEqual(Number(face![2]));
+  });
+});
+
+describe('/projects — the page shell on the drafting field', () => {
+  const projectsPage = (): Page => {
+    const p = byRoute().get('/projects');
+    if (!p) throw new Error('no built page for /projects — run `npm run build`');
+    return p;
+  };
+
+  // Derived from the tree the rail renders, so a stop the page forgot to emit fails here by name. (No fluid sky
+  // and no sky wash on this page is asserted in the describe above.)
+  it('emits an id for every rail stop and for every project', () => {
+    const { ids } = projectsPage();
+    const want = [
+      ...flattenStops(projectStops(projects)).map((s) => s.target),
+      ...projects.map((p) => projectSectionId(p.slug)),
+    ];
+    expect(want.filter((id) => !ids.has(id))).toEqual([]);
+  });
+
+  it('has exactly one <h1>, and it reads "Projects"', () => {
+    const h1s = [...projectsPage().markup.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)]
+      .map((m) => m[1].replace(/<[^>]*>/g, '').trim());
+    expect(h1s).toEqual(['Projects']);
+  });
+
+  // The field is a picture, so its canvas is hidden from assistive tech; it is the page's only canvas.
+  it('paints the field on one aria-hidden canvas, beside <main class="projects-page">', () => {
+    const { markup } = projectsPage();
+    const canvases = [...markup.matchAll(/<canvas\b[^>]*>/g)].map((m) => m[0]);
+    expect(canvases.length, 'canvases on /projects').toBe(1);
+    expect(/\sdata-drafting-field\b/.test(canvases[0]), 'the canvas is not the drafting field').toBe(true);
+    expect(/\saria-hidden="true"/.test(canvases[0]), 'the field canvas is not aria-hidden').toBe(true);
+    expect(/<main\b[^>]*\sclass="[^"]*\bprojects-page\b/.test(markup), 'no <main class="projects-page">').toBe(true);
   });
 });
