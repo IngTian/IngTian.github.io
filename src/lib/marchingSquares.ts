@@ -1,6 +1,6 @@
 // src/lib/marchingSquares.ts
 //
-// ONE MARCHING-SQUARES IMPLEMENTATION, TWO CALLERS.
+// ONE STITCHED MARCHING-SQUARES KERNEL WITH TWO CALLERS, AND ONE SEGMENT-ONLY PASS WITH A THIRD.
 //
 // `descentPath.contours()` drew isolines of the career field within `storyBounds()`; the homepage intro
 // needs isolines of the terrain field within `RANGE`. Those two differ in exactly ONE thing — their bounds.
@@ -13,6 +13,11 @@
 // Pure, with no module state. The callers memoise (see `contoursFor` in descentPath.ts and
 // `terrainContoursFor` in terrainContours.ts); caching here would mean one cache keyed by a function
 // reference, which is the kind of key that silently stops matching.
+//
+// `isoSegments` (bottom of the file) is for a caller that cannot memoise: /projects' drafting field drifts, so its
+// isolines are new on every frame — ~15 a second, 24 levels each. `isoRuns` would sample `fn` four times per
+// cell per level and then stitch in O(n²); the drafting field samples ONE grid per frame, runs every level over
+// it, and strokes the bare segments into a Path2D, where hairlines read as continuous with no stitch at all.
 
 /** A sampling rectangle in world space. Matches the shape `storyBounds()` returns. */
 export interface IsoBounds { x0: number; y0: number; x1: number; y1: number }
@@ -129,4 +134,40 @@ export function isoRuns(
     if (run.length > 3) runs.push(run);
   }
   return runs;
+}
+
+// Edge pairs per case, edges numbered top 0, right 1, bottom 2, left 3 — the approved mockup's table, flattened
+// so cases 5 and 10 (the saddles) carry two pairs. 0 and 15 have no crossing.
+const SEGS: readonly (readonly number[])[] = [
+  [], [3, 0], [0, 1], [3, 1], [1, 2], [3, 0, 1, 2], [0, 2], [3, 2],
+  [2, 3], [0, 2], [0, 1, 2, 3], [1, 2], [1, 3], [0, 1], [0, 3], [],
+];
+
+/**
+ * Isoline segments of a pre-sampled grid at `level`, in px, handed to `emit` one at a time — no stitching.
+ *
+ * `grid` is (cols+1) x (rows+1) samples, row-major with stride cols+1 (what `sampleGrid` in draftingField.ts
+ * returns); sample (i, j) sits at px (i * cell, j * cell). Corners of a cell are a b / d c, top row first.
+ */
+export function isoSegments(
+  grid: Float32Array, cols: number, rows: number, level: number, cell: number,
+  emit: (x0: number, y0: number, x1: number, y1: number) => void,
+): void {
+  const stride = cols + 1;
+  const ex = [0, 0, 0, 0], ey = [0, 0, 0, 0];
+  for (let j = 0; j < rows; j++) {
+    for (let i = 0; i < cols; i++) {
+      const o = j * stride + i, a = grid[o], b = grid[o + 1], c = grid[o + stride + 1], d = grid[o + stride];
+      const idx = (a > level ? 1 : 0) | (b > level ? 2 : 0) | (c > level ? 4 : 0) | (d > level ? 8 : 0);
+      if (idx === 0 || idx === 15) continue;
+      const x = i * cell, y = j * cell;
+      // an edge the level does not cross may divide by zero here; the case table never reads it
+      ex[0] = x + cell * (level - a) / (b - a); ey[0] = y;
+      ex[1] = x + cell;                         ey[1] = y + cell * (level - b) / (c - b);
+      ex[2] = x + cell * (level - d) / (c - d); ey[2] = y + cell;
+      ex[3] = x;                                ey[3] = y + cell * (level - a) / (d - a);
+      const s = SEGS[idx];
+      for (let k = 0; k < s.length; k += 2) emit(ex[s[k]], ey[s[k]], ex[s[k + 1]], ey[s[k + 1]]);
+    }
+  }
 }

@@ -181,7 +181,7 @@ src/
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
   lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter AND the memoised grid cache
-  lib/marchingSquares.ts            # isoRuns(fn, bounds, level, res) — ONE marching-squares kernel; descentPath and terrainContours are both callers
+  lib/marchingSquares.ts            # isoRuns(fn, bounds, level, res) — the ONE stitched kernel; descentPath and terrainContours are both callers. Plus isoSegments: unstitched, over a pre-sampled grid, for lib/draftingField.ts (redrawn per frame, so the O(n²) stitch is unaffordable)
   lib/terrainContours.ts            # the hero field's isolines + levels, memoised — the intro's survey pass
   lib/introTimeline.ts              # the homepage intro's SCHEDULE only — pure. The decision and the ?dur= clamp live in pages/index.astro's is:inline script (it must run before first paint, so it cannot import); lib/introSession.ts reads what that publishes
   lib/descentPath.ts, trajectory.ts # the career descent graph's field and route
