@@ -36,8 +36,9 @@
 // both 2), and each project's RECORD text from profile.ts — NOT its README. One item per project: its
 // visibility, its `idea` in quotes, then its `proof` chips joined by "; ". macboot's item opened "PRIVATE
 // repo, no public link", which is the scoring prompt's wording for `visibility: 'private'`, not record text.
-// The plan asked for the five READMEs; record text is what ran. It is also what the first pass scored: the
-// item a reader of this site sees, under RUBRIC_PROMPT's "score only what the text says".
+// Record text is the instrument on purpose (an early plan draft said READMEs and was corrected): it is what
+// the first pass scored for all twenty items, the item a reader of this site sees under RUBRIC_PROMPT's
+// "score only what the text says", and the only text the quote guard below can check offline.
 //
 // Three raters, run concurrently; each read only the rubric and this file, and none saw another's output.
 // Unlike the first pass they had no assigned stances — all three got the same prompt. Their scores:
@@ -49,7 +50,8 @@
 // rater 2's sentence verbatim (all three tied, so the middle rater) — with ONE later edit. trading-desk's
 // chip was scored as "~270 tests" and then corrected to "~300 tests" (323 collected, 299 run without a
 // book), and its quote follows the chip. It was not re-scored: all three raters read the count only as
-// "public and checkable" and capped the item on "bookkeeping", so the count did not set the 2.
+// "public and checkable" and capped the item as ledger software rather than modelling (two called it
+// bookkeeping, one accounting), so the count did not set the 2.
 // tests/signalWeights.test.ts checks that every quoted span in a project's `because` is still in its item.
 //
 // Project ids are keyed by slug (`projects:witness`), not by index, so adding a project does not reshuffle
