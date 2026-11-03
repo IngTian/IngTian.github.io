@@ -291,7 +291,8 @@ function binaries() {
 // ── run ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 const ALL = { 'rl-bhrp': rlBhrp, offchart, witness, macboot, binaries };
-for (const p of PARTS) if (!(p in ALL)) fail(`no part "${p}"; the parts are ${Object.keys(ALL).join(', ')}`);
+// Own names only: `in` also accepts inherited ones (`toString`), which matched no part and exited 0 having written nothing.
+for (const p of PARTS) if (!Object.hasOwn(ALL, p)) fail(`no part "${p}"; the parts are ${Object.keys(ALL).join(', ')}`);
 for (const d of [VENDOR, ASSETS, PUBLIC]) mkdirSync(d, { recursive: true });
 const files = [];
 for (const [name, run] of Object.entries(ALL)) if (!PARTS.length || PARTS.includes(name)) files.push(...[await run()].flat());

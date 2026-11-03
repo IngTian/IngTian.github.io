@@ -512,6 +512,9 @@ const bubbles = JSON.stringify([
   // astro:page-load, which re-ran every vanilla script — the deck's 7-slide re-measure, the Toc, three beat
   // steppers, the cow — for a palette change none of them care about. Measured at 6x throttle: a 357ms long task
   // on the homepage against 55ms on /404, and identical with the View Transition disabled, so the transition was
-  // never the cost. This canvas is one of only three surfaces that paint from JS and read the palette.
+  // never the cost. This canvas is one of five scripts that read the palette from JS and so listen for
+  // theme:change — with DescentPath and FluidSky here, and DraftingField and Gallery on /projects. (This said "only
+  // three" until /projects added its two.) Added once per document and never removed, like DescentPath's and
+  // FluidSky's: on a page without the canvas, initTerrain finds none and returns.
   document.addEventListener('theme:change', initTerrain);
 </script>

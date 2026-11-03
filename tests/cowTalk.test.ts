@@ -127,3 +127,59 @@ describe('the in-flow cow (projects.astro, below 1180px)', () => {
     expect(hop * over).toBeLessThanOrEqual(margin + 0.5);
   });
 });
+
+// THE PHONE STRIP HOLDS EVERY LINE (Task E, E8). On a phone the bubble opens below the prompt into a strip of fixed
+// height — projects.astro's `.cowbox { height: calc(4px + 4 * 1.45 * 12.5px + …) }`, four rows of the cow's type —
+// beside the 88px cow, so its halves wrap to what is left of the column. A line that wrapped to a fifth row would
+// overrun the strip into the gallery's cards with the suite green, the hole this closes: every half is word-wrapped
+// here at the narrowest column, from the same literals the stylesheets use, and each pair must fit the strip's rows.
+describe("the phone's strip (projects.astro, ≤640px)", () => {
+  const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+  const page = read('../src/pages/projects.astro');
+  const cow = read('../src/components/PlushCow.astro');
+  const num = (re: RegExp, src: string, what: string): number[] => {
+    const m = re.exec(src);
+    if (!m) throw new Error(`could not find ${what}: the stylesheet changed shape, so this spec must follow it`);
+    return m.slice(1).map(Number);
+  };
+  const phone = /@media \(max-width: 640px\) \{([\s\S]*?)\n {2}\}/.exec(page)?.[1] ?? '';
+  const flow = /@media \(max-width: 1179px\) \{([\s\S]*?)\n {2}\}/.exec(page)?.[1] ?? '';
+
+  // The narrowest viewport the site is measured at (CLAUDE.md, Phones). A mono advance is 0.6em (JetBrains Mono,
+  // 600 of 1000 units), the cell TerminalHeader's banner is drawn on.
+  const NARROWEST = 320, ADVANCE_EM = 0.6;
+  const [rows, stripLh, stripFont] = num(/\.cowbox \{ height: calc\(4px \+ (\d+) \* ([\d.]+) \* ([\d.]+)px \+/, phone, "the strip's height");
+  const [padVw] = num(/\.projects-page \{[^}]*padding: 0 ([\d.]+)vw /, page, "the page's side padding");
+  const [art] = num(/\.cowbox :global\(\.cow-art\) \{ width: ([\d.]+)px;/, flow, "the in-flow cow's width");
+  const [gapMin, gapVw, gapMax] = num(/\.cow-wrap \{[^}]*gap: clamp\(([\d.]+)px, ([\d.]+)vw, ([\d.]+)px\);/, cow, "the cow's gap");
+  const [cell] = num(/\.cow-wrap--rail \{ --moo-cell: ([\d.]+)px;/, cow, "the rail cow's cell");
+  const [padCells] = num(/\.cow-wrap--rail \.cow-bubble \{\s*padding: calc\(var\(--moo-cell\) \* [\d.]+\) calc\(var\(--moo-cell\) \* ([\d.]+)\);/, cow, "the bubble's side padding");
+  const [font] = num(/\.cow-wrap--rail \.cow-says \{ margin: 0; font-size: ([\d.]+)px; letter-spacing: 0;/, cow, "the rail cow's type");
+  const [lh] = num(/\.cow-says \{[^}]*line-height: ([\d.]+);/, cow, "the cow's leading");
+
+  it('sizes the strip in the type the bubble is set in', () => {
+    expect(cow).toMatch(/\.cow-bubble \{[^}]*border: var\(--moo-cell\) solid/);   // one cell a side, used below
+    expect([stripFont, stripLh]).toEqual([font, lh]);
+  });
+
+  it('fits every half of every line into its rows at the narrowest column', () => {
+    const column = NARROWEST * (1 - (2 * padVw) / 100);
+    const gap = Math.min(gapMax, Math.max(gapMin, (gapVw / 100) * NARROWEST));
+    const text = column - gap - art - 2 * cell - 2 * padCells * cell;   // 281.6 - 4 - 88 - 8 - 24 = 157.6px today
+    const perRow = Math.floor(text / (ADVANCE_EM * font));
+    expect(perRow).toBeGreaterThan(0);
+    // Greedy word wrap, as the browser does it: a half breaks only at spaces, and a word longer than a row overflows.
+    const wrap = (s: string): number => {
+      let n = 1, at = 0;
+      for (const w of s.split(' ')) {
+        expect(w.length, `"${w}" is wider than a row`).toBeLessThanOrEqual(perRow);
+        if (at === 0) at = w.length;
+        else if (at + 1 + w.length <= perRow) at += 1 + w.length;
+        else { n += 1; at = w.length; }
+      }
+      return n;
+    };
+    const over = ALL.map((pair) => ({ pair: pair.join(' / '), rows: wrap(pair[0]) + wrap(pair[1]) })).filter((l) => l.rows > rows);
+    expect(over).toEqual([]);
+  });
+});

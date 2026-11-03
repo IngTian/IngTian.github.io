@@ -16,6 +16,10 @@
 /** The phone breakpoint, in px. Mirrors every `@media (max-width: 640px)` block in the styles. */
 export const PHONE_MAX_WIDTH = 640;
 
+/** The media query for it, built once: isPhone() asks it, the deck listens on it, and /projects' inline boot
+ *  decider, which cannot import isPhone(), is handed this string instead. */
+export const PHONE_QUERY = `(max-width: ${PHONE_MAX_WIDTH}px)`;
+
 /**
  * True when the viewport is at or below the phone breakpoint.
  *
@@ -26,5 +30,5 @@ export const PHONE_MAX_WIDTH = 640;
 export function isPhone(): boolean {
   if (typeof window === 'undefined') return false;
   if (typeof window.matchMedia !== 'function') return false;
-  return window.matchMedia(`(max-width: ${PHONE_MAX_WIDTH}px)`).matches;
+  return window.matchMedia(PHONE_QUERY).matches;
 }

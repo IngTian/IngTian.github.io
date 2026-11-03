@@ -215,7 +215,7 @@ src/
   data/{cowGlyph,ruleGlyphs,tickerGlyphs,signalWeights}.ts # pixel-art matrices and weights the slides draw from
   lib/deck.ts                       # pure deck stops: WHERE the homepage scroll may rest, and what's next — unit-tested
   lib/pageStops.ts                  # pure Stop trees: one tree per page drives BOTH its rail and its section ids — unit-tested
-  lib/viewport.ts                   # PHONE_MAX_WIDTH = 640 + isPhone() — the one phone gate
+  lib/viewport.ts                   # PHONE_MAX_WIDTH = 640, its PHONE_QUERY + isPhone() — the one phone gate
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
   lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter AND the memoised grid cache
@@ -463,7 +463,10 @@ scroll."*
 `lib/viewport.ts` is the one phone gate: **`PHONE_MAX_WIDTH = 640`** and
 `isPhone()`, which asks `matchMedia` rather than measuring `innerWidth` so it
 agrees with CSS exactly (the two disagree by a scrollbar's width, and that is
-enough to engage the deck on a viewport whose styles think it's a phone).
+enough to engage the deck on a viewport whose styles think it's a phone). The query
+string itself is built once, as `PHONE_QUERY`: `isPhone()`, the deck's change listener,
+/projects' inline boot decider and the dist smoke test's stand-in all read it. It was
+built four times over before, each from the number, which is one typo from four answers.
 
 **The number lives in two places and they are synced BY HAND.** `@media
 (max-width: var(--x))` is not valid CSS, so there is no way to feed one value to
@@ -521,7 +524,7 @@ phone treatment is *bug fixes only*, and the whole of it is:
   gated on `(hover: hover)` rather than on width, so they also stay off on a tablet's
   touch. Two more, both the controller's calls (Task D), and both *deleting* behaviour:
   - **No boot.** `shouldBoot` takes a `phone` flag (the inline decider asks
-    `PHONE_MAX_WIDTH`'s media query, passed in, never typed) and a phone gets the
+    `lib/viewport.ts`'s `PHONE_QUERY`, passed in, never typed) and a phone gets the
     finished page, even with `?boot=1`. On a phone the largest element is a listing line
     the boot prints late: observed mobile LCP was 2,294ms with the boot and 61ms without
     — exactly what boot B was chosen to avoid. With the gate, Lighthouse mobile observed
@@ -531,7 +534,10 @@ phone treatment is *bug fixes only*, and the whole of it is:
     was docked bottom-right over the first screen, then put in a 218px band under the
     listing. The one difference from 641px: a 343px column has no room for the bubble on
     the prompt's row or above it, so on a phone it opens below the prompt, tail turned up,
-    into a fixed strip sized for its tallest line (four rows at 320px).
+    into a fixed strip sized for its tallest line (four rows at 320px). `tests/cowTalk.test.ts`
+    word-wraps every line at 320px from the stylesheets' own literals and fails on a fifth row:
+    the strip is hand-sized against the copy, and a longer line would otherwise overrun it into
+    the gallery with the suite green.
   - **Where the cow stands is two rules, for the whole in-flow range (0–1179px).** It is
     **top-aligned** in its row: the rail wrapper is `align-items: flex-end`, so the cow sat
     on the bottom of a line as tall as its tallest item. From 641px that item is the cow,

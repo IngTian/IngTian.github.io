@@ -614,11 +614,15 @@ const items: Item[] = [
     // Dispatched IMMEDIATELY now. This used to be deferred until after the View Transition finished, on
     // the reasoning that a re-init must not happen "while the page is held" — a trade that cost a beat of
     // stale palette and was measured against a 357ms long task from re-firing astro:page-load across
-    // fifteen scripts. Both halves of that have since gone: the event reaches five listeners, not fifteen
-    // scripts, and at most three on any one page (`/`'s TerrainHero, DescentPath and FluidSky; /projects'
-    // DraftingField and Gallery; FluidSky alone elsewhere) — this comment said "three scripts" until /projects
-    // added its two. A PerformanceObserver check across a flip on `/` reports NO long task at all (worst rAF gap
-    // 34ms, one frame of the hero's own 30fps throttle). There is no transition left to stay outside of.
+    // fifteen scripts. Both halves of that have since gone: the event reaches at most five listeners, not fifteen
+    // scripts, and at most three of them do work on any one page (`/`'s TerrainHero, DescentPath and FluidSky;
+    // /projects' DraftingField and Gallery; FluidSky alone elsewhere). Five and not three because those first three
+    // add theirs at module level, once per document, and never remove it: after a ClientRouter visit to `/` a flip
+    // on /projects still reaches all three, and each finds no canvas and returns. DraftingField and Gallery add theirs
+    // in init and remove it in teardown. This said "three scripts" until /projects added its two, then "at most three
+    // on any one page" until the module-level listeners were counted. A PerformanceObserver check across a flip on
+    // `/` reports NO long task at all (worst rAF gap 34ms, one frame of the hero's own 30fps throttle). There is no
+    // transition left to stay outside of.
     //
     // TerrainHero and FluidSky no longer depend on this for correctness either, since both read the
     // palette per frame. DescentPath still reads per init, so this is what repaints the Story slide; DraftingField

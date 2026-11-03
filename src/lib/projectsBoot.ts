@@ -29,7 +29,7 @@ export const BOOT_DEADLINE_MS = 4500;
  * at a deep link or at a restored scroll — each of those readers is already somewhere, and the boot starts at the
  * top. SHIPPED AS SOURCE into an inline script, so it must stay self-contained: one expression over its argument.
  *
- * NEVER ON A PHONE (`phone` is lib/viewport.ts's PHONE_MAX_WIDTH query, passed in by the decider). Boot B paints the
+ * NEVER ON A PHONE (`phone`: whether lib/viewport.ts's PHONE_QUERY matches, asked by the decider). Boot B paints the
  * banner and the gallery on frame one so LCP is not held back — true on a desktop, where a gallery picture is the
  * largest element. On a phone the gallery is below the fold and the largest element is a listing line the boot
  * prints at ~1.9s: observed mobile LCP was 2,294ms with the boot and 61ms without. The anti-goal boot B was chosen

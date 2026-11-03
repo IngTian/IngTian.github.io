@@ -13,7 +13,7 @@ import { flattenStops, projectSectionId, projectStops } from '../src/lib/pageSto
 import { GALLERY_ORDER } from '../src/lib/galleryLayout';
 import { listingLines } from '../src/lib/projectsListing';
 import { BOOT_CMD, BOOT_DEADLINE_MS, BOOT_SEEN_KEY } from '../src/lib/projectsBoot';
-import { PHONE_MAX_WIDTH } from '../src/lib/viewport';
+import { PHONE_QUERY } from '../src/lib/viewport';
 
 /* ================================================================================================
    THE FIRST TEST THAT LOOKS AT WHAT THE SITE ACTUALLY SHIPS.
@@ -793,7 +793,7 @@ describe('/projects — the boot: decided inline before first paint, and the ser
       history: { state: o.stateY === undefined ? null : { index: 0, scrollX: 0, scrollY: o.stateY } },
       // The phone query must be lib/viewport.ts's, exactly: a typed or drifted width never matches here.
       matchMedia: (q: string) => ({
-        matches: (/reduce/.test(q) && o.reduce === true) || (q === `(max-width: ${PHONE_MAX_WIDTH}px)` && o.phone === true),
+        matches: (/reduce/.test(q) && o.reduce === true) || (q === PHONE_QUERY && o.phone === true),
       }),
       performance: { now: () => 1234.5 },
       setTimeout: (fn: () => void, ms: number) => timers.push({ fn, ms }),

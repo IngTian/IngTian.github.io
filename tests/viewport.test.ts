@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isPhone, PHONE_MAX_WIDTH } from '../src/lib/viewport';
+import { isPhone, PHONE_MAX_WIDTH, PHONE_QUERY } from '../src/lib/viewport';
 
 /**
  * The phone gate decides BEHAVIOUR, not just looks: whether the slide deck attaches its listeners at all.
@@ -16,6 +16,12 @@ describe('viewport phone gate', () => {
     // If this fails, the `@media (max-width: 640px)` blocks in CornerNav.astro, Heights.astro and
     // global.css must change with it — that is the whole reason the assertion exists.
     expect(PHONE_MAX_WIDTH).toBe(640);
+  });
+
+  it('builds its one media query from that number', () => {
+    // isPhone(), /projects' inline boot decider and the dist smoke test's stand-in all read this string, so the
+    // width is never retyped into a query (Task E, E8).
+    expect(PHONE_QUERY).toBe('(max-width: 640px)');
   });
 
   it('asks CSS the question rather than measuring innerWidth', () => {

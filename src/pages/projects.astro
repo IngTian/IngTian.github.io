@@ -11,7 +11,7 @@ import WorkshopCards from '../components/projects/WorkshopCards.astro';
 import { projects } from '../data/profile';
 import { projectStops } from '../lib/pageStops';
 import { BOOT_DEADLINE_MS, BOOT_SEEN_KEY, shouldBoot } from '../lib/projectsBoot';
-import { PHONE_MAX_WIDTH } from '../lib/viewport';
+import { PHONE_QUERY } from '../lib/viewport';
 
 // /projects on its own register: the drafting field behind it (no FluidSky, no SkyWash — `page="drafting"` swaps
 // in ink sized for the drafting ground) and no descent veil, because the page's boot is its entrance.
@@ -30,9 +30,9 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
 // checks is the one that runs — CLAUDE.md's "a test is not a consumer" (the intro's shouldPlayIntro had specs and
 // no caller). tests/distSmoke.test.ts runs this script as shipped. A restored scroll is the router's: it keeps
 // scrollY in history.state and restores it after parse, so `scrollY` alone still reads 0 here.
-// The phone query is built from lib/viewport.ts's PHONE_MAX_WIDTH, never typed — the same interpolation as the key
-// and the deadline (define:vars would do the same job; this script already carries its constants this way). An
-// inline script cannot import isPhone(), so it asks the media query isPhone() asks.
+// The phone query is lib/viewport.ts's PHONE_QUERY, never typed — interpolated like the key and the deadline
+// (define:vars would do the same job; this script already carries its constants this way). An inline script cannot
+// import isPhone(), so it asks the very string isPhone() asks.
 // It also owns the boot's CLOCK and its DEADLINE, both from parse. data-boot-at is t=0 for TerminalHeader, which
 // may start late. The deadline is the failsafe: only TerminalHeader can light what this hides, so if its script
 // never arrives or throws, at BOOT_DEADLINE_MS this takes the class off and tells the page itself — "a script
@@ -42,7 +42,7 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
 const bootDecider = `(function () {
   try {
     var KEY = ${JSON.stringify(BOOT_SEEN_KEY)}, DEADLINE = ${JSON.stringify(BOOT_DEADLINE_MS)};
-    var PHONE = ${JSON.stringify(`(max-width: ${PHONE_MAX_WIDTH}px)`)};
+    var PHONE = ${JSON.stringify(PHONE_QUERY)};
     var shouldBoot = ${shouldBoot.toString()};
     var seen = null;
     try { seen = sessionStorage.getItem(KEY); } catch (e) { seen = null; }
@@ -175,7 +175,8 @@ const bootDecider = `(function () {
   /* The phone's strip: the bubble's top 4px under the prompt's line (its tail, turned up, rises beside the prompt's
      empty right end), and the box's height the bubble's tallest case — four rows (4 × 12.5px × 1.45, plus 54px of
      border, padding and MOO type) — less the gallery's 44px phone margin it may sit in, plus 6px of air. Four rows is
-     the widest line at 320px; at 390px nothing passes three. */
+     the widest line at 320px; at 390px nothing passes three. tests/cowTalk.test.ts word-wraps every line at 320px from
+     these literals and PlushCow's, so a fifth row fails there rather than overrunning into the gallery. */
   @media (max-width: 640px) {
     .cowbox { height: calc(4px + 4 * 1.45 * 12.5px + 54px - 44px + 6px); }
     .cowbox :global(.cow-wrap--talk .cow-bubble) { align-self: flex-start; margin: calc(12px + 13.5px * 1.55 + 4px) 0 0; transform-origin: 85% 0; }
