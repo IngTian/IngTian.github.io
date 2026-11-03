@@ -349,25 +349,33 @@ const measure = widestHalf(lines.slice(0, 1)) + 1;
     .cow-wrap--large .cow-says { font-size: 13px; }
   }
 
-  /* ── THE RAIL — /projects' cow, the mockup's: the bubble ABOVE the cow at every width, on a 4px cell. Last in the
-     file, so the narrow-screen cells above cannot reach it. Where it sits, and how wide the drawing is below
-     1180px, belong to the page. */
-  .cow-wrap--rail { --moo-cell: 4px; flex-direction: column; align-items: flex-end; gap: 0; }
+  /* ── THE RAIL — /projects' cow, the mockup's, on a 4px cell. Last in the file, so the narrow-screen cells above
+     cannot reach it. Where it sits, and how wide the drawing is below 1180px, belong to the page. */
+  .cow-wrap--rail { --moo-cell: 4px; }
   .cow-wrap--rail .cow-bubble {
     padding: calc(var(--moo-cell) * 2.5) calc(var(--moo-cell) * 3);
-    margin-bottom: calc(var(--moo-cell) * 6);
     box-shadow: calc(var(--moo-cell) * 1.5) calc(var(--moo-cell) * 1.5) 0 rgba(var(--hairline-rgb), 0.25);
   }
   .cow-wrap--rail .cow-moo { margin-bottom: calc(var(--moo-cell) * 1.5); }
   /* No letter-spacing, so a `ch` is exactly one glyph's advance — the talking script sizes the line in ch. */
   .cow-wrap--rail .cow-says { margin: 0; font-size: 12.5px; letter-spacing: 0; color: var(--ink-1); }
-  /* Over the cow's head, which is below the bubble here rather than beside it. */
-  .cow-wrap--rail .cow-tail { right: 44px; }
   .cow-wrap--rail .cow:focus-visible { outline-color: var(--ochre); }
+  /* THE BUBBLE ABOVE THE COW only where the page fixes it: its right-hand gutter from 1180px and the phone dock
+     (both breakpoints synced by hand with projects.astro's .cowbox). Between them the cow sits in the page's flow
+     beside the listing's last line, and there it keeps the bubble BESIDE it — the row geometry above, tail at the
+     bubble's lower right — so it costs the cow's 104px of height rather than bubble plus cow. */
+  @media (min-width: 1180px), (max-width: 640px) {
+    .cow-wrap--rail { flex-direction: column; align-items: flex-end; gap: 0; }
+    .cow-wrap--rail .cow-bubble { margin-bottom: calc(var(--moo-cell) * 6); }
+    /* Over the cow's head, which is below the bubble here rather than beside it. */
+    .cow-wrap--rail .cow-tail { right: 44px; }
+  }
 
   /* ── TALKING: silent until it speaks. The box follows its line (the script sets the line's width before it
-     types), and the bubble never takes a click meant for the page under it. */
-  .cow-wrap--talk .cow-bubble { width: auto; opacity: 0; pointer-events: none; }
+     types). What takes a click is the page's to say: projects.astro makes the whole box transparent to the
+     pointer but the button, because a child's pointer-events: none does not let a click through its parent's
+     box, and this wrapper is as wide as the bubble even while the bubble is hidden. */
+  .cow-wrap--talk .cow-bubble { width: auto; opacity: 0; }
   .cow-wrap--talk .cow-bubble.is-on { opacity: 1; }
   @media (prefers-reduced-motion: no-preference) {
     .cow-wrap--talk .cow-bubble {

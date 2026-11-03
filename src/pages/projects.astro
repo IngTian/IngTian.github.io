@@ -28,7 +28,7 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
 
     <TerminalHeader />
     {/* The cow: fixed in the right-hand column from 1180px, docked bottom-right on a phone, and between those in the
-        flow at the end of the listing — here in the source for that middle case. */}
+        flow beside the listing's last line — here in the source for that middle case. */}
     <div class="cowbox"><PlushCow size="rail" talk /></div>
     <Gallery />
 
@@ -72,19 +72,34 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
   .back { display: inline-block; margin-top: 140px; font: 12px var(--font-mono); color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
   .back:hover { color: var(--ochre); }
 
-  /* THE COW'S COLUMN. Between 641 and 1179px it sits in the flow, right-aligned under the listing, and follows no
-     scroll: fixed there, it and its bubble would cover text and tap targets on tablets and small laptops. From
-     1180px it is fixed in the gutter the padding above reserves, mirroring the rail; on a phone it docks to the
-     bottom-right corner at the same inset. Its bubble is its own opaque ground, so no label knockout. Hidden while
-     the page boots, like the mockup's, and not pressable then. */
-  .cowbox { display: flex; justify-content: flex-end; margin-top: 8px; text-shadow: none; }
+  /* THE COW'S COLUMN. From 1180px it is fixed in the gutter the padding above reserves, mirroring the rail; on a
+     phone it docks to the bottom-right corner at the same inset. Between 641 and 1179px it follows no scroll —
+     fixed there, it and its bubble would cover text and tap targets on tablets and small laptops — and sits in the
+     flow BESIDE THE LISTING'S LAST LINE, the idle prompt, whose 14 characters leave the rest of that row empty.
+     The box takes no height of its own: the cow's top meets the summary's bottom (TerminalHeader's .idle is a
+     12px margin plus one 13.5px/1.55 line, synced by hand) and its 104px reach down into the gallery's 70px top
+     margin, so the gallery starts where it would with no cow. A band under the listing (218px, then a 104px row)
+     pushed the gallery below the fold at 1100x800 and 1080x810, against spec §3. Its bubble is its own opaque
+     ground, so no label knockout.
+     NOTHING HERE TAKES A CLICK BUT THE COW. A child's pointer-events: none does not let a click through its
+     parent's box, and the cow's wrapper is as wide as the bubble even while the bubble is hidden — so with only
+     the bubble transparent, a 212x226 box on a phone and a strip over the rows' arrows at 1440 swallowed every
+     click, after the bubble had gone. Hidden while the page boots, like the mockup's, and not pressable then: the
+     boot rule is on the button, because its `auto` would beat a `none` inherited from the box. */
+  .cowbox { display: flex; justify-content: flex-end; text-shadow: none; pointer-events: none; }
+  .cowbox :global(.cow) { pointer-events: auto; }
   /* The bubble is the drafting panel, as every other surface on this page is; set on the bubble so it beats the
      cow's own paper, and its tail inherits it. */
   .cowbox :global(.cow-bubble) { --moo-paper: var(--draft-panel); }
   @media (max-width: 1179px) { .cowbox :global(.cow-art) { width: 88px; height: auto; } }
-  @media (min-width: 1180px) { .cowbox { position: fixed; right: max(26px, 3.2vw); top: 47vh; z-index: 15; margin: 0; } }
-  @media (max-width: 640px) { .cowbox { position: fixed; right: max(26px, 3.2vw); bottom: max(26px, 3.2vw); z-index: 15; margin: 0; } }
-  :global(html.projects-boot) .cowbox { opacity: 0; transform: translateY(24px); pointer-events: none; }
+  @media (min-width: 641px) and (max-width: 1179px) {
+    .cowbox { height: 0; align-items: flex-start; }
+    .cowbox :global(.cow-wrap) { margin-top: calc(-12px - 13.5px * 1.55); }
+  }
+  @media (min-width: 1180px) { .cowbox { position: fixed; right: max(26px, 3.2vw); top: 47vh; z-index: 15; } }
+  @media (max-width: 640px) { .cowbox { position: fixed; right: max(26px, 3.2vw); bottom: max(26px, 3.2vw); z-index: 15; } }
+  :global(html.projects-boot) .cowbox { opacity: 0; transform: translateY(24px); }
+  :global(html.projects-boot) .cowbox :global(.cow) { pointer-events: none; }
   @media (prefers-reduced-motion: no-preference) {
     .cowbox { transition: opacity 0.6s, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
   }
@@ -173,7 +188,7 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
     const said: Record<string, number> = {};
     // Arrival counts as quiet, so the first idle line is never sooner than 14s in.
     let lastSpoke = performance.now();
-    let typeT = 0, hideT = 0, helloT = 0, idleT = 0;
+    let typeT = 0, hideT = 0, helloT = 0, idleT = 0, liveF = 0;
 
     function say(key: string, announce: boolean): void {
       const k = key in sets ? key : 'idle';
@@ -183,7 +198,17 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
       lastSpoke = performance.now();
       window.clearTimeout(typeT);
       window.clearTimeout(hideT);
-      if (announce) live.textContent = `${top} ${bottom}`;
+      if (announce) {
+        // A reader's line wins: once they have asked, "Click one. I'll explain." has nothing left to say, so a
+        // pending greeting (or one still waiting on the boot) is dropped rather than typed over their line.
+        window.clearTimeout(helloT);
+        window.removeEventListener('projects:booted', greet);
+        // Cleared, then set a frame later, so a line equal to the last one (in-progress has only one) is a new
+        // addition to the region rather than the same text, which a screen reader may not repeat.
+        live.textContent = '';
+        cancelAnimationFrame(liveF);
+        liveF = requestAnimationFrame(() => { live.textContent = `${top} ${bottom}`; });
+      }
       // The box is sized for the whole line before a character lands, so it does not grow as it types.
       says.style.width = `${Math.max(top.length, bottom.length)}ch`;
       bubble.classList.add('is-on');
@@ -231,6 +256,7 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
 
     teardownCow = () => {
       [typeT, hideT, helloT, idleT].forEach((id) => window.clearTimeout(id));
+      cancelAnimationFrame(liveF);
       window.removeEventListener('projects:booted', greet);
       window.removeEventListener('cow:say', onSay);
       btn.removeEventListener('click', onPress);
