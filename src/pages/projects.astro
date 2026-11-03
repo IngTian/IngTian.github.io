@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import PlushCow from '../components/PlushCow.astro';
 import SideRail from '../components/SideRail.astro';
 import DraftingField from '../components/projects/DraftingField.astro';
 import Gallery from '../components/projects/Gallery.astro';
@@ -26,6 +27,9 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
     <a class="back" href="/">← back</a>
 
     <TerminalHeader />
+    {/* The cow: fixed in the right-hand column from 1180px, docked bottom-right on a phone, and between those in the
+        flow at the end of the listing — here in the source for that middle case. */}
+    <div class="cowbox"><PlushCow size="rail" talk /></div>
     <Gallery />
 
     <section class="sec" id="p-selected" aria-labelledby="p-selected-h">
@@ -68,6 +72,23 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
   .back { display: inline-block; margin-top: 140px; font: 12px var(--font-mono); color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
   .back:hover { color: var(--ochre); }
 
+  /* THE COW'S COLUMN. Between 641 and 1179px it sits in the flow, right-aligned under the listing, and follows no
+     scroll: fixed there, it and its bubble would cover text and tap targets on tablets and small laptops. From
+     1180px it is fixed in the gutter the padding above reserves, mirroring the rail; on a phone it docks to the
+     bottom-right corner at the same inset. Its bubble is its own opaque ground, so no label knockout. Hidden while
+     the page boots, like the mockup's, and not pressable then. */
+  .cowbox { display: flex; justify-content: flex-end; margin-top: 8px; text-shadow: none; }
+  /* The bubble is the drafting panel, as every other surface on this page is; set on the bubble so it beats the
+     cow's own paper, and its tail inherits it. */
+  .cowbox :global(.cow-bubble) { --moo-paper: var(--draft-panel); }
+  @media (max-width: 1179px) { .cowbox :global(.cow-art) { width: 88px; height: auto; } }
+  @media (min-width: 1180px) { .cowbox { position: fixed; right: max(26px, 3.2vw); top: 47vh; z-index: 15; margin: 0; } }
+  @media (max-width: 640px) { .cowbox { position: fixed; right: max(26px, 3.2vw); bottom: max(26px, 3.2vw); z-index: 15; margin: 0; } }
+  :global(html.projects-boot) .cowbox { opacity: 0; transform: translateY(24px); pointer-events: none; }
+  @media (prefers-reduced-motion: no-preference) {
+    .cowbox { transition: opacity 0.6s, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  }
+
   .sec { margin-top: 120px; }
   .sec-h { display: flex; align-items: baseline; gap: 16px; border-bottom: 1px solid rgba(var(--draft-line-rgb), 0.2); padding-bottom: 14px; }
   .sec-h .n { font: 12px var(--font-mono); color: var(--ochre); }
@@ -81,7 +102,11 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
   // the pop-up — instead of leaving; a modified or middle click falls through and opens the repo, as a reader doing
   // that expects. A button has no repo to fall through to, so a modified click on one asks too. One listener here,
   // so the rule cannot differ between the three.
+  import { PROJECT_COW_LINES } from '../data/cowLines';
+  import type { SpokenLine } from '../lib/cowSpeech';
+  import { BUBBLE_MS, HELLO_DELAY_MS, IDLE_EVERY_MS, TYPE_MS, mayIdle, nextLine } from '../lib/cowTalk';
   import { askPoint } from '../lib/galleryLayout';
+  import { prefersReducedMotion } from '../lib/motion';
 
   let teardown: (() => void) | null = null;
 
@@ -98,6 +123,11 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
     let pressInBoot = false;
     const onDown = (): void => { pressInBoot = document.documentElement.classList.contains('projects-boot'); };
     const onClick = (e: MouseEvent): void => {
+      // A listing name is an index: it jumps (no preventDefault) and never asks, but the cow still says its line.
+      const listed = (e.target as Element).closest<HTMLElement>('[data-cow-key]');
+      if (listed && !(pressInBoot && e.detail > 0)) {
+        window.dispatchEvent(new CustomEvent('cow:say', { detail: { key: listed.dataset.cowKey!, announce: true } }));
+      }
       const from = (e.target as Element).closest<HTMLElement>('[data-ask]');
       if (!from) return;
       if (pressInBoot && e.detail > 0) { e.preventDefault(); return; }
@@ -111,6 +141,99 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
     teardown = () => {
       window.removeEventListener('pointerdown', onDown, { capture: true });
       page.removeEventListener('click', onClick);
+    };
+  });
+
+  // THE COW TALKS. PlushCow's `talk` markup, driven from here so no other page with a cow ships any of this. It greets
+  // once per page view, HELLO_DELAY_MS after the page is booted — "booted" is a state: no html.projects-boot means
+  // booted already, otherwise wait for `projects:booted`. It says a project's line on `cow:say` (the ask and the
+  // listing send one), its next idle line when pressed, and now and then one on its own, gated by mayIdle() and
+  // never while the tab is hidden. Only `announce` lines reach the live region: a reader asked for those, and the
+  // greeting and idle chatter would interrupt a screen reader every 10-20s.
+  let teardownCow: (() => void) | null = null;
+
+  document.addEventListener('astro:page-load', () => {
+    teardownCow?.();
+    teardownCow = null;
+    const wrap = document.querySelector<HTMLElement>('.cow-wrap--talk');
+    const maybeBtn = wrap?.querySelector<HTMLButtonElement>('[data-cow]');
+    const maybeBubble = wrap?.querySelector<HTMLElement>('.cow-bubble');
+    const maybeSays = wrap?.querySelector<HTMLElement>('[data-cow-says]');
+    const maybeA = wrap?.querySelector<HTMLElement>('[data-said-a]');
+    const maybeB = wrap?.querySelector<HTMLElement>('[data-said-b]');
+    const maybeLive = wrap?.querySelector<HTMLElement>('[data-cow-live]');
+    if (!maybeBtn || !maybeBubble || !maybeSays || !maybeA || !maybeB || !maybeLive) return;
+    const btn = maybeBtn, bubble = maybeBubble, says = maybeSays, lineA = maybeA, lineB = maybeB, live = maybeLive;
+    const root = document.documentElement;
+    const reduce = prefersReducedMotion();
+
+    const sets: Record<string, readonly SpokenLine[]> = {
+      ...PROJECT_COW_LINES.byKey, hello: PROJECT_COW_LINES.hello, idle: PROJECT_COW_LINES.idle,
+    };
+    const said: Record<string, number> = {};
+    // Arrival counts as quiet, so the first idle line is never sooner than 14s in.
+    let lastSpoke = performance.now();
+    let typeT = 0, hideT = 0, helloT = 0, idleT = 0;
+
+    function say(key: string, announce: boolean): void {
+      const k = key in sets ? key : 'idle';
+      const next = nextLine(sets[k], said[k] ?? 0);
+      said[k] = next.said;
+      const [top, bottom] = next.line;
+      lastSpoke = performance.now();
+      window.clearTimeout(typeT);
+      window.clearTimeout(hideT);
+      if (announce) live.textContent = `${top} ${bottom}`;
+      // The box is sized for the whole line before a character lands, so it does not grow as it types.
+      says.style.width = `${Math.max(top.length, bottom.length)}ch`;
+      bubble.classList.add('is-on');
+      const hide = (): void => { bubble.classList.remove('is-on'); };
+      // Reduced motion: the line whole, no typing and no hop.
+      if (reduce) {
+        lineA.textContent = top;
+        lineB.textContent = bottom;
+        hideT = window.setTimeout(hide, BUBBLE_MS);
+        return;
+      }
+      btn.classList.remove('is-hop');
+      void btn.offsetWidth;   // restart the hop on a line that interrupts the last one
+      btn.classList.add('is-hop');
+      let n = 0;
+      const type = (): void => {
+        n += 1;
+        lineA.textContent = top.slice(0, n);
+        lineB.textContent = bottom.slice(0, Math.max(0, n - top.length));
+        if (n < top.length + bottom.length) typeT = window.setTimeout(type, TYPE_MS);
+        else hideT = window.setTimeout(hide, BUBBLE_MS);
+      };
+      type();
+    }
+
+    const greet = (): void => { helloT = window.setTimeout(() => say('hello', false), HELLO_DELAY_MS); };
+    const idle = (): void => {
+      const [lo, hi] = IDLE_EVERY_MS;
+      idleT = window.setTimeout(() => {
+        if (!document.hidden && mayIdle(performance.now(), lastSpoke, root.classList.contains('projects-boot'))) say('idle', false);
+        idle();
+      }, lo + Math.random() * (hi - lo));
+    };
+    const onSay = (e: Event): void => {
+      const d = (e as CustomEvent<{ key: string; announce: boolean }>).detail;
+      if (d?.key) say(d.key, d.announce === true);
+    };
+    const onPress = (): void => say('idle', true);
+
+    if (root.classList.contains('projects-boot')) window.addEventListener('projects:booted', greet, { once: true });
+    else greet();
+    idle();
+    window.addEventListener('cow:say', onSay);
+    btn.addEventListener('click', onPress);
+
+    teardownCow = () => {
+      [typeT, hideT, helloT, idleT].forEach((id) => window.clearTimeout(id));
+      window.removeEventListener('projects:booted', greet);
+      window.removeEventListener('cow:say', onSay);
+      btn.removeEventListener('click', onPress);
     };
   });
 </script>

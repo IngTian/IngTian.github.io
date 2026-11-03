@@ -1,7 +1,8 @@
 ---
 // /projects' header, as a terminal session: the PROJECTS login banner, the prompt `~/projects $ ls --shipped`, its
 // output — the `# ideas…` comment, an `ls -l` listing of every project and a summary line of counts — and an idle
-// prompt. The listing stays on the page as its index: each name jumps to that project.
+// prompt. The listing stays on the page as its index: each name jumps to that project, and its data-cow-key (the
+// slug without ls's trailing slash, or `in-progress`) tells the cow which one — projects.astro's click handler.
 //
 // This is the FINISHED state, which is also what reduced motion and no-JS get. The order on screen is the DOM
 // order, banner first (the approved mockup lifted it with `order: -1`; here it is simply written first).
@@ -40,7 +41,7 @@ const n = summaryCounts(projects);
   <ul class="ls">
     {lines.map((l) => (
       <li class:list={{ wip: l.wip }}>
-        <span class="perm" aria-hidden="true">{l.perm}</span><a href={l.href}>{l.name}</a><span class="k">{l.kind}</span><span class="d">{l.short}</span>
+        <span class="perm" aria-hidden="true">{l.perm}</span><a href={l.href} data-cow-key={l.wip ? 'in-progress' : l.name.slice(0, -1)}>{l.name}</a><span class="k">{l.kind}</span><span class="d">{l.short}</span>
       </li>
     ))}
   </ul>
