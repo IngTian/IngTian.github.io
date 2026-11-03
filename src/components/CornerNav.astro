@@ -279,17 +279,20 @@ const items: Item[] = [
      or as nothing. The dot is shape plus colour, so it does not rely on colour alone, and the bloom pill stays
      hover's. Its colour is the accent role token, never a literal: ochre in light, emerald in dark, and seal red
      on /projects, whose drafting palette overrides `--ochre` (tokens.css).
-     THE DOT TAKES NO SPACE. It sits in the link's left padding (14px: the 6px dot and its 8px gap, so it reads exactly
-     as it did inline), positioned off the label rather than inside it. Inline it made the current label 14px wider,
-     and the capsule is anchored on the right, so every label left of the current page moved 14px from page to page
-     and a View Transition cross-faded two capsules. Now every .page-label has the same x and width on every page
-     (Task D, D2 — measured on the five pages in both themes); the weight changes nothing either, since a monospace
-     face keeps its advances at 400 and 600. */
+     THE DOT TAKES NO SPACE OF ITS OWN. It sits in the link's left padding, off the label rather than inside it:
+     inline it made the current label 14px wider, and the capsule is anchored on the right, so every label left of
+     the current page moved 14px from page to page. EVERY page link carries the same 20px left padding (6px more
+     than the 14px items share) so the dot has room — 7px from the link's edge, 7px from the label. In the shared
+     14px it sat flush on the link's edge, which on "Research", the first item, was 4px from the capsule's border
+     (the owner: "almost on the edge"), and on the phone's 13px rows it poked out of the row. Being the same on
+     every link, the reserve moves nothing between pages; the weight changes nothing either, since a monospace face
+     keeps its advances at 400 and 600. */
+  .cnav .page { padding-left: 20px; }
   .cnav .page .page-label { position: relative; }
   .cnav a[aria-current='page'] .page-label::before {
     content: '';
     position: absolute;
-    right: calc(100% + 8px); top: 50%;
+    right: calc(100% + 7px); top: 50%;
     width: 6px; height: 6px; margin-top: -3px;
     border-radius: 50%;
     background: var(--ochre);
@@ -339,9 +342,10 @@ const items: Item[] = [
 
   /* Narrow: the page WORDS are what must survive (they are the navigation), so the contact marks go first —
      every one of them is still reachable from the Signature section at the foot of the page.
-     The threshold is 1200px, not 1000: with five pages the full capsule measures 664px, which is 65% of a
+     The threshold is 1200px, not 1000: with five pages the full capsule measured 664px, which is 65% of a
      1024px viewport and 52% of a 1280px one. A nav is a corner affordance, and at two thirds of the width it
-     has stopped being one. Dropping the marks brings it to 512px (50% at 1024). */
+     has stopped being one. Dropping the marks brought it to 512px (50% at 1024). Both are 30px wider since the
+     page links reserve 6px each for the current-page dot (694 and 542px); the reasoning is unchanged. */
   /* BOTH separators go with the icons, not just the first. Hiding the icon links but keeping the rule on each
      side of them left a stray double divider with an empty slot between them: measured at 768px, rules at x=646
      and x=663 with 14px of blank pill between, then the toggle at x=683. It read as a missing button.

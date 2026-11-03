@@ -568,8 +568,11 @@ phone treatment is *bug fixes only*, and the whole of it is:
   colour, so it does not rely on colour alone; the **bloom pill stays hover's and
   focus's**, so "here" and "you could go here" never look alike.
   - **The dot reserves its space; it does not take any.** It is positioned in the link's
-    left padding, off the label, so every `.page-label` has the same x and width on every
-    page (measured on the five pages in both themes: within 0.02px). Its first version
+    left padding, off the label, and every page link carries the same 20px of it (6px more
+    than the other items), so every `.page-label` has the same x and width on every page
+    (measured on the five pages in both themes: within 0.02px). The 6px is what keeps the
+    dot off the edge: in the shared 14px it sat flush on the link's edge, 4px from the
+    capsule's border on "Research" — the owner: "almost on the edge". Its first version
     was an inline-block inside the label, which made the current item 14px wider — and
     the capsule is anchored on the right, so every label left of the current page moved
     14px from page to page, and a View Transition cross-faded two capsules. The weight
