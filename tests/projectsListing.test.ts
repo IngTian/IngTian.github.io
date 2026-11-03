@@ -26,7 +26,7 @@ describe('listingLines', () => {
   });
 
   // The listing is set in JetBrains Mono, vendored as a latin subset. A character outside it falls back to the
-  // system mono at another size (witness's short line had a →, T5-F7). The class is a conservative slice of the
+  // system mono at another size (witness's short line had a →). The class is a conservative slice of the
   // subset's cmap, read from src/assets/fonts/jetbrains-mono-latin-var.woff2: no arrow is in it.
   it('uses only characters the mono subset can draw', () => {
     const drawable = /^[\x20-\x7e\xa0-\xff\u2013\u2014\u2018\u2019\u201c\u201d\u2022\u2026]*$/;

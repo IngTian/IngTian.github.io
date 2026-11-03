@@ -39,14 +39,14 @@ describe('fanPose', () => {
 
 // The backstop is a timer that, when it fires, ends every card's loading state unconditionally — Gallery's script.
 // It was readyAfter(loaded, now - t0), a clock comparison a timer firing a fraction early answered "not yet", with
-// nothing left to ask again, so a picture that never arrived shimmered forever (Task E, E7).
+// nothing left to ask again, so a picture that never arrived shimmered forever.
 describe('READY_MS', () => {
   it('gives a picture that never arrives four seconds', () => {
     expect(READY_MS).toBe(4000);
   });
 });
 
-// WCAG 2.2.2 (Task E, E6; tests/motionLimit.test.ts holds the five seconds).
+// WCAG 2.2.2 (tests/motionLimit.test.ts holds the five seconds).
 describe('videoPlays', () => {
   const at = { onScreen: true, hidden: false, opening: false, engaged: false };
 

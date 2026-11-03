@@ -1,7 +1,7 @@
 // tests/motionLimit.test.ts
 // WCAG 2.2.2 (Level A): motion that starts on its own and lasts more than five seconds needs a way to stop it. On
 // /projects the three such things in the reading area — the idle prompt's cursor, manifold's video and the cow's
-// unprompted lines — stop on their own instead (Task E, E6 and its fix round). The video's rule is
+// unprompted lines — stop on their own instead. The video's rule is
 // lib/galleryLayout.ts' videoPlays() and the cow's is lib/cowTalk.ts' idleLines(), each in its own spec; this holds
 // the limit and the cursor, which is CSS, so its literals are read from the stylesheet the way artSizes pins CAL_MAX_H.
 import { readFileSync } from 'node:fs';

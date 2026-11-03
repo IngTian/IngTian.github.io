@@ -207,16 +207,9 @@ describe('wealthSvg (rl-bhrp)', () => {
     expect(bench.at(-1)![1]).toBeGreaterThan(bhrp.at(-1)![1]);
   });
 
-  it('prints no paper figure — the reproduction\'s numbers only', () => {
-    // 15.2% and 1.20 are the PAPER's Table 2 (profile.ts). Checked on what is printed: the coordinates are
-    // digits too, and a point at x=115.2 is not a claim.
-    const text = printed(svg);
-    expect(text).not.toContain('15.2');
-    expect(text).not.toContain('1.20');
-    expect(text).toMatch(/reproduction/i);
-  });
-
-  it('prints only numbers derived from the vendored returns', () => {
+  // The reproduction's numbers, never the paper's Table 2 (profile.ts): an allow-list, so it also keeps those out.
+  it('prints only numbers derived from the vendored returns, and says they are the reproduction\'s', () => {
+    expect(printed(svg)).toMatch(/reproduction/i);
     const allowed = new Set([
       d.dates[0].slice(0, 4), d.dates.at(-1)!.slice(0, 4), String(d.rlSeeds.length),
       ...[d.rlSeeds[medianSeed(d.rlSeeds)], d.bhrp, d.benchmark].map((r) => wealth(r).toFixed(2)),

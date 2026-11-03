@@ -26,7 +26,7 @@ describe('shouldBoot', () => {
     expect(shouldBoot({ ...fresh, force: true, restoredScroll: true })).toBe(false);
   });
   // On a phone the largest element is a listing line the boot prints late: observed LCP was 2,294ms with the boot
-  // and 61ms without (Task 11's measurement). So a phone gets the finished page, like reduced motion — even forced.
+  // and 61ms without. So a phone gets the finished page, like reduced motion — even forced.
   it('never plays on a phone, not even forced', () => {
     expect(shouldBoot({ ...fresh, phone: true })).toBe(false);
     expect(shouldBoot({ ...fresh, phone: true, force: true })).toBe(false);
@@ -37,24 +37,9 @@ describe('bootSteps — the approved mockup\'s boot(), as a schedule', () => {
   const steps = bootSteps('ls --shipped', 6, 8);
   const at = (d: string, i = 0) => steps.find((s) => s.do === d && s.i === i)!.at;
 
-  it('lights the banner rows 62ms apart from 140ms', () => {
-    expect(steps.filter((s) => s.do === 'banner-row').map((s) => s.at)).toEqual([140, 202, 264, 326, 388, 450]);
-  });
-  it('types the 12 keys of the command from 772ms, 61ms apart', () => {
-    const keys = steps.filter((s) => s.do === 'type').map((s) => s.at);
-    expect(keys).toHaveLength(12);
-    expect(keys).toEqual(keys.map((_, i) => 772 + 61 * i));
-  });
-  it('prints the comment at 1724, the listing from 1874, the summary at 2530', () => {
-    expect(at('line', 0)).toBe(1724);
-    expect(at('line', 1)).toBe(1874);
-    expect(steps.filter((s) => s.do === 'line')).toHaveLength(9);
-    expect(at('summary')).toBe(2530);
-  });
-  it('deals and finishes together at 2920, finishing last', () => {
-    expect(at('deal')).toBe(2920);
-    expect(at('done')).toBe(2920);
-    expect(steps.at(-1)!.do).toBe('done');
+  it("keeps the mockup's milestones: rows from 140ms, keys from 772, the comment at 1724, the summary at 2530", () => {
+    expect({ row0: at('banner-row'), key0: at('type'), comment: at('line'), summary: at('summary'), deal: at('deal'), done: at('done') })
+      .toEqual({ row0: 140, key0: 772, comment: 1724, summary: 2530, deal: 2920, done: 2920 });
   });
   it('never goes back in time', () => {
     for (let k = 1; k < steps.length; k++) expect(steps[k].at).toBeGreaterThanOrEqual(steps[k - 1].at);

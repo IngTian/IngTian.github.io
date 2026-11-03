@@ -49,7 +49,7 @@ describe('the vendored series', () => {
     expect(d.oi.every((x) => x > 0)).toBe(true);
   });
 
-  it('is pinned to the 10-year note from the start of the TFF series, as the plan fixed it', () => {
+  it('is pinned to the 10-year note from the start of the TFF series', () => {
     expect(d.weeks[0]).toBe('2006-06-13');
     expect(d.weeks.length).toBeGreaterThanOrEqual(1064);
   });

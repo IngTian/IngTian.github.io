@@ -96,7 +96,7 @@ describe('bannerSvg', () => {
   });
 
   // The strokes are anti-aliased, because under crispEdges a 0.86px stroke rounds to 0, 1 or 2 device px by where
-  // it starts (T5-F5, F6). The blocks are left to the caller, which keeps them crisp: AA blocks seam.
+  // it starts. The blocks are left to the caller, which keeps them crisp: AA blocks seam.
   it('anti-aliases every shade group', () => {
     const groups = [...svg.matchAll(/<g class="shade"([^>]*)>/g)].map((m) => m[1]);
     expect(groups).toHaveLength(6);

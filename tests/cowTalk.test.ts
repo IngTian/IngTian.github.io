@@ -35,7 +35,7 @@ describe('mayIdle', () => {
   });
 });
 
-// IT STOPS ON ITS OWN (Task E, fix round 1; WCAG 2.2.2, lib/motion.ts). Unbounded, the idle chatter popped a bubble,
+// IT STOPS ON ITS OWN (WCAG 2.2.2, lib/motion.ts). Unbounded, the idle chatter popped a bubble,
 // typed and hopped beside the listing every 14-32s for as long as the page was open, and pressing the cow only said
 // more. Now everything it does unasked — the greeting plus idleLines() idle lines — must add up to less movement than
 // MOTION_LIMIT_MS, the way motionLimit.test.ts holds the cursor's blinks. A line's pop, hop and typing start together;
@@ -111,8 +111,8 @@ describe('PROJECT_COW_LINES', () => {
 // THE BUBBLE IS CAPPED TO THE COW'S COLUMN, AND THE COLUMN IS THE MOCKUP'S. From 1180px the cow is fixed in a
 // right-hand gutter, which spec §3 (the owner's) says exists so the cow never overlaps content — and its bubble is as
 // wide as the line it says. The mockup's gutter, calc(4vw + 210px), is narrower than the widest bubbles (~272px) from
-// 1180 to ~1560px. The controller's call (Task D, D7) was to cap the bubble to the gutter rather than widen it, so a
-// long half wraps inside the bubble. This holds the cap and the gutter to the same terms: neither moves alone.
+// 1180 to ~1560px. The bubble is capped to the gutter rather than the gutter widened, so a long half wraps inside
+// the bubble. This holds the cap and the gutter to the same terms: neither moves alone.
 describe("the cow's right-hand column (projects.astro)", () => {
   const page = readFileSync(new URL('../src/pages/projects.astro', import.meta.url), 'utf8');
   const wide = [...page.matchAll(/@media \(min-width: 1180px\) \{([\s\S]*?)\n {2}\}/g)].map((m) => m[1]).join('\n');
@@ -129,7 +129,7 @@ describe("the cow's right-hand column (projects.astro)", () => {
   });
 });
 
-// THE IN-FLOW COW (below 1180px, phones included) stands on two hand-synced numbers (Task D, fix round 1). PlushCow's
+// THE IN-FLOW COW (below 1180px, phones included) stands on two hand-synced numbers. PlushCow's
 // rail wrapper is a row with align-items: flex-end, so without its own align-self the cow sat on the bottom of a line
 // as tall as the phone's bubble: 23px low at rest, 18px lower for every row a line wrapped to. And its top is the
 // prompt line's top (TerminalHeader's .idle margin) so the hop on each line, overshoot included, stays under the
@@ -160,7 +160,7 @@ describe('the in-flow cow (projects.astro, below 1180px)', () => {
   });
 });
 
-// THE PHONE STRIP HOLDS EVERY LINE (Task E, E8). On a phone the bubble opens below the prompt into a strip of fixed
+// THE PHONE STRIP HOLDS EVERY LINE. On a phone the bubble opens below the prompt into a strip of fixed
 // height — projects.astro's `.cowbox { height: calc(4px + 4 * 1.45 * 12.5px + …) }`, four rows of the cow's type —
 // beside the 88px cow, so its halves wrap to what is left of the column. A line that wrapped to a fifth row would
 // overrun the strip into the gallery's cards with the suite green, the hole this closes: every half is word-wrapped

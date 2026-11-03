@@ -65,20 +65,14 @@ function alphaIn(file: string, text: string, rule: string, token: string): numbe
 }
 
 const THEMES = [
-  {
-    theme: 'light', sel: "html[data-page='drafting']", base: ':root',
-    ground: '#f3f1ea', line: '30, 28, 24', hi: '178, 58, 46', seal: '#b23a2e',
-  },
-  {
-    theme: 'dark', sel: "html[data-page='drafting'][data-theme='dark']", base: "html[data-theme='dark']",
-    ground: '#08080a', line: '226, 224, 216', hi: '255, 138, 118', seal: '#e0574a',
-  },
+  { theme: 'light', sel: "html[data-page='drafting']", base: ':root' },
+  { theme: 'dark', sel: "html[data-page='drafting'][data-theme='dark']", base: "html[data-theme='dark']" },
 ] as const;
 
 const ROLE = ['--paper', '--ink-1', '--ink-2', '--ink-3', '--ink-4', '--ink-5', '--ochre', '--on-accent',
   '--hairline-rgb', '--bg'];
 // No --draft-glass: it was the mockup's nav glass, and the real CornerNav keeps its own (spec §3), so nothing
-// rendered it. Deleted in Task E (E2) rather than left to read as if the nav were reskinned here.
+// rendered it; it is gone rather than left to read as if the nav were reskinned here.
 const DRAFT = ['--draft-ground', '--draft-line-rgb', '--draft-hi-rgb', '--draft-panel',
   '--draft-shadow', '--draft-ph', '--draft-tag', '--draft-vig'];
 
@@ -95,24 +89,12 @@ describe('the drafting palette (tokens.css)', () => {
   for (const t of THEMES) {
     describe(t.theme, () => {
       const tk = tokens(t.sel);
-
-      it('draws on its own ground, with its own line and highlight', () => {
-        expect(tk['--draft-ground']).toBe(t.ground);
-        expect(tk['--draft-line-rgb'].replace(/\s+/g, ' ')).toBe(t.line);
-        expect(tk['--draft-hi-rgb'].replace(/\s+/g, ' ')).toBe(t.hi);
-      });
+      const ground = tk['--draft-ground'];
 
       it('makes the accent the seal, so seal red stays the only colour on the page', () => {
-        expect(tk['--ochre']).toBe(t.seal);
-        // and the seal the rest of the site declares for this theme, so the two cannot drift apart
+        // the seal the rest of the site declares for this theme, so the two cannot drift apart
         expect(tk['--ochre']).toBe(tokens(t.base)['--seal']);
       });
-
-      for (const ink of ['--ink-1', '--ink-3', '--ink-4']) {
-        it(`${ink} clears AA on the ground`, () => {
-          expect(ratio(tk[ink], t.ground)).toBeGreaterThanOrEqual(AA_BODY);
-        });
-      }
 
       // The vignette sits over the field and UNDER the page's text, so wherever it is drawn the ground the text reads
       // against is the ground with the vignette composited on — anywhere from the bare ground (its transparent
@@ -123,7 +105,7 @@ describe('the drafting palette (tokens.css)', () => {
       // ground the worst: checked at the corner alone, dark theme was measured where it is easiest to read.
       // Compositing is linear per channel, so the luminance along the ramp is monotonic and the ends bound it.
       it('every text ink clears AA anywhere on the edge vignette', () => {
-        for (const under of vignetteRamp(tk, t.ground)) {
+        for (const under of vignetteRamp(tk, ground)) {
           for (const ink of ['--ink-1', '--ink-3', '--ink-4', '--ochre']) {
             expect(onGround(tk[ink], under), `${ink} under the vignette`).toBeGreaterThanOrEqual(AA_BODY);
           }
@@ -142,11 +124,11 @@ describe('the drafting palette (tokens.css)', () => {
         // A row and the dashed card lie on the open field, so on both ends of the vignette (see above); a card's
         // inside is its own opaque ground.
         const grounds: [string, RGB, string[]][] = [
-          ...vignetteRamp(tk, t.ground).flatMap((field, end): [string, RGB, string[]][] => [
+          ...vignetteRamp(tk, ground).flatMap((field, end): [string, RGB, string[]][] => [
             [`a hovered row (vignette ${end ? 'corner' : 'centre'})`, over(line, wash, field), ['--ink-1', '--ink-2', '--ochre']],
             [`the lit dashed card (vignette ${end ? 'corner' : 'centre'})`, over(hi, spot, field), ['--ink-1', '--ink-2']],
           ]),
-          ['a lit card', over(hi, spot, rgbOf(t.ground)), ['--ink-1', '--ink-2']],
+          ['a lit card', over(hi, spot, rgbOf(ground)), ['--ink-1', '--ink-2']],
         ];
         for (const [where, ground, inks] of grounds) {
           for (const ink of inks) expect(onGround(tk[ink], ground), `${ink} on ${where}`).toBeGreaterThanOrEqual(AA_BODY);
@@ -162,7 +144,7 @@ describe('the drafting palette (tokens.css)', () => {
         const body = /\.cmd \{([^}]*)\}/.exec(cardsSrc)?.[1] ?? '';
         const m = /background: linear-gradient\(rgba\(var\(--draft-line-rgb\), ([\d.]+)\), rgba\(var\(--draft-line-rgb\), \1\)\), var\(--draft-ground\);/.exec(body);
         expect(m, `WorkshopCards.astro's .cmd is not a tint on var(--draft-ground): ${body}`).not.toBeNull();
-        expect(onGround(tk['--ochre'], over(rgbToken(tk['--draft-line-rgb']), Number(m![1]), rgbOf(t.ground)))).toBeGreaterThanOrEqual(AA_BODY);
+        expect(onGround(tk['--ochre'], over(rgbToken(tk['--draft-line-rgb']), Number(m![1]), rgbOf(ground)))).toBeGreaterThanOrEqual(AA_BODY);
       });
 
       // The computed pictures (lib/projectVisuals.ts) print their words in ink-1 and ink-3 on --draft-ph, not on

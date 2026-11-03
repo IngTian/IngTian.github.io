@@ -20,7 +20,7 @@ describe('viewport phone gate', () => {
 
   it('builds its one media query from that number', () => {
     // isPhone(), /projects' inline boot decider and the dist smoke test's stand-in all read this string, so the
-    // width is never retyped into a query (Task E, E8).
+    // width is never retyped into a query.
     expect(PHONE_QUERY).toBe('(max-width: 640px)');
   });
 

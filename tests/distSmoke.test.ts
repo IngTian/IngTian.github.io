@@ -125,6 +125,15 @@ const pages = (): Page[] => {
 
 /** Root-relative route → page, keyed the way routeOf spells it (no trailing slash). */
 const byRoute = (): Map<string, Page> => new Map(pages().map((p) => [p.route, p]));
+const builtPage = (route: string): Page => {
+  const p = byRoute().get(route);
+  if (!p) throw new Error(`no built page for ${route} — run \`npm run build\``);
+  return p;
+};
+const projectsPage = (): Page => builtPage('/projects');
+/** Every bundled stylesheet in dist/_astro, concatenated. */
+const distCss = (): string => readdirSync(join(DIST, '_astro')).filter((f) => f.endsWith('.css'))
+  .map((f) => readFileSync(join(DIST, '_astro', f), 'utf8')).join('\n');
 
 /**
  * The URL the host really serves a route at — the base a relative href resolves against.
@@ -540,22 +549,17 @@ describe("BaseLayout's per-page hooks ship on /projects and ONLY on /projects", 
   // text ~4.4s away. Both are props, so what this guards is a default changing under every other route.
   // Read from `markup` (scripts stripped): the veil's own inline script names `[data-veil]` on every page.
   const veilEl = /<div\b[^>]*\sdata-veil\b/;
-  const page = (route: string): Page => {
-    const p = byRoute().get(route);
-    if (!p) throw new Error(`no built page for ${route} — run \`npm run build\``);
-    return p;
-  };
 
   // `.test()` rather than `toMatch` so a failure names the defect instead of printing the whole page.
   it('marks /projects as the drafting page, on <html>, and renders it no veil', () => {
-    const { markup } = page('/projects');
+    const { markup } = projectsPage();
     expect(/<html\b[^>]*\sdata-page="drafting"/.test(markup), '<html> on /projects lacks data-page="drafting"')
       .toBe(true);
     expect(veilEl.test(markup), '/projects renders a [data-veil] element').toBe(false);
   });
 
   it('leaves every other page unmarked, and /research its veil', () => {
-    expect(veilEl.test(page('/research').markup), '/research lost its [data-veil] element').toBe(true);
+    expect(veilEl.test(builtPage('/research').markup), '/research lost its [data-veil] element').toBe(true);
     const marked = pages().filter((p) => p.route !== '/projects' && /\sdata-page=/.test(p.markup)).map((p) => p.route);
     expect(marked).toEqual([]);
   });
@@ -563,7 +567,7 @@ describe("BaseLayout's per-page hooks ship on /projects and ONLY on /projects", 
   // The drafting ink is sized for the drafting ground (tests/draftingPalette.test.ts), not for the reading sky:
   // light --ink-3 over --reading-grad's lower stops measured 4.20 and 3.89. So the page must not paint a sky.
   it('paints /projects no fluid sky and no sky wash, so its ink sits on the ground it was measured on', () => {
-    const { markup } = page('/projects');
+    const { markup } = projectsPage();
     expect(/class="fluid-sky"/.test(markup), '/projects renders the fluid-sky canvas').toBe(false);
     expect(/class="sky-wash"/.test(markup), '/projects renders the SkyWash layer').toBe(false);
   });
@@ -571,10 +575,8 @@ describe("BaseLayout's per-page hooks ship on /projects and ONLY on /projects", 
   // A face declared below the weight a rule asks for gets a FAKE bold (the engine clamps, then emboldens), and a
   // computed style cannot show that: it reads 600 either way. So compare the request with the declared face.
   it("declares JetBrains Mono up to the nav's current-page weight, so that weight is real, not synthesised", () => {
-    const css = readdirSync(join(DIST, '_astro')).filter((f) => f.endsWith('.css'))
-      .map((f) => readFileSync(join(DIST, '_astro', f), 'utf8')).join('\n');
-    const want = /aria-current=page\][^{]*\{font-weight:(\d+)/.exec(css);
-    const face = /@font-face\{font-family:"JetBrains Mono-[^"]*";[^}]*font-weight:(\d+) (\d+)/.exec(page('/research').html);
+    const want = /aria-current=page\][^{]*\{font-weight:(\d+)/.exec(distCss());
+    const face = /@font-face\{font-family:"JetBrains Mono-[^"]*";[^}]*font-weight:(\d+) (\d+)/.exec(builtPage('/research').html);
     expect(want, "no font-weight rule for the nav's current link in dist/_astro/*.css").not.toBeNull();
     expect(face, 'no JetBrains Mono @font-face with a weight range on /research').not.toBeNull();
     expect(Number(want![1])).toBeLessThanOrEqual(Number(face![2]));
@@ -582,12 +584,6 @@ describe("BaseLayout's per-page hooks ship on /projects and ONLY on /projects", 
 });
 
 describe('/projects — the page shell on the drafting field', () => {
-  const projectsPage = (): Page => {
-    const p = byRoute().get('/projects');
-    if (!p) throw new Error('no built page for /projects — run `npm run build`');
-    return p;
-  };
-
   // Derived from the tree the rail renders, so a stop the page forgot to emit fails here by name. (No fluid sky
   // and no sky wash on this page is asserted in the describe above.)
   it('emits an id for every rail stop and for every project', () => {
@@ -601,8 +597,8 @@ describe('/projects — the page shell on the drafting field', () => {
 
   // NOT /art's issue #60. The vendored captures are static ImageMetadata imports read only through <Image>, and Astro
   // drops an original whose `.src` nothing reads — so their PNGs never reach dist; only the webp variants do. This was
-  // predicted otherwise (~593 KB of originals) and planned around (Task D, D4: store them pre-shrunk); measured, it
-  // was 0 bytes, and this holds it there. The day something reads `.src` (an og:image, a plain <img>), it goes red.
+  // predicted otherwise (~593 KB of originals) and planned around (storing them pre-shrunk); measured, it was 0
+  // bytes, and this holds it there. The day something reads `.src` (an og:image, a plain <img>), it goes red.
   it('ships no original of a vendored capture, only its webp variants', () => {
     const vendored = readdirSync(new URL('../src/assets/projects/', import.meta.url))
       .filter((f) => f.endsWith('.png')).map((f) => f.slice(0, -'.png'.length));
@@ -632,41 +628,28 @@ describe('/projects — the page shell on the drafting field', () => {
   // styles into the HTML; the bundled sheets are included in case it ever stops doing so.
   const rawCss = (): string => {
     const inline = [...projectsPage().html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]);
-    const bundled = readdirSync(join(DIST, '_astro')).filter((f) => f.endsWith('.css'))
-      .map((f) => readFileSync(join(DIST, '_astro', f), 'utf8'));
-    return [...inline, ...bundled].join('\n');
+    return [...inline, distCss()].join('\n');
   };
   const shippedCss = (): string => rawCss().replace(/\[data-astro-cid-[\w-]+\]/g, '');
 
   // Every jump target lands clear of the fixed corner nav — and the scope hashes are the point here, so this reads
-  // the RAW selectors. The rule lives on the page, the targets are partly rendered by child components, and a
-  // scoped selector cannot reach a child's elements: #p-index (TerminalHeader's) once compiled out of reach and sat
-  // flush under the nav (T5-F1). Each selector is matched against the target's own opening tag; a selector this
-  // cannot parse (pseudo-classes, `>`) counts as not reaching, so the test can fail spuriously but never pass so.
+  // the RAW rule. It lives on the page, the targets are partly rendered by child components, and a scoped selector
+  // cannot reach a child's elements: #p-index (TerminalHeader's) once compiled out of reach and sat flush under the
+  // nav. So the rule must carry <main>'s own scope hash on `.projects-page` and none on `section[id]` / `li[id]`,
+  // and every target must be one of those inside <main>.
   it('gives every jump target a scroll-margin-top whose selector actually reaches it', () => {
     const { markup } = projectsPage();
     const main = /<main\b[^>]*>/.exec(markup)![0];
+    const cid = /\s(data-astro-cid-[\w-]+)/.exec(main)?.[1];
+    expect(cid, '<main> carries no scope hash').toBeTruthy();
+    const scope = `\\.projects-page\\[${cid}\\]`;
+    expect(rawCss()).toMatch(new RegExp(`${scope} section\\[id\\],${scope} li\\[id\\]\\{[^}]*scroll-margin-top:`));
     const inMain = markup.slice(markup.indexOf(main), markup.indexOf('</main>'));
-    const matches = (compound: string, tag: string): boolean => {
-      const m = /^([a-z][\w-]*)?((?:\.[\w-]+|\[[^\]]+\])*)$/i.exec(compound);
-      if (!m || (m[1] && !new RegExp(`^<${m[1]}\\b`, 'i').test(tag))) return false;
-      const classes = (/\sclass="([^"]*)"/.exec(tag)?.[1] ?? '').split(/\s+/);
-      return [...m[2].matchAll(/\.([\w-]+)|\[([\w-]+)(?:="([^"]*)")?\]/g)].every(([, cls, attr, val]) =>
-        cls ? classes.includes(cls) : new RegExp(`\\s${attr}${val === undefined ? '(=|\\s|>)' : `="${val}"`}`).test(tag));
-    };
-    const selectors = [...rawCss().matchAll(/([^{}]+)\{[^{}]*scroll-margin-top:[^{}]*\}/g)]
-      .flatMap((m) => m[1].split(',')).map((s) => s.trim().split(/\s+/));
     const targets = new Set([
       ...flattenStops(projectStops(projects)).map((s) => s.target),
       ...listingLines(projects, inProgress).map((l) => l.href.slice(1)),
     ]);
-    const stranded = [...targets].filter((id) => {
-      const tag = new RegExp(`<[a-z][\\w-]*\\b[^>]*\\sid="${id}"[^>]*>`).exec(markup)?.[0];
-      if (!tag) return true;
-      return !selectors.some((parts) => matches(parts.at(-1)!, tag) &&
-        parts.slice(0, -1).every((p) => matches(p, main)) && (parts.length === 1 || inMain.includes(tag)));
-    });
-    expect(stranded).toEqual([]);
+    expect([...targets].filter((id) => !new RegExp(`<(section|li)\\b[^>]*\\sid="${id}"`).test(inMain))).toEqual([]);
   });
 
   // The mockup's always-on edge vignette (projects-b4.html `.ov-vig`): a layer of its own after the canvas, so it
@@ -681,7 +664,7 @@ describe('/projects — the page shell on the drafting field', () => {
   });
 
   // 100vh is the LARGE viewport, so the box holds still while a phone's toolbar collapses: at `height: 100%` the
-  // bitmap stretched and every isoline jumped by half the toolbar on each change of scroll direction (T4-F2).
+  // bitmap stretched and every isoline jumped by half the toolbar on each change of scroll direction.
   it("sizes the field's box to the large viewport, so a mobile toolbar cannot move the drawing", () => {
     const rule = /\.drafting-field,\.drafting-vig\{([^}]*)\}/.exec(shippedCss());
     expect(rule, 'no shared .drafting-field,.drafting-vig rule').not.toBeNull();
@@ -690,7 +673,7 @@ describe('/projects — the page shell on the drafting field', () => {
   });
 
   // main has no background, so its text sits straight on the field's strokes. The knockout gives every glyph an
-  // opaque 1px ring of the ground: eight offsets, none blurred, in the ground colour (T4-F5).
+  // opaque 1px ring of the ground: eight offsets, none blurred, in the ground colour.
   it("rings every glyph in <main> with the bare ground, so no stroke touches the page's text", () => {
     const rule = /\.projects-page\{([^}]*text-shadow:[^}]*)\}/.exec(shippedCss());
     expect(rule, 'no text-shadow on .projects-page').not.toBeNull();
@@ -709,11 +692,6 @@ describe('/projects — the ask: one non-modal dialog and its GitHub button', ()
   // The pop-up a project click opens (components/projects/ProjectAsk.astro). NON-MODAL on purpose: it closes on an
   // outside click, on scroll and when focus leaves it, so there is no focus trap to promise — aria-modal would tell
   // a screen reader the rest of the page is unreachable when it is not.
-  const markup = (): string => {
-    const p = byRoute().get('/projects');
-    if (!p) throw new Error('no built page for /projects — run `npm run build`');
-    return p.markup;
-  };
   /** The element whose opening tag starts at `at`, through its matching close tag. */
   const outer = (html: string, at: number): string => {
     const tag = /^<([a-z][\w-]*)/.exec(html.slice(at))![1];
@@ -727,9 +705,10 @@ describe('/projects — the ask: one non-modal dialog and its GitHub button', ()
     throw new Error(`unclosed <${tag}> at ${at}`);
   };
   const dialog = (): { tag: string; html: string } => {
-    const opens = [...markup().matchAll(/<[a-z][\w-]*\b[^>]*\srole="dialog"[^>]*>/g)];
+    const { markup } = projectsPage();
+    const opens = [...markup.matchAll(/<[a-z][\w-]*\b[^>]*\srole="dialog"[^>]*>/g)];
     expect(opens.length, '[role="dialog"] elements on /projects').toBe(1);
-    return { tag: opens[0][0], html: outer(markup(), opens[0].index!) };
+    return { tag: opens[0][0], html: outer(markup, opens[0].index!) };
   };
 
   it('ships exactly one [role="dialog"]: non-modal, inert while closed, labelled by its own title', () => {
@@ -754,11 +733,6 @@ describe('/projects — the ask: one non-modal dialog and its GitHub button', ()
 });
 
 describe('/projects — the boot: decided inline before first paint, and the served HTML is the finished state', () => {
-  const projectsPage = (): Page => {
-    const p = byRoute().get('/projects');
-    if (!p) throw new Error('no built page for /projects — run `npm run build`');
-    return p;
-  };
   const decider = (): { at: number; body: string } => {
     const m = /<script>((?:(?!<\/script>)[\s\S])*?projects\.boot\.seen[\s\S]*?)<\/script>/.exec(projectsPage().html);
     expect(m, 'no inline boot decider in dist/projects/index.html').not.toBeNull();
@@ -847,9 +821,7 @@ describe('/projects — the boot: decided inline before first paint, and the ser
   // the listing, rows and cards fading out). A transition takes its timing from the style it goes to, so every rule
   // that holds something back under html.projects-boot must say `transition: none` — the way out still animates.
   it('holds nothing back with a transition: every boot rule that sets opacity or transform says transition: none', () => {
-    const css = readdirSync(join(DIST, '_astro')).filter((f) => f.endsWith('.css'))
-      .map((f) => readFileSync(join(DIST, '_astro', f), 'utf8')).join('\n');
-    const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    const rules = [...distCss().matchAll(/([^{}]+)\{([^{}]*)\}/g)]
       .filter(([, sel]) => sel.split(',').every((s) => /html\.projects-boot\b/.test(s)))
       .filter(([, , body]) => /(^|;)\s*(opacity|transform)\s*:/.test(body));
     expect(rules.length, 'the nine boot rules written today').toBeGreaterThanOrEqual(9);
@@ -885,11 +857,6 @@ describe('/projects — the boot: decided inline before first paint, and the ser
 });
 
 describe('/projects — repo links, private repos, and what assistive tech is told', () => {
-  const projectsPage = (): Page => {
-    const p = byRoute().get('/projects');
-    if (!p) throw new Error('no built page for /projects — run `npm run build`');
-    return p;
-  };
   /** Every opening tag in the markup carrying `data-ask="<slug>"` — the page's project surfaces. */
   const surfaces = (slug: string): string[] =>
     [...projectsPage().markup.matchAll(new RegExp(`<[a-z][\\w-]*\\b[^>]*\\sdata-ask="${slug}"[^>]*>`, 'g'))].map((m) => m[0]);
