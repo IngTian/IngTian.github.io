@@ -69,6 +69,11 @@ and which kind a component is decides how a page may change it:
 **Restraint is the aesthetic.** Text is English-only — the literati feel comes
 from composition and negative space, never from displayed CJK glyphs. The lone
 exceptions are deliberate math glyphs (∇/λ/μ), rendered as build-time MathML.
+**The rule governs TEXT, not pictures of the owner's works:** a capture of a work keeps
+what it shows — the calligraphy on /art, and the two-character motto recorded in
+manifold's screensaver on /projects, which `tools/vendor-projects.mjs` once painted out
+and now vendors whole. Words the site sets (copy, labels, the cow's lines, the computed
+pictures' svg text) stay English, and the tests that hold them say "text".
 When in doubt, remove rather than add.
 
 ## Stack
@@ -181,6 +186,11 @@ When in doubt, remove rather than add.
     photos it named, but it omitted the calligraphy pair, and a comment in `art.astro` separately claimed the
     originals "drop out of `dist` entirely", which was simply false.) Costs deploy artifact size and zero
     visitor bytes; see issue #60.
+    **/projects' vendored PNGs do not join them**, though they too arrive by static import: they are read
+    only through `<Image>`, nothing reads their `.src` URL, and Astro drops an original nobody reads —
+    measured, 0 bytes of PNG in `dist/_astro`. It was predicted otherwise once (~593 KB) and a downscale was
+    planned around the prediction. `tests/distSmoke.test.ts` holds it at zero, and was seen to go red: a
+    mutation that read `.src` on the three dark captures shipped all three originals, 653,419 B.
 - `site: 'https://ingtian.github.io'`, no `base` (user site at root).
 
 ## Layout
@@ -241,7 +251,7 @@ src/
   data/vendor/*.ts                  # GENERATED — the computed pictures' inputs, with provenance in each header. Do not edit; re-run the tool
   scripts/artGallery.ts             # the /art page behavior (justified rows, placard, scrollspy, lightbox)
 tests/*.test.ts                     # vitest — every pure lib module, the data/route invariants, the content seam
-tools/vendor-projects.mjs           # the ONLY thing that touches the network, run by hand: writes data/vendor/*, src/assets/projects/* and public/projects/*
+tools/vendor-projects.mjs           # the ONLY thing that touches the network, run by hand: writes data/vendor/*, src/assets/projects/* and public/projects/*; name parts (`… binaries`) to re-vendor only those
 ```
 
 ### Routes
@@ -459,13 +469,15 @@ card width, which must move with the strip's block. So there are **15 real CSS
 blocks across 13 files**: `experience` ×2, `projects/Gallery` ×2 (one of them
 `@media not all and (max-width: 640px)` — the desktop-only card lift, written
 negated so this grep still finds it), and one each in `global.css`, `CornerNav`,
-`Toc`, `DescentPath`, `FluidSky`, `Heights`, `PlushCow` (the talking cow's
-bubble-above layout, in a query list with `min-width: 1180px`),
-`projects/TerminalHeader`, `404`, `research` and `writing/[...slug]`.
-(`ProjectCard.astro`, which carried one, was deleted with the /projects redesign. It
-read "19 hits in 13 files … 14 blocks" until the cow's block landed.) **Two blocks
-spell the same breakpoint so this grep misses them** — `global.css:343` and
-`projects.astro:154`, both `min-width: 641px` — check those by hand.
+`Toc`, `DescentPath`, `FluidSky`, `Heights`, `projects.astro` (the phone's strip
+for the cow's bubble), `projects/TerminalHeader`, `404`, `research` and
+`writing/[...slug]`. (`ProjectCard.astro`, which carried one, was deleted with the
+/projects redesign. It read "19 hits in 13 files … 14 blocks" until the cow's block
+landed; that block was in `PlushCow`, in a query list with `min-width: 1180px`, until
+the phone cow moved beside the listing and the list lost its 640 half.) **One block
+spells the same breakpoint so this grep misses it** — `global.css:343`,
+`min-width: 641px` — check it by hand. (`projects.astro` had a second, its
+641–1179px cow; that range now runs from 0.)
   Two notes on how this count has gone wrong before, because it keeps doing so.
 It read "15 hits … 13 real blocks … `global.css` ×2" — overcounting `global.css`
 because one of its two prose mentions is `max-width:640px` with **no space**,
@@ -497,10 +509,22 @@ phone treatment is *bug fixes only*, and the whole of it is:
   height, with the sentence that explains it read *after* it rather than across it;
 - the **fluid sky canvas is skipped** entirely under 640px;
 - on **/projects**, the gallery's fan becomes a horizontal strip, the drafting field is
-  painted once as a still frame, and the cow sits in a band of its own under the
-  listing (not docked over the first screen, where it covered the index). The rows'
-  floating preview and the cards' glow are gated on `(hover: hover)` rather than on
-  width, so they also stay off on a tablet's touch.
+  painted once as a still frame, and the rows' floating preview and the cards' glow are
+  gated on `(hover: hover)` rather than on width, so they also stay off on a tablet's
+  touch. Two more, both the controller's calls (Task D), and both *deleting* behaviour:
+  - **No boot.** `shouldBoot` takes a `phone` flag (the inline decider asks
+    `PHONE_MAX_WIDTH`'s media query, passed in, never typed) and a phone gets the
+    finished page, even with `?boot=1`. On a phone the largest element is a listing line
+    the boot prints late: observed mobile LCP was 2,294ms with the boot and 61ms without
+    — exactly what boot B was chosen to avoid. With the gate, Lighthouse mobile observed
+    71ms (simulated 1,955ms; Perf 99), the LCP element the summary line.
+  - **The cow sits beside the listing's last line, as it does from 641px, and says only
+    what it is asked** — no greeting and no idle lines, so the idle timer is never set. It
+    was docked bottom-right over the first screen, then put in a 218px band under the
+    listing. The one difference from 641px: a 343px column has no room for the bubble on
+    the prompt's row or above it, so on a phone it opens below the prompt, tail turned up,
+    into a fixed strip sized for its tallest line (four rows at 320px), and nothing moves
+    when it speaks.
 
 ## Navigation & structure
 
@@ -896,10 +920,22 @@ galaxy). The whole system is **token override**, not per-component branching:
   just uses tokens. Only redefine a surface explicitly when it hardcodes a
   color a token can't reach.
 - **Role tokens that must NOT flip with the ink ramp:** `--bg` (page base
-  behind the sky — always dark, never flashes bright), `--on-accent` (dark
-  ink for text ON the accent chip — the accent is a light color in both themes,
-  so text on it stays dark), and `--descent-grad` (the whole sky, redefined
-  wholesale per theme).
+  behind the sky — always dark, never flashes bright, **except on the drafting page**,
+  below), `--on-accent` (dark ink for text ON the accent chip — the accent is a light
+  color in both themes, so text on it stays dark), and `--descent-grad` (the whole sky,
+  redefined wholesale per theme).
+- **A page can override the ROLE tokens, per theme, from `html[data-page]`.**
+  `BaseLayout`'s `page` prop puts `data-page` on `<html>`; today only /projects uses it
+  (`page="drafting"`). Its two blocks in `tokens.css` — `html[data-page='drafting']` and
+  `…[data-theme='dark']` — re-declare `--paper`, the ink ramp, `--ochre` (→ the seal),
+  `--on-accent`, `--hairline-rgb` and `--bg`, plus the page's own nine `--draft-*` tokens
+  (`--draft-ground`, `-line-rgb`, `-hi-rgb`, `-panel`, `-glass`, `-shadow`, `-ph`, `-tag`,
+  `-vig`). That is how the shared nav, rail and cow reskin there with no edit. There
+  **`--bg` is the sheet** (`var(--draft-ground)`), light in the light theme, so an
+  overscroll shows paper, not ink. Both blocks declare every token, because
+  `html[data-page='drafting']` and `html[data-theme='dark']` have equal specificity and a
+  light-only value would win in dark on source order; `tests/draftingPalette.test.ts`
+  asserts the two sets match and holds the text inks to AA on that page's grounds.
 - **Surfaces that can't inherit CSS tokens** (handle per-theme by hand):
   the **terrain canvas** (JS-painted — `TerrainHero.astro` picks a `TerrainRamp`
   + walker palette off `data-theme`; dark = the cyan-blue **"Glacier"** ramp,
@@ -1133,7 +1169,9 @@ titles came to rest hard against the browser chrome — the lead is a number in
 ## Taste rules (these define the look — hold the line)
 
 - **Palette discipline:** ONLY the tokens in `tokens.css` (paper, ink-1..5,
-  ochre, indigo, seal, plus the derived `--hairline-rgb` and `--rule`).
+  ochre, indigo, seal, plus the derived `--hairline-rgb` and `--rule` — and, on
+  /projects only, its nine `--draft-*` tokens and its overrides of the role tokens; see
+  *Themes*).
   - **`--rule` exists because `/experience` was already using it.** Two rules there declared
     `border-bottom: 1px solid var(--rule)` against a property defined nowhere, which by spec makes the whole
     shorthand invalid at computed-value time — every longhand falls back to its initial, and

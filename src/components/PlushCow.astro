@@ -349,34 +349,38 @@ const measure = widestHalf(lines.slice(0, 1)) + 1;
     .cow-wrap--large .cow-says { font-size: 13px; }
   }
 
-  /* ── THE RAIL — /projects' cow, the mockup's, on a 4px cell. Last in the file, so the narrow-screen cells above
-     cannot reach it. Where it sits, and how wide the drawing is below 1180px, belong to the page. */
-  .cow-wrap--rail { --moo-cell: 4px; }
+  /* ── THE RAIL — /projects' cow, the mockup's, on a 4px cell. Last in the file, so the narrow-screen cells and the
+     narrow-screen stacking above cannot reach it (it keeps the row on a phone; see below). Where it sits, and how
+     wide the drawing is below 1180px, belong to the page. */
+  .cow-wrap--rail { --moo-cell: 4px; flex-direction: row; align-items: flex-end; }
   .cow-wrap--rail .cow-bubble {
     padding: calc(var(--moo-cell) * 2.5) calc(var(--moo-cell) * 3);
     box-shadow: calc(var(--moo-cell) * 1.5) calc(var(--moo-cell) * 1.5) 0 rgba(var(--hairline-rgb), 0.25);
   }
   .cow-wrap--rail .cow-moo { margin-bottom: calc(var(--moo-cell) * 1.5); }
-  /* No letter-spacing, so a `ch` is exactly one glyph's advance — the talking script sizes the line in ch. */
+  /* No letter-spacing, the mockup's line. */
   .cow-wrap--rail .cow-says { margin: 0; font-size: 12.5px; letter-spacing: 0; color: var(--ink-1); }
   .cow-wrap--rail .cow:focus-visible { outline-color: var(--ochre); }
-  /* THE BUBBLE ABOVE THE COW in the page's right-hand gutter from 1180px, and on a phone, whose column has no room
-     beside the cow, in the band under the listing (both breakpoints synced by hand with projects.astro's .cowbox).
-     Between them the cow sits in the page's flow beside the listing's last line, and there it keeps the bubble
-     BESIDE it — the row geometry above, tail at the bubble's lower right — so it costs the cow's 104px of height
-     rather than bubble plus cow. */
-  @media (min-width: 1180px), (max-width: 640px) {
+  /* THE BUBBLE ABOVE THE COW in the page's right-hand gutter from 1180px (synced by hand with projects.astro's
+     .cowbox). Below that, phones included, the cow sits in the page's flow beside the listing's last line, and there
+     it keeps the bubble BESIDE it — the row geometry above, tail at the bubble's lower right — so it costs the cow's
+     104px of height rather than bubble plus cow. Where on that row the bubble opens is the page's to say. */
+  @media (min-width: 1180px) {
     .cow-wrap--rail { flex-direction: column; align-items: flex-end; gap: 0; }
     .cow-wrap--rail .cow-bubble { margin-bottom: calc(var(--moo-cell) * 6); }
     /* Over the cow's head, which is below the bubble here rather than beside it. */
     .cow-wrap--rail .cow-tail { right: 44px; }
   }
 
-  /* ── TALKING: silent until it speaks. The box follows its line (the script sets the line's width before it
-     types). What takes a click is the page's to say: projects.astro makes the whole box transparent to the
+  /* ── TALKING: silent until it speaks. The box follows its line (the script lays the whole line out before
+     it types it). What takes a click is the page's to say: projects.astro makes the whole box transparent to the
      pointer but the button, because a child's pointer-events: none does not let a click through its parent's
      box, and this wrapper is as wide as the bubble even while the bubble is hidden. */
   .cow-wrap--talk .cow-bubble { width: auto; opacity: 0; }
+  /* Each half stays its own line-group, so the pair's break (and its punchline) never moves — but where the page caps
+     the bubble a long half may wrap inside it. The script lays each line out whole before typing it, so the box's
+     width is the line's own and a half breaks only where the cap binds, never as an artefact of sizing. */
+  .cow-wrap--talk .cow-said { white-space: normal; }
   .cow-wrap--talk .cow-bubble.is-on { opacity: 1; }
   @media (prefers-reduced-motion: no-preference) {
     .cow-wrap--talk .cow-bubble {

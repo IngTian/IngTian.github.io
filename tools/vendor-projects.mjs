@@ -1,4 +1,6 @@
-// tools/vendor-projects.mjs — run BY HAND, never by the build: `node tools/vendor-projects.mjs`.
+// tools/vendor-projects.mjs — run BY HAND, never by the build: `node tools/vendor-projects.mjs [part ...]`.
+// With no part it re-vendors everything; name parts (rl-bhrp, offchart, witness, macboot, binaries) to re-vendor
+// only those, so fixing one file does not also pull every other source's newest data.
 //
 // /projects' pictures come from each project's own output, vendored into this repo with their provenance. This
 // script is the only place the network is used for them (the font lesson in CLAUDE.md: a build that fetches
@@ -12,11 +14,9 @@
 //     src/assets/projects/SOURCES.txt, the binaries' provenance.
 //
 // It FAILS rather than writes when a source is not what the page assumes — a CFTC series offchart's own rule
-// would split, a table that lost its header, a character the site's mono subset cannot draw, a recording that
-// is not the one the motto box below was measured on.
+// would split, a table that lost its header, a character the site's mono subset cannot draw.
 // Needs: `gh` authenticated as the owner (macboot is private), and `ffmpeg` on PATH.
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -24,7 +24,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OWNER = 'IngTian';
-const COMMAND = 'node tools/vendor-projects.mjs';
+const PARTS = process.argv.slice(2);
+const COMMAND = ['node tools/vendor-projects.mjs', ...PARTS].join(' ');
 const TODAY = new Date().toISOString().slice(0, 10);
 const VENDOR = join(ROOT, 'src/data/vendor');
 const ASSETS = join(ROOT, 'src/assets/projects');
@@ -230,16 +231,12 @@ function macboot() {
 
 // ── the binaries: captures and manifold's motion ─────────────────────────────────────────────────────────────
 
-/** manifold's motto, the small line under its clock: a user setting ("leave empty to hide", its README) that both
- *  recordings set to CJK, which this site never renders. The DRAWABLE guard reads text, not pixels, so the line is
- *  painted out here with ffmpeg's delogo over the box it holds in the 520x322 frame (glyphs at x 381-395, y 203-210
- *  in every frame, plus two pixels), leaving the documented empty-motto state. That box is true only for these
- *  exact recordings, so any other bytes are refused: a re-recorded GIF must be looked at and the box re-measured. */
-const MOTTO = 'delogo=x=379:y=201:w=19:h=12';
-const SAVER_BLOBS = { dark: '61c04ecf8927d3c681e7c8b035a1bc18b8e3c4ff', light: '184204984315aa44ed67a242de93542528688007' };
-/** git's blob id of some bytes, the `sha` that `gh api repos/.../contents/<path>` reports for a file. */
-const blobSha = (buf) => createHash('sha1').update(`blob ${buf.length}\0`).update(buf).digest('hex');
-const VIDEO_FILTER = `${MOTTO},scale=trunc(iw/2)*2:trunc(ih/2)*2`;
+/** The recordings are converted whole, the motto under the clock included: a user setting that both recordings set
+ *  to two CJK characters. It used to be painted out here with ffmpeg's delogo, on the reading that the site renders no
+ *  CJK. The controller's call (Task D, D3) is that the rule governs the site's TEXT, not pictures of the owner's own
+ *  work — the calligraphy on /art is the same category — so the frames are vendored as recorded. The DRAWABLE guard
+ *  above still holds every vendored string. The filter only makes the frame even, which yuv420p requires. */
+const VIDEO_FILTER = 'scale=trunc(iw/2)*2:trunc(ih/2)*2';
 
 function binaries() {
   const tmp = mkdtempSync(join(tmpdir(), 'vendor-projects-'));
@@ -262,9 +259,7 @@ function binaries() {
   for (const theme of ['dark', 'light']) {
     const path = `docs/saver-${theme}.gif`;
     const gif = join(tmp, `saver-${theme}.gif`);
-    const bytes = fileAt('manifold', sha('manifold'), path);
-    if (blobSha(bytes) !== SAVER_BLOBS[theme]) fail(`${path} is not the recording the motto box was measured on`);
-    writeFileSync(gif, bytes);
+    writeFileSync(gif, fileAt('manifold', sha('manifold'), path));
     console.log(`  ${path} (deleted after conversion)  ${statSync(gif).size} B`);
     const out = join(PUBLIC, `manifold-saver-${theme}.mp4`);
     execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', gif, '-movflags', '+faststart', '-pix_fmt', 'yuv420p',
@@ -284,7 +279,7 @@ function binaries() {
     `command: ${COMMAND}`,
     'The MP4s are the GIFs converted with: ffmpeg -i in.gif -movflags +faststart -pix_fmt yuv420p '
       + `-vf "${VIDEO_FILTER}" out.mp4`,
-    '(delogo paints out the motto line under the clock, a user setting both recordings set to CJK; see MOTTO.)',
+    '(Whole frames: the motto under the clock is kept as recorded, a picture of the work; see VIDEO_FILTER.)',
     'Each manifold PNG is its MP4\'s first frame: ffmpeg -i out.mp4 -frames:v 1 out.png',
     '',
     ...sources,
@@ -295,6 +290,9 @@ function binaries() {
 
 // ── run ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
+const ALL = { 'rl-bhrp': rlBhrp, offchart, witness, macboot, binaries };
+for (const p of PARTS) if (!(p in ALL)) fail(`no part "${p}"; the parts are ${Object.keys(ALL).join(', ')}`);
 for (const d of [VENDOR, ASSETS, PUBLIC]) mkdirSync(d, { recursive: true });
-const files = [rlBhrp(), await offchart(), witness(), macboot(), ...binaries()];
+const files = [];
+for (const [name, run] of Object.entries(ALL)) if (!PARTS.length || PARTS.includes(name)) files.push(...[await run()].flat());
 for (const f of files) console.log(`  ${f.slice(ROOT.length)}  ${statSync(f).size} B`);

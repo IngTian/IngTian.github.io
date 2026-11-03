@@ -11,6 +11,7 @@ import WorkshopCards from '../components/projects/WorkshopCards.astro';
 import { projects } from '../data/profile';
 import { projectStops } from '../lib/pageStops';
 import { BOOT_DEADLINE_MS, BOOT_SEEN_KEY, shouldBoot } from '../lib/projectsBoot';
+import { PHONE_MAX_WIDTH } from '../lib/viewport';
 
 // /projects on its own register: the drafting field behind it (no FluidSky, no SkyWash — `page="drafting"` swaps
 // in ink sized for the drafting ground) and no descent veil, because the page's boot is its entrance.
@@ -29,6 +30,9 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
 // checks is the one that runs — CLAUDE.md's "a test is not a consumer" (the intro's shouldPlayIntro had specs and
 // no caller). tests/distSmoke.test.ts runs this script as shipped. A restored scroll is the router's: it keeps
 // scrollY in history.state and restores it after parse, so `scrollY` alone still reads 0 here.
+// The phone query is built from lib/viewport.ts's PHONE_MAX_WIDTH, never typed — the same interpolation as the key
+// and the deadline (define:vars would do the same job; this script already carries its constants this way). An
+// inline script cannot import isPhone(), so it asks the media query isPhone() asks.
 // It also owns the boot's CLOCK and its DEADLINE, both from parse. data-boot-at is t=0 for TerminalHeader, which
 // may start late. The deadline is the failsafe: only TerminalHeader can light what this hides, so if its script
 // never arrives or throws, at BOOT_DEADLINE_MS this takes the class off and tells the page itself — "a script
@@ -38,6 +42,7 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
 const bootDecider = `(function () {
   try {
     var KEY = ${JSON.stringify(BOOT_SEEN_KEY)}, DEADLINE = ${JSON.stringify(BOOT_DEADLINE_MS)};
+    var PHONE = ${JSON.stringify(`(max-width: ${PHONE_MAX_WIDTH}px)`)};
     var shouldBoot = ${shouldBoot.toString()};
     var seen = null;
     try { seen = sessionStorage.getItem(KEY); } catch (e) { seen = null; }
@@ -46,6 +51,7 @@ const bootDecider = `(function () {
       seen: seen !== null,
       force: new URLSearchParams(location.search).get('boot') === '1',
       reduce: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      phone: matchMedia(PHONE).matches,
       hash: location.hash,
       restoredScroll: scrollY > 0 || !!(st && st.scrollY > 0),
     })) return;
@@ -70,8 +76,8 @@ const bootDecider = `(function () {
     <a class="back" href="/">← back</a>
 
     <TerminalHeader />
-    {/* The cow: fixed in the right-hand column from 1180px; below that in the flow, after the listing — beside its
-        last line from 641px, under it on a phone. */}
+    {/* The cow: fixed in the right-hand column from 1180px; below that in the flow, beside the listing's last line
+        (on a phone its bubble opens below that line). */}
     <div class="cowbox"><PlushCow size="rail" talk /></div>
     <Gallery />
 
@@ -105,15 +111,14 @@ const bootDecider = `(function () {
   /* Clears SideRail where it shows (it hides at ≤1100px). Measured with every row active, so every rule drawn:
      its right edge is at x=139 at 1101px and x=151 at 2000px, against content starting at 190 and 230. */
   @media (min-width: 1101px) { .projects-page { padding-left: clamp(190px, 13vw, 230px); } }
-  /* THE COW'S COLUMN HOLDS ITS WIDEST BUBBLE — the owner's "the cow never overlaps content" (spec §3). The fixed cow
-     sits max(26px, 3.2vw) from the edge, and its bubble, right-aligned above it, is at most 272px: the widest line
-     ("Look before you change anything.", 32ch of 12.5px mono) plus the 4px cell's padding and border. So the column
-     reserves that and a 24px gap. The mockup's calc(4vw + 210px) left that bubble 52px over the column from 1180 to
-     1440 and cleared only from ~1600; it stays as the floor, so the layout is unchanged where it already cleared.
-     The last term is the room past the main's 1500px max-width, which is the cow's already. tests/cowTalk.test.ts
-     holds the 296 against the copy, so a longer line cannot quietly reach back over the column. */
+  /* THE COW'S COLUMN IS THE MOCKUP'S, and the bubble is capped to it (.cowbox, below) — the owner's "the cow never
+     overlaps content" (spec §3). The widest bubble is ~272px ("Look before you change anything.", 32 characters of
+     12.5px mono, plus the 4px cell's padding and border), wider than this gutter from 1180 to ~1560px, where it
+     painted up to ~52px over the column. A fix round widened the gutter to hold it; the controller's call (Task D,
+     D7) was the other way: the column keeps the mockup's width and a long half wraps inside the bubble.
+     tests/cowTalk.test.ts holds this padding and the cap to the same terms. */
   @media (min-width: 1180px) {
-    .projects-page { padding-right: max(calc(4vw + 210px), calc(max(26px, 3.2vw) + 296px - (100% - min(100%, 1500px)))); }
+    .projects-page { padding-right: calc(4vw + 210px); }
   }
 
   /* Every jump target lands 110px down, clear of the fixed corner nav. :global because the targets are rendered by
@@ -126,20 +131,18 @@ const bootDecider = `(function () {
 
   /* THE COW'S COLUMN. From 1180px it is fixed in the gutter the padding above reserves, mirroring the rail. Below
      that it follows no scroll — fixed, it and its bubble would cover text and tap targets.
-     ON A PHONE IT SITS UNDER THE LISTING, in a band of its own, the bubble's room reserved above it. It used to
-     dock to the bottom-right corner (spec §3's "docks bottom-right", a planning call), and there it was over the
-     first screen: at 390x844 the cow covered the summary's tail and its 272x90 bubble the right 60% of the
-     listing's last three lines, macboot/ and ai-mentor-core/ included — a box the reader cannot move, over the
-     page's index. Clicks passed through it, so no hit-test caught it; the owner's rule for this cow is that it
-     never overlaps content. The band costs ~220px of a page a phone scrolls anyway, and nothing moves when it
-     speaks: the bubble keeps its box while hidden (opacity), two rows tall whatever the line.
-     Between 641 and 1179px it sits in the flow BESIDE THE LISTING'S LAST LINE, the idle prompt, whose 14
-     characters leave the rest of that row empty.
-     The box takes no height of its own: the cow's top meets the summary's bottom (TerminalHeader's .idle is a
-     12px margin plus one 13.5px/1.55 line, synced by hand) and its 104px reach down into the gallery's 70px top
-     margin, so the gallery starts where it would with no cow. A band under the listing (218px, then a 104px row)
-     pushed the gallery below the fold at 1100x800 and 1080x810, against spec §3. Its bubble is its own opaque
-     ground, so no label knockout.
+     BELOW 1180px, PHONES INCLUDED, it sits in the flow BESIDE THE LISTING'S LAST LINE, the idle prompt, whose 14
+     characters leave the rest of that row empty. The box takes no height of its own there: the cow's top meets
+     the summary's bottom (TerminalHeader's .idle is a 12px margin plus one 13.5px/1.55 line, synced by hand) and
+     its 104px reach down into the gallery's 70px top margin, so the gallery starts where it would with no cow. A
+     band under the listing (218px, then a 104px row) pushed the gallery below the fold at 1100x800 and 1080x810,
+     against spec §3. Its bubble is its own opaque ground, so no label knockout.
+     A PHONE USED TO DOCK IT bottom-right (spec §3, a planning call), over the first screen's listing and summary,
+     and then to put it in a 218px band under the listing. The controller's call (Task D, D8) is the placement from
+     641px. One thing cannot carry over: in a 343px column the bubble beside the cow has no room on the prompt's
+     row (the prompt sits under its left end) or above it (the summary), so on a phone it opens BELOW the prompt,
+     tail turned up at the cow, into a strip the box reserves — fixed, so nothing moves when it speaks — and its
+     halves wrap to the column.
      NOTHING HERE TAKES A CLICK BUT THE COW. A child's pointer-events: none does not let a click through its
      parent's box, and the cow's wrapper is as wide as the bubble even while the bubble is hidden — so with only
      the bubble transparent, a 212x226 box on a phone and a strip over the rows' arrows at 1440 swallowed every
@@ -150,12 +153,30 @@ const bootDecider = `(function () {
   /* The bubble is the drafting panel, as every other surface on this page is; set on the bubble so it beats the
      cow's own paper, and its tail inherits it. */
   .cowbox :global(.cow-bubble) { --moo-paper: var(--draft-panel); }
-  @media (max-width: 1179px) { .cowbox :global(.cow-art) { width: 88px; height: auto; } }
-  @media (min-width: 641px) and (max-width: 1179px) {
+  @media (max-width: 1179px) {
     .cowbox { height: 0; align-items: flex-start; }
     .cowbox :global(.cow-wrap) { margin-top: calc(-12px - 13.5px * 1.55); }
+    .cowbox :global(.cow-art) { width: 88px; height: auto; }
   }
-  @media (min-width: 1180px) { .cowbox { position: fixed; right: max(26px, 3.2vw); top: 47vh; z-index: 15; } }
+  /* The phone's strip: the bubble's top 4px under the prompt's line (its tail, turned up, rises beside the prompt's
+     empty right end), and the box's height the bubble's tallest case — four rows (4 × 12.5px × 1.45, plus 54px of
+     border, padding and MOO type) — less the gallery's 44px phone margin it may sit in, plus 6px of air. Four rows is
+     the widest line at 320px; at 390px nothing passes three. */
+  @media (max-width: 640px) {
+    .cowbox { height: calc(4px + 4 * 1.45 * 12.5px + 54px - 44px + 6px); }
+    .cowbox :global(.cow-wrap--talk .cow-bubble) { align-self: flex-start; margin: calc(12px + 13.5px * 1.55 + 4px) 0 0; transform-origin: 85% 0; }
+    .cowbox :global(.cow-tail) { top: auto; bottom: calc(100% - 4px); transform: scaleY(-1); }   /* 4px: one cell */
+  }
+  /* FIXED IN THE GUTTER, capped to it, anchored by its BOTTOM. The cap is the gutter (the padding above) less the
+     cow's inset: 100% is the viewport here, and past the main's 1500px max-width the room beyond it is the cow's.
+     So a long half wraps (measured: five of the twenty lines at 1180px, four at 1280-1440, one at 1560) and the
+     bubble grows a row taller — upward, because the box hangs from where the two-row pair's bottom sat under the
+     mockup's `top: 47vh`: two rows, the bubble's 54px of border, padding and MOO type, its 24px gap and the 156px
+     cow, so 47vh + 270.25px. The cow itself never moves. */
+  @media (min-width: 1180px) {
+    .cowbox { position: fixed; right: max(26px, 3.2vw); bottom: calc(53vh - 2 * 1.45 * 12.5px - 234px); z-index: 15;
+      max-width: calc(100% - min(100%, 1500px) + 4vw + 210px - max(26px, 3.2vw)); }
+  }
   :global(html.projects-boot) .cowbox { opacity: 0; transform: translateY(24px); transition: none; }
   :global(html.projects-boot) .cowbox :global(.cow) { pointer-events: none; }
   @media (prefers-reduced-motion: no-preference) {
@@ -184,6 +205,7 @@ const bootDecider = `(function () {
   import { askPoint } from '../lib/galleryLayout';
   import { prefersReducedMotion } from '../lib/motion';
   import { onPageView } from '../lib/pageView';
+  import { isPhone } from '../lib/viewport';
 
   let teardown: (() => void) | null = null;
 
@@ -234,6 +256,8 @@ const bootDecider = `(function () {
   // listing send one), its next idle line when pressed, and now and then one on its own, gated by mayIdle() and
   // never while the tab is hidden. Only `announce` lines reach the live region: a reader asked for those, and the
   // greeting and idle chatter would interrupt a screen reader every 10-20s.
+  // ON A PHONE IT SAYS ONLY WHAT IT IS ASKED (Task D, D8): no greeting and no idle lines, so the idle timer is never
+  // set. In a phone's one column a bubble the reader did not ask for is a box over what they are reading.
   let teardownCow: (() => void) | null = null;
 
   document.addEventListener('astro:page-load', () => {
@@ -242,14 +266,14 @@ const bootDecider = `(function () {
     const wrap = document.querySelector<HTMLElement>('.cow-wrap--talk');
     const maybeBtn = wrap?.querySelector<HTMLButtonElement>('[data-cow]');
     const maybeBubble = wrap?.querySelector<HTMLElement>('.cow-bubble');
-    const maybeSays = wrap?.querySelector<HTMLElement>('[data-cow-says]');
     const maybeA = wrap?.querySelector<HTMLElement>('[data-said-a]');
     const maybeB = wrap?.querySelector<HTMLElement>('[data-said-b]');
     const maybeLive = wrap?.querySelector<HTMLElement>('[data-cow-live]');
-    if (!maybeBtn || !maybeBubble || !maybeSays || !maybeA || !maybeB || !maybeLive) return;
-    const btn = maybeBtn, bubble = maybeBubble, says = maybeSays, lineA = maybeA, lineB = maybeB, live = maybeLive;
+    if (!maybeBtn || !maybeBubble || !maybeA || !maybeB || !maybeLive) return;
+    const btn = maybeBtn, bubble = maybeBubble, lineA = maybeA, lineB = maybeB, live = maybeLive;
     const root = document.documentElement;
     const reduce = prefersReducedMotion();
+    const phone = isPhone();
 
     const sets: Record<string, readonly SpokenLine[]> = {
       ...PROJECT_COW_LINES.byKey, hello: PROJECT_COW_LINES.hello, idle: PROJECT_COW_LINES.idle,
@@ -278,8 +302,6 @@ const bootDecider = `(function () {
         cancelAnimationFrame(liveF);
         liveF = requestAnimationFrame(() => { live.textContent = `${top} ${bottom}`; });
       }
-      // The box is sized for the whole line before a character lands, so it does not grow as it types.
-      says.style.width = `${Math.max(top.length, bottom.length)}ch`;
       bubble.classList.add('is-on');
       const hide = (): void => { bubble.classList.remove('is-on'); };
       // Reduced motion: the line whole, no typing and no hop.
@@ -292,11 +314,21 @@ const bootDecider = `(function () {
       btn.classList.remove('is-hop');
       void btn.offsetWidth;   // restart the hop on a line that interrupts the last one
       btn.classList.add('is-hop');
+      // THE BOX IS THE WHOLE LINE BEFORE A CHARACTER LANDS, so it neither grows nor re-wraps as it types: each half is
+      // laid out in full from the first key, the untyped rest of it present but invisible. Where the page caps the
+      // bubble (its gutter from 1180px, the column on a phone) a long half wraps, and it wraps where the finished
+      // line will — sized in `ch` instead, as it was, the box could not know a half was about to break.
+      const put = (el: HTMLElement, text: string, typed: number): void => {
+        const rest = document.createElement('span');
+        rest.style.visibility = 'hidden';
+        rest.textContent = text.slice(typed);
+        el.replaceChildren(text.slice(0, typed), rest);
+      };
       let n = 0;
       const type = (): void => {
         n += 1;
-        lineA.textContent = top.slice(0, n);
-        lineB.textContent = bottom.slice(0, Math.max(0, n - top.length));
+        put(lineA, top, n);
+        put(lineB, bottom, Math.max(0, n - top.length));
         if (n < top.length + bottom.length) typeT = window.setTimeout(type, TYPE_MS);
         else hideT = window.setTimeout(hide, BUBBLE_MS);
       };
@@ -317,9 +349,11 @@ const bootDecider = `(function () {
     };
     const onPress = (): void => say('idle', true);
 
-    if (root.classList.contains('projects-boot')) window.addEventListener('projects:booted', greet, { once: true });
-    else greet();
-    idle();
+    if (!phone) {
+      if (root.classList.contains('projects-boot')) window.addEventListener('projects:booted', greet, { once: true });
+      else greet();
+      idle();
+    }
     window.addEventListener('cow:say', onSay);
     btn.addEventListener('click', onPress);
 

@@ -65,8 +65,9 @@ describe('PROJECT_COW_LINES', () => {
   });
 
   // By code point: CJK symbols and kana through the unified ideographs, Hangul, the compatibility ideographs and
-  // the full-width forms.
-  it('prints no CJK', () => {
+  // the full-width forms. TEXT: the English-only rule governs words the site sets, not pictures of the owner's works
+  // (CLAUDE.md, The concept) — manifold's screensaver frames keep the motto they were recorded with.
+  it('prints no CJK text', () => {
     const cjk = (cp: number): boolean =>
       (cp >= 0x3000 && cp <= 0x9fff) || (cp >= 0xac00 && cp <= 0xd7af) ||
       (cp >= 0xf900 && cp <= 0xfaff) || (cp >= 0xff00 && cp <= 0xffef);
@@ -75,25 +76,23 @@ describe('PROJECT_COW_LINES', () => {
   });
 });
 
-// THE COLUMN HOLDS THE WIDEST BUBBLE. From 1180px the cow is fixed in a right-hand gutter, which spec §3 (the owner's)
-// says exists so the cow never overlaps content — and its bubble is as wide as the line it is saying. The mockup's
-// gutter left the widest bubble 52px over the content column from 1180 to 1440 (Task 9's measurement), so the
-// gutter is now the cow's inset plus a reserve, and this holds the reserve against the copy: a longer line must
-// widen the gutter, not reach back over the column.
+// THE BUBBLE IS CAPPED TO THE COW'S COLUMN, AND THE COLUMN IS THE MOCKUP'S. From 1180px the cow is fixed in a
+// right-hand gutter, which spec §3 (the owner's) says exists so the cow never overlaps content — and its bubble is as
+// wide as the line it says. The mockup's gutter, calc(4vw + 210px), is narrower than the widest bubbles (~272px) from
+// 1180 to ~1560px. The controller's call (Task D, D7) was to cap the bubble to the gutter rather than widen it, so a
+// long half wraps inside the bubble. This holds the cap and the gutter to the same terms: neither moves alone.
 describe("the cow's right-hand column (projects.astro)", () => {
-  const read = (f: string): string => readFileSync(new URL(f, import.meta.url), 'utf8');
-  it('reserves the widest line\'s bubble plus a 24px gap', () => {
-    const page = read('../src/pages/projects.astro');
-    const reserve = /calc\(max\(26px, 3\.2vw\) \+ (\d+)px - \(100% - min\(100%, 1500px\)\)\)/.exec(page)?.[1];
-    expect(reserve, 'projects.astro no longer reserves the gutter as max(26px, 3.2vw) + Npx').toBeTruthy();
-    // and the cow sits at that same inset, so the reserve is measured from where it actually is
-    expect(page).toMatch(/\.cowbox \{ position: fixed; right: max\(26px, 3\.2vw\);/);
-    const font = /\.cow-wrap--rail \.cow-says \{[^}]*font-size: ([\d.]+)px;[^}]*letter-spacing: 0;/.exec(read('../src/components/PlushCow.astro'))?.[1];
-    expect(font, "PlushCow's rail line is no longer a px size with no letter-spacing").toBeTruthy();
-    // The script sizes the line in ch, and JetBrains Mono's advance is 0.6em. The box adds the rail's padding (3
-    // cells a side) and border (1 cell) at its 4px cell: 32px.
-    const widest = Math.max(...ALL.flat().map((h) => h.length));
-    const bubble = widest * Number(font) * 0.6 + 32;
-    expect(Number(reserve) - bubble).toBeGreaterThanOrEqual(24);
+  const page = readFileSync(new URL('../src/pages/projects.astro', import.meta.url), 'utf8');
+  const wide = [...page.matchAll(/@media \(min-width: 1180px\) \{([\s\S]*?)\n {2}\}/g)].map((m) => m[1]).join('\n');
+
+  it("keeps the mockup's gutter", () => {
+    expect(wide).toMatch(/\.projects-page \{ padding-right: calc\(4vw \+ 210px\); \}/);
+  });
+
+  it("caps the cow's box at that gutter, less the cow's own inset", () => {
+    const box = /\.cowbox \{([^}]*)\}/.exec(wide)?.[1] ?? '';
+    expect(box).toMatch(/right: max\(26px, 3\.2vw\);/);
+    // The box is fixed, so 100% is the viewport; past the main's 1500px max-width the room beyond it is the cow's.
+    expect(box).toMatch(/max-width: calc\(100% - min\(100%, 1500px\) \+ 4vw \+ 210px - max\(26px, 3\.2vw\)\);/);
   });
 });

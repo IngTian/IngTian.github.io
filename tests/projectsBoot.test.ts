@@ -7,7 +7,7 @@ import { bannerRows } from '../src/lib/asciiBanner';
 import { BOOT_CMD, BOOT_DEADLINE_MS, BOOT_KEY_MS, bootState, bootSteps, shouldBoot } from '../src/lib/projectsBoot';
 import { listingLines } from '../src/lib/projectsListing';
 
-const fresh = { seen: false, force: false, reduce: false, hash: '', restoredScroll: false };
+const fresh = { seen: false, force: false, reduce: false, phone: false, hash: '', restoredScroll: false };
 
 describe('shouldBoot', () => {
   it('plays on a fresh arrival at the top', () => {
@@ -24,6 +24,12 @@ describe('shouldBoot', () => {
     expect(shouldBoot({ ...fresh, force: true, reduce: true })).toBe(false);
     expect(shouldBoot({ ...fresh, force: true, hash: '#p-witness' })).toBe(false);
     expect(shouldBoot({ ...fresh, force: true, restoredScroll: true })).toBe(false);
+  });
+  // On a phone the largest element is a listing line the boot prints late: observed LCP was 2,294ms with the boot
+  // and 61ms without (Task 11's measurement). So a phone gets the finished page, like reduced motion — even forced.
+  it('never plays on a phone, not even forced', () => {
+    expect(shouldBoot({ ...fresh, phone: true })).toBe(false);
+    expect(shouldBoot({ ...fresh, phone: true, force: true })).toBe(false);
   });
 });
 

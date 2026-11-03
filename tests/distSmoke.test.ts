@@ -13,6 +13,7 @@ import { flattenStops, projectSectionId, projectStops } from '../src/lib/pageSto
 import { GALLERY_ORDER } from '../src/lib/galleryLayout';
 import { listingLines } from '../src/lib/projectsListing';
 import { BOOT_CMD, BOOT_DEADLINE_MS, BOOT_SEEN_KEY } from '../src/lib/projectsBoot';
+import { PHONE_MAX_WIDTH } from '../src/lib/viewport';
 
 /* ================================================================================================
    THE FIRST TEST THAT LOOKS AT WHAT THE SITE ACTUALLY SHIPS.
@@ -598,6 +599,19 @@ describe('/projects — the page shell on the drafting field', () => {
     expect(want.filter((id) => !ids.has(id))).toEqual([]);
   });
 
+  // NOT /art's issue #60. The vendored captures are static ImageMetadata imports read only through <Image>, and Astro
+  // drops an original whose `.src` nothing reads — so their PNGs never reach dist; only the webp variants do. This was
+  // predicted otherwise (~593 KB of originals) and planned around (Task D, D4: store them pre-shrunk); measured, it
+  // was 0 bytes, and this holds it there. The day something reads `.src` (an og:image, a plain <img>), it goes red.
+  it('ships no original of a vendored capture, only its webp variants', () => {
+    const vendored = readdirSync(new URL('../src/assets/projects/', import.meta.url))
+      .filter((f) => f.endsWith('.png')).map((f) => f.slice(0, -'.png'.length));
+    expect(vendored.length, 'no PNG captures in src/assets/projects').toBeGreaterThan(0);
+    const emitted = readdirSync(join(DIST, '_astro')).filter((f) => vendored.some((v) => f.startsWith(`${v}.`)));
+    expect(emitted.filter((f) => !f.endsWith('.webp'))).toEqual([]);
+    expect(vendored.filter((v) => !emitted.some((f) => f.startsWith(`${v}.`))), 'captures with no variant at all').toEqual([]);
+  });
+
   it('has exactly one <h1>, and it reads "Projects"', () => {
     const h1s = [...projectsPage().markup.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)]
       .map((m) => m[1].replace(/<[^>]*>/g, '').trim());
@@ -761,7 +775,7 @@ describe('/projects — the boot: decided inline before first paint, and the ser
 
   // The policy, asserted where it ships: the shipped script, run against stand-ins for what it reads. This is the
   // wiring the unit tests of shouldBoot cannot see — which input comes from where, and when the flag is written.
-  type Arrival = { search?: string; hash?: string; seen?: boolean; reduce?: boolean; stateY?: number; throws?: boolean };
+  type Arrival = { search?: string; hash?: string; seen?: boolean; reduce?: boolean; phone?: boolean; stateY?: number; throws?: boolean };
   const exec = (o: Arrival) => {
     const store = new Map<string, string>(o.seen ? [[BOOT_SEEN_KEY, '1']] : []);
     const classes = new Set<string>();
@@ -777,7 +791,10 @@ describe('/projects — the boot: decided inline before first paint, and the ser
       URLSearchParams, sessionStorage: storage, scrollY: 0,
       location: { search: o.search ?? '', hash: o.hash ?? '' },
       history: { state: o.stateY === undefined ? null : { index: 0, scrollX: 0, scrollY: o.stateY } },
-      matchMedia: (q: string) => ({ matches: /reduce/.test(q) && o.reduce === true }),
+      // The phone query must be lib/viewport.ts's, exactly: a typed or drifted width never matches here.
+      matchMedia: (q: string) => ({
+        matches: (/reduce/.test(q) && o.reduce === true) || (q === `(max-width: ${PHONE_MAX_WIDTH}px)` && o.phone === true),
+      }),
       performance: { now: () => 1234.5 },
       setTimeout: (fn: () => void, ms: number) => timers.push({ fn, ms }),
       Event: FakeEvent,
@@ -789,7 +806,7 @@ describe('/projects — the boot: decided inline before first paint, and the ser
     return { classes, store, dataset, timers, sent };
   };
 
-  it('boots a fresh top-of-page arrival only, sets the flag at start, and survives a storage that throws', () => {
+  it('boots a fresh top-of-page arrival off a phone only, sets the flag at start, and survives a storage that throws', () => {
     const run = (o: Arrival) => {
       const r = exec(o);
       return { boot: r.classes.has('projects-boot'), flagged: r.store.has(BOOT_SEEN_KEY) };
@@ -801,6 +818,7 @@ describe('/projects — the boot: decided inline before first paint, and the ser
     expect(run({ stateY: 2400 })).toEqual({ boot: false, flagged: false });
     expect(run({ stateY: 0 })).toEqual({ boot: true, flagged: true });
     expect(run({ reduce: true, search: '?boot=1' })).toEqual({ boot: false, flagged: false });
+    expect(run({ phone: true, search: '?boot=1' })).toEqual({ boot: false, flagged: false });
     expect(run({ throws: true })).toEqual({ boot: true, flagged: false });
   });
 
