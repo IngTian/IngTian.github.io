@@ -26,13 +26,19 @@ export function fanPose(i: number, n: number): { x: number; z: number; ry: numbe
   };
 }
 
-/** How long a card may wait for its picture before it leaves the loading state regardless. */
+/** How long a card may wait for its picture before it leaves the loading state regardless: a picture that is slow
+ *  or never arrives must not leave a card shimmering forever. When the timer fires, every card leaves it — no clock
+ *  is compared, so a timer that fires a fraction early cannot leave one waiting. */
 export const READY_MS = 4000;
 
-/** Whether a card stops shimmering: when its picture has loaded, or once READY_MS has passed without it — a
- *  picture that is slow or never arrives must not leave a card shimmering forever. */
-export function readyAfter(loaded: boolean, elapsedMs: number): boolean {
-  return loaded || elapsedMs >= READY_MS;
+/**
+ * Whether manifold's video plays. On its own only while the fan is `opening` — the first MOTION_LIMIT_MS (lib/motion.ts)
+ * after it opens, WCAG 2.2.2 — then it rests on the frame it reached, and plays again only while the card is
+ * `engaged`: hovered by a pointer that can hover, or keyboard-focused. Never off-screen or in a hidden tab, where it
+ * would decode for nobody. Under reduced motion and on a phone there is no video at all, only the still.
+ */
+export function videoPlays(s: { onScreen: boolean; hidden: boolean; opening: boolean; engaged: boolean }): boolean {
+  return s.onScreen && !s.hidden && (s.opening || s.engaged);
 }
 
 interface ClickLike {

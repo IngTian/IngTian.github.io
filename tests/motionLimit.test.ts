@@ -1,0 +1,35 @@
+// tests/motionLimit.test.ts
+// WCAG 2.2.2 (Level A): motion that starts on its own and lasts more than five seconds needs a way to stop it. On
+// /projects the two such things in the reading area — the idle prompt's cursor and manifold's video — stop on their
+// own instead (Task E, E6). The video's rule is lib/galleryLayout.ts' videoPlays(), in its own spec; this holds the
+// limit and the cursor, which is CSS, so its literals are read from the stylesheet the way artSizes pins CAL_MAX_H.
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { MOTION_LIMIT_MS } from '../src/lib/motion';
+
+describe('MOTION_LIMIT_MS', () => {
+  it("is WCAG 2.2.2's five seconds", () => {
+    expect(MOTION_LIMIT_MS).toBe(5000);
+  });
+});
+
+describe("the idle prompt's cursor (TerminalHeader.astro)", () => {
+  const src = readFileSync(new URL('../src/components/projects/TerminalHeader.astro', import.meta.url), 'utf8');
+  const blink = /\.cur \{ animation: term-blink ([\d.]+)s steps\(1\) (\w+); \}/.exec(src);
+
+  it('blinks a counted number of times, inside the limit', () => {
+    expect(blink, "the cursor's `animation: term-blink …` rule").not.toBeNull();
+    const [, seconds, count] = blink!;
+    // `infinite` is NaN here, which is the bug this replaced: a cursor beside the listing that blinked forever.
+    expect(Number.isInteger(Number(count)), `iteration count "${count}"`).toBe(true);
+    expect(Number(seconds) * 1000 * Number(count)).toBeLessThanOrEqual(MOTION_LIMIT_MS);
+  });
+
+  it('comes to rest solid: the only frame it is off is mid-cycle', () => {
+    expect(src).toMatch(/@keyframes term-blink \{ 50% \{ opacity: 0; \} \}/);
+  });
+
+  it('starts counting when it appears, not while the boot is hiding it', () => {
+    expect(src).toMatch(/:global\(html\.projects-boot\) \.idle \.cur \{ animation: none; \}/);
+  });
+});

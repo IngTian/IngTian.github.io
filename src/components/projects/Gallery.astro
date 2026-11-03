@@ -19,8 +19,9 @@
 // where Chrome fetches it at first layout anyway, and below it on a phone), and a card whose picture has not arrived
 // when the script runs shows the palette tone with a transform-only shimmer, then fades the picture in — or gives
 // up waiting after READY_MS, so nothing shimmers forever. manifold shows its still, then swaps to its MP4 once the
-// fan is open: preloaded, so the card never blanks, paused while it is offscreen, and never under reduced motion
-// or on a phone, which keep the still.
+// fan is open: preloaded, so the card never blanks, and never under reduced motion or on a phone, which keep the
+// still. It plays on its own for the first five seconds only (WCAG 2.2.2), then rests on the frame it reached and
+// plays again while the card is hovered or keyboard-focused — lib/galleryLayout.ts' videoPlays().
 import { projects, repoUrl } from '../../data/profile';
 import { visualFor } from '../../data/projectVisuals';
 import { GALLERY_ORDER, fanPose } from '../../lib/galleryLayout';
@@ -173,8 +174,8 @@ const cards = GALLERY_ORDER.map((slug, i) => {
 </style>
 
 <script>
-  import { READY_MS, readyAfter } from '../../lib/galleryLayout';
-  import { prefersReducedMotion } from '../../lib/motion';
+  import { READY_MS, videoPlays } from '../../lib/galleryLayout';
+  import { MOTION_LIMIT_MS, prefersReducedMotion } from '../../lib/motion';
   import { onPageView } from '../../lib/pageView';
   import { isPhone } from '../../lib/viewport';
 
@@ -193,14 +194,15 @@ const cards = GALLERY_ORDER.map((slug, i) => {
     const root = document.documentElement;
     const shots = [...gallery.querySelectorAll<HTMLElement>('.shot')];
     const timers: number[] = [];
-    const t0 = performance.now();
 
-    // A card waits while the picture it is SHOWING (the theme decides which) has not loaded — until READY_MS.
+    // A card waits while the picture it is SHOWING (the theme decides which) has not loaded — until READY_MS, when
+    // the backstop ends every wait and nothing starts one again.
+    let gaveUp = false;
     const shown = (s: HTMLElement): HTMLImageElement | undefined =>
       [...s.querySelectorAll('img')].find((img) => getComputedStyle(img).display !== 'none');
     function check(s: HTMLElement): void {
       const img = shown(s);
-      if (img) s.classList.toggle('wait', !readyAfter(img.complete && img.naturalWidth > 0, performance.now() - t0));
+      if (img) s.classList.toggle('wait', !gaveUp && !(img.complete && img.naturalWidth > 0));
     }
     // load and error do not bubble, so they are caught on the way down.
     const onSettle = (e: Event): void => {
@@ -211,17 +213,25 @@ const cards = GALLERY_ORDER.map((slug, i) => {
     const motionShot = shots.find((s) => s.dataset.motionDark);
     const animate = !prefersReducedMotion() && !isPhone();
     let video: HTMLVideoElement | null = null;
-    // A looping video decodes for as long as it plays, so it plays only while its card is on screen. The observer
-    // reports once as soon as it observes, long before the swap at MOTION_AFTER_MS reads this.
-    let onScreen = false;
-    const run = (v: HTMLVideoElement): void => {
-      if (onScreen) v.play().catch(() => { /* autoplay refused: the still stays, which is a finished state */ });
-      else v.pause();   // also clears the autoplay flag, so an offscreen card does not start itself
-    };
-    const io = new IntersectionObserver(([en]) => {
-      onScreen = en.isIntersecting;
-      if (video) run(video);
-    });
+    // WHETHER IT PLAYS is videoPlays()'s, asked again whenever one of these changes: on its own only while the fan
+    // is `opening` (WCAG 2.2.2 — it used to loop for as long as the gallery was on screen), then while the card is
+    // hovered or keyboard-focused; never off-screen or in a hidden tab, since a playing video decodes for nobody
+    // there. The observer reports once as soon as it observes, long before the swap at MOTION_AFTER_MS reads this.
+    let onScreen = false, opening = false, hovered = false, focused = false;
+    function run(): void {
+      if (!video) return;
+      if (videoPlays({ onScreen, hidden: document.hidden, opening, engaged: hovered || focused })) {
+        video.play().catch(() => { /* playback refused: the still stays, which is a finished state */ });
+      } else video.pause();   // on the frame it reached, which is what the card keeps showing
+    }
+    const io = new IntersectionObserver(([en]) => { onScreen = en.isIntersecting; run(); });
+    // A touch's pointerenter comes with the tap that opens the ask, and its leave with the lift: not a hover.
+    const onEnter = (e: PointerEvent): void => { if (e.pointerType !== 'touch') { hovered = true; run(); } };
+    const onLeave = (): void => { hovered = false; run(); };
+    // Keyboard focus, as the card's lift is: a mouse press on a link focuses it too, without :focus-visible.
+    const onFocus = (): void => { focused = !!motionShot?.matches(':focus-visible'); run(); };
+    const onBlur = (): void => { focused = false; run(); };
+    const onVis = (): void => run();
     function stopVideo(): void {
       if (!video) return;
       video.pause();
@@ -241,11 +251,11 @@ const cards = GALLERY_ORDER.map((slug, i) => {
       const src = root.dataset.theme === 'dark' ? dark : (s.dataset.motionLight ?? dark);
       if (video?.getAttribute('src') === src) return;
       stopVideo();
+      // No autoplay: every play is run()'s, so nothing starts that videoPlays() did not allow.
       const v = document.createElement('video');
       v.muted = true;
       v.loop = true;
       v.playsInline = true;
-      v.autoplay = true;
       v.preload = 'auto';
       v.setAttribute('muted', '');
       v.setAttribute('aria-hidden', 'true');
@@ -254,9 +264,15 @@ const cards = GALLERY_ORDER.map((slug, i) => {
       v.src = src;
       s.querySelector('.shot-in')!.append(v);
       video = v;
-      run(v);
+      run();
     }
-    const startMotion = (): void => { timers.push(window.setTimeout(play, MOTION_AFTER_MS)); };
+    // The fan is open: the video's own play window starts now, and the swap to it a beat later, so it plays on its
+    // own for MOTION_LIMIT_MS less the swap and the load — at most the limit, from the moment it could first move.
+    const startMotion = (): void => {
+      opening = true;
+      timers.push(window.setTimeout(play, MOTION_AFTER_MS));
+      timers.push(window.setTimeout(() => { opening = false; run(); }, MOTION_LIMIT_MS));
+    };
 
     const onTheme = (): void => {
       shots.forEach(check);
@@ -267,10 +283,18 @@ const cards = GALLERY_ORDER.map((slug, i) => {
     gallery.addEventListener('error', onSettle, true);
     document.addEventListener('theme:change', onTheme);
     shots.forEach(check);
-    timers.push(window.setTimeout(() => shots.forEach(check), READY_MS));
+    // THE BACKSTOP ENDS THE WAIT, UNCONDITIONALLY. It used to ask readyAfter(loaded, performance.now() - t0), a clock
+    // comparison: a timer that fires a fraction early is answered "not yet", nothing asks again, and a picture that
+    // never arrives shimmers forever.
+    timers.push(window.setTimeout(() => { gaveUp = true; shots.forEach((s) => s.classList.remove('wait')); }, READY_MS));
     // "Booted" is a state: without html.projects-boot the fan is already open.
     if (motionShot && animate) {
       io.observe(motionShot);
+      motionShot.addEventListener('pointerenter', onEnter);
+      motionShot.addEventListener('pointerleave', onLeave);
+      motionShot.addEventListener('focus', onFocus);
+      motionShot.addEventListener('blur', onBlur);
+      document.addEventListener('visibilitychange', onVis);
       if (root.classList.contains('projects-boot')) window.addEventListener('projects:booted', startMotion, { once: true });
       else startMotion();
     }
@@ -281,6 +305,11 @@ const cards = GALLERY_ORDER.map((slug, i) => {
       gallery.removeEventListener('error', onSettle, true);
       document.removeEventListener('theme:change', onTheme);
       window.removeEventListener('projects:booted', startMotion);
+      motionShot?.removeEventListener('pointerenter', onEnter);
+      motionShot?.removeEventListener('pointerleave', onLeave);
+      motionShot?.removeEventListener('focus', onFocus);
+      motionShot?.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVis);
       io.disconnect();
       stopVideo();
     };

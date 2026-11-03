@@ -97,8 +97,13 @@ const n = summaryCounts(projects);
   .tsum b { color: var(--ochre); font-weight: 600; }
   .idle { margin-top: 12px; }
   .cur { display: inline-block; width: 0.62em; height: 1.05em; margin-left: 2px; vertical-align: -3px; background: var(--ochre); }
+  /* FOUR BLINKS, THEN SOLID — WCAG 2.2.2. It blinked forever beside the listing a reader is reading, motion that
+     starts on its own and has no off switch. Four is 4.2s, inside lib/motion.ts' MOTION_LIMIT_MS, and the keyframe's
+     one off frame is mid-cycle, so it comes to rest lit, as reduced motion has it from the start. The boot holds it
+     (below) so the count starts when the idle prompt appears; the typing cursor shares the rule and is gone in about
+     a second. tests/motionLimit.test.ts reads these literals. */
   @media (prefers-reduced-motion: no-preference) {
-    .cur { animation: term-blink 1.05s steps(1) infinite; }
+    .cur { animation: term-blink 1.05s steps(1) 4; }
     @keyframes term-blink { 50% { opacity: 0; } }
   }
   /* The typing cursor: only while the boot is typing, so the finished first line has none. */
@@ -121,6 +126,7 @@ const n = summaryCounts(projects);
   :global(html.projects-boot) .ls li:not(.on),
   :global(html.projects-boot) .tsum:not(.on) { opacity: 0; transform: translateX(-8px); transition: none; }
   :global(html.projects-boot) .idle { opacity: 0; transition: none; }
+  :global(html.projects-boot) .idle .cur { animation: none; }
   @media (prefers-reduced-motion: no-preference) {
     .banner :global(.row) { transition: opacity 0.16s ease-out; }
     .tc, .ls li, .tsum { transition: opacity 0.28s ease-out, transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1); }

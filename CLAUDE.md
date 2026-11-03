@@ -1227,6 +1227,17 @@ titles came to rest hard against the browser chrome — the lead is a number in
   no-preference)` via `lib/motion.ts`. The no-motion state must look *finished* —
   it's also the Firefox fallback (`animation-timeline` isn't in Firefox yet), and
   it's what a reduced-motion reader gets instead of the deck.
+  - **Nothing new that moves on its own runs past five seconds** — WCAG 2.2.2 (Level A),
+    which neither Lighthouse nor axe tests, so A11y 100 says nothing about it. The limit is
+    `MOTION_LIMIT_MS` in `lib/motion.ts`. On /projects, the idle prompt's cursor blinks four
+    times (4.2s, counted from when it appears) and rests solid, and manifold's MP4 plays only
+    for the first five seconds after the fan opens, then rests on the frame it reached and
+    plays again while its card is hovered or keyboard-focused (`videoPlays()` in
+    `lib/galleryLayout.ts`). Both used to run forever beside what a reader is reading.
+    `tests/motionLimit.test.ts` reads the cursor's CSS literals against the limit. **The
+    backgrounds are not held to it yet**: the hero terrain, the fluid sky and the drafting
+    field drift for as long as they are on screen. That is the site's older pattern and a
+    known gap against 2.2.2, not a precedent for new motion in the reading area.
 - **Loading states are designed, not default.** No bare grey rectangles — a
   loading tile uses a palette-tone placeholder with a transform-only shimmer (see
   `.tile` in `art.astro`), gone the instant the image decodes.

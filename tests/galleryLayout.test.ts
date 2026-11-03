@@ -2,7 +2,7 @@
 // /projects' gallery geometry and the click rule its project surfaces share (src/lib/galleryLayout.ts).
 import { describe, expect, it } from 'vitest';
 import { projects } from '../src/data/profile';
-import { GALLERY_ORDER, READY_MS, askPoint, fanPose, readyAfter } from '../src/lib/galleryLayout';
+import { GALLERY_ORDER, READY_MS, askPoint, fanPose, videoPlays } from '../src/lib/galleryLayout';
 
 describe('GALLERY_ORDER', () => {
   it('is the mockup\'s six, every one a real project', () => {
@@ -37,15 +37,32 @@ describe('fanPose', () => {
   });
 });
 
-describe('readyAfter', () => {
-  it('is ready the moment the picture has loaded', () => {
-    expect(readyAfter(true, 0)).toBe(true);
+// The backstop is a timer that, when it fires, ends every card's loading state unconditionally — Gallery's script.
+// It was readyAfter(loaded, now - t0), a clock comparison a timer firing a fraction early answered "not yet", with
+// nothing left to ask again, so a picture that never arrived shimmered forever (Task E, E7).
+describe('READY_MS', () => {
+  it('gives a picture that never arrives four seconds', () => {
+    expect(READY_MS).toBe(4000);
+  });
+});
+
+// WCAG 2.2.2 (Task E, E6; tests/motionLimit.test.ts holds the five seconds).
+describe('videoPlays', () => {
+  const at = { onScreen: true, hidden: false, opening: false, engaged: false };
+
+  it('plays on its own only while the fan is opening, then rests', () => {
+    expect(videoPlays({ ...at, opening: true })).toBe(true);
+    expect(videoPlays(at)).toBe(false);
   });
 
-  it('gives a picture that never arrives four seconds, then leaves the loading state anyway', () => {
-    expect(READY_MS).toBe(4000);
-    expect(readyAfter(false, 3999)).toBe(false);
-    expect(readyAfter(false, 4000)).toBe(true);
+  it('plays again while the card is hovered or keyboard-focused', () => {
+    expect(videoPlays({ ...at, engaged: true })).toBe(true);
+  });
+
+  it('never plays off-screen or in a hidden tab, whatever else is true', () => {
+    for (const off of [{ onScreen: false }, { hidden: true }]) {
+      expect(videoPlays({ ...at, opening: true, engaged: true, ...off }), JSON.stringify(off)).toBe(false);
+    }
   });
 });
 
