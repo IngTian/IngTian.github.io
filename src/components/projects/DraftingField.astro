@@ -36,6 +36,7 @@
   } from '../../lib/draftingField';
   import { isoSegments } from '../../lib/marchingSquares';
   import { prefersReducedMotion } from '../../lib/motion';
+  import { onPageView } from '../../lib/pageView';
   import { isPhone } from '../../lib/viewport';
 
   let teardown: (() => void) | null = null;
@@ -158,7 +159,8 @@
     };
   }
 
-  // Every page load, including a View Transition swap: a page without the canvas just tears the last one down,
-  // which is what stops the loop when a reader leaves /projects.
-  document.addEventListener('astro:page-load', init);
+  // Started at parse on a full load (lib/pageView.ts), not at window `load` (which waits for the fonts), so the field
+  // paints with the banner rather than after it; then once per new DOM, and a page without the canvas just tears
+  // the last one down, which is what stops the loop when a reader leaves /projects.
+  onPageView('[data-drafting-field]', init);
 </script>

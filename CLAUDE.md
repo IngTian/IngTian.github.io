@@ -219,7 +219,7 @@ src/
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
   lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter AND the memoised grid cache
-  lib/marchingSquares.ts            # isoRuns(fn, bounds, level, res) — the ONE stitched kernel; descentPath and terrainContours are both callers. Plus isoSegments: unstitched, over a pre-sampled grid, for lib/draftingField.ts (redrawn per frame, so the O(n²) stitch is unaffordable)
+  lib/marchingSquares.ts            # isoRuns(fn, bounds, level, res) — the ONE stitched kernel; descentPath and terrainContours are both callers. Plus isoSegments: unstitched, over a pre-sampled grid, called by components/projects/DraftingField.astro (redrawn per frame, so the O(n²) stitch is unaffordable)
   lib/terrainContours.ts            # the hero field's isolines + levels, memoised — the intro's survey pass
   lib/introTimeline.ts              # the homepage intro's SCHEDULE only — pure. The decision and the ?dur= clamp live in pages/index.astro's is:inline script (it must run before first paint, so it cannot import); lib/introSession.ts reads what that publishes
   lib/descentPath.ts, trajectory.ts # the career descent graph's field and route
@@ -240,11 +240,11 @@ src/
   components/Button.astro           # the shared button ANATOMY + a per-page skin (only 'sticker', /projects') — see The concept
   components/{SealMark,Grain}.astro # (ProjectCard.astro was here; deleted with the /projects redesign)
   components/projects/*.astro       # /projects only: DraftingField (the background), TerminalHeader (banner, listing, the boot), Gallery (the fan), SelectedRows, WorkshopCards, ProjectAsk (the "open on GitHub?" pop-up), ProjectPicture (no script)
-  lib/draftingField.ts              # the drafting field: drift, the ping schedule, probe readouts — pure; isolines via marchingSquares' isoSegments
+  lib/draftingField.ts              # the drafting field: drift, the ping schedule, probe readouts — pure; DraftingField.astro strokes its isolines through marchingSquares' isoSegments over the grid sampleGrid() lays out
   lib/asciiBanner.ts                # the PROJECTS banner as SVG rects from letter matrices (the mono subset has no block glyphs)
   lib/projectsListing.ts            # the header's `ls -l` lines and the summary counts, computed from the records
   lib/projectsBoot.ts               # the boot: shouldBoot (WHETHER — shipped as source by projects.astro's is:inline decider) + bootSteps/bootState (WHAT, at each ms)
-  lib/pageView.ts                   # onPageView(): starts the boot's scripts right after parse, not at window `load`
+  lib/pageView.ts                   # onPageView(): starts /projects' scripts right after parse, not at window `load` (all but two — see Interactivity)
   lib/{cowTalk,galleryLayout}.ts    # when the /projects cow talks and which line; the fan's poses + the one click rule every project surface shares
   lib/{positioning,projectVisuals}.ts # offchart's percentile, ported; the four COMPUTED pictures as SVG strings, coloured only by CSS variables
   data/{cowLines,projectVisuals}.ts # the /projects cow's lines (stored as PAIRS); which picture each project shows
@@ -347,13 +347,19 @@ Everything else here:
   only runs at parse time works on first load and is dead after the first
   navigation.
   - **On a FULL load `astro:page-load` is window `load`**, which waits for every
-    eager image and font — and never comes if one image never arrives. So the three
-    scripts `/projects`' boot depends on (`TerminalHeader`, `ProjectAsk`, the page's
-    ask dispatcher) start through `lib/pageView.ts`'s `onPageView()`: at module
-    evaluation, right after parse, and then once per new DOM on `astro:page-load`.
-    The rest still start at `load`, and `Gallery`'s designed loading state pays for
-    it: by then every eager picture has loaded or failed, so the shimmer can show only
-    for a failed one, and a picture that never arrives means `Gallery` never runs.
+    font and eager subresource — and never comes if one never arrives. (Every
+    `/projects` picture is `loading="lazy"`; in headless Chrome 156 a held lazy
+    picture did not hold `load`, held fonts did.) So six `/projects` scripts start
+    through `lib/pageView.ts`'s `onPageView()`, at module evaluation right after
+    parse and then once per new DOM on `astro:page-load`: `TerminalHeader`,
+    `ProjectAsk`, `Gallery`, `DraftingField`, and `pages/projects.astro`'s ask
+    dispatcher and cow. Each of the last four once started at `load` and paid for it:
+    until then a slow `Gallery` card was a bare tone with no shimmer, and a picture
+    landing before `load` popped in unfaded; the field stayed blank while the banner
+    lit; and the cow missed every `cow:say` sent before `load`, then greeted "Click
+    one. I'll explain." to a reader whose pop-up was already open. Only
+    `SelectedRows`' preview and `WorkshopCards`' spotlight still start at `load` —
+    both are hover-only, and the first pointer move after it finds them.
 - **Pure logic goes in `lib/`, plumbing stays in the component.** That split is
   why `deck.ts`, `pageStops.ts`, `terrain.ts`, `justify.ts` and `scrollspy.ts`
   have specs at all — the parts worth testing are not tangled in event handlers.

@@ -272,9 +272,11 @@ const bootDecider = `(function () {
   // greeting and idle chatter would interrupt a screen reader every 10-20s.
   // ON A PHONE IT SAYS ONLY WHAT IT IS ASKED (Task D, D8): no greeting and no idle lines, so the idle timer is never
   // set. In a phone's one column a bubble the reader did not ask for is a box over what they are reading.
+  // STARTED AT PARSE, like the dispatcher above that sends it `cow:say`: started at window `load` it missed every ask
+  // made before then, and then greeted ("Click one. I'll explain.") a reader whose pop-up was already open.
   let teardownCow: (() => void) | null = null;
 
-  document.addEventListener('astro:page-load', () => {
+  onPageView('.cow-wrap--talk', () => {
     teardownCow?.();
     teardownCow = null;
     const wrap = document.querySelector<HTMLElement>('.cow-wrap--talk');

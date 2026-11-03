@@ -175,6 +175,7 @@ const cards = GALLERY_ORDER.map((slug, i) => {
 <script>
   import { READY_MS, readyAfter } from '../../lib/galleryLayout';
   import { prefersReducedMotion } from '../../lib/motion';
+  import { onPageView } from '../../lib/pageView';
   import { isPhone } from '../../lib/viewport';
 
   // manifold's motion waits for the fan to settle: its .55s transform plus the deal's stagger across six cards.
@@ -285,5 +286,8 @@ const cards = GALLERY_ORDER.map((slug, i) => {
     };
   }
 
-  document.addEventListener('astro:page-load', init);
+  // Started at parse on a full load (lib/pageView.ts), not at window `load`, which waits for the fonts: started
+  // there, a slow card sat as a bare tone with no shimmer until `load`, and a picture landing before it popped in
+  // unfaded — the loading state above exists for exactly that picture.
+  onPageView('[data-gallery]', init);
 </script>

@@ -212,7 +212,9 @@ export const projects: Project[] = [
     slug: 'daylogs', name: 'daylogs', tier: 'workshop', kind: 'tool', year: '2026',
     idea: 'Weight, food and spending, typed by hand in one line each — plus one short daily read.',
     short: 'weight, food, spending — by hand',
-    proof: ['on PyPI, 5 releases'],
+    // No release count, unlike witness's: the spec's "5 releases" was 9 on PyPI by 2026-11-03 (0.6.0-0.6.3 landed in
+    // nine hours), and a count that moves that fast is false between edits whether or not it carries an asOf.
+    proof: ['on PyPI'],
     install: { text: 'uv tool install daylogs' },
     visibility: 'public', registry: 'pypi', ci: true,
   },

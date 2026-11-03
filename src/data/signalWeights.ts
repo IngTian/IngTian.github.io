@@ -166,7 +166,7 @@ export const SIGNAL_WEIGHTS: SignalWeights = {
     {
       id: 'projects:daylogs', factor: 'projects', score: 2,
       label: 'daylogs',
-      because: 'Public and checkable ("on PyPI, 5 releases"), but tracking "weight, food and spending" is a personal logging tool with no statistics, optimisation or modelling in it, the same off-axis band as witness.',
+      because: 'Public and checkable ("on PyPI"), but tracking "weight, food and spending" is a personal logging tool with no statistics, optimisation or modelling in it, the same off-axis band as witness.',
     },
     {
       id: 'projects:manifold', factor: 'projects', score: 2,

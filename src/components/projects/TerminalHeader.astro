@@ -227,7 +227,7 @@ const n = summaryCounts(projects);
     };
   }
 
-  // Started at parse on a full load, not at astro:page-load (window `load`, which waits for every picture): see
+  // Started at parse on a full load, not at astro:page-load (window `load`, which waits for the fonts): see
   // lib/pageView.ts. A ClientRouter arrival still starts on its page-load.
   onPageView('[data-term]', init);
 </script>
