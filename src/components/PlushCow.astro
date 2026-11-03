@@ -360,10 +360,11 @@ const measure = widestHalf(lines.slice(0, 1)) + 1;
   /* No letter-spacing, so a `ch` is exactly one glyph's advance — the talking script sizes the line in ch. */
   .cow-wrap--rail .cow-says { margin: 0; font-size: 12.5px; letter-spacing: 0; color: var(--ink-1); }
   .cow-wrap--rail .cow:focus-visible { outline-color: var(--ochre); }
-  /* THE BUBBLE ABOVE THE COW only where the page fixes it: its right-hand gutter from 1180px and the phone dock
-     (both breakpoints synced by hand with projects.astro's .cowbox). Between them the cow sits in the page's flow
-     beside the listing's last line, and there it keeps the bubble BESIDE it — the row geometry above, tail at the
-     bubble's lower right — so it costs the cow's 104px of height rather than bubble plus cow. */
+  /* THE BUBBLE ABOVE THE COW in the page's right-hand gutter from 1180px, and on a phone, whose column has no room
+     beside the cow, in the band under the listing (both breakpoints synced by hand with projects.astro's .cowbox).
+     Between them the cow sits in the page's flow beside the listing's last line, and there it keeps the bubble
+     BESIDE it — the row geometry above, tail at the bubble's lower right — so it costs the cow's 104px of height
+     rather than bubble plus cow. */
   @media (min-width: 1180px), (max-width: 640px) {
     .cow-wrap--rail { flex-direction: column; align-items: flex-end; gap: 0; }
     .cow-wrap--rail .cow-bubble { margin-bottom: calc(var(--moo-cell) * 6); }

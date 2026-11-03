@@ -15,8 +15,8 @@
 // resting box AND the lifted face. It also means a deal stagger set on .shot cannot delay a lift, which the
 // mockup needed `transition-delay: 0s !important` on its hover rule for.
 //
-// LOADING IS DESIGNED: every picture is eager (the gallery is above the fold), the middle card's at high
-// priority where the build knows which picture shows (ProjectPicture), and a card whose picture has not arrived
+// LOADING IS DESIGNED: every picture is lazy (ProjectPicture says why: the gallery is above the fold on a desktop,
+// where Chrome fetches it at first layout anyway, and below it on a phone), and a card whose picture has not arrived
 // when the script runs shows the palette tone with a transform-only shimmer, then fades the picture in — or gives
 // up waiting after READY_MS, so nothing shimmers forever. manifold shows its still, then swaps to its MP4 once the
 // fan is open: preloaded, so the card never blanks, paused while it is offscreen, and never under reduced motion
@@ -26,7 +26,6 @@ import { visualFor } from '../../data/projectVisuals';
 import { GALLERY_ORDER, fanPose } from '../../lib/galleryLayout';
 import ProjectPicture from './ProjectPicture.astro';
 
-const MIDDLE = Math.floor(GALLERY_ORDER.length / 2);
 const cards = GALLERY_ORDER.map((slug, i) => {
   const p = projects.find((q) => q.slug === slug);
   if (!p) throw new Error(`Gallery: no project "${slug}" in profile.ts`);
@@ -34,7 +33,7 @@ const cards = GALLERY_ORDER.map((slug, i) => {
   const url = repoUrl(p);
   const f = fanPose(i, GALLERY_ORDER.length);
   return {
-    p, url, Tag: (url ? 'a' : 'button') as 'a' | 'button', i,
+    p, url, Tag: (url ? 'a' : 'button') as 'a' | 'button',
     motion: v.kind === 'image' ? v.motion : undefined,
     // --x is unitless: the CSS turns it into px through --fit, which narrows the fan to its column.
     style: `--x:${f.x};--z:${f.z}px;--ry:${f.ry}deg;--rz:${f.rz}deg;--zi:${f.zi};--pile:${f.pile}deg`,
@@ -43,12 +42,12 @@ const cards = GALLERY_ORDER.map((slug, i) => {
 ---
 <div class="gallery" data-gallery>
   <div class="fan">
-    {cards.map(({ p, url, Tag, i, motion, style }) => (
+    {cards.map(({ p, url, Tag, motion, style }) => (
       <Tag class="shot" href={url ?? undefined} type={url ? undefined : 'button'}
            data-ask={p.slug} data-motion-dark={motion?.dark} data-motion-light={motion?.light} style={style}>
         <span class="shot-in">
           <span class="tag">{p.name}</span>
-          <ProjectPicture slug={p.slug} sizes="(max-width: 640px) 240px, 330px" loading="eager" priority={i === MIDDLE} />
+          <ProjectPicture slug={p.slug} sizes="(max-width: 640px) 240px, 330px" />
         </span>
       </Tag>
     ))}

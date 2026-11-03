@@ -76,9 +76,12 @@ const { stops, id, label = 'On this page' } = Astro.props;
     max-width: 200px;
   }
   .side-rail ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
-  /* Nested lists breathe less than top-level ones, so a group reads as a group. */
-  .side-rail .sub { gap: 9px; margin-top: 9px; padding-left: 12px; }
-  .side-rail .sub-2 { gap: 7px; margin-top: 7px; }
+  /* Nested lists breathe less than top-level ones, so a group reads as a group — but not below 12px, at any depth.
+     A nested row is 12.5px tall (10px type at 1.25), and axe's target-size, which Lighthouse scores in A11y, wants
+     an undersized target's centre 24px from every neighbour's: 12px gives rows 24.5px apart and the first 25.1px
+     from its parent. At the old 9px (and 7px a tier deeper) the desktop runs failed it on every rail with a nested
+     list: /projects 96, and /research, /experience and /writing 95 each. */
+  .side-rail .sub { gap: 12px; margin-top: 12px; padding-left: 12px; }
 
   .side-rail a {
     display: flex; align-items: center; gap: 10px; text-decoration: none;

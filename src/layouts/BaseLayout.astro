@@ -52,6 +52,15 @@ interface Props {
    * and :286 is italic.
    */
   preloadAccent?: boolean | 'italic';
+  /**
+   * Preload JetBrains Mono: for a page whose first screen is SET in it (/projects' terminal header, whose listing is
+   * its mobile LCP element). Undiscovered until the stylesheets have parsed, the file is fetched at the HIGHEST
+   * priority, which Lighthouse's simulation counts as render-blocking: on /projects it was the last request to land
+   * in the FCP estimate (31,660 B, simulated 1,654ms optimistic / 1,804 pessimistic), and preloaded it is fetched
+   * with the document at high priority instead — mobile FCP 1,732 -> 1,435ms for identical bytes. Fraunces' rule,
+   * below, from the other side: a page that uses a face fetches it either way, so announce it early.
+   */
+  preloadMono?: boolean;
 }
 
 const {
@@ -64,6 +73,7 @@ const {
   navZone = 'scroll',
   noindex = false,
   preloadAccent = false,
+  preloadMono = false,
 } = Astro.props;
 
 // Per-page canonical + og:url. Astro.site is 'https://ingtian.github.io';
@@ -196,7 +206,7 @@ const personLd = {
       cssVariable="--ff-fraunces"
       preload={preloadAccent === 'italic' ? [{ style: 'italic' as const }] : preloadAccent}
     />
-    <Font cssVariable="--ff-jetbrains" />
+    <Font cssVariable="--ff-jetbrains" preload={preloadMono} />
     <ClientRouter />
     <title>{title}</title>
   </head>

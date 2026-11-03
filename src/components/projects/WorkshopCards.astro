@@ -26,7 +26,7 @@ const cards = projects.filter((p) => p.tier === 'workshop').map((p) => {
       <Tag class="card" href={url ?? undefined} type={url ? undefined : 'button'} data-ask={p.slug}>
         <span class="card-in">
           <span class="thumb">
-            <ProjectPicture slug={p.slug} sizes="(max-width: 760px) 92vw, (max-width: 1400px) 460px, 320px" loading="lazy" />
+            <ProjectPicture slug={p.slug} sizes="(max-width: 760px) 92vw, (max-width: 1400px) 460px, 320px" />
           </span>
           <span class="cb">
             <span class="nm">{p.name}</span>

@@ -52,6 +52,9 @@ function vignetteCorner(tk: Record<string, string>, ground: string): RGB {
   return over(v!.slice(1, 4).map(Number), Number(v![4]) * share, rgbOf(ground));
 }
 
+/** The two ends of the vignette's ramp: the bare ground at its transparent centre, and its darkest corner. */
+const vignetteRamp = (tk: Record<string, string>, ground: string): [RGB, RGB] => [rgbOf(ground), vignetteCorner(tk, ground)];
+
 /** The alpha a component's rule gives one of the drafting rgb tokens, e.g. the row wash's `rgba(var(--draft-line-rgb), .04)`. */
 function alphaIn(file: string, text: string, rule: string, token: string): number {
   const body = new RegExp(`${rule.replace(/[.:()]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(text)?.[1];
@@ -110,30 +113,38 @@ describe('the drafting palette (tokens.css)', () => {
       }
 
       // The vignette sits over the field and UNDER the page's text, so wherever it is drawn the ground the text reads
-      // against is the ground with the vignette composited on. In light theme that is darker than the bare ground,
-      // so it costs contrast. Its darkest point is a corner (the farthest point of the box from the gradient's
-      // centre); the geometry is read from the component that ships it, so the two cannot drift apart.
-      it('every text ink clears AA at the darkest point of the edge vignette', () => {
-        const under = vignetteCorner(tk, t.ground);
-        for (const ink of ['--ink-1', '--ink-3', '--ink-4', '--ochre']) {
-          expect(onGround(tk[ink], under), `${ink} under the vignette`).toBeGreaterThanOrEqual(AA_BODY);
+      // against is the ground with the vignette composited on — anywhere from the bare ground (its transparent
+      // centre) to its darkest point, a corner (the farthest point of the box from the gradient's centre). The
+      // geometry is read from the component that ships it, so the two cannot drift apart.
+      // BOTH ENDS, because which end is the worst one depends on the theme. The vignette darkens, so in light theme
+      // (dark ink) the corner costs contrast, and in dark theme (light ink) the corner is the BEST case and the bare
+      // ground the worst: checked at the corner alone, dark theme was measured where it is easiest to read.
+      // Compositing is linear per channel, so the luminance along the ramp is monotonic and the ends bound it.
+      it('every text ink clears AA anywhere on the edge vignette', () => {
+        for (const under of vignetteRamp(tk, t.ground)) {
+          for (const ink of ['--ink-1', '--ink-3', '--ink-4', '--ochre']) {
+            expect(onGround(tk[ink], under), `${ink} under the vignette`).toBeGreaterThanOrEqual(AA_BODY);
+          }
         }
       });
 
       // THE HOVER TINTS lie over grounds the palette alone does not describe, and compound with them: the row wash
       // with the vignette under the open field, the card spotlight (the seal, at the pointer) with a card's ground —
       // and on the dashed card, which has none, with the field and the vignette as well. So a lit row or card lifts
-      // its ink-3 words to ink-2, and every ink it then wears must clear AA on the tint at the vignette's corner.
+      // its ink-3 words to ink-2, and every ink it then wears must clear AA on the tint, at both ends of the vignette.
       // The seal cannot be lifted (it is the page's one colour), so the tints are capped by it.
       it('every word a hover lights clears AA on the tint it lies under', () => {
-        const corner = vignetteCorner(tk, t.ground);
         const line = rgbToken(tk['--draft-line-rgb']), hi = rgbToken(tk['--draft-hi-rgb']);
         const wash = alphaIn('SelectedRows.astro', rowsSrc, '.row::before', '--draft-line-rgb');
         const spot = alphaIn('WorkshopCards.astro', cardsSrc, '.card-in::before', '--draft-hi-rgb');
+        // A row and the dashed card lie on the open field, so on both ends of the vignette (see above); a card's
+        // inside is its own opaque ground.
         const grounds: [string, RGB, string[]][] = [
-          ['a hovered row', over(line, wash, corner), ['--ink-1', '--ink-2', '--ochre']],
+          ...vignetteRamp(tk, t.ground).flatMap((field, end): [string, RGB, string[]][] => [
+            [`a hovered row (vignette ${end ? 'corner' : 'centre'})`, over(line, wash, field), ['--ink-1', '--ink-2', '--ochre']],
+            [`the lit dashed card (vignette ${end ? 'corner' : 'centre'})`, over(hi, spot, field), ['--ink-1', '--ink-2']],
+          ]),
           ['a lit card', over(hi, spot, rgbOf(t.ground)), ['--ink-1', '--ink-2']],
-          ['the lit dashed card', over(hi, spot, corner), ['--ink-1', '--ink-2']],
         ];
         for (const [where, ground, inks] of grounds) {
           for (const ink of inks) expect(onGround(tk[ink], ground), `${ink} on ${where}`).toBeGreaterThanOrEqual(AA_BODY);

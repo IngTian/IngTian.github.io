@@ -1,5 +1,6 @@
 // tests/cowTalk.test.ts
 // The /projects cow: what it says (data/cowLines.ts) and when it may say it (lib/cowTalk.ts).
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PROJECT_COW_LINES } from '../src/data/cowLines';
 import { projects } from '../src/data/profile';
@@ -71,5 +72,28 @@ describe('PROJECT_COW_LINES', () => {
       (cp >= 0xf900 && cp <= 0xfaff) || (cp >= 0xff00 && cp <= 0xffef);
     const found = ALL.flatMap((pair) => [...pair.join(' ')]).filter((c) => cjk(c.codePointAt(0)!));
     expect(found).toEqual([]);
+  });
+});
+
+// THE COLUMN HOLDS THE WIDEST BUBBLE. From 1180px the cow is fixed in a right-hand gutter, which spec §3 (the owner's)
+// says exists so the cow never overlaps content — and its bubble is as wide as the line it is saying. The mockup's
+// gutter left the widest bubble 52px over the content column from 1180 to 1440 (Task 9's measurement), so the
+// gutter is now the cow's inset plus a reserve, and this holds the reserve against the copy: a longer line must
+// widen the gutter, not reach back over the column.
+describe("the cow's right-hand column (projects.astro)", () => {
+  const read = (f: string): string => readFileSync(new URL(f, import.meta.url), 'utf8');
+  it('reserves the widest line\'s bubble plus a 24px gap', () => {
+    const page = read('../src/pages/projects.astro');
+    const reserve = /calc\(max\(26px, 3\.2vw\) \+ (\d+)px - \(100% - min\(100%, 1500px\)\)\)/.exec(page)?.[1];
+    expect(reserve, 'projects.astro no longer reserves the gutter as max(26px, 3.2vw) + Npx').toBeTruthy();
+    // and the cow sits at that same inset, so the reserve is measured from where it actually is
+    expect(page).toMatch(/\.cowbox \{ position: fixed; right: max\(26px, 3\.2vw\);/);
+    const font = /\.cow-wrap--rail \.cow-says \{[^}]*font-size: ([\d.]+)px;[^}]*letter-spacing: 0;/.exec(read('../src/components/PlushCow.astro'))?.[1];
+    expect(font, "PlushCow's rail line is no longer a px size with no letter-spacing").toBeTruthy();
+    // The script sizes the line in ch, and JetBrains Mono's advance is 0.6em. The box adds the rail's padding (3
+    // cells a side) and border (1 cell) at its 4px cell: 32px.
+    const widest = Math.max(...ALL.flat().map((h) => h.length));
+    const bubble = widest * Number(font) * 0.6 + 32;
+    expect(Number(reserve) - bubble).toBeGreaterThanOrEqual(24);
   });
 });

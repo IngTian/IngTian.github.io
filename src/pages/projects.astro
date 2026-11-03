@@ -61,7 +61,7 @@ const bootDecider = `(function () {
   } catch (e) { /* storage that throws means play (above); anything else, the finished page — never a broken one */ }
 })();`;
 ---
-<BaseLayout title="Projects — Ing Tian" description={description} page="drafting" veil={false} navZone="light">
+<BaseLayout title="Projects — Ing Tian" description={description} page="drafting" veil={false} navZone="light" preloadMono>
   <script is:inline set:html={bootDecider} />
   <DraftingField />
   <SideRail stops={stops} id="projects-toc" />
@@ -70,8 +70,8 @@ const bootDecider = `(function () {
     <a class="back" href="/">← back</a>
 
     <TerminalHeader />
-    {/* The cow: fixed in the right-hand column from 1180px, docked bottom-right on a phone, and between those in the
-        flow beside the listing's last line — here in the source for that middle case. */}
+    {/* The cow: fixed in the right-hand column from 1180px; below that in the flow, after the listing — beside its
+        last line from 641px, under it on a phone. */}
     <div class="cowbox"><PlushCow size="rail" talk /></div>
     <Gallery />
 
@@ -105,28 +105,36 @@ const bootDecider = `(function () {
   /* Clears SideRail where it shows (it hides at ≤1100px). Measured with every row active, so every rule drawn:
      its right edge is at x=139 at 1101px and x=151 at 2000px, against content starting at 190 and 230. */
   @media (min-width: 1101px) { .projects-page { padding-left: clamp(190px, 13vw, 230px); } }
-  @media (min-width: 1180px) { .projects-page { padding-right: calc(4vw + 210px); } }
+  /* THE COW'S COLUMN HOLDS ITS WIDEST BUBBLE — the owner's "the cow never overlaps content" (spec §3). The fixed cow
+     sits max(26px, 3.2vw) from the edge, and its bubble, right-aligned above it, is at most 272px: the widest line
+     ("Look before you change anything.", 32ch of 12.5px mono) plus the 4px cell's padding and border. So the column
+     reserves that and a 24px gap. The mockup's calc(4vw + 210px) left that bubble 52px over the column from 1180 to
+     1440 and cleared only from ~1600; it stays as the floor, so the layout is unchanged where it already cleared.
+     The last term is the room past the main's 1500px max-width, which is the cow's already. tests/cowTalk.test.ts
+     holds the 296 against the copy, so a longer line cannot quietly reach back over the column. */
+  @media (min-width: 1180px) {
+    .projects-page { padding-right: max(calc(4vw + 210px), calc(max(26px, 3.2vw) + 296px - (100% - min(100%, 1500px)))); }
+  }
 
   /* Every jump target lands 110px down, clear of the fixed corner nav. :global because the targets are rendered by
      child components too (#p-index is TerminalHeader's): scoped, this compiled to section[cid-of-this-page][id] and
      silently missed them — CLAUDE.md's scoped-style trap. Anchored under .projects-page so it cannot leak. */
   .projects-page :global(section[id]), .projects-page :global(li[id]) { scroll-margin-top: 110px; }
 
-  /* THE RAIL'S TARGETS. SideRail's nested rows are 12.5px tall at a 21.5px pitch (a 9px gap), and axe's target-size,
-     which Lighthouse scores in A11y, wants an undersized target's centre 24px from its neighbours': the desktop run
-     scored 96 on it, flagging "Selected" and the four rows under it. 12px puts rows 24.5px apart and the first
-     25.1px from its parent. Set here rather than in SideRail because the rail is shared: /research misses the same
-     audit (95), and a change to every reading page's rail is not this page's to make. :global and anchored on this
-     rail's id, so it reaches SideRail's elements (a scoped rule here could not) and nothing else. */
-  :global(#projects-toc .sub) { gap: 12px; margin-top: 12px; }
-
   .back { display: inline-block; margin-top: 140px; font: 12px var(--font-mono); color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
   .back:hover { color: var(--ochre); }
 
-  /* THE COW'S COLUMN. From 1180px it is fixed in the gutter the padding above reserves, mirroring the rail; on a
-     phone it docks to the bottom-right corner at the same inset. Between 641 and 1179px it follows no scroll —
-     fixed there, it and its bubble would cover text and tap targets on tablets and small laptops — and sits in the
-     flow BESIDE THE LISTING'S LAST LINE, the idle prompt, whose 14 characters leave the rest of that row empty.
+  /* THE COW'S COLUMN. From 1180px it is fixed in the gutter the padding above reserves, mirroring the rail. Below
+     that it follows no scroll — fixed, it and its bubble would cover text and tap targets.
+     ON A PHONE IT SITS UNDER THE LISTING, in a band of its own, the bubble's room reserved above it. It used to
+     dock to the bottom-right corner (spec §3's "docks bottom-right", a planning call), and there it was over the
+     first screen: at 390x844 the cow covered the summary's tail and its 272x90 bubble the right 60% of the
+     listing's last three lines, macboot/ and ai-mentor-core/ included — a box the reader cannot move, over the
+     page's index. Clicks passed through it, so no hit-test caught it; the owner's rule for this cow is that it
+     never overlaps content. The band costs ~220px of a page a phone scrolls anyway, and nothing moves when it
+     speaks: the bubble keeps its box while hidden (opacity), two rows tall whatever the line.
+     Between 641 and 1179px it sits in the flow BESIDE THE LISTING'S LAST LINE, the idle prompt, whose 14
+     characters leave the rest of that row empty.
      The box takes no height of its own: the cow's top meets the summary's bottom (TerminalHeader's .idle is a
      12px margin plus one 13.5px/1.55 line, synced by hand) and its 104px reach down into the gallery's 70px top
      margin, so the gallery starts where it would with no cow. A band under the listing (218px, then a 104px row)
@@ -148,7 +156,6 @@ const bootDecider = `(function () {
     .cowbox :global(.cow-wrap) { margin-top: calc(-12px - 13.5px * 1.55); }
   }
   @media (min-width: 1180px) { .cowbox { position: fixed; right: max(26px, 3.2vw); top: 47vh; z-index: 15; } }
-  @media (max-width: 640px) { .cowbox { position: fixed; right: max(26px, 3.2vw); bottom: max(26px, 3.2vw); z-index: 15; } }
   :global(html.projects-boot) .cowbox { opacity: 0; transform: translateY(24px); transition: none; }
   :global(html.projects-boot) .cowbox :global(.cow) { pointer-events: none; }
   @media (prefers-reduced-motion: no-preference) {

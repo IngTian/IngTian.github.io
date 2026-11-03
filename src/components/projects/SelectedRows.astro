@@ -32,7 +32,7 @@ const rows = projects.filter((p) => p.tier === 'selected').map((p, i) => {
 </ul>
 <div class="peek" aria-hidden="true" data-peek>
   {rows.map(({ p }) => (
-    <span class="pk" data-for={p.slug} hidden><ProjectPicture slug={p.slug} sizes="360px" loading="lazy" /></span>
+    <span class="pk" data-for={p.slug} hidden><ProjectPicture slug={p.slug} sizes="360px" /></span>
   ))}
 </div>
 
