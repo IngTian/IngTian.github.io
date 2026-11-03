@@ -36,7 +36,7 @@ describe('mayIdle', () => {
 });
 
 // IT STOPS ON ITS OWN (Task E, fix round 1; WCAG 2.2.2, lib/motion.ts). Unbounded, the idle chatter popped a bubble,
-// typed and hopped beside the listing every 14-30s for as long as the page was open, and pressing the cow only said
+// typed and hopped beside the listing every 14-32s for as long as the page was open, and pressing the cow only said
 // more. Now everything it does unasked — the greeting plus idleLines() idle lines — must add up to less movement than
 // MOTION_LIMIT_MS, the way motionLimit.test.ts holds the cursor's blinks. A line's pop, hop and typing start together;
 // its fade comes after BUBBLE_MS of stillness. The pop/fade and the hop are read from PlushCow.astro's stylesheet.

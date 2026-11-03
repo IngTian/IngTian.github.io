@@ -47,7 +47,7 @@
 //   rater 2       4        3           2           2        1
 //   rater 3       4        3           2           2        1
 // 5 items · 5 exact agreement · 0 disputes, so each committed MEDIAN is unanimous, and each `because` is
-// rater 2's sentence verbatim (all three tied, so the middle rater) — with TWO later edits. trading-desk's
+// rater 2's sentence verbatim (all three tied, so the middle rater) — with THREE later edits. trading-desk's
 // chip was scored as "~270 tests" and then corrected to "~300 tests" (323 collected, 299 run without a
 // book), and its quote follows the chip. It was not re-scored: all three raters read the count only as
 // "public and checkable" and capped the item as ledger software rather than modelling (two called it
@@ -57,6 +57,9 @@
 // the new words already say). Not re-scored either: the sentence scores the checkable artefact — a public repo,
 // "tests tied to the paper's theorems", "results committed" — and caps it on self-reproduction, so "published"
 // set nothing; and 4 is the ceiling without external validation anyway (above).
+// And macboot's chip said "was 4,700 lines of bash" where its README says "~4,700"; the chip gained the tilde and
+// the quote follows. Not re-scored: the item is capped at 1 on "PRIVATE repo, no public link", which no line count
+// can move.
 // tests/signalWeights.test.ts checks that every quoted span in a project's `because` is still in its item.
 //
 // Project ids are keyed by slug (`projects:witness`), not by index, so adding a project does not reshuffle
@@ -181,7 +184,7 @@ export const SIGNAL_WEIGHTS: SignalWeights = {
     {
       id: 'projects:macboot', factor: 'projects', score: 1,
       label: 'macboot',
-      because: 'A "PRIVATE repo, no public link", so a reader can check nothing. "Mac setup" run "by Claude Code" and "was 4,700 lines of bash" describe machine provisioning, with no quantitative content.',
+      because: 'A "PRIVATE repo, no public link", so a reader can check nothing. "Mac setup" run "by Claude Code" and "was ~4,700 lines of bash" describe machine provisioning, with no quantitative content.',
     },
 
     // ── Craft ───────────────────────────────────────────────────────────────

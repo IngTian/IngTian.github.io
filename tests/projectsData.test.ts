@@ -66,7 +66,9 @@ describe('the project records', () => {
   it("calls rl-bhrp's paper what its record calls it: on arXiv, not published", () => {
     expect(publications.find((p) => p.arxivId)!.venue).toBe('arXiv preprint');
     expect(bySlug('rl-bhrp').idea).toMatch(/arXiv/);
-    for (const p of projects) expect(`${p.idea} ${p.short}`, p.slug).not.toMatch(/publish/i);
+    // Scoped to the claim, not the word: another project may truthfully "publish" something.
+    const rl = bySlug('rl-bhrp');
+    expect(`${rl.idea} ${rl.short}`).not.toMatch(/\bpublished\b/i);
   });
 
   // macboot is private, so the card shows the prompt its README hands to Claude Code — and the prompt runs on for two

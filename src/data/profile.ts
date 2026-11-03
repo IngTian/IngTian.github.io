@@ -238,7 +238,7 @@ export const projects: Project[] = [
     slug: 'macboot', name: 'macboot', tier: 'workshop', kind: 'guide',
     idea: 'My Mac setup as one document an AI agent runs: it looks before it changes anything, skips what is already there, and hands me only the steps a person should do.',
     short: 'a Mac setup an agent runs, from one README',
-    proof: ['one README', 'run by Claude Code', 'was 4,700 lines of bash'],
+    proof: ['one README', 'run by Claude Code', 'was ~4,700 lines of bash'],
     // An excerpt (macboot's README at a690e47, lines 10-12): verbatim to the end of its first clause, colon kept; the
     // prompt goes on to what to skip, never to upgrade, and the three lists to finish with. The \u00a0 holds the
     // ellipsis to the colon, so a narrow card cannot wrap it onto a line of its own.
