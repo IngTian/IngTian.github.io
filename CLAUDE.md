@@ -31,12 +31,36 @@ carries the weight; the sky, the math-generative terrain hero, and one editorial
 tagline carry the soul.
 
 The homepage is the descent. Around it are the **reading pages** — /research,
-/writing, /writing/&lt;slug&gt;, /projects, /experience — and **/art**, a quiet museum
-room for calligraphy and photography. Every route except /projects rides the same sky
-(/projects sits on the plain drafting ground its `data-page` palette is measured on), and the
-reading pages deliberately share one margin, one measure and one back-link
+/writing, /writing/&lt;slug&gt;, /experience — **/projects**, and **/art**, a quiet museum
+room for calligraphy and photography. Every route except /projects rides the same sky,
+and the reading pages deliberately share one margin, one measure and one back-link
 treatment: pages that each guessed their own layout would read as several sites.
 Borrow composition from the neighbouring page rather than inventing it.
+
+**/projects is the first page with a register of its own, and it will not be the last.**
+The owner: *"techy… pure tech and engineering."* It left the shared sky for a drafting
+sheet — isolines of a drifting Gaussian-mixture field, ticks and probe readouts, seal red
+the only colour (`components/projects/DraftingField.astro`) — and has its own measure
+(a 1500px main, the rail's column on the left and, from 1180px, the cow's on the
+right). The rule for the others, in his words, for their own passes: **research
+serious, academic; art imaginative, romantic; writing imaginative, fun, casual,
+stylish.** Until a page gets its pass it keeps the current look; "every route rides the same sky" was true until
+/projects, and is now a fact about the pages not yet redesigned rather than a rule.
+
+**What keeps them one site is shared components, not a shared background.** Two kinds,
+and which kind a component is decides how a page may change it:
+- **Shared, as is: the corner nav, the rail and the back link.** `CornerNav` and
+  `SideRail` are components; the back link is a treatment each page writes the same way
+  (`<a class="back">`, 12px mono in `--ink-3`). A page does not restyle any of them.
+  /projects reskins them without an edit: its `html[data-page='drafting']` block in
+  `tokens.css` overrides the *role* tokens (`--paper`, the ink ramp, `--ochre` → the
+  seal), so the nav's dot, pill and focus ring turn seal red there by reading the same
+  variable they read everywhere. A change to one of these is a change to every page.
+- **Page-own: buttons.** One anatomy, a skin per page. `components/Button.astro` owns
+  the size, label, arrow, press, focus ring and the `<a>`/`<button>` behaviour; a page's
+  look is a `skin` value plus one `.btn--<skin>` block. Today the only skin is
+  /projects' **sticker** (a slight tilt, a 1.5px ink edge, a hard 4px offset shadow in
+  the accent). A new page **adds a skin, not a new button.**
 
 **Restraint is the aesthetic.** Text is English-only — the literati feel comes
 from composition and negative space, never from displayed CJK glyphs. The lone
@@ -195,13 +219,25 @@ src/
   components/SkyWash.astro          # woven warm/cold broken-color wash over the sky — CSS + a small script (it is in the Interactivity list below; this line used to say "pure CSS")
   components/TerrainHero.astro      # the hero's terrain canvas (Heights only)
   components/DescentPath.astro      # the career descent graph (inside Story)
-  components/SideRail.astro         # the reading pages' marginal rail, driven by a Stop tree
+  components/SideRail.astro         # the reading pages' and /projects' marginal rail, driven by a Stop tree
   components/Toc.astro              # the homepage's thin left-margin TOC, driven by homeStops()
   components/CornerNav.astro        # the always-visible glass nav + theme toggle
-  components/PlushCow.astro         # the cow, at three scales, with a pixel speech bubble
-  components/{SealMark,Grain}.astro
+  components/PlushCow.astro         # the cow, at three scales, with a pixel speech bubble; `talk` is /projects' cow, driven by that page's script
+  components/Button.astro           # the shared button ANATOMY + a per-page skin (only 'sticker', /projects') — see The concept
+  components/{SealMark,Grain}.astro # (ProjectCard.astro was here; deleted with the /projects redesign)
+  components/projects/*.astro       # /projects only: DraftingField (the background), TerminalHeader (banner, listing, the boot), Gallery (the fan), SelectedRows, WorkshopCards, ProjectAsk (the "open on GitHub?" pop-up), ProjectPicture (no script)
+  lib/draftingField.ts              # the drafting field: drift, the ping schedule, probe readouts — pure; isolines via marchingSquares' isoSegments
+  lib/asciiBanner.ts                # the PROJECTS banner as SVG rects from letter matrices (the mono subset has no block glyphs)
+  lib/projectsListing.ts            # the header's `ls -l` lines and the summary counts, computed from the records
+  lib/projectsBoot.ts               # the boot: shouldBoot (WHETHER — shipped as source by projects.astro's is:inline decider) + bootSteps/bootState (WHAT, at each ms)
+  lib/pageView.ts                   # onPageView(): starts the boot's scripts right after parse, not at window `load`
+  lib/{cowTalk,galleryLayout}.ts    # when the /projects cow talks and which line; the fan's poses + the one click rule every project surface shares
+  lib/{positioning,projectVisuals}.ts # offchart's percentile, ported; the four COMPUTED pictures as SVG strings, coloured only by CSS variables
+  data/{cowLines,projectVisuals}.ts # the /projects cow's lines (stored as PAIRS); which picture each project shows
+  data/vendor/*.ts                  # GENERATED — the computed pictures' inputs, with provenance in each header. Do not edit; re-run the tool
   scripts/artGallery.ts             # the /art page behavior (justified rows, placard, scrollspy, lightbox)
 tests/*.test.ts                     # vitest — every pure lib module, the data/route invariants, the content seam
+tools/vendor-projects.mjs           # the ONLY thing that touches the network, run by hand: writes data/vendor/*, src/assets/projects/* and public/projects/*
 ```
 
 ### Routes
@@ -217,7 +253,7 @@ more prototype routes existed and the table below still named all four.
 | `/research` | papers, in full: the idea, the method's equations, results |
 | `/writing` | the writing shelf — kinds, each listing its markdown pieces |
 | `/writing/<slug>` | one piece, rendered from `src/content/writing/<slug>.md` |
-| `/projects` | shipped artifacts with links |
+| `/projects` | every notable project, on its own drafting register: the terminal header and its boot, the gallery, selected work, the workshop |
 | `/experience` | the timeline — education and roles |
 | `/art` | calligraphy + photography |
 | `/404` | the not-found page (noindex, no canonical) |
@@ -254,21 +290,24 @@ is a plain Astro component or page with a `<script>`, **not** an island (see *St
 `grep -rln '<script' src` returns **26 files** against the 23 surfaces above, and the
 difference is not all drift: `lib/introTimeline.ts`, `lib/motion.ts` and
 `lib/descentPath.ts` match on the string `<script>` inside their own COMMENTS. Filter
-to `src/{components,sections,pages,layouts}` before trusting a count. The real gap this
+to `src/{components,sections,pages,layouts}` before trusting a count — filtered, it
+returns **23**, the list above exactly (`components/projects/ProjectPicture.astro` and
+`Button.astro` have no script). The real gap this
 caught was `pages/index.astro`, which the list had never named. (It read 19 against 16
 until `/projects` added seven surfaces across several commits, most of which did not
 update it.)
 
-**And `index.astro` is the one surface that does NOT keep the contract below, on
-purpose.** Its intro decider is `is:inline`, so it runs at parse time and exactly once
-— no `astro:page-load`, no teardown. That is the whole reason it exists: a bundled
-script is deferred until after parse, by which point the sky has already painted its
-finished colours, which is the flash it was written to remove. `BaseLayout`'s two
-inline scripts are the same exception for the same reason, and so is `projects.astro`'s
-boot decider: it sets `html.projects-boot` before the banner and the gallery parse, or
-the finished listing and the open fan would paint and then be taken away. It ships
-`lib/projectsBoot.ts`'s `shouldBoot` as its own source rather than a retyped copy, so the
-tested function is the one that runs. It also owns the boot's clock (`data-boot-at`, from
+**And three files do NOT keep the contract below, on purpose — each through an
+`is:inline` script: `index.astro`, `BaseLayout` and `projects.astro`.** (This read
+"`index.astro` is the one surface" until `/projects` made it three.) `index.astro`'s
+intro decider runs at parse time and exactly once — no `astro:page-load`, no teardown.
+That is the whole reason it exists: a bundled script is deferred until after parse, by
+which point the sky has already painted its finished colours, which is the flash it was
+written to remove. `BaseLayout`'s two inline scripts are the same exception for the same
+reason, and so is `projects.astro`'s boot decider: it sets `html.projects-boot` before
+the banner and the gallery parse, or the finished listing and the open fan would paint
+and then be taken away. It ships `lib/projectsBoot.ts`'s `shouldBoot` as its own source
+rather than a retyped copy, so the tested function is the one that runs. It also owns the boot's clock (`data-boot-at`, from
 parse) and a failsafe: at `BOOT_DEADLINE_MS` it takes the class off itself, so a header
 script that never arrives cannot leave the page hidden. And every `html.projects-boot`
 rule that holds something back says `transition: none`, because a ClientRouter arrival
@@ -354,10 +393,11 @@ were written while it existed: `lib/skyShader.ts` and `components/proto/FluidSky
 each explain an amplitude decision in terms of where Mountains used to sit, which is
 a historical note on a live decision and is fine to leave.
 
-The loose end it left behind — `ProjectCard.astro`'s unreachable `'teaser'` variant,
-tuned for the dark Mountains gradient — is gone with the card itself: the component
-was **deleted** by the /projects redesign, whose data model dropped every field it
-rendered (`tagline`, `blurb`, `highlights`, `stack`, `links`).
+This section used to carry a "loose end" paragraph about `ProjectCard.astro`'s
+unreachable `'teaser'` variant, tuned for the dark Mountains gradient. The card itself
+is **deleted** — the /projects redesign replaced it with `components/projects/*`, and
+its data model dropped every field the card rendered (`tagline`, `blurb`,
+`highlights`, `stack`, `links`) — so there is no loose end left to step around.
 
 ### THE DECK — one gesture, one slide
 
@@ -393,19 +433,22 @@ enough to engage the deck on a viewport whose styles think it's a phone).
 **The number lives in two places and they are synced BY HAND.** `@media
 (max-width: var(--x))` is not valid CSS, so there is no way to feed one value to
 both. **If you change `PHONE_MAX_WIDTH`, change every `@media (max-width: 640px)`
-block with it.** `grep -rn 'max-width: *640px' src` returns **19 hits in 13 files**,
-and **four of the 19 are prose, not rules** — `viewport.ts` ×2 (its own doc
+block with it.** `grep -rn 'max-width: *640px' src` returns **20 hits in 14 files**,
+and **four of the 20 are prose, not rules** — `viewport.ts` ×2 (its own doc
 comments) plus `global.css:178` and `global.css:327`, which describe the
 breakpoint in comments rather than declaring it — and **one is a `sizes` hint**:
 `projects/Gallery`'s `sizes="(max-width: 640px) 240px, 330px"`, the phone strip's
-card width, which must move with the strip's block. So there are **14 real CSS
-blocks across 12 files**: `experience` ×2, `projects/Gallery` ×2 (one of them
+card width, which must move with the strip's block. So there are **15 real CSS
+blocks across 13 files**: `experience` ×2, `projects/Gallery` ×2 (one of them
 `@media not all and (max-width: 640px)` — the desktop-only card lift, written
 negated so this grep still finds it), and one each in `global.css`, `CornerNav`,
-`Toc`, `DescentPath`, `FluidSky`, `Heights`, `projects/TerminalHeader`, `404`,
-`research` and `writing/[...slug]`. (`ProjectCard.astro`, which carried one, was
-deleted with the /projects redesign. `global.css:343`'s `min-width: 641px` is the
-same breakpoint spelled so this grep misses it — check it by hand.)
+`Toc`, `DescentPath`, `FluidSky`, `Heights`, `PlushCow` (the talking cow's
+bubble-above layout, in a query list with `min-width: 1180px`),
+`projects/TerminalHeader`, `404`, `research` and `writing/[...slug]`.
+(`ProjectCard.astro`, which carried one, was deleted with the /projects redesign. It
+read "19 hits in 13 files … 14 blocks" until the cow's block landed.) **Two blocks
+spell the same breakpoint so this grep misses them** — `global.css:343` and
+`projects.astro:154`, both `min-width: 641px` — check those by hand.
   Two notes on how this count has gone wrong before, because it keeps doing so.
 It read "15 hits … 13 real blocks … `global.css` ×2" — overcounting `global.css`
 because one of its two prose mentions is `max-width:640px` with **no space**,
@@ -435,7 +478,12 @@ phone treatment is *bug fixes only*, and the whole of it is:
 - the **Toc hides** (`display: none` — a 38px margin rail has no margin to sit in);
 - the **descent graph** drops its in-frame labels and becomes a block with its own
   height, with the sentence that explains it read *after* it rather than across it;
-- the **fluid sky canvas is skipped** entirely under 640px.
+- the **fluid sky canvas is skipped** entirely under 640px;
+- on **/projects**, the gallery's fan becomes a horizontal strip, the drafting field is
+  painted once as a still frame, and the cow sits in a band of its own under the
+  listing (not docked over the first screen, where it covered the index). The rows'
+  floating preview and the cards' glow are gated on `(hover: hover)` rather than on
+  width, so they also stay off on a tablet's touch.
 
 ## Navigation & structure
 
@@ -446,6 +494,19 @@ phone treatment is *bug fixes only*, and the whole of it is:
   a link to `/experience` before that page existed, and `tests/nav.test.ts` now
   asserts every href resolves to a real route, with no duplicate hrefs or labels.
   `CornerNav` renders it.
+- **The page you are on is marked by a lit DOT before its label**, on every page:
+  `aria-current="page"` on the link, a 6px dot plus a glow, and the label at weight 600.
+  It replaced a 1px accent hairline under the label at weight 500, which the owner found
+  unclear — that thin, it reads as an underline or as nothing. The dot is shape plus
+  colour, so it does not rely on colour alone; the **bloom pill stays hover's and
+  focus's**, so "here" and "you could go here" never look alike.
+  - Its colour is the accent **role token** `--ochre`, never a literal: ochre in light,
+    emerald in dark, seal red on /projects (whose drafting palette overrides `--ochre`).
+    The pill and the focus ring read the same token.
+  - The 600 is real, not synthesised: the local JetBrains Mono face declares its weight
+    range up to it, and `tests/distSmoke.test.ts` compares the built rule's weight with
+    the declared face — a weight past the face's range gets a fake bold that no
+    computed style can reveal.
 - **`profile.ts`'s `links` array is a SECOND list, and it HAS diverged before.**
   It exists for a different job — the footer, the CV button, and the GitHub/LinkedIn
   hrefs that JSON-LD's `sameAs` reads — but it also enumerates pages, and it once
@@ -472,8 +533,8 @@ phone treatment is *bug fixes only*, and the whole of it is:
   "Method" link jumped to paper 1. Now the same function that names a stop's anchor
   hands the page the id to render, so **a stop cannot point at an id the page didn't
   emit.** Add a section to a page → add it to its `*Stops()` and render the id from
-  the same helper. `SideRail` (reading pages) and `Toc` (homepage, via `homeStops()`)
-  are both dumb markup over these trees.
+  the same helper. `SideRail` (reading pages and /projects) and `Toc` (homepage, via
+  `homeStops()`) are both dumb markup over these trees.
   - Rail labels are **bookmarks, not sentences**: measured, "The problem" /
     "Constraints" pushed the indented tier's right edge to x=151 against a headline
     starting at 143, and the rail printed over the words.
@@ -830,8 +891,14 @@ galaxy). The whole system is **token override**, not per-component branching:
   resolves theme *before first paint* — explicit `localStorage.theme` first,
   else `prefers-color-scheme` (so a first-time visitor matches their OS). The
   toggle (a real `<button>` in `CornerNav`, sun/moon by action) writes
-  `localStorage` and flips the attribute live, then re-fires `astro:page-load`
-  so the canvases repaint for the new palette.
+  `localStorage`, flips the attribute live, and dispatches **`theme:change`** on
+  `document` so the scripts that paint from JS repaint for the new palette:
+  `TerrainHero`, `DescentPath`, `FluidSky`, and on /projects `DraftingField` and
+  `Gallery` (manifold's still and video are per theme). **Never re-fire
+  `astro:page-load` for a repaint** — this line said the toggle did, long after it
+  stopped: that re-ran every page script's init, re-measuring the deck and rebuilding
+  observers no colour affects, and measured as a 357ms long task on `/`. A new
+  JS-painted surface listens for `theme:change`, with its teardown.
 - **Additive rule (load-bearing):** the dark theme must NEVER degrade the
   shipped light Descent. Light is the base; dark is an override layer. When
   touching themes, verify BOTH — build breaks and contrast regressions hide in
@@ -1066,6 +1133,11 @@ titles came to rest hard against the browser chrome — the lead is a number in
   (the user chose it seeing both this and a "night descent" variant live). Do
   NOT "fix" this back to ochre. The seal red stays the brand mark in both
   themes (brightened to `#e0574a` for the dark ground).
+  **And the exception to the exception: /projects has no emerald.** Its drafting
+  palette sets `--ochre` to the seal in both themes, so seal red is the only
+  saturated colour there in dark too — the page's palette as the owner chose it. Its
+  tokens are `html[data-page='drafting']` in `tokens.css`, and both blocks declare
+  every token (in dark, a light-only value would win on source order).
 - **Motion:** animate only `transform` / `opacity`; NEVER animate `filter: blur`
   (bake it). ALL motion is gated behind `@media (prefers-reduced-motion:
   no-preference)` via `lib/motion.ts`. The no-motion state must look *finished* —
@@ -1117,3 +1189,28 @@ looked at, and turned down:
 - **The scripted terminal** — the site's only React island, deleted on the owner's
   instruction ("you can delete the terminal at the bottom, it's already useless").
   Its data, engine and spec went with it; git holds them.
+
+**From the /projects redesign.** These were built in its design mockups rather than in
+the repo, looked at there, and turned down — so git does not hold them, and the design
+doc (`docs/superpowers/specs/2026-11-02-projects-page-design.md`, local; `docs/` is
+gitignored) is the record:
+
+- **A sweeping light across the background** — a moving horizontal band; the owner
+  rejected it because it competes with the reading. After the boot's two pings the
+  field does nothing but drift, "so that readers can read quietly".
+- **The "blueprint" (blue) and "phosphor" (green) backgrounds** — colour variants of the
+  drafting field. Seal red is the only colour on the page, in both themes.
+- **The cursor-dent field** — isolines that dented around the pointer. It lagged on the
+  owner's machine, and a cursor-driven background competes with the reading, the same
+  reason as the sweeping light.
+- **The liquid-metal button** — a WebGL shader; its swirls echoed the contour
+  background, so the button read as part of the field.
+- **Brushed steel as a site-wide button** — liked, but "not applicable to other pages",
+  and weak on paper. Buttons are page-own instead: one anatomy, a skin per page (see
+  *The concept*), so a page that wants steel can have it as its own skin.
+- **Boot A** — the first approved boot, which held the gallery and the listing invisible
+  until ~3.2s. Measured in the mockup at Lighthouse's desktop size: **LCP 3,192ms**,
+  because Chrome does not count the banner or the gallery fading in, so the listing's
+  last line became the largest element. Boot B paints the banner and the gallery on the
+  first frame and measured **108ms** there. The rule it leaves: nothing the reader came
+  for starts invisible — the same arithmetic as the homepage's deleted `?seq=1` spike.
