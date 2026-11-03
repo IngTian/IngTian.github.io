@@ -102,7 +102,11 @@ const cards = projects.filter((p) => p.tier === 'workshop').map((p) => {
   .t { padding: 3px 7px; border-radius: 3px; border: 1px solid rgba(var(--draft-line-rgb), 0.22); font: 10.5px var(--font-mono);
     letter-spacing: 0.04em; color: var(--ink-3); }
   /* The mockup's .06 tint, laid over an OPAQUE ground so the spotlight never shows through it: through it, the seal
-     on the tinted light fell to 4.12:1 in light theme and 4.25 in dark. At rest it is the same colour as before. */
+     on the tinted light fell to 4.12:1 in light theme and 4.25 in dark. At rest it is the same colour as before.
+     LIT, IT IS NOT THE MOCKUP, and that is the price of the spec's 4.5:1 rule: with the pointer on the line the card
+     around it warms by deltaE76 5.5 (light) / 6.3 (dark) and the line by 0, so it reads as a neutral well inside a
+     warm glow, fading as the pointer leaves it (the light ends 234px out). No share of the light buys the mockup
+     back: past 30% the seal falls under AA in light theme, and 30% warms the line by under deltaE 2, too little to see. */
   .cmd { display: block; margin-top: 14px; padding: 7px 9px; border-radius: 4px;
     background: linear-gradient(rgba(var(--draft-line-rgb), 0.06), rgba(var(--draft-line-rgb), 0.06)), var(--draft-ground);
     font: 11.5px var(--font-mono); color: var(--ochre); overflow-wrap: anywhere; }
