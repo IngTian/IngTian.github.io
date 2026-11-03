@@ -11,7 +11,7 @@ import { INTRO_SEEN_KEY } from '../src/lib/introSession';
 import { inProgress, projects } from '../src/data/profile';
 import { flattenStops, projectSectionId, projectStops } from '../src/lib/pageStops';
 import { listingLines } from '../src/lib/projectsListing';
-import { BOOT_SEEN_KEY } from '../src/lib/projectsBoot';
+import { BOOT_CMD, BOOT_DEADLINE_MS, BOOT_SEEN_KEY } from '../src/lib/projectsBoot';
 
 /* ================================================================================================
    THE FIRST TEST THAT LOOKS AT WHAT THE SITE ACTUALLY SHIPS.
@@ -760,22 +760,38 @@ describe('/projects — the boot: decided inline before first paint, and the ser
 
   // The policy, asserted where it ships: the shipped script, run against stand-ins for what it reads. This is the
   // wiring the unit tests of shouldBoot cannot see — which input comes from where, and when the flag is written.
+  type Arrival = { search?: string; hash?: string; seen?: boolean; reduce?: boolean; stateY?: number; throws?: boolean };
+  const exec = (o: Arrival) => {
+    const store = new Map<string, string>(o.seen ? [[BOOT_SEEN_KEY, '1']] : []);
+    const classes = new Set<string>();
+    const dataset: Record<string, string> = {};
+    const timers: { fn: () => void; ms: number }[] = [];
+    const sent: string[] = [];
+    const storage = {
+      getItem: (k: string) => { if (o.throws) throw new Error('denied'); return store.get(k) ?? null; },
+      setItem: (k: string, v: string) => { if (o.throws) throw new Error('denied'); store.set(k, v); },
+    };
+    class FakeEvent { type: string; constructor(type: string) { this.type = type; } }
+    runInNewContext(decider().body, {
+      URLSearchParams, sessionStorage: storage, scrollY: 0,
+      location: { search: o.search ?? '', hash: o.hash ?? '' },
+      history: { state: o.stateY === undefined ? null : { index: 0, scrollX: 0, scrollY: o.stateY } },
+      matchMedia: (q: string) => ({ matches: /reduce/.test(q) && o.reduce === true }),
+      performance: { now: () => 1234.5 },
+      setTimeout: (fn: () => void, ms: number) => timers.push({ fn, ms }),
+      Event: FakeEvent,
+      window: { dispatchEvent: (e: FakeEvent) => { sent.push(e.type); return true; } },
+      document: { documentElement: { dataset, classList: {
+        add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c), contains: (c: string) => classes.has(c),
+      } } },
+    });
+    return { classes, store, dataset, timers, sent };
+  };
+
   it('boots a fresh top-of-page arrival only, sets the flag at start, and survives a storage that throws', () => {
-    const run = (o: { search?: string; hash?: string; seen?: boolean; reduce?: boolean; stateY?: number; throws?: boolean }) => {
-      const store = new Map<string, string>(o.seen ? [[BOOT_SEEN_KEY, '1']] : []);
-      const classes = new Set<string>();
-      const storage = {
-        getItem: (k: string) => { if (o.throws) throw new Error('denied'); return store.get(k) ?? null; },
-        setItem: (k: string, v: string) => { if (o.throws) throw new Error('denied'); store.set(k, v); },
-      };
-      runInNewContext(decider().body, {
-        URLSearchParams, sessionStorage: storage, scrollY: 0,
-        location: { search: o.search ?? '', hash: o.hash ?? '' },
-        history: { state: o.stateY === undefined ? null : { index: 0, scrollX: 0, scrollY: o.stateY } },
-        matchMedia: (q: string) => ({ matches: /reduce/.test(q) && o.reduce === true }),
-        document: { documentElement: { classList: { add: (c: string) => classes.add(c) } } },
-      });
-      return { boot: classes.has('projects-boot'), flagged: store.has(BOOT_SEEN_KEY) };
+    const run = (o: Arrival) => {
+      const r = exec(o);
+      return { boot: r.classes.has('projects-boot'), flagged: r.store.has(BOOT_SEEN_KEY) };
     };
     expect(run({})).toEqual({ boot: true, flagged: true });
     expect(run({ seen: true })).toEqual({ boot: false, flagged: true });
@@ -785,6 +801,41 @@ describe('/projects — the boot: decided inline before first paint, and the ser
     expect(run({ stateY: 0 })).toEqual({ boot: true, flagged: true });
     expect(run({ reduce: true, search: '?boot=1' })).toEqual({ boot: false, flagged: false });
     expect(run({ throws: true })).toEqual({ boot: true, flagged: false });
+  });
+
+  // The boot's clock and its failsafe start here, at parse, with the class. TerminalHeader reads data-boot-at as its
+  // t=0, so a late start catches up; the deadline ends a boot whose header never ran, and whoever takes the class
+  // off sends `projects:booted` — so a header that finished first leaves the deadline nothing to say.
+  it('starts the clock and arms the deadline with the boot; at the deadline it ends the boot itself, once', () => {
+    const r = exec({});
+    expect(r.dataset.bootAt).toBe('1234.5');
+    expect(r.timers.map((t) => t.ms)).toEqual([BOOT_DEADLINE_MS]);
+    r.timers[0].fn();
+    expect(r.classes.has('projects-boot')).toBe(false);
+    expect(r.sent).toEqual(['projects:booted']);
+
+    const finished = exec({});
+    finished.classes.delete('projects-boot');
+    finished.timers[0].fn();
+    expect(finished.sent).toEqual([]);
+
+    const seen = exec({ seen: true });
+    expect([seen.timers.length, seen.dataset.bootAt]).toEqual([0, undefined]);
+  });
+
+  // A ClientRouter arrival styles the new DOM before the decider runs, so that style is the finished page. A boot
+  // rule with a transition would animate the finished page INTO the boot (measured: the fan folding into the pile,
+  // the listing, rows and cards fading out). A transition takes its timing from the style it goes to, so every rule
+  // that holds something back under html.projects-boot must say `transition: none` — the way out still animates.
+  it('holds nothing back with a transition: every boot rule that sets opacity or transform says transition: none', () => {
+    const css = readdirSync(join(DIST, '_astro')).filter((f) => f.endsWith('.css'))
+      .map((f) => readFileSync(join(DIST, '_astro', f), 'utf8')).join('\n');
+    const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter(([, sel]) => sel.split(',').every((s) => /html\.projects-boot\b/.test(s)))
+      .filter(([, , body]) => /(^|;)\s*(opacity|transform)\s*:/.test(body));
+    expect(rules.length, 'the nine boot rules written today').toBeGreaterThanOrEqual(9);
+    const moving = rules.filter(([, , body]) => !/(^|;)\s*transition\s*:\s*none\b/.test(body)).map(([, sel]) => sel.trim());
+    expect(moving).toEqual([]);
   });
 
   // With JS off nothing sets html.projects-boot, so every boot rule is inert and the page is exactly what was
@@ -801,5 +852,15 @@ describe('/projects — the boot: decided inline before first paint, and the ser
       ...listingLines(projects, inProgress).map((l) => l.perm + l.name + l.kind + l.short),
     ];
     expect(want.filter((w) => !text.includes(w))).toEqual([]);
+  });
+
+  // The command is one span per key so the boot can type it, which a screen reader can read as twelve letters
+  // (VoiceOver stops on each span). So the keys are aria-hidden and an sr-only copy says the command whole.
+  it('reads the command whole: the typed keys are aria-hidden, and an sr-only copy precedes them', () => {
+    const line = /<div\b[^>]*class="tline"[^>]*>([\s\S]*?)<\/div>/.exec(projectsPage().markup)?.[1] ?? '';
+    const m = /<span\b[^>]*class="sr-only"[^>]*>([^<]*)<\/span>\s*<span\b([^>]*class="cmd"[^>]*)>/.exec(line);
+    expect(m, 'no sr-only command before the typed keys').not.toBeNull();
+    expect(m![1]).toBe(BOOT_CMD);
+    expect(m![2]).toMatch(/\saria-hidden="true"/);
   });
 });

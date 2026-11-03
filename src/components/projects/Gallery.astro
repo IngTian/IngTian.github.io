@@ -87,8 +87,9 @@ const cards = GALLERY_ORDER.map((slug, i) => {
     box-shadow: 0 30px 60px var(--draft-shadow);
     transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s;
   }
-  /* The visible pile the boot deals from: every card at the centre, slightly turned, already painted. */
-  :global(html.projects-boot) .shot { opacity: 1; transform: translateY(46px) rotateZ(var(--pile)) scale(0.9); }
+  /* The visible pile the boot deals from: every card at the centre, slightly turned, already painted. Arriving
+     into it is instant and only leaving it moves (TerminalHeader's boot CSS says why every boot rule does this). */
+  :global(html.projects-boot) .shot { opacity: 1; transform: translateY(46px) rotateZ(var(--pile)) scale(0.9); transition: none; }
 
   .tag {
     position: absolute; left: 10px; bottom: 10px; z-index: 2; padding: 4px 7px; border-radius: 3px;
@@ -157,7 +158,7 @@ const cards = GALLERY_ORDER.map((slug, i) => {
 
   .g-cap { margin: 0; font: 11px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; text-align: center; color: var(--ink-3); }
   /* "hover a project" is no use while the pile cannot be hovered: it waits for the deal, as in the mockup. */
-  :global(html.projects-boot) .g-cap { opacity: 0; }
+  :global(html.projects-boot) .g-cap { opacity: 0; transition: none; }
   @media (prefers-reduced-motion: no-preference) { .g-cap { transition: opacity 0.5s; } }
 
   /* Phones: a strip that scrolls sideways, every card flat and whole, running to the screen's edges — the -6vw

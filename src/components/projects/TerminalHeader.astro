@@ -10,9 +10,11 @@
 //
 // THE BOOT plays over this markup when projects.astro's inline decider has set html.projects-boot: the CSS below
 // dims or holds back each piece until the script lights it (.on), rendering lib/projectsBoot.ts' bootState() on
-// every frame. The command is one span per key so it can type without its text ever leaving the HTML.
+// every frame. The command is one span per key so it can type without its text ever leaving the HTML; those spans
+// are aria-hidden and an sr-only copy reads the command whole, since VoiceOver can stop on each span and spell it.
 import { inProgress, projects } from '../../data/profile';
 import { bannerRows, bannerSvg } from '../../lib/asciiBanner';
+import { BOOT_CMD } from '../../lib/projectsBoot';
 import { listingLines, summaryCounts } from '../../lib/projectsListing';
 
 // Banner geometry in hundredths of an em: a mono cell is 0.6em wide, and the mockup set the rows at line-height 1.04.
@@ -21,7 +23,6 @@ const CELL_W = 60, CELL_H = 104;
 const W = ROWS[0].length * CELL_W, H = ROWS.length * CELL_H;
 const lines = listingLines(projects, inProgress);
 const n = summaryCounts(projects);
-const CMD = 'ls --shipped';
 ---
 <section class="term" id="p-index" aria-labelledby="p-index-h" data-term>
   <h1 class="sr-only" id="p-index-h">Projects</h1>
@@ -41,7 +42,7 @@ const CMD = 'ls --shipped';
     </defs>
     <g fill="url(#projects-banner-ink)" shape-rendering="crispEdges" set:html={bannerSvg(ROWS, CELL_W, CELL_H)} />
   </svg>
-  <div class="tline"><span class="ps">~/projects $</span> <span class="cmd">{[...CMD].map((c) => <span>{c}</span>)}</span><span class="cur cur-type" aria-hidden="true"></span></div>
+  <div class="tline"><span class="ps">~/projects $</span> <span class="sr-only">{BOOT_CMD}</span><span class="cmd" aria-hidden="true">{[...BOOT_CMD].map((c) => <span>{c}</span>)}</span><span class="cur cur-type" aria-hidden="true"></span></div>
   <p class="tc"># ideas I turned into things that run</p>
   <ul class="ls">
     {lines.map((l) => (
@@ -106,14 +107,20 @@ const CMD = 'ls --shipped';
   /* THE BOOT — boot B's states, from the approved mockup. The banner is a ghost at .13, NEVER 0: it is painted on
      the first frame, and Largest Contentful Paint is not held back. Its rows come from set:html, so they carry no
      scope hash and are reached through :global. The command's keys are display: none rather than transparent, so
-     the cursor sits right after the last one typed. Under reduced motion the decider never sets the class. */
-  :global(html.projects-boot) .banner :global(.row:not(.on)) { opacity: 0.13; }
+     the cursor sits right after the last one typed. Under reduced motion the decider never sets the class.
+     EVERY RULE THAT HOLDS SOMETHING BACK ALSO SAYS `transition: none` — here and in Gallery, SelectedRows,
+     WorkshopCards and projects.astro. A ClientRouter arrival gives the new DOM a style before the decider runs (the
+     router's fallback reads getAnimations(); a native View Transition captures the new state), and that style is
+     the finished page, so adding the class TRANSITIONED it into the boot: measured, 53 transitions in the first
+     130ms — the fan folding into the pile, the listing, rows and cards fading out. A transition takes its timing
+     from the style it goes TO, so this cancels the way in and keeps the way out. */
+  :global(html.projects-boot) .banner :global(.row:not(.on)) { opacity: 0.13; transition: none; }
   :global(html.projects-boot) .cmd > span:not(.on) { display: none; }
   :global(html.projects-boot) .term:not(.ran) .cur-type { display: inline-block; }
   :global(html.projects-boot) .tc:not(.on),
   :global(html.projects-boot) .ls li:not(.on),
-  :global(html.projects-boot) .tsum:not(.on) { opacity: 0; transform: translateX(-8px); }
-  :global(html.projects-boot) .idle { opacity: 0; }
+  :global(html.projects-boot) .tsum:not(.on) { opacity: 0; transform: translateX(-8px); transition: none; }
+  :global(html.projects-boot) .idle { opacity: 0; transition: none; }
   @media (prefers-reduced-motion: no-preference) {
     .banner :global(.row) { transition: opacity 0.16s ease-out; }
     .tc, .ls li, .tsum { transition: opacity 0.28s ease-out, transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1); }
@@ -129,10 +136,9 @@ const CMD = 'ls --shipped';
 </style>
 
 <script>
-  import { bootState, bootSteps } from '../../lib/projectsBoot';
+  import { onPageView } from '../../lib/pageView';
+  import { BOOT_KEY_MS, bootState, bootSteps } from '../../lib/projectsBoot';
 
-  // The mockup's per-key delay, 38–84ms, drawn once per boot.
-  const KEY_MS = [38, 84] as const;
   // The deal's stagger, and how long it stays set: the last riser's delay (870ms for today's eight rows and cards)
   // plus its .5s rise, with room.
   const FAN_STAGGER_MS = 75, RISE_AT_MS = 380, RISE_STAGGER_MS = 70, DEAL_MS = 1600;
@@ -152,10 +158,13 @@ const CMD = 'ls --shipped';
     const keys = [...term.querySelectorAll('.cmd > span')];
     const lines = [...term.querySelectorAll('.tc, .ls li')];
     const summary = term.querySelector('.tsum');
-    const [lo, hi] = KEY_MS;
+    const [lo, hi] = BOOT_KEY_MS;
     const steps = bootSteps(term.querySelector('.cmd')?.textContent ?? '', rows.length, lines.length - 1,
       keys.map(() => lo + Math.random() * (hi - lo)));
-    const t0 = performance.now();
+    // THE DECIDER'S CLOCK, from parse, not this script's: a header that starts late (a slow chunk, a busy main
+    // thread) lands where the schedule already is, and on bootState(Infinity) if it is over.
+    const bootAt = Number(root.dataset.bootAt);
+    const t0 = Number.isFinite(bootAt) ? bootAt : performance.now();
     let raf = 0, dealT = 0, done = false;
 
     const light = (els: readonly Element[], n: number): void => els.forEach((el, i) => el.classList.toggle('on', i < n));
@@ -166,14 +175,16 @@ const CMD = 'ls --shipped';
       summary?.classList.toggle('on', s.summary);
       term.classList.toggle('ran', s.lines > 0);
     }
-    // Once, whichever comes first: the schedule's `done`, or a skip. A skip paints bootState(Infinity) — the same
-    // state a full run ends on — and deals without the stagger. Then the class goes, then the page hears it.
+    // Once, whichever comes first: the schedule's `done`, a skip, or the decider's deadline. A skip paints
+    // bootState(Infinity) — the same state a full run ends on — and deals without the stagger. Then the class goes,
+    // then the page hears it — unless the deadline got there first, which took the class off and told the page.
     function finish(stagger: boolean): void {
       if (done) return;
       done = true;
       cancelAnimationFrame(raf);
       unlisten();
       paint(bootState(steps, Infinity));
+      if (!root.classList.contains('projects-boot')) return;
       if (stagger) {
         const fan = [...document.querySelectorAll<HTMLElement>('[data-gallery] .shot')];
         const risers = [...document.querySelectorAll<HTMLElement>('[data-rows] > li, [data-cards] > li')];
@@ -187,6 +198,7 @@ const CMD = 'ls --shipped';
     function tick(): void {
       // A reader who leaves mid-boot leaves this frame behind until the next page's init tears it down.
       if (!term.isConnected) return;
+      if (!root.classList.contains('projects-boot')) { finish(false); return; }
       const s = bootState(steps, performance.now() - t0);
       if (s.dealt) { finish(true); return; }
       paint(s);
@@ -204,7 +216,9 @@ const CMD = 'ls --shipped';
     window.addEventListener('pointerdown', skip);
     window.addEventListener('keydown', skip);
     window.addEventListener('wheel', skip, { passive: true });
-    tick();
+    // A reader who scrolled before this script arrived has skipped already.
+    if (scrollY > 0) finish(false);
+    else tick();
 
     teardown = () => {
       cancelAnimationFrame(raf);
@@ -213,5 +227,7 @@ const CMD = 'ls --shipped';
     };
   }
 
-  document.addEventListener('astro:page-load', init);
+  // Started at parse on a full load, not at astro:page-load (window `load`, which waits for every picture): see
+  // lib/pageView.ts. A ClientRouter arrival still starts on its page-load.
+  onPageView('[data-term]', init);
 </script>

@@ -268,12 +268,26 @@ inline scripts are the same exception for the same reason, and so is `projects.a
 boot decider: it sets `html.projects-boot` before the banner and the gallery parse, or
 the finished listing and the open fan would paint and then be taken away. It ships
 `lib/projectsBoot.ts`'s `shouldBoot` as its own source rather than a retyped copy, so the
-tested function is the one that runs. Everything else here:
+tested function is the one that runs. It also owns the boot's clock (`data-boot-at`, from
+parse) and a failsafe: at `BOOT_DEADLINE_MS` it takes the class off itself, so a header
+script that never arrives cannot leave the page hidden. And every `html.projects-boot`
+rule that holds something back says `transition: none`, because a ClientRouter arrival
+styles the new DOM finished before the decider runs, and the class would otherwise
+*animate* the finished page into the boot (`tests/distSmoke.test.ts` checks the built CSS).
+Everything else here:
 
 - **Re-init on `astro:page-load`, with a teardown**, because `ClientRouter` is on
   and a View Transition replaces the DOM without a fresh page load. A script that
   only runs at parse time works on first load and is dead after the first
   navigation.
+  - **On a FULL load `astro:page-load` is window `load`**, which waits for every
+    eager image and font — and never comes if one image never arrives. So the three
+    scripts `/projects`' boot depends on (`TerminalHeader`, `ProjectAsk`, the page's
+    ask dispatcher) start through `lib/pageView.ts`'s `onPageView()`: at module
+    evaluation, right after parse, and then once per new DOM on `astro:page-load`.
+    The rest still start at `load`, and `Gallery`'s designed loading state pays for
+    it: by then every eager picture has loaded or failed, so the shimmer can show only
+    for a failed one, and a picture that never arrives means `Gallery` never runs.
 - **Pure logic goes in `lib/`, plumbing stays in the component.** That split is
   why `deck.ts`, `pageStops.ts`, `terrain.ts`, `justify.ts` and `scrollspy.ts`
   have specs at all — the parts worth testing are not tangled in event handlers.

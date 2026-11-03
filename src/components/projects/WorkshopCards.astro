@@ -56,7 +56,7 @@ const cards = projects.filter((p) => p.tier === 'workshop').map((p) => {
     grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   }
   /* The boot: each card waits below its place, and rises in after the rows when TerminalHeader deals. */
-  :global(html.projects-boot) .cards li { opacity: 0; transform: translateY(18px); }
+  :global(html.projects-boot) .cards li { opacity: 0; transform: translateY(18px); transition: none; }
   @media (prefers-reduced-motion: no-preference) {
     .cards li { transition: opacity 0.4s, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
   }

@@ -11,6 +11,19 @@
 /** The session flag. Versioned: bump the suffix when the boot changes enough to want a second look mid-session. */
 export const BOOT_SEEN_KEY = 'projects.boot.seen.v1';
 
+/** The command the prompt types, and the mockup's per-key delay range in ms, drawn once per boot. */
+export const BOOT_CMD = 'ls --shipped';
+export const BOOT_KEY_MS = [38, 84] as const;
+
+/**
+ * The decider's deadline, from parse: past it the decider takes html.projects-boot off itself and tells the page
+ * (`projects:booted`), so a header script that never arrives or throws hides nothing for longer than this. It must
+ * outlast the longest boot the page can schedule (every key at the top of BOOT_KEY_MS) with room for a late frame;
+ * tests/projectsBoot.test.ts holds that against today's banner and listing. In a hidden tab it ends a boot nobody is
+ * watching, which is the better return: a finished page, not a 1.4s deal played on arrival.
+ */
+export const BOOT_DEADLINE_MS = 4500;
+
 /**
  * Play the boot? Once per session (`force` is `?boot=1`, and overrides only that), and never under reduced motion,
  * at a deep link or at a restored scroll — each of those readers is already somewhere, and the boot starts at the

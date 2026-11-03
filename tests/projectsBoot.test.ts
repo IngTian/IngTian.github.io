@@ -2,7 +2,10 @@
 // /projects' boot: when it plays (shouldBoot — the inline decider in pages/projects.astro ships this very function)
 // and what it shows at each moment (bootSteps, bootState — TerminalHeader renders bootState on every tick).
 import { describe, expect, it } from 'vitest';
-import { bootState, bootSteps, shouldBoot } from '../src/lib/projectsBoot';
+import { inProgress, projects } from '../src/data/profile';
+import { bannerRows } from '../src/lib/asciiBanner';
+import { BOOT_CMD, BOOT_DEADLINE_MS, BOOT_KEY_MS, bootState, bootSteps, shouldBoot } from '../src/lib/projectsBoot';
+import { listingLines } from '../src/lib/projectsListing';
 
 const fresh = { seen: false, force: false, reduce: false, hash: '', restoredScroll: false };
 
@@ -69,5 +72,17 @@ describe('bootState', () => {
     const done = { rows: 6, typed: 12, lines: 9, summary: true, dealt: true };
     expect(bootState(steps, Infinity)).toEqual(done);
     expect(bootState(steps, steps.at(-1)!.at)).toEqual(done);
+  });
+});
+
+// The decider's failsafe takes html.projects-boot off at BOOT_DEADLINE_MS from parse, whether or not the header ran.
+// It must never cut a real boot short: against the page as built today — its banner, its listing, its command —
+// with every key at the slowest the header draws, the boot is still over a second before the deadline. A project
+// added to the listing costs 82ms, a key in the command up to 84; this goes red before they eat the room.
+describe('BOOT_DEADLINE_MS', () => {
+  it('outlasts the slowest boot today\'s page can schedule, by at least a second', () => {
+    const slowest = bootSteps(BOOT_CMD, bannerRows('PROJECTS').length, listingLines(projects, inProgress).length,
+      [...BOOT_CMD].map(() => BOOT_KEY_MS[1]));
+    expect(BOOT_DEADLINE_MS - slowest.at(-1)!.at).toBeGreaterThanOrEqual(1000);
   });
 });

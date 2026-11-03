@@ -87,6 +87,7 @@ const asks: Record<string, { name: string; idea: string; url: string | null }> =
 
 <script>
   import { prefersReducedMotion } from '../../lib/motion';
+  import { onPageView } from '../../lib/pageView';
 
   interface Ask { name: string; idea: string; url: string | null }
   interface AskDetail { slug: string; x: number; y: number; from: HTMLElement }
@@ -189,5 +190,7 @@ const asks: Record<string, { name: string; idea: string; url: string | null }> =
     teardown = () => { ac.abort(); clearTimeout(goTimer); };
   }
 
-  document.addEventListener('astro:page-load', init);
+  // Started at parse on a full load (lib/pageView.ts), with the page's ask dispatcher: once that is turning a click
+  // into `projects:ask`, nothing may leave the click unanswered until window `load`.
+  onPageView('[data-ask-dialog]', init);
 </script>
