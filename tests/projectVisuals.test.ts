@@ -10,6 +10,7 @@ import { macbootSections } from '../src/data/vendor/macbootSections';
 import { offchartPositioning } from '../src/data/vendor/offchartPositioning';
 import { rlBhrpWealth } from '../src/data/vendor/rlBhrpWealth';
 import { witnessFacets } from '../src/data/vendor/witnessFacets';
+import { GALLERY_ORDER } from '../src/lib/galleryLayout';
 import { expandingPercentile, shareOf } from '../src/lib/positioning';
 import { facetsSvg, medianSeed, positioningSvg, sectionsSvg, wealthSvg } from '../src/lib/projectVisuals';
 
@@ -141,8 +142,12 @@ describe('the gallery\'s name tag covers nothing', () => {
   const TAG = { inset: 10, size: 10.5, tracking: 0.1, padX: 7, padY: 4, lineHeight: 1.32 };
   // A gallery card is 330x220, or 240x160 on a phone, with a 1px border; Tailwind's preflight makes it border-box.
   const CARDS = [[330, 220], [240, 160]] as const;
-  // The computed pictures among the gallery's six (every project but macboot, which is a workshop card only).
-  const GALLERY_SVGS = ['rl-bhrp', 'offchart', 'witness'];
+  // The computed pictures among the gallery's six (macboot is a workshop card only), read from the gallery's own
+  // order so a card added to it is held to the tag rule too.
+  const GALLERY_SVGS = GALLERY_ORDER.filter((s) => visualFor(s).kind === 'svg');
+  it('finds the three computed pictures in the gallery', () => {
+    expect(GALLERY_SVGS).toEqual(['rl-bhrp', 'offchart', 'witness']);
+  });
 
   /** The tag's box in the picture's own units: the svg fills the card inside its border, framed by `meet`. */
   function tagZone(name: string, [w, h]: readonly [number, number]) {

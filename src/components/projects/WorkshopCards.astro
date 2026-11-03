@@ -1,0 +1,127 @@
+---
+// /projects' "02 · The workshop": the personal tools as cards (the 21st.dev spotlight-card reference, rebuilt by
+// hand) — a glow that follows the pointer, the picture, the idea, chips and the install line — then the dashed
+// in-progress card, which lists `inProgress` and carries the rail's #p-in-progress.
+//
+// Each card is the project's repo link, or a button for a private one (macboot) and for the in-progress card,
+// carrying data-ask like every project surface on the page. Since a button may only hold phrasing content, the
+// card is built from spans, so one markup serves both.
+//
+// THE INSTALL LINE IS SHOWN WHOLE, never abbreviated and never clipped: manifold's is its README's 92-character
+// curl with a 74-character URL that has no break opportunity, ~510px of 11.5px mono in a card whose text is
+// ~240px wide. The card is overflow: hidden, so an unwrapped line would be cut off silently rather than overflow
+// the page — so `.cmd` wraps anywhere. A `prompt` line (macboot's words for Claude Code) drops the "$ ".
+import { inProgress, projects, repoUrl } from '../../data/profile';
+import { projectSectionId } from '../../lib/pageStops';
+import ProjectPicture from './ProjectPicture.astro';
+
+const cards = projects.filter((p) => p.tier === 'workshop').map((p) => {
+  const url = repoUrl(p);
+  return { p, url, Tag: (url ? 'a' : 'button') as 'a' | 'button' };
+});
+---
+<ul class="cards" data-cards>
+  {cards.map(({ p, url, Tag }) => (
+    <li id={projectSectionId(p.slug)}>
+      <Tag class="card" href={url ?? undefined} type={url ? undefined : 'button'} data-ask={p.slug}>
+        <span class="card-in">
+          <span class="thumb">
+            <ProjectPicture slug={p.slug} sizes="(max-width: 760px) 92vw, (max-width: 1400px) 460px, 320px" loading="lazy" />
+          </span>
+          <span class="cb">
+            <span class="nm">{p.name}</span>
+            <span class="idea">{p.idea}</span>
+            <span class="chips">{p.proof.map((t) => <span class="t">{t}</span>)}</span>
+            {p.install && <span class="cmd">{p.install.prompt ? '' : '$ '}{p.install.text}</span>}
+          </span>
+        </span>
+      </Tag>
+    </li>
+  ))}
+  <li id="p-in-progress">
+    <button type="button" class="card ghost" data-ask="in-progress">
+      <span class="card-in">
+        <span class="nm">in progress</span>
+        {inProgress.map((w) => (
+          <span class="wip"><span class="wn">{w.name}</span><span class="idea">{w.idea}</span></span>
+        ))}
+      </span>
+    </button>
+  </li>
+</ul>
+
+<style>
+  .cards {
+    list-style: none; margin: 26px 0 0; padding: 0; display: grid; gap: 18px;
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  }
+  /* The 1px padding is the border: the spotlight under it shows through as a ring. The card has its own opaque
+     ground, so it drops the page's label knockout. */
+  .card {
+    position: relative; display: block; width: 100%; height: 100%; padding: 1px; overflow: hidden;
+    border-radius: 12px; background: rgba(var(--draft-line-rgb), 0.13); color: var(--ink-1);
+    font: inherit; text-align: left; text-decoration: none; text-shadow: none; cursor: pointer;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; opacity: 0; pointer-events: none;
+    background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(var(--draft-hi-rgb), 0.7), transparent 42%);
+  }
+  .card-in { position: relative; display: block; height: 100%; overflow: hidden; border-radius: 11px; background: var(--draft-ground); }
+  .card-in::before {
+    content: ""; position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    background: radial-gradient(520px circle at var(--mx, 50%) var(--my, 50%), rgba(var(--draft-hi-rgb), 0.09), transparent 45%);
+  }
+  @media (prefers-reduced-motion: no-preference) { .card::before, .card-in::before { transition: opacity 0.35s; } }
+  /* Pointer only, so a tap never leaves a card lit. The dashed card has no ring: its inside is transparent, so the
+     ring's gradient would show through it as a blot rather than at its edge. */
+  @media (hover: hover) {
+    .card:not(.ghost):hover::before, .card:hover .card-in::before { opacity: 1; }
+  }
+  .card:focus-visible { outline: 2px solid var(--ochre); outline-offset: 3px; }
+
+  .thumb { position: relative; display: block; height: 170px; overflow: hidden; background: var(--draft-ph);
+    border-bottom: 1px solid rgba(var(--draft-line-rgb), 0.12); }
+  .cb { position: relative; display: block; padding: 18px 20px 20px; }
+  .nm { display: block; font: 600 17px var(--font-mono); }
+  .idea { display: block; margin: 8px 0 14px; font-size: 14px; line-height: 1.5; color: var(--ink-3); }
+  /* Not nowrap: a chip wider than the card ("gradients checked against finite differences in CI") wraps inside
+     itself, where nowrap had the card's overflow cut it off. A chip that fits never wraps — flex-wrap moves it to
+     a new line first. */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .t { padding: 3px 7px; border-radius: 3px; border: 1px solid rgba(var(--draft-line-rgb), 0.22); font: 10.5px var(--font-mono);
+    letter-spacing: 0.04em; color: var(--ink-3); }
+  .cmd { display: block; margin-top: 14px; padding: 7px 9px; border-radius: 4px; background: rgba(var(--draft-line-rgb), 0.06);
+    font: 11.5px var(--font-mono); color: var(--ochre); overflow-wrap: anywhere; }
+
+  .card.ghost { background: transparent; border: 1px dashed rgba(var(--draft-line-rgb), 0.3); }
+  .ghost .card-in { display: flex; flex-direction: column; justify-content: center; min-height: 300px; padding: 26px; background: transparent; }
+  .ghost .nm { font-size: 15px; }
+  .wip { display: block; margin-top: 14px; }
+  .wn { display: block; font: 13px var(--font-mono); }
+  .ghost .idea { margin: 4px 0 0; line-height: 1.55; }
+</style>
+
+<script>
+  let teardown: (() => void) | null = null;
+
+  function init(): void {
+    teardown?.();
+    teardown = null;
+    const list = document.querySelector<HTMLElement>('[data-cards]');
+    // Pointer only: a touch screen's tap fires hover too, and would leave a card's glow on.
+    if (!list || !matchMedia('(hover: hover)').matches) return;
+    // The glow's centre follows the pointer; the inner layer inherits the custom properties from its card.
+    const onMove = (e: PointerEvent): void => {
+      if (e.pointerType === 'touch') return;
+      const c = (e.target as Element).closest<HTMLElement>('.card');
+      if (!c) return;
+      const r = c.getBoundingClientRect();
+      c.style.setProperty('--mx', `${e.clientX - r.left}px`);
+      c.style.setProperty('--my', `${e.clientY - r.top}px`);
+    };
+    list.addEventListener('pointermove', onMove);
+    teardown = () => list.removeEventListener('pointermove', onMove);
+  }
+
+  document.addEventListener('astro:page-load', init);
+</script>

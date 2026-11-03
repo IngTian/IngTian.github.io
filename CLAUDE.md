@@ -370,15 +370,19 @@ enough to engage the deck on a viewport whose styles think it's a phone).
 **The number lives in two places and they are synced BY HAND.** `@media
 (max-width: var(--x))` is not valid CSS, so there is no way to feed one value to
 both. **If you change `PHONE_MAX_WIDTH`, change every `@media (max-width: 640px)`
-block with it.** `grep -rn 'max-width: *640px' src` returns **16 hits in 12 files**,
-and **four of the 16 are prose, not rules** — `viewport.ts` ×2 (its own doc
+block with it.** `grep -rn 'max-width: *640px' src` returns **19 hits in 13 files**,
+and **four of the 19 are prose, not rules** — `viewport.ts` ×2 (its own doc
 comments) plus `global.css:178` and `global.css:327`, which describe the
-breakpoint in comments rather than declaring it. So there are **12 real CSS
-blocks across 11 files**: `experience` ×2, and one each in `global.css`,
-`CornerNav`, `Toc`, `DescentPath`, `FluidSky`, `Heights`, `projects/TerminalHeader`,
-`404`, `research` and `writing/[...slug]`. (`ProjectCard.astro`, which carried one,
-was deleted with the /projects redesign; the terminal header's listing brought the
-count back to 16 / 12.)
+breakpoint in comments rather than declaring it — and **one is a `sizes` hint**:
+`projects/Gallery`'s `sizes="(max-width: 640px) 240px, 330px"`, the phone strip's
+card width, which must move with the strip's block. So there are **14 real CSS
+blocks across 12 files**: `experience` ×2, `projects/Gallery` ×2 (one of them
+`@media not all and (max-width: 640px)` — the desktop-only card lift, written
+negated so this grep still finds it), and one each in `global.css`, `CornerNav`,
+`Toc`, `DescentPath`, `FluidSky`, `Heights`, `projects/TerminalHeader`, `404`,
+`research` and `writing/[...slug]`. (`ProjectCard.astro`, which carried one, was
+deleted with the /projects redesign. `global.css:343`'s `min-width: 641px` is the
+same breakpoint spelled so this grep misses it — check it by hand.)
   Two notes on how this count has gone wrong before, because it keeps doing so.
 It read "15 hits … 13 real blocks … `global.css` ×2" — overcounting `global.css`
 because one of its two prose mentions is `max-width:640px` with **no space**,

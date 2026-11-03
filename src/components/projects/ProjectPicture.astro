@@ -1,0 +1,46 @@
+---
+// A project's picture, wherever /projects shows one (a gallery card, a row's hover preview, a workshop card's
+// thumb): the computed svg inline, or the capture as responsive webp. Fills its container, cropped by
+// `object-fit: cover` (the svgs frame themselves to fit — lib/projectVisuals.ts).
+//
+// A capture with a light version (manifold) renders both, and CSS shows the one for the theme. trading-desk and
+// daylogs have only a dark capture, shown in both themes and never CSS-inverted (spec section 6).
+//
+// WIDTHS stop well short of the two large captures' native widths (1600, 1400): the largest box is a workshop
+// thumb, ~460 CSS px, so 1000 covers it at DPR 2. manifold's stills are only 520 wide, so Astro drops the widths
+// past that and serves 400 and the whole 520 (14 KB). The gallery card (330) and the hover preview (360) pick
+// the same variant at a given DPR — 800 at DPR 2 — so the preview reuses the file the gallery already fetched.
+import { Image } from 'astro:assets';
+import { visualFor } from '../../data/projectVisuals';
+
+interface Props {
+  slug: string;
+  sizes: string;
+  loading: 'eager' | 'lazy';
+  priority?: boolean;
+}
+const { slug, sizes, loading, priority = false } = Astro.props;
+const v = visualFor(slug);
+const WIDTHS = [400, 800, 1000];
+const fetchpriority = priority ? 'high' : undefined;
+---
+{v.kind === 'svg' ? (
+  <span class="pic" set:html={v.svg} />
+) : (
+  <>
+    <Image class:list={['pic', { 'pic-dark': v.light }]} src={v.dark} alt={v.alt} widths={WIDTHS} sizes={sizes}
+           loading={loading} fetchpriority={fetchpriority} />
+    {v.light && (
+      <Image class="pic pic-light" src={v.light} alt={v.alt} widths={WIDTHS} sizes={sizes}
+             loading={loading} fetchpriority={fetchpriority} />
+    )}
+  </>
+)}
+
+<style>
+  /* The picture brings its own ground (the svg's --draft-ph, the capture's pixels), so it drops the page's label
+     knockout, which would ring the svg's words in the bare ground. */
+  .pic { display: block; width: 100%; height: 100%; object-fit: cover; text-shadow: none; }
+  .pic :global(svg) { display: block; width: 100%; height: 100%; }
+  :global(html[data-theme='dark']) .pic-light, :global(html:not([data-theme='dark'])) .pic-dark { display: none; }
+</style>

@@ -1,0 +1,241 @@
+---
+// /projects' gallery: the projects' pictures as a fan of overlapping cards in 3D (the 21st.dev portfolio-gallery
+// reference, rebuilt by hand). Hovering a card straightens it, brings it to the front with a thin glow ring and
+// dims the rest. Phones get a horizontal strip.
+//
+// Each card is the project's repo link (a button for a private one), so it works without JS and for cmd/middle-
+// click; the page turns a plain click into the "open on GitHub?" ask (data-ask). The pose of each card comes from
+// fanPose(). The visible pile it is dealt from is keyed on html.projects-boot, the page's booted state (no class:
+// already booted, the fan open), so a boot that sets the class before first paint has its pile on the first frame.
+//
+// LOADING IS DESIGNED: every picture is eager (the gallery is above the fold), the middle card's at high
+// priority, and a card whose picture has not decoded shows the palette tone with a transform-only shimmer, then
+// fades the picture in — or gives up waiting after READY_MS, so nothing shimmers forever. The computed svgs are
+// ready in the markup. manifold shows its still, then swaps to its MP4 once the fan is open: preloaded, so the
+// card never blanks, and never under reduced motion or on a phone, which keep the still.
+import { projects, repoUrl } from '../../data/profile';
+import { visualFor } from '../../data/projectVisuals';
+import { GALLERY_ORDER, fanPose } from '../../lib/galleryLayout';
+import ProjectPicture from './ProjectPicture.astro';
+
+const MIDDLE = Math.floor(GALLERY_ORDER.length / 2);
+const cards = GALLERY_ORDER.map((slug, i) => {
+  const p = projects.find((q) => q.slug === slug);
+  if (!p) throw new Error(`Gallery: no project "${slug}" in profile.ts`);
+  const v = visualFor(slug);
+  const url = repoUrl(p);
+  const f = fanPose(i, GALLERY_ORDER.length);
+  return {
+    p, url, Tag: (url ? 'a' : 'button') as 'a' | 'button', i,
+    ready: v.kind === 'svg',
+    motion: v.kind === 'image' ? v.motion : undefined,
+    // --x is unitless: the CSS turns it into px through --fit, which narrows the fan to its column.
+    style: `--x:${f.x};--z:${f.z}px;--ry:${f.ry}deg;--rz:${f.rz}deg;--zi:${f.zi};--pile:${f.pile}deg`,
+  };
+});
+---
+<div class="gallery" data-gallery>
+  <div class="fan">
+    {cards.map(({ p, url, Tag, i, ready, motion, style }) => (
+      <Tag class:list={['shot', { ready }]} href={url ?? undefined} type={url ? undefined : 'button'}
+           data-ask={p.slug} data-motion-dark={motion?.dark} data-motion-light={motion?.light} style={style}>
+        <span class="tag">{p.name}</span>
+        <ProjectPicture slug={p.slug} sizes="(max-width: 640px) 240px, 330px" loading="eager" priority={i === MIDDLE} />
+      </Tag>
+    ))}
+  </div>
+</div>
+<p class="g-cap">hover a project · everything here runs</p>
+
+<style>
+  /* A query container, so the fan can narrow to the column it sits in: at full spread the resting fan is ~1,070px
+     wide, and the rail and the cow's gutter leave a 1180px window a 733px column. --fit is "px per fan unit", and
+     every pose multiplies its --x by it: (100cqw - 330px) / 650 is the full 1px from a 980px column — the mockup's
+     fan, at the owner's 2000px window — and less below it. Measured, the resting fan then reaches at most ~46px past
+     the column into its padding: clear of the rail (closest at 1440px, 3px inside the rail's box but past its
+     longest label), of the cow's gutter, and of the screen's edge at every width from 700 to 2000px. */
+  .gallery { position: relative; height: 420px; margin: 70px 0 14px; perspective: 1600px; container-type: inline-size;
+    --fit: min(1px, (100cqw - 330px) / 650); }
+  .fan { position: absolute; left: 50%; top: 40px; width: 0; height: 0; }
+
+  .shot {
+    position: absolute; left: -165px; display: block; width: 330px; height: 220px; padding: 0; overflow: hidden;
+    border-radius: 10px; border: 1px solid rgba(var(--draft-line-rgb), 0.26); color: var(--ink-1); font: inherit;
+    background: rgba(var(--draft-line-rgb), 0.05); box-shadow: 0 30px 60px var(--draft-shadow); cursor: pointer;
+    text-shadow: none;
+    /* THE Z-ORDER IS A CUSTOM PROPERTY, NEVER AN INLINE z-index: an inline one beats the hover rule below, so a
+       lifted card stayed behind its neighbour — the bug the owner found in the mockup. */
+    z-index: var(--zi, 1);
+    transform: translateX(calc(var(--x) * var(--fit))) translateZ(var(--z)) rotateY(var(--ry)) rotateZ(var(--rz));
+    transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s;
+  }
+  /* The visible pile the boot deals from: every card at the centre, slightly turned, already painted. */
+  :global(html.projects-boot) .shot { opacity: 1; transform: translateY(46px) rotateZ(var(--pile)) scale(0.9); }
+
+  .tag {
+    position: absolute; left: 10px; bottom: 10px; z-index: 2; padding: 4px 7px; border-radius: 3px;
+    font: 10.5px var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase;
+    background: var(--draft-tag); color: var(--ink-1);
+  }
+
+  /* THE LOADING STATE, only where a script will end it (no JS: the picture simply shows). The tone is the card's
+     own background; the shimmer is a transform-only sweep over it, and only with motion allowed. */
+  @media (scripting: enabled) {
+    .shot::after {
+      content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+      background: linear-gradient(100deg, transparent 30%, rgba(var(--draft-line-rgb), 0.07) 50%, transparent 70%);
+      transform: translateX(-100%);
+    }
+    .shot.ready::after { opacity: 0; }
+    .shot :global(img) { opacity: 0; }
+    .shot.ready :global(img) { opacity: 1; }
+  }
+  @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+    .shot::after { transition: opacity 0.35s; }
+    .shot:not(.ready)::after { animation: shot-shimmer 1.3s linear infinite; }
+    .shot :global(img) { transition: opacity 0.35s ease-out; }
+    @keyframes shot-shimmer { to { transform: translateX(100%); } }
+  }
+
+  /* manifold's motion, laid over its still once it is actually playing. */
+  .shot :global(video) {
+    position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0;
+    transition: opacity 0.35s;
+  }
+  .shot.moving :global(video) { opacity: 1; }
+
+  /* Lifted: straightened, brought forward and to the top, ringed, the rest dimmed — by a pointer, or by keyboard
+     focus (a focused card can otherwise sit mostly behind its neighbours). Hover only where hover is real, so a
+     tap on a touch screen never leaves a card stuck up; and never in the phone strip, whose cards stay flat.
+     Not while the boot's pile is showing. */
+  @media not all and (max-width: 640px) {
+    @media (hover: hover) {
+      :global(html:not(.projects-boot)) .fan:hover .shot { opacity: 0.26; }
+      :global(html:not(.projects-boot)) .fan .shot:hover {
+        opacity: 1; z-index: 40; border-color: rgba(var(--draft-hi-rgb), 0.9);
+        box-shadow: 0 0 0 1px rgba(var(--draft-hi-rgb), 0.55), 0 0 34px rgba(var(--draft-hi-rgb), 0.22), 0 44px 90px var(--draft-shadow);
+        transform: translateX(calc(var(--x) * var(--fit))) translateY(-34px) translateZ(140px) rotateY(0deg) rotateZ(0deg) scale(1.08);
+      }
+    }
+    :global(html:not(.projects-boot)) .fan .shot:focus-visible {
+      opacity: 1; z-index: 40; border-color: rgba(var(--draft-hi-rgb), 0.9);
+      transform: translateX(calc(var(--x) * var(--fit))) translateY(-34px) translateZ(140px) rotateY(0deg) rotateZ(0deg) scale(1.08);
+    }
+  }
+  .shot:focus-visible { outline: 2px solid var(--ochre); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { .shot { transition: none; } }
+
+  .g-cap { margin: 0; font: 11px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; text-align: center; color: var(--ink-3); }
+
+  /* Phones: a strip that scrolls sideways, every card flat and whole, running to the screen's edges — the -6vw
+     undoes .projects-page's phone padding. A scroll box clips at its padding edge, so the shadow is shorter here
+     and the bottom padding holds it. Placed last, so it wins on source order. */
+  @media (max-width: 640px) {
+    .gallery { height: auto; margin: 44px -6vw 14px; padding: 10px 6vw 30px; perspective: none; overflow-x: auto;
+      overscroll-behavior-x: contain; }
+    .fan { position: static; display: flex; gap: 14px; width: max-content; height: auto; }
+    .shot, :global(html.projects-boot) .shot { position: relative; left: 0; flex: none; width: 240px; height: 160px; transform: none;
+      box-shadow: 0 10px 20px var(--draft-shadow); }
+  }
+</style>
+
+<script>
+  import { READY_MS, readyAfter } from '../../lib/galleryLayout';
+  import { prefersReducedMotion } from '../../lib/motion';
+  import { isPhone } from '../../lib/viewport';
+
+  // manifold's motion waits for the fan to settle: its .55s transform plus the deal's stagger across six cards.
+  const MOTION_AFTER_MS = 900;
+
+  let teardown: (() => void) | null = null;
+
+  function init(): void {
+    teardown?.();
+    teardown = null;
+    const maybeGallery = document.querySelector<HTMLElement>('[data-gallery]');
+    if (!maybeGallery) return;
+    // Non-null alias: TypeScript does not carry the guard's narrowing into the hoisted functions below.
+    const gallery = maybeGallery;
+    const root = document.documentElement;
+    const shots = [...gallery.querySelectorAll<HTMLElement>('.shot')];
+    const timers: number[] = [];
+    const t0 = performance.now();
+
+    // A card is ready once the picture it is SHOWING (the theme decides which) has loaded — or READY_MS on.
+    const shown = (s: HTMLElement): HTMLImageElement | undefined =>
+      [...s.querySelectorAll('img')].find((img) => getComputedStyle(img).display !== 'none');
+    function check(s: HTMLElement): void {
+      const img = shown(s);
+      if (img) s.classList.toggle('ready', readyAfter(img.complete && img.naturalWidth > 0, performance.now() - t0));
+    }
+    // load and error do not bubble, so they are caught on the way down.
+    const onSettle = (e: Event): void => {
+      const s = (e.target as Element).closest<HTMLElement>('.shot');
+      if (s) check(s);
+    };
+
+    const motionShot = shots.find((s) => s.dataset.motionDark);
+    const animate = !prefersReducedMotion() && !isPhone();
+    let video: HTMLVideoElement | null = null;
+    function stopVideo(): void {
+      if (!video) return;
+      video.pause();
+      video.removeAttribute('src');
+      video.load();   // drops the download rather than finishing it
+      video.remove();
+      video = null;
+      motionShot?.classList.remove('moving');
+    }
+    // The motion for the current theme, preloaded under the still and shown only once it plays.
+    function play(): void {
+      if (!motionShot) return;
+      const s = motionShot;
+      const dark = s.dataset.motionDark!;
+      const src = root.dataset.theme === 'dark' ? dark : (s.dataset.motionLight ?? dark);
+      if (video?.getAttribute('src') === src) return;
+      stopVideo();
+      const v = document.createElement('video');
+      v.muted = true;
+      v.loop = true;
+      v.playsInline = true;
+      v.autoplay = true;
+      v.preload = 'auto';
+      v.setAttribute('muted', '');
+      v.setAttribute('aria-hidden', 'true');
+      v.poster = shown(s)?.currentSrc ?? '';
+      v.addEventListener('playing', () => s.classList.add('moving'), { once: true });
+      v.src = src;
+      s.append(v);
+      video = v;
+      v.play().catch(() => { /* autoplay refused: the still stays, which is a finished state */ });
+    }
+    const startMotion = (): void => { timers.push(window.setTimeout(play, MOTION_AFTER_MS)); };
+
+    const onTheme = (): void => {
+      shots.forEach(check);
+      if (video) play();
+    };
+
+    gallery.addEventListener('load', onSettle, true);
+    gallery.addEventListener('error', onSettle, true);
+    document.addEventListener('theme:change', onTheme);
+    shots.forEach(check);
+    timers.push(window.setTimeout(() => shots.forEach(check), READY_MS));
+    // "Booted" is a state: without html.projects-boot the fan is already open.
+    if (motionShot && animate) {
+      if (root.classList.contains('projects-boot')) window.addEventListener('projects:booted', startMotion, { once: true });
+      else startMotion();
+    }
+
+    teardown = () => {
+      timers.forEach((id) => window.clearTimeout(id));
+      gallery.removeEventListener('load', onSettle, true);
+      gallery.removeEventListener('error', onSettle, true);
+      document.removeEventListener('theme:change', onTheme);
+      window.removeEventListener('projects:booted', startMotion);
+      stopVideo();
+    };
+  }
+
+  document.addEventListener('astro:page-load', init);
+</script>
