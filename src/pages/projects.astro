@@ -112,6 +112,14 @@ const bootDecider = `(function () {
      silently missed them — CLAUDE.md's scoped-style trap. Anchored under .projects-page so it cannot leak. */
   .projects-page :global(section[id]), .projects-page :global(li[id]) { scroll-margin-top: 110px; }
 
+  /* THE RAIL'S TARGETS. SideRail's nested rows are 12.5px tall at a 21.5px pitch (a 9px gap), and axe's target-size,
+     which Lighthouse scores in A11y, wants an undersized target's centre 24px from its neighbours': the desktop run
+     scored 96 on it, flagging "Selected" and the four rows under it. 12px puts rows 24.5px apart and the first
+     25.1px from its parent. Set here rather than in SideRail because the rail is shared: /research misses the same
+     audit (95), and a change to every reading page's rail is not this page's to make. :global and anchored on this
+     rail's id, so it reaches SideRail's elements (a scoped rule here could not) and nothing else. */
+  :global(#projects-toc .sub) { gap: 12px; margin-top: 12px; }
+
   .back { display: inline-block; margin-top: 140px; font: 12px var(--font-mono); color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
   .back:hover { color: var(--ochre); }
 

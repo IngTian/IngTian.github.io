@@ -78,9 +78,15 @@ const cards = projects.filter((p) => p.tier === 'workshop').map((p) => {
   }
   @media (prefers-reduced-motion: no-preference) { .card::before, .card-in::before { transition: opacity 0.35s; } }
   /* Pointer only, so a tap never leaves a card lit. The dashed card has no ring: its inside is transparent, so the
-     ring's gradient would show through it as a blot rather than at its edge. */
+     ring's gradient would show through it as a blot rather than at its edge.
+     CONTRAST ON HOVER: at the pointer the spotlight is the seal at .09 over the card's ground, which takes ink-3 to
+     4.39:1 in light theme — and over the dashed card's open field it compounds with the edge vignette. So a lit
+     card lifts its ink-3 words to ink-2 (7.82 at worst, the dashed card at the vignette's corner), as a hovered row
+     does; the install line is kept out of the light by its own opaque ground, below. tests/draftingPalette.test.ts
+     holds the numbers. */
   @media (hover: hover) {
     .card:not(.ghost):hover::before, .card:hover .card-in::before { opacity: 1; }
+    .card:hover .idea, .card:hover .t { color: var(--ink-2); }
   }
   .card:focus-visible { outline: 2px solid var(--ochre); outline-offset: 3px; }
 
@@ -95,7 +101,10 @@ const cards = projects.filter((p) => p.tier === 'workshop').map((p) => {
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .t { padding: 3px 7px; border-radius: 3px; border: 1px solid rgba(var(--draft-line-rgb), 0.22); font: 10.5px var(--font-mono);
     letter-spacing: 0.04em; color: var(--ink-3); }
-  .cmd { display: block; margin-top: 14px; padding: 7px 9px; border-radius: 4px; background: rgba(var(--draft-line-rgb), 0.06);
+  /* The mockup's .06 tint, laid over an OPAQUE ground so the spotlight never shows through it: through it, the seal
+     on the tinted light fell to 4.12:1 in light theme and 4.25 in dark. At rest it is the same colour as before. */
+  .cmd { display: block; margin-top: 14px; padding: 7px 9px; border-radius: 4px;
+    background: linear-gradient(rgba(var(--draft-line-rgb), 0.06), rgba(var(--draft-line-rgb), 0.06)), var(--draft-ground);
     font: 11.5px var(--font-mono); color: var(--ochre); overflow-wrap: anywhere; }
 
   /* THE DASHED CARD IS TRANSPARENT, so its words sit straight on the drafting field and need the page's knockout

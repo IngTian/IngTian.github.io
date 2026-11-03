@@ -50,10 +50,15 @@ const rows = projects.filter((p) => p.tier === 'selected').map((p, i) => {
     text-align: left; font: inherit; cursor: pointer;
   }
   /* The hover wash is its own layer, faded by opacity, and the content slides by transform — the mockup moved
-     padding-left, which is a layout animation. */
+     padding-left, which is a layout animation.
+     CONTRAST ON HOVER: the wash lies over the edge vignette, and the two compound. At the vignette's darkest corner
+     the mockup's .05 took the ink-3 chips and index to 4.25:1 and the lit chip (the seal) to 4.47 in light theme.
+     So the wash is .04, which the seal clears (4.56; nothing can lift the page's one colour), and a hovered row
+     lifts its ink-3 words to ink-2 (8.22 there), the way the mockup already lifts the idea to ink-1.
+     tests/draftingPalette.test.ts reads this alpha and holds the numbers. */
   .row::before {
     content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0;
-    background: rgba(var(--draft-line-rgb), 0.05); transition: opacity 0.25s;
+    background: rgba(var(--draft-line-rgb), 0.04); transition: opacity 0.25s;
   }
   .row > * { transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
   .i { font: 12px var(--font-mono); color: var(--ink-3); }
@@ -69,6 +74,7 @@ const rows = projects.filter((p) => p.tier === 'selected').map((p, i) => {
     .row:hover > * { transform: translateX(10px); }
     .row:hover .go { transform: translateX(16px); color: var(--ochre); }
     .row:hover .idea { color: var(--ink-1); }
+    .row:hover .i, .row:hover .t:not(.hot) { color: var(--ink-2); }
   }
   .row:focus-visible { outline: 2px solid var(--ochre); outline-offset: -2px; }
   .row:focus-visible .idea { color: var(--ink-1); }

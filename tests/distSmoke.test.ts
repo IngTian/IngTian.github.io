@@ -10,6 +10,7 @@ import {
 import { INTRO_SEEN_KEY } from '../src/lib/introSession';
 import { inProgress, projects } from '../src/data/profile';
 import { flattenStops, projectSectionId, projectStops } from '../src/lib/pageStops';
+import { GALLERY_ORDER } from '../src/lib/galleryLayout';
 import { listingLines } from '../src/lib/projectsListing';
 import { BOOT_CMD, BOOT_DEADLINE_MS, BOOT_SEEN_KEY } from '../src/lib/projectsBoot';
 
@@ -862,5 +863,84 @@ describe('/projects — the boot: decided inline before first paint, and the ser
     expect(m, 'no sr-only command before the typed keys').not.toBeNull();
     expect(m![1]).toBe(BOOT_CMD);
     expect(m![2]).toMatch(/\saria-hidden="true"/);
+  });
+});
+
+describe('/projects — repo links, private repos, and what assistive tech is told', () => {
+  const projectsPage = (): Page => {
+    const p = byRoute().get('/projects');
+    if (!p) throw new Error('no built page for /projects — run `npm run build`');
+    return p;
+  };
+  /** Every opening tag in the markup carrying `data-ask="<slug>"` — the page's project surfaces. */
+  const surfaces = (slug: string): string[] =>
+    [...projectsPage().markup.matchAll(new RegExp(`<[a-z][\\w-]*\\b[^>]*\\sdata-ask="${slug}"[^>]*>`, 'g'))].map((m) => m[0]);
+  /** Which surface a tag is: a gallery card (.shot), a selected row (.row) or a workshop card (.card). */
+  const kindOf = (tag: string): string =>
+    (/\sclass="([^"]*)"/.exec(tag)?.[1] ?? '').split(/\s+/).find((c) => ['shot', 'row', 'card'].includes(c)) ?? tag;
+  /** The surfaces a project should have: its row or card, and a gallery card if the fan holds it. */
+  const where = (p: (typeof projects)[number]): string[] =>
+    [p.tier === 'selected' ? 'row' : 'card', ...((GALLERY_ORDER as readonly string[]).includes(p.slug) ? ['shot'] : [])].sort();
+
+  // A real <a href> to the repo is what makes a surface work without JS, for crawlers and for cmd/middle-click;
+  // the page only turns a PLAIN click into the ask (spec §11).
+  it("links every public project's row or card, and its gallery card, to https://github.com/IngTian/<slug>", () => {
+    for (const p of projects.filter((q) => q.visibility === 'public')) {
+      const tags = surfaces(p.slug);
+      expect(tags.map(kindOf).sort(), `${p.slug}'s surfaces`).toEqual(where(p));
+      for (const t of tags) {
+        expect(/^<a\b/.test(t), `${p.slug}: ${t} is not a link`).toBe(true);
+        expect(/\shref="([^"]*)"/.exec(t)?.[1], `${p.slug}: ${t}`).toBe(`https://github.com/IngTian/${p.slug}`);
+      }
+    }
+  });
+
+  // The RAW HTML, scripts and attributes included — the ask's data-asks JSON is where a URL would slip in. The
+  // in-progress card stands for a repo that is not public yet, so its name is held to the same rule.
+  it('renders no GitHub URL for a private repo anywhere in the HTML, and makes its surfaces buttons', () => {
+    const html = projectsPage().html.toLowerCase();
+    const hidden = [
+      ...projects.filter((p) => p.visibility === 'private').map((p) => p.slug),
+      ...inProgress.flatMap((w) => (w.repo ? [w.repo] : [])),
+    ];
+    expect(hidden.length, 'no private repos to check').toBeGreaterThan(0);
+    for (const slug of hidden) expect(html, slug).not.toContain(`github.com/ingtian/${slug.toLowerCase()}`);
+    for (const p of projects.filter((q) => q.visibility === 'private')) {
+      const tags = surfaces(p.slug);
+      expect(tags.map(kindOf).sort(), `${p.slug}'s surfaces`).toEqual(where(p));
+      for (const t of tags) {
+        expect(/^<button\b/.test(t), `${p.slug}: ${t} is not a button`).toBe(true);
+        expect(/\shref=/.test(t), `${p.slug}: ${t} has an href`).toBe(false);
+      }
+    }
+  });
+
+  // Pictures say nothing to a screen reader. The probes' elevation readouts are the canvas's own text (DraftingField
+  // paints them with fillText), so the canvas being hidden is what hides them.
+  it("hides the pictures: the field canvas, the banner and the ask's brackets are aria-hidden", () => {
+    const { markup } = projectsPage();
+    for (const [re, what] of [
+      [/<canvas\b[^>]*\sdata-drafting-field\b[^>]*>/g, 'the field canvas'],
+      [/<svg\b[^>]*\sclass="banner\b[^>]*>/g, 'the banner'],
+      [/<[a-z][\w-]*\b[^>]*\sdata-ask-rk\b[^>]*>/g, "the ask's brackets"],
+    ] as const) {
+      const tags = [...markup.matchAll(re)].map((m) => m[0]);
+      expect(tags.length, `${what} on /projects`).toBe(1);
+      expect(/\saria-hidden="true"/.test(tags[0]), `${what} is not aria-hidden`).toBe(true);
+    }
+  });
+
+  // The cow must not narrate unprompted (spec §8): its visible bubble types every line, the greeting and idle
+  // chatter included, so it is hidden; only the lines a reader asked for reach the ONE polite region.
+  it("hides the cow's visible bubble and gives the page exactly one live region, the cow's polite one", () => {
+    const { markup } = projectsPage();
+    const bubbles = [...markup.matchAll(/<[a-z][\w-]*\b[^>]*\sclass="cow-bubble\b[^>]*>/g)].map((m) => m[0]);
+    expect(bubbles.length, 'cow bubbles').toBe(1);
+    expect(/\saria-hidden="true"/.test(bubbles[0]), 'the cow bubble is not aria-hidden').toBe(true);
+    const live = [...markup.matchAll(/<[a-z][\w-]*\b[^>]*(?:\saria-live="(?!off")[^"]*"|\srole="(?:status|log|alert|marquee|timer)")[^>]*>/g)]
+      .map((m) => m[0]);
+    expect(live.length, `live regions: ${live.join(' ')}`).toBe(1);
+    expect(live[0]).toMatch(/\saria-live="polite"/);
+    expect(live[0]).toMatch(/\sdata-cow-live\b/);
   });
 });
