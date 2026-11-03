@@ -156,6 +156,9 @@ const cards = GALLERY_ORDER.map((slug, i) => {
   @media (prefers-reduced-motion: reduce) { .shot, .shot-in, .tag { transition: none; } }
 
   .g-cap { margin: 0; font: 11px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; text-align: center; color: var(--ink-3); }
+  /* "hover a project" is no use while the pile cannot be hovered: it waits for the deal, as in the mockup. */
+  :global(html.projects-boot) .g-cap { opacity: 0; }
+  @media (prefers-reduced-motion: no-preference) { .g-cap { transition: opacity 0.5s; } }
 
   /* Phones: a strip that scrolls sideways, every card flat and whole, running to the screen's edges — the -6vw
      undoes .projects-page's phone padding. A scroll box clips at its padding edge, so the shadow is shorter here

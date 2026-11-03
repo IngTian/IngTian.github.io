@@ -39,6 +39,11 @@ const rows = projects.filter((p) => p.tier === 'selected').map((p, i) => {
 <style>
   .rows { list-style: none; margin: 0; padding: 0; container-type: inline-size; }
   .rows li { border-bottom: 1px solid rgba(var(--draft-line-rgb), 0.12); }
+  /* The boot: each row waits below its place, and rises in when TerminalHeader deals (it sets the stagger). */
+  :global(html.projects-boot) .rows li { opacity: 0; transform: translateY(18px); }
+  @media (prefers-reduced-motion: no-preference) {
+    .rows li { transition: opacity 0.4s, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  }
   .row {
     position: relative; z-index: 0; display: grid; grid-template-columns: 56px minmax(180px, 1.1fr) 2fr 270px 26px;
     gap: 22px; align-items: baseline; width: 100%; padding: 26px 8px; color: var(--ink-1); text-decoration: none;

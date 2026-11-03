@@ -10,6 +10,7 @@ import TerminalHeader from '../components/projects/TerminalHeader.astro';
 import WorkshopCards from '../components/projects/WorkshopCards.astro';
 import { projects } from '../data/profile';
 import { projectStops } from '../lib/pageStops';
+import { BOOT_SEEN_KEY, shouldBoot } from '../lib/projectsBoot';
 
 // /projects on its own register: the drafting field behind it (no FluidSky, no SkyWash — `page="drafting"` swaps
 // in ink sized for the drafting ground) and no descent veil, because the page's boot is its entrance.
@@ -18,8 +19,37 @@ import { projectStops } from '../lib/pageStops';
 const stops = projectStops(projects);
 const names = projects.filter((p) => p.tier === 'selected').map((p) => p.name);
 const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into things that run: ${names.slice(0, -1).join(', ')} and ${names.at(-1)}, plus the tools he built for himself and kept using.`;
+
+// THE BOOT IS DECIDED HERE, INLINE, BEFORE FIRST PAINT — for the reason index.astro's intro decider is: a bundled
+// script runs after parse, so the finished listing and the open fan would paint first and then be taken away.
+// It survives ClientRouter navigation the same way too: `<html>` takes the incoming page's attributes (none of
+// them `projects-boot`), and the router runs an inline script it has not run before, so arriving at /projects
+// from another page decides once and a return in the same session finds the flag set anyway.
+// shouldBoot is shipped AS ITS OWN SOURCE rather than retyped here, so the function tests/projectsBoot.test.ts
+// checks is the one that runs — CLAUDE.md's "a test is not a consumer" (the intro's shouldPlayIntro had specs and
+// no caller). tests/distSmoke.test.ts runs this script as shipped. A restored scroll is the router's: it keeps
+// scrollY in history.state and restores it after parse, so `scrollY` alone still reads 0 here.
+const bootDecider = `(function () {
+  try {
+    var KEY = ${JSON.stringify(BOOT_SEEN_KEY)};
+    var shouldBoot = ${shouldBoot.toString()};
+    var seen = null;
+    try { seen = sessionStorage.getItem(KEY); } catch (e) { seen = null; }
+    var st = history.state;
+    if (!shouldBoot({
+      seen: seen !== null,
+      force: new URLSearchParams(location.search).get('boot') === '1',
+      reduce: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      hash: location.hash,
+      restoredScroll: scrollY > 0 || !!(st && st.scrollY > 0),
+    })) return;
+    try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
+    document.documentElement.classList.add('projects-boot');
+  } catch (e) { /* storage that throws means play (above); anything else, the finished page — never a broken one */ }
+})();`;
 ---
 <BaseLayout title="Projects — Ing Tian" description={description} page="drafting" veil={false} navZone="light">
+  <script is:inline set:html={bootDecider} />
   <DraftingField />
   <SideRail stops={stops} id="projects-toc" />
 
@@ -109,6 +139,9 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
   .sec-h .n { font: 12px var(--font-mono); color: var(--ochre); }
   .sec-h h2 { font: 600 13px var(--font-mono); letter-spacing: 0.24em; text-transform: uppercase; margin: 0; color: var(--ink-1); }
   .sec-h .s { margin-left: auto; font: 11.5px var(--font-mono); color: var(--ink-3); }
+  /* The section heads wait out the boot with the rows and cards under them, as in the mockup. */
+  :global(html.projects-boot) .sec-h { opacity: 0; }
+  @media (prefers-reduced-motion: no-preference) { .sec-h { transition: opacity 0.5s; } }
 </style>
 
 <script>
@@ -138,14 +171,18 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
     let pressInBoot = false;
     const onDown = (): void => { pressInBoot = document.documentElement.classList.contains('projects-boot'); };
     const onClick = (e: MouseEvent): void => {
+      const skipped = pressInBoot && e.detail > 0;
       // A listing name is an index: it jumps (no preventDefault) and never asks, but the cow still says its line.
+      // A press that skipped the boot does not jump either: a line not yet printed is transparent, not absent, so
+      // its link still takes the press.
       const listed = (e.target as Element).closest<HTMLElement>('[data-cow-key]');
-      if (listed && !(pressInBoot && e.detail > 0)) {
-        window.dispatchEvent(new CustomEvent('cow:say', { detail: { key: listed.dataset.cowKey!, announce: true } }));
+      if (listed) {
+        if (skipped) e.preventDefault();
+        else window.dispatchEvent(new CustomEvent('cow:say', { detail: { key: listed.dataset.cowKey!, announce: true } }));
       }
       const from = (e.target as Element).closest<HTMLElement>('[data-ask]');
       if (!from) return;
-      if (pressInBoot && e.detail > 0) { e.preventDefault(); return; }
+      if (skipped) { e.preventDefault(); return; }
       const at = askPoint(e, from.getBoundingClientRect(), from.matches('a[href]'));
       if (!at) return;
       e.preventDefault();

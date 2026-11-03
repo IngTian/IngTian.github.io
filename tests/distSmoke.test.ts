@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import { PAGES } from '../src/data/nav';
 import {
@@ -10,6 +11,7 @@ import { INTRO_SEEN_KEY } from '../src/lib/introSession';
 import { inProgress, projects } from '../src/data/profile';
 import { flattenStops, projectSectionId, projectStops } from '../src/lib/pageStops';
 import { listingLines } from '../src/lib/projectsListing';
+import { BOOT_SEEN_KEY } from '../src/lib/projectsBoot';
 
 /* ================================================================================================
    THE FIRST TEST THAT LOOKS AT WHAT THE SITE ACTUALLY SHIPS.
@@ -733,5 +735,71 @@ describe('/projects — the ask: one non-modal dialog and its GitHub button', ()
     expect(/\sclass="[^"]*\bbtn--sticker\b/.test(links[0]), `${links[0]} is not the sticker button`).toBe(true);
     expect(/\starget="_blank"/.test(links[0]), `${links[0]} lacks target="_blank"`).toBe(true);
     expect(/\srel="[^"]*\bnoopener\b/.test(links[0]), `${links[0]} lacks rel="noopener"`).toBe(true);
+  });
+});
+
+describe('/projects — the boot: decided inline before first paint, and the served HTML is the finished state', () => {
+  const projectsPage = (): Page => {
+    const p = byRoute().get('/projects');
+    if (!p) throw new Error('no built page for /projects — run `npm run build`');
+    return p;
+  };
+  const decider = (): { at: number; body: string } => {
+    const m = /<script>((?:(?!<\/script>)[\s\S])*?projects\.boot\.seen[\s\S]*?)<\/script>/.exec(projectsPage().html);
+    expect(m, 'no inline boot decider in dist/projects/index.html').not.toBeNull();
+    return { at: m!.index, body: m![1] };
+  };
+
+  // Inline (a bare <script>, so no src and no defer) and ahead of the banner, so html.projects-boot is set before
+  // anything it dims or hides is parsed — a bundled script runs after parse, which is past the first paint.
+  it('ships the decider inline, before the banner, keyed on the session flag from lib/', () => {
+    const { at, body } = decider();
+    expect(at, 'the decider must precede the banner').toBeLessThan(projectsPage().html.search(/<svg\b[^>]*class="banner\b/));
+    expect(body).toContain(JSON.stringify(BOOT_SEEN_KEY));
+  });
+
+  // The policy, asserted where it ships: the shipped script, run against stand-ins for what it reads. This is the
+  // wiring the unit tests of shouldBoot cannot see — which input comes from where, and when the flag is written.
+  it('boots a fresh top-of-page arrival only, sets the flag at start, and survives a storage that throws', () => {
+    const run = (o: { search?: string; hash?: string; seen?: boolean; reduce?: boolean; stateY?: number; throws?: boolean }) => {
+      const store = new Map<string, string>(o.seen ? [[BOOT_SEEN_KEY, '1']] : []);
+      const classes = new Set<string>();
+      const storage = {
+        getItem: (k: string) => { if (o.throws) throw new Error('denied'); return store.get(k) ?? null; },
+        setItem: (k: string, v: string) => { if (o.throws) throw new Error('denied'); store.set(k, v); },
+      };
+      runInNewContext(decider().body, {
+        URLSearchParams, sessionStorage: storage, scrollY: 0,
+        location: { search: o.search ?? '', hash: o.hash ?? '' },
+        history: { state: o.stateY === undefined ? null : { index: 0, scrollX: 0, scrollY: o.stateY } },
+        matchMedia: (q: string) => ({ matches: /reduce/.test(q) && o.reduce === true }),
+        document: { documentElement: { classList: { add: (c: string) => classes.add(c) } } },
+      });
+      return { boot: classes.has('projects-boot'), flagged: store.has(BOOT_SEEN_KEY) };
+    };
+    expect(run({})).toEqual({ boot: true, flagged: true });
+    expect(run({ seen: true })).toEqual({ boot: false, flagged: true });
+    expect(run({ seen: true, search: '?boot=1' })).toEqual({ boot: true, flagged: true });
+    expect(run({ hash: '#p-witness' })).toEqual({ boot: false, flagged: false });
+    expect(run({ stateY: 2400 })).toEqual({ boot: false, flagged: false });
+    expect(run({ stateY: 0 })).toEqual({ boot: true, flagged: true });
+    expect(run({ reduce: true, search: '?boot=1' })).toEqual({ boot: false, flagged: false });
+    expect(run({ throws: true })).toEqual({ boot: true, flagged: false });
+  });
+
+  // With JS off nothing sets html.projects-boot, so every boot rule is inert and the page is exactly what was
+  // served: the banner, the command, the comment, the whole listing and the summary.
+  it('serves the finished state: no boot class, and the banner, listing and summary all in the markup', () => {
+    const { markup } = projectsPage();
+    expect(/<html\b[^>]*\bprojects-boot\b/.test(markup), '<html> is served with projects-boot').toBe(false);
+    const term = /<section\b[^>]*\sid="p-index"[^>]*>([\s\S]*?)<\/section>/.exec(markup)?.[1];
+    expect(term, 'no #p-index terminal section').toBeTruthy();
+    expect([...term!.matchAll(/<g\b[^>]*\sdata-row="\d"/g)], 'banner rows').toHaveLength(6);
+    const text = term!.replace(/<[^>]*>/g, '').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+    const want = [
+      '~/projects $ ls --shipped', '# ideas I turned into things that run', ' shipped · ',
+      ...listingLines(projects, inProgress).map((l) => l.perm + l.name + l.kind + l.short),
+    ];
+    expect(want.filter((w) => !text.includes(w))).toEqual([]);
   });
 });

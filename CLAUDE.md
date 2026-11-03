@@ -244,26 +244,31 @@ indexed one is a real leak, not an untidiness.
 `Deck`, `Toc`, `SideRail`, `CornerNav`, `TerrainHero`, `FluidSky`, `SkyWash`,
 `DescentPath`, `PlushCow`, the three explainer slides (`Choice`, `Rules`, `Solve`),
 `BaseLayout`'s no-FOUC theme resolver and veil, `pages/index.astro`'s intro decider,
-the `/art` and `/research` pages, and `/projects` — `pages/projects.astro` (the ask
-dispatcher) plus five of `components/projects/*`: `DraftingField`, `Gallery`,
-`SelectedRows`, `WorkshopCards` and `ProjectAsk` — all need JS. That is the whole list,
-22 files. Every one is a plain Astro component or page with a `<script>`, **not** an
-island (see *Stack*).
+the `/art` and `/research` pages, and `/projects` — `pages/projects.astro` (the boot
+decider, the ask dispatcher and the cow's talk) plus six of `components/projects/*`:
+`DraftingField`, `Gallery`, `SelectedRows`, `WorkshopCards`, `ProjectAsk` and
+`TerminalHeader` (the boot) — all need JS. That is the whole list, 23 files. Every one
+is a plain Astro component or page with a `<script>`, **not** an island (see *Stack*).
 
 **Two corrections to how this list is checked, because the obvious check misleads.**
-`grep -rln '<script' src` returns **25 files** against the 22 surfaces above, and the
+`grep -rln '<script' src` returns **26 files** against the 23 surfaces above, and the
 difference is not all drift: `lib/introTimeline.ts`, `lib/motion.ts` and
 `lib/descentPath.ts` match on the string `<script>` inside their own COMMENTS. Filter
 to `src/{components,sections,pages,layouts}` before trusting a count. The real gap this
 caught was `pages/index.astro`, which the list had never named. (It read 19 against 16
-until `/projects` added six surfaces across several commits, none of which updated it.)
+until `/projects` added seven surfaces across several commits, most of which did not
+update it.)
 
 **And `index.astro` is the one surface that does NOT keep the contract below, on
 purpose.** Its intro decider is `is:inline`, so it runs at parse time and exactly once
 — no `astro:page-load`, no teardown. That is the whole reason it exists: a bundled
 script is deferred until after parse, by which point the sky has already painted its
 finished colours, which is the flash it was written to remove. `BaseLayout`'s two
-inline scripts are the same exception for the same reason. Everything else here:
+inline scripts are the same exception for the same reason, and so is `projects.astro`'s
+boot decider: it sets `html.projects-boot` before the banner and the gallery parse, or
+the finished listing and the open fan would paint and then be taken away. It ships
+`lib/projectsBoot.ts`'s `shouldBoot` as its own source rather than a retyped copy, so the
+tested function is the one that runs. Everything else here:
 
 - **Re-init on `astro:page-load`, with a teardown**, because `ClientRouter` is on
   and a View Transition replaces the DOM without a fresh page load. A script that

@@ -55,6 +55,11 @@ const cards = projects.filter((p) => p.tier === 'workshop').map((p) => {
     list-style: none; margin: 26px 0 0; padding: 0; display: grid; gap: 18px;
     grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   }
+  /* The boot: each card waits below its place, and rises in after the rows when TerminalHeader deals. */
+  :global(html.projects-boot) .cards li { opacity: 0; transform: translateY(18px); }
+  @media (prefers-reduced-motion: no-preference) {
+    .cards li { transition: opacity 0.4s, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  }
   /* The 1px padding is the border: the spotlight under it shows through as a ring. A card has its own opaque
      ground (.card-in), so it drops the page's label knockout — all but the dashed one, below, which has none. */
   .card {

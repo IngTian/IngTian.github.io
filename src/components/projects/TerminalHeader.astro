@@ -7,6 +7,10 @@
 // This is the FINISHED state, which is also what reduced motion and no-JS get. The order on screen is the DOM
 // order, banner first (the approved mockup lifted it with `order: -1`; here it is simply written first).
 // Every number in the summary comes from summaryCounts(), and every listing line from listingLines().
+//
+// THE BOOT plays over this markup when projects.astro's inline decider has set html.projects-boot: the CSS below
+// dims or holds back each piece until the script lights it (.on), rendering lib/projectsBoot.ts' bootState() on
+// every frame. The command is one span per key so it can type without its text ever leaving the HTML.
 import { inProgress, projects } from '../../data/profile';
 import { bannerRows, bannerSvg } from '../../lib/asciiBanner';
 import { listingLines, summaryCounts } from '../../lib/projectsListing';
@@ -17,8 +21,9 @@ const CELL_W = 60, CELL_H = 104;
 const W = ROWS[0].length * CELL_W, H = ROWS.length * CELL_H;
 const lines = listingLines(projects, inProgress);
 const n = summaryCounts(projects);
+const CMD = 'ls --shipped';
 ---
-<section class="term" id="p-index" aria-labelledby="p-index-h">
+<section class="term" id="p-index" aria-labelledby="p-index-h" data-term>
   <h1 class="sr-only" id="p-index-h">Projects</h1>
   {/* The paint is a gradient across 1.5x the banner's width, because the mockup's ran across its 980px box while
       the letters covered about two thirds of it — so the last letters end short of the pure line colour.
@@ -36,7 +41,7 @@ const n = summaryCounts(projects);
     </defs>
     <g fill="url(#projects-banner-ink)" shape-rendering="crispEdges" set:html={bannerSvg(ROWS, CELL_W, CELL_H)} />
   </svg>
-  <div class="tline"><span class="ps">~/projects $</span> <span class="cmd">ls --shipped</span></div>
+  <div class="tline"><span class="ps">~/projects $</span> <span class="cmd">{[...CMD].map((c) => <span>{c}</span>)}</span><span class="cur cur-type" aria-hidden="true"></span></div>
   <p class="tc"># ideas I turned into things that run</p>
   <ul class="ls">
     {lines.map((l) => (
@@ -95,6 +100,24 @@ const n = summaryCounts(projects);
     .cur { animation: term-blink 1.05s steps(1) infinite; }
     @keyframes term-blink { 50% { opacity: 0; } }
   }
+  /* The typing cursor: only while the boot is typing, so the finished first line has none. */
+  .cur-type { display: none; }
+
+  /* THE BOOT — boot B's states, from the approved mockup. The banner is a ghost at .13, NEVER 0: it is painted on
+     the first frame, and Largest Contentful Paint is not held back. Its rows come from set:html, so they carry no
+     scope hash and are reached through :global. The command's keys are display: none rather than transparent, so
+     the cursor sits right after the last one typed. Under reduced motion the decider never sets the class. */
+  :global(html.projects-boot) .banner :global(.row:not(.on)) { opacity: 0.13; }
+  :global(html.projects-boot) .cmd > span:not(.on) { display: none; }
+  :global(html.projects-boot) .term:not(.ran) .cur-type { display: inline-block; }
+  :global(html.projects-boot) .tc:not(.on),
+  :global(html.projects-boot) .ls li:not(.on),
+  :global(html.projects-boot) .tsum:not(.on) { opacity: 0; transform: translateX(-8px); }
+  :global(html.projects-boot) .idle { opacity: 0; }
+  @media (prefers-reduced-motion: no-preference) {
+    .banner :global(.row) { transition: opacity 0.16s ease-out; }
+    .tc, .ls li, .tsum { transition: opacity 0.28s ease-out, transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  }
 
   /* Phones: the same content, wrapped rather than hidden (the mockup hid kind and description under 760px; the
      site's phone rule is same content). The description takes its own full-width line under each entry: under the
@@ -104,3 +127,91 @@ const n = summaryCounts(projects);
     .ls .d { grid-column: 1 / -1; }
   }
 </style>
+
+<script>
+  import { bootState, bootSteps } from '../../lib/projectsBoot';
+
+  // The mockup's per-key delay, 38–84ms, drawn once per boot.
+  const KEY_MS = [38, 84] as const;
+  // The deal's stagger, and how long it stays set: the last riser's delay (870ms for today's eight rows and cards)
+  // plus its .5s rise, with room.
+  const FAN_STAGGER_MS = 75, RISE_AT_MS = 380, RISE_STAGGER_MS = 70, DEAL_MS = 1600;
+
+  let teardown: (() => void) | null = null;
+
+  function init(): void {
+    teardown?.();
+    teardown = null;
+    const root = document.documentElement;
+    const maybeTerm = document.querySelector<HTMLElement>('[data-term]');
+    // No class: this page view is not booting, and the HTML as served is already the finished state.
+    if (!maybeTerm || !root.classList.contains('projects-boot')) return;
+    // Non-null alias: TypeScript does not carry the guard's narrowing into the hoisted functions below.
+    const term = maybeTerm;
+    const rows = [...term.querySelectorAll('.banner .row')];
+    const keys = [...term.querySelectorAll('.cmd > span')];
+    const lines = [...term.querySelectorAll('.tc, .ls li')];
+    const summary = term.querySelector('.tsum');
+    const [lo, hi] = KEY_MS;
+    const steps = bootSteps(term.querySelector('.cmd')?.textContent ?? '', rows.length, lines.length - 1,
+      keys.map(() => lo + Math.random() * (hi - lo)));
+    const t0 = performance.now();
+    let raf = 0, dealT = 0, done = false;
+
+    const light = (els: readonly Element[], n: number): void => els.forEach((el, i) => el.classList.toggle('on', i < n));
+    function paint(s: ReturnType<typeof bootState>): void {
+      light(rows, s.rows);
+      light(keys, s.typed);
+      light(lines, s.lines);
+      summary?.classList.toggle('on', s.summary);
+      term.classList.toggle('ran', s.lines > 0);
+    }
+    // Once, whichever comes first: the schedule's `done`, or a skip. A skip paints bootState(Infinity) — the same
+    // state a full run ends on — and deals without the stagger. Then the class goes, then the page hears it.
+    function finish(stagger: boolean): void {
+      if (done) return;
+      done = true;
+      cancelAnimationFrame(raf);
+      unlisten();
+      paint(bootState(steps, Infinity));
+      if (stagger) {
+        const fan = [...document.querySelectorAll<HTMLElement>('[data-gallery] .shot')];
+        const risers = [...document.querySelectorAll<HTMLElement>('[data-rows] > li, [data-cards] > li')];
+        fan.forEach((el, i) => { el.style.transitionDelay = `${i * FAN_STAGGER_MS}ms`; });
+        risers.forEach((el, i) => { el.style.transitionDelay = `${RISE_AT_MS + i * RISE_STAGGER_MS}ms`; });
+        dealT = window.setTimeout(() => [...fan, ...risers].forEach((el) => { el.style.transitionDelay = ''; }), DEAL_MS);
+      }
+      root.classList.remove('projects-boot');
+      window.dispatchEvent(new Event('projects:booted'));
+    }
+    function tick(): void {
+      // A reader who leaves mid-boot leaves this frame behind until the next page's init tears it down.
+      if (!term.isConnected) return;
+      const s = bootState(steps, performance.now() - t0);
+      if (s.dealt) { finish(true); return; }
+      paint(s);
+      raf = requestAnimationFrame(tick);
+    }
+
+    // Any press, key or wheel skips. NOT a capture listener on window: projects.astro's ask dispatcher reads the
+    // boot class in window's capture phase, before this removes it, so the press that skips does nothing else.
+    const skip = (): void => finish(false);
+    function unlisten(): void {
+      window.removeEventListener('pointerdown', skip);
+      window.removeEventListener('keydown', skip);
+      window.removeEventListener('wheel', skip);
+    }
+    window.addEventListener('pointerdown', skip);
+    window.addEventListener('keydown', skip);
+    window.addEventListener('wheel', skip, { passive: true });
+    tick();
+
+    teardown = () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(dealT);
+      unlisten();
+    };
+  }
+
+  document.addEventListener('astro:page-load', init);
+</script>
