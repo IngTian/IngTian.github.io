@@ -297,9 +297,12 @@ caught was `pages/index.astro`, which the list had never named. (It read 19 agai
 until `/projects` added seven surfaces across several commits, most of which did not
 update it.)
 
-**And three files do NOT keep the contract below, on purpose — each through an
-`is:inline` script: `index.astro`, `BaseLayout` and `projects.astro`.** (This read
-"`index.astro` is the one surface" until `/projects` made it three.) `index.astro`'s
+**And four files do NOT keep the contract below, on purpose — each through an
+`is:inline` script: `index.astro`, `BaseLayout`, `research.astro` and `projects.astro`**
+(`grep -rn '<script is:inline' src` → 6 scripts in those 4 files). This used to read
+"`index.astro` is the one surface", which was false when written: `BaseLayout` was named later
+in the same paragraph, and `research.astro`'s two inline scripts were already shipping and
+never named. `index.astro`'s
 intro decider runs at parse time and exactly once — no `astro:page-load`, no teardown.
 That is the whole reason it exists: a bundled script is deferred until after parse, by
 which point the sky has already painted its finished colours, which is the flash it was
@@ -313,6 +316,16 @@ script that never arrives cannot leave the page hidden. And every `html.projects
 rule that holds something back says `transition: none`, because a ClientRouter arrival
 styles the new DOM finished before the decider runs, and the class would otherwise
 *animate* the finished page into the boot (`tests/distSmoke.test.ts` checks the built CSS).
+`research.astro`'s two are the exception for its own reason: they do, before first paint,
+what CSS cannot. The one in the head adds `html.paper-js`, which the panels' collapse CSS
+is gated on, so a reader with JS gets closed cards on the first frame and a reader without
+it gets every paper open. The one after the papers opens the panel a deep link points
+into, mirrors that onto each card's `aria-expanded`, and marks the closed panels `inert`.
+Moved into an `astro:page-load` handler, the linked panel would paint closed, the chevrons
+would be a frame late, and the closed panels' links would sit in the tab order inside
+zero-height boxes, a keyboard trap on a page that looks empty. Its bundled script does keep
+the contract (it re-adds `paper-js` at `astro:after-swap` and re-inits on `astro:page-load`),
+which is why `/research` is in the list above as well.
 Everything else here:
 
 - **Re-init on `astro:page-load`, with a teardown**, because `ClientRouter` is on
