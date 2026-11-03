@@ -2,7 +2,7 @@
 // The /projects terminal header's listing and summary line are computed from the records, never typed — the
 // homepage's rule that a number in prose comes from the data it describes. These pin both against profile.ts.
 import { describe, expect, it } from 'vitest';
-import { inProgress, projects, type Project } from '../src/data/profile';
+import { inProgress, projects } from '../src/data/profile';
 import { projectSectionId } from '../src/lib/pageStops';
 import { listingLines, summaryCounts } from '../src/lib/projectsListing';
 
@@ -42,12 +42,7 @@ describe('listingLines', () => {
 });
 
 describe('summaryCounts', () => {
-  it('counts the records: 7 shipped · 2 on PyPI · 1 on npm · 29 releases of witness · CI on 5', () => {
-    expect(summaryCounts(projects)).toEqual({ shipped: 7, pypi: 2, npm: 1, ci: 5, witnessReleases: 29 });
-  });
-
-  it('reports no release count when witness has none, rather than inventing one', () => {
-    const noWitness: Project[] = projects.filter((p) => p.slug !== 'witness');
-    expect(summaryCounts(noWitness).witnessReleases).toBeNull();
+  it('counts the records: 7 shipped · 2 on PyPI · 1 on npm · CI on 5', () => {
+    expect(summaryCounts(projects)).toEqual({ shipped: 7, pypi: 2, npm: 1, ci: 5 });
   });
 });

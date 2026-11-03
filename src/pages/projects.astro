@@ -345,7 +345,7 @@ const bootDecider = `(function () {
       if (idleLeft <= 0) return;
       const [lo, hi] = IDLE_EVERY_MS;
       idleT = window.setTimeout(() => {
-        if (!document.hidden && mayIdle(performance.now(), lastSpoke, root.classList.contains('projects-boot'))) {
+        if (!document.hidden && mayIdle(performance.now(), lastSpoke)) {
           say('idle', false);
           idleLeft -= 1;
         }

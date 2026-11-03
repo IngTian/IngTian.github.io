@@ -3,7 +3,7 @@
 // computed lines (the ls summary, the homepage appendix) are derived from.
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
-import { projects, inProgress, publications, repoUrl, appendixProjects } from '../src/data/profile';
+import { projects, inProgress, publications, repoUrl, appendixProjects, WITNESS_RELEASES } from '../src/data/profile';
 
 const bySlug = (slug: string) => projects.find((p) => p.slug === slug)!;
 
@@ -49,15 +49,13 @@ describe('the project records', () => {
     expect(projects.filter((p) => p.registry === 'pypi')).toHaveLength(2);
     expect(projects.filter((p) => p.registry === 'npm')).toHaveLength(1);
     expect(projects.filter((p) => p.ci)).toHaveLength(5);
-    expect(bySlug('witness').releases?.count).toBe(29);
-    expect(bySlug('witness').releases?.asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(WITNESS_RELEASES).toBe(29);
   });
 
-  // ONE SOURCE: the chip used to be typed as '29 releases' beside `releases: { count: 29 }`, so a bump
-  // moved the summary line and the cow's joke (both read the count) and left the selected row saying the old number.
+  // ONE SOURCE: a chip typed as '29 releases' beside the count drifted from it — a bump moved the summary line and
+  // the cow's joke (both read the count) and left the selected row saying the old number.
   it("prints witness's release chip from its count, never a number typed beside it", () => {
-    const w = bySlug('witness');
-    expect(w.proof[0]).toBe(`${w.releases!.count} releases`);
+    expect(bySlug('witness').proof[0]).toBe(`${WITNESS_RELEASES} releases`);
     expect(readFileSync(new URL('../src/data/profile.ts', import.meta.url), 'utf8')).not.toMatch(/'\d+ releases'/);
   });
 

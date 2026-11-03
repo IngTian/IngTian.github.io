@@ -74,7 +74,6 @@ export interface Project {
   visibility: 'public' | 'private';
   registry?: 'pypi' | 'npm';
   ci: boolean;
-  releases?: { count: number; asOf: string };     // hand-maintained, YYYY-MM-DD — not fetched at build time
 }
 
 export interface InProgressItem { name: string; idea: string; repo?: string }   // repo: set only once the repo exists
@@ -170,8 +169,8 @@ export const awards: Award[] = [
   { year: '2020', title: 'Rio Tinto–Richards Evans Exchange Award · McGill' },
 ];
 
-// witness's release count, hand-maintained (see `releases`): its record holds it, and its first chip prints it.
-const WITNESS_RELEASES = { count: 29, asOf: '2026-11-02' };
+// witness's release count: hand-maintained, not fetched at build time (that needs the network); counted 2026-11-02.
+export const WITNESS_RELEASES = 29;
 
 // Every notable project, in VALUE order: the selected (quant) tier first, then the workshop of personal tools.
 // Records, not prose, because they render in many shapes — the ls listing, the gallery, a row or a card, the
@@ -208,16 +207,15 @@ export const projects: Project[] = [
     idea: 'Turns any text stream — market news, research, coding sessions — into a dated history of what changed, and why.',
     short: 'text stream to dated history of change',
     // The chip is computed from the count, so the row, the summary line and the cow's joke all read one number.
-    proof: [`${WITNESS_RELEASES.count} releases`, 'cross-platform binaries', 'npm'],
+    proof: [`${WITNESS_RELEASES} releases`, 'cross-platform binaries', 'npm'],
     visibility: 'public', registry: 'npm', ci: true,
-    releases: WITNESS_RELEASES,
   },
   {
     slug: 'daylogs', name: 'daylogs', tier: 'workshop', kind: 'tool',
     idea: 'Weight, food and spending, typed by hand in one line each — plus one short daily read.',
     short: 'weight, food, spending — by hand',
     // No release count, unlike witness's: the spec's "5 releases" was 9 on PyPI by 2026-11-03 (0.6.0-0.6.3 landed in
-    // nine hours), and a count that moves that fast is false between edits whether or not it carries an asOf.
+    // nine hours), and a count that moves that fast is false between edits whether or not it carries a date.
     proof: ['on PyPI'],
     install: { text: 'uv tool install daylogs' },
     visibility: 'public', registry: 'pypi', ci: true,

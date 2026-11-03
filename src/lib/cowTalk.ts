@@ -16,10 +16,10 @@ export function nextLine(lines: readonly SpokenLine[], said: number): { line: Sp
   return { line: lines[said % lines.length], said: said + 1 };
 }
 
-/** An unprompted line never comes during the boot, nor within 14s of the last line, so it never talks over itself
- *  or over someone still reading what it just said. */
-export function mayIdle(nowMs: number, lastSpokeMs: number, booting: boolean): boolean {
-  return !booting && nowMs - lastSpokeMs >= 14000;
+/** An unprompted line never comes within 14s of the last line, so it never talks over itself or over someone still
+ *  reading what it just said. Arrival counts as a line, so that is never during the boot (BOOT_DEADLINE_MS, 4.5s). */
+export function mayIdle(nowMs: number, lastSpokeMs: number): boolean {
+  return nowMs - lastSpokeMs >= 14000;
 }
 
 /** Unprompted lines per page view (two keep the owner's "now and then"), then it waits to be asked (MOTION_LIMIT_MS;

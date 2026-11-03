@@ -26,16 +26,12 @@ export function listingLines(ps: readonly Project[], wip: readonly InProgressIte
   ];
 }
 
-/** The summary line's numbers. witness's release count is hand-maintained on its record (it cannot be computed
- *  without the network); null when the record has none, so the line drops the clause rather than inventing one. */
-export function summaryCounts(ps: readonly Project[]): {
-  shipped: number; pypi: number; npm: number; ci: number; witnessReleases: number | null;
-} {
+/** The summary line's numbers, counted from the records. */
+export function summaryCounts(ps: readonly Project[]): { shipped: number; pypi: number; npm: number; ci: number } {
   return {
     shipped: ps.length,
     pypi: ps.filter((p) => p.registry === 'pypi').length,
     npm: ps.filter((p) => p.registry === 'npm').length,
     ci: ps.filter((p) => p.ci).length,
-    witnessReleases: ps.find((p) => p.slug === 'witness')?.releases?.count ?? null,
   };
 }

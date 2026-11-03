@@ -3,9 +3,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PROJECT_COW_LINES } from '../src/data/cowLines';
-import { projects } from '../src/data/profile';
+import { projects, WITNESS_RELEASES } from '../src/data/profile';
 import { TYPE_MS, idleLines, mayIdle, nextLine } from '../src/lib/cowTalk';
 import { MOTION_LIMIT_MS } from '../src/lib/motion';
+import { BOOT_DEADLINE_MS } from '../src/lib/projectsBoot';
 
 const { hello, idle, byKey } = PROJECT_COW_LINES;
 const ALL = [...hello, ...idle, ...Object.values(byKey).flat()];
@@ -26,12 +27,13 @@ describe('nextLine', () => {
 
 describe('mayIdle', () => {
   it('speaks unprompted only 14s after its last line', () => {
-    expect(mayIdle(20000, 5000, false)).toBe(true);
-    expect(mayIdle(18999, 5000, false)).toBe(false);
+    expect(mayIdle(20000, 5000)).toBe(true);
+    expect(mayIdle(18999, 5000)).toBe(false);
   });
 
-  it('never speaks during the boot', () => {
-    expect(mayIdle(99999, 0, true)).toBe(false);
+  // Arrival counts as a line, and the decider's failsafe ends any boot by BOOT_DEADLINE_MS: so no idle line in a boot.
+  it('stays quiet through the boot', () => {
+    expect(mayIdle(BOOT_DEADLINE_MS, 0)).toBe(false);
   });
 });
 
@@ -90,10 +92,9 @@ describe('PROJECT_COW_LINES', () => {
     ]);
   });
 
-  // witness's release count is hand-maintained on its record; the joke quotes it, so the two must not drift.
-  it("quotes witness's release count from its record", () => {
-    const count = projects.find((p) => p.slug === 'witness')?.releases?.count;
-    expect(byKey.witness.some(([a]) => a === `${count} releases.`)).toBe(true);
+  // witness's release count is hand-maintained in profile.ts; the joke quotes it, so the two must not drift.
+  it("quotes witness's release count from profile.ts", () => {
+    expect(byKey.witness.some(([a]) => a === `${WITNESS_RELEASES} releases.`)).toBe(true);
   });
 
   // By code point: CJK symbols and kana through the unified ideographs, Hangul, the compatibility ideographs and
