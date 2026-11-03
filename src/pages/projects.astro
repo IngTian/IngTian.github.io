@@ -77,7 +77,8 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
   // THE ASK: every project surface on the page (gallery card, selected row, workshop card) is its repo link, or a
   // button for a private one, carrying data-ask. A plain primary click asks first — `projects:ask` on window, for
   // the pop-up — instead of leaving; a modified or middle click falls through and opens the repo, as a reader doing
-  // that expects. One listener here, so the rule cannot differ between the three.
+  // that expects. A button has no repo to fall through to, so a modified click on one asks too. One listener here,
+  // so the rule cannot differ between the three.
   import { askPoint } from '../lib/galleryLayout';
 
   let teardown: (() => void) | null = null;
@@ -89,7 +90,7 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
     if (!page) return;
     const onClick = (e: MouseEvent): void => {
       const from = (e.target as Element).closest<HTMLElement>('[data-ask]');
-      const at = from && askPoint(e, from.getBoundingClientRect());
+      const at = from && askPoint(e, from.getBoundingClientRect(), from.matches('a[href]'));
       if (!from || !at) return;
       e.preventDefault();
       window.dispatchEvent(new CustomEvent('projects:ask', { detail: { slug: from.dataset.ask!, ...at, from } }));

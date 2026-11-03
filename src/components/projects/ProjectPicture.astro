@@ -22,7 +22,11 @@ interface Props {
 const { slug, sizes, loading, priority = false } = Astro.props;
 const v = visualFor(slug);
 const WIDTHS = [400, 800, 1000];
-const fetchpriority = priority ? 'high' : undefined;
+// HIGH PRIORITY ONLY WHERE THE BUILD KNOWS WHICH PICTURE SHOWS. A capture with a light version renders two stills
+// and the theme hides one, and the theme is decided on the client — so `high` on both put a display:none image at
+// the front of the queue. Neither gets it: Chrome raises the shown one itself once layout puts it in the
+// viewport, and leaves the hidden one low.
+const fetchpriority = priority && !(v.kind === 'image' && v.light) ? 'high' : undefined;
 ---
 {v.kind === 'svg' ? (
   <span class="pic" set:html={v.svg} />

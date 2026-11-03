@@ -50,19 +50,30 @@ describe('readyAfter', () => {
 });
 
 describe('askPoint', () => {
-  const plain = { button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, clientX: 120, clientY: 340 };
+  const plain = { button: 0, detail: 1, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, clientX: 120, clientY: 340 };
   const box = { left: 100, top: 300, width: 200, height: 80 };
 
   it('asks at the pointer on a plain primary click', () => {
-    expect(askPoint(plain, box)).toEqual({ x: 120, y: 340 });
+    expect(askPoint(plain, box, true)).toEqual({ x: 120, y: 340 });
   });
 
-  it('lets a modified or non-primary click fall through to the link', () => {
-    for (const k of ['metaKey', 'ctrlKey', 'shiftKey', 'altKey'] as const) expect(askPoint({ ...plain, [k]: true }, box)).toBeNull();
-    expect(askPoint({ ...plain, button: 1 }, box)).toBeNull();
+  it('lets a modified or non-primary click on a link fall through to the link', () => {
+    for (const k of ['metaKey', 'ctrlKey', 'shiftKey', 'altKey'] as const) expect(askPoint({ ...plain, [k]: true }, box, true)).toBeNull();
+    expect(askPoint({ ...plain, button: 1 }, box, true)).toBeNull();
   });
 
-  it('asks at the element\'s centre for a keyboard activation, which has no pointer (0, 0)', () => {
-    expect(askPoint({ ...plain, clientX: 0, clientY: 0 }, box)).toEqual({ x: 200, y: 340 });
+  it('asks on a modified click when there is no link to fall through to (a private project\'s button)', () => {
+    for (const k of ['metaKey', 'ctrlKey', 'shiftKey', 'altKey'] as const) {
+      expect(askPoint({ ...plain, [k]: true }, box, false)).toEqual({ x: 120, y: 340 });
+    }
+  });
+
+  it('asks at the element\'s centre for a keyboard activation: a click count of 0, whatever coordinates it reports', () => {
+    expect(askPoint({ ...plain, detail: 0 }, box, true)).toEqual({ x: 200, y: 340 });
+    expect(askPoint({ ...plain, detail: 0, clientX: 0, clientY: 0 }, box, false)).toEqual({ x: 200, y: 340 });
+  });
+
+  it('keeps Chrome\'s (0, 0) as a second sign of a keyboard activation', () => {
+    expect(askPoint({ ...plain, clientX: 0, clientY: 0 }, box, true)).toEqual({ x: 200, y: 340 });
   });
 });

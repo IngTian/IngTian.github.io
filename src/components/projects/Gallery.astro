@@ -8,11 +8,19 @@
 // fanPose(). The visible pile it is dealt from is keyed on html.projects-boot, the page's booted state (no class:
 // already booted, the fan open), so a boot that sets the class before first paint has its pile on the first frame.
 //
+// A CARD IS TWO BOXES, and the split is what keeps a hover from flickering. The link (.shot) holds the pose and
+// never moves on hover; the face inside it (.shot-in) is what lifts. The lift raises a card's bottom edge 18-34px
+// above where it rested, so with one box a pointer resting in that strip un-hovered the card, which fell back
+// under the pointer and was hovered again — measured at 32 toggles in 50 samples. With two, the hover area is the
+// resting box AND the lifted face. It also means a deal stagger set on .shot cannot delay a lift, which the
+// mockup needed `transition-delay: 0s !important` on its hover rule for.
+//
 // LOADING IS DESIGNED: every picture is eager (the gallery is above the fold), the middle card's at high
-// priority, and a card whose picture has not decoded shows the palette tone with a transform-only shimmer, then
-// fades the picture in — or gives up waiting after READY_MS, so nothing shimmers forever. The computed svgs are
-// ready in the markup. manifold shows its still, then swaps to its MP4 once the fan is open: preloaded, so the
-// card never blanks, and never under reduced motion or on a phone, which keep the still.
+// priority where the build knows which picture shows (ProjectPicture), and a card whose picture has not arrived
+// when the script runs shows the palette tone with a transform-only shimmer, then fades the picture in — or gives
+// up waiting after READY_MS, so nothing shimmers forever. manifold shows its still, then swaps to its MP4 once the
+// fan is open: preloaded, so the card never blanks, paused while it is offscreen, and never under reduced motion
+// or on a phone, which keep the still.
 import { projects, repoUrl } from '../../data/profile';
 import { visualFor } from '../../data/projectVisuals';
 import { GALLERY_ORDER, fanPose } from '../../lib/galleryLayout';
@@ -27,7 +35,6 @@ const cards = GALLERY_ORDER.map((slug, i) => {
   const f = fanPose(i, GALLERY_ORDER.length);
   return {
     p, url, Tag: (url ? 'a' : 'button') as 'a' | 'button', i,
-    ready: v.kind === 'svg',
     motion: v.kind === 'image' ? v.motion : undefined,
     // --x is unitless: the CSS turns it into px through --fit, which narrows the fan to its column.
     style: `--x:${f.x};--z:${f.z}px;--ry:${f.ry}deg;--rz:${f.rz}deg;--zi:${f.zi};--pile:${f.pile}deg`,
@@ -36,11 +43,13 @@ const cards = GALLERY_ORDER.map((slug, i) => {
 ---
 <div class="gallery" data-gallery>
   <div class="fan">
-    {cards.map(({ p, url, Tag, i, ready, motion, style }) => (
-      <Tag class:list={['shot', { ready }]} href={url ?? undefined} type={url ? undefined : 'button'}
+    {cards.map(({ p, url, Tag, i, motion, style }) => (
+      <Tag class="shot" href={url ?? undefined} type={url ? undefined : 'button'}
            data-ask={p.slug} data-motion-dark={motion?.dark} data-motion-light={motion?.light} style={style}>
-        <span class="tag">{p.name}</span>
-        <ProjectPicture slug={p.slug} sizes="(max-width: 640px) 240px, 330px" loading="eager" priority={i === MIDDLE} />
+        <span class="shot-in">
+          <span class="tag">{p.name}</span>
+          <ProjectPicture slug={p.slug} sizes="(max-width: 640px) 240px, 330px" loading="eager" priority={i === MIDDLE} />
+        </span>
       </Tag>
     ))}
   </div>
@@ -58,15 +67,24 @@ const cards = GALLERY_ORDER.map((slug, i) => {
     --fit: min(1px, (100cqw - 330px) / 650); }
   .fan { position: absolute; left: 50%; top: 40px; width: 0; height: 0; }
 
+  /* The link: the pose, the stacking order and the hit area, painting nothing itself. preserve-3d so the face's
+     lift composes with the pose in 3D, which is why nothing here may flatten it — no opacity, overflow or filter;
+     the dim and the clip are the face's. */
   .shot {
-    position: absolute; left: -165px; display: block; width: 330px; height: 220px; padding: 0; overflow: hidden;
-    border-radius: 10px; border: 1px solid rgba(var(--draft-line-rgb), 0.26); color: var(--ink-1); font: inherit;
-    background: rgba(var(--draft-line-rgb), 0.05); box-shadow: 0 30px 60px var(--draft-shadow); cursor: pointer;
-    text-shadow: none;
+    position: absolute; left: -165px; display: block; width: 330px; height: 220px; padding: 0; border: 0;
+    background: none; color: var(--ink-1); font: inherit; cursor: pointer; text-shadow: none;
     /* THE Z-ORDER IS A CUSTOM PROPERTY, NEVER AN INLINE z-index: an inline one beats the hover rule below, so a
        lifted card stayed behind its neighbour — the bug the owner found in the mockup. */
     z-index: var(--zi, 1);
     transform: translateX(calc(var(--x) * var(--fit))) translateZ(var(--z)) rotateY(var(--ry)) rotateZ(var(--rz));
+    transform-style: preserve-3d;
+    transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  /* The face: everything you see, and the part that lifts. */
+  .shot-in {
+    position: relative; display: block; width: 100%; height: 100%; overflow: hidden; border-radius: 10px;
+    border: 1px solid rgba(var(--draft-line-rgb), 0.26); background: rgba(var(--draft-line-rgb), 0.05);
+    box-shadow: 0 30px 60px var(--draft-shadow);
     transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s;
   }
   /* The visible pile the boot deals from: every card at the centre, slightly turned, already painted. */
@@ -75,25 +93,27 @@ const cards = GALLERY_ORDER.map((slug, i) => {
   .tag {
     position: absolute; left: 10px; bottom: 10px; z-index: 2; padding: 4px 7px; border-radius: 3px;
     font: 10.5px var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase;
-    background: var(--draft-tag); color: var(--ink-1);
+    background: var(--draft-tag); color: var(--ink-1); transition: opacity 0.4s;
   }
 
-  /* THE LOADING STATE, only where a script will end it (no JS: the picture simply shows). The tone is the card's
-     own background; the shimmer is a transform-only sweep over it, and only with motion allowed. */
-  @media (scripting: enabled) {
-    .shot::after {
-      content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-      background: linear-gradient(100deg, transparent 30%, rgba(var(--draft-line-rgb), 0.07) 50%, transparent 70%);
-      transform: translateX(-100%);
-    }
-    .shot.ready::after { opacity: 0; }
-    .shot :global(img) { opacity: 0; }
-    .shot.ready :global(img) { opacity: 1; }
+  /* THE LOADING STATE IS THE SCRIPT'S TO SET, never the markup's default. A card whose picture has not arrived when
+     the script runs is marked .wait — the tone is the face's own background, the shimmer a transform-only sweep
+     over it (only with motion allowed), the picture held back — and the mark comes off when the picture loads or
+     READY_MS passes. A picture that arrives first is never hidden, so its first paint waits on no script (LCP);
+     and a script that never runs hides nothing, so nothing can shimmer forever. */
+  .shot-in::after {
+    content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0;
+    background: linear-gradient(100deg, transparent 30%, rgba(var(--draft-line-rgb), 0.07) 50%, transparent 70%);
+    transform: translateX(-100%);
   }
-  @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
-    .shot::after { transition: opacity 0.35s; }
-    .shot:not(.ready)::after { animation: shot-shimmer 1.3s linear infinite; }
+  .shot.wait .shot-in::after { opacity: 1; }
+  .shot.wait :global(img) { opacity: 0; }
+  @media (prefers-reduced-motion: no-preference) {
+    .shot-in::after { transition: opacity 0.35s; }
+    .shot.wait .shot-in::after { animation: shot-shimmer 1.3s linear infinite; }
+    /* Only the arrival fades: a picture is held back at once, and fades in when it lands. */
     .shot :global(img) { transition: opacity 0.35s ease-out; }
+    .shot.wait :global(img) { transition: none; }
     @keyframes shot-shimmer { to { transform: translateX(100%); } }
   }
 
@@ -107,23 +127,33 @@ const cards = GALLERY_ORDER.map((slug, i) => {
   /* Lifted: straightened, brought forward and to the top, ringed, the rest dimmed — by a pointer, or by keyboard
      focus (a focused card can otherwise sit mostly behind its neighbours). Hover only where hover is real, so a
      tap on a touch screen never leaves a card stuck up; and never in the phone strip, whose cards stay flat.
-     Not while the boot's pile is showing. */
+     Not while the boot's pile is showing.
+     The face's lift is the pose undone, then the mockup's lift: under a link at translateX(x) translateZ(z)
+     rotateY(ry) rotateZ(rz) it lands on exactly the mockup's translateX(x) translateY(-34px) translateZ(140px)
+     scale(1.08).
+     A DIMMED CARD'S LABEL GOES RATHER THAN DIMS: at 0.26 the tag's ink-1 on its ground measures ~1.8:1 (light) and
+     ~2.0:1 (dark), under the 4.5:1 every word on this page keeps. */
   @media not all and (max-width: 640px) {
     @media (hover: hover) {
-      :global(html:not(.projects-boot)) .fan:hover .shot { opacity: 0.26; }
-      :global(html:not(.projects-boot)) .fan .shot:hover {
-        opacity: 1; z-index: 40; border-color: rgba(var(--draft-hi-rgb), 0.9);
+      :global(html:not(.projects-boot)) .fan:hover .shot:not(:hover, :focus-visible) .shot-in { opacity: 0.26; }
+      :global(html:not(.projects-boot)) .fan:hover .shot:not(:hover, :focus-visible) .tag { opacity: 0; }
+      :global(html:not(.projects-boot)) .shot:hover { z-index: 40; }
+      :global(html:not(.projects-boot)) .shot:hover .shot-in {
+        border-color: rgba(var(--draft-hi-rgb), 0.9);
         box-shadow: 0 0 0 1px rgba(var(--draft-hi-rgb), 0.55), 0 0 34px rgba(var(--draft-hi-rgb), 0.22), 0 44px 90px var(--draft-shadow);
-        transform: translateX(calc(var(--x) * var(--fit))) translateY(-34px) translateZ(140px) rotateY(0deg) rotateZ(0deg) scale(1.08);
+        transform: rotateZ(calc(-1 * var(--rz))) rotateY(calc(-1 * var(--ry))) translateY(-34px) translateZ(calc(140px - var(--z))) scale(1.08);
       }
     }
-    :global(html:not(.projects-boot)) .fan .shot:focus-visible {
-      opacity: 1; z-index: 40; border-color: rgba(var(--draft-hi-rgb), 0.9);
-      transform: translateX(calc(var(--x) * var(--fit))) translateY(-34px) translateZ(140px) rotateY(0deg) rotateZ(0deg) scale(1.08);
+    :global(html:not(.projects-boot)) .shot:focus-visible { z-index: 40; }
+    :global(html:not(.projects-boot)) .shot:focus-visible .shot-in {
+      border-color: rgba(var(--draft-hi-rgb), 0.9);
+      transform: rotateZ(calc(-1 * var(--rz))) rotateY(calc(-1 * var(--ry))) translateY(-34px) translateZ(calc(140px - var(--z))) scale(1.08);
     }
   }
-  .shot:focus-visible { outline: 2px solid var(--ochre); outline-offset: 3px; }
-  @media (prefers-reduced-motion: reduce) { .shot { transition: none; } }
+  /* The focus ring is drawn on the face, so it rides the lift rather than marking where the card rested. */
+  .shot:focus-visible { outline: none; }
+  .shot:focus-visible .shot-in { outline: 2px solid var(--ochre); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { .shot, .shot-in, .tag { transition: none; } }
 
   .g-cap { margin: 0; font: 11px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; text-align: center; color: var(--ink-3); }
 
@@ -134,8 +164,8 @@ const cards = GALLERY_ORDER.map((slug, i) => {
     .gallery { height: auto; margin: 44px -6vw 14px; padding: 10px 6vw 30px; perspective: none; overflow-x: auto;
       overscroll-behavior-x: contain; }
     .fan { position: static; display: flex; gap: 14px; width: max-content; height: auto; }
-    .shot, :global(html.projects-boot) .shot { position: relative; left: 0; flex: none; width: 240px; height: 160px; transform: none;
-      box-shadow: 0 10px 20px var(--draft-shadow); }
+    .shot, :global(html.projects-boot) .shot { position: relative; left: 0; flex: none; width: 240px; height: 160px; transform: none; }
+    .shot-in { box-shadow: 0 10px 20px var(--draft-shadow); }
   }
 </style>
 
@@ -161,12 +191,12 @@ const cards = GALLERY_ORDER.map((slug, i) => {
     const timers: number[] = [];
     const t0 = performance.now();
 
-    // A card is ready once the picture it is SHOWING (the theme decides which) has loaded — or READY_MS on.
+    // A card waits while the picture it is SHOWING (the theme decides which) has not loaded — until READY_MS.
     const shown = (s: HTMLElement): HTMLImageElement | undefined =>
       [...s.querySelectorAll('img')].find((img) => getComputedStyle(img).display !== 'none');
     function check(s: HTMLElement): void {
       const img = shown(s);
-      if (img) s.classList.toggle('ready', readyAfter(img.complete && img.naturalWidth > 0, performance.now() - t0));
+      if (img) s.classList.toggle('wait', !readyAfter(img.complete && img.naturalWidth > 0, performance.now() - t0));
     }
     // load and error do not bubble, so they are caught on the way down.
     const onSettle = (e: Event): void => {
@@ -177,6 +207,17 @@ const cards = GALLERY_ORDER.map((slug, i) => {
     const motionShot = shots.find((s) => s.dataset.motionDark);
     const animate = !prefersReducedMotion() && !isPhone();
     let video: HTMLVideoElement | null = null;
+    // A looping video decodes for as long as it plays, so it plays only while its card is on screen. The observer
+    // reports once as soon as it observes, long before the swap at MOTION_AFTER_MS reads this.
+    let onScreen = false;
+    const run = (v: HTMLVideoElement): void => {
+      if (onScreen) v.play().catch(() => { /* autoplay refused: the still stays, which is a finished state */ });
+      else v.pause();   // also clears the autoplay flag, so an offscreen card does not start itself
+    };
+    const io = new IntersectionObserver(([en]) => {
+      onScreen = en.isIntersecting;
+      if (video) run(video);
+    });
     function stopVideo(): void {
       if (!video) return;
       video.pause();
@@ -188,7 +229,9 @@ const cards = GALLERY_ORDER.map((slug, i) => {
     }
     // The motion for the current theme, preloaded under the still and shown only once it plays.
     function play(): void {
-      if (!motionShot) return;
+      // isConnected: a reader who leaves within MOTION_AFTER_MS leaves this timer behind until the next page's
+      // init clears it, and it must not start a download into a page that has gone.
+      if (!motionShot?.isConnected) return;
       const s = motionShot;
       const dark = s.dataset.motionDark!;
       const src = root.dataset.theme === 'dark' ? dark : (s.dataset.motionLight ?? dark);
@@ -205,9 +248,9 @@ const cards = GALLERY_ORDER.map((slug, i) => {
       v.poster = shown(s)?.currentSrc ?? '';
       v.addEventListener('playing', () => s.classList.add('moving'), { once: true });
       v.src = src;
-      s.append(v);
+      s.querySelector('.shot-in')!.append(v);
       video = v;
-      v.play().catch(() => { /* autoplay refused: the still stays, which is a finished state */ });
+      run(v);
     }
     const startMotion = (): void => { timers.push(window.setTimeout(play, MOTION_AFTER_MS)); };
 
@@ -223,6 +266,7 @@ const cards = GALLERY_ORDER.map((slug, i) => {
     timers.push(window.setTimeout(() => shots.forEach(check), READY_MS));
     // "Booted" is a state: without html.projects-boot the fan is already open.
     if (motionShot && animate) {
+      io.observe(motionShot);
       if (root.classList.contains('projects-boot')) window.addEventListener('projects:booted', startMotion, { once: true });
       else startMotion();
     }
@@ -233,6 +277,7 @@ const cards = GALLERY_ORDER.map((slug, i) => {
       gallery.removeEventListener('error', onSettle, true);
       document.removeEventListener('theme:change', onTheme);
       window.removeEventListener('projects:booted', startMotion);
+      io.disconnect();
       stopVideo();
     };
   }

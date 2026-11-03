@@ -55,8 +55,8 @@ const cards = projects.filter((p) => p.tier === 'workshop').map((p) => {
     list-style: none; margin: 26px 0 0; padding: 0; display: grid; gap: 18px;
     grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   }
-  /* The 1px padding is the border: the spotlight under it shows through as a ring. The card has its own opaque
-     ground, so it drops the page's label knockout. */
+  /* The 1px padding is the border: the spotlight under it shows through as a ring. A card has its own opaque
+     ground (.card-in), so it drops the page's label knockout — all but the dashed one, below, which has none. */
   .card {
     position: relative; display: block; width: 100%; height: 100%; padding: 1px; overflow: hidden;
     border-radius: 12px; background: rgba(var(--draft-line-rgb), 0.13); color: var(--ink-1);
@@ -93,7 +93,11 @@ const cards = projects.filter((p) => p.tier === 'workshop').map((p) => {
   .cmd { display: block; margin-top: 14px; padding: 7px 9px; border-radius: 4px; background: rgba(var(--draft-line-rgb), 0.06);
     font: 11.5px var(--font-mono); color: var(--ochre); overflow-wrap: anywhere; }
 
-  .card.ghost { background: transparent; border: 1px dashed rgba(var(--draft-line-rgb), 0.3); }
+  /* THE DASHED CARD IS TRANSPARENT, so its words sit straight on the drafting field and need the page's knockout
+     back: without it a stroke under a glyph takes light ink-3 to 4.10:1 (minor line), 3.03 (major) and 1.34 (a lit
+     ping) — projects.astro's numbers. `inherit`, not merely no `none`: it is a <button>, and the UA stylesheet gives
+     buttons `text-shadow: none` of their own. */
+  .card.ghost { background: transparent; border: 1px dashed rgba(var(--draft-line-rgb), 0.3); text-shadow: inherit; }
   .ghost .card-in { display: flex; flex-direction: column; justify-content: center; min-height: 300px; padding: 26px; background: transparent; }
   .ghost .nm { font-size: 15px; }
   .wip { display: block; margin-top: 14px; }

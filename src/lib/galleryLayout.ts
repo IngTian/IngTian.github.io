@@ -35,17 +35,23 @@ export function readyAfter(loaded: boolean, elapsedMs: number): boolean {
   return loaded || elapsedMs >= READY_MS;
 }
 
-interface ClickLike { button: number; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean; clientX: number; clientY: number }
+interface ClickLike {
+  button: number; detail: number; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean; altKey: boolean; clientX: number; clientY: number;
+}
 interface BoxLike { left: number; top: number; width: number; height: number }
 
 /**
  * Where a click on a project asks "open on GitHub?", or null when it should fall through to the link: a modifier
- * or a non-primary button (cmd/ctrl/middle-click) opens the repo directly, as a reader doing that expects. A
- * keyboard activation (Enter, or Space on a button) reports no pointer — (0, 0) — so it asks at the element's
- * centre instead. MouseEvent and DOMRect satisfy the two shapes as they are.
+ * or a non-primary button (cmd/ctrl/middle-click) opens the repo directly, as a reader doing that expects. `link`
+ * is whether there IS a link to fall through to — a private project's button has none, so a modified click on it
+ * asks like a plain one rather than doing nothing at all.
+ * A keyboard activation (Enter, or Space on a button) has no pointer, so it asks at the element's centre. It is
+ * known by its click count, `detail`, which is 0 for a click no pointer made; Chrome also reports (0, 0), which is
+ * kept as a second sign. Only Chrome has been driven, so the count is the one that does not assume an engine's
+ * coordinates. MouseEvent and DOMRect satisfy the two shapes as they are.
  */
-export function askPoint(e: ClickLike, box: BoxLike): { x: number; y: number } | null {
-  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return null;
-  if (e.clientX === 0 && e.clientY === 0) return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+export function askPoint(e: ClickLike, box: BoxLike, link: boolean): { x: number; y: number } | null {
+  if (e.button !== 0 || (link && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey))) return null;
+  if (e.detail === 0 || (e.clientX === 0 && e.clientY === 0)) return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
   return { x: e.clientX, y: e.clientY };
 }
