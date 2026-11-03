@@ -216,7 +216,7 @@ const bootDecider = `(function () {
   // so the rule cannot differ between the three.
   import { PROJECT_COW_LINES } from '../data/cowLines';
   import type { SpokenLine } from '../lib/cowSpeech';
-  import { BUBBLE_MS, HELLO_DELAY_MS, IDLE_EVERY_MS, TYPE_MS, mayIdle, nextLine } from '../lib/cowTalk';
+  import { BUBBLE_MS, HELLO_DELAY_MS, IDLE_EVERY_MS, TYPE_MS, idleLines, mayIdle, nextLine } from '../lib/cowTalk';
   import { askPoint } from '../lib/galleryLayout';
   import { prefersReducedMotion } from '../lib/motion';
   import { onPageView } from '../lib/pageView';
@@ -269,8 +269,9 @@ const bootDecider = `(function () {
   // once per page view, HELLO_DELAY_MS after the page is booted — "booted" is a state: no html.projects-boot means
   // booted already, otherwise wait for `projects:booted`. It says a project's line on `cow:say` (the ask and the
   // listing send one), its next idle line when pressed, and now and then one on its own, gated by mayIdle() and
-  // never while the tab is hidden. Only `announce` lines reach the live region: a reader asked for those, and the
-  // greeting and idle chatter would interrupt a screen reader every 10-20s.
+  // never while the tab is hidden — at most idleLines() of them per page view, then it stops scheduling them and
+  // waits to be asked (WCAG 2.2.2; none at all under reduced motion). Only `announce` lines reach the live region: a
+  // reader asked for those, and the greeting and idle chatter would interrupt a screen reader every 10-20s.
   // ON A PHONE IT SAYS ONLY WHAT IT IS ASKED (Task D, D8): no greeting and no idle lines, so the idle timer is never
   // set. In a phone's one column a bubble the reader did not ask for is a box over what they are reading.
   // STARTED AT PARSE, like the dispatcher above that sends it `cow:say`: started at window `load` it missed every ask
@@ -353,10 +354,15 @@ const bootDecider = `(function () {
     }
 
     const greet = (): void => { helloT = window.setTimeout(() => say('hello', false), HELLO_DELAY_MS); };
+    let idleLeft = idleLines(phone, reduce);
     const idle = (): void => {
+      if (idleLeft <= 0) return;
       const [lo, hi] = IDLE_EVERY_MS;
       idleT = window.setTimeout(() => {
-        if (!document.hidden && mayIdle(performance.now(), lastSpoke, root.classList.contains('projects-boot'))) say('idle', false);
+        if (!document.hidden && mayIdle(performance.now(), lastSpoke, root.classList.contains('projects-boot'))) {
+          say('idle', false);
+          idleLeft -= 1;
+        }
         idle();
       }, lo + Math.random() * (hi - lo));
     };
@@ -369,8 +375,8 @@ const bootDecider = `(function () {
     if (!phone) {
       if (root.classList.contains('projects-boot')) window.addEventListener('projects:booted', greet, { once: true });
       else greet();
-      idle();
     }
+    idle();
     window.addEventListener('cow:say', onSay);
     btn.addEventListener('click', onPress);
 

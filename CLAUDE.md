@@ -1241,7 +1241,16 @@ titles came to rest hard against the browser chrome — the lead is a number in
     for the first five seconds after the fan opens, then rests on the frame it reached and
     plays again while its card is hovered or keyboard-focused (`videoPlays()` in
     `lib/galleryLayout.ts`). Both used to run forever beside what a reader is reading.
-    `tests/motionLimit.test.ts` reads the cursor's CSS literals against the limit. **The
+    `tests/motionLimit.test.ts` reads the cursor's CSS literals against the limit.
+    **So did the cow, and this rule claimed the page met it while the cow did not.** Its idle
+    chatter popped a bubble, typed and hopped beside the listing every 14-30s for as long as
+    the page was open, under reduced motion too (minus the typing and the hop), and pressing
+    it only said more: the auto-advancing carousel 2.2.2 is written for. Now it says the
+    greeting and at most `idleLines()` (`lib/cowTalk.ts`: two, none on a phone or under
+    reduced motion) unprompted lines per page view, then stops scheduling them; the rest of
+    the idle set is a press away. `tests/cowTalk.test.ts` adds up what it does unasked from
+    PlushCow's transition and hop literals and `TYPE_MS`, ~3.4s, and holds it under the
+    limit. **The
     backgrounds are not held to it yet**: the hero terrain, the fluid sky and the drafting
     field drift for as long as they are on screen. That is the site's older pattern and a
     known gap against 2.2.2, not a precedent for new motion in the reading area.

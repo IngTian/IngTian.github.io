@@ -21,7 +21,9 @@ export function prefersReducedMotion(): boolean {
 
 /**
  * WCAG 2.2.2's five seconds: motion that starts on its own and runs longer needs a way to stop it. /projects' idle
- * cursor and manifold's video stop on their own inside it instead (tests/motionLimit.test.ts). Not yet the
+ * cursor and manifold's video stop on their own inside it instead (tests/motionLimit.test.ts), and so does its cow:
+ * the greeting and lib/cowTalk.ts' idleLines() unprompted lines, ~3.4s of movement in all, then it speaks only when
+ * asked (tests/cowTalk.test.ts). It used to chatter every 14-30s for as long as the page was open. Not yet the
  * backgrounds: the hero terrain, the fluid sky and the drafting field drift for as long as they are on screen,
  * the site's older pattern, and are not held to this.
  */

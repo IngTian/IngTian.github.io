@@ -21,3 +21,12 @@ export function nextLine(lines: readonly SpokenLine[], said: number): { line: Sp
 export function mayIdle(nowMs: number, lastSpokeMs: number, booting: boolean): boolean {
   return !booting && nowMs - lastSpokeMs >= 14000;
 }
+
+/** HOW MANY LINES IT SAYS UNPROMPTED IN ONE PAGE VIEW, and then it stops scheduling them. WCAG 2.2.2 (lib/motion.ts'
+ *  MOTION_LIMIT_MS): a bubble that popped up, typed and hopped beside the listing every 14-30s, forever, was an
+ *  auto-advancing thing with no way to stop it. Two keep the owner's "now and then", and with the greeting they add
+ *  up to ~3.4s of movement (tests/cowTalk.test.ts adds it up); the rest of the idle set is a press away. None on a phone
+ *  (it says only what it is asked, Task D) and none under reduced motion, where they were a box swapping its text. */
+export function idleLines(phone: boolean, reduce: boolean): number {
+  return phone || reduce ? 0 : 2;
+}

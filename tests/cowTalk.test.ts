@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PROJECT_COW_LINES } from '../src/data/cowLines';
 import { projects } from '../src/data/profile';
-import { mayIdle, nextLine } from '../src/lib/cowTalk';
+import { TYPE_MS, idleLines, mayIdle, nextLine } from '../src/lib/cowTalk';
+import { MOTION_LIMIT_MS } from '../src/lib/motion';
 
 const { hello, idle, byKey } = PROJECT_COW_LINES;
 const ALL = [...hello, ...idle, ...Object.values(byKey).flat()];
@@ -31,6 +32,37 @@ describe('mayIdle', () => {
 
   it('never speaks during the boot', () => {
     expect(mayIdle(99999, 0, true)).toBe(false);
+  });
+});
+
+// IT STOPS ON ITS OWN (Task E, fix round 1; WCAG 2.2.2, lib/motion.ts). Unbounded, the idle chatter popped a bubble,
+// typed and hopped beside the listing every 14-30s for as long as the page was open, and pressing the cow only said
+// more. Now everything it does unasked — the greeting plus idleLines() idle lines — must add up to less movement than
+// MOTION_LIMIT_MS, the way motionLimit.test.ts holds the cursor's blinks. A line's pop, hop and typing start together;
+// its fade comes after BUBBLE_MS of stillness. The pop/fade and the hop are read from PlushCow.astro's stylesheet.
+describe('idleLines', () => {
+  const page = readFileSync(new URL('../src/pages/projects.astro', import.meta.url), 'utf8');
+  const cow = readFileSync(new URL('../src/components/PlushCow.astro', import.meta.url), 'utf8');
+
+  it('says none unprompted on a phone or under reduced motion, and the page asks with both', () => {
+    expect([idleLines(true, false), idleLines(false, true), idleLines(true, true)]).toEqual([0, 0, 0]);
+    expect(page).toMatch(/let idleLeft = idleLines\(phone, reduce\);/);
+    expect(page).toMatch(/if \(idleLeft <= 0\) return;/);
+  });
+
+  it('adds up to under the limit: a counted number of lines, then quiet', () => {
+    const hop = /\.cow\.is-hop \.cow-art \{ animation: cow-hop ([\d.]+)s/.exec(cow);
+    const bubble = /\.cow-wrap--talk \.cow-bubble \{[^}]*?transition: opacity ([\d.]+)s, transform ([\d.]+)s/.exec(cow);
+    expect(hop, "PlushCow's `cow-hop` animation").not.toBeNull();
+    expect(bubble, "the talking bubble's transition").not.toBeNull();
+    const ease = Math.max(Number(bubble![1]), Number(bubble![2])) * 1000;
+    const moves = (pair: readonly string[]): number =>
+      Math.max(pair.join('').length * TYPE_MS, Number(hop![1]) * 1000, ease) + ease;
+    const n = idleLines(false, false);
+    expect(Number.isInteger(n), `${n} idle lines`).toBe(true);
+    expect(n).toBeGreaterThan(0);   // the owner's "now and then": bounded, not deleted
+    const total = Math.max(...hello.map(moves)) + n * Math.max(...idle.map(moves));
+    expect(total).toBeLessThanOrEqual(MOTION_LIMIT_MS);
   });
 });
 
