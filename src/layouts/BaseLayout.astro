@@ -12,17 +12,11 @@ interface Props {
   veilLine?: string;
   /** Play the veil on a FRESH load of this page? (Transitions always play it.) */
   veilOnLoad?: boolean;
-  /**
-   * Render the veil at all? `false` emits no `[data-veil]` element, so neither the fresh-load script nor the
-   * after-swap listener finds one to play. For a page whose own entrance replaces it — /projects' boot: two
-   * entrances back to back would put readable text seconds further away.
-   */
+  /** Render the veil? `false` emits no `[data-veil]`, so nothing plays it — for a page whose own entrance
+   *  replaces it (/projects' boot). */
   veil?: boolean;
-  /**
-   * A page with a register of its own: sets `data-page` on <html>, and tokens.css scopes that page's palette
-   * from it by overriding the role tokens, so the shared components reskin there with no edit. ClientRouter
-   * copies <html>'s attributes from the incoming page, so the attribute leaves with the page.
-   */
+  /** Sets `data-page` on <html>; tokens.css re-skins the role tokens from it. ClientRouter copies <html>'s
+   *  attributes, so it leaves with the page. */
   page?: 'drafting';
   /**
    * How the corner nav picks its (light-theme) text color:
@@ -53,12 +47,8 @@ interface Props {
    */
   preloadAccent?: boolean | 'italic';
   /**
-   * Preload JetBrains Mono: for a page whose first screen is SET in it (/projects' terminal header, whose listing is
-   * its mobile LCP element). Undiscovered until the stylesheets have parsed, the file is fetched at the HIGHEST
-   * priority, which Lighthouse's simulation counts as render-blocking: on /projects it was the last request to land
-   * in the FCP estimate (31,660 B, simulated 1,654ms optimistic / 1,804 pessimistic), and preloaded it is fetched
-   * with the document at high priority instead — mobile FCP 1,732 -> 1,435ms for identical bytes. Fraunces' rule,
-   * below, from the other side: a page that uses a face fetches it either way, so announce it early.
+   * Preload JetBrains Mono for a page whose first screen is set in it (/projects: the listing is its mobile LCP).
+   * Discovered late, Lighthouse counts it render-blocking; preloaded, mobile FCP 1,732 -> 1,435ms for identical bytes.
    */
   preloadMono?: boolean;
 }
@@ -224,13 +214,8 @@ const personLd = {
         opts in via veilOnLoad. Each page carries its own line. transform/opacity
         only; gated behind prefers-reduced-motion (finished state = uncovered page).
 
-        FIVE OF THE NINE ROUTES OPT IN: /art, /experience, /research, /writing
-        and /writing/<slug>. /, /404 and /proto-sketches render the veil but do
-        not play it on load. /projects is the one route with NO veil at all
-        (`veil={false}`): its boot is its entrance, on load and on navigation in,
-        and a veil wiping off first would put its text ~4.4s away. This paragraph
-        used to say "the gallery", then "six routes" — each written when it was
-        true and not updated when the set changed.
+        Pages opt in on a fresh load with veilOnLoad (`grep veilOnLoad src/pages`);
+        /projects renders none (veil={false}): its boot is its entrance.
 
         `/` DOES NOT USE THE VEIL, and now has its own treatment instead: on a
         first open the hero's terrain surveys itself as a contour map and rises out

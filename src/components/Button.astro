@@ -42,7 +42,7 @@ const Tag = href ? 'a' : 'button';
      After the anatomy, so its :active wins at equal specificity.
      THE PLATE MOVES BY TRANSFORM, NOT BY BOX-SHADOW. The mockup drew the offset as a second box-shadow and
      transitioned it (4px at rest, 6px lifted, 1px pressed), which repaints the shadow on every frame of every hover
-     and press — against the site's transform/opacity-only motion rule (Task D, D6). So the offset is ::after, the
+     and press — against the site's transform/opacity-only motion rule. So the offset is ::after, the
      button's own shape in the accent, and only its transform moves. The FACE has to be a layer too: the tilt makes
      the button a stacking context, and a z-index: -1 child of a stacking context paints ABOVE that element's own
      background, so a plate behind a background-drawn face would cover it. ::before is the face and carries the ink

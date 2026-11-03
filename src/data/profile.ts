@@ -68,11 +68,8 @@ export interface Project {
   idea: string;            // the one-line idea — rows, cards, pop-up, homepage appendix
   short: string;           // the ls listing's description (≤ 44 chars), set in mono — no → or ↗, which its latin subset lacks
   proof: string[];         // chips; proof[0] is the highlighted one
-  // The README's own line, verbatim and runnable — never abbreviated. manifold's holds a 74-char URL with no
-  // break opportunity (~510px of 11.5px mono in a ~240px card), so a renderer must wrap it
-  // (`overflow-wrap: anywhere`); the card clips its overflow, so an unwrapped line is cut off silently.
-  // A `prompt` line is the exception: words for an agent rather than a command, shown without a leading "$ ", and
-  // it may be an EXCERPT — verbatim up to where it stops, then "…", so it never reads as the whole prompt.
+  // The README's line verbatim, never abbreviated (WorkshopCards wraps it). `prompt`: words for an agent, no '$ ',
+  // may be an excerpt ending in '…'.
   install?: { text: string; prompt?: boolean };
   visibility: 'public' | 'private';
   registry?: 'pypi' | 'npm';

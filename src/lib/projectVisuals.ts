@@ -5,20 +5,11 @@
 // drawing re-themes with the page (the drafting palette in tokens.css) and is never CSS-inverted.
 //
 // Rules the drawings keep, each pinned by tests/projectVisuals.test.ts:
-// - every number printed comes from the vendored data — rl-bhrp's wealth is the reproduction's, never the
-//   paper's Table 2 in profile.ts (mixing the two would be a drift bug that reads as a claim);
-// - words are set in --ink-1 or --ink-3 on --draft-ph, the pair the palette test holds to AA in both themes,
-//   and only in characters the site's mono subset can draw;
-// - the default `meet` framing, never `slice`: the whole 350x220 drawing is always in view, scaled to fit, and
-//   the svg's own CSS background (--draft-ph) fills whatever the container has to spare. The containers are not
-//   one shape. The gallery's 330x220 and 240x160 cards and the row preview's 360x230 sit near this 1.59:1, but a
-//   workshop card's thumb is 170px tall at any width from 300px — about 1.75:1 to 3.6:1 — and `slice` there cut
-//   macboot's title and its last sections off (a 451x170 thumb, 2.65:1, lost 44 units top and bottom);
-// - the gallery's three (rl-bhrp, offchart, witness) draw nothing below FLOOR, because the bottom-left of a
-//   gallery card is its name tag. macboot is a workshop card only, with no tag, and keeps the full height;
-// - each is an image with a name: role="img" and an aria-label built from the same values it prints, so its
-//   figures reach a screen reader wherever the string is dropped. A copy that only repeats one (a hover
-//   preview) is hidden by its wrapper, not here.
+// - numbers come only from the vendored data, never profile.ts's Table 2;
+// - text is --ink-1/--ink-3 on --draft-ph, in the mono subset;
+// - `meet`, never `slice` (workshop thumbs run 1.75:1 to 3.6:1);
+// - the gallery's three draw nothing below FLOOR;
+// - each svg is role=img with an aria-label built from its printed values.
 // Pure: returns markup, touches no DOM.
 import type { macbootSections } from '../data/vendor/macbootSections';
 import type { offchartPositioning } from '../data/vendor/offchartPositioning';

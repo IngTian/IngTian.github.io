@@ -4,8 +4,8 @@
 // Renders one level per level of the Stop tree (up to three), so the rail's depth
 // follows the data rather than being hardcoded per page.
 //
-// Not a React island (the site's one island is the terminal). Vanilla <script>,
-// re-inits on astro:page-load with teardown so it survives View Transitions.
+// Not an island (the site has none). Vanilla <script>, re-inits on
+// astro:page-load with teardown so it survives View Transitions.
 //
 // Scope note: the site has two OTHER rails — Toc.astro (post-hero fade-in) and the
 // /art rail (coupled to gallery formation). Both carry behavior this component

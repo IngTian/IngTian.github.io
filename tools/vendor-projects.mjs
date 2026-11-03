@@ -231,11 +231,8 @@ function macboot() {
 
 // ── the binaries: captures and manifold's motion ─────────────────────────────────────────────────────────────
 
-/** The recordings are converted whole, the motto under the clock included: a user setting that both recordings set
- *  to two CJK characters. It used to be painted out here with ffmpeg's delogo, on the reading that the site renders no
- *  CJK. The controller's call (Task D, D3) is that the rule governs the site's TEXT, not pictures of the owner's own
- *  work — the calligraphy on /art is the same category — so the frames are vendored as recorded. The DRAWABLE guard
- *  above still holds every vendored string. The filter only makes the frame even, which yuv420p requires. */
+/** Frames vendored whole, the CJK motto under the clock included: the no-CJK rule governs the site's text, not
+ *  pictures of the owner's work (CLAUDE.md, The concept). The filter only evens the frame, which yuv420p requires. */
 const VIDEO_FILTER = 'scale=trunc(iw/2)*2:trunc(ih/2)*2';
 
 function binaries() {
@@ -279,7 +276,6 @@ function binaries() {
     `command: ${COMMAND}`,
     'The MP4s are the GIFs converted with: ffmpeg -i in.gif -movflags +faststart -pix_fmt yuv420p '
       + `-vf "${VIDEO_FILTER}" out.mp4`,
-    '(Whole frames: the motto under the clock is kept as recorded, a picture of the work; see VIDEO_FILTER.)',
     'Each manifold PNG is its MP4\'s first frame: ffmpeg -i out.mp4 -frames:v 1 out.png',
     '',
     ...sources,

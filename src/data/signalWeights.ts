@@ -36,34 +36,15 @@
 // both 2), and each project's RECORD text from profile.ts — NOT its README. One item per project: its
 // visibility, its `idea` in quotes, then its `proof` chips joined by "; ". macboot's item opened "PRIVATE
 // repo, no public link", which is the scoring prompt's wording for `visibility: 'private'`, not record text.
-// Record text is the instrument on purpose (an early plan draft said READMEs and was corrected): it is what
-// the first pass scored for all twenty items, the item a reader of this site sees under RUBRIC_PROMPT's
-// "score only what the text says", and the only text the quote guard below can check offline.
+// Record text is the instrument on purpose: it is what the first pass scored for all twenty items, the item a
+// reader of this site sees under RUBRIC_PROMPT's "score only what the text says", and the only text the quote guard
+// below can check offline.
 //
-// Three raters, run concurrently; each read only the rubric and this file, and none saw another's output.
-// Unlike the first pass they had no assigned stances — all three got the same prompt. Their scores:
-//              rl-bhrp  offchart  trading-desk  daylogs  macboot
-//   rater 1       4        3           2           2        1
-//   rater 2       4        3           2           2        1
-//   rater 3       4        3           2           2        1
-// 5 items · 5 exact agreement · 0 disputes, so each committed MEDIAN is unanimous, and each `because` is
-// rater 2's sentence verbatim (all three tied, so the middle rater) — with THREE later edits. trading-desk's
-// chip was scored as "~270 tests" and then corrected to "~300 tests" (323 collected, 299 run without a
-// book), and its quote follows the chip. It was not re-scored: all three raters read the count only as
-// "public and checkable" and capped the item as ledger software rather than modelling (two called it
-// bookkeeping, one accounting), so the count did not set the 2.
-// And rl-bhrp's idea opened "My published portfolio allocator" for a paper that is an arXiv preprint; it now reads
-// "The portfolio allocator from my arXiv paper", and the quote follows (less the rater's " from the paper", which
-// the new words already say). Not re-scored either: the sentence scores the checkable artefact — a public repo,
-// "tests tied to the paper's theorems", "results committed" — and caps it on self-reproduction, so "published"
-// set nothing; and 4 is the ceiling without external validation anyway (above).
-// And macboot's chip said "was 4,700 lines of bash" where its README says "~4,700"; the chip gained the tilde and
-// the quote follows. Not re-scored: the item is capped at 1 on "PRIVATE repo, no public link", which no line count
-// can move.
-// tests/signalWeights.test.ts checks that every quoted span in a project's `because` is still in its item.
-//
-// Project ids are keyed by slug (`projects:witness`), not by index, so adding a project does not reshuffle
-// these scores.
+// All three raters, same prompt, none seeing another's output: rl-bhrp 4, offchart 3, trading-desk 2, daylogs 2,
+// macboot 1 (5/5 exact); each `because` is rater 2's sentence (the median rater; all three tied). Three wording
+// edits came after scoring (trading-desk '~300 tests', rl-bhrp 'from my arXiv paper', macboot '~4,700'). Each
+// quote follows its item. None was re-scored, because none touched what capped the score: bookkeeping,
+// self-reproduction, a private repo. tests/signalWeights.test.ts checks every quoted span is still in its item.
 
 import type { SignalWeights } from '../lib/signalRubric';
 

@@ -57,16 +57,10 @@ export function fieldAt(x: number, y: number, tSec: number, centers: ReturnType<
 }
 
 /**
- * Field units per px, and the field coordinates of the top-left corner. The frame is centred on the origin, and
- * FIELD_SPAN covers the viewport's LONGER side.
- *
- * On a landscape screen that is the width, which is exactly the mockup's framing (x from -3.2 to 3.2) — every
- * desktop frame is unchanged by this rule. The mockup fitted the width on every screen, and it was only ever judged
- * on a desktop. On a portrait phone that reached y = ±6.93 at 390x844, far past the Gaussians, where only the 0.05
- * ripple is left: no level but 0 crosses it, and its zero set is the straight lines x = nπ/1.7 and
- * y = (π/2 + nπ)/1.3 — a rectangular lattice, on 60% of the rows (12 px samples where every Gaussian is under
- * 0.02). Fitting the longer side keeps |y| <= 3.2 on any screen, which brings that down to 13%, and the ripple's
- * zero lines are then 244 px apart, too far apart to read as a grid.
+ * Field units per px, and the field coordinates of the top-left corner. FIELD_SPAN covers the LONGER side, centred
+ * on the origin. On landscape that is the mockup's fit-to-width. On a portrait phone, fit-to-width reached |y|≈6.9,
+ * past every Gaussian, where the 0.05 ripple's zero set drew a rectangular lattice on 60% of rows (13% with this
+ * rule; held by tests/draftingField.test.ts).
  */
 function scale(widthPx: number, heightPx: number): { sx: number; x0: number; y0: number } {
   const sx = FIELD_SPAN / Math.max(widthPx, heightPx);

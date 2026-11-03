@@ -8,8 +8,7 @@
 // frame of that theme's MP4, so it is also that video's poster — the swap to motion shows no jump, a light-theme
 // reader never sees a dark still turn light, and reduced motion keeps a real frame. The MP4s sit in public/
 // (converted from the repo's 1.0-1.2 MB GIFs), fetched by URL only once the fan has opened, never on the
-// critical path. The repo's own thumbnail was the poster until it was seen to read "Lorem Ipsum", manifold's
-// default motto; it is no longer vendored.
+// critical path.
 import type { ImageMetadata } from 'astro';
 import daylogsBody from '../assets/projects/daylogs-body.png';
 import manifoldDark from '../assets/projects/manifold-saver-dark.png';
@@ -21,9 +20,7 @@ import { offchartPositioning } from './vendor/offchartPositioning';
 import { rlBhrpWealth } from './vendor/rlBhrpWealth';
 import { witnessFacets } from './vendor/witnessFacets';
 
-/** A capture carries its `alt`, written by hand because nothing computes a screenshot's content. A computed
- *  picture names itself: its svg is role="img" with an aria-label built from the numbers it prints. Neither needs
- *  wiring to reach a screen reader; only a duplicate (a hover preview) should be hidden, by its wrapper. */
+/** A capture's `alt` is hand-written; a computed svg labels itself (lib/projectVisuals.ts). */
 export type ProjectVisual =
   | { kind: 'image'; dark: ImageMetadata; light?: ImageMetadata; alt: string; motion?: { dark: string; light?: string } }
   | { kind: 'svg'; svg: string };

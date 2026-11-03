@@ -121,7 +121,7 @@ const bubbles = JSON.stringify([
     // The cause is an asymmetry, not a delay anyone chose. FluidSky's shader takes `uDark` from
     // `dataset.theme` on EVERY frame, so it flips in the same frame CSS does. This component read
     // `themePalette()` once at init, so it could only change when CornerNav dispatched `theme:change`
-    // — which it deliberately does AFTER the View Transition crossfade finishes ("a canvas settles into
+    // — which it then did only AFTER the View Transition crossfade finished ("a canvas settles into
     // its new palette a beat after the crossfade"). Re-reading per frame makes the terrain behave like
     // the sky, and the re-init becomes a repaint this no longer depends on for correctness.
     //
@@ -513,8 +513,8 @@ const bubbles = JSON.stringify([
   // steppers, the cow — for a palette change none of them care about. Measured at 6x throttle: a 357ms long task
   // on the homepage against 55ms on /404, and identical with the View Transition disabled, so the transition was
   // never the cost. This canvas is one of five scripts that read the palette from JS and so listen for
-  // theme:change — with DescentPath and FluidSky here, and DraftingField and Gallery on /projects. (This said "only
-  // three" until /projects added its two.) Added once per document and never removed, like DescentPath's and
-  // FluidSky's: on a page without the canvas, initTerrain finds none and returns.
+  // theme:change — with DescentPath and FluidSky here, and DraftingField and Gallery on /projects. Added once per
+  // document and never removed, like DescentPath's and FluidSky's: on a page without the canvas, initTerrain finds
+  // none and returns.
   document.addEventListener('theme:change', initTerrain);
 </script>

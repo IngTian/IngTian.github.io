@@ -250,7 +250,6 @@ const items: Item[] = [
   /* ── PAGES vs MARKS. The pages are the navigation and read as words; the contact marks are recognisable
      glyphs, so by default they carry only their icon and the capsule stays a capsule. The label is still in
      the DOM (visually hidden, not display:none) so screen readers and the accessible name are unaffected. ── */
-  .cnav .page .page-label { display: inline-block; }
   .cnav .mark .label {
     position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
@@ -274,21 +273,13 @@ const items: Item[] = [
     .cnav .mark { padding: 9px 14px; }
   }
 
-  /* THE PAGE YOU ARE ON: a lit dot before the label, and the label at 600. It replaced a 1px accent hairline
-     under the label at weight 500, which the owner found unclear — a hairline that thin reads as an underline
-     or as nothing. The dot is shape plus colour, so it does not rely on colour alone, and the bloom pill stays
-     hover's. Its colour is the accent role token, never a literal: ochre in light, emerald in dark, and seal red
-     on /projects, whose drafting palette overrides `--ochre` (tokens.css).
-     THE DOT TAKES NO SPACE OF ITS OWN. It sits in the link's left padding, off the label rather than inside it:
-     inline it made the current label 14px wider, and the capsule is anchored on the right, so every label left of
-     the current page moved 14px from page to page. EVERY page link carries the same 20px left padding (6px more
-     than the 14px items share) so the dot has room — 7px from the link's edge, 7px from the label. In the shared
-     14px it sat flush on the link's edge, which on "Research", the first item, was 4px from the capsule's border
-     (the owner: "almost on the edge"), and on the phone's 13px rows it poked out of the row. Being the same on
-     every link, the reserve moves nothing between pages; the weight changes nothing either, since a monospace face
-     keeps its advances at 400 and 600. */
+  /* THE PAGE YOU ARE ON: a 6px dot in the accent role token (--ochre, so seal red on /projects) plus weight 600 —
+     shape plus colour; the bloom pill stays hover's. The dot sits in the link's left padding, never inside the
+     label, and every page link reserves the same 20px, so no label moves between pages (the capsule is
+     right-anchored). 20 is the shared 14 + 6, so the dot sits 7px off the link's edge and 7px off the label; at 14
+     it sat flush on the edge (the owner: "almost on the edge"). */
   .cnav .page { padding-left: 20px; }
-  .cnav .page .page-label { position: relative; }
+  .cnav .page .page-label { display: inline-block; position: relative; }
   .cnav a[aria-current='page'] .page-label::before {
     content: '';
     position: absolute;
@@ -586,9 +577,8 @@ const items: Item[] = [
 
     // ── Theme toggle ──────────────────────────────────────────────────────
     // Flip data-theme on <html>, persist the explicit choice, and keep the
-    // button's a11y state in sync. The terrain canvas reads its palette from
-    // data-theme once per init, so re-fire astro:page-load to make it (and any
-    // other page-load-driven vanilla script) repaint for the new theme.
+    // button's a11y state in sync. The JS-painted surfaces repaint on
+    // `theme:change` (repaintForTheme, below).
     const toggle = nav.querySelector<HTMLButtonElement>('[data-theme-toggle]');
     function syncToggle() {
       const dark = document.documentElement.dataset.theme === 'dark';
@@ -598,10 +588,7 @@ const items: Item[] = [
     }
     syncToggle();
 
-    // The actual flip: swap the attribute, persist, sync a11y, and repaint the
-    // canvas-based / page-load-driven pieces (terrain) for the new palette.
-    // THE ATTRIBUTE FLIP ONLY. Everything here must be cheap, because this runs as a View Transition's DOM-update
-    // callback and the browser holds the page frozen until it returns.
+    // THE ATTRIBUTE FLIP ONLY: swap it, persist, sync a11y. The repaint is repaintForTheme's.
     //
     // It used to also dispatch astro:page-load from inside here, which re-initialises EVERY vanilla script on the
     // page — the deck's full slide re-measure, three beat steppers, the Toc, the cow, and the terrain canvas
@@ -615,27 +602,14 @@ const items: Item[] = [
       syncToggle();
     }
 
-    // Dispatched IMMEDIATELY now. This used to be deferred until after the View Transition finished, on
-    // the reasoning that a re-init must not happen "while the page is held" — a trade that cost a beat of
-    // stale palette and was measured against a 357ms long task from re-firing astro:page-load across
-    // fifteen scripts. Both halves of that have since gone: the event reaches at most five listeners, not fifteen
-    // scripts, and at most three of them do work on any one page (`/`'s TerrainHero, DescentPath and FluidSky;
-    // /projects' DraftingField and Gallery; FluidSky alone elsewhere). Five and not three because those first three
-    // add theirs at module level, once per document, and never remove it: after a ClientRouter visit to `/` a flip
-    // on /projects still reaches all three, and each finds no canvas and returns. DraftingField and Gallery add theirs
-    // in init and remove it in teardown. This said "three scripts" until /projects added its two, then "at most three
-    // on any one page" until the module-level listeners were counted. A PerformanceObserver check across a flip on
-    // `/` reports NO long task at all (worst rAF gap 34ms, one frame of the hero's own 30fps throttle). There is no
-    // transition left to stay outside of.
-    //
-    // TerrainHero and FluidSky no longer depend on this for correctness either, since both read the
-    // palette per frame. DescentPath still reads per init, so this is what repaints the Story slide; DraftingField
-    // reads its colours on init and here; Gallery swaps manifold's still and video for the theme.
+    // Its listeners are the JS-painted surfaces (CLAUDE.md, Themes). TerrainHero and FluidSky also read the palette
+    // per frame; DescentPath, DraftingField and Gallery repaint ONLY on this event. TerrainHero, DescentPath and
+    // FluidSky add theirs at module level and never remove it, so after a ClientRouter visit to `/` they still fire
+    // elsewhere and return when their canvas is absent. A PerformanceObserver check across a flip on `/` reports no
+    // long task (worst rAF gap 34ms, one frame of the hero's own 30fps throttle).
     function repaintForTheme() {
-      // A DEDICATED EVENT, not astro:page-load. Eleven scripts listen for page-load on `/` (twenty across the site;
-      // fifteen when this was measured) and only five paint from JS and read the palette (TerrainHero, DescentPath,
-      // FluidSky, DraftingField, Gallery) — the rest re-measure the deck's seven slides, rebuild the Toc's
-      // observers, restart three beat steppers and re-wire the cow, none of which a colour change affects. Isolated
+      // A DEDICATED EVENT, never astro:page-load: re-firing that re-runs every page script's init (the deck's
+      // re-measure, the Toc's observers, the beat steppers, the cow), none of which a colour change affects. Isolated
       // by measurement: 357ms of long task on the homepage against 55ms on /404, and unchanged when the View
       // Transition was disabled, so the cost was always this re-init and never the transition.
       document.dispatchEvent(new Event('theme:change'));
