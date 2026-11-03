@@ -59,8 +59,12 @@ and which kind a component is decides how a page may change it:
 - **Page-own: buttons.** One anatomy, a skin per page. `components/Button.astro` owns
   the size, label, arrow, press, focus ring and the `<a>`/`<button>` behaviour; a page's
   look is a `skin` value plus one `.btn--<skin>` block. Today the only skin is
-  /projects' **sticker** (a slight tilt, a 1.5px ink edge, a hard 4px offset shadow in
-  the accent). A new page **adds a skin, not a new button.**
+  /projects' **sticker** (a slight tilt, a 1.5px ink edge, a hard 4px offset plate in
+  the accent). A new page **adds a skin, not a new button.** A skin obeys the motion rule
+  like everything else: the sticker's plate is a `::after` moved by `transform` (4px at
+  rest, 6px lifted, 1px pressed), not the mockup's transitioned `box-shadow`, and its face
+  is `::before`, because the tilt makes the button a stacking context and a `z-index: -1`
+  child paints above its parent's own background.
 
 **Restraint is the aesthetic.** Text is English-only — the literati feel comes
 from composition and negative space, never from displayed CJK glyphs. The lone
@@ -513,6 +517,13 @@ phone treatment is *bug fixes only*, and the whole of it is:
   unclear — that thin, it reads as an underline or as nothing. The dot is shape plus
   colour, so it does not rely on colour alone; the **bloom pill stays hover's and
   focus's**, so "here" and "you could go here" never look alike.
+  - **The dot reserves its space; it does not take any.** It is positioned in the link's
+    left padding, off the label, so every `.page-label` has the same x and width on every
+    page (measured on the five pages in both themes: within 0.02px). Its first version
+    was an inline-block inside the label, which made the current item 14px wider — and
+    the capsule is anchored on the right, so every label left of the current page moved
+    14px from page to page, and a View Transition cross-faded two capsules. The weight
+    moves nothing: a monospace face keeps its advances at 400 and 600.
   - Its colour is the accent **role token** `--ochre`, never a literal: ochre in light,
     emerald in dark, seal red on /projects (whose drafting palette overrides `--ochre`).
     The pill and the focus ring read the same token.

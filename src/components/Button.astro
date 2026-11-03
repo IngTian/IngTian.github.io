@@ -38,18 +38,31 @@ const Tag = href ? 'a' : 'button';
   }
 
   /* THE STICKER — /projects' skin, so it reads that page's drafting tokens. A slight tilt, a 1.5px ink edge and a
-     hard offset shadow in the accent (the seal, on that page); it lifts toward you on hover and snaps flat on press.
-     After the anatomy, so its :active wins at equal specificity. */
-  .btn--sticker {
-    border-radius: 12px; color: var(--ink-1); background: var(--draft-panel); transform: rotate(1.5deg);
-    box-shadow: 0 0 0 1.5px var(--ink-1), 4px 4px 0 var(--ochre);
-  }
-  .btn--sticker:focus-visible { transform: rotate(-1deg) translate(-2px, -2px); box-shadow: 0 0 0 1.5px var(--ink-1), 6px 6px 0 var(--ochre); }
+     hard offset plate in the accent (the seal, on that page); it lifts toward you on hover and snaps flat on press.
+     After the anatomy, so its :active wins at equal specificity.
+     THE PLATE MOVES BY TRANSFORM, NOT BY BOX-SHADOW. The mockup drew the offset as a second box-shadow and
+     transitioned it (4px at rest, 6px lifted, 1px pressed), which repaints the shadow on every frame of every hover
+     and press — against the site's transform/opacity-only motion rule (Task D, D6). So the offset is ::after, the
+     button's own shape in the accent, and only its transform moves. The FACE has to be a layer too: the tilt makes
+     the button a stacking context, and a z-index: -1 child of a stacking context paints ABOVE that element's own
+     background, so a plate behind a background-drawn face would cover it. ::before is the face and carries the ink
+     ring as a static shadow; ::after is the plate under it. `isolation` keeps both inside the button whatever its
+     transform. Screenshotted against the box-shadow version at rest, focused, hovered and pressed, in both themes:
+     five of the eight shots identical or within 2/255, and the other three (lifted) differing by more than 8/255 in
+     one pixel of 17,600, an anti-aliased edge along the tilt. */
+  .btn--sticker { border-radius: 12px; color: var(--ink-1); background: none; transform: rotate(1.5deg); isolation: isolate; }
+  .btn--sticker::before, .btn--sticker::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+  .btn--sticker::before { z-index: -1; background: var(--draft-panel); box-shadow: 0 0 0 1.5px var(--ink-1); }
+  .btn--sticker::after { z-index: -2; background: var(--ochre); transform: translate(4px, 4px); }
+  .btn--sticker:focus-visible { transform: rotate(-1deg) translate(-2px, -2px); }
+  .btn--sticker:focus-visible::after { transform: translate(6px, 6px); }
   @media (hover: hover) {
-    .btn--sticker:hover { transform: rotate(-1deg) translate(-2px, -2px); box-shadow: 0 0 0 1.5px var(--ink-1), 6px 6px 0 var(--ochre); }
+    .btn--sticker:hover { transform: rotate(-1deg) translate(-2px, -2px); }
+    .btn--sticker:hover::after { transform: translate(6px, 6px); }
   }
-  .btn--sticker:active { transform: translate(3px, 3px); box-shadow: 0 0 0 1.5px var(--ink-1), 1px 1px 0 var(--ochre); }
+  .btn--sticker:active { transform: translate(3px, 3px); }
+  .btn--sticker:active::after { transform: translate(1px, 1px); }
   @media (prefers-reduced-motion: no-preference) {
-    .btn--sticker { transition: transform 0.22s cubic-bezier(0.3, 1.6, 0.5, 1), box-shadow 0.22s; }
+    .btn--sticker, .btn--sticker::after { transition: transform 0.22s cubic-bezier(0.3, 1.6, 0.5, 1); }
   }
 </style>

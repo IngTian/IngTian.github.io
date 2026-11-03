@@ -278,14 +278,20 @@ const items: Item[] = [
      under the label at weight 500, which the owner found unclear — a hairline that thin reads as an underline
      or as nothing. The dot is shape plus colour, so it does not rely on colour alone, and the bloom pill stays
      hover's. Its colour is the accent role token, never a literal: ochre in light, emerald in dark, and seal red
-     on /projects, whose drafting palette overrides `--ochre` (tokens.css). */
+     on /projects, whose drafting palette overrides `--ochre` (tokens.css).
+     THE DOT TAKES NO SPACE. It sits in the link's left padding (14px: the 6px dot and its 8px gap, so it reads exactly
+     as it did inline), positioned off the label rather than inside it. Inline it made the current label 14px wider,
+     and the capsule is anchored on the right, so every label left of the current page moved 14px from page to page
+     and a View Transition cross-faded two capsules. Now every .page-label has the same x and width on every page
+     (Task D, D2 — measured on the five pages in both themes); the weight changes nothing either, since a monospace
+     face keeps its advances at 400 and 600. */
+  .cnav .page .page-label { position: relative; }
   .cnav a[aria-current='page'] .page-label::before {
     content: '';
-    display: inline-block;
-    width: 6px; height: 6px;
+    position: absolute;
+    right: calc(100% + 8px); top: 50%;
+    width: 6px; height: 6px; margin-top: -3px;
     border-radius: 50%;
-    margin-right: 8px;
-    vertical-align: 1px;
     background: var(--ochre);
     box-shadow: 0 0 9px color-mix(in oklab, var(--ochre) 75%, transparent);
   }
@@ -608,18 +614,22 @@ const items: Item[] = [
     // Dispatched IMMEDIATELY now. This used to be deferred until after the View Transition finished, on
     // the reasoning that a re-init must not happen "while the page is held" — a trade that cost a beat of
     // stale palette and was measured against a 357ms long task from re-firing astro:page-load across
-    // fifteen scripts. Both halves of that have since gone: the event reaches three scripts, not fifteen,
-    // and a PerformanceObserver check across a flip now reports NO long task at all (worst rAF gap 34ms,
-    // one frame of the hero's own 30fps throttle). There is no transition left to stay outside of.
+    // fifteen scripts. Both halves of that have since gone: the event reaches five listeners, not fifteen
+    // scripts, and at most three on any one page (`/`'s TerrainHero, DescentPath and FluidSky; /projects'
+    // DraftingField and Gallery; FluidSky alone elsewhere) — this comment said "three scripts" until /projects
+    // added its two. A PerformanceObserver check across a flip on `/` reports NO long task at all (worst rAF gap
+    // 34ms, one frame of the hero's own 30fps throttle). There is no transition left to stay outside of.
     //
     // TerrainHero and FluidSky no longer depend on this for correctness either, since both read the
-    // palette per frame. DescentPath still reads per init, so this is what repaints the Story slide.
+    // palette per frame. DescentPath still reads per init, so this is what repaints the Story slide; DraftingField
+    // reads its colours on init and here; Gallery swaps manifold's still and video for the theme.
     function repaintForTheme() {
-      // A DEDICATED EVENT, not astro:page-load. Fifteen scripts listen for page-load and only three paint from JS
-      // and read the palette (TerrainHero, DescentPath, FluidSky) — the rest re-measure the deck's seven slides,
-      // rebuild the Toc's observers, restart three beat steppers and re-wire the cow, none of which a colour change
-      // affects. Isolated by measurement: 357ms of long task on the homepage against 55ms on /404, and unchanged
-      // when the View Transition was disabled, so the cost was always this re-init and never the transition.
+      // A DEDICATED EVENT, not astro:page-load. Eleven scripts listen for page-load on `/` (twenty across the site;
+      // fifteen when this was measured) and only five paint from JS and read the palette (TerrainHero, DescentPath,
+      // FluidSky, DraftingField, Gallery) — the rest re-measure the deck's seven slides, rebuild the Toc's
+      // observers, restart three beat steppers and re-wire the cow, none of which a colour change affects. Isolated
+      // by measurement: 357ms of long task on the homepage against 55ms on /404, and unchanged when the View
+      // Transition was disabled, so the cost was always this re-init and never the transition.
       document.dispatchEvent(new Event('theme:change'));
     }
 
