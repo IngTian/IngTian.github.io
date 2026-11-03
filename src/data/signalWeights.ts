@@ -47,11 +47,16 @@
 //   rater 2       4        3           2           2        1
 //   rater 3       4        3           2           2        1
 // 5 items · 5 exact agreement · 0 disputes, so each committed MEDIAN is unanimous, and each `because` is
-// rater 2's sentence verbatim (all three tied, so the middle rater) — with ONE later edit. trading-desk's
+// rater 2's sentence verbatim (all three tied, so the middle rater) — with TWO later edits. trading-desk's
 // chip was scored as "~270 tests" and then corrected to "~300 tests" (323 collected, 299 run without a
 // book), and its quote follows the chip. It was not re-scored: all three raters read the count only as
 // "public and checkable" and capped the item as ledger software rather than modelling (two called it
 // bookkeeping, one accounting), so the count did not set the 2.
+// And rl-bhrp's idea opened "My published portfolio allocator" for a paper that is an arXiv preprint; it now reads
+// "The portfolio allocator from my arXiv paper", and the quote follows (less the rater's " from the paper", which
+// the new words already say). Not re-scored either: the sentence scores the checkable artefact — a public repo,
+// "tests tied to the paper's theorems", "results committed" — and caps it on self-reproduction, so "published"
+// set nothing; and 4 is the ceiling without external validation anyway (above).
 // tests/signalWeights.test.ts checks that every quoted span in a project's `because` is still in its item.
 //
 // Project ids are keyed by slug (`projects:witness`), not by index, so adding a project does not reshuffle
@@ -146,7 +151,7 @@ export const SIGNAL_WEIGHTS: SignalWeights = {
     {
       id: 'projects:rl-bhrp', factor: 'projects', score: 4,
       label: 'rl-bhrp',
-      because: 'A public repo that rebuilds "my published portfolio allocator" from the paper, with "tests tied to the paper\'s theorems" and "results committed", is checkable and squarely on the quant axis. It is still the author reproducing his own work, though, so nobody else has checked it yet.',
+      because: 'A public repo that rebuilds "the portfolio allocator from my arXiv paper", with "tests tied to the paper\'s theorems" and "results committed", is checkable and squarely on the quant axis. It is still the author reproducing his own work, though, so nobody else has checked it yet.',
     },
     {
       id: 'projects:offchart', factor: 'projects', score: 3,

@@ -1,8 +1,9 @@
 // tests/projectsData.test.ts
 // The /projects records: which projects are on the page, in what order, and the facts the page's
 // computed lines (the ls summary, the homepage appendix) are derived from.
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
-import { projects, inProgress, repoUrl, appendixProjects } from '../src/data/profile';
+import { projects, inProgress, publications, repoUrl, appendixProjects } from '../src/data/profile';
 
 const bySlug = (slug: string) => projects.find((p) => p.slug === slug)!;
 
@@ -50,6 +51,29 @@ describe('the project records', () => {
     expect(projects.filter((p) => p.ci)).toHaveLength(5);
     expect(bySlug('witness').releases?.count).toBe(29);
     expect(bySlug('witness').releases?.asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  // ONE SOURCE (Task E, E1): the chip used to be typed as '29 releases' beside `releases: { count: 29 }`, so a bump
+  // moved the summary line and the cow's joke (both read the count) and left the selected row saying the old number.
+  it("prints witness's release chip from its count, never a number typed beside it", () => {
+    const w = bySlug('witness');
+    expect(w.proof[0]).toBe(`${w.releases!.count} releases`);
+    expect(readFileSync(new URL('../src/data/profile.ts', import.meta.url), 'utf8')).not.toMatch(/'\d+ releases'/);
+  });
+
+  // The paper is an arXiv preprint — its own record's venue, and how /research shows it. "Published" claimed more,
+  // the inflation the site's "incoming PhD, never present-tense" rule exists to refuse (Task E, E3).
+  it("calls rl-bhrp's paper what its record calls it: on arXiv, not published", () => {
+    expect(publications.find((p) => p.arxivId)!.venue).toBe('arXiv preprint');
+    expect(bySlug('rl-bhrp').idea).toMatch(/arXiv/);
+    for (const p of projects) expect(`${p.idea} ${p.short}`, p.slug).not.toMatch(/publish/i);
+  });
+
+  // macboot is private, so the card shows the prompt its README hands to Claude Code — and the prompt runs on for two
+  // more sentences. An excerpt must read as one (Task E, E4): the README's words verbatim to the end of their first
+  // clause, its colon kept, then an ellipsis — tied to the colon by a no-break space so it never wraps alone.
+  it("shows macboot's prompt as the excerpt it is", () => {
+    expect(bySlug('macboot').install).toEqual({ text: '> Set up this Mac from README.md. Look before you change anything:\u00a0…', prompt: true });
   });
 
   it('lists the homepage appendix by tier, not by array order', () => {

@@ -147,7 +147,6 @@ html[data-page='drafting'] {
   --draft-line-rgb: 30, 28, 24;      /* the hairlines, as R,G,B so each use picks its alpha */
   --draft-hi-rgb: 178, 58, 46;       /* the ping's lit line — the seal */
   --draft-panel: #fbfaf6;
-  --draft-glass: rgba(251, 250, 246, 0.74);
   --draft-shadow: rgba(60, 45, 30, 0.18);
   --draft-ph: #f6f4ee;               /* a picture's placeholder tone, before it decodes */
   --draft-tag: rgba(251, 250, 246, 0.92);   /* the gallery label's ground */
@@ -169,7 +168,6 @@ html[data-page='drafting'][data-theme='dark'] {
   --draft-line-rgb: 226, 224, 216;
   --draft-hi-rgb: 255, 138, 118;
   --draft-panel: #0c0c0e;
-  --draft-glass: rgba(8, 9, 11, 0.62);
   --draft-shadow: rgba(0, 0, 0, 0.6);
   --draft-ph: #080b0e;
   --draft-tag: rgba(6, 6, 8, 0.82);

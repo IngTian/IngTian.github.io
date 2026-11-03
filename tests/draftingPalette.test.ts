@@ -77,7 +77,9 @@ const THEMES = [
 
 const ROLE = ['--paper', '--ink-1', '--ink-2', '--ink-3', '--ink-4', '--ink-5', '--ochre', '--on-accent',
   '--hairline-rgb', '--bg'];
-const DRAFT = ['--draft-ground', '--draft-line-rgb', '--draft-hi-rgb', '--draft-panel', '--draft-glass',
+// No --draft-glass: it was the mockup's nav glass, and the real CornerNav keeps its own (spec §3), so nothing
+// rendered it. Deleted in Task E (E2) rather than left to read as if the nav were reskinned here.
+const DRAFT = ['--draft-ground', '--draft-line-rgb', '--draft-hi-rgb', '--draft-panel',
   '--draft-shadow', '--draft-ph', '--draft-tag', '--draft-vig'];
 
 describe('the drafting palette (tokens.css)', () => {

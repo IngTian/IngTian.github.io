@@ -65,14 +65,15 @@ export interface Project {
   name: string;
   tier: ProjectTier;
   kind: ProjectKind;
-  year: string;
   idea: string;            // the one-line idea — rows, cards, pop-up, homepage appendix
   short: string;           // the ls listing's description (≤ 44 chars), set in mono — no → or ↗, which its latin subset lacks
   proof: string[];         // chips; proof[0] is the highlighted one
   // The README's own line, verbatim and runnable — never abbreviated. manifold's holds a 74-char URL with no
   // break opportunity (~510px of 11.5px mono in a ~240px card), so a renderer must wrap it
   // (`overflow-wrap: anywhere`); the card clips its overflow, so an unwrapped line is cut off silently.
-  install?: { text: string; prompt?: boolean };   // prompt: shown without a leading "$ "
+  // A `prompt` line is the exception: words for an agent rather than a command, shown without a leading "$ ", and
+  // it may be an EXCERPT — verbatim up to where it stops, then "…", so it never reads as the whole prompt.
+  install?: { text: string; prompt?: boolean };
   visibility: 'public' | 'private';
   registry?: 'pypi' | 'npm';
   ci: boolean;
@@ -172,27 +173,32 @@ export const awards: Award[] = [
   { year: '2020', title: 'Rio Tinto–Richards Evans Exchange Award · McGill' },
 ];
 
+// witness's release count, hand-maintained (see `releases`): its record holds it, and its first chip prints it.
+const WITNESS_RELEASES = { count: 29, asOf: '2026-11-02' };
+
 // Every notable project, in VALUE order: the selected (quant) tier first, then the workshop of personal tools.
 // Records, not prose, because they render in many shapes — the ls listing, the gallery, a row or a card, the
 // pop-up, the homepage appendix, and the summary line's counts, which are computed from these fields rather
 // than typed. Held back: rebal ("not for release yet") and argmin (one script, no tests or output).
 export const projects: Project[] = [
   {
-    slug: 'rl-bhrp', name: 'rl-bhrp', tier: 'selected', kind: 'research', year: '2026',
-    idea: "My published portfolio allocator, rebuilt from the paper alone — with a plain report of which numbers reproduce and which don't.",
+    slug: 'rl-bhrp', name: 'rl-bhrp', tier: 'selected', kind: 'research',
+    // "From my arXiv paper", not "my published": the paper is a preprint — its venue in `publications` above, and
+    // how /research shows it.
+    idea: "The portfolio allocator from my arXiv paper, rebuilt from the paper alone — with a plain report of which numbers reproduce and which don't.",
     short: 'my paper, rebuilt from the paper alone',
     proof: ["tests tied to the paper's theorems", 'results committed'],
     visibility: 'public', ci: false,
   },
   {
-    slug: 'offchart', name: 'offchart', tier: 'selected', kind: 'data', year: '2026',
+    slug: 'offchart', name: 'offchart', tier: 'selected', kind: 'data',
     idea: "Public positioning and survey data — CFTC Commitments of Traders, UMich expectations — in one database that can't see the future.",
     short: 'CFTC + survey data, look-ahead-free',
     proof: ['daily CI against the live CFTC feed', 'CFTC data back to 1986'],
     visibility: 'public', ci: true,
   },
   {
-    slug: 'trading-desk', name: 'trading-desk', tier: 'selected', kind: 'tool', year: '2026',
+    slug: 'trading-desk', name: 'trading-desk', tier: 'selected', kind: 'tool',
     idea: 'A trading book in the terminal that gets P&L right across currencies and refuses to record a state that contradicts itself.',
     short: "a trading book that can't contradict itself",
     // ~300, not the spec's ~270: at trading-desk 1e60108 pytest collects 323, of which test_book.py's 24 skip
@@ -201,15 +207,16 @@ export const projects: Project[] = [
     visibility: 'public', registry: 'pypi', ci: true,
   },
   {
-    slug: 'witness', name: 'witness', tier: 'selected', kind: 'engine', year: '2026',
+    slug: 'witness', name: 'witness', tier: 'selected', kind: 'engine',
     idea: 'Turns any text stream — market news, research, coding sessions — into a dated history of what changed, and why.',
     short: 'text stream to dated history of change',
-    proof: ['29 releases', 'cross-platform binaries', 'npm'],
+    // The chip is computed from the count, so the row, the summary line and the cow's joke all read one number.
+    proof: [`${WITNESS_RELEASES.count} releases`, 'cross-platform binaries', 'npm'],
     visibility: 'public', registry: 'npm', ci: true,
-    releases: { count: 29, asOf: '2026-11-02' },
+    releases: WITNESS_RELEASES,
   },
   {
-    slug: 'daylogs', name: 'daylogs', tier: 'workshop', kind: 'tool', year: '2026',
+    slug: 'daylogs', name: 'daylogs', tier: 'workshop', kind: 'tool',
     idea: 'Weight, food and spending, typed by hand in one line each — plus one short daily read.',
     short: 'weight, food, spending — by hand',
     // No release count, unlike witness's: the spec's "5 releases" was 9 on PyPI by 2026-11-03 (0.6.0-0.6.3 landed in
@@ -219,7 +226,7 @@ export const projects: Project[] = [
     visibility: 'public', registry: 'pypi', ci: true,
   },
   {
-    slug: 'manifold', name: 'manifold', tier: 'workshop', kind: 'art', year: '2026',
+    slug: 'manifold', name: 'manifold', tier: 'workshop', kind: 'art',
     idea: 'A macOS screensaver: a mountain of light where gradient-descent walkers roll down real optimization surfaces.',
     short: 'a macOS screensaver of real descent',
     proof: ['gradients checked against finite differences in CI'],
@@ -228,11 +235,14 @@ export const projects: Project[] = [
   },
   {
     // Private, so there is nothing to clone: the card shows the prompt its README hands to Claude Code instead.
-    slug: 'macboot', name: 'macboot', tier: 'workshop', kind: 'guide', year: '2026',
+    slug: 'macboot', name: 'macboot', tier: 'workshop', kind: 'guide',
     idea: 'My Mac setup as one document an AI agent runs: it looks before it changes anything, skips what is already there, and hands me only the steps a person should do.',
     short: 'a Mac setup an agent runs, from one README',
     proof: ['one README', 'run by Claude Code', 'was 4,700 lines of bash'],
-    install: { text: '> Set up this Mac from README.md. Look before you change anything.', prompt: true },
+    // An excerpt (macboot's README at a690e47, lines 10-12): verbatim to the end of its first clause, colon kept; the
+    // prompt goes on to what to skip, never to upgrade, and the three lists to finish with. The \u00a0 holds the
+    // ellipsis to the colon, so a narrow card cannot wrap it onto a line of its own.
+    install: { text: '> Set up this Mac from README.md. Look before you change anything:\u00a0…', prompt: true },
     visibility: 'private', ci: false,
   },
 ];

@@ -429,8 +429,10 @@ a historical note on a live decision and is fine to leave.
 This section used to carry a "loose end" paragraph about `ProjectCard.astro`'s
 unreachable `'teaser'` variant, tuned for the dark Mountains gradient. The card itself
 is **deleted** — the /projects redesign replaced it with `components/projects/*`, and
-its data model dropped every field the card rendered (`tagline`, `blurb`,
-`highlights`, `stack`, `links`) — so there is no loose end left to step around.
+its data model dropped every field the card rendered (`year`, `tagline`, `blurb`,
+`highlights`, `stack`, `links`) — so there is no loose end left to step around. `year`
+went last: it outlived the card by the whole redesign with no reader at all, and this
+sentence listed the other five as if they were everything.
 
 ### THE DECK — one gesture, one slide
 
@@ -946,9 +948,11 @@ galaxy). The whole system is **token override**, not per-component branching:
   `BaseLayout`'s `page` prop puts `data-page` on `<html>`; today only /projects uses it
   (`page="drafting"`). Its two blocks in `tokens.css` — `html[data-page='drafting']` and
   `…[data-theme='dark']` — re-declare `--paper`, the ink ramp, `--ochre` (→ the seal),
-  `--on-accent`, `--hairline-rgb` and `--bg`, plus the page's own nine `--draft-*` tokens
-  (`--draft-ground`, `-line-rgb`, `-hi-rgb`, `-panel`, `-glass`, `-shadow`, `-ph`, `-tag`,
-  `-vig`). That is how the shared nav, rail and cow reskin there with no edit. There
+  `--on-accent`, `--hairline-rgb` and `--bg`, plus the page's own eight `--draft-*` tokens
+  (`--draft-ground`, `-line-rgb`, `-hi-rgb`, `-panel`, `-shadow`, `-ph`, `-tag`, `-vig`).
+  There were nine: `--draft-glass` was the mockup's nav glass, and nothing rendered it —
+  the real CornerNav keeps its own glass on this page too (spec §3) — so it was deleted
+  rather than left to read as a reskinned nav. That is how the shared nav, rail and cow reskin there with no edit. There
   **`--bg` is the sheet** (`var(--draft-ground)`), light in the light theme, so an
   overscroll shows paper, not ink. Both blocks declare every token, because
   `html[data-page='drafting']` and `html[data-theme='dark']` have equal specificity and a
@@ -1188,7 +1192,7 @@ titles came to rest hard against the browser chrome — the lead is a number in
 
 - **Palette discipline:** ONLY the tokens in `tokens.css` (paper, ink-1..5,
   ochre, indigo, seal, plus the derived `--hairline-rgb` and `--rule` — and, on
-  /projects only, its nine `--draft-*` tokens and its overrides of the role tokens; see
+  /projects only, its eight `--draft-*` tokens and its overrides of the role tokens; see
   *Themes*).
   - **`--rule` exists because `/experience` was already using it.** Two rules there declared
     `border-bottom: 1px solid var(--rule)` against a property defined nowhere, which by spec makes the whole

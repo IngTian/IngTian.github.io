@@ -126,8 +126,8 @@ export const FUND = {
 //
 // So: the heading states the openness outright, the tabs name THREE GENERAL methodologies — the three families
 // he named himself — and each gets a couple of plain sentences rather than a reading list. The RL-BHRP tab is
-// gone: the paper is work, and the work section is where work goes. Naming a published attempt on a slide about
-// an open problem also quietly implied the attempt had closed part of it.
+// gone: the paper is work, and the work section is where work goes. Naming a posted attempt (a preprint, not a
+// publication) on a slide about an open problem also quietly implied the attempt had closed part of it.
 //
 // The restraint is the honesty here. A general direction, plainly stated, cannot overclaim; a survey with dates
 // on it starts to sound like a solution assembled from parts.
