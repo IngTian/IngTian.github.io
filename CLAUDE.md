@@ -216,7 +216,7 @@ src/
   lib/deck.ts                       # pure deck stops: WHERE the homepage scroll may rest, and what's next — unit-tested
   lib/pageStops.ts                  # pure Stop trees: one tree per page drives BOTH its rail and its section ids — unit-tested
   lib/viewport.ts                   # PHONE_MAX_WIDTH = 640, its PHONE_QUERY + isPhone() — the one phone gate
-  lib/motion.ts                     # prefersReducedMotion() — the one motion gate
+  lib/motion.ts                     # prefersReducedMotion() — the one motion gate; MOTION_LIMIT_MS, WCAG 2.2.2's five seconds
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
   lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter AND the memoised grid cache
   lib/marchingSquares.ts            # isoRuns(fn, bounds, level, res) — the ONE stitched kernel; descentPath and terrainContours are both callers. Plus isoSegments: unstitched, over a pre-sampled grid, called by components/projects/DraftingField.astro (redrawn per frame, so the O(n²) stitch is unaffordable)
@@ -956,9 +956,10 @@ galaxy). The whole system is **token override**, not per-component branching:
   `…[data-theme='dark']` — re-declare `--paper`, the ink ramp, `--ochre` (→ the seal),
   `--on-accent`, `--hairline-rgb` and `--bg`, plus the page's own eight `--draft-*` tokens
   (`--draft-ground`, `-line-rgb`, `-hi-rgb`, `-panel`, `-shadow`, `-ph`, `-tag`, `-vig`).
-  There were nine: `--draft-glass` was the mockup's nav glass, and nothing rendered it —
-  the real CornerNav keeps its own glass on this page too (spec §3) — so it was deleted
-  rather than left to read as a reskinned nav. That is how the shared nav, rail and cow reskin there with no edit. There
+  That is how the shared nav, rail and cow reskin there with no edit. (There were nine:
+  `--draft-glass` was the mockup's nav glass, and nothing rendered it — the real CornerNav
+  keeps its own glass on this page too, spec §3 — so it was deleted rather than left to
+  read as a reskinned nav.) There
   **`--bg` is the sheet** (`var(--draft-ground)`), light in the light theme, so an
   overscroll shows paper, not ink. Both blocks declare every token, because
   `html[data-page='drafting']` and `html[data-theme='dark']` have equal specificity and a
