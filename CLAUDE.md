@@ -244,15 +244,19 @@ indexed one is a real leak, not an untidiness.
 `Deck`, `Toc`, `SideRail`, `CornerNav`, `TerrainHero`, `FluidSky`, `SkyWash`,
 `DescentPath`, `PlushCow`, the three explainer slides (`Choice`, `Rules`, `Solve`),
 `BaseLayout`'s no-FOUC theme resolver and veil, `pages/index.astro`'s intro decider,
-and the `/art` and `/research` pages all need JS — that is the whole list. Every one
-is a plain Astro component or page with a `<script>`, **not** an island (see *Stack*).
+the `/art` and `/research` pages, and `/projects` — `pages/projects.astro` (the ask
+dispatcher) plus five of `components/projects/*`: `DraftingField`, `Gallery`,
+`SelectedRows`, `WorkshopCards` and `ProjectAsk` — all need JS. That is the whole list,
+22 files. Every one is a plain Astro component or page with a `<script>`, **not** an
+island (see *Stack*).
 
 **Two corrections to how this list is checked, because the obvious check misleads.**
-`grep -rln '<script' src` returns **19 files** against the 16 surfaces above, and the
+`grep -rln '<script' src` returns **25 files** against the 22 surfaces above, and the
 difference is not all drift: `lib/introTimeline.ts`, `lib/motion.ts` and
 `lib/descentPath.ts` match on the string `<script>` inside their own COMMENTS. Filter
 to `src/{components,sections,pages,layouts}` before trusting a count. The real gap this
-caught was `pages/index.astro`, which the list had never named.
+caught was `pages/index.astro`, which the list had never named. (It read 19 against 16
+until `/projects` added six surfaces across several commits, none of which updated it.)
 
 **And `index.astro` is the one surface that does NOT keep the contract below, on
 purpose.** Its intro decider is `is:inline`, so it runs at parse time and exactly once

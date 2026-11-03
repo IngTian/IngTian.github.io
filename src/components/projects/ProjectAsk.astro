@@ -127,7 +127,11 @@ const asks: Record<string, { name: string; idea: string; url: string | null }> =
       dialog.classList.toggle('private', !a.url);
 
       // Measured after the content is in, so a long idea or the button-less private form is placed by its real
-      // size. Measuring also flushes the closed state, so an ask that replaces an open one replays from its click.
+      // size. An ask that replaces an open one moves to its click and re-flies the brackets (committed below), but
+      // the panel's scale and its lines' rise replay only as far as the close had run, since a reversed transition
+      // is shortened by how far it got (CSS Transitions §3). A mouse re-ask closed at mousedown, so it replays
+      // partly; when the close and this open land in one task, as on a touch re-ask, every reversal measured 0ms
+      // in Chrome — nothing replays. The mockup does not replay them either, and nothing asks it to.
       const vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
       const w = dialog.offsetWidth, h = dialog.offsetHeight;
       const left = Math.max(GAP, Math.min(vw - w - GAP, x - w / 2));

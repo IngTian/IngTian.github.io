@@ -90,14 +90,27 @@ const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into th
     teardown = null;
     const page = document.querySelector<HTMLElement>('main.projects-page');
     if (!page) return;
+    // A PRESS THAT SKIPS THE BOOT DOES NOTHING ELSE: the click ending it neither asks nor falls through to the repo.
+    // During the boot the gallery is still the pile and the rows are invisible, so what is under the pointer is not
+    // what the reader aimed at. Read at pointerdown, in the capture phase on window, because the boot's skip removes
+    // html.projects-boot on that same pointerdown — a check at click time would never see the boot. A keyboard click
+    // (detail 0) has no pointerdown of its own, so a stale mark from a press that never clicked cannot swallow it.
+    let pressInBoot = false;
+    const onDown = (): void => { pressInBoot = document.documentElement.classList.contains('projects-boot'); };
     const onClick = (e: MouseEvent): void => {
       const from = (e.target as Element).closest<HTMLElement>('[data-ask]');
-      const at = from && askPoint(e, from.getBoundingClientRect(), from.matches('a[href]'));
-      if (!from || !at) return;
+      if (!from) return;
+      if (pressInBoot && e.detail > 0) { e.preventDefault(); return; }
+      const at = askPoint(e, from.getBoundingClientRect(), from.matches('a[href]'));
+      if (!at) return;
       e.preventDefault();
       window.dispatchEvent(new CustomEvent('projects:ask', { detail: { slug: from.dataset.ask!, ...at, from } }));
     };
+    window.addEventListener('pointerdown', onDown, { capture: true });
     page.addEventListener('click', onClick);
-    teardown = () => page.removeEventListener('click', onClick);
+    teardown = () => {
+      window.removeEventListener('pointerdown', onDown, { capture: true });
+      page.removeEventListener('click', onClick);
+    };
   });
 </script>
