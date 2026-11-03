@@ -133,7 +133,7 @@ const bootDecider = `(function () {
      that it follows no scroll — fixed, it and its bubble would cover text and tap targets.
      BELOW 1180px, PHONES INCLUDED, it sits in the flow BESIDE THE LISTING'S LAST LINE, the idle prompt, whose 14
      characters leave the rest of that row empty. The box takes no height of its own there: the cow's top meets
-     the summary's bottom (TerminalHeader's .idle is a 12px margin plus one 13.5px/1.55 line, synced by hand) and
+     the prompt line's top (TerminalHeader's .idle is a 12px margin plus one 13.5px/1.55 line, synced by hand) and
      its 104px reach down into the gallery's 70px top margin, so the gallery starts where it would with no cow. A
      band under the listing (218px, then a 104px row) pushed the gallery below the fold at 1100x800 and 1080x810,
      against spec §3. Its bubble is its own opaque ground, so no label knockout.
@@ -141,8 +141,9 @@ const bootDecider = `(function () {
      and then to put it in a 218px band under the listing. The controller's call (Task D, D8) is the placement from
      641px. One thing cannot carry over: in a 343px column the bubble beside the cow has no room on the prompt's
      row (the prompt sits under its left end) or above it (the summary), so on a phone it opens BELOW the prompt,
-     tail turned up at the cow, into a strip the box reserves — fixed, so nothing moves when it speaks — and its
-     halves wrap to the column.
+     tail turned up at the cow, into a strip the box reserves, and its halves wrap to the column. The strip is a
+     fixed height and the cow is top-aligned (below), so neither the gallery nor the cow moves when it speaks. That
+     bubble is the one difference from 641px; the cow stands where it does there.
      NOTHING HERE TAKES A CLICK BUT THE COW. A child's pointer-events: none does not let a click through its
      parent's box, and the cow's wrapper is as wide as the bubble even while the bubble is hidden — so with only
      the bubble transparent, a 212x226 box on a phone and a strip over the rows' arrows at 1440 swallowed every
@@ -153,9 +154,22 @@ const bootDecider = `(function () {
   /* The bubble is the drafting panel, as every other surface on this page is; set on the bubble so it beats the
      cow's own paper, and its tail inherits it. */
   .cowbox :global(.cow-bubble) { --moo-paper: var(--draft-panel); }
+  /* WHERE THE IN-FLOW COW STANDS, and why it is two rules (Task D, fix round 1).
+     TOP-ALIGNED, so the bubble's height never reaches it. The rail wrapper is a row with align-items: flex-end
+     (PlushCow), so the cow sat on the bottom of a line as tall as its tallest item. From 641px that is the cow, but
+     a phone's bubble is 36.9px down and 90-127px tall: the cow rested 23px low and dropped 18px for every row a line
+     wrapped to, under the finger that had just tapped it.
+     12px DOWN, its top on the prompt line's top rather than the summary's bottom, because of the hop on each line
+     (PlushCow's cow-hop: 11px, 12.2px with its easing's overshoot). Where the summary's last words end over the cow's
+     horns — "of 7" at 360 and 390px, and at 681-761px — the hop carried the horns over those glyphs. 12px clears it:
+     at 61 widths from 320 to 1179, the horns at the hop's peak stay at least 1.67px under every glyph box. Its cost
+     is from 641px, where a lifted gallery card now covers 15.9px of the cow's legs (it was 3.9px). The card paints
+     over the cow, so the cow still covers nothing. The 12 is the .idle's margin and the 11 is the keyframe's, both
+     synced by hand. */
   @media (max-width: 1179px) {
     .cowbox { height: 0; align-items: flex-start; }
     .cowbox :global(.cow-wrap) { margin-top: calc(-12px - 13.5px * 1.55); }
+    .cowbox :global(.cow) { align-self: flex-start; margin-top: 12px; }
     .cowbox :global(.cow-art) { width: 88px; height: auto; }
   }
   /* The phone's strip: the bubble's top 4px under the prompt's line (its tail, turned up, rises beside the prompt's

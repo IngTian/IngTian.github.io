@@ -96,3 +96,34 @@ describe("the cow's right-hand column (projects.astro)", () => {
     expect(box).toMatch(/max-width: calc\(100% - min\(100%, 1500px\) \+ 4vw \+ 210px - max\(26px, 3\.2vw\)\);/);
   });
 });
+
+// THE IN-FLOW COW (below 1180px, phones included) stands on two hand-synced numbers (Task D, fix round 1). PlushCow's
+// rail wrapper is a row with align-items: flex-end, so without its own align-self the cow sat on the bottom of a line
+// as tall as the phone's bubble: 23px low at rest, 18px lower for every row a line wrapped to. And its top is the
+// prompt line's top (TerminalHeader's .idle margin) so the hop on each line, overshoot included, stays under the
+// summary's type. The 0.5px is the overshoot's spill into the summary's half-leading; measured in one headless Chrome
+// at 61 widths from 320 to 1179, the horns at the peak stayed at least 1.67px under every glyph box.
+describe('the in-flow cow (projects.astro, below 1180px)', () => {
+  const read = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+  const page = read('../src/pages/projects.astro');
+  const cow = read('../src/components/PlushCow.astro');
+  const flow = /@media \(max-width: 1179px\) \{([\s\S]*?)\n {2}\}/.exec(page)?.[1] ?? '';
+  const rule = /\.cowbox :global\(\.cow\) \{([^}]*)\}/.exec(flow)?.[1] ?? '';
+
+  it("is top-aligned, so the bubble's height cannot move it", () => {
+    expect(cow).toMatch(/\.cow-wrap--rail \{[^}]*align-items: flex-end;/);
+    expect(rule).toMatch(/align-self: flex-start;/);
+  });
+
+  it("stands on the prompt line's top, high enough to clear the hop's overshoot", () => {
+    const margin = Number(/margin-top: ([\d.]+)px;/.exec(rule)?.[1]);
+    const idle = Number(/\.idle \{ margin-top: ([\d.]+)px; \}/.exec(read('../src/components/projects/TerminalHeader.astro'))?.[1]);
+    expect(margin).toBe(idle);
+    const hop = Number(/@keyframes cow-hop \{[\s\S]*?40% +\{ transform: translateY\(-([\d.]+)px\); \}/.exec(cow)?.[1]);
+    const [, y1, , y2] = (/animation: cow-hop [\d.]+s cubic-bezier\(([^)]*)\)/.exec(cow)?.[1] ?? '').split(',').map(Number);
+    let over = 0;
+    for (let t = 0; t <= 1; t += 1e-3) over = Math.max(over, 3 * (1 - t) ** 2 * t * y1 + 3 * (1 - t) * t * t * y2 + t ** 3);
+    expect(hop).toBeGreaterThan(0);
+    expect(hop * over).toBeLessThanOrEqual(margin + 0.5);
+  });
+});

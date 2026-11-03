@@ -523,8 +523,20 @@ phone treatment is *bug fixes only*, and the whole of it is:
     was docked bottom-right over the first screen, then put in a 218px band under the
     listing. The one difference from 641px: a 343px column has no room for the bubble on
     the prompt's row or above it, so on a phone it opens below the prompt, tail turned up,
-    into a fixed strip sized for its tallest line (four rows at 320px), and nothing moves
-    when it speaks.
+    into a fixed strip sized for its tallest line (four rows at 320px).
+  - **Where the cow stands is two rules, for the whole in-flow range (0–1179px).** It is
+    **top-aligned** in its row: the rail wrapper is `align-items: flex-end`, so the cow sat
+    on the bottom of a line as tall as its tallest item. From 641px that item is the cow,
+    so nothing showed. On a phone it is the bubble, so the cow rested 23px low and dropped
+    18px for every row a line wrapped to, under the finger that had just tapped it. Task
+    D's first pass wrote "nothing moves when it speaks" here while that was happening: its
+    ad-hoc browser probe watched the gallery and not the cow. The fix round's probe
+    asserts the cow's rect for every line. And its top is the **prompt line's top**, 12px
+    under the summary rather than on it. The 11px hop (12.2px with the easing's
+    overshoot) carried the horns over the summary's last words wherever they end above
+    the cow, at 360, 390 and 681–761px. The cost is that a lifted gallery card now covers
+    15.9px of the cow's legs from 641px (it was 3.9px). The card paints over the cow, so
+    the cow still covers nothing.
 
 ## Navigation & structure
 
