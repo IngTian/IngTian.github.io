@@ -39,11 +39,7 @@
   import { onPageView } from '../../lib/pageView';
   import { isPhone } from '../../lib/viewport';
 
-  let teardown: (() => void) | null = null;
-
-  function init(): void {
-    teardown?.();
-    teardown = null;
+  function init(): (() => void) | undefined {
     const maybeCvs = document.querySelector<HTMLCanvasElement>('[data-drafting-field]');
     const maybeCtx = maybeCvs?.getContext('2d');
     if (!maybeCvs || !maybeCtx) return;
@@ -138,24 +134,23 @@
     const ping = (): void => { rings.push(pingAt(performance.now() / 1000, W, H, Math.random())); };
     const schedulePings = (): void => { for (const ms of PING_DELAYS_MS) pingTimers.push(window.setTimeout(ping, ms)); };
 
+    const ac = new AbortController();
+    const signal = ac.signal;
     size(); colours(); draw(clock());
     if (animate) {
-      if (root.classList.contains('projects-boot')) window.addEventListener('projects:booted', schedulePings, { once: true });
+      if (root.classList.contains('projects-boot')) window.addEventListener('projects:booted', schedulePings, { once: true, signal });
       else schedulePings();
     }
     start();
-    document.addEventListener('visibilitychange', onVis);
-    document.addEventListener('theme:change', onTheme);
-    window.addEventListener('resize', onResize);
+    document.addEventListener('visibilitychange', onVis, { signal });
+    document.addEventListener('theme:change', onTheme, { signal });
+    window.addEventListener('resize', onResize, { signal });
 
-    teardown = () => {
+    return () => {
+      ac.abort();
       stop();
       window.clearTimeout(resizeT);
       pingTimers.forEach((id) => window.clearTimeout(id));
-      window.removeEventListener('projects:booted', schedulePings);
-      document.removeEventListener('visibilitychange', onVis);
-      document.removeEventListener('theme:change', onTheme);
-      window.removeEventListener('resize', onResize);
     };
   }
 

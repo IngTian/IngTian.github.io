@@ -7,22 +7,25 @@
 // script runs right after parse.
 //
 // So init runs NOW when the document is still loading its subresources, and again on each astro:page-load that
-// brings a DOM it has not run for — a ClientRouter arrival, or a departure whose teardown must run. The page-load
-// that ends a full load finds the same element and does nothing: the element, not a flag, because a flag cannot
-// tell that page-load from the next arrival's.
+// brings a DOM it has not run for — a ClientRouter arrival, or a departure whose teardown must run. init returns
+// its teardown, and this runs it before the next init. The page-load that ends a full load finds the same element
+// and does nothing: the element, not a flag, because a flag cannot tell that page-load from the next arrival's.
 //
 // It touches the DOM despite living in lib/, the exception lib/introSession.ts makes for the same reason: six scripts
 // share it (TerminalHeader, ProjectAsk, Gallery, DraftingField, and the page's ask dispatcher and cow), and a
 // component cannot import one.
 
-/** Run `init` for this page view's `selector` element: now on a full load, then once per new DOM. */
-export function onPageView(selector: string, init: () => void): void {
+/** Run `init` for this page view's `selector` element: now on a full load, then once per new DOM, each time after
+ *  the teardown the last init returned. */
+export function onPageView(selector: string, init: () => (() => void) | undefined): void {
   let ranFor: Element | null = null;
+  let teardown: (() => void) | undefined;
   const run = (): void => {
     const el = document.querySelector(selector);
     if (el && el === ranFor) return;
     ranFor = el;
-    init();
+    teardown?.();
+    teardown = init();
   };
   if (document.readyState !== 'complete') run();
   document.addEventListener('astro:page-load', run);

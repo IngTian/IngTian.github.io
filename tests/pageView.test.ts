@@ -53,4 +53,24 @@ describe('onPageView', () => {
     doc.pageLoad();
     expect(runs).toBe(3);
   });
+
+  it('keeps the teardown init returns and runs it before the next init — only for a new DOM, and also when leaving', () => {
+    const doc = fakeDocument('interactive');
+    const log: string[] = [];
+    let n = 0;
+    onPageView('[data-term]', () => {
+      if (!doc.el) { log.push('init, nothing found'); return undefined; }
+      const k = ++n;
+      log.push(`init ${k}`);
+      return () => { log.push(`teardown ${k}`); };
+    });
+    doc.readyState = 'complete';
+    doc.pageLoad();       // the page-load that ends the full load: same DOM, nothing torn down
+    expect(log).toEqual(['init 1']);
+    doc.el = null;        // left for another page
+    doc.pageLoad();
+    doc.el = {};          // back again: a new DOM, and the page without it left nothing to tear down
+    doc.pageLoad();
+    expect(log).toEqual(['init 1', 'teardown 1', 'init, nothing found', 'init 2']);
+  });
 });

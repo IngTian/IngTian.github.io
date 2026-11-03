@@ -182,11 +182,7 @@ const cards = GALLERY_ORDER.map((slug, i) => {
   // manifold's motion waits for the fan to settle: its .55s transform plus the deal's stagger across six cards.
   const MOTION_AFTER_MS = 900;
 
-  let teardown: (() => void) | null = null;
-
-  function init(): void {
-    teardown?.();
-    teardown = null;
+  function init(): (() => void) | undefined {
     const maybeGallery = document.querySelector<HTMLElement>('[data-gallery]');
     if (!maybeGallery) return;
     // Non-null alias: TypeScript does not carry the guard's narrowing into the hoisted functions below.
@@ -194,6 +190,9 @@ const cards = GALLERY_ORDER.map((slug, i) => {
     const root = document.documentElement;
     const shots = [...gallery.querySelectorAll<HTMLElement>('.shot')];
     const timers: number[] = [];
+    // One signal for the window and document listeners; listeners on the gallery's own elements leave with its DOM.
+    const ac = new AbortController();
+    const signal = ac.signal;
 
     // A card waits while the picture it is SHOWING (the theme decides which) has not loaded — until READY_MS, when
     // the backstop ends every wait and nothing starts one again.
@@ -243,8 +242,8 @@ const cards = GALLERY_ORDER.map((slug, i) => {
     }
     // The motion for the current theme, preloaded under the still and shown only once it plays.
     function play(): void {
-      // isConnected: a reader who leaves within MOTION_AFTER_MS leaves this timer behind until the next page's
-      // init clears it, and it must not start a download into a page that has gone.
+      // isConnected: a reader who leaves within MOTION_AFTER_MS leaves this timer behind until the next page view
+      // clears it, and it must not start a download into a page that has gone.
       if (!motionShot?.isConnected) return;
       const s = motionShot;
       const dark = s.dataset.motionDark!;
@@ -281,7 +280,7 @@ const cards = GALLERY_ORDER.map((slug, i) => {
 
     gallery.addEventListener('load', onSettle, true);
     gallery.addEventListener('error', onSettle, true);
-    document.addEventListener('theme:change', onTheme);
+    document.addEventListener('theme:change', onTheme, { signal });
     shots.forEach(check);
     // THE BACKSTOP ENDS THE WAIT, UNCONDITIONALLY. It used to ask readyAfter(loaded, performance.now() - t0), a clock
     // comparison: a timer that fires a fraction early is answered "not yet", nothing asks again, and a picture that
@@ -294,22 +293,14 @@ const cards = GALLERY_ORDER.map((slug, i) => {
       motionShot.addEventListener('pointerleave', onLeave);
       motionShot.addEventListener('focus', onFocus);
       motionShot.addEventListener('blur', onBlur);
-      document.addEventListener('visibilitychange', onVis);
-      if (root.classList.contains('projects-boot')) window.addEventListener('projects:booted', startMotion, { once: true });
+      document.addEventListener('visibilitychange', onVis, { signal });
+      if (root.classList.contains('projects-boot')) window.addEventListener('projects:booted', startMotion, { once: true, signal });
       else startMotion();
     }
 
-    teardown = () => {
+    return () => {
+      ac.abort();
       timers.forEach((id) => window.clearTimeout(id));
-      gallery.removeEventListener('load', onSettle, true);
-      gallery.removeEventListener('error', onSettle, true);
-      document.removeEventListener('theme:change', onTheme);
-      window.removeEventListener('projects:booted', startMotion);
-      motionShot?.removeEventListener('pointerenter', onEnter);
-      motionShot?.removeEventListener('pointerleave', onLeave);
-      motionShot?.removeEventListener('focus', onFocus);
-      motionShot?.removeEventListener('blur', onBlur);
-      document.removeEventListener('visibilitychange', onVis);
       io.disconnect();
       stopVideo();
     };

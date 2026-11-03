@@ -148,11 +148,7 @@ const n = summaryCounts(projects);
   // plus its .5s rise, with room.
   const FAN_STAGGER_MS = 75, RISE_AT_MS = 380, RISE_STAGGER_MS = 70, DEAL_MS = 1600;
 
-  let teardown: (() => void) | null = null;
-
-  function init(): void {
-    teardown?.();
-    teardown = null;
+  function init(): (() => void) | undefined {
     const root = document.documentElement;
     const maybeTerm = document.querySelector<HTMLElement>('[data-term]');
     // No class: this page view is not booting, and the HTML as served is already the finished state.
@@ -171,6 +167,8 @@ const n = summaryCounts(projects);
     const bootAt = Number(root.dataset.bootAt);
     const t0 = Number.isFinite(bootAt) ? bootAt : performance.now();
     let raf = 0, dealT = 0, done = false;
+    const ac = new AbortController();
+    const signal = ac.signal;
 
     const light = (els: readonly Element[], n: number): void => els.forEach((el, i) => el.classList.toggle('on', i < n));
     function paint(s: ReturnType<typeof bootState>): void {
@@ -187,7 +185,7 @@ const n = summaryCounts(projects);
       if (done) return;
       done = true;
       cancelAnimationFrame(raf);
-      unlisten();
+      ac.abort();
       paint(bootState(steps, Infinity));
       if (!root.classList.contains('projects-boot')) return;
       if (stagger) {
@@ -201,7 +199,7 @@ const n = summaryCounts(projects);
       window.dispatchEvent(new Event('projects:booted'));
     }
     function tick(): void {
-      // A reader who leaves mid-boot leaves this frame behind until the next page's init tears it down.
+      // A reader who leaves mid-boot leaves this frame behind until the next page view tears it down.
       if (!term.isConnected) return;
       if (!root.classList.contains('projects-boot')) { finish(false); return; }
       const s = bootState(steps, performance.now() - t0);
@@ -213,22 +211,17 @@ const n = summaryCounts(projects);
     // Any press, key or wheel skips. NOT a capture listener on window: projects.astro's ask dispatcher reads the
     // boot class in window's capture phase, before this removes it, so the press that skips does nothing else.
     const skip = (): void => finish(false);
-    function unlisten(): void {
-      window.removeEventListener('pointerdown', skip);
-      window.removeEventListener('keydown', skip);
-      window.removeEventListener('wheel', skip);
-    }
-    window.addEventListener('pointerdown', skip);
-    window.addEventListener('keydown', skip);
-    window.addEventListener('wheel', skip, { passive: true });
+    window.addEventListener('pointerdown', skip, { signal });
+    window.addEventListener('keydown', skip, { signal });
+    window.addEventListener('wheel', skip, { passive: true, signal });
     // A reader who scrolled before this script arrived has skipped already.
     if (scrollY > 0) finish(false);
     else tick();
 
-    teardown = () => {
+    return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(dealT);
-      unlisten();
+      ac.abort();
     };
   }
 

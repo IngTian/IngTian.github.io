@@ -334,6 +334,10 @@ Everything else here:
     one. I'll explain." to a reader whose pop-up was already open. Only
     `SelectedRows`' preview and `WorkshopCards`' spotlight still start at `load` —
     both are hover-only, and the first pointer move after it finds them.
+  - **The teardown is returned.** An `onPageView` init returns it and `onPageView` runs
+    it before the next init: one `AbortController`'s `abort()` for the `window`/`document`
+    listeners, plus the timers, rAF loops, observers and video. Listeners on elements in
+    the swapped `<body>` leave with it (nothing here is `transition:persist`).
 - **Pure logic goes in `lib/`, plumbing stays in the component.** That split is
   why `deck.ts`, `pageStops.ts`, `terrain.ts`, `justify.ts` and `scrollspy.ts`
   have specs at all — the parts worth testing are not tangled in event handlers.

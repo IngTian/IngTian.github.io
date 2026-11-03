@@ -208,14 +208,10 @@ const bootDecider = `(function () {
   import { onPageView } from '../lib/pageView';
   import { isPhone } from '../lib/viewport';
 
-  let teardown: (() => void) | null = null;
-
   // Started with the boot (lib/pageView.ts), not at window `load`: the boot can be skipped once the header's script
   // runs, right after parse, and the press that skips it must already find this listening — and ProjectAsk, which
   // starts the same way, there to answer the clicks this turns into asks.
   onPageView('main.projects-page', () => {
-    teardown?.();
-    teardown = null;
     const page = document.querySelector<HTMLElement>('main.projects-page');
     if (!page) return;
     // A PRESS THAT SKIPS THE BOOT DOES NOTHING ELSE: the click ending it neither asks nor falls through to the repo.
@@ -243,12 +239,10 @@ const bootDecider = `(function () {
       e.preventDefault();
       window.dispatchEvent(new CustomEvent('projects:ask', { detail: { slug: from.dataset.ask!, ...at, from } }));
     };
-    window.addEventListener('pointerdown', onDown, { capture: true });
+    const ac = new AbortController();
+    window.addEventListener('pointerdown', onDown, { capture: true, signal: ac.signal });
     page.addEventListener('click', onClick);
-    teardown = () => {
-      window.removeEventListener('pointerdown', onDown, { capture: true });
-      page.removeEventListener('click', onClick);
-    };
+    return () => ac.abort();
   });
 
   // THE COW TALKS. PlushCow's `talk` markup, driven from here so no other page with a cow ships any of this. It greets
@@ -262,11 +256,7 @@ const bootDecider = `(function () {
   // phone's one column a bubble the reader did not ask for is a box over what they are reading.
   // STARTED AT PARSE, like the dispatcher above that sends it `cow:say`: started at window `load` it missed every ask
   // made before then, and then greeted ("Click one. I'll explain.") a reader whose pop-up was already open.
-  let teardownCow: (() => void) | null = null;
-
   onPageView('.cow-wrap--talk', () => {
-    teardownCow?.();
-    teardownCow = null;
     const wrap = document.querySelector<HTMLElement>('.cow-wrap--talk');
     const maybeBtn = wrap?.querySelector<HTMLButtonElement>('[data-cow]');
     const maybeBubble = wrap?.querySelector<HTMLElement>('.cow-bubble');
@@ -358,20 +348,20 @@ const bootDecider = `(function () {
     };
     const onPress = (): void => say('idle', true);
 
+    const ac = new AbortController();
+    const signal = ac.signal;
     if (!phone) {
-      if (root.classList.contains('projects-boot')) window.addEventListener('projects:booted', greet, { once: true });
+      if (root.classList.contains('projects-boot')) window.addEventListener('projects:booted', greet, { once: true, signal });
       else greet();
     }
     idle();
-    window.addEventListener('cow:say', onSay);
+    window.addEventListener('cow:say', onSay, { signal });
     btn.addEventListener('click', onPress);
 
-    teardownCow = () => {
+    return () => {
+      ac.abort();
       [typeT, hideT, helloT, idleT].forEach((id) => window.clearTimeout(id));
       cancelAnimationFrame(liveF);
-      window.removeEventListener('projects:booted', greet);
-      window.removeEventListener('cow:say', onSay);
-      btn.removeEventListener('click', onPress);
     };
   });
 </script>

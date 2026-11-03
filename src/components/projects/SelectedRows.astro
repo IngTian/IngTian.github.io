@@ -162,12 +162,8 @@ const rows = projects.filter((p) => p.tier === 'selected').map((p, i) => {
     list.addEventListener('pointermove', onMove);
     list.addEventListener('pointerleave', onLeave);
 
-    teardown = () => {
-      cancelAnimationFrame(raf);
-      list.removeEventListener('pointerover', onOver);
-      list.removeEventListener('pointermove', onMove);
-      list.removeEventListener('pointerleave', onLeave);
-    };
+    // The list's listeners leave with its DOM; a reader who left mid-hover leaves the loop running, so stop it.
+    teardown = () => cancelAnimationFrame(raf);
   }
 
   document.addEventListener('astro:page-load', init);

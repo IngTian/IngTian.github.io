@@ -125,11 +125,9 @@ const cards = projects.filter((p) => p.tier === 'workshop').map((p) => {
 </style>
 
 <script>
-  let teardown: (() => void) | null = null;
-
+  // Started at astro:page-load, not at parse: hover-only, so the first pointer move after `load` finds it. Its one
+  // listener is on the list, which leaves with the DOM, so there is nothing to tear down.
   function init(): void {
-    teardown?.();
-    teardown = null;
     const list = document.querySelector<HTMLElement>('[data-cards]');
     // Pointer only: a touch screen's tap fires hover too, and would leave a card's glow on.
     if (!list || !matchMedia('(hover: hover)').matches) return;
@@ -143,7 +141,6 @@ const cards = projects.filter((p) => p.tier === 'workshop').map((p) => {
       c.style.setProperty('--my', `${e.clientY - r.top}px`);
     };
     list.addEventListener('pointermove', onMove);
-    teardown = () => list.removeEventListener('pointermove', onMove);
   }
 
   document.addEventListener('astro:page-load', init);
