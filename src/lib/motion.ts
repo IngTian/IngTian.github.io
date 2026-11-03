@@ -18,3 +18,7 @@ export function prefersReducedMotion(): boolean {
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
 }
+
+/** WCAG 2.2.2: motion that starts on its own and runs past this needs a way to stop it. What is and is not yet
+ *  held to it: CLAUDE.md, Motion. */
+export const MOTION_LIMIT_MS = 5000;

@@ -55,11 +55,9 @@
     #16140f 100%           /* ground: near-black ink */
   );
 
-  /* Reading-page gradient — /research and /projects are READING pages, so they
-     hold the luminous range top-to-bottom (never sinking to the near-black
-     ground) so ink text stays legible the whole way down. Tokenized here (was
-     duplicated + DRIFTED per page: research 5-stop→#dcd5cf vs projects
-     4-stop→#e7ddce). Canonical = research's warm→cool 5-stop. Dark twin below. */
+  /* Reading-page gradient (/research, /writing and its pieces, /experience): holds
+     the luminous range top to bottom, never sinking to the near-black ground, so
+     ink stays legible. Dark twin below. */
   --reading-grad: linear-gradient(
     168deg,
     #f4efe4 0%,
@@ -112,9 +110,62 @@ html[data-theme='dark'] {
     #08090b 100%
   );
 
-  /* Reading-page dark twin — a gentle EVEN charcoal (not the deep void) so the
-     light ink ramp holds contrast top-to-bottom (matches research's prior dark
-     override; /projects had the identical value, so this is byte-identical for
-     both in dark). */
+  /* Reading-page dark twin: an even charcoal, not the deep void, so the light
+     ink ramp holds contrast the whole way down. */
   --reading-grad: linear-gradient(168deg, #14171b 0%, #131619 48%, #111417 100%);
+}
+
+/* ============================================================
+   DRAFTING — /projects' own register (BaseLayout `page="drafting"` puts the attribute on <html>)
+   Isoline hairlines on a technical sheet: paper in light, near-black in dark, and SEAL RED AS THE ONLY COLOUR
+   in both. It overrides the ROLE tokens rather than adding a parallel set, so every shared component on the
+   page (corner nav, rail, cow) reskins with no edit — which is how the accent becomes the seal here: the nav's
+   dot, its hover pill and its focus ring all read `--ochre`.
+   The ink ramp comes from the mockup's two levels — `--ink` is ink-1, `--dim` is ink-3 AND ink-4 (both must
+   clear 4.5:1 on the ground; tests/draftingPalette.test.ts holds the numbers) — with ink-2 the midpoint of
+   the two and ink-5 the midpoint of dim and the ground.
+   BOTH BLOCKS DECLARE EVERY TOKEN. The light block and `html[data-theme='dark']` have equal specificity, so in
+   dark theme the light drafting value would beat the site's dark one by source order alone.
+   ============================================================ */
+html[data-page='drafting'] {
+  --paper: #f3f1ea;
+  --ink-1: #16140f;
+  --ink-2: #403e37;
+  --ink-3: #6a675f;
+  --ink-4: #6a675f;
+  --ink-5: #afaca5;
+  --ochre: #b23a2e;      /* = --seal */
+  --on-accent: #fff8f4;
+  --hairline-rgb: var(--draft-line-rgb);
+  --bg: var(--draft-ground);   /* the page base IS the sheet here, so overscroll shows paper, not ink */
+
+  --draft-ground: #f3f1ea;
+  --draft-line-rgb: 30, 28, 24;      /* the hairlines, as R,G,B so each use picks its alpha */
+  --draft-hi-rgb: 178, 58, 46;       /* the ping's lit line — the seal */
+  --draft-panel: #fbfaf6;
+  --draft-shadow: rgba(60, 45, 30, 0.18);
+  --draft-ph: #f6f4ee;               /* a picture's placeholder tone, before it decodes */
+  --draft-tag: rgba(251, 250, 246, 0.92);   /* the gallery label's ground */
+  --draft-vig: rgba(120, 100, 70, 0.1);     /* the edge vignette */
+}
+html[data-page='drafting'][data-theme='dark'] {
+  --paper: #ecebe6;      /* the site's dark convention: paper is the light text colour, not a surface */
+  --ink-1: #ecebe6;
+  --ink-2: #b9b8b3;
+  --ink-3: #85847f;
+  --ink-4: #85847f;
+  --ink-5: #474645;
+  --ochre: #e0574a;      /* = the dark theme's --seal */
+  --on-accent: #160c0a;
+  --hairline-rgb: var(--draft-line-rgb);
+  --bg: var(--draft-ground);
+
+  --draft-ground: #08080a;
+  --draft-line-rgb: 226, 224, 216;
+  --draft-hi-rgb: 255, 138, 118;
+  --draft-panel: #0c0c0e;
+  --draft-shadow: rgba(0, 0, 0, 0.6);
+  --draft-ph: #080b0e;
+  --draft-tag: rgba(6, 6, 8, 0.82);
+  --draft-vig: rgba(0, 0, 0, 0.55);
 }

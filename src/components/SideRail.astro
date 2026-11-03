@@ -4,8 +4,8 @@
 // Renders one level per level of the Stop tree (up to three), so the rail's depth
 // follows the data rather than being hardcoded per page.
 //
-// Not a React island (the site's one island is the terminal). Vanilla <script>,
-// re-inits on astro:page-load with teardown so it survives View Transitions.
+// Not an island (the site has none). Vanilla <script>, re-inits on
+// astro:page-load with teardown so it survives View Transitions.
 //
 // Scope note: the site has two OTHER rails — Toc.astro (post-hero fade-in) and the
 // /art rail (coupled to gallery formation). Both carry behavior this component
@@ -37,7 +37,7 @@ const { stops, id, label = 'On this page' } = Astro.props;
                     <span class="rule" aria-hidden="true"></span><span class="label">{c.label}</span>
                   </a>
                   {c.children && c.children.length > 0 && (
-                    <ul class="sub sub-2">
+                    <ul class="sub">
                       {c.children.map((g) => (
                         <li>
                           <a href={`#${g.target}`} data-target={g.target}>
@@ -76,9 +76,11 @@ const { stops, id, label = 'On this page' } = Astro.props;
     max-width: 200px;
   }
   .side-rail ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
-  /* Nested lists breathe less than top-level ones, so a group reads as a group. */
-  .side-rail .sub { gap: 9px; margin-top: 9px; padding-left: 12px; }
-  .side-rail .sub-2 { gap: 7px; margin-top: 7px; }
+  /* Nested lists breathe less than top-level ones, so a group reads as a group — but not below 12px, at any depth.
+     A nested row is 12.5px tall (10px type at 1.25), and axe's target-size, which Lighthouse scores in A11y, wants
+     an undersized target's centre 24px from every neighbour's: 12px gives rows 24.5px apart and the first 25.1px
+     from its parent. At 9px every nested rail failed it on the desktop runs, scoring 95-96. */
+  .side-rail .sub { gap: 12px; margin-top: 12px; padding-left: 12px; }
 
   .side-rail a {
     display: flex; align-items: center; gap: 10px; text-decoration: none;
@@ -107,18 +109,18 @@ const { stops, id, label = 'On this page' } = Astro.props;
      nested active stop stayed at the child tier's opacity 0.34 — the active
      indicator never appeared on any child row, which is every section stop on
      /research. Verified in the browser: the active leaf computed to 0.34.
-     :where() contributes ZERO specificity, so `.side-rail :where(.sub, .sub-2) a`
+     :where() contributes ZERO specificity, so `.side-rail :where(.sub) a`
      still targets the nested tiers but cannot outrank a state class. */
   .side-rail a.is-active,
-  .side-rail :where(.sub, .sub-2) a.is-active { opacity: 1; color: var(--ink-1); }
+  .side-rail :where(.sub) a.is-active { opacity: 1; color: var(--ink-1); }
   .side-rail a.is-active .rule,
-  .side-rail :where(.sub, .sub-2) a.is-active .rule { width: 20px; }
+  .side-rail :where(.sub) a.is-active .rule { width: 20px; }
   /* Ancestor of the active leaf: lit, but not as loud as the leaf itself, so you
      can see WHICH paper you're inside without it competing with the section. */
   .side-rail a.is-ancestor,
-  .side-rail :where(.sub, .sub-2) a.is-ancestor { opacity: 0.78; color: var(--ink-2); }
+  .side-rail :where(.sub) a.is-ancestor { opacity: 0.78; color: var(--ink-2); }
   .side-rail a.is-ancestor .rule,
-  .side-rail :where(.sub, .sub-2) a.is-ancestor .rule { width: 12px; }
+  .side-rail :where(.sub) a.is-ancestor .rule { width: 12px; }
 
   /* Hover must not DIM the active row. The hover rules come later in the sheet at
      equal-or-higher specificity than the state rules, so without the :not() guard
@@ -126,7 +128,7 @@ const { stops, id, label = 'On this page' } = Astro.props;
      row the pointer is most likely resting on. */
   @media (hover: hover) {
     .side-rail a:not(.is-active):not(.is-ancestor):hover { opacity: 0.85; }
-    .side-rail :where(.sub, .sub-2) a:not(.is-active):not(.is-ancestor):hover { opacity: 0.7; }
+    .side-rail :where(.sub) a:not(.is-active):not(.is-ancestor):hover { opacity: 0.7; }
   }
 
   /* Keyboard focus must be visible. The inherited element `opacity` fades a UA

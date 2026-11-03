@@ -1,0 +1,170 @@
+---
+// /projects' "01 · Selected work": the quant projects as large rows (the 21st.dev project-showcase reference,
+// rebuilt by hand) — index, name, the one-line idea, proof chips (the first one lit), an arrow. Hovering a row
+// floats that project's picture after the pointer with an eased lag.
+//
+// Each row is the project's repo link (a button for a private one) carrying data-ask, like every project surface
+// on the page; each <li> carries the id the rail points at. The preview is pointer only — `(hover: hover)` — so a
+// tap never leaves it on; it is a copy of a picture the gallery already names, so it is aria-hidden.
+import { projects, repoUrl } from '../../data/profile';
+import { projectSectionId } from '../../lib/pageStops';
+import ProjectPicture from './ProjectPicture.astro';
+
+const rows = projects.filter((p) => p.tier === 'selected').map((p, i) => {
+  const url = repoUrl(p);
+  return { p, url, Tag: (url ? 'a' : 'button') as 'a' | 'button', n: String(i + 1).padStart(2, '0') };
+});
+---
+<ul class="rows" data-rows>
+  {rows.map(({ p, url, Tag, n }) => (
+    <li id={projectSectionId(p.slug)}>
+      <Tag class="row" href={url ?? undefined} type={url ? undefined : 'button'} data-ask={p.slug}>
+        <span class="i">{n}</span>
+        <span class="nm">{p.name}</span>
+        <span class="idea">{p.idea}</span>
+        <span class="tags">{p.proof.map((t, j) => <span class:list={['t', { hot: j === 0 }]}>{t}</span>)}</span>
+        <svg class="go" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+          <path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.4" />
+        </svg>
+      </Tag>
+    </li>
+  ))}
+</ul>
+<div class="peek" aria-hidden="true" data-peek>
+  {rows.map(({ p }) => (
+    <span class="pk" data-for={p.slug} hidden><ProjectPicture slug={p.slug} sizes="360px" /></span>
+  ))}
+</div>
+
+<style>
+  .rows { list-style: none; margin: 0; padding: 0; container-type: inline-size; }
+  .rows li { border-bottom: 1px solid rgba(var(--draft-line-rgb), 0.12); }
+  /* The boot: each row waits below its place, and rises in when TerminalHeader deals (it sets the stagger). */
+  :global(html.projects-boot) .rows li { opacity: 0; transform: translateY(18px); transition: none; }
+  @media (prefers-reduced-motion: no-preference) {
+    .rows li { transition: opacity 0.4s, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  }
+  .row {
+    position: relative; z-index: 0; display: grid; grid-template-columns: 56px minmax(180px, 1.1fr) 2fr 270px 26px;
+    gap: 22px; align-items: baseline; width: 100%; padding: 26px 8px; color: var(--ink-1); text-decoration: none;
+    text-align: left; font: inherit; cursor: pointer;
+  }
+  /* The hover wash is its own layer, faded by opacity, and the content slides by transform — the mockup moved
+     padding-left, which is a layout animation.
+     CONTRAST ON HOVER: the wash lies over the edge vignette, and the two compound. At the vignette's darkest corner
+     the mockup's .05 took the ink-3 chips and index to 4.25:1 and the lit chip (the seal) to 4.47 in light theme.
+     So the wash is .04, which the seal clears (4.56; nothing can lift the page's one colour), and a hovered row
+     lifts its ink-3 words to ink-2 (8.22 there), the way the mockup already lifts the idea to ink-1.
+     tests/draftingPalette.test.ts reads this alpha and holds the numbers. */
+  .row::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0;
+    background: rgba(var(--draft-line-rgb), 0.04); transition: opacity 0.25s;
+  }
+  .row > * { transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .i { font: 12px var(--font-mono); color: var(--ink-3); }
+  .nm { font: 600 clamp(22px, 2.3vw, 34px)/1.05 var(--font-body); letter-spacing: -0.02em; }
+  .idea { font-size: 15px; line-height: 1.5; color: var(--ink-3); }
+  .tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .t { padding: 3px 7px; border-radius: 3px; border: 1px solid rgba(var(--draft-line-rgb), 0.22); font: 10.5px var(--font-mono);
+    letter-spacing: 0.04em; color: var(--ink-3); }
+  .t.hot { color: var(--ochre); border-color: rgba(var(--draft-line-rgb), 0.5); }
+  .go { align-self: center; color: var(--ink-3); }
+  @media (hover: hover) {
+    .row:hover::before { opacity: 1; }
+    .row:hover > * { transform: translateX(10px); }
+    .row:hover .go { transform: translateX(16px); color: var(--ochre); }
+    .row:hover .idea { color: var(--ink-1); }
+    .row:hover .i, .row:hover .t:not(.hot) { color: var(--ink-2); }
+  }
+  .row:focus-visible { outline: 2px solid var(--ochre); outline-offset: -2px; }
+  .row:focus-visible .idea { color: var(--ink-1); }
+  @media (prefers-reduced-motion: reduce) { .row::before, .row > * { transition: none; } }
+
+  /* Too narrow for five columns — a phone, or the column the rail and the cow's gutter leave a 1180px window — the
+     idea and chips move under the name. A container query, because the column's width is what decides it. */
+  @container (max-width: 880px) {
+    .row { grid-template-columns: 34px 1fr 20px; row-gap: 12px; }
+    .idea, .tags { grid-column: 2 / 3; }
+    .tags { justify-content: flex-start; }
+    .go { grid-row: 1; grid-column: 3; }
+  }
+
+  .peek {
+    position: fixed; left: 0; top: 0; z-index: 30; width: 360px; height: 230px; overflow: hidden; pointer-events: none;
+    border-radius: 10px; border: 1px solid rgba(var(--draft-hi-rgb), 0.5); background: var(--draft-panel);
+    box-shadow: 0 30px 70px var(--draft-shadow); opacity: 0; will-change: transform;
+  }
+  .peek.on { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) { .peek { transition: opacity 0.2s; } }
+  .pk { position: absolute; inset: 0; }
+</style>
+
+<script>
+  import { prefersReducedMotion } from '../../lib/motion';
+
+  // Where the preview sits from the pointer, and how far it closes the gap each frame.
+  const OFFSET_X = 28, OFFSET_Y = -115, EASE = 0.14;
+
+  let teardown: (() => void) | null = null;
+
+  function init(): void {
+    teardown?.();
+    teardown = null;
+    const maybeList = document.querySelector<HTMLElement>('[data-rows]');
+    const maybePeek = document.querySelector<HTMLElement>('[data-peek]');
+    // Pointer only: a touch screen's tap fires hover too, and would leave the preview standing.
+    if (!maybeList || !maybePeek || !matchMedia('(hover: hover)').matches) return;
+    // Non-null aliases: TypeScript does not carry the guard's narrowing into the hoisted functions below.
+    const list = maybeList, peek = maybePeek;
+    const pks = [...peek.querySelectorAll<HTMLElement>('[data-for]')];
+    // Reduced motion: the preview sits at the pointer, without the lag or the lean.
+    const still = prefersReducedMotion();
+    const ease = still ? 1 : EASE;
+
+    let tx = 0, ty = 0, px = 0, py = 0, raf = 0, live = false, current: string | null = null;
+    const place = (): void => {
+      peek.style.transform = `translate3d(${px}px,${py}px,0) rotate(${still ? 0 : (tx - px) * 0.02}deg)`;
+    };
+    function step(): void {
+      px += (tx - px) * ease;
+      py += (ty - py) * ease;
+      place();
+      raf = live || Math.abs(tx - px) > 0.5 || Math.abs(ty - py) > 0.5 ? requestAnimationFrame(step) : 0;
+    }
+    const aim = (e: PointerEvent): void => { tx = e.clientX + OFFSET_X; ty = e.clientY + OFFSET_Y; };
+    const run = (): void => { if (!raf) raf = requestAnimationFrame(step); };
+
+    const onOver = (e: PointerEvent): void => {
+      if (e.pointerType === 'touch') return;
+      const slug = (e.target as Element).closest<HTMLElement>('[data-ask]')?.dataset.ask;
+      if (!slug || slug === current) return;
+      current = slug;
+      for (const pk of pks) pk.hidden = pk.dataset.for !== slug;
+      aim(e);
+      // Arrive at the pointer, placed now rather than on the next frame, so it never shows where it last was.
+      if (!peek.classList.contains('on')) { px = tx; py = ty; place(); }
+      live = true;
+      peek.classList.add('on');
+      run();
+    };
+    const onMove = (e: PointerEvent): void => {
+      if (e.pointerType === 'touch' || !live) return;
+      aim(e);
+      run();
+    };
+    const onLeave = (): void => {
+      live = false;
+      current = null;
+      peek.classList.remove('on');
+    };
+
+    list.addEventListener('pointerover', onOver);
+    list.addEventListener('pointermove', onMove);
+    list.addEventListener('pointerleave', onLeave);
+
+    // The list's listeners leave with its DOM; a reader who left mid-hover leaves the loop running, so stop it.
+    teardown = () => cancelAnimationFrame(raf);
+  }
+
+  document.addEventListener('astro:page-load', init);
+</script>

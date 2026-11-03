@@ -1,0 +1,68 @@
+---
+// The shared button: one ANATOMY (size, label, arrow, press, focus ring, and the keyboard and a11y
+// behaviour a real <a>/<button> already has) with a per-page SKIN on top. Buttons are page-own — each page gets
+// its own look when it is designed — so ANOTHER PAGE ADDS A SKIN HERE, NOT A NEW BUTTON: a `skin` value and one
+// `.btn--<skin>` block below the anatomy. Today the only skin is /projects' sticker.
+//
+// An <a> when there is an href, a <button type="button"> when there is not. Anything else passed (target, rel,
+// data-*) lands on that element. The arrow is an SVG, because the mono face's latin subset has no ↗ glyph.
+import type { HTMLAttributes } from 'astro/types';
+
+type Props = Omit<HTMLAttributes<'a'>, 'href' | 'type'> & { href?: string; skin: 'sticker'; arrow?: boolean };
+
+const { href, skin, arrow = false, class: extra, ...rest } = Astro.props;
+const Tag = href ? 'a' : 'button';
+---
+<Tag class:list={['btn', `btn--${skin}`, extra]} href={href} type={href ? undefined : ('button' as const)} {...rest}>
+  <slot />
+  {arrow && (
+    <svg class="arr" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false">
+      <path d="M2.5 9.5l7-7M4 2.5h5.5V8" fill="none" stroke="currentColor" stroke-width="1.4" />
+    </svg>
+  )}
+</Tag>
+
+<style>
+  /* THE ANATOMY — every skin shares it. */
+  .btn {
+    position: relative; display: inline-flex; align-items: center; height: 42px; padding: 0 20px; border: 0;
+    font: 600 13px var(--font-mono); letter-spacing: 0.04em; text-decoration: none; white-space: nowrap; cursor: pointer;
+  }
+  .btn .arr { margin-left: 8px; }
+  .btn:active { transform: scale(0.96); }
+  .btn:focus-visible { outline: 2px solid var(--ochre); outline-offset: 3px; }
+  @media (hover: hover) { .btn:hover .arr { transform: translate(2px, -2px); } }
+  @media (prefers-reduced-motion: no-preference) {
+    .btn { transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+    .btn .arr { transition: transform 0.25s; }
+  }
+
+  /* THE STICKER — /projects' skin, so it reads that page's drafting tokens. A slight tilt, a 1.5px ink edge and a
+     hard offset plate in the accent (the seal, on that page); it lifts toward you on hover and snaps flat on press.
+     After the anatomy, so its :active wins at equal specificity.
+     THE PLATE MOVES BY TRANSFORM, NOT BY BOX-SHADOW. The mockup drew the offset as a second box-shadow and
+     transitioned it (4px at rest, 6px lifted, 1px pressed), which repaints the shadow on every frame of every hover
+     and press — against the site's transform/opacity-only motion rule. So the offset is ::after, the
+     button's own shape in the accent, and only its transform moves. The FACE has to be a layer too: the tilt makes
+     the button a stacking context, and a z-index: -1 child of a stacking context paints ABOVE that element's own
+     background, so a plate behind a background-drawn face would cover it. ::before is the face and carries the ink
+     ring as a static shadow; ::after is the plate under it. `isolation` keeps both inside the button whatever its
+     transform. Screenshotted against the box-shadow version at rest, focused, hovered and pressed, in both themes:
+     five of the eight shots identical or within 2/255, and the other three (lifted) differing by more than 8/255 in
+     one pixel of 17,600, an anti-aliased edge along the tilt. */
+  .btn--sticker { border-radius: 12px; color: var(--ink-1); background: none; transform: rotate(1.5deg); isolation: isolate; }
+  .btn--sticker::before, .btn--sticker::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+  .btn--sticker::before { z-index: -1; background: var(--draft-panel); box-shadow: 0 0 0 1.5px var(--ink-1); }
+  .btn--sticker::after { z-index: -2; background: var(--ochre); transform: translate(4px, 4px); }
+  .btn--sticker:focus-visible { transform: rotate(-1deg) translate(-2px, -2px); }
+  .btn--sticker:focus-visible::after { transform: translate(6px, 6px); }
+  @media (hover: hover) {
+    .btn--sticker:hover { transform: rotate(-1deg) translate(-2px, -2px); }
+    .btn--sticker:hover::after { transform: translate(6px, 6px); }
+  }
+  .btn--sticker:active { transform: translate(3px, 3px); }
+  .btn--sticker:active::after { transform: translate(1px, 1px); }
+  @media (prefers-reduced-motion: no-preference) {
+    .btn--sticker, .btn--sticker::after { transition: transform 0.22s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  }
+</style>

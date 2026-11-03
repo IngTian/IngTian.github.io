@@ -27,6 +27,24 @@
 // scored 1 unanimously — they are declared interests, not artefacts.
 //
 // Nothing may exceed 4 without external validation. arXiv is verifiable, not peer-reviewed.
+//
+// SECOND PASS — Claude Opus 5.5, 2026-11-02 — for the five projects added by the /projects redesign
+// (rl-bhrp, offchart, trading-desk, daylogs, macboot). The `model` and `scoredAt` fields below still
+// describe the first pass, which scored the other twenty.
+//
+// WHAT THE RATERS WERE GIVEN: RUBRIC_PROMPT and SCALE, this file (to calibrate against witness and manifold,
+// both 2), and each project's RECORD text from profile.ts — NOT its README. One item per project: its
+// visibility, its `idea` in quotes, then its `proof` chips joined by "; ". macboot's item opened "PRIVATE
+// repo, no public link", which is the scoring prompt's wording for `visibility: 'private'`, not record text.
+// Record text is the instrument on purpose: it is what the first pass scored for all twenty items, the item a
+// reader of this site sees under RUBRIC_PROMPT's "score only what the text says", and the only text the quote guard
+// below can check offline.
+//
+// All three raters, same prompt, none seeing another's output: rl-bhrp 4, offchart 3, trading-desk 2, daylogs 2,
+// macboot 1 (5/5 exact); each `because` is rater 2's sentence (the median rater; all three tied). Three wording
+// edits came after scoring (trading-desk '~300 tests', rl-bhrp 'from my arXiv paper', macboot '~4,700'). Each
+// quote follows its item. None was re-scored, because none touched what capped the score: bookkeeping,
+// self-reproduction, a private repo. tests/signalWeights.test.ts checks every quoted span is still in its item.
 
 import type { SignalWeights } from '../lib/signalRubric';
 
@@ -115,14 +133,39 @@ export const SIGNAL_WEIGHTS: SignalWeights = {
 
     // ── Projects ────────────────────────────────────────────────────────────
     {
-      id: 'projects:0', factor: 'projects', score: 2,
+      id: 'projects:rl-bhrp', factor: 'projects', score: 4,
+      label: 'rl-bhrp',
+      because: 'A public repo that rebuilds "the portfolio allocator from my arXiv paper", with "tests tied to the paper\'s theorems" and "results committed", is checkable and squarely on the quant axis. It is still the author reproducing his own work, though, so nobody else has checked it yet.',
+    },
+    {
+      id: 'projects:offchart', factor: 'projects', score: 3,
+      label: 'offchart',
+      because: 'Named datasets ("CFTC Commitments of Traders, UMich expectations") in a public repo, plus "can\'t see the future", show point-in-time discipline that matters for research. But it is data infrastructure, and the text names no signal, model or result built on it.',
+    },
+    {
+      id: 'projects:trading-desk', factor: 'projects', score: 2,
+      label: 'trading-desk',
+      because: 'Public and checkable ("on PyPI; ~300 tests"), but "a trading book in the terminal" that "gets P&L right across currencies" is bookkeeping software. The tests show engineering correctness, not modelling or research.',
+    },
+    {
+      id: 'projects:witness', factor: 'projects', score: 2,
       label: 'witness',
       because: 'A public, checkable artefact, but developer tooling with no statistics, optimisation or modelling in it.',
     },
     {
-      id: 'projects:1', factor: 'projects', score: 2,
+      id: 'projects:daylogs', factor: 'projects', score: 2,
+      label: 'daylogs',
+      because: 'Public and checkable ("on PyPI"), but tracking "weight, food and spending" is a personal logging tool with no statistics, optimisation or modelling in it, the same off-axis band as witness.',
+    },
+    {
+      id: 'projects:manifold', factor: 'projects', score: 2,
       label: 'manifold',
       because: 'Public and checkable, and it does implement a Gaussian-bump field with gradient-descent walkers — but it visualises maths rather than researching it.',
+    },
+    {
+      id: 'projects:macboot', factor: 'projects', score: 1,
+      label: 'macboot',
+      because: 'A "PRIVATE repo, no public link", so a reader can check nothing. "Mac setup" run "by Claude Code" and "was ~4,700 lines of bash" describe machine provisioning, with no quantitative content.',
     },
 
     // ── Craft ───────────────────────────────────────────────────────────────

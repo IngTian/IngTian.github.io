@@ -55,21 +55,28 @@ export interface ResearchInterest {
   gloss: string;
 }
 
-export interface ProjectLink {
-  label: string;         // e.g. 'GitHub', 'Live', 'Writeup'
-  href: string;
+export type ProjectTier = 'selected' | 'workshop';
+export type ProjectKind = 'research' | 'data' | 'tool' | 'engine' | 'art' | 'guide';
+
+// Images are deliberately NOT on the record: vitest runs without Astro's vite, so a test importing this
+// file could not import an image. They are keyed by slug in their own module.
+export interface Project {
+  slug: string;            // the GitHub repo name; also the section id and the signal id
+  name: string;
+  tier: ProjectTier;
+  kind: ProjectKind;
+  idea: string;            // the one-line idea — rows, cards, pop-up, homepage appendix
+  short: string;           // the ls listing's description (≤ 44 chars), set in mono — no → or ↗, which its latin subset lacks
+  proof: string[];         // chips; proof[0] is the highlighted one
+  // The README's line verbatim, never abbreviated (WorkshopCards wraps it). `prompt`: words for an agent, no '$ ',
+  // may be an excerpt ending in '…'.
+  install?: { text: string; prompt?: boolean };
+  visibility: 'public' | 'private';
+  registry?: 'pypi' | 'npm';
+  ci: boolean;
 }
 
-export interface Project {
-  name: string;
-  year: string;          // e.g. '2026' or '2025 —'
-  tagline: string;       // one line, shown on the card + as the homepage teaser
-  blurb: string;         // 2-3 sentences, shown on the /projects page
-  stack: string[];       // tech tags, e.g. ['Go', 'MCP', 'SQLite']
-  links: ProjectLink[];  // repo / live / writeup
-  highlights?: string[]; // a few notable points, surfaced on the /projects page
-  featured?: boolean;    // gets the full treatment on /projects
-}
+export interface InProgressItem { name: string; idea: string; repo?: string }   // repo: set only once the repo exists
 
 export const name = { first: 'Ing', last: 'Tian' } as const;
 
@@ -162,43 +169,95 @@ export const awards: Award[] = [
   { year: '2020', title: 'Rio Tinto–Richards Evans Exchange Award · McGill' },
 ];
 
-// Selected projects — shipped artifacts with links (distinct from Experience
-// = roles, and Selected writing = papers). Shown as a teaser on the homepage
-// and in full on /projects. Engineering output: kept a clear second to the
-// research signal in the site's identity hierarchy.
+// witness's release count: hand-maintained, not fetched at build time (that needs the network); counted 2026-11-02.
+export const WITNESS_RELEASES = 29;
+
+// Every notable project, in VALUE order: the selected (quant) tier first, then the workshop of personal tools.
+// Records, not prose, because they render in many shapes — the ls listing, the gallery, a row or a card, the
+// pop-up, the homepage appendix, and the summary line's counts, which are computed from these fields rather
+// than typed. Held back: rebal ("not for release yet") and argmin (one script, no tests or output).
 export const projects: Project[] = [
   {
-    name: 'witness',
-    year: '2026',
-    tagline: 'A Claude Code / OpenCode plugin that keeps a person-centric archive of how you think and grow — not what your code did.',
-    blurb:
-      'A coach-oriented (not clone-oriented) memory layer: it quietly mines each coding session for evidence-anchored observations about how you reason, get stuck, and change — then synthesizes them into evolving, bi-temporal "facets" that keep their own history, so the archive answers "how did I change," not just "who am I now." Collect-only and local-first: it captures and serves the archive over MCP but never injects anything into a session.',
-    stack: ['Go', 'MCP', 'SQLite', 'Local embeddings', 'Claude Code · OpenCode'],
-    links: [{ label: 'GitHub', href: 'https://github.com/IngTian/witness' }],
-    highlights: [
-      'Four-layer archive — verbatim raw turns → mined observations → bi-temporal facets (with change history) → a regenerable narrative profile.',
-      'Single self-contained Go binary: no Python, no external services, no vector DB, no cloud key.',
-      'Pure-Go local multilingual (EN + ZH) embeddings via GoMLX (CGO_ENABLED=0) — verified to match ONNX Runtime exactly.',
-      'Pluggable "lenses" (a markdown EXTRACT/REVIEW prompt pair) let you track any domain — coding, math — through the same engine.',
-    ],
-    featured: true,
+    slug: 'rl-bhrp', name: 'rl-bhrp', tier: 'selected', kind: 'research',
+    // "From my arXiv paper", not "my published": the paper is a preprint — its venue in `publications` above, and
+    // how /research shows it.
+    idea: "The portfolio allocator from my arXiv paper, rebuilt from the paper alone — with a plain report of which numbers reproduce and which don't.",
+    short: 'my paper, rebuilt from the paper alone',
+    proof: ["tests tied to the paper's theorems", 'results committed'],
+    visibility: 'public', ci: false,
   },
   {
-    name: 'manifold',
-    year: '2026',
-    tagline: "This site's hero terrain, ported to a native macOS screen saver and live wallpaper — a mountain rendered as breathing points of light.",
-    blurb:
-      'A faithful Swift port of the homepage\'s math-generative terrain: a Gaussian-bump elevation field sampled on a 33×33 grid, projected through a fixed rotation and drawn as ~1000 elevation-colored dots that breathe, with glowing "walker" particles that periodically trace gradient-descent paths downhill and settle. The name is literal — the terrain is a 2-manifold — and nods to manifold optimization and to many-folded mountain ranges. Two builds share one renderer: a screen saver with a clock on the golden section, and a menu-bar live wallpaper with no clock — just the mountain breathing behind your icons, cross-fading between light and dark. Everything is sized as a fraction of the view, so it scales cleanly from 16:9 to 32:9 ultrawide.',
-    stack: ['Swift', 'Core Graphics', 'AppKit', 'macOS'],
-    links: [{ label: 'GitHub', href: 'https://github.com/IngTian/manifold' }],
-    highlights: [
-      'Two builds, one shared renderer: a screen saver (.saver, in System Settings) and a "Manifold Wallpaper.app" live desktop wallpaper (menu-bar app, no clock) — pinned at the desktop level since macOS exposes no public API for animated wallpapers.',
-      'Builds locally with swiftc into universal (arm64 + x86_64) bundles — no Xcode, no Apple Developer account; local builds skip Gatekeeper quarantine, so install is one curl command.',
-      'The wallpaper is battery-aware: 30fps normally, 15fps on battery / Low Power Mode, and fully pauses whenever the desktop is covered, the display sleeps, or the screen is locked.',
-      'Colors are the exact light/dark values from the site, and switching themes cross-fades smoothly — a slow dawn/dusk transition — rather than snapping.',
-    ],
+    slug: 'offchart', name: 'offchart', tier: 'selected', kind: 'data',
+    idea: "Public positioning and survey data — CFTC Commitments of Traders, UMich expectations — in one database that can't see the future.",
+    short: 'CFTC + survey data, look-ahead-free',
+    proof: ['daily CI against the live CFTC feed', 'CFTC data back to 1986'],
+    visibility: 'public', ci: true,
+  },
+  {
+    slug: 'trading-desk', name: 'trading-desk', tier: 'selected', kind: 'tool',
+    idea: 'A trading book in the terminal that gets P&L right across currencies and refuses to record a state that contradicts itself.',
+    short: "a trading book that can't contradict itself",
+    // ~300, not the spec's ~270: at trading-desk 1e60108 pytest collects 323, of which test_book.py's 24 skip
+    // without a book — so CI runs 299. The README states no count.
+    proof: ['on PyPI', '~300 tests'],
+    visibility: 'public', registry: 'pypi', ci: true,
+  },
+  {
+    slug: 'witness', name: 'witness', tier: 'selected', kind: 'engine',
+    idea: 'Turns any text stream — market news, research, coding sessions — into a dated history of what changed, and why.',
+    short: 'text stream to dated history of change',
+    // The chip is computed from the count, so the row, the summary line and the cow's joke all read one number.
+    proof: [`${WITNESS_RELEASES} releases`, 'cross-platform binaries', 'npm'],
+    visibility: 'public', registry: 'npm', ci: true,
+  },
+  {
+    slug: 'daylogs', name: 'daylogs', tier: 'workshop', kind: 'tool',
+    idea: 'Weight, food and spending, typed by hand in one line each — plus one short daily read.',
+    short: 'weight, food, spending — by hand',
+    // No release count, unlike witness's: the spec's "5 releases" was 9 on PyPI by 2026-11-03 (0.6.0-0.6.3 landed in
+    // nine hours), and a count that moves that fast is false between edits whether or not it carries a date.
+    proof: ['on PyPI'],
+    install: { text: 'uv tool install daylogs' },
+    visibility: 'public', registry: 'pypi', ci: true,
+  },
+  {
+    slug: 'manifold', name: 'manifold', tier: 'workshop', kind: 'art',
+    idea: 'A macOS screensaver: a mountain of light where gradient-descent walkers roll down real optimization surfaces.',
+    short: 'a macOS screensaver of real descent',
+    proof: ['gradients checked against finite differences in CI'],
+    install: { text: 'curl -fsSL https://raw.githubusercontent.com/IngTian/manifold/main/scripts/install.sh | bash' },
+    visibility: 'public', ci: true,
+  },
+  {
+    // Private, so there is nothing to clone: the card shows the prompt its README hands to Claude Code instead.
+    slug: 'macboot', name: 'macboot', tier: 'workshop', kind: 'guide',
+    idea: 'My Mac setup as one document an AI agent runs: it looks before it changes anything, skips what is already there, and hands me only the steps a person should do.',
+    short: 'a Mac setup an agent runs, from one README',
+    proof: ['one README', 'run by Claude Code', 'was ~4,700 lines of bash'],
+    // An excerpt (macboot's README at a690e47, lines 10-12): verbatim to the end of its first clause, colon kept; the
+    // prompt goes on to what to skip, never to upgrade, and the three lists to finish with. The \u00a0 holds the
+    // ellipsis to the colon, so a narrow card cannot wrap it onto a line of its own.
+    install: { text: '> Set up this Mac from README.md. Look before you change anything:\u00a0…', prompt: true },
+    visibility: 'private', ci: false,
   },
 ];
+
+export const inProgress: InProgressItem[] = [
+  { name: 'ai-mentor-core', repo: 'ai-mentor-core', idea: 'Study vaults that share one mentoring framework, so an improvement reaches every vault without hand-copying.' },
+  { name: 'a new AI-learning repo', idea: 'Not started yet.' },
+];
+
+/** The repo's GitHub page, or null when it is private — a private repo has nothing a reader can open. */
+export function repoUrl(p: Project): string | null {
+  return p.visibility === 'public' ? `https://github.com/IngTian/${p.slug}` : null;
+}
+
+/** The homepage appendix's two rows, chosen by tier rather than array order: the first two selected projects
+ *  that are not research-kind, since RL-BHRP already sits in the Publications column beside them. Two, because
+ *  the slide's balance with the writing column depends on it. */
+export function appendixProjects(ps: readonly Project[]): Project[] {
+  return ps.filter((p) => p.tier === 'selected' && p.kind !== 'research').slice(0, 2);
+}
 
 export const links: { label: string; href: string; primary?: boolean }[] = [
   { label: 'Download CV', href: '/cv.pdf', primary: true },

@@ -20,13 +20,13 @@
 //     a finished state, not a degraded one
 //   · trackpad momentum — a gesture is coalesced, so one flick is one slide rather than five
 //
-// No React island (the terminal is the only one). Vanilla script, re-inits on astro:page-load with a
+// No island — the site has none since the terminal was deleted (CLAUDE.md, Stack). Vanilla script, re-inits on astro:page-load with a
 // teardown, matching TerrainHero / Toc / DescentPath.
 ---
 <script>
   import { deckStops, nextStop, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide } from '../lib/deck';
   import { prefersReducedMotion } from '../lib/motion';
-  import { isPhone, PHONE_MAX_WIDTH } from '../lib/viewport';
+  import { isPhone, PHONE_QUERY } from '../lib/viewport';
 
   function initDeck(): (() => void) | null {
     const main = document.querySelector<HTMLElement>('main.is-slides');
@@ -338,6 +338,6 @@
   // changes the answer, so there is nothing to debounce. The deck's own resize handling (measure(), inside
   // initDeck) still deals with size changes that do NOT cross the boundary.
   if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-    window.matchMedia(`(max-width: ${PHONE_MAX_WIDTH}px)`).addEventListener('change', reinit);
+    window.matchMedia(PHONE_QUERY).addEventListener('change', reinit);
   }
 </script>

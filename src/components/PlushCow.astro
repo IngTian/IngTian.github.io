@@ -32,27 +32,35 @@ interface Props {
    * notice it was never asked for. Required means the next call site that forgets is a type error rather
    * than a cow at whatever size happens to be default.
    */
-  size: 'mark' | 'large';
-  /** Override what it says. Defaults to the homepage lines. */
+  size: 'mark' | 'large' | 'rail';
+  /** Override what it says. Defaults to the homepage lines. Unused with `talk`. */
   lines?: readonly string[];
   /** Accessible name — worth tailoring, since on /404 and /writing the cow is the main thing on the page. */
   label?: string;
+  /**
+   * THE TALKING COW, /projects' 'rail' one. The bubble starts empty and hidden and is aria-hidden; a separate
+   * visually-hidden polite live region carries only the lines a reader asked for. This is the MARKUP only: the
+   * script that types into it (listening for `cow:say` on window) is projects.astro's, because a second script
+   * here would ship to every page with a cow, and the homepage, /404 and /writing cows stay byte-identical.
+   * No `data-cow-lines` either, which is what keeps the press-to-rotate script below off this cow.
+   */
+  talk?: boolean;
 }
 
-const { size, lines = COW_LINES, label = 'A cow. Press it.' } = Astro.props;
+const { size, lines = COW_LINES, label = 'A cow. Press it.', talk = false } = Astro.props;
 
 // The cow grew with the bubble. At 2px cells (44x52) it was a speck beside a 270px bubble — the pair has to
 // read as one object. 'mark' is the smallest: the owner picked it for the Work slide so the pair reads as a
-// margin note rather than a fourth panel.
-const CELL = size === 'large' ? 8 : 3;
+// margin note rather than a fourth panel. 'rail' is 132px wide, the mockup's cow in /projects' right column.
+const CELL = size === 'large' ? 8 : size === 'rail' ? 6 : 3;
 // One cell, shared by the border, the MOO type and the tail. 10px was the owner's pick at footer scale; the
 // mark halves it, which keeps the pixel grid intact because every dimension is a multiple of the cell.
-const MOO_CELL = size === 'mark' ? 5 : 10;
+const MOO_CELL = size === 'mark' ? 5 : size === 'rail' ? 4 : 10;
 
 // EVERY MESSAGE PRE-BROKEN INTO TWO LINES, at build time. See lib/cowSpeech.ts for why: the bubble has to keep
 // one height and vary its WIDTH, or pressing the cow reflows the page. Shipping the pairs means the client never
-// measures text or decides a break.
-const spoken = splitAll(lines);
+// measures text or decides a break. A talking cow ships none: it starts silent, and its lines are pairs already.
+const spoken = talk ? [] : splitAll(lines);
 // THE FIRST MESSAGE'S wider half, not the widest of all of them. Sizing the box from the copy at build time is
 // what avoids a resize on first paint — but sizing it to the LONGEST message means the bubble ships too wide for
 // the message actually in it and then shrinks on the first press. Measured: 311px on load against the 132px that
@@ -65,13 +73,13 @@ const measure = widestHalf(lines.slice(0, 1)) + 1;
 ---
 
 <div
-  class:list={['cow-wrap', `cow-wrap--${size}`]}
-  data-cow-lines={JSON.stringify(spoken)}
-  style={`--moo-measure: ${measure}ch`}
+  class:list={['cow-wrap', `cow-wrap--${size}`, talk && 'cow-wrap--talk']}
+  data-cow-lines={talk ? undefined : JSON.stringify(spoken)}
+  style={talk ? undefined : `--moo-measure: ${measure}ch`}
 >
   {/* THE BUBBLE COMES FIRST in source order so a screen reader hears what the cow says before being told it
        can press it, and so the visual order (bubble left, cow right) needs no reordering. */}
-  <div class="cow-bubble">
+  <div class="cow-bubble" aria-hidden={talk ? 'true' : undefined}>
     <svg
       class="cow-moo"
       viewBox={`0 0 ${COW_MOO.w * MOO_CELL} ${COW_MOO.h * MOO_CELL}`}
@@ -94,7 +102,7 @@ const measure = widestHalf(lines.slice(0, 1)) + 1;
          bubble's height cannot change between messages — which is what was shoving the panel up and down on
          every press. The width follows the wider half instead. Rendered at build time so the no-JS and
          before-first-press states both look finished. */}
-    <p class="cow-says" data-cow-says aria-live="polite">
+    <p class="cow-says" data-cow-says aria-live={talk ? undefined : 'polite'}>
       <span class="cow-said" data-said-a>{spoken[0]?.[0]}</span>
       <span class="cow-said" data-said-b>{spoken[0]?.[1]}</span>
     </p>
@@ -154,7 +162,7 @@ const measure = widestHalf(lines.slice(0, 1)) + 1;
         ))}
       </g>
     </svg>
-  </button>
+  </button>{talk && <p class="sr-only" aria-live="polite" data-cow-live></p>}
 </div>
 
 <style>
@@ -339,6 +347,54 @@ const measure = widestHalf(lines.slice(0, 1)) + 1;
   @media (max-width: 430px) {
     .cow-wrap, .cow-wrap--large { --moo-cell: 7px; }
     .cow-wrap--large .cow-says { font-size: 13px; }
+  }
+
+  /* ── THE RAIL — /projects' cow, the mockup's, on a 4px cell. Last in the file, so the narrow-screen cells and the
+     narrow-screen stacking above cannot reach it (it keeps the row on a phone; see below). Where it sits, and how
+     wide the drawing is below 1180px, belong to the page. */
+  .cow-wrap--rail { --moo-cell: 4px; flex-direction: row; align-items: flex-end; }
+  .cow-wrap--rail .cow-bubble {
+    padding: calc(var(--moo-cell) * 2.5) calc(var(--moo-cell) * 3);
+    box-shadow: calc(var(--moo-cell) * 1.5) calc(var(--moo-cell) * 1.5) 0 rgba(var(--hairline-rgb), 0.25);
+  }
+  .cow-wrap--rail .cow-moo { margin-bottom: calc(var(--moo-cell) * 1.5); }
+  /* No letter-spacing, the mockup's line. */
+  .cow-wrap--rail .cow-says { margin: 0; font-size: 12.5px; letter-spacing: 0; color: var(--ink-1); }
+  .cow-wrap--rail .cow:focus-visible { outline-color: var(--ochre); }
+  /* THE BUBBLE ABOVE THE COW in the page's right-hand gutter from 1180px (synced by hand with projects.astro's
+     .cowbox). Below that, phones included, the cow sits in the page's flow beside the listing's last line, and there
+     it keeps the bubble BESIDE it — the row geometry above, tail at the bubble's lower right — so it costs the cow's
+     104px of height rather than bubble plus cow. Where on that row the bubble opens is the page's to say. */
+  @media (min-width: 1180px) {
+    .cow-wrap--rail { flex-direction: column; align-items: flex-end; gap: 0; }
+    .cow-wrap--rail .cow-bubble { margin-bottom: calc(var(--moo-cell) * 6); }
+    /* Over the cow's head, which is below the bubble here rather than beside it. */
+    .cow-wrap--rail .cow-tail { right: 44px; }
+  }
+
+  /* ── TALKING: silent until it speaks. The box follows its line (the script lays the whole line out before
+     it types it). What takes a click is the page's to say: projects.astro makes the whole box transparent to the
+     pointer but the button, because a child's pointer-events: none does not let a click through its parent's
+     box, and this wrapper is as wide as the bubble even while the bubble is hidden. */
+  .cow-wrap--talk .cow-bubble { width: auto; opacity: 0; }
+  /* Each half stays its own line-group, so the pair's break (and its punchline) never moves — but where the page caps
+     the bubble a long half may wrap inside it. The script lays each line out whole before typing it, so the box's
+     width is the line's own and a half breaks only where the cap binds, never as an artefact of sizing. */
+  .cow-wrap--talk .cow-said { white-space: normal; }
+  .cow-wrap--talk .cow-bubble.is-on { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    .cow-wrap--talk .cow-bubble {
+      transform: translateY(8px) scale(0.96); transform-origin: 85% 100%;
+      transition: opacity 0.22s, transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+    }
+    .cow-wrap--talk .cow-bubble.is-on { transform: none; }
+    /* A hop on each line. */
+    .cow.is-hop .cow-art { animation: cow-hop 0.42s cubic-bezier(0.3, 1.6, 0.5, 1); }
+    @keyframes cow-hop {
+      0%   { transform: translateY(0); }
+      40%  { transform: translateY(-11px); }
+      100% { transform: translateY(0); }
+    }
   }
 </style>
 

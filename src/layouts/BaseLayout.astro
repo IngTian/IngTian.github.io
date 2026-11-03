@@ -12,6 +12,12 @@ interface Props {
   veilLine?: string;
   /** Play the veil on a FRESH load of this page? (Transitions always play it.) */
   veilOnLoad?: boolean;
+  /** Render the veil? `false` emits no `[data-veil]`, so nothing plays it — for a page whose own entrance
+   *  replaces it (/projects' boot). */
+  veil?: boolean;
+  /** Sets `data-page` on <html>; tokens.css re-skins the role tokens from it. ClientRouter copies <html>'s
+   *  attributes, so it leaves with the page. */
+  page?: 'drafting';
   /**
    * How the corner nav picks its (light-theme) text color:
    *  - 'scroll' (default): flip dark→paper by the descent fraction behind it
@@ -40,6 +46,11 @@ interface Props {
    * and :286 is italic.
    */
   preloadAccent?: boolean | 'italic';
+  /**
+   * Preload JetBrains Mono for a page whose first screen is set in it (/projects: the listing is its mobile LCP).
+   * Discovered late, Lighthouse counts it render-blocking; preloaded, mobile FCP 1,732 -> 1,435ms for identical bytes.
+   */
+  preloadMono?: boolean;
 }
 
 const {
@@ -47,9 +58,12 @@ const {
   description = 'Ing Tian (Zeying Tian) — quant researcher in portfolio optimization and incoming Operations Research PhD at the University of Toronto. Also a full-stack software and ML engineer. Toronto.',
   veilLine = 'a researcher by day',
   veilOnLoad = false,
+  veil = true,
+  page,
   navZone = 'scroll',
   noindex = false,
   preloadAccent = false,
+  preloadMono = false,
 } = Astro.props;
 
 // Per-page canonical + og:url. Astro.site is 'https://ingtian.github.io';
@@ -78,7 +92,7 @@ const personLd = {
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" data-page={page}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -182,7 +196,7 @@ const personLd = {
       cssVariable="--ff-fraunces"
       preload={preloadAccent === 'italic' ? [{ style: 'italic' as const }] : preloadAccent}
     />
-    <Font cssVariable="--ff-jetbrains" />
+    <Font cssVariable="--ff-jetbrains" preload={preloadMono} />
     <ClientRouter />
     <title>{title}</title>
   </head>
@@ -194,17 +208,14 @@ const personLd = {
         navZone tells it how to pick light-theme text color per page. */}
     <CornerNav navZone={navZone} />
     {/* "The Descent" loader: a night veil covering the page wipes DOWNWARD off
-        the bottom to reveal it. It plays on EVERY client-side navigation (the
-        after-swap listener at the bottom of this file, in both directions), and
-        on a fresh load only when the destination opts in via veilOnLoad.
-        Each page carries its own line. transform/opacity only; gated behind
-        prefers-reduced-motion (finished state = uncovered page).
+        the bottom to reveal it. It plays on EVERY client-side navigation into a
+        page that renders one (the after-swap listener at the bottom of this
+        file, in both directions), and on a fresh load only when the destination
+        opts in via veilOnLoad. Each page carries its own line. transform/opacity
+        only; gated behind prefers-reduced-motion (finished state = uncovered page).
 
-        SIX OF THE NINE ROUTES OPT IN: /art, /experience, /projects, /research,
-        /writing and /writing/<slug>. The three that do not are /, /404 and
-        /proto-sketches. This paragraph used to say "the gallery", and the script
-        below said "only /art opts in" — both were written when that was true and
-        neither was updated when five more routes joined.
+        Pages opt in on a fresh load with veilOnLoad (`grep veilOnLoad src/pages`);
+        /projects renders none (veil={false}): its boot is its entrance.
 
         `/` DOES NOT USE THE VEIL, and now has its own treatment instead: on a
         first open the hero's terrain surveys itself as a contour map and rises out
@@ -213,14 +224,16 @@ const personLd = {
         layer over the page, which is exactly why it does not belong here: the veil
         covers a whole document, the intro IS the content arriving. Nothing to
         reconcile between them, and no reason for / to opt into `veilOnLoad`. */}
-    <div
-      class="descent-veil"
-      aria-hidden="true"
-      data-veil
-      data-veil-on-load={veilOnLoad ? 'true' : 'false'}
-    >
-      <span class="descent-veil__line">{veilLine}</span>
-    </div>
+    {veil && (
+      <div
+        class="descent-veil"
+        aria-hidden="true"
+        data-veil
+        data-veil-on-load={veilOnLoad ? 'true' : 'false'}
+      >
+        <span class="descent-veil__line">{veilLine}</span>
+      </div>
+    )}
   </body>
 </html>
 
@@ -300,7 +313,7 @@ const personLd = {
     if (!window.__descentVeilInit) {
       window.__descentVeilInit = true; // first load only
       var v = document.querySelector('[data-veil]');
-      if (v && v.dataset.veilOnLoad === 'true') play(); // six routes opt in; / does not (see above)
+      if (v && v.dataset.veilOnLoad === 'true') play(); // five routes opt in; / does not (see above)
     }
     // else: a transition re-run — the after-swap listener handles it.
   })();

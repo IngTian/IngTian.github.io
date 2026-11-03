@@ -1,0 +1,231 @@
+---
+// /projects' header, as a terminal session: the PROJECTS login banner, the prompt `~/projects $ ls --shipped`, its
+// output — the `# ideas…` comment, an `ls -l` listing of every project and a summary line of counts — and an idle
+// prompt. The listing stays on the page as its index: each name jumps to that project, and its data-cow-key (the
+// slug without ls's trailing slash, or `in-progress`) tells the cow which one — projects.astro's click handler.
+//
+// This is the FINISHED state, which is also what reduced motion and no-JS get. The order on screen is the DOM
+// order, banner first (the approved mockup lifted it with `order: -1`; here it is simply written first).
+// Every number in the summary comes from summaryCounts() (witness's releases from profile.ts' WITNESS_RELEASES),
+// and every listing line from listingLines().
+//
+// THE BOOT plays over this markup when projects.astro's inline decider has set html.projects-boot: the CSS below
+// dims or holds back each piece until the script lights it (.on), rendering lib/projectsBoot.ts' bootState() on
+// every frame. The command is one span per key so it can type without its text ever leaving the HTML; those spans
+// are aria-hidden and an sr-only copy reads the command whole, since VoiceOver can stop on each span and spell it.
+import { inProgress, projects, WITNESS_RELEASES } from '../../data/profile';
+import { bannerRows, bannerSvg } from '../../lib/asciiBanner';
+import { BOOT_CMD } from '../../lib/projectsBoot';
+import { listingLines, summaryCounts } from '../../lib/projectsListing';
+
+// Banner geometry in hundredths of an em: a mono cell is 0.6em wide, and the mockup set the rows at line-height 1.04.
+const ROWS = bannerRows('PROJECTS');
+const CELL_W = 60, CELL_H = 104;
+const W = ROWS[0].length * CELL_W, H = ROWS.length * CELL_H;
+const lines = listingLines(projects, inProgress);
+const n = summaryCounts(projects);
+---
+<section class="term" id="p-index" aria-labelledby="p-index-h" data-term>
+  <h1 class="sr-only" id="p-index-h">Projects</h1>
+  {/* The paint is a gradient across 1.5x the banner's width, because the mockup's ran across its 980px box while
+      the letters covered about two thirds of it — so the last letters end short of the pure line colour.
+      crispEdges for the BLOCKS, because every cell is its own rect: anti-aliased, each shared edge between two
+      blocks drew as a faint seam, so the letters showed their cell grid. The box strokes are not crisp — bannerSvg
+      marks its shade groups geometricPrecision, since a stroke thinner than a device pixel snapped to 0, 1 or 2px
+      by position — and they overlap their neighbours by half a stroke, so anti-aliasing leaves no seam there. */}
+  <svg class="banner" viewBox={`0 0 ${W} ${H}`} width={`${W / 100}em`} height={`${H / 100}em`} aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="projects-banner-ink" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={W * 1.5} y2="0">
+        <stop offset="0" class="ink-hi" />
+        <stop offset="0.45" class="ink-acc" />
+        <stop offset="1" class="ink-line" />
+      </linearGradient>
+    </defs>
+    <g fill="url(#projects-banner-ink)" shape-rendering="crispEdges" set:html={bannerSvg(ROWS, CELL_W, CELL_H)} />
+  </svg>
+  <div class="tline"><span class="ps">~/projects $</span> <span class="sr-only">{BOOT_CMD}</span><span class="cmd" aria-hidden="true">{[...BOOT_CMD].map((c) => <span>{c}</span>)}</span><span class="cur cur-type" aria-hidden="true"></span></div>
+  <p class="tc"># ideas I turned into things that run</p>
+  <ul class="ls">
+    {lines.map((l) => (
+      <li class:list={{ wip: l.wip }}>
+        <span class="perm" aria-hidden="true">{l.perm}</span><a href={l.href} data-cow-key={l.wip ? 'in-progress' : l.name.slice(0, -1)}>{l.name}</a><span class="k">{l.kind}</span><span class="d">{l.short}</span>
+      </li>
+    ))}
+  </ul>
+  <p class="tsum">
+    <b>{n.shipped}</b> shipped · <b>{n.pypi}</b> on PyPI · <b>{n.npm}</b> on npm · <b>{WITNESS_RELEASES}</b> releases of witness · CI on <b>{n.ci}</b> of <b>{n.shipped}</b>
+  </p>
+  <div class="tline idle" aria-hidden="true"><span class="ps">~/projects $</span> <span class="cur"></span></div>
+</section>
+
+<style>
+  .term { margin-top: 22px; max-width: 980px; font: 13.5px/1.55 var(--font-mono); color: var(--ink-1); }
+
+  /* 0.6em per cell, so the letters are as wide as the mockup's text banner at the same clamp; the SVG scales down
+     before it can overflow a phone. Its glow is a static drop-shadow, never animated. */
+  .banner { display: block; font-size: clamp(9px, 1.02vw, 15px); max-width: 100%; height: auto; margin: 0 0 14px;
+    filter: drop-shadow(0 0 14px rgba(var(--draft-hi-rgb), 0.22)); }
+  .ink-hi { stop-color: rgb(var(--draft-hi-rgb)); }
+  .ink-acc { stop-color: var(--ochre); }
+  .ink-line { stop-color: rgb(var(--draft-line-rgb)); }
+
+  .ps { color: var(--ochre); }
+  .tc { color: var(--ink-3); }
+  /* 18px, not 10: the mockup laid these out in a flex column, where the comment's 8px and the listing's 10px do
+     not collapse into one margin. */
+  .ls { list-style: none; margin: 18px 0 0; padding: 0; }
+  /* 2px, not the mockup's 1: each link is one 20.9px line, so 1px put the next link 22.9px away and axe's
+     target-size (scored in Lighthouse's A11y) failed it — a target under 24px needs 24px to its neighbour. */
+  .ls li { display: grid; grid-template-columns: 104px 150px 96px 1fr; gap: 14px; padding: 2px 0; white-space: nowrap; }
+  /* CONTRAST, measured against the ground and against the vignette's darkest point: the mockup's .65 on the
+     permissions took --ink-3 to 2.57:1 (light) and its .4 on the wip line took the seal to 1.85:1. Raising the
+     opacity until each cleared 4.5:1 landed at 0.98 (ink-3) and 0.95 (seal) in light theme, so there was nothing
+     left to dim with. So both are solid: --ink-3 and the seal, which tests/draftingPalette.test.ts holds to AA at
+     that vignette point, and the wip line reads as dim by wearing --ink-3 throughout rather than by fading. Solid
+     also keeps the label knockout opaque — an element at opacity < 1 lets the field's strokes back through its
+     ring. The description is --ink-2 (between ink-1 and ink-3, so above both floors), which is the mockup's ink at
+     .78 without the opacity. */
+  .ls .perm { color: var(--ink-3); }
+  .ls a { color: var(--ochre); text-decoration: none; }
+  .ls a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .ls .k { color: var(--ink-3); }
+  .ls .d { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; }
+  .ls .wip a, .ls .wip .d { color: var(--ink-3); }
+
+  .tsum { margin-top: 12px; }
+  .tsum b { color: var(--ochre); font-weight: 600; }
+  .idle { margin-top: 12px; }
+  .cur { display: inline-block; width: 0.62em; height: 1.05em; margin-left: 2px; vertical-align: -3px; background: var(--ochre); }
+  /* FOUR BLINKS, THEN SOLID — WCAG 2.2.2. It blinked forever beside the listing a reader is reading, motion that
+     starts on its own and has no off switch. Four is 4.2s, inside lib/motion.ts' MOTION_LIMIT_MS, and the keyframe's
+     one off frame is mid-cycle, so it comes to rest lit, as reduced motion has it from the start. The boot holds it
+     (below) so the count starts when the idle prompt appears; the typing cursor shares the rule and is gone ~1.7s
+     in, when the listing starts (bootSteps). tests/motionLimit.test.ts reads these literals. */
+  @media (prefers-reduced-motion: no-preference) {
+    .cur { animation: term-blink 1.05s steps(1) 4; }
+    @keyframes term-blink { 50% { opacity: 0; } }
+  }
+  /* The typing cursor: only while the boot is typing, so the finished first line has none. */
+  .cur-type { display: none; }
+
+  /* THE BOOT — boot B's states, from the approved mockup. The banner is a ghost at .13, NEVER 0: it is painted on
+     the first frame, and Largest Contentful Paint is not held back. Its rows come from set:html, so they carry no
+     scope hash and are reached through :global. The command's keys are display: none rather than transparent, so
+     the cursor sits right after the last one typed. Under reduced motion the decider never sets the class.
+     EVERY RULE THAT HOLDS SOMETHING BACK ALSO SAYS `transition: none` — here and in Gallery, SelectedRows,
+     WorkshopCards and projects.astro. A ClientRouter arrival gives the new DOM a style before the decider runs (the
+     router's fallback reads getAnimations(); a native View Transition captures the new state), and that style is
+     the finished page, so adding the class TRANSITIONED it into the boot: measured, 53 transitions in the first
+     130ms — the fan folding into the pile, the listing, rows and cards fading out. A transition takes its timing
+     from the style it goes TO, so this cancels the way in and keeps the way out. */
+  :global(html.projects-boot) .banner :global(.row:not(.on)) { opacity: 0.13; transition: none; }
+  :global(html.projects-boot) .cmd > span:not(.on) { display: none; }
+  :global(html.projects-boot) .term:not(.ran) .cur-type { display: inline-block; }
+  :global(html.projects-boot) .tc:not(.on),
+  :global(html.projects-boot) .ls li:not(.on),
+  :global(html.projects-boot) .tsum:not(.on) { opacity: 0; transform: translateX(-8px); transition: none; }
+  :global(html.projects-boot) .idle { opacity: 0; transition: none; }
+  :global(html.projects-boot) .idle .cur { animation: none; }
+  @media (prefers-reduced-motion: no-preference) {
+    .banner :global(.row) { transition: opacity 0.16s ease-out; }
+    .tc, .ls li, .tsum { transition: opacity 0.28s ease-out, transform 0.38s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  }
+
+  /* Phones: the same content, wrapped rather than hidden (the mockup hid kind and description under 760px; the
+     site's phone rule is same content). The description takes its own full-width line under each entry: under the
+     name alone it had ~30 characters at 390px, so every description broke in two. */
+  @media (max-width: 640px) {
+    .ls li { grid-template-columns: 10ch minmax(0, 1fr) auto; gap: 0 1.5ch; padding: 4px 0; white-space: normal; }
+    .ls .d { grid-column: 1 / -1; }
+  }
+</style>
+
+<script>
+  import { onPageView } from '../../lib/pageView';
+  import { BOOT_KEY_MS, bootState, bootSteps } from '../../lib/projectsBoot';
+
+  // The deal's stagger, and how long it stays set: the last riser's delay (870ms for today's eight rows and cards)
+  // plus its .5s rise, with room.
+  const FAN_STAGGER_MS = 75, RISE_AT_MS = 380, RISE_STAGGER_MS = 70, DEAL_MS = 1600;
+
+  function init(): (() => void) | undefined {
+    const root = document.documentElement;
+    const maybeTerm = document.querySelector<HTMLElement>('[data-term]');
+    // No class: this page view is not booting, and the HTML as served is already the finished state.
+    if (!maybeTerm || !root.classList.contains('projects-boot')) return;
+    // Non-null alias: TypeScript does not carry the guard's narrowing into the hoisted functions below.
+    const term = maybeTerm;
+    const rows = [...term.querySelectorAll('.banner .row')];
+    const keys = [...term.querySelectorAll('.cmd > span')];
+    const lines = [...term.querySelectorAll('.tc, .ls li')];
+    const summary = term.querySelector('.tsum');
+    const [lo, hi] = BOOT_KEY_MS;
+    const steps = bootSteps(term.querySelector('.cmd')?.textContent ?? '', rows.length, lines.length - 1,
+      keys.map(() => lo + Math.random() * (hi - lo)));
+    // THE DECIDER'S CLOCK, from parse, not this script's: a header that starts late (a slow chunk, a busy main
+    // thread) lands where the schedule already is, and on bootState(Infinity) if it is over.
+    const bootAt = Number(root.dataset.bootAt);
+    const t0 = Number.isFinite(bootAt) ? bootAt : performance.now();
+    let raf = 0, dealT = 0, done = false;
+    const ac = new AbortController();
+    const signal = ac.signal;
+
+    const light = (els: readonly Element[], n: number): void => els.forEach((el, i) => el.classList.toggle('on', i < n));
+    function paint(s: ReturnType<typeof bootState>): void {
+      light(rows, s.rows);
+      light(keys, s.typed);
+      light(lines, s.lines);
+      summary?.classList.toggle('on', s.summary);
+      term.classList.toggle('ran', s.lines > 0);
+    }
+    // Once, whichever comes first: the schedule's `done`, a skip, or the decider's deadline. A skip paints
+    // bootState(Infinity) — the same state a full run ends on — and deals without the stagger. Then the class goes,
+    // then the page hears it — unless the deadline got there first, which took the class off and told the page.
+    function finish(stagger: boolean): void {
+      if (done) return;
+      done = true;
+      cancelAnimationFrame(raf);
+      ac.abort();
+      paint(bootState(steps, Infinity));
+      if (!root.classList.contains('projects-boot')) return;
+      if (stagger) {
+        const fan = [...document.querySelectorAll<HTMLElement>('[data-gallery] .shot')];
+        const risers = [...document.querySelectorAll<HTMLElement>('[data-rows] > li, [data-cards] > li')];
+        fan.forEach((el, i) => { el.style.transitionDelay = `${i * FAN_STAGGER_MS}ms`; });
+        risers.forEach((el, i) => { el.style.transitionDelay = `${RISE_AT_MS + i * RISE_STAGGER_MS}ms`; });
+        dealT = window.setTimeout(() => [...fan, ...risers].forEach((el) => { el.style.transitionDelay = ''; }), DEAL_MS);
+      }
+      root.classList.remove('projects-boot');
+      window.dispatchEvent(new Event('projects:booted'));
+    }
+    function tick(): void {
+      // A reader who leaves mid-boot leaves this frame behind until the next page view tears it down.
+      if (!term.isConnected) return;
+      if (!root.classList.contains('projects-boot')) { finish(false); return; }
+      const s = bootState(steps, performance.now() - t0);
+      if (s.dealt) { finish(true); return; }
+      paint(s);
+      raf = requestAnimationFrame(tick);
+    }
+
+    // Any press, key or wheel skips. NOT a capture listener on window: projects.astro's ask dispatcher reads the
+    // boot class in window's capture phase, before this removes it, so the press that skips does nothing else.
+    const skip = (): void => finish(false);
+    window.addEventListener('pointerdown', skip, { signal });
+    window.addEventListener('keydown', skip, { signal });
+    window.addEventListener('wheel', skip, { passive: true, signal });
+    // A reader who scrolled before this script arrived has skipped already.
+    if (scrollY > 0) finish(false);
+    else tick();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(dealT);
+      ac.abort();
+    };
+  }
+
+  // Started at parse on a full load, not at astro:page-load (window `load`, which waits for the fonts): see
+  // lib/pageView.ts. A ClientRouter arrival still starts on its page-load.
+  onPageView('[data-term]', init);
+</script>

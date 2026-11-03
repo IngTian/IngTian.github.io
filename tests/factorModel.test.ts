@@ -36,7 +36,8 @@ describe('identifiedSignals — declared membership, drawn from real data', () =
     // two artefacts one score. Worth asserting now that this list is the model's only membership source.
     const ids = sig.map((s) => s.id);
     expect(new Set(ids).size, 'duplicate signal id').toBe(ids.length);
-    for (const id of ids) expect(id).toMatch(/^[a-z]+:\d+$/);
+    // Indexes for most collections, slugs for projects (so a new project cannot reshuffle the scores).
+    for (const id of ids) expect(id).toMatch(/^[a-z]+:[a-z0-9-]+$/);
   });
 
   it('leaves Writing and Market reports with NO signals', () => {

@@ -1,96 +1,367 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import FluidSky from '../components/proto/FluidSky.astro';
-import SkyWash from '../components/SkyWash.astro';
-import ProjectCard from '../components/ProjectCard.astro';
+import PlushCow from '../components/PlushCow.astro';
 import SideRail from '../components/SideRail.astro';
+import DraftingField from '../components/projects/DraftingField.astro';
+import Gallery from '../components/projects/Gallery.astro';
+import ProjectAsk from '../components/projects/ProjectAsk.astro';
+import SelectedRows from '../components/projects/SelectedRows.astro';
+import TerminalHeader from '../components/projects/TerminalHeader.astro';
+import WorkshopCards from '../components/projects/WorkshopCards.astro';
 import { projects } from '../data/profile';
-import { projectStops, projectSectionId } from '../lib/pageStops';
+import { projectStops } from '../lib/pageStops';
+import { BOOT_DEADLINE_MS, BOOT_SEEN_KEY, shouldBoot } from '../lib/projectsBoot';
+import { PHONE_QUERY } from '../lib/viewport';
 
-// One rail stop per project — flat and literal. See lib/pageStops.ts.
+// /projects on its own register: the drafting field behind it, no FluidSky or SkyWash (`page="drafting"` re-inks the
+// page for the drafting ground), and no veil, because the boot is the entrance. Every section and project carries
+// the id projectStops() points at.
 const stops = projectStops(projects);
+const names = projects.filter((p) => p.tier === 'selected').map((p) => p.name);
+const description = `Projects by Ing Tian (Zeying Tian) — ideas turned into things that run: ${names.slice(0, -1).join(', ')} and ${names.at(-1)}, plus the tools he built for himself and kept using.`;
+
+// THE BOOT IS DECIDED INLINE, BEFORE FIRST PAINT (CLAUDE.md, Interactivity). shouldBoot ships as its own source, and
+// PHONE_QUERY is interpolated because an inline script cannot import; tests/distSmoke.test.ts runs this as shipped.
+// At this point a restored scroll is in history.state, not in scrollY. The script owns the boot clock (data-boot-at,
+// t=0 for TerminalHeader) and the BOOT_DEADLINE_MS failsafe: whoever removes the class sends `projects:booted`, so it
+// goes once. Under ClientRouter, <html> takes the incoming page's attributes, and the router runs this once per
+// document.
+const bootDecider = `(function () {
+  try {
+    var KEY = ${JSON.stringify(BOOT_SEEN_KEY)}, DEADLINE = ${JSON.stringify(BOOT_DEADLINE_MS)};
+    var PHONE = ${JSON.stringify(PHONE_QUERY)};
+    var shouldBoot = ${shouldBoot.toString()};
+    var seen = null;
+    try { seen = sessionStorage.getItem(KEY); } catch (e) { seen = null; }
+    var st = history.state;
+    if (!shouldBoot({
+      seen: seen !== null,
+      force: new URLSearchParams(location.search).get('boot') === '1',
+      reduce: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      phone: matchMedia(PHONE).matches,
+      hash: location.hash,
+      restoredScroll: scrollY > 0 || !!(st && st.scrollY > 0),
+    })) return;
+    try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
+    var root = document.documentElement;
+    root.dataset.bootAt = String(performance.now());
+    root.classList.add('projects-boot');
+    setTimeout(function () {
+      if (!root.classList.contains('projects-boot')) return;
+      root.classList.remove('projects-boot');
+      window.dispatchEvent(new Event('projects:booted'));
+    }, DEADLINE);
+  } catch (e) { /* storage that throws means play (above); anything else, the finished page — never a broken one */ }
+})();`;
 ---
-<BaseLayout
-  title="Projects — Ing Tian"
-  description="Selected projects by Ing Tian (Zeying Tian) — shipped tools and systems. Featuring witness, a Go plugin that keeps a person-centric archive of how you think and grow as you code."
-  veilLine="a builder by trade"
-  veilOnLoad={true}
-  navZone="light"
->
-  <main class="projects descent is-fluid">
-    <FluidSky strength={4} variant="reading" yStart={1.15} />
-    <SkyWash />
+<BaseLayout title="Projects — Ing Tian" description={description} page="drafting" veil={false} navZone="light" preloadMono>
+  <script is:inline set:html={bootDecider} />
+  <DraftingField />
+  <SideRail stops={stops} id="projects-toc" />
 
-    <SideRail stops={stops} id="projects-toc" />
+  <main class="projects-page">
+    <a class="back" href="/">← back</a>
 
-    <div class="projects-block">
-      <header class="projects-head">
-        <a class="back" href="/">← back</a>
-        <h1>Projects</h1>
-        <p class="lede">Shipped tools and systems — built end to end. Fewer, but finished; each one solves a problem I actually had.</p>
-      </header>
+    <TerminalHeader />
+    {/* The cow: fixed in the right-hand column from 1180px; below that in the flow, beside the listing's last line
+        (on a phone its bubble opens below that line). */}
+    <div class="cowbox"><PlushCow size="rail" talk /></div>
+    <Gallery />
 
-      <div class="project-list">
-        {projects.map((p, i) => (
-          <div class="project-slot" id={projectSectionId(i)}>
-            <ProjectCard project={p} variant="full" headingLevel={2} />
-          </div>
-        ))}
-      </div>
+    <section class="sec" id="p-selected" aria-labelledby="p-selected-h">
+      <div class="sec-h"><span class="n">01</span><h2 id="p-selected-h">Selected work</h2><span class="s">quant · research · data</span></div>
+      <SelectedRows />
+    </section>
 
-      <footer class="projects-foot"><a class="back" href="/">← back to the descent</a></footer>
-    </div>
+    <section class="sec" id="p-workshop" aria-labelledby="p-workshop-h">
+      <div class="sec-h"><span class="n">02</span><h2 id="p-workshop-h">The workshop</h2><span class="s">tools I built for myself and kept using</span></div>
+      <WorkshopCards />
+    </section>
   </main>
+  <ProjectAsk />
 </BaseLayout>
 
 <style>
-  .projects { position: relative; z-index: 0; min-height: 100vh; }
-
-  /* Like /research, this is a READING page — it uses the shared --reading-grad
-     token (tokens.css), which holds the luminous range top-to-bottom (light)
-     and an even charcoal (dark) so text stays legible. Shared with /research so
-     the two reading pages stay identical instead of drifting. */
-  .projects.descent { background: var(--reading-grad); }
-
-  /* Same composition as /research — identical left margin and right gutter, so
-     the two reading pages read as one system instead of two guesses. The measure
-     caps at 860px rather than /research's 1180px because these cards hold prose
-     and a 1180px card reads as stretched; the paper page needs the extra width
-     for its two-column body. A percentage left margin (not a clamp, which caps
-     out and drifts left on wide monitors) keeps ~34% as the rail's margin. */
-  .projects-block {
-    width: min(64%, 860px);
-    margin-left: 34%;
-    margin-right: clamp(24px, 4vw, 90px);
-    box-sizing: border-box;
+  /* Above the field (z 0). The right gutter from 1180px is the cow's column, mirroring the rail on the left.
+     THE LABEL KNOCKOUT: every glyph on the page wears a 1px ring of the bare ground, the way a drafting sheet clears
+     the contours around a label. main has no background, so its text sits straight on the field's strokes, and a
+     stroke under a glyph takes light --ink-3 from 5.00:1 to 4.10 (minor line), 3.03 (major) and 1.34 (a fresh lit
+     ping) — the 4.5:1 rule held only between strokes. With the ring, the pixels touching a glyph are the ground the
+     palette was measured on (tests/draftingPalette.test.ts). Offsets with no blur, so the ring is opaque; eight of
+     them so the diagonals are closed too. A component with its own opaque ground should set `text-shadow: none`. */
+  .projects-page {
+    position: relative; z-index: 1; max-width: 1500px; padding: 0 6vw 180px;
+    --knock: var(--draft-ground);
+    text-shadow: -1px -1px 0 var(--knock), 0 -1px 0 var(--knock), 1px -1px 0 var(--knock), -1px 0 0 var(--knock),
+      1px 0 0 var(--knock), -1px 1px 0 var(--knock), 0 1px 0 var(--knock), 1px 1px 0 var(--knock);
+  }
+  /* Clears SideRail where it shows (it hides at ≤1100px). Measured with every row active, so every rule drawn:
+     its right edge is at x=139 at 1101px and x=151 at 2000px, against content starting at 190 and 230. */
+  @media (min-width: 1101px) { .projects-page { padding-left: clamp(190px, 13vw, 230px); } }
+  /* THE COW'S COLUMN IS THE MOCKUP'S, and the bubble is capped to it (.cowbox, below) — the owner's "the cow never
+     overlaps content" (spec §3). The widest bubble is ~272px ("Look before you change anything.", 32 characters of
+     12.5px mono, plus the 4px cell's padding and border), wider than this gutter from 1180 to ~1560px, where it
+     painted up to ~52px over the column. The column keeps the mockup's width rather than widening to hold it: a
+     long half wraps inside the bubble.
+     tests/cowTalk.test.ts holds this padding and the cap to the same terms. */
+  @media (min-width: 1180px) {
+    .projects-page { padding-right: calc(4vw + 210px); }
   }
 
-  .projects-head { padding: 14vh 0 5vh; }
-  .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
-  .back:hover { color: var(--seal); }
-  .projects h1 {
-    font-family: var(--font-display); font-weight: 500; font-size: clamp(38px, 5vw, 58px);
-    line-height: 1.04; letter-spacing: -0.01em; font-variation-settings: 'SOFT' 60; margin-top: 16px; color: var(--ink-1);
+  /* Every jump target lands 110px down, clear of the fixed corner nav. :global because the targets are rendered by
+     child components too (#p-index is TerminalHeader's): scoped, this compiled to section[cid-of-this-page][id] and
+     silently missed them — CLAUDE.md's scoped-style trap. Anchored under .projects-page so it cannot leak. */
+  .projects-page :global(section[id]), .projects-page :global(li[id]) { scroll-margin-top: 110px; }
+
+  .back { display: inline-block; margin-top: 140px; font: 12px var(--font-mono); color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
+  .back:hover { color: var(--ochre); }
+
+  /* THE COW'S COLUMN. From 1180px it is fixed in the gutter the padding above reserves, mirroring the rail. Below
+     that it follows no scroll — fixed, it and its bubble would cover text and tap targets.
+     BELOW 1180px, PHONES INCLUDED, it sits in the flow BESIDE THE LISTING'S LAST LINE, the idle prompt, whose 14
+     characters leave the rest of that row empty. The box takes no height of its own there: the cow's top meets
+     the prompt line's top (TerminalHeader's .idle is a 12px margin plus one 13.5px/1.55 line, synced by hand) and
+     its 104px reach down into the gallery's 70px top margin, so the gallery starts where it would with no cow. A
+     band under the listing (218px, then a 104px row) pushed the gallery below the fold at 1100x800 and 1080x810,
+     against spec §3. Its bubble is its own opaque ground, so no label knockout.
+     A PHONE GETS THE PLACEMENT FROM 641px, not a dock bottom-right over the first screen's listing and summary,
+     nor a 218px band under the listing. One thing cannot carry over: in a 343px column the bubble beside the cow
+     has no room on the prompt's row (the prompt sits under its left end) or above it (the summary), so on a phone
+     it opens BELOW the prompt, tail turned up at the cow, into a strip the box reserves, and its halves wrap to the
+     column. The strip is a fixed height and the cow is top-aligned (below), so neither the gallery nor the cow
+     moves when it speaks. That bubble is the one difference from 641px; the cow stands where it does there.
+     NOTHING HERE TAKES A CLICK BUT THE COW. A child's pointer-events: none does not let a click through its
+     parent's box, and the cow's wrapper is as wide as the bubble even while the bubble is hidden — so with only
+     the bubble transparent, a 212x226 box on a phone and a strip over the rows' arrows at 1440 swallowed every
+     click, after the bubble had gone. Hidden while the page boots, like the mockup's, and not pressable then: the
+     boot rule is on the button, because its `auto` would beat a `none` inherited from the box. */
+  .cowbox { display: flex; justify-content: flex-end; text-shadow: none; pointer-events: none; }
+  .cowbox :global(.cow) { pointer-events: auto; }
+  /* The bubble is the drafting panel, as every other surface on this page is; set on the bubble so it beats the
+     cow's own paper, and its tail inherits it. */
+  .cowbox :global(.cow-bubble) { --moo-paper: var(--draft-panel); }
+  /* WHERE THE IN-FLOW COW STANDS, and why it is two rules.
+     TOP-ALIGNED, so the bubble's height never reaches it. The rail wrapper is a row with align-items: flex-end
+     (PlushCow), so the cow sat on the bottom of a line as tall as its tallest item. From 641px that is the cow, but
+     a phone's bubble is 36.9px down and 90-127px tall: the cow rested 23px low and dropped 18px for every row a line
+     wrapped to, under the finger that had just tapped it.
+     12px DOWN, its top on the prompt line's top rather than the summary's bottom, because of the hop on each line
+     (PlushCow's cow-hop: 11px, 12.2px with its easing's overshoot). Where the summary's last words end over the cow's
+     horns — "of 7" at 360 and 390px, and at 681-761px — the hop carried the horns over those glyphs. 12px clears it:
+     at 61 widths from 320 to 1179, the horns at the hop's peak stay at least 1.67px under every glyph box. Its cost
+     is from 641px, where a lifted gallery card now covers 15.9px of the cow's legs (it was 3.9px). The card paints
+     over the cow, so the cow still covers nothing. The 12 is the .idle's margin and the 11 is the keyframe's, both
+     synced by hand. */
+  @media (max-width: 1179px) {
+    .cowbox { height: 0; align-items: flex-start; }
+    .cowbox :global(.cow-wrap) { margin-top: calc(-12px - 13.5px * 1.55); }
+    .cowbox :global(.cow) { align-self: flex-start; margin-top: 12px; }
+    .cowbox :global(.cow-art) { width: 88px; height: auto; }
   }
-  .lede { font-size: 14px; color: var(--ink-3); margin-top: 16px; line-height: 1.7; max-width: 54ch; }
-
-  .project-list { display: grid; gap: 22px; }
-  /* Anchor wrapper for the rail, offset so a jumped-to card isn't glued to the
-     viewport's top edge. A REAL box, not display:contents — a contents element
-     generates no box, so getBoundingClientRect() returns zeros and every rail
-     stop would report top:0, pinning the scrollspy to the last stop forever. */
-  .project-slot { scroll-margin-top: 12vh; }
-
-  .projects-foot { padding: 10vh 0 16vh; }
-
-  /* Narrow / tablet: the rail hides itself (same 1100px breakpoint as SideRail);
-     the column re-centers at the reading measure. */
-  @media (max-width: 1100px) {
-    .projects-block { width: auto; margin: 0 auto; padding: 0 24px; max-width: 760px; }
+  /* The phone's strip: the bubble's top 4px under the prompt's line (its tail, turned up, rises beside the prompt's
+     empty right end), and the box's height the bubble's tallest case — four rows (4 × 12.5px × 1.45, plus 54px of
+     border, padding and MOO type) — less the gallery's 44px phone margin it may sit in, plus 6px of air. Four rows is
+     the widest line at 320px; at 390px nothing passes three. tests/cowTalk.test.ts word-wraps every line at 320px from
+     these literals and PlushCow's, so a fifth row fails there rather than overrunning into the gallery. */
+  @media (max-width: 640px) {
+    .cowbox { height: calc(4px + 4 * 1.45 * 12.5px + 54px - 44px + 6px); }
+    .cowbox :global(.cow-wrap--talk .cow-bubble) { align-self: flex-start; margin: calc(12px + 13.5px * 1.55 + 4px) 0 0; transform-origin: 85% 0; }
+    .cowbox :global(.cow-tail) { top: auto; bottom: calc(100% - 4px); transform: scaleY(-1); }   /* 4px: one cell */
   }
-
+  /* FIXED IN THE GUTTER, capped to it, anchored by its BOTTOM. The cap is the gutter (the padding above) less the
+     cow's inset: 100% is the viewport here, and past the main's 1500px max-width the room beyond it is the cow's.
+     So a long half wraps (measured: five of the twenty lines at 1180px, four at 1280-1440, one at 1560) and the
+     bubble grows a row taller — upward, because the box hangs from where the two-row pair's bottom sat under the
+     mockup's `top: 47vh`: two rows, the bubble's 54px of border, padding and MOO type, its 24px gap and the 156px
+     cow, so 47vh + 270.25px. The cow itself never moves. */
+  @media (min-width: 1180px) {
+    .cowbox { position: fixed; right: max(26px, 3.2vw); bottom: calc(53vh - 2 * 1.45 * 12.5px - 234px); z-index: 15;
+      max-width: calc(100% - min(100%, 1500px) + 4vw + 210px - max(26px, 3.2vw)); }
+  }
+  :global(html.projects-boot) .cowbox { opacity: 0; transform: translateY(24px); transition: none; }
+  :global(html.projects-boot) .cowbox :global(.cow) { pointer-events: none; }
   @media (prefers-reduced-motion: no-preference) {
-    .project-list :global(.pcard) { animation: projects-in 0.7s ease both; }
-    @keyframes projects-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    .cowbox { transition: opacity 0.6s, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
   }
+
+  .sec { margin-top: 120px; }
+  .sec-h { display: flex; align-items: baseline; gap: 16px; border-bottom: 1px solid rgba(var(--draft-line-rgb), 0.2); padding-bottom: 14px; }
+  .sec-h .n { font: 12px var(--font-mono); color: var(--ochre); }
+  .sec-h h2 { font: 600 13px var(--font-mono); letter-spacing: 0.24em; text-transform: uppercase; margin: 0; color: var(--ink-1); }
+  .sec-h .s { margin-left: auto; font: 11.5px var(--font-mono); color: var(--ink-3); }
+  /* The section heads wait out the boot with the rows and cards under them, as in the mockup. */
+  :global(html.projects-boot) .sec-h { opacity: 0; transition: none; }
+  @media (prefers-reduced-motion: no-preference) { .sec-h { transition: opacity 0.5s; } }
 </style>
+
+<script>
+  // THE ASK: every project surface on the page (gallery card, selected row, workshop card) is its repo link, or a
+  // button for a private one, carrying data-ask. A plain primary click asks first — `projects:ask` on window, for
+  // the pop-up — instead of leaving; a modified or middle click falls through and opens the repo, as a reader doing
+  // that expects. A button has no repo to fall through to, so a modified click on one asks too. One listener here,
+  // so the rule cannot differ between the three.
+  import { PROJECT_COW_LINES } from '../data/cowLines';
+  import type { SpokenLine } from '../lib/cowSpeech';
+  import { BUBBLE_MS, HELLO_DELAY_MS, IDLE_EVERY_MS, TYPE_MS, idleLines, mayIdle, nextLine } from '../lib/cowTalk';
+  import { askPoint } from '../lib/galleryLayout';
+  import { prefersReducedMotion } from '../lib/motion';
+  import { onPageView } from '../lib/pageView';
+  import { isPhone } from '../lib/viewport';
+
+  // Started with the boot (lib/pageView.ts), not at window `load`: the boot can be skipped once the header's script
+  // runs, right after parse, and the press that skips it must already find this listening — and ProjectAsk, which
+  // starts the same way, there to answer the clicks this turns into asks.
+  onPageView('main.projects-page', () => {
+    const page = document.querySelector<HTMLElement>('main.projects-page');
+    if (!page) return;
+    // A PRESS THAT SKIPS THE BOOT DOES NOTHING ELSE: the click ending it neither asks nor falls through to the repo.
+    // During the boot the gallery is still the pile and the rows are invisible, so what is under the pointer is not
+    // what the reader aimed at. Read at pointerdown, in the capture phase on window, because the boot's skip removes
+    // html.projects-boot on that same pointerdown — a check at click time would never see the boot. A keyboard click
+    // (detail 0) has no pointerdown of its own, so a stale mark from a press that never clicked cannot swallow it.
+    let pressInBoot = false;
+    const onDown = (): void => { pressInBoot = document.documentElement.classList.contains('projects-boot'); };
+    const onClick = (e: MouseEvent): void => {
+      const skipped = pressInBoot && e.detail > 0;
+      // A listing name is an index: it jumps (no preventDefault) and never asks, but the cow still says its line.
+      // A press that skipped the boot does not jump either: a line not yet printed is transparent, not absent, so
+      // its link still takes the press.
+      const listed = (e.target as Element).closest<HTMLElement>('[data-cow-key]');
+      if (listed) {
+        if (skipped) e.preventDefault();
+        else window.dispatchEvent(new CustomEvent('cow:say', { detail: { key: listed.dataset.cowKey!, announce: true } }));
+      }
+      const from = (e.target as Element).closest<HTMLElement>('[data-ask]');
+      if (!from) return;
+      if (skipped) { e.preventDefault(); return; }
+      const at = askPoint(e, from.getBoundingClientRect(), from.matches('a[href]'));
+      if (!at) return;
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('projects:ask', { detail: { slug: from.dataset.ask!, ...at, from } }));
+    };
+    const ac = new AbortController();
+    window.addEventListener('pointerdown', onDown, { capture: true, signal: ac.signal });
+    page.addEventListener('click', onClick);
+    return () => ac.abort();
+  });
+
+  // THE COW TALKS. PlushCow's `talk` markup, driven from here so no other page with a cow ships any of this. It greets
+  // once per page view, HELLO_DELAY_MS after the page is booted — "booted" is a state: no html.projects-boot means
+  // booted already, otherwise wait for `projects:booted`. It says a project's line on `cow:say` (the ask and the
+  // listing send one), its next idle line when pressed, and now and then one on its own, gated by mayIdle() and
+  // never while the tab is hidden — at most idleLines() of them per page view, then it stops scheduling them and
+  // waits to be asked (WCAG 2.2.2; none at all under reduced motion). Only `announce` lines reach the live region: a
+  // reader asked for those, and the greeting and idle chatter would interrupt a screen reader every 10-20s.
+  // ON A PHONE IT SAYS ONLY WHAT IT IS ASKED: no greeting and no idle lines, so the idle timer is never set. In a
+  // phone's one column a bubble the reader did not ask for is a box over what they are reading.
+  // STARTED AT PARSE, like the dispatcher above that sends it `cow:say`: started at window `load` it missed every ask
+  // made before then, and then greeted ("Click one. I'll explain.") a reader whose pop-up was already open.
+  onPageView('.cow-wrap--talk', () => {
+    const wrap = document.querySelector<HTMLElement>('.cow-wrap--talk');
+    const maybeBtn = wrap?.querySelector<HTMLButtonElement>('[data-cow]');
+    const maybeBubble = wrap?.querySelector<HTMLElement>('.cow-bubble');
+    const maybeA = wrap?.querySelector<HTMLElement>('[data-said-a]');
+    const maybeB = wrap?.querySelector<HTMLElement>('[data-said-b]');
+    const maybeLive = wrap?.querySelector<HTMLElement>('[data-cow-live]');
+    if (!maybeBtn || !maybeBubble || !maybeA || !maybeB || !maybeLive) return;
+    const btn = maybeBtn, bubble = maybeBubble, lineA = maybeA, lineB = maybeB, live = maybeLive;
+    const root = document.documentElement;
+    const reduce = prefersReducedMotion();
+    const phone = isPhone();
+
+    const sets: Record<string, readonly SpokenLine[]> = {
+      ...PROJECT_COW_LINES.byKey, hello: PROJECT_COW_LINES.hello, idle: PROJECT_COW_LINES.idle,
+    };
+    const said: Record<string, number> = {};
+    // Arrival counts as quiet, so the first idle line is never sooner than 14s in.
+    let lastSpoke = performance.now();
+    let typeT = 0, hideT = 0, helloT = 0, idleT = 0, liveF = 0;
+
+    function say(key: string, announce: boolean): void {
+      const k = key in sets ? key : 'idle';
+      const next = nextLine(sets[k], said[k] ?? 0);
+      said[k] = next.said;
+      const [top, bottom] = next.line;
+      lastSpoke = performance.now();
+      window.clearTimeout(typeT);
+      window.clearTimeout(hideT);
+      if (announce) {
+        // A reader's line wins: once they have asked, "Click one. I'll explain." has nothing left to say, so a
+        // pending greeting (or one still waiting on the boot) is dropped rather than typed over their line.
+        window.clearTimeout(helloT);
+        window.removeEventListener('projects:booted', greet);
+        // Cleared, then set a frame later, so a line equal to the last one (in-progress has only one) is a new
+        // addition to the region rather than the same text, which a screen reader may not repeat.
+        live.textContent = '';
+        cancelAnimationFrame(liveF);
+        liveF = requestAnimationFrame(() => { live.textContent = `${top} ${bottom}`; });
+      }
+      bubble.classList.add('is-on');
+      const hide = (): void => { bubble.classList.remove('is-on'); };
+      // Reduced motion: the line whole, no typing and no hop.
+      if (reduce) {
+        lineA.textContent = top;
+        lineB.textContent = bottom;
+        hideT = window.setTimeout(hide, BUBBLE_MS);
+        return;
+      }
+      btn.classList.remove('is-hop');
+      void btn.offsetWidth;   // restart the hop on a line that interrupts the last one
+      btn.classList.add('is-hop');
+      // THE BOX IS THE WHOLE LINE BEFORE A CHARACTER LANDS, so it neither grows nor re-wraps as it types: each half is
+      // laid out in full from the first key, the untyped rest of it present but invisible. Where the page caps the
+      // bubble (its gutter from 1180px, the column on a phone) a long half wraps, and it wraps where the finished
+      // line will — sized in `ch` instead, as it was, the box could not know a half was about to break.
+      const put = (el: HTMLElement, text: string, typed: number): void => {
+        const rest = document.createElement('span');
+        rest.style.visibility = 'hidden';
+        rest.textContent = text.slice(typed);
+        el.replaceChildren(text.slice(0, typed), rest);
+      };
+      let n = 0;
+      const type = (): void => {
+        n += 1;
+        put(lineA, top, n);
+        put(lineB, bottom, Math.max(0, n - top.length));
+        if (n < top.length + bottom.length) typeT = window.setTimeout(type, TYPE_MS);
+        else hideT = window.setTimeout(hide, BUBBLE_MS);
+      };
+      type();
+    }
+
+    const greet = (): void => { helloT = window.setTimeout(() => say('hello', false), HELLO_DELAY_MS); };
+    let idleLeft = idleLines(phone, reduce);
+    const idle = (): void => {
+      if (idleLeft <= 0) return;
+      const [lo, hi] = IDLE_EVERY_MS;
+      idleT = window.setTimeout(() => {
+        if (!document.hidden && mayIdle(performance.now(), lastSpoke)) {
+          say('idle', false);
+          idleLeft -= 1;
+        }
+        idle();
+      }, lo + Math.random() * (hi - lo));
+    };
+    const onSay = (e: Event): void => {
+      const d = (e as CustomEvent<{ key: string; announce: boolean }>).detail;
+      if (d?.key) say(d.key, d.announce === true);
+    };
+    const onPress = (): void => say('idle', true);
+
+    const ac = new AbortController();
+    const signal = ac.signal;
+    if (!phone) {
+      if (root.classList.contains('projects-boot')) window.addEventListener('projects:booted', greet, { once: true, signal });
+      else greet();
+    }
+    idle();
+    window.addEventListener('cow:say', onSay, { signal });
+    btn.addEventListener('click', onPress);
+
+    return () => {
+      ac.abort();
+      [typeT, hideT, helloT, idleT].forEach((id) => window.clearTimeout(id));
+      cancelAnimationFrame(liveF);
+    };
+  });
+</script>

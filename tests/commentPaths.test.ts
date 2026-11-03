@@ -132,6 +132,7 @@ const NOT_FILES = [
   /^docs\//,        // gitignored per CLAUDE.md, so design docs are real locally and never in the repo
   /[*]/,            // a glob, i.e. a pattern rather than a reference
   /-$/,             // a truncated glob stem, e.g. `pages/proto-` from `pages/proto-*.astro`
+  /\.py$/,          // another repo's code: this one has no Python, so lib/positioning.ts citing offchart's is a source
   /^(src|tests|src\/lib|src\/data|src\/pages|src\/components)$/,   // a directory named as a shape
 ];
 
