@@ -588,12 +588,8 @@ const items: Item[] = [
     }
     syncToggle();
 
-    // THE ATTRIBUTE FLIP ONLY: swap it, persist, sync a11y. The repaint is repaintForTheme's.
-    //
-    // It used to also dispatch astro:page-load from inside here, which re-initialises EVERY vanilla script on the
-    // page — the deck's full slide re-measure, three beat steppers, the Toc, the cow, and the terrain canvas
-    // repaint — all inside that frozen window. Measured at 6x CPU throttle: 4 long tasks with the worst at 383ms,
-    // by far the largest single stall anywhere on the site. That is the "slowish" the owner felt.
+    // THE ATTRIBUTE FLIP ONLY: swap it, persist, sync a11y. The repaint is repaintForTheme's, and why it is not
+    // astro:page-load is said there.
     function flipTheme() {
       const dark = document.documentElement.dataset.theme === 'dark';
       if (dark) { delete document.documentElement.dataset.theme; }

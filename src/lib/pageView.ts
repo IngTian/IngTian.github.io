@@ -24,7 +24,10 @@ export function onPageView(selector: string, init: () => (() => void) | undefine
     const el = document.querySelector(selector);
     if (el && el === ranFor) return;
     ranFor = el;
-    teardown?.();
+    // Empty the slot before init runs, so an init that throws cannot leave a spent teardown to run twice.
+    const last = teardown;
+    teardown = undefined;
+    last?.();
     teardown = init();
   };
   if (document.readyState !== 'complete') run();

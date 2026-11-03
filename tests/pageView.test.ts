@@ -73,4 +73,21 @@ describe('onPageView', () => {
     doc.pageLoad();
     expect(log).toEqual(['init 1', 'teardown 1', 'init, nothing found', 'init 2']);
   });
+
+  it('never runs a teardown twice, even when the init after it throws', () => {
+    const doc = fakeDocument('interactive');
+    const log: string[] = [];
+    let n = 0;
+    onPageView('[data-term]', () => {
+      const k = ++n;
+      if (k === 2) throw new Error('init 2 failed');
+      log.push(`init ${k}`);
+      return () => { log.push(`teardown ${k}`); };
+    });
+    doc.el = {};          // a new DOM, whose init throws
+    expect(() => doc.pageLoad()).toThrow('init 2 failed');
+    doc.el = {};          // and another: teardown 1 is spent and must not run again
+    doc.pageLoad();
+    expect(log).toEqual(['init 1', 'teardown 1', 'init 3']);
+  });
 });
