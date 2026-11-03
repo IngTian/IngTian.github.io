@@ -687,3 +687,51 @@ describe('/projects — the page shell on the drafting field', () => {
     expect(new Set(offsets)).toEqual(new Set(['-1,-1', '0,-1', '1,-1', '-1,0', '1,0', '-1,1', '0,1', '1,1']));
   });
 });
+
+describe('/projects — the ask: one non-modal dialog and its GitHub button', () => {
+  // The pop-up a project click opens (components/projects/ProjectAsk.astro). NON-MODAL on purpose: it closes on an
+  // outside click, on scroll and when focus leaves it, so there is no focus trap to promise — aria-modal would tell
+  // a screen reader the rest of the page is unreachable when it is not.
+  const markup = (): string => {
+    const p = byRoute().get('/projects');
+    if (!p) throw new Error('no built page for /projects — run `npm run build`');
+    return p.markup;
+  };
+  /** The element whose opening tag starts at `at`, through its matching close tag. */
+  const outer = (html: string, at: number): string => {
+    const tag = /^<([a-z][\w-]*)/.exec(html.slice(at))![1];
+    const re = new RegExp(`<(/?)${tag}\\b[^>]*>`, 'g');
+    re.lastIndex = at;
+    let depth = 0;
+    for (let m = re.exec(html); m; m = re.exec(html)) {
+      depth += m[1] ? -1 : 1;
+      if (depth === 0) return html.slice(at, m.index + m[0].length);
+    }
+    throw new Error(`unclosed <${tag}> at ${at}`);
+  };
+  const dialog = (): { tag: string; html: string } => {
+    const opens = [...markup().matchAll(/<[a-z][\w-]*\b[^>]*\srole="dialog"[^>]*>/g)];
+    expect(opens.length, '[role="dialog"] elements on /projects').toBe(1);
+    return { tag: opens[0][0], html: outer(markup(), opens[0].index!) };
+  };
+
+  it('ships exactly one [role="dialog"]: non-modal, inert while closed, labelled by its own title', () => {
+    const { tag, html } = dialog();
+    expect(/\saria-modal\b/.test(tag), 'the dialog claims aria-modal').toBe(false);
+    // Closed, it is only transparent — without inert its controls would sit in the Tab order, unseen.
+    expect(/\sinert\b/.test(tag), 'the closed dialog is not inert').toBe(true);
+    const id = /\saria-labelledby="([^"]+)"/.exec(tag)?.[1];
+    expect(id, 'the dialog has no aria-labelledby').toBeTruthy();
+    const title = new RegExp(`<[a-z][\\w-]*\\b[^>]*\\sid="${id}"[^>]*>`).exec(html)?.[0];
+    expect(title, `aria-labelledby="${id}" names no element inside the dialog`).toBeTruthy();
+    expect(/\sclass="[^"]*\bask-t\b/.test(title!), `the dialog is labelled by ${title}, not by its title`).toBe(true);
+  });
+
+  it("makes the dialog's GitHub button a link to a new tab that is not handed window.opener", () => {
+    const links = [...dialog().html.matchAll(/<a\b[^>]*>/g)].map((m) => m[0]);
+    expect(links.length, '<a> elements in the dialog').toBe(1);
+    expect(/\sclass="[^"]*\bbtn--sticker\b/.test(links[0]), `${links[0]} is not the sticker button`).toBe(true);
+    expect(/\starget="_blank"/.test(links[0]), `${links[0]} lacks target="_blank"`).toBe(true);
+    expect(/\srel="[^"]*\bnoopener\b/.test(links[0]), `${links[0]} lacks rel="noopener"`).toBe(true);
+  });
+});

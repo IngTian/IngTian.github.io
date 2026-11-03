@@ -1,0 +1,55 @@
+---
+// The shared button: one ANATOMY (size, label, arrow, press, focus ring, and the keyboard and a11y
+// behaviour a real <a>/<button> already has) with a per-page SKIN on top. Buttons are page-own — each page gets
+// its own look when it is designed — so ANOTHER PAGE ADDS A SKIN HERE, NOT A NEW BUTTON: a `skin` value and one
+// `.btn--<skin>` block below the anatomy. Today the only skin is /projects' sticker.
+//
+// An <a> when there is an href, a <button type="button"> when there is not. Anything else passed (target, rel,
+// data-*) lands on that element. The arrow is an SVG, because the mono face's latin subset has no ↗ glyph.
+import type { HTMLAttributes } from 'astro/types';
+
+type Props = Omit<HTMLAttributes<'a'>, 'href' | 'type'> & { href?: string; skin: 'sticker'; arrow?: boolean };
+
+const { href, skin, arrow = false, class: extra, ...rest } = Astro.props;
+const Tag = href ? 'a' : 'button';
+---
+<Tag class:list={['btn', `btn--${skin}`, extra]} href={href} type={href ? undefined : ('button' as const)} {...rest}>
+  <slot />
+  {arrow && (
+    <svg class="arr" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false">
+      <path d="M2.5 9.5l7-7M4 2.5h5.5V8" fill="none" stroke="currentColor" stroke-width="1.4" />
+    </svg>
+  )}
+</Tag>
+
+<style>
+  /* THE ANATOMY — every skin shares it. */
+  .btn {
+    position: relative; display: inline-flex; align-items: center; height: 42px; padding: 0 20px; border: 0;
+    font: 600 13px var(--font-mono); letter-spacing: 0.04em; text-decoration: none; white-space: nowrap; cursor: pointer;
+  }
+  .btn .arr { margin-left: 8px; }
+  .btn:active { transform: scale(0.96); }
+  .btn:focus-visible { outline: 2px solid var(--ochre); outline-offset: 3px; }
+  @media (hover: hover) { .btn:hover .arr { transform: translate(2px, -2px); } }
+  @media (prefers-reduced-motion: no-preference) {
+    .btn { transition: transform 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+    .btn .arr { transition: transform 0.25s; }
+  }
+
+  /* THE STICKER — /projects' skin, so it reads that page's drafting tokens. A slight tilt, a 1.5px ink edge and a
+     hard offset shadow in the accent (the seal, on that page); it lifts toward you on hover and snaps flat on press.
+     After the anatomy, so its :active wins at equal specificity. */
+  .btn--sticker {
+    border-radius: 12px; color: var(--ink-1); background: var(--draft-panel); transform: rotate(1.5deg);
+    box-shadow: 0 0 0 1.5px var(--ink-1), 4px 4px 0 var(--ochre);
+  }
+  .btn--sticker:focus-visible { transform: rotate(-1deg) translate(-2px, -2px); box-shadow: 0 0 0 1.5px var(--ink-1), 6px 6px 0 var(--ochre); }
+  @media (hover: hover) {
+    .btn--sticker:hover { transform: rotate(-1deg) translate(-2px, -2px); box-shadow: 0 0 0 1.5px var(--ink-1), 6px 6px 0 var(--ochre); }
+  }
+  .btn--sticker:active { transform: translate(3px, 3px); box-shadow: 0 0 0 1.5px var(--ink-1), 1px 1px 0 var(--ochre); }
+  @media (prefers-reduced-motion: no-preference) {
+    .btn--sticker { transition: transform 0.22s cubic-bezier(0.3, 1.6, 0.5, 1), box-shadow 0.22s; }
+  }
+</style>

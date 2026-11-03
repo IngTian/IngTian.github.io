@@ -1,0 +1,189 @@
+---
+// /projects' ask: the small pop-up a project click opens AT THE CLICK — "open on GitHub?", the name, its one-line
+// idea, the sticker button, `not now`, and the repo path. A private repo (and the in-progress card, which stands
+// for ai-mentor-core) gets the "private for now" form, with no button: there is nothing to open.
+//
+// It listens for `projects:ask` (projects.astro turns every plain primary click on a [data-ask] surface into one)
+// and tells the cow which project was asked about with `cow:say`, announced, since the reader asked.
+//
+// A NON-MODAL dialog: it closes on Esc, `not now`, a click elsewhere, a scroll past 60px and focus leaving it, so
+// there is no trap. It is `inert` while closed — otherwise its invisible controls would sit in the Tab order —
+// and `tabindex="-1"`, so a click on its text keeps focus inside instead of reading as focus leaving. Focus moves
+// to the button (or `not now`) on open and back to the item that asked on close.
+//
+// It sits outside <main> on purpose: main is a stacking context at z 1, which would put the pop-up under the
+// corner nav, and its label knockout is for text on the field — the pop-up has its own opaque ground.
+import { inProgress, projects, repoUrl } from '../../data/profile';
+import Button from '../Button.astro';
+
+const wip = inProgress[0];
+const asks: Record<string, { name: string; idea: string; url: string | null }> = {
+  ...Object.fromEntries(projects.map((p) => [p.slug, { name: p.name, idea: p.idea, url: repoUrl(p) }])),
+  'in-progress': { name: wip.repo ?? wip.name, idea: wip.idea, url: null },
+};
+---
+<div aria-hidden="true" data-ask-rk>
+  <span class="rk tl"></span><span class="rk tr"></span><span class="rk bl"></span><span class="rk br"></span>
+</div>
+<div class="ask" role="dialog" aria-labelledby="ask-t" aria-describedby="ask-d" tabindex="-1" inert
+  data-ask-dialog data-asks={JSON.stringify(asks)}>
+  <div class="ask-k" data-k>open on GitHub?</div>
+  <div class="ask-t" id="ask-t" data-t></div>
+  <p class="ask-d" id="ask-d" data-d></p>
+  <div class="ask-a">
+    <Button skin="sticker" arrow href="https://github.com/IngTian" target="_blank" rel="noopener" data-go>Open on GitHub</Button>
+    <button type="button" class="ask-x" data-no>not now</button>
+  </div>
+  <div class="ask-r" data-r></div>
+</div>
+
+<style>
+  .ask {
+    position: fixed; left: 0; top: 0; z-index: 50; width: min(330px, calc(100vw - 32px)); padding: 18px 18px 14px;
+    border-radius: 12px; background: var(--draft-panel); color: var(--ink-1);
+    border: 1px solid rgba(var(--draft-line-rgb), 0.28);
+    box-shadow: 0 0 0 1px rgba(var(--draft-hi-rgb), 0.08), 0 30px 80px var(--draft-shadow);
+    opacity: 0; transform-origin: var(--ox, 50%) var(--oy, 0);
+  }
+  .ask.on { opacity: 1; }
+  .ask > * { opacity: 0; }
+  .ask.on > * { opacity: 1; }
+  .ask.private :global(.btn) { display: none; }
+
+  /* The arrival, motion only: the panel scales out of the click while its lines rise in turn. Under reduced
+     motion none of this applies — the pop-up simply appears, unscaled. */
+  @media (prefers-reduced-motion: no-preference) {
+    .ask { transform: scale(0.88); transition: opacity 0.14s, transform 0.14s; }
+    .ask.on { transform: none; transition: opacity 0.2s 0.1s, transform 0.42s 0.1s cubic-bezier(0.2, 0.95, 0.3, 1.18); }
+    .ask > * { transform: translateY(7px); transition: opacity 0.12s, transform 0.12s; }
+    .ask.on > * { transform: none; transition: opacity 0.28s, transform 0.38s cubic-bezier(0.2, 0.9, 0.3, 1); }
+    .ask.on > :nth-child(1) { transition-delay: 0.2s; }
+    .ask.on > :nth-child(2) { transition-delay: 0.25s; }
+    .ask.on > :nth-child(3) { transition-delay: 0.3s; }
+    .ask.on > :nth-child(4) { transition-delay: 0.36s; }
+    .ask.on > :nth-child(5) { transition-delay: 0.41s; }
+    .rk.go { transition: transform 0.4s cubic-bezier(0.2, 0.9, 0.25, 1), opacity 0.2s; }
+  }
+
+  /* ink-3 on the panel is 5.41:1 light and 5.22:1 dark. The mockup also dimmed the path to 0.75, which would
+     take it under 4.5:1, so it does not. */
+  .ask-k { font: 10.5px var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
+  .ask-t { margin: 6px 0; font: 600 22px var(--font-body); letter-spacing: -0.01em; }
+  .ask-d { margin: 0 0 16px; font-size: 13.5px; line-height: 1.5; color: var(--ink-3); }
+  .ask-a { display: flex; align-items: center; gap: 14px; }
+  .ask-x { padding: 6px 2px; border: 0; background: none; font: 12px var(--font-mono); color: var(--ink-3); cursor: pointer; }
+  .ask-x:hover, .ask-x:focus-visible { color: var(--ink-1); text-decoration: underline; text-underline-offset: 4px; }
+  .ask-x:focus-visible { outline: 2px solid var(--ochre); outline-offset: 3px; }
+  .ask-r { margin-top: 12px; font: 10.5px var(--font-mono); color: var(--ink-3); }
+
+  /* The viewfinder: four corner brackets that fly from the click and lock 7px outside the pop-up's corners. */
+  .rk { position: fixed; left: 0; top: 0; z-index: 51; width: 14px; height: 14px; pointer-events: none; opacity: 0;
+    border: 0 solid var(--ochre); }
+  .tl { border-width: 1.5px 0 0 1.5px; }
+  .tr { border-width: 1.5px 1.5px 0 0; }
+  .bl { border-width: 0 0 1.5px 1.5px; }
+  .br { border-width: 0 1.5px 1.5px 0; }
+</style>
+
+<script>
+  import { prefersReducedMotion } from '../../lib/motion';
+
+  interface Ask { name: string; idea: string; url: string | null }
+  interface AskDetail { slug: string; x: number; y: number; from: HTMLElement }
+
+  // The mockup's numbers: 16px from the click and from the viewport's edges, 14px brackets locking 7px outside the
+  // corners, and a scroll of more than 60px closes the ask.
+  const GAP = 16, RK = 14, RK_OUT = 7, SCROLL_CLOSE = 60;
+
+  let teardown: (() => void) | null = null;
+
+  function init(): void {
+    teardown?.();
+    teardown = null;
+    const maybe = document.querySelector<HTMLElement>('[data-ask-dialog]');
+    if (!maybe) return;
+    // Non-null alias: TypeScript does not carry the guard's narrowing into the hoisted functions below.
+    const dialog = maybe;
+    const asks = JSON.parse(dialog.dataset.asks ?? '{}') as Record<string, Ask>;
+    const part = (sel: string): HTMLElement => dialog.querySelector<HTMLElement>(sel)!;
+    const kicker = part('[data-k]'), title = part('[data-t]'), idea = part('[data-d]'), path = part('[data-r]');
+    const go = part('[data-go]') as HTMLAnchorElement, no = part('[data-no]');
+    const rks = [...document.querySelectorAll<HTMLElement>('[data-ask-rk] .rk')];
+    let from: HTMLElement | null = null;
+    let y0 = 0;
+    let goTimer = 0;
+
+    function open({ slug, x, y, from: el }: AskDetail): void {
+      window.dispatchEvent(new CustomEvent('cow:say', { detail: { key: slug, announce: true } }));
+      const a = asks[slug];
+      if (!a) return;
+      from = el;
+      y0 = scrollY;
+      kicker.textContent = a.url ? 'open on GitHub?' : 'private for now';
+      title.textContent = a.name;
+      idea.textContent = a.idea;
+      path.textContent = a.url ? a.url.replace(/^https:\/\//, '') : 'not public yet — nothing to open';
+      if (a.url) go.href = a.url;
+      dialog.classList.toggle('private', !a.url);
+
+      // Measured after the content is in, so a long idea or the button-less private form is placed by its real
+      // size. Measuring also flushes the closed state, so an ask that replaces an open one replays from its click.
+      const vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+      const w = dialog.offsetWidth, h = dialog.offsetHeight;
+      const left = Math.max(GAP, Math.min(vw - w - GAP, x - w / 2));
+      const top = y + h + 24 < vh ? y + GAP : Math.max(GAP, y - h - GAP);
+      dialog.style.left = `${left}px`;
+      dialog.style.top = `${top}px`;
+      dialog.style.setProperty('--ox', `${x - left}px`);
+      dialog.style.setProperty('--oy', `${y - top}px`);
+
+      // Each bracket starts at the click, shrunk, then flies to its corner. Under reduced motion it is simply there.
+      const fly = !prefersReducedMotion();
+      const corners = [
+        [left - RK_OUT, top - RK_OUT], [left + w + RK_OUT - RK, top - RK_OUT],
+        [left - RK_OUT, top + h + RK_OUT - RK], [left + w + RK_OUT - RK, top + h + RK_OUT - RK],
+      ];
+      rks.forEach((k, i) => {
+        const [cx, cy] = corners[i];
+        k.classList.remove('go');
+        k.style.left = `${cx}px`;
+        k.style.top = `${cy}px`;
+        k.style.transform = fly ? `translate(${x - cx - RK / 2}px, ${y - cy - RK / 2}px) scale(0.4)` : 'none';
+        k.style.opacity = '1';
+      });
+      if (fly) {
+        void rks[0].offsetWidth;   // commit the start pose, so the flight is a transition rather than a jump
+        rks.forEach((k) => { k.classList.add('go'); k.style.transform = 'none'; });
+      }
+
+      dialog.inert = false;
+      dialog.classList.add('on');
+      (a.url ? go : no).focus({ preventScroll: true });
+    }
+
+    function close(): void {
+      if (dialog.inert) return;
+      dialog.inert = true;
+      dialog.classList.remove('on');
+      rks.forEach((k) => { k.classList.add('go'); k.style.opacity = '0'; k.style.transform = 'scale(0.6)'; });
+      from?.focus({ preventScroll: true });
+      from = null;
+    }
+
+    const ac = new AbortController();
+    const signal = ac.signal;
+    window.addEventListener('projects:ask', (e) => open((e as CustomEvent<AskDetail>).detail), { signal });
+    no.addEventListener('click', close, { signal });
+    // The repo opens in a new tab; the ask has been answered. Deferred, so the press shows and the link's own
+    // activation is not raced by the dialog going inert under it.
+    go.addEventListener('click', () => { clearTimeout(goTimer); goTimer = window.setTimeout(close, 120); }, { signal });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); }, { signal });
+    // CAPTURE, so a click on another project closes this ask before the page's listener opens the next one.
+    document.addEventListener('click', (e) => { if (!dialog.contains(e.target as Node)) close(); }, { capture: true, signal });
+    window.addEventListener('scroll', () => { if (Math.abs(scrollY - y0) > SCROLL_CLOSE) close(); }, { passive: true, signal });
+    dialog.addEventListener('focusout', (e) => { if (!dialog.contains(e.relatedTarget as Node | null)) close(); }, { signal });
+    teardown = () => { ac.abort(); clearTimeout(goTimer); };
+  }
+
+  document.addEventListener('astro:page-load', init);
+</script>
