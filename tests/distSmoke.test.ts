@@ -11,7 +11,7 @@ import { INTRO_SEEN_KEY } from '../src/lib/introSession';
 import { inProgress, projects, timeline } from '../src/data/profile';
 import { type Stop, experienceStops, flattenStops, projectSectionId, projectStops } from '../src/lib/pageStops';
 import { GALLERY_ORDER } from '../src/lib/galleryLayout';
-import { EASE, RAIL_ENTER_MS } from '../src/lib/motionTiming';
+import { EASE, RAIL_ENTER_MS, stagger } from '../src/lib/motionTiming';
 import { listingLines } from '../src/lib/projectsListing';
 import { BOOT_CMD, BOOT_DEADLINE_MS, BOOT_SEEN_KEY } from '../src/lib/projectsBoot';
 import { PHONE_QUERY } from '../src/lib/viewport';
@@ -628,17 +628,19 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
   });
 
   // The label is two layers in the markup and two more in CSS (::before, ::after, from data-l), so its states
-  // cross-fade by opacity. The dash is its own aria-hidden span. The marks are the script's: none is served.
-  it('renders every link as href + aria-hidden dash + one label whose data-l is its text, and no state', () => {
+  // cross-fade by opacity. The dash is its own aria-hidden span. The marks are the script's: none is served. The
+  // one thing served on a link is its place in the entrance, --i, its index in document order.
+  it('renders every link as href + aria-hidden dash + one label whose data-l is its text, its --i, and no state', () => {
     const bad: string[] = [];
     for (const p of railPages()) {
-      for (const it of itemsOf(p)) {
+      for (const [k, it] of itemsOf(p).entries()) {
         const parts = /^<span class="rule" aria-hidden="true"[^>]*><\/span><span class="lbl" data-l="([^"]*)"[^>]*><span class="dim"[^>]*>([^<]*)<\/span><\/span>$/
           .exec(it.inner);
         if (!parts) bad.push(`${p.route} #${it.target}: ${it.inner}`);
         else if (decode(parts[1]) !== decode(parts[2])) bad.push(`${p.route} #${it.target}: data-l ≠ its text`);
         if (!p.ids.has(it.target)) bad.push(`${p.route}: the rail links #${it.target}, which the page does not emit`);
-        if (/\s(aria-current|style|class)=/.test(it.tag)) bad.push(`${p.route} #${it.target}: served with ${it.tag}`);
+        if (/\s(aria-current|class)=/.test(it.tag)) bad.push(`${p.route} #${it.target}: served with ${it.tag}`);
+        if (/\sstyle="([^"]*)"/.exec(it.tag)?.[1] !== `--i:${k}`) bad.push(`${p.route} #${it.target}: not style="--i:${k}" in ${it.tag}`);
       }
     }
     expect(bad).toEqual([]);
@@ -659,7 +661,7 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
   const railCss = (): string => [...railPages().flatMap((p) => [...p.html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)]
     .map((m) => m[1])), distCss()].join('\n').replace(/\[data-astro-cid-[\w-]+\]/g, '');
   const railRules = (): RegExpMatchArray[] => [...railCss().matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .filter(([, sel]) => /\.side-rail\b|#projects-toc\b/.test(sel));
+    .filter(([, sel]) => /\.side-rail\b/.test(sel));
 
   it('transitions nothing but opacity and transform', () => {
     const rules = railRules();
@@ -674,24 +676,36 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
     expect([...curves].map((c) => c.replace(/\s+/g, ''))).toEqual([EASE]);
   });
 
-  // The bundled script runs after the browser has painted, so the entrance's from-state is held by an inline
-  // decider that parses BEFORE the rail, on every arrival too (data-astro-rerun), and ends itself at RAIL_ENTER_MS.
-  // Run as shipped: it holds, and its timer lets go.
-  it('holds its entrance from before the rail parses, for RAIL_ENTER_MS at most, and only where motion is allowed', () => {
+  // THE ENTRANCE IS CSS, so it runs from the first frame with no script to wait for (a bundled script runs after
+  // the browser has painted). Each row comes in from 6px left, --i (its index) times the rail's --gap late, with a
+  // backwards fill so it waits in its from-state; --gap is lib/motionTiming's stagger() over the rail's rows, so
+  // every row is in by RAIL_ENTER_MS however long the rail is. Read as shipped, the duration and the gaps.
+  it('enters by CSS alone, where motion is allowed: opacity and transform, each row --i x --gap late, all in by RAIL_ENTER_MS', () => {
+    const css = railCss();
+    const frames = /@keyframes side-rail-enter\{((?:[^{}]*\{[^{}]*\})*)\}/.exec(css);
+    expect(frames, 'no @keyframes side-rail-enter').not.toBeNull();
+    // one frame, the from-state, and nothing in it but opacity and transform
+    expect(frames![1]).toMatch(/^(?:from|0%)\{opacity:0;transform:translate(?:X)?\(-6px\)\}$/);
+
+    const gated = [...css.matchAll(/@media ?\(prefers-reduced-motion: ?no-preference\) ?\{((?:[^{}]*\{[^{}]*\})*)\}/g)]
+      .map((m) => m[1]).join('');
+    const rule = /\.side-rail a\{(animation:side-rail-enter [^}]*)\}/.exec(gated);
+    expect(rule, 'the entrance is not on .side-rail a under prefers-reduced-motion: no-preference').not.toBeNull();
+    expect([...css.matchAll(/animation(?:-name)?:side-rail-enter\b/g)], 'the entrance is also set outside the motion gate').toHaveLength(1);
+    const m = /^animation:side-rail-enter (\d*\.?\d+)(m?s) (cubic-bezier\([^)]*\)) backwards;animation-delay:calc\(var\(--i\) ?\* ?var\(--gap\)\)$/.exec(rule![1]);
+    expect(m, `the entrance's declarations: ${rule![1]}`).not.toBeNull();
+    const row = Number(m![1]) * (m![2] === 's' ? 1000 : 1);
+    expect(m![3]).toBe(EASE);
+
     for (const p of railPages()) {
-      const m = /<script data-astro-rerun>([^<]*)<\/script>\s*<nav\b[^>]*\sclass="side-rail"/.exec(p.html);
-      expect(m, `${p.route}: no data-astro-rerun decider right before the rail`).not.toBeNull();
-      const classes = new Set<string>();
-      let timer: { fn: () => void; ms: number } | undefined;
-      const run = new Function('document', 'setTimeout', m![1]);
-      run({ documentElement: { classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c) } } },
-        (fn: () => void, ms: number) => { timer = { fn, ms }; });
-      expect([...classes], p.route).toEqual(['rail-enter']);
-      expect(timer?.ms, p.route).toBe(RAIL_ENTER_MS);
-      timer!.fn();
-      expect(classes.size, `${p.route}: the deadline did not end the hold`).toBe(0);
+      const gap = /<nav\b[^>]*\sclass="side-rail"[^>]*\sstyle="--gap:([\d.]+)ms"/.exec(p.html);
+      expect(gap, `${p.route}: the rail carries no --gap`).not.toBeNull();
+      const n = itemsOf(p).length; // and each row's --i is its index (the markup test above)
+      for (let i = 0; i < n; i += 1) {
+        expect(i * Number(gap![1]), `${p.route} row ${i}`).toBeCloseTo(stagger(i, n, { step: 40, total: RAIL_ENTER_MS - row }), 6);
+      }
+      expect((n - 1) * Number(gap![1]) + row, p.route).toBeLessThanOrEqual(RAIL_ENTER_MS + 1e-9);
     }
-    expect(railCss()).toMatch(/@media ?\(prefers-reduced-motion:no-preference\)\{html\.rail-enter \.side-rail a\{opacity:0;transform:translate(?:X)?\(-6px\)\}/);
   });
 
   // A touch laptop's primary pointer can hover, so a tap there leaves :hover on the tapped row until the next tap
@@ -792,10 +806,15 @@ describe('/projects — the page shell on the drafting field', () => {
   });
 
   // Neither main nor the rail has a background, so their text sits straight on the field's strokes. The knockout
-  // gives every glyph an opaque 1px ring of the ground: eight offsets, none blurred, in the ground colour.
+  // gives every glyph an opaque 1px ring of the ground: eight offsets, none blurred, in the ground colour. <main> is
+  // the page's own; the rail is shared, so it wears the same ring through the role tokens the drafting blocks declare
+  // (tests/draftingPalette.test.ts holds their values), and the page does not touch it.
   it("rings every glyph in <main> and in the rail with the bare ground, so no stroke touches the page's text", () => {
-    const rule = /\.projects-page,#projects-toc\{([^}]*text-shadow:[^}]*)\}/.exec(shippedCss());
-    expect(rule, 'no text-shadow rule for .projects-page and #projects-toc together').not.toBeNull();
+    const css = shippedCss();
+    expect(css).toMatch(/\.side-rail \.lbl\{(?:[^}]*;)?text-shadow:var\(--rail-halo,\s*none\)/);
+    expect(css).toMatch(/\.side-rail \.rule\{(?:[^}]*;)?box-shadow:var\(--rail-dash-halo,\s*none\)/);
+    const rule = /\.projects-page\{([^}]*text-shadow:[^}]*)\}/.exec(css);
+    expect(rule, 'no text-shadow rule for .projects-page').not.toBeNull();
     expect(rule![1]).toMatch(/--knock:\s*var\(--draft-ground\)/);
     const shadows = /text-shadow:([^;}]*)/.exec(rule![1])![1].split(/,(?![^(]*\))/).map((s) => s.trim());
     const offsets = shadows.map((s) => {

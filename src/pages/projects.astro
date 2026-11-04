@@ -56,9 +56,8 @@ const bootDecider = `(function () {
 ---
 <BaseLayout title="Projects — Ing Tian" description={description} page="drafting" veil={false} navZone="light" preloadMono>
   <script is:inline set:html={bootDecider} />
-  {/* The rail before the field, so the rail's module runs first and its entrance starts as early as it can: its
-      from-state is held from before first paint and only until a deadline, and the field's init (a whole frame of
-      isolines) is the longest on the page. */}
+  {/* The rail before the field, so the rail's script runs first and its first marks land inside its entrance: the
+      field's init (a whole frame of isolines) is the longest on the page. */}
   <SideRail stops={stops} id="projects-toc" />
   <DraftingField />
 
@@ -87,25 +86,19 @@ const bootDecider = `(function () {
 <style>
   /* Above the field (z 0). The right gutter from 1180px is the cow's column, mirroring the rail on the left. */
   .projects-page { position: relative; z-index: 1; max-width: 1500px; padding: 0 6vw 180px; }
-  /* THE LABEL KNOCKOUT: every glyph on the page wears a 1px ring of the bare ground, the way a drafting sheet clears
-     the contours around a label. Neither main nor the rail (fixed over the field, z 30) has a background, so their
-     text sits straight on the field's strokes, and a stroke under a glyph takes light --ink-3 from 5.00:1 to 4.10
-     (minor line), 3.03 (major) and 1.34 (a fresh lit ping) — the 4.5:1 rule held only between strokes. With the
-     ring, the pixels touching a glyph are the ground the palette was measured on (tests/draftingPalette.test.ts) —
-     measured on the rail's labels over a major line, all but 10 of 424 of them, and those few, at the ring's
+  /* THE LABEL KNOCKOUT: every glyph in main wears a 1px ring of the bare ground, the way a drafting sheet clears the
+     contours around a label. main has no background, so its text sits straight on the field's strokes, and a stroke
+     under a glyph takes light --ink-3 from 5.00:1 to 4.10 (minor line), 3.03 (major) and 1.34 (a fresh lit ping) —
+     the 4.5:1 rule held only between strokes. With the ring, the pixels touching a glyph are the ground the palette
+     was measured on (tests/draftingPalette.test.ts) — measured on the rail's labels, which wear the same ring
+     (tokens.css' --rail-halo), over a major line: all but 10 of 424 of them, and those few, at the ring's
      anti-aliased edge, within 26/255 of it. Offsets with no blur, so the ring is opaque; eight of them so the
      diagonals are closed too. A component with its own opaque ground should set `text-shadow: none`. */
-  .projects-page, :global(#projects-toc) {
+  .projects-page {
     --knock: var(--draft-ground);
     text-shadow: -1px -1px 0 var(--knock), 0 -1px 0 var(--knock), 1px -1px 0 var(--knock), -1px 0 0 var(--knock),
       1px 0 0 var(--knock), -1px 1px 0 var(--knock), 0 1px 0 var(--knock), 1px 1px 0 var(--knock);
   }
-  /* The rail's dash is a painted span, which a text-shadow does not reach, so it wears the ring as a box-shadow.
-     Bare, the dash is 2.39:1 against a major line beside it in light, under the 3:1 a mark needs; ringed, the
-     pixels beside it are the bare ground (tests/draftingPalette.test.ts holds both). 2px, not 1: the
-     1px dash sits at a fractional y and covers two pixel rows in part, so a 1px ring leaves the rows next to those
-     partly line. The dash's strength is the alpha of its colour (SideRail's --mk), so the ring is opaque. */
-  :global(#projects-toc .rule) { box-shadow: 0 0 0 2px var(--knock); }
   /* Clears SideRail where it shows (it hides at ≤1100px). Every label sits past the dash's gutter whatever its
      state; measured, the rail's right edge ("THE WORKSHOP") is at x=159.4 at 1101px and x=171.0 at 2000px, 2px more
      under the hover nudge, against content starting at 190 and 230. */

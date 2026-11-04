@@ -13,7 +13,7 @@
 //
 // It touches the DOM despite living in lib/, the exception lib/introSession.ts makes for the same reason: seven scripts
 // share it (/projects' TerminalHeader, ProjectAsk, Gallery, DraftingField, and that page's ask dispatcher and cow;
-// and SideRail, whose entrance must start before its pre-paint hold runs out), and a component cannot import one.
+// and SideRail, whose first marks must land while its rows are still coming in), and a component cannot import one.
 
 /** Run `init` for this page view's `selector` element: now on a full load, then once per new DOM, each time after
  *  the teardown the last init returned. */

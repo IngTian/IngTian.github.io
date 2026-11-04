@@ -6,8 +6,7 @@ export const EASE = 'cubic-bezier(.2,.7,.2,1)';
 /** A figure drawing itself: a gentle start, then the same long settle. */
 export const DRAW = 'cubic-bezier(.33,.08,.24,1)';
 
-/** The rail's entrance: every row in within this. It is also how long the rail waits hidden for its script before it
- *  shows at rest instead, since an entrance that started later would end after it was meant to. */
+/** The rail's entrance (SideRail.astro, in CSS): every row in within this. */
 export const RAIL_ENTER_MS = 500;
 
 /**

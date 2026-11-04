@@ -5,7 +5,7 @@
 // so every shared component on the page — the corner nav, the rail, the cow — reskins with no edit. That is also
 // why it needs a test: a shared component chose its ink assuming the site's grounds, and here it lands on a
 // different one. The numbers below are the ones a reader actually gets.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { AA_BODY } from '../src/lib/skyLegibility';
 import { between, onGround, over, railMark, ratio, rgbaOf, rgbOf, tokens, type RGB } from './helpers/palette';
@@ -14,7 +14,6 @@ const src = (f: string): string => readFileSync(new URL(`../src/components/proje
 const fieldSrc = src('DraftingField.astro');
 const rowsSrc = src('SelectedRows.astro');
 const cardsSrc = src('WorkshopCards.astro');
-const pageSrc = readFileSync(new URL('../src/pages/projects.astro', import.meta.url), 'utf8');
 
 /** The field's stroke alphas, read from DraftingField.astro: minor and major per theme, and a lit ping's peak. */
 function strokeAlphas(theme: 'light' | 'dark'): { minor: number; major: number; lit: number } {
@@ -63,6 +62,9 @@ const ROLE = ['--paper', '--ink-1', '--ink-2', '--ink-3', '--ink-4', '--ink-5', 
 // rendered it; it is gone rather than left to read as if the nav were reskinned here.
 const DRAFT = ['--draft-ground', '--draft-line-rgb', '--draft-hi-rgb', '--draft-panel',
   '--draft-shadow', '--draft-ph', '--draft-tag', '--draft-vig'];
+// The rail's halos: role tokens only this register declares, so the shared rail (SideRail.astro, which falls back to
+// `none`) wears the label knockout here without the page restyling it.
+const RAIL = ['--rail-halo', '--rail-dash-halo'];
 
 describe('the drafting palette (tokens.css)', () => {
   it('declares the same tokens in both themes', () => {
@@ -70,7 +72,7 @@ describe('the drafting palette (tokens.css)', () => {
     // theme the drafting light block beats the site's dark block by source order. A token set only in the light
     // drafting block would therefore show its LIGHT value in dark theme. Both blocks must declare every token.
     const [light, dark] = THEMES.map((t) => Object.keys(tokens(t.sel)).sort());
-    expect(light).toEqual([...ROLE, ...DRAFT].sort());
+    expect(light).toEqual([...ROLE, ...RAIL, ...DRAFT].sort());
     expect(dark).toEqual(light);
   });
 
@@ -135,12 +137,26 @@ describe('the drafting palette (tokens.css)', () => {
         expect(onGround(tk['--ochre'], over(rgbToken(tk['--draft-line-rgb']), Number(m![1]), rgbOf(ground)))).toBeGreaterThanOrEqual(AA_BODY);
       });
 
+      // THE RAIL'S LABELS lie straight on the field, so each glyph wears the knockout <main>'s text wears: an opaque
+      // 1px ring of the bare ground, eight unblurred offsets so the diagonals are closed too. The pixels touching a
+      // glyph are then the ground, where the inks above clear AA.
+      it("--rail-halo rings the rail's labels with the bare ground", () => {
+        const offsets = tk['--rail-halo'].split(/,(?![^(]*\))/).map((s) => {
+          const p = /^(-?\d+)(?:px)? (-?\d+)(?:px)? 0 var\(--draft-ground\)$/.exec(s.trim());
+          expect(p, `"${s}" is not an unblurred offset in var(--draft-ground)`).not.toBeNull();
+          return `${Number(p![1])},${Number(p![2])}`;
+        });
+        expect(offsets.sort()).toEqual(['-1,-1', '-1,0', '-1,1', '0,-1', '0,1', '1,-1', '1,0', '1,1']);
+      });
+
       // THE RAIL'S DASH is a mark (3:1), and it lies straight on the field. Bare, a major line BESIDE it is what it
-      // is read against, and in light that is 2.39:1. So the page rings it with the bare ground (the knockout its
-      // labels wear, as a box-shadow), and what lies beside it is always that ground; what lies UNDER it can be
-      // the bare ground, any of the three strokes, and either end of the vignette, and each is checked.
+      // is read against, and in light that is 2.39:1. So it is ringed with the bare ground (--rail-dash-halo, a
+      // box-shadow, since a text-shadow does not reach a painted span), and what lies beside it is always that
+      // ground; what lies UNDER it can be the bare ground, any of the three strokes, and either end of the
+      // vignette, and each is checked. 2px, not 1: the 1px dash sits at a fractional y and covers two pixel rows in
+      // part, so a 1px ring leaves the rows next to those partly line.
       it("the rail's dash clears 3:1 wherever the field runs under it, ringed with the bare ground", () => {
-        expect(pageSrc).toContain(':global(#projects-toc .rule) { box-shadow: 0 0 0 2px var(--knock); }');
+        expect(tk['--rail-dash-halo']).toBe('0 0 0 2px var(--draft-ground)');
         const line = rgbToken(tk['--draft-line-rgb']), hi = rgbToken(tk['--draft-hi-rgb']);
         const a = strokeAlphas(t.theme);
         const ink = rgbOf(tk['--ink-1']), bare = rgbOf(ground);
@@ -171,4 +187,32 @@ describe('the drafting palette (tokens.css)', () => {
       });
     });
   }
+});
+
+// CLAUDE.md, The concept: a page reskins a shared component only through role tokens. So the halos are declared in
+// the two drafting blocks and nowhere else (the key-set test above holds both blocks), SideRail reads them, and no
+// page's stylesheet reaches into the rail.
+describe('the rail reskins through role tokens only', () => {
+  const SRC = new URL('../src/', import.meta.url);
+  const files = readdirSync(SRC, { recursive: true, encoding: 'utf8' }).filter((f) => /\.(astro|css|ts)$/.test(f));
+  const text = (f: string): string => readFileSync(new URL(f, SRC), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('declares the halos in tokens.css alone, once per drafting block', () => {
+    for (const token of RAIL) {
+      const where = files.flatMap((f) => [...text(f).matchAll(new RegExp(`${token}\\s*:`, 'g'))].map(() => f));
+      expect(where, token).toEqual(['styles/tokens.css', 'styles/tokens.css']);
+    }
+  });
+
+  it('SideRail reads them, falling back to none', () => {
+    const rail = text('components/SideRail.astro');
+    expect(rail).toMatch(/\.side-rail \.lbl \{[^}]*text-shadow: var\(--rail-halo, none\);/);
+    expect(rail).toMatch(/\.side-rail \.rule \{[^}]*box-shadow: var\(--rail-dash-halo, none\);/);
+  });
+
+  it('no page styles the rail', () => {
+    const styled = files.filter((f) => f.startsWith('pages/')).flatMap((f) => [...text(f).matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)]
+      .filter((m) => /#projects-toc\b|\.side-rail\b/.test(m[1])).map(() => f));
+    expect(styled).toEqual([]);
+  });
 });

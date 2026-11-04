@@ -49,7 +49,7 @@ export const between = (a: RGB, b: RGB): number => contrastRatio(wcagLuminance(a
  *  paints it, so the number measured is the one drawn. */
 export function railMark(): number {
   const src = readFileSync(new URL('../../src/components/SideRail.astro', import.meta.url), 'utf8');
-  expect(src, "SideRail.astro's dash is not ink-1 at --mk").toContain('.side-rail .rule { background: color-mix(in srgb, var(--ink-1) var(--mk), transparent); }');
+  expect(src, "SideRail.astro's dash is not ink-1 at --mk").toContain('.side-rail .rule { background: color-mix(in srgb, var(--ink-1) var(--mk), transparent);');
   const m = /--mk:\s*([\d.]+)%;/.exec(src);
   expect(m, 'SideRail.astro declares no --mk: N%').not.toBeNull();
   return Number(m![1]) / 100;
