@@ -3,13 +3,12 @@
 // its window or the vendored reproduction moved under a sentence that quotes them, which is the point: the
 // prose cannot be edited to follow, because it types no number.
 import { describe, it, expect } from 'vitest';
-import { TABLE2, PAPER, REPRO, REPRO_NOTES } from '../src/data/papers/rl-bhrp';
+import { TABLE2, PAPER, REPRO, REPRO_NOTES, paperValue } from '../src/data/papers/rl-bhrp';
 import { PAPER_DATA } from '../src/data/papers';
-import { rlBhrpValues } from '../src/lib/paperNumbers';
 import { rlBhrpWealth } from '../src/data/vendor/rlBhrpWealth';
 import { cumulative } from '../src/lib/wealth';
 
-const v = rlBhrpValues(TABLE2, PAPER, REPRO, REPRO_NOTES);
+const v = PAPER_DATA['rl-bhrp'].values;
 
 describe("Table 2, as the paper prints it", () => {
   it('has all 18 rows, in the paper\'s order (paper-pdf.txt, Table 2)', () => {
@@ -31,7 +30,7 @@ describe("Table 2, as the paper prints it", () => {
   });
 });
 
-describe('rlBhrpValues — the paper\'s figures', () => {
+describe('VALUES — the paper\'s figures', () => {
   it('quotes what $1 became', () => {
     expect([v['usd.rl'], v['usd.bhrp'], v['usd.bench']]).toEqual(['$2.20', '$2.01', '$1.91']);
   });
@@ -83,7 +82,7 @@ describe('rlBhrpValues — the paper\'s figures', () => {
   });
 });
 
-describe('rlBhrpValues — the reproduction\'s figures, from its vendored returns', () => {
+describe('VALUES — the reproduction\'s figures, from its vendored returns', () => {
   it("quotes the median run's edge over BHRP", () => {
     expect(v.reproGap).toBe('1.1');
   });
@@ -116,8 +115,13 @@ describe('rlBhrpValues — the reproduction\'s figures, from its vendored return
   });
 });
 
-describe('PAPER_DATA', () => {
-  it("serves RL-BHRP's values under its slug", () => {
-    expect(PAPER_DATA['rl-bhrp'].values).toEqual(v);
+describe('paperValue and the homepage line', () => {
+  it('throws on a key VALUES does not have, as an unknown :v fails the build', () => {
+    expect(paperValue('usd.rl')).toBe(v['usd.rl']);
+    expect(() => paperValue('usd.rll')).toThrow('unknown value "usd.rll" for rl-bhrp');
+  });
+
+  it("prints the appendix line from Table 2 over the paper's window", () => {
+    expect(PAPER_DATA['rl-bhrp'].line).toBe('$1 → $2.20, Feb 2020 – Aug 2025 · Sharpe 0.90 vs 0.85 BHRP');
   });
 });

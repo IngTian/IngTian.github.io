@@ -1,5 +1,4 @@
-import { PAPER_DATA } from './papers';
-import { PAPER } from './papers/rl-bhrp';
+import { paperValue } from './papers/rl-bhrp';
 
 export interface TimelineEntry {
   period: string;
@@ -101,9 +100,6 @@ export const timeline: TimelineEntry[] = [
   { period: '2019 — 23', title: 'B.Eng, Computer Engineering · McGill', detail: "CGPA 3.99 · Dean's Honour List · Full Scholarship.", kind: 'education' },
 ];
 
-// The paper's own figures, for the one finding that quotes them (lib/paperNumbers.ts).
-const RL = PAPER_DATA['rl-bhrp'].values;
-
 // Newest first. Each record is what every surface listing a paper reads: the /research cards, the homepage
 // appendix, and the factor model's signal ids.
 export const publications: Publication[] = [
@@ -126,7 +122,8 @@ export const publications: Publication[] = [
     href: 'https://arxiv.org/abs/2508.11856v1',
     pdfHref: 'https://arxiv.org/pdf/2508.11856v1',
     reproduction: 'https://github.com/IngTian/rl-bhrp',
-    finding: `On one ${PAPER.start.slice(0, 4)}–${PAPER.end.slice(0, 4)} test of ${PAPER.universe} large US stocks, a policy that learns sector and stock weights under a risk-parity penalty turned $1 into ${RL['usd.rl']}, against ${RL['usd.bhrp']} for plain two-level risk parity — with somewhat more risk, and no test of whether the gap is more than chance.`,
+    // The paper's own figures (data/papers/rl-bhrp.ts VALUES).
+    finding: `On one ${paperValue('startYear')}–${paperValue('endYear')} test of ${paperValue('universe')} large US stocks, a policy that learns sector and stock weights under a risk-parity penalty turned $1 into ${paperValue('usd.rl')}, against ${paperValue('usd.bhrp')} for plain two-level risk parity — with somewhat more risk, and no test of whether the gap is more than chance.`,
     tags: ['reinforcement learning', 'Bayesian hierarchical risk parity', 'portfolio optimization', 'asset allocation'],
     abstract:
       'We propose a two-level, learning-based portfolio method (RL-BHRP) that spreads risk across sectors and stocks, and adjusts exposures as market conditions change. Using U.S. Equities from 2012 to mid-2025, we design the model using 2012 to 2019 data, and evaluate it out-of-sample from 2020 to 2025 against a sector index built from exchange-traded funds and a static risk-balanced portfolio. Over the test window, the adaptive portfolio compounds wealth by approximately 120 percent, compared with 101 percent for the static comparator and 91 percent for the sector benchmark. The average annual growth is roughly 15 percent, compared to 13 percent and 12 percent, respectively. Gains are achieved without significant deviations from the benchmark and with peak-to-trough losses comparable to those of the alternatives, indicating that the method adds value while remaining diversified and investable. Weight charts show gradual shifts rather than abrupt swings, reflecting disciplined rebalancing and the cost-aware design. Overall, the results support risk-balanced, adaptive allocation as a practical approach to achieving stronger and more stable long-term performance.',

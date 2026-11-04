@@ -243,14 +243,13 @@ src/
   lib/paperMarkdown/{index,remarkPaper,rehypePaper}.ts # the markdown chain (spelled once) + the paper format's compiler and checks — see Papers are files
   lib/paperFigures/{wealthFigure,pipelineFigure,metricsTable}.ts # a paper's drawings and Table 1, as HTML strings from its data; a :::figure places each
   lib/paperPage.ts                  # the paper page script's pure half: note stacking, the readout's month, step and label
-  lib/paperNumbers.ts               # rlBhrpValues(): every figure RL-BHRP's prose prints, as the string it prints (a :v reads one)
   lib/wealth.ts                     # the one wealth module: growth of $1, CAGR, drawdown, the band of runs, scales and ticks — the paper page's figures and /projects' rl-bhrp picture
   lib/words.ts                      # the one word counter (countWords, readingMinutes) + hyphenatedParts, so a title keeps "RL-BHRP" whole
   lib/dates.ts                      # the one date helper: longDate, monthYear (UTC)
   lib/motionTiming.ts               # the motion module's pure half: EASE/DRAW, RAIL_ENTER_MS, stagger, sweepDurations, mergeLines
   scripts/motion.ts                 # THE ONE MOTION MODULE, its DOM half: play, onceSeen, riseOnceSeen, sweepLines — the rail and both research routes; the reduced-motion gate is inside it
   scripts/pageView.ts               # onPageView(selector, init): starts nine scripts right after parse, not at window `load`, handing init its element — /projects' (all but two), SideRail's and both research routes' (see Interactivity)
-  data/papers/{index,rl-bhrp}.ts    # PAPER_DATA (values, figures, thumb) and RL-BHRP's Table 2, window and reproduction series
+  data/papers/{index,rl-bhrp}.ts    # PAPER_DATA (values, figures, the homepage line, thumb); RL-BHRP's Table 2, window, reproduction series, and VALUES — every figure its prose prints, as the string it prints (a :v reads one; TypeScript reads one through paperValue, which throws on an unknown key)
   lib/mathml.ts                     # the one MathML letter fix: fixMathVariants for lib/equations.ts, rehypeMathVariants for every .md
   data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline, publications, projects + inProgress, awards, links
   data/nav.ts                       # PAGES — the canonical page set (see Navigation)
@@ -796,7 +795,10 @@ file holds is the prose; everything else has one home of its own:
 - **The numbers and pictures** are `PAPER_DATA[slug]` (`src/data/papers/`): `values`, strings
   computed from the paper's data; `figures`, the drawings and tables made from it by
   `lib/paperFigures/` (HTML strings, the maths in them build-time MathML; a figure's caption is the
-  file's); and `thumb`, the index card's picture, for a paper that has one. They reach the plugins as
+  file's); `line`, the homepage appendix's line, for a paper whose line quotes its numbers; and `thumb`,
+  the index card's picture, for a paper that has one. TypeScript that quotes a value (`profile.ts`'s
+  finding, the line) reads it through `paperValue`, which throws on an unknown key, as an unknown `:v`
+  fails the build; a bare `values[key]` would print "undefined" with every gate green. They reach the plugins as
   **options** from `astro.config.mjs`, with the records (for `::abstract`), so they are in Astro's
   config digest and a moved number re-renders the paper. Plugin *code* is not in the digest: after editing a
   plugin, delete `node_modules/.astro/data-store.json` before building or the old render is served.
