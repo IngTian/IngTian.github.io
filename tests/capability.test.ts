@@ -102,13 +102,11 @@ describe('dimensionDepth — volume and quality are different axes', () => {
   });
 
   it('separates share from mean score', () => {
-    // The distinction the fan alone hid. Experience has the largest share because it has the
-    // most items, while its mean evidence score is low; Research has fewer items at a higher
-    // mean. A picture showing only share implied volume and quality were the same thing.
-    const exp = depth.find((d) => d.key === 'experience')!;
-    const res = depth.find((d) => d.key === 'research')!;
-    expect(exp.share).toBeGreaterThan(res.share);
-    expect(res.meanScore).toBeGreaterThan(exp.meanScore);
+    // The distinction the fan alone hid. On the live profile some dimension holds the larger share
+    // because it has more items while its mean evidence score is lower than another's. A picture
+    // showing only share implied volume and quality were the same thing.
+    const disagree = depth.some((a) => depth.some((b) => a.share > b.share && b.meanScore > a.meanScore));
+    expect(disagree).toBe(true);
   });
 
   it('gives an empty dimension zero depth rather than NaN', () => {

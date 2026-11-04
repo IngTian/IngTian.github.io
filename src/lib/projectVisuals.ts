@@ -5,7 +5,7 @@
 // drawing re-themes with the page (the drafting palette in tokens.css) and is never CSS-inverted.
 //
 // Rules the drawings keep, each pinned by tests/projectVisuals.test.ts:
-// - numbers come only from the vendored data, never profile.ts's Table 2;
+// - numbers come only from the vendored data, never the paper's Table 2 (data/papers/rl-bhrp.ts);
 // - text is --ink-1/--ink-3 on --draft-ph, in the mono subset;
 // - `meet`, never `slice` (workshop thumbs run 1.75:1 to 3.6:1);
 // - the gallery's three draw nothing below FLOOR;

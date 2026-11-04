@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { EQUATIONS, PAPER_EQUATIONS, BELLMAN_EQUATIONS } from '../src/lib/equations';
+import { EQUATIONS, BELLMAN_EQUATIONS } from '../src/lib/equations';
 
 describe('baked equations', () => {
   it('renders MathML (no KaTeX CSS/font dependency)', () => {
@@ -12,25 +12,11 @@ describe('baked equations', () => {
   });
   // Chrome's MathML Core draws mathvariant="double-struck"/"script" as a plain italic letter.
   it('writes blackboard and script letters as Unicode letters, which every engine draws', () => {
-    for (const set of [EQUATIONS, PAPER_EQUATIONS, BELLMAN_EQUATIONS]) {
+    for (const set of [EQUATIONS, BELLMAN_EQUATIONS]) {
       for (const [k, v] of Object.entries(set)) expect(v, k).not.toMatch(/mathvariant="(?:script|double-struck)"/);
     }
     expect(BELLMAN_EQUATIONS.recursion).toContain('𝔼');
     expect(BELLMAN_EQUATIONS.curse).toContain('𝒳');
-  });
-});
-
-describe('paper equations (research showcase)', () => {
-  it('renders every showcase equation as MathML', () => {
-    for (const html of Object.values(PAPER_EQUATIONS)) {
-      expect(html).toContain('<math');
-      expect(html).not.toContain('class="katex-html"');
-    }
-  });
-  it('covers the four key equations', () => {
-    expect(Object.keys(PAPER_EQUATIONS).sort()).toEqual(
-      ['reward', 'riskConservation', 'sectorCov', 'weightMap'],
-    );
   });
 });
 

@@ -4,9 +4,9 @@
 //
 // rl-bhrp's committed reproduction run (actor-centering "shared-global"): one simple monthly return per
 // row, 67 months out of sample. rlSeeds[s][t] is seed s's return in month t, 10 seeds in
-// the CSV's column order. These are the REPRODUCTION's numbers, not the paper's Table 2 (profile.ts).
-// fetched: 2026-11-02
-// command: node tools/vendor-projects.mjs
+// the CSV's column order. These are the REPRODUCTION's numbers, not the paper's Table 2 (data/papers/rl-bhrp.ts).
+// fetched: 2026-11-04
+// command: node tools/vendor-projects.mjs rl-bhrp
 export const rlBhrpWealth: { dates: string[]; rlSeeds: number[][]; bhrp: number[]; benchmark: number[] } = {
   dates: [
     "2020-02-29", "2020-03-31", "2020-04-30", "2020-05-31", "2020-06-30", "2020-07-31", "2020-08-31", "2020-09-30",

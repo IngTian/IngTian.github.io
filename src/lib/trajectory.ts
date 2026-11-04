@@ -17,9 +17,9 @@
 //        a plain descent from the second basin PROVABLY stays stuck
 //    Two real minima, a real barrier, real entrapment. Nothing relabelled.
 //
-// 2. It is the paper's own thesis. profile.ts describes RL-BHRP as "learning how to allocate,
-//    rather than assuming". The career story is the same structure: not descending a known
-//    landscape, but learning the objective while descending.
+// 2. It is the paper's own thesis. profile.ts describes RL-BHRP as "a policy that learns sector
+//    and stock weights" rather than fixing them in advance. The career story is the same structure:
+//    not descending a known landscape, but learning the objective while descending.
 //
 // 3. It explains the SDE-to-quant move WITHOUT self-congratulation. The field looked flat in one
 //    direction until he learned he was sensitive to it — a statement about preference discovery,

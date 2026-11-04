@@ -14,28 +14,8 @@ export const EQUATIONS = {
   kkt: tex('\\nabla f + J_h^{\\top}\\lambda + J_g^{\\top}\\mu = 0', opts),
 };
 
-// Display-mode (centered, larger) for the /research showcase panel.
+// Display-mode (centred, larger), for the equations set on a line of their own.
 const display = { ...opts, displayMode: true };
-
-// Key equations from RL-BHRP (arXiv:2508.11856), transcribed VERBATIM from the
-// paper — used in the /research right-column showcase. Each pairs with a plain
-// gloss in research.astro. Do NOT alter the math to "look nicer": these are the
-// paper's actual definitions (honesty rule).
-export const PAPER_EQUATIONS = {
-  // Two-level composition: final asset weight = sector weight × within-sector weight.
-  weightMap: tex('w_i = W_{g(i)}\\,\\eta_{i\\mid g(i)}', display),
-  // Average-reward MDP reward: gross return − transaction cost − risk-dispersion
-  // penalty. Even in the wide left column this is too long for one line at full
-  // body size, so it breaks across two aligned lines at the second minus.
-  reward: tex(
-    '\\begin{aligned} U_{t+1} = {}& w_t^{\\top} R_{t+1} - c\\lVert w_t - w_{t-1}\\rVert_1 \\\\ &{} - \\lambda\\big[\\alpha V_{\\text{within}} + (1-\\alpha) V_{\\text{across}}\\big] \\end{aligned}',
-    display,
-  ),
-  // Risk-contribution conservation: contributions sum to portfolio variance.
-  riskConservation: tex('\\sum_{i=1}^{N} \\mathrm{RC}_i(w) = \\sigma_p^2(w)', display),
-  // Sector-level composite covariance from within-sector weights.
-  sectorCov: tex('\\tilde{\\Sigma}_{gh} = (\\eta^{(g)})^{\\top}\\Sigma_{gh}\\,\\eta^{(h)}', display),
-};
 
 // ── THE FACTOR MODEL IS GONE, AND IT WAS REJECTED BEFORE IT WAS DEAD ────────────────────────────────────
 //

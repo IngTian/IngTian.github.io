@@ -217,7 +217,7 @@ describe('wealthSvg (rl-bhrp)', () => {
     expect(Math.max(...off)).toBeLessThanOrEqual(0.16);   // three 0.1 roundings, two of them in the frame
   });
 
-  // The reproduction's numbers, never the paper's Table 2 (profile.ts): an allow-list, so it also keeps those out.
+  // The reproduction's numbers, never the paper's Table 2 (data/papers/rl-bhrp.ts): an allow-list, so it also keeps those out.
   it('prints only numbers derived from the vendored returns, and says they are the reproduction\'s', () => {
     expect(printed(svg)).toMatch(/reproduction/i);
     const allowed = new Set([

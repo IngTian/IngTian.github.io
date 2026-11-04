@@ -108,7 +108,7 @@ function rlBhrp() {
       '',
       'rl-bhrp\'s committed reproduction run (actor-centering "shared-global"): one simple monthly return per',
       `row, ${value.dates.length} months out of sample. rlSeeds[s][t] is seed s's return in month t, ${seedCols.length} seeds in`,
-      'the CSV\'s column order. These are the REPRODUCTION\'s numbers, not the paper\'s Table 2 (profile.ts).',
+      'the CSV\'s column order. These are the REPRODUCTION\'s numbers, not the paper\'s Table 2 (data/papers/rl-bhrp.ts).',
     ]);
 }
 

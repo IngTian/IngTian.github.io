@@ -39,11 +39,10 @@ interface Props {
    *
    * THE STYLE MATTERS BECAUSE THE TWO FILES ARE SEPARATE AND BOTH ARE BIG. Fraunces ships as
    * normal (36,560 B) and italic (45,624 B), and `preload={true}` force-downloads BOTH at high priority.
-   * Measured: `/research` and `/writing/<slug>` opted in with `true`, and every Fraunces rule on either page
-   * is `font-style: italic` (research.astro's `.card-takeaway`, and the slug page's `.prose blockquote` /
-   * `.prose em`) — so 36,560 B of a face no selector on those pages can ever match was being fetched on the
-   * critical path. `/` is the one page that genuinely needs both: Work.astro:255 is non-italic at weight 500
-   * and :286 is italic.
+   * Measured: `/writing/<slug>` opted in with `true`, and every Fraunces rule on it is `font-style: italic`
+   * (`.prose blockquote` / `.prose em`) — so 36,560 B of a face no selector on the page can ever match was
+   * being fetched on the critical path. `/` is the one page that genuinely needs both: Work.astro's
+   * `.wk-item-name` is non-italic at weight 500 and its `.wk-promise` is italic.
    */
   preloadAccent?: boolean | 'italic';
   /**
@@ -164,8 +163,8 @@ const personLd = {
         than early and announced.
 
         But it does not belong on every page either, which is what it used to do. `grep -rn -- --font-accent src`
-        finds exactly three consuming FILES — sections/Work.astro (so the homepage), research.astro and
-        writing/[...slug].astro — plus the token's own definition in global.css and this comment.
+        finds exactly two consuming FILES — sections/Work.astro (so the homepage) and writing/[...slug].astro —
+        plus the token's own definition in global.css and this comment.
 
         THE DOUBLE DASH IN THAT COMMAND IS NOT PEDANTRY, and it is why the token is spelled `--font-accent` —
         with its leading dashes — everywhere in this comment. Tailwind v4's scanner harvests utility candidates
@@ -184,10 +183,10 @@ const personLd = {
 
         The @font-face rules themselves are NOT gated — <Font> always emits data.css, so --ff-fraunces stays
         resolvable everywhere and any page that later grows an accent rule still renders it (just discovered
-        normally). Only the <link rel=preload> tags are conditional. Verified from dist: of the three opted-in
+        normally). Only the <link rel=preload> tags are conditional. Verified from dist: of the two opted-in
         routes, `/` carries two preload links (it passes `true` — the Work slide uses both the roman and the
-        italic) while /research and /writing/<slug> carry ONE each (they pass `'italic'`, see just below); the
-        other six carry zero, and all nine still carry the Fraunces @font-face block. */}
+        italic) while /writing/<slug> carries ONE (it passes `'italic'`, see just below); the other seven carry
+        zero, and all nine still carry the Fraunces @font-face block. */}
     {/* `'italic'` narrows the preload to the one file the page can actually use. Astro's filter takes a
         list of variant predicates (see filterPreloads in astro/dist/assets/fonts/core/), so this emits one
         <link> instead of two and still leaves the full @font-face block in place — a page that later grows a

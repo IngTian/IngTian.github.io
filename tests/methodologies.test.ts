@@ -138,7 +138,10 @@ describe('the paper is not on this slide', () => {
     expect(allCopy).not.toMatch(/arXiv/i);
     expect(allCopy).not.toMatch(/RL-BHRP/i);
     expect(allCopy).not.toMatch(/preprint/i);
-    expect(allCopy).not.toMatch(/S\. Kang/);
+    // by surname, so neither "Shaofeng Kang" nor "S. Kang" gets through
+    const coauthors = publications.find((p) => p.arxivId === '2508.11856')!.authors.filter((a) => a.name !== 'Zeying Tian');
+    expect(coauthors.length).toBeGreaterThan(0);
+    for (const { name } of coauthors) expect(allCopy).not.toMatch(new RegExp(`\\b${name.split(' ').at(-1)}\\b`));
   });
 
   it('points at the work instead', () => {

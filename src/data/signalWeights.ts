@@ -45,6 +45,14 @@
 // edits came after scoring (trading-desk '~300 tests', rl-bhrp 'from my arXiv paper', macboot '~4,700'). Each
 // quote follows its item. None was re-scored, because none touched what capped the score: bookkeeping,
 // self-reproduction, a private repo. tests/signalWeights.test.ts checks every quoted span is still in its item.
+//
+// THIRD PASS — Claude Opus 5.5, 2026-11-03 — one item, re-scored because its record gained a DOI link:
+// publications:self-attention-rnn-text. Three raters, RUBRIC_PROMPT, none seeing another's output, gave 1, 1
+// and 2; the committed score is the median, 1, and the `because` is the median rater's sentence verbatim. The
+// item scored was the title alone, "Self-Attention on RNN-based Text Classification", so the sentence's "no
+// venue, link" describes that text, not the record, which now carries both. The same pass keyed both
+// publications by slug and set RL-BHRP's label to the paper's title spelling, without re-scoring it: the
+// evidence its score rests on did not change.
 
 import type { SignalWeights } from '../lib/signalRubric';
 
@@ -101,14 +109,14 @@ export const SIGNAL_WEIGHTS: SignalWeights = {
 
     // ── Research ────────────────────────────────────────────────────────────
     {
-      id: 'publications:0', factor: 'research', score: 4,
-      label: 'Optimal Portfolio Construction — A Reinforcement-Learning-Embedded Bayesian Hierarchical Risk Parity (RL-BHRP) Approach',
+      id: 'publications:rl-bhrp', factor: 'research', score: 4,
+      label: 'Optimal Portfolio Construction — A Reinforcement Learning Embedded Bayesian Hierarchical Risk Parity (RL-BHRP) Approach',
       because: 'arXiv:2508.11856 with a public PDF and a full out-of-sample metrics table over a stated train/test split is fully checkable — but a preprint is not peer-reviewed.',
     },
     {
-      id: 'publications:1', factor: 'research', score: 4,
+      id: 'publications:self-attention-rnn-text', factor: 'research', score: 1,
       label: 'Self-Attention on RNN-based Text Classification',
-      because: 'A real proceedings volume a reader can look up, but the entry carries no link, no dataset and no reported metric, and text classification is off this axis.',
+      because: 'The item is only a title, "Self-Attention on RNN-based Text Classification", with no venue, link, dataset or reported metric for a reader to check, and text classification is NLP modelling rather than quantitative research, so the text gives nothing beyond a mention.',
     },
     {
       id: 'interests:0', factor: 'research', score: 1,

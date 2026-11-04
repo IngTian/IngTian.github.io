@@ -84,7 +84,7 @@ describe('the honesty ceiling', () => {
   });
 
   it('scores the RL-BHRP paper as the strongest single artefact', () => {
-    const paper = SIGNAL_WEIGHTS.signals.find((s) => s.id === 'publications:0')!;
+    const paper = SIGNAL_WEIGHTS.signals.find((s) => s.id === 'publications:rl-bhrp')!;
     const max = Math.max(...SIGNAL_WEIGHTS.signals.map((s) => s.score));
     expect(paper.score).toBe(max);
   });
