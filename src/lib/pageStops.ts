@@ -103,9 +103,9 @@ export function railLabel(entry: TimelineEntry): string {
 export function writingStops(kinds: readonly WritingKind[]): Stop[] {
   return kinds.map((k) => {
     const children = sortedEntries(k).map((e) => ({
-      // 18, not 22: measured with a real title, a 22-character label still wrapped to two lines in the rail's
-      // 190px box. SideRail also clips with an ellipsis as a backstop, but the tree should hand it something
-      // that fits rather than relying on the fallback.
+      // 18, not 22: a nested label gets 158px of the rail's 200 (its 30px dash gutter and 12px indent out), and
+      // 22 characters of 10px mono at 0.12em tracking take 158.4px. SideRail clips with an ellipsis as a backstop,
+      // but the tree should hand it something that fits rather than relying on the fallback.
       label: e.title.length > 18 ? `${e.title.slice(0, 17)}…` : e.title,
       target: entrySectionId(k.key, e.slug),
     }));

@@ -8,9 +8,10 @@ import {
   INTRO_DURATION_MS, INTRO_DUR_MIN_MS, INTRO_DUR_MAX_MS,
 } from '../src/lib/introTimeline';
 import { INTRO_SEEN_KEY } from '../src/lib/introSession';
-import { inProgress, projects } from '../src/data/profile';
-import { flattenStops, projectSectionId, projectStops } from '../src/lib/pageStops';
+import { inProgress, projects, timeline } from '../src/data/profile';
+import { type Stop, experienceStops, flattenStops, projectSectionId, projectStops } from '../src/lib/pageStops';
 import { GALLERY_ORDER } from '../src/lib/galleryLayout';
+import { EASE } from '../src/lib/motionTiming';
 import { listingLines } from '../src/lib/projectsListing';
 import { BOOT_CMD, BOOT_DEADLINE_MS, BOOT_SEEN_KEY } from '../src/lib/projectsBoot';
 import { PHONE_QUERY } from '../src/lib/viewport';
@@ -595,6 +596,80 @@ describe("BaseLayout's per-page hooks: /projects is the drafting page, the resea
   });
 });
 
+describe('SideRail — one rail, shipped the same way on every page that has it', () => {
+  // Found by markup rather than listed, so a page that gains the rail is checked too; the set is pinned as well, so a
+  // page that loses its rail fails by name.
+  const railPages = (): Page[] => pages().filter((p) => /<nav\b[^>]*\sclass="side-rail"/.test(p.markup));
+  const decode = (s: string): string => s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  interface Item { target: string; label: string; depth: number; tag: string; inner: string }
+  /** The rail's links in document order, each with its nesting depth (0 = top level). */
+  const itemsOf = (p: Page): Item[] => {
+    const nav = /<nav\b[^>]*\sclass="side-rail"[\s\S]*?<\/nav>/.exec(p.markup)![0];
+    const out: Item[] = [];
+    let open = 0;
+    for (const m of nav.matchAll(/<ul\b[^>]*>|<\/ul>|(<a\b[^>]*>)([\s\S]*?)<\/a>/g)) {
+      if (m[0].startsWith('<ul')) open += 1;
+      else if (m[0] === '</ul>') open -= 1;
+      else {
+        out.push({
+          target: /\shref="#([^"]*)"/.exec(m[1])?.[1] ?? '', label: decode(/\sdata-l="([^"]*)"/.exec(m[2])?.[1] ?? ''),
+          depth: open - 1, tag: m[1], inner: m[2],
+        });
+      }
+    }
+    return out;
+  };
+  const flat = (stops: readonly Stop[], depth = 0): { target: string; label: string; depth: number }[] =>
+    stops.flatMap((s) => [{ target: s.target, label: s.label, depth }, ...flat(s.children ?? [], depth + 1)]);
+
+  it('is on /experience, /projects and /writing', () => {
+    expect(railPages().map((p) => p.route).sort()).toEqual(['/experience', '/projects', '/writing']);
+  });
+
+  // The label is two layers in the markup and two more in CSS (::before, ::after, from data-l), so its states
+  // cross-fade by opacity. The dash is its own aria-hidden span. The marks are the script's: none is served.
+  it('renders every link as href + aria-hidden dash + one label whose data-l is its text, and no state', () => {
+    const bad: string[] = [];
+    for (const p of railPages()) {
+      for (const it of itemsOf(p)) {
+        const parts = /^<span class="rule" aria-hidden="true"[^>]*><\/span><span class="lbl" data-l="([^"]*)"[^>]*><span class="dim"[^>]*>([^<]*)<\/span><\/span>$/
+          .exec(it.inner);
+        if (!parts) bad.push(`${p.route} #${it.target}: ${it.inner}`);
+        else if (decode(parts[1]) !== decode(parts[2])) bad.push(`${p.route} #${it.target}: data-l ≠ its text`);
+        if (!p.ids.has(it.target)) bad.push(`${p.route}: the rail links #${it.target}, which the page does not emit`);
+        if (/\s(aria-current|style|class)=/.test(it.tag)) bad.push(`${p.route} #${it.target}: served with ${it.tag}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  // Every level of the tree, at its depth: the template recurses rather than unrolling a fixed number of levels.
+  it("nests the links as the page's Stop tree does, at every depth", () => {
+    const strip = (xs: Item[]) => xs.map(({ target, label, depth }) => ({ target, label, depth }));
+    expect(strip(itemsOf(projectsPage()))).toEqual(flat(projectStops(projects)));
+    expect(strip(itemsOf(builtPage('/experience')))).toEqual(flat(experienceStops(timeline)));
+    expect(new Set(itemsOf(builtPage('/writing')).map((i) => i.depth))).toEqual(new Set([0, 1]));
+  });
+
+  // CLAUDE.md, Motion: only transform and opacity animate. The old rail transitioned `width` (its dash, which pushed
+  // the label sideways) and `color`.
+  it('transitions nothing but opacity and transform', () => {
+    const css = [...railPages().flatMap((p) => [...p.html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1])), distCss()]
+      .join('\n');
+    const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(([, sel]) => /\.side-rail\b|#projects-toc\b/.test(sel));
+    expect(rules.length, 'no shipped rule styles the rail').toBeGreaterThan(5);
+    const moving = rules.flatMap(([, sel, body]) => [...body.matchAll(/(?:^|;)\s*transition(?:-property)?\s*:([^;]*)/g)]
+      .flatMap((t) => t[1].split(/,(?![^(]*\))/).map((x) => x.trim().split(/\s+/)[0]))
+      .filter((prop) => !['opacity', 'transform', 'none'].includes(prop))
+      .map((prop) => `${sel.trim()} transitions ${prop}`));
+    expect(moving).toEqual([]);
+    // CSS cannot import lib/motionTiming, so the curve is a literal there: hold it to EASE.
+    const curves = new Set(rules.flatMap(([, , body]) => body.match(/cubic-bezier\([^)]*\)/g) ?? []));
+    expect([...curves].map((c) => c.replace(/\s+/g, ''))).toEqual([EASE]);
+  });
+});
+
 describe('/projects — the page shell on the drafting field', () => {
   // Derived from the tree the rail renders, so a stop the page forgot to emit fails here by name. (No fluid sky
   // and no sky wash on this page is asserted in the describe above.)
@@ -684,11 +759,11 @@ describe('/projects — the page shell on the drafting field', () => {
     expect(rule![1]).toMatch(/(^|;)position:fixed(;|$)/);
   });
 
-  // main has no background, so its text sits straight on the field's strokes. The knockout gives every glyph an
-  // opaque 1px ring of the ground: eight offsets, none blurred, in the ground colour.
-  it("rings every glyph in <main> with the bare ground, so no stroke touches the page's text", () => {
-    const rule = /\.projects-page\{([^}]*text-shadow:[^}]*)\}/.exec(shippedCss());
-    expect(rule, 'no text-shadow on .projects-page').not.toBeNull();
+  // Neither main nor the rail has a background, so their text sits straight on the field's strokes. The knockout
+  // gives every glyph an opaque 1px ring of the ground: eight offsets, none blurred, in the ground colour.
+  it("rings every glyph in <main> and in the rail with the bare ground, so no stroke touches the page's text", () => {
+    const rule = /\.projects-page,#projects-toc\{([^}]*text-shadow:[^}]*)\}/.exec(shippedCss());
+    expect(rule, 'no text-shadow rule for .projects-page and #projects-toc together').not.toBeNull();
     expect(rule![1]).toMatch(/--knock:\s*var\(--draft-ground\)/);
     const shadows = /text-shadow:([^;}]*)/.exec(rule![1])![1].split(/,(?![^(]*\))/).map((s) => s.trim());
     const offsets = shadows.map((s) => {
