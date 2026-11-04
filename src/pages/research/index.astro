@@ -125,7 +125,7 @@ const STATUS: Record<PublicationStatus, string> = { preprint: 'Preprint', confer
   /* ── hover and focus: the card lifts 2px inside a hairline frame drawn outside its text, so nothing in it moves, and
      its title's underline slides in a line at a time (the script's spans; it redraws the picture too). Hover is the
      script's .is-hover, for a mouse or a pen and never a touch; focus is a keyboard's, so a tap leaves nothing on. ── */
-  .research .pc::before { content: ''; position: absolute; inset: -1px -20px; border: 1px solid rgba(var(--hairline-rgb), 0.6);
+  .research .pc::before { content: ''; position: absolute; inset: -1px -20px; border: 1px solid rgba(var(--hairline-rgb), 0.66);
     border-radius: 2px; opacity: 0; pointer-events: none; }
   .research .ul { position: absolute; height: 1px; background: var(--ink-1); pointer-events: none; transform: scaleX(0); transform-origin: 0 50%; }
   .research .pc:has(a:focus-visible) { z-index: 2; }
@@ -151,6 +151,9 @@ const STATUS: Record<PublicationStatus, string> = { preprint: 'Preprint', confer
     .research .pc.is-hover { transform: translateY(-2px); }
     .research .pc.is-hover .ul { transition: transform 320ms cubic-bezier(.2,.7,.2,1) calc(var(--k) * 110ms); }
   }
+  /* what is still below the screen waits for its reveal (set by the script, never served). After the card's
+     transition above, so that its transition: none wins at the same specificity. */
+  .research [data-pending] { opacity: 0; transition: none; }
 
   .research .interests { list-style: none; margin: 0; padding: 0; font-size: 16.5px; line-height: 1.58; color: var(--ink-3); }
   .research .interests li { margin: 0 0 10px; }
@@ -178,13 +181,15 @@ const STATUS: Record<PublicationStatus, string> = { preprint: 'Preprint', confer
 </style>
 
 <script>
-  // The cards' hover and focus. The lift and the frame are CSS on .is-hover and :focus-visible; this sets .is-hover
-  // (a mouse or a pen on a device that hovers, never a touch), lays each title's underline on its lines, and redraws
-  // a card's picture the first time it is hovered or focused in a page view. Started through onPageView, so it runs
-  // at parse on a full load and once per arrival, after the last arrival's teardown.
+  // The reveals and the cards' hover and focus. The headings, the cards and the interests rise in as they are first
+  // seen, as a paper page's sections do (riseOnceSeen). The lift and the frame are CSS on .is-hover and
+  // :focus-visible; this sets .is-hover (a mouse or a pen on a device that hovers, never a touch), lays each title's
+  // underline on its lines, and redraws a card's picture the first time it is hovered or focused in a page view.
+  // Started through onPageView, so it runs at parse on a full load and once per arrival, after the last arrival's
+  // teardown.
   import { DRAW, mergeLines } from '../../lib/motionTiming';
   import { onPageView } from '../../lib/pageView';
-  import { play } from '../../scripts/motion';
+  import { play, riseOnceSeen } from '../../scripts/motion';
 
   onPageView('main.research', () => {
     const maybePage = document.querySelector<HTMLElement>('main.research');
@@ -195,6 +200,8 @@ const STATUS: Record<PublicationStatus, string> = { preprint: 'Preprint', confer
     const live = new Set<Animation>();
     const cards = [...page.querySelectorAll<HTMLElement>('.pc')];
     const hover = matchMedia('(hover: hover)');
+
+    riseOnceSeen(page.querySelectorAll('.block > h2, .pc, .interests'), { signal, live });
 
     // ── the title's underline: a 1px span on each of its lines (a line's fragments merged), which the CSS scales in
     // from the left, a line 110ms after the one above. Laid again whenever the title's box changes, as its lines

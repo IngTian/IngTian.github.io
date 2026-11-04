@@ -23,12 +23,16 @@ const ROLE = ['--paper', '--ink-1', '--ink-2', '--ink-3', '--ink-4', '--ink-5', 
   '--hairline-rgb', '--bg'];
 const SHEET = ['--sheet-ground', '--sheet-ul', '--sheet-band', '--sheet-axis', '--sheet-one', '--sheet-grid', '--sheet-mark'];
 
-// The paper page's own stylesheet and the sheet it shares with the index (styles/paper.css, where Figure 2's series
-// are coloured), comments stripped: the alphas its marks are drawn at are read from them, so the number measured is
-// the one drawn.
+// The two research pages' own stylesheets and the sheet they share (styles/paper.css, where Figure 2's series are
+// coloured), comments stripped: the alphas their marks are drawn at are read from them, so the number measured is the
+// one drawn.
+const styleOf = (page: string): string =>
+  readFileSync(new URL(`../src/pages/research/${page}`, import.meta.url), 'utf8').match(/<style is:global>([\s\S]*?)<\/style>/)?.[1] ?? '';
 const pageCss = [
-  readFileSync(new URL('../src/pages/research/[slug].astro', import.meta.url), 'utf8').match(/<style is:global>([\s\S]*?)<\/style>/)?.[1] ?? '',
+  styleOf('[slug].astro'),
   readFileSync(new URL('../src/styles/paper.css', import.meta.url), 'utf8'),
+  // last: rule() takes the first match, and the index's miniature re-sizes the series' strokes (`.mini .f-rl`)
+  styleOf('index.astro'),
 ].join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
 /** The declarations of the page's rule whose selector is exactly `sel`. */
 function rule(sel: string): string {
@@ -137,6 +141,14 @@ describe('the paper palette (tokens.css)', () => {
         for (const [sel, prop] of [['.p-arrow', 'stroke'], ['.p-head', 'stroke']]) {
           expect(between(over(hair, hairAlpha(sel, prop), ground), ground), sel).toBeGreaterThanOrEqual(NON_TEXT);
         }
+      });
+
+      // An index card's hover and focus state: the hairline frame round it and its title's underline, both marks.
+      it("an index card's frame and underline clear 3:1", () => {
+        const a = Number(/^1px solid rgba\(var\(--hairline-rgb\),\s*([\d.]+)\)$/.exec(decl('.research .pc::before', 'border'))?.[1]);
+        expect(a, "the frame is not 1px solid rgba(var(--hairline-rgb), a)").toBeGreaterThan(0);
+        expect(between(over(hair, a, ground), ground), 'the frame').toBeGreaterThanOrEqual(NON_TEXT);
+        expect(decl('.research .ul', 'background')).toBe('var(--ink-1)');
       });
 
       // While a term and its note are linked, the other notes dim; dimmed, they are still text a reader reads.

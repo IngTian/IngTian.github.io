@@ -1128,6 +1128,9 @@ describe('/projects — repo links, private repos, and what assistive tech is to
   });
 });
 
+/** A title's hyphenated words: its whitespace-separated tokens with a hyphen in them. */
+const hyphenated = (title: string): string[] => title.split(/\s+/).filter((w) => w.includes('-'));
+
 describe('/research — the papers as cards, newest first, then the interests', () => {
   const page = (): Page => builtPage('/research');
   const text = (html: string): string => html.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&nbsp;|\s+/g, ' ').trim();
@@ -1189,6 +1192,14 @@ describe('/research — the papers as cards, newest first, then the interests', 
       expect(text(c.html)).toContain(thumb.caption);
     }
     expect(PAPER_DATA['rl-bhrp'].thumb, "RL-BHRP's card has no miniature").toBeDefined();
+  });
+
+  // A browser may break a line after any hyphen, and a title would then split a paper's own name ("(RL-BHRP)").
+  it("keeps each card title's hyphenated words whole", () => {
+    expect(cards()).toHaveLength(publications.length);
+    for (const [i, c] of cards().entries()) {
+      for (const w of hyphenated(publications[i].title)) expect(c.html, w).toContain(`<span class="nw">${w}</span>`);
+    }
   });
 
   it('emits the id of every rail stop, the papers before the interests', () => {
@@ -1256,6 +1267,14 @@ describe('/research/rl-bhrp — a paper explained, from its file', async () => {
     expect(contents.map((m) => m[1])).toEqual(links('side-rail').map((m) => m[1]));
     expect(contents.map((m) => text(m[2]).trim()))
       .toEqual(paperSections(report.sections).map((s) => [s.n, s.title].filter(Boolean).join(' ')));
+  });
+
+  // text-wrap: balance happens to keep "(RL-BHRP)" whole at 390px, but only where balance applies (not past six
+  // lines, nor in Safari before 17.5), so the title's hyphenated words are kept whole by markup, as on its card.
+  it("keeps the title's hyphenated words whole", () => {
+    const h1 = /<h1 class="ptitle">([\s\S]*?)<\/h1>/.exec(page().markup)?.[1] ?? '';
+    expect(hyphenated(rl.title)).toContain('(RL-BHRP)');
+    for (const w of hyphenated(rl.title)) expect(h1, w).toContain(`<span class="nw">${w}</span>`);
   });
 
   it("prints the paper's Table 2 whole: all 18 rows", () => {

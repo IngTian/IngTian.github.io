@@ -13,7 +13,7 @@ import { authorName, publications } from '../../data/profile';
 import { longDate } from '../../lib/dates';
 import { refId, type PaperReport } from '../../lib/paperMarkdown';
 import { PAPER_END, paperPageOwns, paperSections, paperStops } from '../../lib/pageStops';
-import { countWords, readingMinutes } from '../../lib/words';
+import { countWords, hyphenatedParts, readingMinutes } from '../../lib/words';
 import '../../styles/paper.css';
 
 export async function getStaticPaths() {
@@ -78,7 +78,7 @@ const noted = errata.map((e) => e.date).sort().at(-1);
 
     <header class="head">
       <a class="back" href="/research">← all research</a>
-      <h1 class="ptitle">{p.title}</h1>
+      <h1 class="ptitle">{hyphenatedParts(p.title).map((s, i) => (i % 2 ? <span class="nw">{s}</span> : s))}</h1>
       <p class="byline">
         {p.authors.map((a, i) => (
           <>{i > 0 && <span class="and">{i === p.authors.length - 1 ? 'and' : ','}</span>}{a.name}{a.affiliation && <> <span class="aff">{a.affiliation}</span></>}</>
@@ -442,13 +442,10 @@ const noted = errata.map((e) => e.date).sort().at(-1);
   // notes rising in, the highlights drawn, Figure 2 drawn, Figure 1 assembled). Only transform and opacity move,
   // each thing once and in under 2s, and what is on screen or above it when the page opens is never held back
   // (scripts/motion.ts). Started through onPageView, so it runs at parse on a full load and once per arrival.
-  import { DRAW, stagger } from '../../lib/motionTiming';
+  import { DRAW } from '../../lib/motionTiming';
   import { onPageView } from '../../lib/pageView';
   import { readoutIndex, readoutStep, readoutWhen, stackNotes, tipLeft } from '../../lib/paperPage';
-  import { onceSeen, play, sweepLines } from '../../scripts/motion';
-
-  const UP = [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }];
-  const SIDE = [{ opacity: 0, transform: 'translateX(10px)' }, { opacity: 1, transform: 'none' }];
+  import { batch, onceSeen, play, riseOnceSeen, sweepLines } from '../../scripts/motion';
 
   onPageView('main.paper', () => {
     const maybePage = document.querySelector<HTMLElement>('main.paper');
@@ -486,22 +483,11 @@ const noted = errata.map((e) => e.date).sort().at(-1);
     const ro = new ResizeObserver(() => place());
     ro.observe(page);
 
-    // ── reveals: a section's heading and first block rise 8px and fade in (340ms); a margin note slides in from
-    // 10px right (380ms, after its block). Several at once are 60ms apart, at most 120ms. ──
-    const rising = new WeakMap<Element, Animation>();
+    // ── reveals: a section's heading and first block rise in, and a margin note after its block, beside the text
+    // from the right (riseOnceSeen) ──
     const risers = [...page.querySelectorAll('.sec > h2')].flatMap((h) => [h, h.nextElementSibling].filter((x): x is Element => !!x));
-    const batch = <T extends Element>(fn: (els: T[]) => void) => {
-      let queue: T[] = [];
-      return (el: Element): void => {
-        if (!queue.length) queueMicrotask(() => { const els = queue; queue = []; if (!signal.aborted) fn(els); });
-        queue.push(el as T);
-      };
-    };
-    const rise = batch<Element>((els) => {
-      els.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).forEach((el, k) => {
-        const note = el.classList.contains('mn'), side = note && wide.matches;
-        rising.set(el, play(el, side ? SIDE : UP, { duration: side ? 380 : 340, delay: stagger(k, els.length, { step: 60, max: 120 }) + (note ? 120 : 0) }, live));
-      });
+    const rising = riseOnceSeen([...risers, ...notes.filter(shown)], {
+      signal, live, note: (el) => (el.classList.contains('mn') ? (wide.matches ? 'beside' : 'below') : null),
     });
 
     // ── highlights draw left to right once each is wholly on screen (640ms), after the block they sit in has
@@ -516,7 +502,7 @@ const noted = errata.map((e) => e.date).sort().at(-1);
       const host = rising.get(mk.closest('.sec > *') ?? mk);
       if (host?.playState === 'running') host.finished.then(go, go);
       else go();
-    }));
+    }), signal);
 
     // ── Figure 2 draws left to right (1600ms), its end labels fading in at once; Figure 1's arrows appear in the
     // order the data flows. The words never wait. ──
@@ -540,7 +526,6 @@ const noted = errata.map((e) => e.date).sort().at(-1);
       art?.querySelectorAll('.p-arrow').forEach((p, k) => play(p, [{ opacity: 0 }, { opacity: 1 }], { duration: 360, delay: k * 120 }, live));
     };
 
-    onceSeen([...risers, ...notes.filter(shown)], rise, { signal });
     onceSeen(page.querySelectorAll('mark.hl'), (mk) => sweep(mk), { threshold: 1, signal });
     if (plot) onceSeen([plot], drawFigure, { threshold: 0.15, signal });
     if (pipe) onceSeen([pipe], assemble, { threshold: 0.15, signal });

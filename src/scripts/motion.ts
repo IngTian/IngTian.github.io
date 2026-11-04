@@ -6,7 +6,7 @@
 // and lands on the element's own finished style; under reduced motion nothing plays and nothing waits, because the
 // gate is here and not in the callers: `play` lands on its last frame at once, and `onceSeen` holds nothing back.
 import { MOTION_LIMIT_MS, prefersReducedMotion } from '../lib/motion';
-import { EASE, mergeLines, sweepDurations } from '../lib/motionTiming';
+import { EASE, mergeLines, stagger, sweepDurations } from '../lib/motionTiming';
 
 /** Whether anything may move: the reduced-motion gate, asked once per call. */
 export function motionAllowed(): boolean {
@@ -104,6 +104,45 @@ export function onceSeen(
     for (const el of [...waiting.keys()]) go(el);
     io.disconnect();
   }, { once: true });
+}
+
+/**
+ * Gather what is passed in one task into one call of `fn`, at the next microtask, so the elements one observer
+ * callback reports arrive together and can be staggered. Nothing is called once `signal` has aborted.
+ */
+export function batch<T extends Element>(fn: (els: T[]) => void, signal: AbortSignal): (el: Element) => void {
+  let queue: T[] = [];
+  return (el) => {
+    if (!queue.length) queueMicrotask(() => { const els = queue; queue = []; if (!signal.aborted) fn(els); });
+    queue.push(el as T);
+  };
+}
+
+const UP: Keyframe[] = [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }];
+const SIDE: Keyframe[] = [{ opacity: 0, transform: 'translateX(10px)' }, { opacity: 1, transform: 'none' }];
+
+/**
+ * The research pages' reveal: each of `els`, the first time it is seen (`onceSeen`, so nothing on the landing screen
+ * or above it waits), rises 8px and fades in over 340ms. A margin note (`note` says where it stands) follows its
+ * block by 120ms, and beside the text slides in from 10px right instead, over 380ms. Several seen together go top to
+ * bottom, 60ms apart and at most 120ms. While an element waits it carries `data-pending`, and the page's CSS holds
+ * it at opacity 0 there, with `transition: none`. Returns each element's animation, for a caller that waits on a
+ * block's rise.
+ */
+export function riseOnceSeen(
+  els: Iterable<Element>,
+  opts: { signal: AbortSignal; live: Set<Animation>; note?: (el: Element) => 'beside' | 'below' | null },
+): WeakMap<Element, Animation> {
+  const { signal, live, note = () => null } = opts;
+  const rising = new WeakMap<Element, Animation>();
+  onceSeen(els, batch((seen) => {
+    seen.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).forEach((el, k) => {
+      const at = note(el), side = at === 'beside';
+      const delay = stagger(k, seen.length, { step: 60, max: 120 }) + (at ? 120 : 0);
+      rising.set(el, play(el, side ? SIDE : UP, { duration: side ? 380 : 340, delay }, live));
+    });
+  }, signal), { signal });
+  return rising;
 }
 
 /**
