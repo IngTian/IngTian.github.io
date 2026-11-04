@@ -3,13 +3,13 @@
 // its window or the vendored reproduction moved under a sentence that quotes them, which is the point: the
 // prose cannot be edited to follow, because it types no number.
 import { describe, it, expect } from 'vitest';
-import { TABLE2, PAPER, REPRO } from '../src/data/papers/rl-bhrp';
+import { TABLE2, PAPER, REPRO, REPRO_NOTES } from '../src/data/papers/rl-bhrp';
 import { PAPER_DATA } from '../src/data/papers';
 import { rlBhrpValues } from '../src/lib/paperNumbers';
 import { rlBhrpWealth } from '../src/data/vendor/rlBhrpWealth';
 import { cumulative } from '../src/lib/wealth';
 
-const v = rlBhrpValues(TABLE2, PAPER, REPRO);
+const v = rlBhrpValues(TABLE2, PAPER, REPRO, REPRO_NOTES);
 
 describe("Table 2, as the paper prints it", () => {
   it('has all 18 rows, in the paper\'s order (paper-pdf.txt, Table 2)', () => {
@@ -46,8 +46,31 @@ describe('rlBhrpValues — the paper\'s figures', () => {
     expect(v.costBpsMonth).toBe('3');   // 0.60 of the portfolio a month at 5 bps
   });
 
-  it('prints no number with a sign or a tilde: magnitudes, at a fixed precision', () => {
-    for (const [k, s] of Object.entries(v)) expect(s, k).toMatch(/^\$?\d+(?:\.\d+)?$/);
+  it('prints no number with a sign or a tilde: magnitudes at a fixed precision, or dates', () => {
+    const date = /^(?:\d{4}-\d{2}-\d{2}|(?:\d{1,2} )?[A-Z][a-z]+ \d{4})$/;
+    for (const [k, s] of Object.entries(v)) expect(s, k).toMatch(new RegExp(`^\\$?\\d+(?:\\.\\d+)?$|${date.source}`));
+  });
+
+  it('quotes the window, the training years and how many monthly decisions they hold', () => {
+    expect([v.start, v.end, v.dataEndIso]).toEqual(['2020-02-29', '2025-08-31', '2025-08-13']);
+    expect([v.startMonth, v.endMonth, v.dataEnd]).toEqual(['February 2020', 'August 2025', '13 August 2025']);
+    expect([v.startYear, v.endYear, v.trainFrom, v.trainTo]).toEqual(['2020', '2025', '2012', '2019']);
+    expect(v.decisions).toBe('96');   // eight years of month-ends
+  });
+
+  it('counts the sector map: 48 stocks in 11 sectors of 2 to 10, IT the largest', () => {
+    expect([v.universe, v.sectors, v.sectorMin, v.sectorMax, v.itStocks]).toEqual(['48', '11', '2', '10', '10']);
+    // equal risk per stock gives IT 10 of the 48 shares, equal risk per sector 1 of the 11
+    expect([v.itShareStocks, v.itShareSectors]).toEqual(['21', '9']);
+  });
+
+  it('quotes the cost per dollar and per month as percentages, and per year in points', () => {
+    expect([v.costPct, v.costPctMonth, v.costPPYear]).toEqual(['0.05', '0.03', '0.36']);
+  });
+
+  it("quotes Table 2's BHRP CAGR as printed, for the erratum it corrects", () => {
+    expect(v['tableCagr.bhrp']).toBe('0.133563');
+    expect(v['cagr.bhrp']).toBe('13.36');
   });
 
   it('never rounds a comparison into a tie or a flip', () => {
@@ -68,6 +91,22 @@ describe('rlBhrpValues — the reproduction\'s figures, from its vendored return
   it('quotes the drawdowns counted from the starting $1, which Table 2 cannot', () => {
     expect(v['mdd0.bhrp']).toBe('20.53');
     expect(v['mdd0.bench']).toBe('21.93');
+  });
+
+  it("quotes its diagnostics from the vendored summary: turnover, BHRP's share in its top 15 and its cost", () => {
+    expect([v.reproTurnover, v.reproTurnoverBhrp, v.reproTop15Bhrp]).toEqual(['0.14', '0.014', '51']);
+    expect(v.reproCostPPYearBhrp).toBe('0.008');   // 0.014 a month at 5 bps, a year
+    // the caption says its median run trades "about a quarter as much as the paper's"
+    const share = REPRO_NOTES.turnover.rl / PAPER.turnover;
+    expect(share).toBeGreaterThan(0.2);
+    expect(share).toBeLessThan(0.3);
+  });
+
+  it('quotes both readings of the penalty, which barely differ, without rounding them into a tie', () => {
+    expect([v.reproCagrGlobal, v.reproCagrSector]).toEqual(['14.55', '14.54']);
+    const mean = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    expect(REPRO_NOTES.cagr.global).toHaveLength(REPRO.runs);
+    expect(Math.sign(mean(REPRO_NOTES.cagr.global) - mean(REPRO_NOTES.cagr.sector))).toBe(1);
   });
 
   it("rebuilds the paper's BHRP and benchmark to the cent, which is what lets the page set them side by side", () => {

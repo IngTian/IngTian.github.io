@@ -57,9 +57,10 @@ and which kind a component is decides how a page may change it:
   variable they read everywhere. A change to one of these is a change to every page.
 - **Page-own: buttons.** One anatomy, a skin per page. `components/Button.astro` owns
   the size, label, arrow, press, focus ring and the `<a>`/`<button>` behaviour; a page's
-  look is a `skin` value plus one `.btn--<skin>` block. Today the only skin is
+  look is a `skin` value plus one `.btn--<skin>` block. The skins today are
   /projects' **sticker** (a slight tilt, a 1.5px ink edge, a hard 4px offset plate in
-  the accent). A new page **adds a skin, not a new button.** A skin obeys the motion rule:
+  the accent) and the research routes' **paper** (a hairline box in the sheet's own ground,
+  the paper page's Copy BibTeX). A new page **adds a skin, not a new button.** A skin obeys the motion rule:
   the sticker's plate moves by `transform`, not `box-shadow` (`Button.astro` says how).
 
 **Restraint is the aesthetic.** Text is English-only — the literati feel comes
@@ -223,7 +224,13 @@ src/
   layouts/BaseLayout.astro          # head, astro:fonts, meta/OG/JSON-LD, favicons, the page-load veil, CornerNav, ClientRouter
   content.config.ts                 # the two content collections, `writing` and `papers`, their frontmatter schemas and the one isoDate helper
   content/writing/*.md              # the pieces themselves — a new one is a FILE, not a code change
+  content/papers/*.md               # one paper's explainer each (rl-bhrp.md) — see Papers are files
+  pages/research/[slug].astro       # the one paper page: the record's head, the file's body, references, BibTeX; its script places the notes and runs the motion
   lib/paperMarkdown/{index,remarkPaper,rehypePaper}.ts # the markdown chain (spelled once) + the paper format's compiler and checks — see Papers are files
+  lib/paperFigures/{wealthFigure,pipelineFigure,metricsTable}.ts # a paper's drawings and Table 1, as HTML strings from its data; a :::figure places each
+  lib/paperPage.ts                  # the paper page script's pure half: note stacking, the readout's month, step and label
+  lib/dates.ts                      # the one date helper: longDate, monthYear (UTC)
+  data/papers/{index,rl-bhrp}.ts    # PAPER_DATA (values, figures, thumb) and RL-BHRP's Table 2, window and reproduction series
   lib/mathml.ts                     # the one MathML letter fix: fixMathVariants for lib/equations.ts, rehypeMathVariants for every .md
   data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline, publications, projects + inProgress, awards, links
   data/nav.ts                       # PAGES — the canonical page set (see Navigation)
@@ -274,7 +281,7 @@ tools/vendor-projects.mjs           # the ONLY thing that touches the network, r
 
 ### Routes
 
-**Nine pages, not two**, and that is the number `npm run build` prints (`9 page(s)
+**Ten pages, not two**, and that is the number `npm run build` prints (`10 page(s)
 built`) — check it against the build rather than against this table, and `ls
 src/pages` beats both. This line read "twelve" for a while, left over from when three
 more prototype routes existed and the table below still named all four.
@@ -282,7 +289,8 @@ more prototype routes existed and the table below still named all four.
 | Route | What it is |
 | --- | --- |
 | `/` | the descent — the homepage deck |
-| `/research` | papers, in full: the idea, the method's equations, results |
+| `/research` | the papers, as a list of their records |
+| `/research/<slug>` | one paper explained, rendered from `src/content/papers/<file>.md` (today `/research/rl-bhrp`) |
 | `/writing` | the writing shelf — kinds, each listing its markdown pieces |
 | `/writing/<slug>` | one piece, rendered from `src/content/writing/<slug>.md` |
 | `/projects` | every notable project, on its own drafting register: the terminal header and its boot, the gallery, selected work, the workshop |
@@ -679,38 +687,49 @@ kind and gets its own page at `/writing/<slug>`. Nothing else is edited.
 `remark-directive` parses and `lib/paperMarkdown/` compiles and checks at build time. What the
 file holds is the prose; everything else has one home of its own:
 
-- **The record** (title, authors, abstract, BibTeX, links, tags) is the paper's entry in
-  `profile.ts` `publications`, never repeated in the file.
+- **The record** (title, authors, abstract, BibTeX, links, the owner's `reproduction`, tags) is
+  the paper's entry in `profile.ts` `publications`, never repeated in the file. The page is
+  `/research/<record slug>`, and it says which author wrote it from `profile.ts` `authorName`.
 - **The frontmatter** (zod, `content.config.ts`): `publication` (a slug in `publications`),
-  `pageDate`, `references` (`{ key, authors, year, title, venue, doi?, url?, addedHere? }[]`,
-  an author written `Family, Given` so a citation can read "López de Prado, 2016"; `addedHere` is
-  where the paper names a work its bibliography leaves out) and `errata` (`{ date, text }[]`).
+  `pageDate`, `references` (`{ key, authors, year, title, journal?, venue?, doi?, url?, addedHere? }[]`,
+  an author written `Family, Given` so a citation can read "López de Prado, 2016"; `journal` is set
+  in italics and `venue` plain after it; `addedHere` is where the paper names a work its
+  bibliography leaves out), `bibliographyOmits` (the bibliography's works the page does not draw on,
+  each described, for the note above the references), `leftOut` (what the page leaves out of the
+  paper, for "Read the full paper") and `errata` (`{ date, text }[]`, a `:v` in the text filled in).
 - **The numbers and pictures** are `PAPER_DATA[slug]` (`src/data/papers/`): `values`, strings
-  computed from the paper's data; `figures`, HTML strings drawn from vendored data by
-  `lib/paperFigures/` (each a whole `<figure>` with its caption, the maths in it build-time MathML);
-  and `thumb`, the index card's picture, for a paper that has one. They reach the plugins as
-  **options** from `astro.config.mjs`, so they are in Astro's config digest and a moved number re-renders the paper. Plugin *code* is not in the digest: after editing a
+  computed from the paper's data; `figures`, the drawings and tables made from it by
+  `lib/paperFigures/` (HTML strings, the maths in them build-time MathML; a figure's caption is the
+  file's); and `thumb`, the index card's picture, for a paper that has one. They reach the plugins as
+  **options** from `astro.config.mjs`, with the records (for `::abstract`), so they are in Astro's
+  config digest and a moved number re-renders the paper. Plugin *code* is not in the digest: after editing a
   plugin, delete `node_modules/.astro/data-store.json` before building or the old render is served.
 
 **The syntax** — every construct has a case in `tests/fixtures/papers/simple.md`:
 
 | write | renders |
 | --- | --- |
-| `::::section[The question]{#question n=1 rail="Question"}` … `::::` | `<section class="sec" id="question">` with `<h2><span class="n">1</span>The question</h2>`. `n` is optional (In brief has none), `rail` defaults to the title. The rail and the phone Contents come from these. |
+| `::::section[The question]{#question n=1 rail="Question"}` … `::::` | `<section class="sec" id="question">` with `<h2><span class="n">1</span>The question</h2>`. `n` is optional (In brief has none), `rail` defaults to the title, an `aside="…"` follows the title in the heading only (`· in the paper’s own words`). The rail and the phone Contents come from these; the ids are the file's as written (one paper to a page), and the page refuses one it writes itself (`read`, `references`, `cite`). A numbered section opens with its lead, set in full ink. |
+| `::abstract` | the record's abstract, verbatim, as `<blockquote class="abstract" cite="<record href>">`; the paragraph after it is the page's note on it. Raw HTML, so not in `bodyWords` (the page adds it to the reading time) |
+| `**The problem.** …` | a run-in head: `<strong>`, set italic in full ink at the body's weight |
 | `:t[risk parity]{#rp}` | `<i class="t" data-n="rp">` — a term at first use, the anchor of its note |
 | `:::def{for=rp}` `**Risk parity.** …` `:::` | `<aside class="mn def" data-at="rp"><dfn>Risk parity.</dfn> …` — joins the block before it in one `<div class="an">` host, which must hold the term (the page looks for it there) |
 | `:::why{for=…}` … `:::` | `<aside class="mn why"><span class="mk">Why it matters.</span> …`; `for` optional on both kinds |
 | `:hl[…]` | `<mark class="hl">` — Underline, the one highlight style |
 | `::::eq{#eq-4 n=4}` `$$` … `$$` `:::where` … `:::` notes `::::` | `<div class="eq an" id="eq-4">`: the display, its number `(4)` as HTML outside `<math>` (never `\tag`), `<p class="where">`, then its notes. One `$$`, or a `$$ wide` and a `$$ narrow` |
-| `:::notation` with a GFM table `\| Symbol \| Meaning \|` `:::` | `<div class="tbl-scroll"><table class="notation">`, each row `<tr data-sym><th scope="row">`. Each row's symbols (split at commas) are matched **structurally** in every display's MathML and tagged `class="sym" data-sym`: an equal subtree, the largest first, nothing inside a tagged one tagged again — so `W_{g}` tags `W_g` and not a bare `W`. A row that is only in the prose ends its Symbol cell with `{text-only}`. |
+| `:::::thm{#thm-3-1-11}` … `:::::` | `<div class="thm">`, a theorem's frame, its displays inside it; the paragraphs that open it and introduce a display are its heads |
+| `:::notation` with a GFM table `\| Symbol \| Meaning \|` `:::` | `<div class="tbl-scroll"><table class="notation">`, each row `<tr data-sym><th scope="row">`. Each row's symbols (split at commas, and at `∈`: `i\in\mathcal{I}_{g}` introduces `i`) are matched **structurally** in every display's MathML and tagged `class="sym" data-sym`: an equal subtree first, else the symbol's family — a scripted `W_{g}` also stands for `W` with any other script (`W_{g(i)}`, `W^{\top}`) and for `W` alone; the largest first, nothing inside a tagged one tagged again. A row that is only in the prose ends its Symbol cell with `{text-only}`. |
 | `:cite[markowitz1952]` | `<a class="cite" href="#ref-markowitz1952">Markowitz, 1952</a>` — one author, two (`Feng and He`), more (`Maillard et al.`) |
 | `:v[usd.rl]` | the text of `PAPER_DATA[slug].values['usd.rl']`. **Every number the prose prints is a `:v`**, and a `$` amount is always `:v` or `\$` — a bare `$` starts maths |
 | `$:v[wealth.rl]^{12/67}-1$` | the same value written into the TeX, with `$ % # &` escaped — the one directive that works inside maths, so an equation's numbers are computed too. A `:cite`, `:t` or `:hl` there is refused |
-| `::figure{name=wealth}` | `PAPER_DATA[slug].figures.wealth`, inlined; Astro's rehype-raw re-serialises its markup |
+| `:::figure{name=wealth n=2}` caption `:::` | `<figure class="fig" id="figure-2">`: `PAPER_DATA[slug].figures.wealth`, then the container's prose as its `<figcaption>`, "Figure 2." before it, and any notes beside it. A drawing that is a `<table>` is a table: `<figure class="tbl" id="table-1">`, its first paragraph the caption above it, "Table 1.", the table in its own scroll box, its other paragraphs `<p class="src">` under it. Astro's rehype-raw re-serialises the drawing's markup |
+| `:::inpaper` `**In the paper:** …` `:::` | `<p class="inpaper">`, the pointer to what the page leaves to the paper |
+| `:sup[a]` | `<sup>a</sup>`, a table note's mark |
 
 - **Nesting takes colons.** A container holding another needs more colons than the one inside it:
   `:::` for a note or a where, `::::` for an eq or a section of notes, `:::::` for a section that
-  holds an eq. With as many, the inner fence closes both, silently — so the checks below look for
+  holds an eq (or a theorem that holds one, whose section then takes `::::::`). With as many, the
+  inner fence closes both, silently — so the checks below look for
   exactly the traces that leaves (a stray `:::`, a container never closed, content outside a
   section).
 - **Raw HTML is refused.** It would stay an opaque `raw` node until Astro's rehype-raw, after every
@@ -728,18 +747,24 @@ file holds is the prose; everything else has one home of its own:
   itself — Astro logs a plugin's throw and stores the entry unrendered, an empty page with a green
   build — so the plugins collect problems into `remarkPluginFrontmatter.paperProblems` and the
   paper page throws on any, or on an entry with no `rendered`. Reported: an unknown `:cite`, `:v`
-  (in prose or in maths), `::figure` or directive; a directive other than `:v` in maths; a TeX
+  (in prose, in maths or in an erratum), figure name or directive (a literal colon is `\:`, as in
+  `arXiv\:2508.11856`); a `:::figure` without its `n` or its caption; a `::abstract` whose record
+  has none; a directive other than `:v` in maths; a TeX
   error (rehype-katex otherwise draws it in red and moves on); a
   notation row matching no display; a note whose `for` names no term, or a term outside its note's
   host; a term marked twice, or inside a highlight (seal over the seal band is under 3:1, so its
   linked rule would vanish); a `def` without its `**Name.**`; a section without its `#id` or
   `[title]`; an id used twice; an eq without one display or a wide/narrow pair, or with `\tag`;
-  `:::where` outside an eq; raw HTML, a code block or a heading; a `rail` that needs curling; the
-  nesting traces above.
+  `:::where` outside an eq; raw HTML, a code block or a heading; a `rail` or `aside` that needs
+  curling; the nesting traces above.
   `tests/fixtures/papers/malformed.md` holds one of each and `tests/paperMarkdown.test.ts` names them.
-- **The render also reports** `sections` (`{ id, n?, title, rail }`, for the rail and Contents) and
-  `bodyWords` — `countWords` from `lib/words.ts` over the body's text, every element boundary a
-  space, with `math`, `table` and the raw figures left out.
+- **The render also reports** `sections` (`{ id, n?, title, rail }`, for the rail and Contents),
+  `errataText` (the errata with their `:v` filled in) and `bodyWords` — `countWords` from
+  `lib/words.ts` over the body's text, every element boundary a space, with `math`, `table` and the
+  raw figures and abstract left out. The page's reading time is
+  `readingMinutes(bodyWords + countWords(abstract))`.
+- **A line never breaks inside a hyphenated name in capitals (RL-BHRP), a span of years or an ISO
+  date**: the last pass wraps each in `<span class="nw">`, after the words are counted.
 - **Inert everywhere else, by construction.** Astro runs one processor for every `.md`, so the
   directive syntax is not a plugin in the list: `remarkPaperSyntax` wraps remark-parse and adds
   remark-directive's extensions only for the length of a paper's parse. Any other file is parsed

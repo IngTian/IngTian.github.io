@@ -10,6 +10,12 @@ A paper about :t[risk parity]{#rp}, in brief.
 Yearly, that is $:v[wealth.rl]^{12/67}-1$, or $:v[usd.rl]$ at the end.
 ::::
 
+:::section[Abstract]{#abstract aside="in the paper’s own words"}
+::abstract
+
+What the abstract leaves out.
+:::
+
 ::::section[Notation]{#notation}
 :::notation
 | Symbol | Meaning |
@@ -45,5 +51,37 @@ It keeps the weights adding up to one.
 :::
 ::::
 
-::figure{name=pipe}
+::::thm{#thm-1}
+**Theorem 1** *(weights).* In words first:
+
+The weights add up.
+
+In symbols,
+
+:::eq{#eq-2 n=2}
+$$
+W^{\top}W
+$$
+:::
+::::
+
+:::figure{name=pipe n=1}
+**How it runs.** The pieces, :v[usd.rl] in all.
+:::
+
+::::figure{name=table n=1}
+The table, every row.
+
+Source: the paper.
+
+:sup[a] A note on one cell.
+
+:::def
+**Reading the table.** One row a measure.
+:::
+::::
+
+:::inpaper
+**In the paper:** Alg. 1.
+:::
 :::::

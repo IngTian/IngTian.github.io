@@ -21,6 +21,7 @@ import { getCollection } from 'astro:content';
 import { KINDS, buildKinds, sorted, totalEntries, kindSectionId, entrySectionId } from '../data/writing';
 import { COW_LINES_WRITING } from '../data/cowGlyph';
 import { writingStops } from '../lib/pageStops';
+import { longDate } from '../lib/dates';
 
 // THE PIECES COME FROM MARKDOWN; the kinds stay in data/writing.ts. Drafts are dropped here rather than
 // filtered in the template, so nothing downstream — the rail, the count, the sections — can disagree about
@@ -43,11 +44,6 @@ const kinds = buildKinds(entries, KINDS);
 const stops = writingStops(kinds);
 const total = totalEntries(kinds);
 
-// Long-form dates, computed from the ISO string rather than typed twice.
-const longDate = (iso: string) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
-    year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
-  });
 ---
 <BaseLayout
   title="Writing — Ing Tian"

@@ -5,8 +5,11 @@
 // edit, and it adds its own `--sheet-*` tokens for what only these pages draw. The page has no sky: its ground is
 // `--sheet-ground`, and `--bg` is that ground so the body paints it. Every ink a reader gets is measured on it here.
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { AA_BODY } from '../src/lib/skyLegibility';
-import { between, onGround, over, railMark, ratio, rgbaOf, rgbOf, tokens } from './helpers/palette';
+import { between, onGround, over, railMark, ratio, rgbaOf, rgbOf, tokens, type RGB } from './helpers/palette';
+
+const rgbToken = (v: string): number[] => v.split(',').map(Number);
 
 /** WCAG 1.4.11: a mark that is not text — a rule, a band under words — against what it sits on. */
 const NON_TEXT = 3;
@@ -18,7 +21,30 @@ const THEMES = [
 
 const ROLE = ['--paper', '--ink-1', '--ink-2', '--ink-3', '--ink-4', '--ink-5', '--ochre', '--on-accent',
   '--hairline-rgb', '--bg'];
-const SHEET = ['--sheet-ground', '--sheet-ul', '--sheet-band', '--sheet-mark'];
+const SHEET = ['--sheet-ground', '--sheet-ul', '--sheet-band', '--sheet-axis', '--sheet-one', '--sheet-grid', '--sheet-mark'];
+
+// The paper page's own stylesheet, comments stripped: the alphas its marks are drawn at are read from it, so the
+// number measured is the one drawn.
+const pageCss = readFileSync(new URL('../src/pages/research/[slug].astro', import.meta.url), 'utf8')
+  .match(/<style is:global>([\s\S]*?)<\/style>/)?.[1].replace(/\/\*[\s\S]*?\*\//g, '') ?? '';
+/** The declarations of the page's rule whose selector is exactly `sel`. */
+function rule(sel: string): string {
+  const body = new RegExp(`(?:^|[}\\s])${sel.replace(/[.()[\]*+?^$|\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(pageCss)?.[1];
+  expect(body, `the paper page has no "${sel} {" rule`).toBeTruthy();
+  return body!;
+}
+const decl = (sel: string, prop: string): string => {
+  const v = new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`).exec(rule(sel))?.[1].trim();
+  expect(v, `${sel} sets no ${prop}`).toBeTruthy();
+  return v!;
+};
+const hairAlpha = (sel: string, prop: string): number => {
+  const m = /^rgba\(var\(--hairline-rgb\),\s*([\d.]+)\)$/.exec(decl(sel, prop));
+  expect(m, `${sel}'s ${prop} is not rgba(var(--hairline-rgb), a)`).not.toBeNull();
+  return Number(m![1]);
+};
+/** WCAG 1.4.11's exemptions here, each with its reason at the token (tokens.css) and in the design spec. */
+const EXEMPT = ['--sheet-grid', '--sheet-band'];
 
 describe('the paper palette (tokens.css)', () => {
   it('declares the same tokens in both themes', () => {
@@ -71,6 +97,56 @@ describe('the paper palette (tokens.css)', () => {
       it('--on-accent clears AA on the accent (the nav pill on hover)', () => {
         expect(ratio(tk['--on-accent'], tk['--ochre'])).toBeGreaterThanOrEqual(AA_BODY);
       });
+
+      // ── the figures' marks, WCAG 1.4.11: what a reader needs to read a figure clears 3:1 on the sheet ──────
+      const mark = (v: string): RGB => (v.startsWith('#') ? rgbOf(v) : over(...rgbaOf(v), ground));
+      const hair = rgbToken(tk['--hairline-rgb']);
+
+      it("Figure 2's three lines and the readout's dots clear 3:1", () => {
+        expect(decl('.f-rl', 'stroke')).toBe('var(--seal)');
+        expect(decl('.f-bhrp', 'stroke')).toBe('var(--ink-1)');
+        expect(decl('.f-bench', 'stroke')).toBe('var(--ink-3)');
+        expect(decl('.f-dot-bench', 'stroke')).toBe('var(--ink-2)');
+        for (const ink of [seal, tk['--ink-1'], tk['--ink-3'], tk['--ink-2']]) expect(onGround(ink, ground), ink).toBeGreaterThanOrEqual(NON_TEXT);
+      });
+
+      it("the readout's hairline clears 3:1, at the strength the page draws it", () => {
+        expect(decl('.f-hair', 'stroke')).toBe('var(--ink-1)');
+        const a = Number(decl('.f-hair', 'stroke-opacity'));
+        expect(between(over(rgbOf(tk['--ink-1']), a, ground), ground)).toBeGreaterThanOrEqual(NON_TEXT);
+      });
+
+      it('the axis, its ticks and the break-even line clear 3:1, each its own token', () => {
+        expect(decl('.f-axis', 'stroke')).toBe('var(--sheet-axis)');
+        expect(decl('.f-one', 'stroke')).toBe('var(--sheet-one)');
+        for (const k of ['--sheet-axis', '--sheet-one']) expect(between(mark(tk[k]), ground), k).toBeGreaterThanOrEqual(NON_TEXT);
+      });
+
+      // Named, and held BELOW 3:1: a retune that drops a needed mark under 3:1 fails the test above, and one that
+      // quietly changes what is exempt fails here.
+      it('exempts exactly the grid and the band, each under 3:1', () => {
+        expect(decl('.f-grid', 'stroke')).toBe('var(--sheet-grid)');
+        expect(decl('.f-band', 'fill')).toBe('var(--sheet-band)');
+        for (const k of EXEMPT) expect(between(mark(tk[k]), ground), k).toBeLessThan(NON_TEXT);
+      });
+
+      it("Figure 1's arrows and their heads clear 3:1", () => {
+        for (const [sel, prop] of [['.p-arrow', 'stroke'], ['.p-head', 'stroke']]) {
+          expect(between(over(hair, hairAlpha(sel, prop), ground), ground), sel).toBeGreaterThanOrEqual(NON_TEXT);
+        }
+      });
+
+      // While a term and its note are linked, the other notes dim; dimmed, they are still text a reader reads.
+      it('keeps a dimmed margin note legible', () => {
+        const a = Number(decl('.paper.lk-on .mn:not(.lk)', 'opacity'));
+        expect(between(over(rgbOf(tk['--ink-3']), a, ground), ground)).toBeGreaterThanOrEqual(AA_BODY);
+      });
     });
   }
+
+  // In the dark theme --paper is the TEXT colour, so a ground painted with it would turn the sheet light.
+  it("paints no ground with --paper: the paper page's own CSS never reads it", () => {
+    expect(pageCss.length, 'no <style is:global> block on the paper page').toBeGreaterThan(1000);
+    expect(pageCss).not.toMatch(/var\(--paper\b/);
+  });
 });

@@ -29,10 +29,26 @@ export function play(el: Element, frames: Keyframe[], opts: KeyframeAnimationOpt
 }
 
 /**
+ * The bottom of the screen the reader is landing on, in viewport coordinates. A script started at parse runs before
+ * the browser scrolls to a fragment (/research/rl-bhrp#results) and before the router restores a reload's position
+ * (history.state, ClientRouter), so "the screen now" is still the top of the page. What the reader lands on is the
+ * fragment's target, less its scroll margin, or the restored position; else where the window is.
+ */
+function landingBottom(): number {
+  const id = decodeURIComponent(window.location.hash.slice(1));
+  const target = id ? document.getElementById(id) : null;
+  const restored = (history.state as { scrollY?: unknown } | null)?.scrollY;
+  const top = target
+    ? target.getBoundingClientRect().top - (parseFloat(getComputedStyle(target).scrollMarginTop) || 0)
+    : Math.max(0, (typeof restored === 'number' ? restored : 0) - window.scrollY);
+  return top + window.innerHeight;
+}
+
+/**
  * Run `run(el)` once for each element, the first time it is seen (`threshold` of it on screen), and only for what
- * is still below the screen now: anything on screen or above it — the reader is there, or a deep link or a restored
- * scroll carried them past it — is left alone, finished. So is anything a LATER jump carries them past (a fragment
- * scroll that lands after this call, End, a rail click): the moment its top is above the screen it is settled,
+ * is still below the screen the reader lands on: anything on that screen or above it — the reader is there, or a
+ * deep link or a restored scroll carried them past it — is left alone, finished. So is anything a LATER jump carries
+ * them past (End, a rail click): the moment its top is above the screen it is settled,
  * finished and not run, rather than kept waiting until the reader scrolls back up to it. Each element that waits
  * carries `data-pending` until then, so its hold-back state is CSS on that attribute, set by script and never served
  * (a hold-back rule on an element with a transition must say `transition: none`, or it animates into hiding).
@@ -76,8 +92,9 @@ export function onceSeen(
     }
   // ponytail: 1e6px stands in for "everything above"; a page would have to run to about a thousand screens to reach it.
   }, { threshold: threshold > 0 ? [0, threshold] : 0, rootMargin: '1000000px 0px 0px 0px' });
+  const landing = landingBottom();
   for (const el of els) {
-    if (el.getBoundingClientRect().top < window.innerHeight) continue;
+    if (el.getBoundingClientRect().top < landing) continue;
     waiting.set(el, undefined);
     el.setAttribute('data-pending', '');
     io.observe(el);
@@ -99,10 +116,12 @@ export function onceSeen(
  * Where the spans sit, and what they paint over, are the caller's to know:
  * - They are placed absolutely on <body>, in document coordinates, which is right while neither <html> nor <body>
  *   is positioned or transformed and <body> has no margin: true on every page (Tailwind's preflight zeroes it).
+ * - Each covers its line's box, or with `foot` only the bottom `foot` px of it: a band under the words, or a
+ *   hairline, measured in the target's own type (the span itself is set in <body>'s).
  * - They are appended last and carry no z-index, so they paint OVER the text. A band meant to lie under the words
  *   needs `z-index: -1` in `cls`, and that shows only where no ancestor of the text paints a background of its own.
  */
-export function sweepLines(target: Element, cls: string, totalMs: number, live: Set<Animation>): Promise<void> {
+export function sweepLines(target: Element, cls: string, totalMs: number, live: Set<Animation>, foot?: number): Promise<void> {
   const lines = mergeLines([...target.getClientRects()]);
   const durations = sweepDurations(lines.map((l) => l.width), totalMs);
   // One line takes the house curve; a run of lines goes nearly linear, so a sweep does not stall at each break.
@@ -112,8 +131,9 @@ export function sweepLines(target: Element, cls: string, totalMs: number, live: 
     const s = document.createElement('span');
     s.className = cls;
     s.setAttribute('aria-hidden', 'true');
-    s.style.cssText = `position:absolute;left:${l.left + window.scrollX}px;top:${l.top + window.scrollY}px;`
-      + `width:${l.width}px;height:${l.height}px;transform-origin:0 50%;pointer-events:none`;
+    const h = foot ?? l.height;
+    s.style.cssText = `position:absolute;left:${l.left + window.scrollX}px;top:${l.top + l.height - h + window.scrollY}px;`
+      + `width:${l.width}px;height:${h}px;transform-origin:0 50%;pointer-events:none`;
     document.body.append(s);
     const a = play(s, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: durations[k], delay, easing }, live);
     delay += durations[k];

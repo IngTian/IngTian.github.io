@@ -53,6 +53,26 @@ export function projectStops(projects: readonly Project[]): Stop[] {
   ];
 }
 
+/** The sections a paper page writes itself after its file's body, in order: each id, the title its heading and the
+ *  phone's Contents print, and its rail bookmark. Spelled once, so the page and the rail cannot disagree. */
+export const PAPER_END = [
+  { id: 'read', title: 'Read the full paper', rail: 'Full paper' },
+  { id: 'references', title: 'References', rail: 'References' },
+  { id: 'cite', title: 'Cite', rail: 'Cite' },
+] as const;
+
+/**
+ * A paper page's rail: its file's sections, as the markdown plugin reports them (lib/paperMarkdown, `sections`), in
+ * order, then the page's own (PAPER_END). The ids are the file's as written: a paper has a page of its own, so no
+ * other paper's ids are ever beside them, and a deep link reads `/research/rl-bhrp#results`. The plugin refuses an
+ * id used twice in the file, and the page refuses one of PAPER_END's.
+ *
+ * Flat, though a section holds equations and figures: the rail bookmarks the sections a reader moves between.
+ */
+export function paperStops(sections: readonly { id: string; rail: string }[]): Stop[] {
+  return [...sections, ...PAPER_END].map((s) => ({ label: s.rail, target: s.id }));
+}
+
 /** Experience section id — one speller, so rail and page cannot disagree. */
 export function experienceSectionId(index: number): string {
   return `x-${index}`;

@@ -2,7 +2,7 @@
 // The publication records: what every surface that lists a paper reads (the /research cards, the homepage
 // appendix, the factor model's signal ids), so their shape and their honesty are pinned here once.
 import { describe, it, expect } from 'vitest';
-import { publications } from '../src/data/profile';
+import { authorName, publications } from '../src/data/profile';
 
 describe('publications', () => {
   it('keys every record by a unique, URL-safe slug', () => {
@@ -21,6 +21,11 @@ describe('publications', () => {
     for (const p of publications) {
       expect(`${p.title} ${p.finding}`, p.slug).not.toMatch(/published|peer/i);
     }
+  });
+
+  // A paper page says which author wrote it ("written by Zeying Tian, the second author"), from this.
+  it('names the owner among the authors of every record, as the paper spells him', () => {
+    for (const p of publications) expect(p.authors.map((a) => a.name), p.slug).toContain(authorName);
   });
 
   it('gives every arXiv record its PDF', () => {

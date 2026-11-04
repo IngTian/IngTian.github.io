@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 import sitemap from '@astrojs/sitemap';
 import { markdownPlugins } from './src/lib/paperMarkdown/index.ts';
 import { PAPER_DATA } from './src/data/papers/index.ts';
+import { publications } from './src/data/profile.ts';
 
 // https://astro.build/config
 export default defineConfig({
@@ -94,9 +95,9 @@ export default defineConfig({
   //
   // The chain lives in src/lib/paperMarkdown/index.ts, so its spec runs exactly this. It adds the paper format
   // (remark-directive's syntax, parsed only in a paper, and the two paper plugins, inert on any other file) and the MathML
-  // letter fix for every file. PAPER_DATA goes in as an option so it is part of the config digest: when a paper's
-  // number changes, its cached render is thrown away rather than served stale.
-  markdown: markdownPlugins(PAPER_DATA),
+  // letter fix for every file. PAPER_DATA and the records go in as options so they are part of the config digest:
+  // when a paper's number or its record changes, its cached render is thrown away rather than served stale.
+  markdown: markdownPlugins(PAPER_DATA, publications),
 
   // NO REACT, AND NOT INSTALLED ANY MORE. The terminal was the site's only island and it is deleted, so
   // nothing renders a component: no .tsx files, no client:* directives, no react imports remain.

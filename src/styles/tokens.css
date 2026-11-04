@@ -195,7 +195,13 @@ html[data-page='drafting'][data-theme='dark'] {
      --sheet-ul    the underline highlight: a band under words that stay fully legible on their own, so it is
                    emphasis, not a mark the reader needs (WCAG 1.4.11 does not apply). Its strength, 0.42, is the one
                    the owner approved on the prototype; ink-1 over it stays above 8:1.
-     --sheet-band  the figure's band of runs
+     --sheet-band  the figure's band of runs. EXEMPT from 3:1 (WCAG 1.4.11): raised to it (seal at about .68) the
+                   median line over it falls to 1.72:1, so a 3:1 band cannot sit under a 3:1 line; its values are
+                   text instead, the readout giving each month's range across the runs, by pointer, tap and keyboard.
+     --sheet-axis  the figure's axis and year ticks, and
+     --sheet-one   its break-even (1.0) line: both a reader needs, so both clear 3:1.
+     --sheet-grid  its other grid lines. EXEMPT from 3:1: supporting only, every value they help read is text (the
+                   labelled ticks, the end labels and the month-by-month readout).
      --sheet-mark  a marked symbol in an equation, and a linked term's rule, ON THE BARE SHEET ONLY. Over --sheet-ul
                    it is seal on a seal band, under 3:1 at any strength that still reads as a band, so the explainer
                    format refuses a linked term inside a highlight.
@@ -216,6 +222,9 @@ html[data-page='paper'] {
   --sheet-ground: #f4efe4;
   --sheet-ul: rgba(178, 58, 46, 0.42);
   --sheet-band: rgba(178, 58, 46, 0.15);
+  --sheet-axis: rgba(90, 84, 74, 0.78);
+  --sheet-one: rgba(90, 84, 74, 0.66);
+  --sheet-grid: rgba(90, 84, 74, 0.2);
   --sheet-mark: #b23a2e;
 }
 html[data-page='paper'][data-theme='dark'] {
@@ -233,5 +242,8 @@ html[data-page='paper'][data-theme='dark'] {
   --sheet-ground: #0d0d11;
   --sheet-ul: rgba(224, 87, 74, 0.42);
   --sheet-band: rgba(224, 87, 74, 0.2);
+  --sheet-axis: rgba(205, 200, 190, 0.6);
+  --sheet-one: rgba(205, 200, 190, 0.45);
+  --sheet-grid: rgba(205, 200, 190, 0.2);
   --sheet-mark: #e0574a;
 }

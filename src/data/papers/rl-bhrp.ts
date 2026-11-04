@@ -2,9 +2,10 @@
 // RL-BHRP's own numbers (arXiv:2508.11856v1), at the paper's precision, and its reproduction's series, so every
 // figure its explainer and the homepage quote is computed from them (lib/paperNumbers.ts) rather than typed into
 // prose, and every picture drawn from them (lib/paperFigures/).
+import { rlBhrpDiagnostics } from '../vendor/rlBhrpDiagnostics';
 import { rlBhrpWealth } from '../vendor/rlBhrpWealth';
 import type { WealthSeries } from '../../lib/paperFigures/wealthFigure';
-import { band, cumulative, pointwiseMedian } from '../../lib/wealth';
+import { band, cagr, cumulative, pointwiseMedian } from '../../lib/wealth';
 
 /** Table 2, "Full-Period Metrics": all 18 rows in the paper's order, values as printed (6 dp). Columns are
  *  RL-BHRP | BHRP | Benchmark. The benchmark's information ratio is NaN in the paper: its tracking error
@@ -34,17 +35,27 @@ export const TABLE2: readonly {
   { metric: 'Hit Rate (>0)', kind: 'pct', values: [0.641791, 0.641791, 0.626866] },
 ];
 
+/** Table 1 of the paper, its sector map: how many of the test's stocks each GICS sector holds. */
+const SECTOR_SIZES = {
+  'Information Technology': 10, 'Communication Services': 4, 'Consumer Discretionary': 4, 'Consumer Staples': 5,
+  Financials: 5, Energy: 2, 'Health Care': 6, Industrials: 5, Utilities: 3, 'Real Estate': 2, Materials: 2,
+} as const;
+
 /** The test window and the paper's other stated figures. `start`/`end` are the first and last month-ends of
- *  the 67 monthly periods; the last month is partial, the daily data ending at `dataEnd` (paper §4.1).
- *  `costBps` is RL-BHRP's cost per dollar traded. `turnover` and `top15` are paper §4.2: the mean monthly
- *  turnover (with its 95th percentile) and the share held by the 15 largest average weights (mean and range). */
+ *  the 67 monthly periods; the last month is partial, the daily data ending at `dataEnd` (paper §4.1). `train` is
+ *  the span the model was designed and trained on, in whole years (paper §4: 1 January 2012 to 1 January 2020).
+ *  `universe` and `sectors` count the sector map. `costBps` is RL-BHRP's cost per dollar traded. `turnover` and
+ *  `top15` are paper §4.2: the mean monthly turnover (with its 95th percentile) and the share held by the 15
+ *  largest average weights (mean and range). */
 export const PAPER = {
   months: 67,
   start: '2020-02-29',
   end: '2025-08-31',
   dataEnd: '2025-08-13',
-  universe: 48,
-  sectors: 11,
+  train: { from: 2012, to: 2019 },
+  sectorSizes: SECTOR_SIZES,
+  universe: Object.values(SECTOR_SIZES).reduce((a: number, b) => a + b, 0),
+  sectors: Object.keys(SECTOR_SIZES).length,
   costBps: 5,
   turnover: 0.60,
   turnoverP95: 0.85,
@@ -63,4 +74,18 @@ export const REPRO: WealthSeries = {
   ...band(runs),
   bhrp: cumulative(rlBhrpWealth.bhrp),
   bench: cumulative(rlBhrpWealth.benchmark),
+  dataEnd: PAPER.dataEnd,
+};
+
+/** What the explainer quotes about the reproduction beside its series (data/vendor/rlBhrpDiagnostics.ts): the
+ *  monthly turnover of its median run and of BHRP, BHRP's share in its 15 largest weights, and each run's CAGR under
+ *  both readings of the paper's penalty: centred over all the stocks (Def. 3.2.3 as written, the runs above) and
+ *  within each sector (as its Alg. 1 centres). */
+export const REPRO_NOTES = {
+  turnover: rlBhrpDiagnostics.turnover,
+  top15: rlBhrpDiagnostics.top15,
+  cagr: {
+    global: runs.map((w) => cagr(w[w.length - 1] - 1, w.length - 1)),
+    sector: rlBhrpDiagnostics.sectorCentred.cagr,
+  },
 };

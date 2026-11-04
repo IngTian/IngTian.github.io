@@ -8,8 +8,12 @@ import {
   INTRO_DURATION_MS, INTRO_DUR_MIN_MS, INTRO_DUR_MAX_MS,
 } from '../src/lib/introTimeline';
 import { INTRO_SEEN_KEY } from '../src/lib/introSession';
-import { inProgress, projects, timeline } from '../src/data/profile';
-import { type Stop, experienceStops, flattenStops, projectSectionId, projectStops } from '../src/lib/pageStops';
+import { inProgress, projects, publications, timeline } from '../src/data/profile';
+import { PAPER_DATA } from '../src/data/papers';
+import { type Stop, PAPER_END, experienceStops, flattenStops, paperStops, projectSectionId, projectStops } from '../src/lib/pageStops';
+import type { PaperReport } from '../src/lib/paperMarkdown';
+import { countWords, readingMinutes } from '../src/lib/words';
+import { renderMarkdown } from './helpers/paperChain';
 import { GALLERY_ORDER } from '../src/lib/galleryLayout';
 import { EASE, RAIL_ENTER_MS, stagger } from '../src/lib/motionTiming';
 import { listingLines } from '../src/lib/projectsListing';
@@ -189,6 +193,18 @@ const namesAFile = (path: string): boolean => /\/[^/]*\.[a-z0-9]+$/i.test(path);
  * rather than a parked one, and re-adding an exclusion here would hide it.
  */
 const isProto = (p: Page): boolean => p.route.startsWith('/proto-');
+
+/**
+ * What the markdown plugins report for a paper's file (its sections, its words), from the file itself, through the
+ * chain the build runs (tests/helpers/paperChain.ts) — a second reading of the file, so a page that renders its rail
+ * from anything else is caught. The frontmatter is read for what the report needs: which record it explains.
+ */
+const paperReport = async (slug: string): Promise<PaperReport> => {
+  const path = fileURLToPath(new URL(`../src/content/papers/${slug}.md`, import.meta.url));
+  const body = readFileSync(path, 'utf8').replace(/^---\n[\s\S]*?\n---\n/, '');
+  const { report } = await renderMarkdown(body, path, { papers: PAPER_DATA, publications, frontmatter: { publication: slug } });
+  return report;
+};
 
 describe('the built site (dist/) — rendered-output smoke test', () => {
   it('has a build to inspect at all', () => {
@@ -623,8 +639,8 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
   const flat = (stops: readonly Stop[], depth = 0): { target: string; label: string; depth: number }[] =>
     stops.flatMap((s) => [{ target: s.target, label: s.label, depth }, ...flat(s.children ?? [], depth + 1)]);
 
-  it('is on /experience, /projects and /writing', () => {
-    expect(railPages().map((p) => p.route).sort()).toEqual(['/experience', '/projects', '/writing']);
+  it('is on /experience, /projects, /research/rl-bhrp and /writing', () => {
+    expect(railPages().map((p) => p.route).sort()).toEqual(['/experience', '/projects', '/research/rl-bhrp', '/writing']);
   });
 
   // The label is two layers in the markup and two more in CSS (::before, ::after, from data-l), so its states
@@ -647,10 +663,11 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
   });
 
   // Every level of the tree, at its depth: the template recurses rather than unrolling a fixed number of levels.
-  it("nests the links as the page's Stop tree does, at every depth", () => {
+  it("nests the links as the page's Stop tree does, at every depth", async () => {
     const strip = (xs: Item[]) => xs.map(({ target, label, depth }) => ({ target, label, depth }));
     expect(strip(itemsOf(projectsPage()))).toEqual(flat(projectStops(projects)));
     expect(strip(itemsOf(builtPage('/experience')))).toEqual(flat(experienceStops(timeline)));
+    expect(strip(itemsOf(builtPage('/research/rl-bhrp')))).toEqual(flat(paperStops((await paperReport('rl-bhrp')).sections)));
     expect(new Set(itemsOf(builtPage('/writing')).map((i) => i.depth))).toEqual(new Set([0, 1]));
   });
 
@@ -1065,5 +1082,103 @@ describe('/projects — repo links, private repos, and what assistive tech is to
     expect(live.length, `live regions: ${live.join(' ')}`).toBe(1);
     expect(live[0]).toMatch(/\saria-live="polite"/);
     expect(live[0]).toMatch(/\sdata-cow-live\b/);
+  });
+});
+
+describe('/research/rl-bhrp — a paper explained, from its file', async () => {
+  const page = (): Page => builtPage('/research/rl-bhrp');
+  const report = await paperReport('rl-bhrp');
+  const rl = publications.find((p) => p.slug === 'rl-bhrp')!;
+  const text = (html: string): string => html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;|\s+/g, ' ');
+
+  it('is a paper page: data-page="paper", one <main class="paper">', () => {
+    expect(/<html\b[^>]*\sdata-page="paper"/.test(page().markup)).toBe(true);
+    expect(page().markup.match(/<main\b[^>]*\sclass="paper"/g)).toHaveLength(1);
+  });
+
+  // The rail and the page's sections come from one report; a stop the page did not emit fails here by name.
+  it('emits an id for every rail stop, and each id once', () => {
+    const stops = paperStops(report.sections).map((s) => s.target);
+    expect(stops.filter((id) => !page().ids.has(id))).toEqual([]);
+    const all = [...page().markup.matchAll(/\sid="([^"]*)"/g)].map((m) => m[1]);
+    expect(all.filter((id, i) => all.indexOf(id) !== i)).toEqual([]);
+  });
+
+  // Below 1100px the Contents list replaces the rail: the same stops, each by its title, a section's number before it.
+  it('lists the same sections in its Contents as in its rail, each by its title', () => {
+    const nav = /<nav\b[^>]*\sclass="toc-inline"[\s\S]*?<\/nav>/.exec(page().markup)?.[0] ?? '';
+    const items = [...nav.matchAll(/<a\b[^>]*\shref="#([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)].map((m) => ({ target: m[1], label: text(m[2]).trim() }));
+    const want = [...report.sections, ...PAPER_END].map((s) => ({
+      target: s.id, label: [('n' in s && s.n) || '', s.title].filter(Boolean).join(' '),
+    }));
+    expect(items).toEqual(want);
+  });
+
+  it("prints the paper's Table 2 whole: all 18 rows", () => {
+    const table = /<table class="bt">[\s\S]*?<\/table>/.exec(page().markup)?.[0] ?? '';
+    expect(table.match(/<tbody>[\s\S]*<\/tbody>/)?.[0].match(/<tr\b/g)).toHaveLength(18);
+  });
+
+  // Underline, on 5–7 key sentences: no more than about one a screen (spec §4).
+  it('highlights five to seven sentences', () => {
+    const n = page().markup.match(/<mark class="hl">/g)?.length ?? 0;
+    expect(n).toBeGreaterThanOrEqual(5);
+    expect(n).toBeLessThanOrEqual(7);
+  });
+
+  // A preprint, always: never "published" or "peer-reviewed" — the one place it may say "not peer reviewed".
+  it('never says the preprint was published or reviewed', () => {
+    const words = text(page().markup);
+    expect(words).not.toMatch(/published/i);
+    expect(words.replace(/not peer reviewed/g, '')).not.toMatch(/peer[- ]reviewed/i);
+    expect(words).toContain('preprint, not peer reviewed');
+  });
+
+  it('sets every numbered equation as MathML, its number outside the maths', () => {
+    const eqs = [...page().markup.matchAll(/<div class="eq an" id="([^"]+)">([\s\S]*?)<span class="eq-no">([^<]*)<\/span>/g)];
+    const numbered = eqs.filter((m) => m[3]);
+    expect(numbered.map((m) => m[3])).toEqual(['(2)', '(3)', '(4)']);
+    for (const [, id, body] of numbered) expect(body, id).toMatch(/<math\b/);
+    expect(page().markup).not.toMatch(/katex-error|\\tag/);
+  });
+
+  it('cites every reference it lists, and lists every one it cites', () => {
+    const listed = [...page().markup.matchAll(/<li id="(ref-[^"]+)"/g)].map((m) => m[1]);
+    const cited = new Set([...page().markup.matchAll(/<a class="cite" href="#(ref-[^"]+)"/g)].map((m) => m[1]));
+    expect(listed.length).toBeGreaterThan(5);
+    expect(listed.filter((id) => !cited.has(id))).toEqual([]);
+    expect([...cited].filter((id) => !listed.includes(id))).toEqual([]);
+  });
+
+  it('gives the BibTeX verbatim, with a copy control in the paper skin', () => {
+    const pre = /<pre id="bibtex">([\s\S]*?)<\/pre>/.exec(page().markup)?.[1] ?? '';
+    expect(pre.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')).toBe(rl.bibtex);
+    const button = /<button\b[^>]*\sdata-copy="bibtex"[^>]*>/.exec(page().markup)?.[0] ?? '';
+    expect(button).toMatch(/\stype="button"/);
+    expect(button).toMatch(/\sclass="btn btn--paper\b/);
+  });
+
+  // The reading time is computed from the words, never typed: the file's own (the plugin's count) and the abstract's.
+  it('computes its reading time from the words a reader reads', () => {
+    const minutes = readingMinutes(report.bodyWords + countWords(rl.abstract!));
+    expect(text(page().markup)).toContain(`· ${minutes} min read · written by Zeying Tian, the second author`);
+  });
+
+  // The caption is the explainer's, so it says here what the figure is: the owner's reproduction, not the paper's run.
+  it("captions Figure 2 as the second author's reproduction, with the paper's own figure beside it", () => {
+    const cap = /<figure class="fig" id="figure-2">[\s\S]*?<figcaption>([\s\S]*?)<\/figcaption>/.exec(page().markup)?.[1] ?? '';
+    const v = PAPER_DATA['rl-bhrp'].values;
+    expect(text(cap)).toContain('Figure 2. A reproduction, not the paper’s run:');
+    expect(text(cap)).toContain(`median of the reproduction’s ${v.reproRuns} training runs`);
+    expect(text(cap)).toContain(`where the paper reports ${v['usd.rl']} from its original run`);
+    expect(text(cap)).toContain('not fresh evidence');
+  });
+
+  it('shows exactly one drawing per figure in the markup the CSS swaps: a wide and a narrow, by class', () => {
+    for (const id of ['figure-1', 'figure-2']) {
+      const fig = new RegExp(`<figure\\b[^>]*\\sid="${id}"[\\s\\S]*?</figure>`).exec(page().markup)?.[0] ?? '';
+      expect(fig.match(/\sclass="[^"]*\bwide\b/g), id).toHaveLength(1);
+      expect(fig.match(/\sclass="[^"]*\bnarrow\b/g), id).toHaveLength(1);
+    }
   });
 });

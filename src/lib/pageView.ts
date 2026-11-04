@@ -11,9 +11,10 @@
 // its teardown, and this runs it before the next init. The page-load that ends a full load finds the same element
 // and does nothing: the element, not a flag, because a flag cannot tell that page-load from the next arrival's.
 //
-// It touches the DOM despite living in lib/, the exception lib/introSession.ts makes for the same reason: seven scripts
+// It touches the DOM despite living in lib/, the exception lib/introSession.ts makes for the same reason: eight scripts
 // share it (/projects' TerminalHeader, ProjectAsk, Gallery, DraftingField, and that page's ask dispatcher and cow;
-// and SideRail, whose first marks must land while its rows are still coming in), and a component cannot import one.
+// SideRail, whose first marks must land while its rows are still coming in; and the paper page, whose notes must be
+// placed and whose reveals armed before the reader sees the page), and a component cannot import one.
 
 /** Run `init` for this page view's `selector` element: now on a full load, then once per new DOM, each time after
  *  the teardown the last init returned. */

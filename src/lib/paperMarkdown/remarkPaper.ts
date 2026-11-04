@@ -5,6 +5,7 @@
 // paper is parsed (remarkPaperSyntax): any other file is parsed as if remark-directive were not installed.
 import remarkDirective from 'remark-directive';
 import { unified, type Processor } from 'unified';
+import type { Publication } from '../../data/profile';
 
 /** A markdown (mdast) or HTML (hast) node, as loosely as both plugins need. */
 export interface Node {
@@ -21,13 +22,18 @@ export interface Node {
 }
 
 export interface PaperData { values: Record<string, string>; figures: Record<string, string> }
+/** What the format reads from a paper's record (profile.ts `publications`): the abstract `::abstract` quotes, and
+ *  the page it quotes it from. */
+export type PaperRecord = Pick<Publication, 'slug' | 'abstract' | 'href'>;
 
 /** What a paper's render reports on `render(entry).remarkPluginFrontmatter`. A plugin cannot fail the build
- *  (Astro logs a plugin's throw and stores the entry unrendered), so the paper page throws on any problem. */
+ *  (Astro logs a plugin's throw and stores the entry unrendered), so the paper page throws on any problem.
+ *  `errataText` is the frontmatter's errata, in order, each with its `:v` filled in. */
 export interface PaperReport {
   paperProblems: string[];
   sections: { id: string; n?: string; title: string; rail: string }[];
   bodyWords: number;
+  errataText: string[];
 }
 
 interface File { path?: string; value: unknown; data: { astro?: { frontmatter?: Record<string, unknown> } } }
@@ -90,29 +96,34 @@ function citeLabel(r: Reference): string {
 const inTeX = (value: string) => value.replace(/[$%#&]/g, '\\$&');
 // What smartypants (Astro's, before these plugins) curls in text but never sees in an attribute.
 const UNCURLED = /['"]|--|\.\.\./;
+const VALUE = /:v\[\s*([^\]]*?)\s*\]/g;
+const html = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-export function remarkPaper({ papers }: { papers: Record<string, PaperData> }) {
+export function remarkPaper({ papers, publications }: { papers: Record<string, PaperData>; publications: readonly PaperRecord[] }) {
   return (tree: unknown, file: unknown) => {
     if (!isPaper(file)) return;
     const root = tree as Node, src = String((file as File).value);
 
     const fm = report(file);
     const data = papers[String(fm.publication)] ?? { values: {}, figures: {} };
+    const record = publications.find((p) => p.slug === fm.publication);
     const refs = new Map((Array.isArray(fm.references) ? (fm.references as Reference[]) : []).map((r) => [r.key, r]));
     const problems: string[] = [], sections: PaperReport['sections'] = [];
     const ids = new Set<string>(), terms = new Map<string, Node>(), hosts = new WeakSet<Node>();
     const notes: { note: Node; host: Node }[] = [];
     const problem = (p: string) => problems.push(p);
     const claim = (id: string) => { if (ids.has(id)) problem(`id #${id} is used twice`); ids.add(id); };
+    // The one lookup of a :v, wherever it is written: in prose, in maths and in the errata.
+    const value = (key: string): string => {
+      const v = data.values[key];
+      if (v === undefined) problem(`unknown :v key "${key}"`);
+      return v ?? key;
+    };
 
     // remark-math takes $…$ before any directive is parsed, so a :v in maths is still text here: it is expanded
     // in the TeX, and in the copy of it remark-math made for rehype-katex. No other directive works in maths.
     function maths(n: Node): void {
-      const tex = (n.value ?? '').replace(/:v\[\s*([^\]]*?)\s*\]/g, (_, key: string) => {
-        const value = data.values[key];
-        if (value === undefined) problem(`unknown :v key "${key}"`);
-        return inTeX(value ?? key);
-      });
+      const tex = (n.value ?? '').replace(VALUE, (_, key: string) => inTeX(value(key)));
       for (const [d] of tex.matchAll(/:(?:cite|t|hl)\[/g)) problem(`${d}…] in $${tex}$ — only :v works in maths`);
       if (/\\tag\b/.test(tex)) problem(`\\tag in $$${tex}$$ — number it with ::::eq{n=…}`);
       n.value = tex;
@@ -158,12 +169,26 @@ export function remarkPaper({ papers }: { papers: Record<string, PaperData> }) {
           return [section(n)];
         case 'containerDirective:eq': return [eq(n)];
         case 'containerDirective:notation': return [notation(n)];
+        case 'containerDirective:figure': return [figure(n)];
         case 'containerDirective:where': problem(':::where outside an ::::eq'); break;
-        case 'leafDirective:figure': {
-          const name = n.attributes?.name ?? '', figure = data.figures[name];
-          if (figure === undefined) { problem(`unknown ::figure name "${name}"`); return []; }
-          return [{ type: 'html', value: figure }];
+        case 'containerDirective:thm': {
+          const id = n.attributes?.id;
+          if (id) claim(id);
+          blocks(n, inHl);
+          return [set(n, 'div', { className: ['thm'], ...(id ? { id } : {}) })];
         }
+        case 'containerDirective:inpaper': {
+          blocks(n, inHl);
+          for (const p of n.children ?? []) {
+            if (p.type === 'paragraph') set(p, 'p', { className: ['inpaper'] });
+            else problem(`:::inpaper holds a ${p.type} — it is a paragraph pointing into the paper`);
+          }
+          return n.children ?? [];
+        }
+        case 'leafDirective:abstract':
+          if (!record?.abstract) { problem(`::abstract, and the record "${String(fm.publication)}" has no abstract`); return []; }
+          return [{ type: 'html', value: `<blockquote class="abstract" cite="${html(record.href)}"><p>${html(record.abstract)}</p></blockquote>` }];
+        case 'textDirective:sup': blocks(n, inHl); return [set(n, 'sup')];
         case 'textDirective:t': {
           const id = n.attributes?.id;
           if (!id) problem(`a term without an #id: "${plain(n)}"`);
@@ -182,11 +207,7 @@ export function remarkPaper({ papers }: { papers: Record<string, PaperData> }) {
           n.children = [text(r ? citeLabel(r) : key)];
           return [set(n, 'a', { className: ['cite'], href: `#${refId(key)}` })];
         }
-        case 'textDirective:v': {
-          const key = plain(n).trim(), value = data.values[key];
-          if (value === undefined) problem(`unknown :v key "${key}"`);
-          return [text(value ?? key)];
-        }
+        case 'textDirective:v': return [text(value(plain(n).trim()))];
         default:
           if (isDirective(n)) { problem(`unknown directive ${COLONS[n.type]}${n.name} — \\: is a literal colon`); return []; }
       }
@@ -195,18 +216,21 @@ export function remarkPaper({ papers }: { papers: Record<string, PaperData> }) {
     }
 
     function section(n: Node): Node {
-      const { id = '', n: num, rail } = n.attributes ?? {};
+      const { id = '', n: num, rail, aside } = n.attributes ?? {};
       const [first, ...body] = n.children ?? [];
       const label = first?.data?.directiveLabel ? first : undefined;
       if (!id) problem(`:::section${label ? ` [${plain(label)}]` : ''} has no #id`);
       else claim(id);
       if (!label) problem(`:::section #${id} has no [title]`);
-      if (rail && UNCURLED.test(rail)) problem(`rail="${rail}" keeps straight quotes and dashes the title would not — write ’ “ ” – — …`);
+      for (const [k, a] of [['rail', rail], ['aside', aside]]) {
+        if (a && UNCURLED.test(a)) problem(`${k}="${a}" keeps straight quotes and dashes the title would not — write ’ “ ” – — …`);
+      }
       const title = label ? plain(label).trim() : '';
       sections.push({ id, ...(num ? { n: num } : {}), title, rail: rail ?? title });
       // The h2 takes an id of its own: left without one, Astro's heading pass would slug "Notation" into a
-      // second id="notation".
-      const h2 = el('h2', { id: `${id}-title` }, [...(num ? [el('span', { className: ['n'] }, [text(num)])] : []), ...(label?.children ?? [])]);
+      // second id="notation". An aside follows the title in the heading only, so the rail and Contents keep the title.
+      const h2 = el('h2', { id: `${id}-title` }, [...(num ? [el('span', { className: ['n'] }, [text(num)])] : []), ...(label?.children ?? []),
+        ...(aside ? [text(' '), el('span', { className: ['aside'] }, [text(`· ${aside}`)])] : [])]);
       n.children = label ? [h2, ...body] : [h2, first, ...body].filter(Boolean);
       blocks(n, false);
       return set(n, 'section', { className: ['sec'], id });
@@ -242,6 +266,32 @@ export function remarkPaper({ papers }: { papers: Record<string, PaperData> }) {
         el('span', { className: ['eq-no'] }, num ? [text(`(${num})`)] : [])]), ...rest];
       hosts.add(n);
       return set(n, 'div', { className: ['eq', 'an'], ...(id ? { id } : {}) });
+    }
+
+    // A figure: the drawing registered under `name`, numbered by `n`, the container's prose its caption and its
+    // notes beside it. A table (a registered drawing that is a <table>) is captioned above and scrolls in its own
+    // box, its other paragraphs set under it as its notes; anything else is a figure, its whole caption below.
+    function figure(n: Node): Node {
+      const { name = '', n: num } = n.attributes ?? {}, art = data.figures[name];
+      if (art === undefined) problem(`unknown :::figure name "${name}"`);
+      if (!num) problem(`:::figure ${name} has no n=`);
+      const table = /^<table\b/.test(art ?? ''), id = `${table ? 'table' : 'figure'}-${num}`;
+      if (num) claim(id);
+      const paras: Node[] = [], asides: Node[] = [];
+      for (const c of n.children ?? []) {
+        if (c.type === 'paragraph') { blocks(c, false); paras.push(c); }
+        else if (isNote(c)) { asides.push(note(c)); notes.push({ note: c, host: n }); }
+        else problem(`:::figure ${name} holds a ${c.type} — a figure holds its caption and its notes`);
+      }
+      if (!paras.length) problem(`:::figure ${name} has no caption`);
+      paras[0]?.children?.unshift(el('span', { className: ['fig-no'] }, [text(`${table ? 'Table' : 'Figure'} ${num}.`)]), text(' '));
+      const drawing: Node = { type: 'html', value: art ?? '' };
+      n.children = table
+        ? [el('figcaption', { className: ['cap'] }, paras[0]?.children ?? []), el('div', { className: ['tbl-scroll'] }, [drawing]),
+          ...paras.slice(1).map((p) => set(p, 'p', { className: ['src'] })), ...asides]
+        : [drawing, el('figcaption', {}, paras.length === 1 ? paras[0].children ?? [] : paras), ...asides];
+      hosts.add(n);
+      return set(n, 'figure', { className: [table ? 'tbl' : 'fig', ...(asides.length ? ['an'] : [])], ...(num ? { id } : {}) });
     }
 
     function notation(n: Node): Node {
@@ -301,6 +351,9 @@ export function remarkPaper({ papers }: { papers: Record<string, PaperData> }) {
       if (!term) problem(`${noteLabel(n)} names no term`);
       else if (!inside) problem(`${noteLabel(n)}: term #${at} is not in the block the note follows`);
     }
+    // The errata are frontmatter, which the page prints as text: their :v is filled in here, by the same lookup.
+    const errata = Array.isArray(fm.errata) ? (fm.errata as { text?: unknown }[]) : [];
+    fm.errataText = errata.map((e) => String(e.text ?? '').replace(VALUE, (_, key: string) => value(key)));
     fm.paperProblems = problems;
     fm.sections = sections;
   };

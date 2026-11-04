@@ -29,8 +29,23 @@ No name in bold.
 
 A :hlx[typo] directive and some <b>raw HTML</b>.
 
-::figure{name=nothing}
+::figure{name=pipe}
+
+:::figure{name=nothing n=3}
+A caption for a drawing nobody registered.
+:::
+
+:::figure{name=pipe}
+A caption, and no number.
+:::
+
+:::figure{name=pipe n=4}
+:::
 ::::
+
+:::section[Aside]{#aside aside="it's"}
+A section whose aside needs curling.
+:::
 
 :::::section[Equations]{#eqs}
 :::notation

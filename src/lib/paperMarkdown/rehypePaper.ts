@@ -16,7 +16,8 @@ function same(a: Node, b: Node): boolean {
     && ka.length === kb.length && ka.every((c, i) => same(c, kb[i]));
 }
 
-/** A row's symbols: its maths split at the commas between them (`N,\ G` is two), spaces dropped. */
+/** A row's symbols: its maths split at the commas between them (`N,\ G` is two) and at a membership (`i ∈ 𝓘_g`
+ *  introduces i), spaces dropped. */
 function symbolsOf(row: Node): { tex: string; parts: Node[][] } {
   let math: Node | undefined;
   walk(row.children?.find((c) => isEl(c, 'th')) ?? row, (n) => { math ??= isEl(n, 'math') ? n : undefined; });
@@ -25,7 +26,7 @@ function symbolsOf(row: Node): { tex: string; parts: Node[][] } {
   const seq = body.length === 1 && body[0].tagName === 'mrow' ? body[0].children ?? [] : body;
   const parts: Node[][] = [[]];
   for (const c of seq) {
-    if (isEl(c, 'mo') && c.properties?.separator === 'true') parts.push([]);
+    if (isEl(c, 'mo') && (c.properties?.separator === 'true' || plain(c) === '∈')) parts.push([]);
     else if (!(isEl(c, 'mspace') || (isEl(c, 'mtext') && !plain(c).trim()))) parts.at(-1)!.push(c);
   }
   const tex = semantics?.children?.find((c) => isEl(c, 'annotation'));
@@ -36,10 +37,21 @@ const mark = (n: Node, key: string) => {
   n.properties = { ...n.properties, className: [...((n.properties?.className as string[]) ?? []), 'sym'], dataSym: key };
 };
 
+const SCRIPTS = new Set(['msub', 'msup', 'msubsup']);
+const base = (n: Node) => (isEl(n) && SCRIPTS.has(n.tagName!) ? n.children?.find((c) => isEl(c)) : undefined);
+/** A row's scripted symbol names its family: `W_{g}` is the sector weight for every g, so it also stands for W with
+ *  any other script (W_{g(i)}, W^⊤) and for W alone, the vector of them. */
+const ofFamily = (n: Node, symbol: Node) => {
+  const b = base(symbol);
+  return b !== undefined && (same(n, b) || (base(n) !== undefined && same(base(n)!, b)));
+};
+
 // Top down, so the largest match wins and nothing inside a tagged symbol is tagged again: a row `W_{g}` tags the
-// whole msub, and a bare W elsewhere is not W_g. A symbol that is several siblings (`RC_i(w)`) gets an mrow round it.
+// whole msub, not its W. An exact match comes before a family one. A symbol that is several siblings (`RC_i(w)`)
+// gets an mrow round it.
 function tag(n: Node, symbols: { key: string; nodes: Node[] }[], seen: Set<string>): void {
-  const whole = symbols.find((s) => s.nodes.length === 1 && same(n, s.nodes[0]));
+  const whole = symbols.find((s) => s.nodes.length === 1 && same(n, s.nodes[0]))
+    ?? symbols.find((s) => s.nodes.length === 1 && ofFamily(n, s.nodes[0]));
   if (whole) { mark(n, whole.key); seen.add(whole.key); return; }
   const kids = n.children ?? [], out: Node[] = [];
   for (let i = 0; i < kids.length;) {
@@ -53,6 +65,31 @@ function tag(n: Node, symbols: { key: string; nodes: Node[] }[], seen: Set<strin
     }
   }
   n.children = out;
+}
+
+// A hyphenated name in capitals (RL-BHRP), a span of years and an ISO date each read as one word, so a line never
+// breaks inside one: "RL-" at the end of a line and "BHRP" at the start of the next is two words to a reader.
+const WHOLE = /[A-Z]{2,}-[A-Z]{2,}|\d{4}–\d{4}|\d{4}-\d{2}-\d{2}/g;
+function keepWhole(n: Node): void {
+  if (!n.children || (isEl(n) && n.tagName === 'math')) return;
+  const out: Node[] = [];
+  for (const c of n.children) {
+    const prev = out.at(-1);
+    if (c.type === 'text' && prev?.type === 'text') prev.value += c.value ?? '';   // a :v is a text node of its own
+    else out.push(c.type === 'text' ? { ...c } : c);
+  }
+  n.children = out.flatMap((c) => {
+    if (c.type !== 'text' || !c.value!.match(WHOLE)) { keepWhole(c); return [c]; }
+    const parts: Node[] = [];
+    let at = 0;
+    for (const m of c.value!.matchAll(WHOLE)) {
+      if (m.index > at) parts.push({ type: 'text', value: c.value!.slice(at, m.index) });
+      parts.push({ type: 'element', tagName: 'span', properties: { className: ['nw'] }, children: [{ type: 'text', value: m[0] }] });
+      at = m.index + m[0].length;
+    }
+    if (at < c.value!.length) parts.push({ type: 'text', value: c.value!.slice(at) });
+    return parts;
+  });
 }
 
 const UNREAD = new Set(['math', 'table']);
@@ -88,5 +125,6 @@ export function rehypePaper() {
     // are not read as prose. A figure is still a raw node here, so it is not counted either, and a paper holds
     // no other HTML and no code (remarkPaper refuses both).
     fm.bodyWords = countWords(words(root).join(' '));
+    keepWhole(root);
   };
 }

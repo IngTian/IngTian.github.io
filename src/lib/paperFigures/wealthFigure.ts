@@ -12,12 +12,16 @@
 //   slides g.f-mask right by its data-d, and hides it again. It is clipped to where it lies at rest, so the slide
 //   never paints outside the drawing, whatever the svg's overflow.
 // - g.f-labels, the end labels; g.f-read, the readout's hairline and dots at the origin, unshown (opacity 0).
-// - .f-plot, the readout's target: the three series it reads on data-rl, data-bhrp and data-bench (4 dp; point 0
-//   is the start, point i the month-end data-dates[i - 1]), its legend .f-tip and a live region.
+// - .f-plot, the readout's target and the string's root: the series it reads on data-rl, data-bhrp, data-bench and
+//   the band's edges on data-lo and data-hi (4 dp; point 0 is the start, point i the month-end data-dates[i - 1]),
+//   the day the data end on data-end (the last month is partial), its legend .f-tip and a live region.
+// The <figure> and its caption are the explainer's (a :::figure container), so this is the drawing alone.
+import { monthYear } from '../dates';
 import { linearScale, niceDomain, nudgeLabels } from '../wealth';
 
 export interface WealthSeries {
   dates: readonly string[];   // the month-ends; every series has one point more, the start
+  dataEnd: string;            // the last day of data: the last month runs from its month-end to here
   runs: number;               // how many runs `rl` is the median of, and `lo`/`hi` the band of
   rl: readonly number[];
   lo: readonly number[];
@@ -39,7 +43,6 @@ const GROUND = 'var(--sheet-ground)';
 
 const r1 = (n: number) => String(Math.round(n * 10) / 10);
 const final = <T>(s: readonly T[]) => s[s.length - 1];
-const month = (date: string) => new Date(`${date}T00:00:00Z`).toLocaleString('en', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 /** The frame every drawing of `d` shares: a twentieth of the data's range clear above and below it, out to the
  *  next 0.05, with grid lines at the multiples of 0.5 inside. */
@@ -100,8 +103,8 @@ function drawing(d: WealthSeries, f: typeof WIDE, cls: string, dom: ReturnType<t
     + '</svg>';
 }
 
-/** `full` is Figure 2 itself: the figure, its readout's markup and its caption. `mini` is the series alone, no
- *  text, for the index card, which says what it is in its own caption. */
+/** `full` is Figure 2's drawing: the plot and its readout's markup. `mini` is the series alone, no text, for the
+ *  index card, which says what it is in its own caption. */
 export function wealthFigure(d: WealthSeries, size: 'full' | 'mini'): string {
   const dom = domain(d);
   if (size === 'mini') {
@@ -109,22 +112,17 @@ export function wealthFigure(d: WealthSeries, size: 'full' | 'mini'): string {
     return `<svg class="mini" viewBox="0 0 ${f.W} ${f.H}" aria-hidden="true" focusable="false">`
       + `${series(d, f, dom, { id: 'fm-mini', top: f.y0 - 6, bottom: f.y1 + 4 }).svg}</svg>`;
   }
-  const from = month(d.dates[0]), to = month(final(d.dates));
+  const from = monthYear(d.dates[0]), to = monthYear(final(d.dates));
   const label = `Growth of $1 in the second author’s reproduction, ${from} to ${to}: RL-BHRP, the month-by-month median of `
-    + `${d.runs} runs, ends at $${final(d.rl).toFixed(2)}, BHRP at $${final(d.bhrp).toFixed(2)} and the benchmark at $${final(d.bench).toFixed(2)}.`;
+    + `${d.runs} runs, ends at $${final(d.rl).toFixed(2)}, BHRP at $${final(d.bhrp).toFixed(2)} and the benchmark at `
+    + `$${final(d.bench).toFixed(2)}; the runs end between $${final(d.lo).toFixed(2)} and $${final(d.hi).toFixed(2)}.`;
   const data = (s: readonly number[]) => s.map((v) => Number(v.toFixed(4))).join(' ');
-  return '<figure class="fig" id="figure-2">'
-    + '<div class="f-plot" tabindex="0" role="group" aria-label="Plot of Figure 2. Hover, or use the left and right arrow keys, to read the three values month by month."'
-    + ` data-dates="${d.dates.join(' ')}" data-rl="${data(d.rl)}" data-bhrp="${data(d.bhrp)}" data-bench="${data(d.bench)}">`
+  return '<div class="f-plot" tabindex="0" role="group" aria-label="Plot of Figure 2. Hover, tap, or use the left and right arrow keys, to read the values month by month."'
+    + ` data-dates="${d.dates.join(' ')}" data-end="${d.dataEnd}" data-rl="${data(d.rl)}" data-lo="${data(d.lo)}" data-hi="${data(d.hi)}"`
+    + ` data-bhrp="${data(d.bhrp)}" data-bench="${data(d.bench)}">`
     + drawing(d, WIDE, 'wide', dom, label) + drawing(d, NARROW, 'narrow', dom, label)
     + `<div class="f-tip" aria-hidden="true"><p class="f-tip-d"></p><dl><dt class="rl">RL-BHRP <i>median of ${d.runs} runs</i></dt>`
-    + '<dd data-k="rl"></dd><dt>BHRP</dt><dd data-k="bhrp"></dd><dt>Benchmark</dt><dd data-k="bench"></dd></dl></div>'
-    + '<span class="sr-only" aria-live="polite"></span></div>'
-    + '<figcaption><span class="fig-no">Figure 2.</span> <span class="claim">A reproduction, not the paper’s run:</span> '
-    + `growth of $1, ${from} to ${to} (the last month is partial). The paper’s own curve is its Figure 1 (paper §4.1); it `
-    + 'does not release the monthly series, so this figure redraws the second author’s reproduction instead. The red line is '
-    + `the month-by-month median of the reproduction’s ${d.runs} training runs and the band their range: they ended between `
-    + `$${final(d.lo).toFixed(2)} and $${final(d.hi).toFixed(2)}. Some of its settings were chosen after the test period had `
-    + 'been seen, so it is not fresh evidence. Source: <a href="https://github.com/IngTian/rl-bhrp">IngTian/rl-bhrp</a>, '
-    + '<code>results/shared-global</code>.</figcaption></figure>';
+    + '<dd data-k="rl"></dd><dt class="band"><i>the runs</i></dt><dd data-k="band"></dd><dt>BHRP</dt><dd data-k="bhrp"></dd>'
+    + '<dt>Benchmark</dt><dd data-k="bench"></dd></dl></div>'
+    + '<span class="sr-only" aria-live="polite"></span></div>';
 }

@@ -1,17 +1,19 @@
 // tests/paperFigures.test.ts
-// RL-BHRP's two figures and the index card's miniature, as the strings the build inlines. Figure 2 is drawn from
-// the reproduction's series (REPRO): its frame is derived from them, its labels never collide, the mask that
-// draws it is the sheet's ground in either theme, and its name says every value it prints. Figure 1 sets its
-// maths as MathML.
+// RL-BHRP's two figures, its Table 1 and the index card's miniature, as the strings the build inlines (each the
+// drawing alone: the <figure> and its caption are the explainer's). Figure 2 is drawn from the reproduction's series
+// (REPRO): its frame is derived from them, its labels never collide, the mask that draws it is the sheet's ground in
+// either theme, and its name says every value it prints. Figure 1 sets its maths as MathML. Table 1 is Table 2 whole.
 import { describe, expect, it } from 'vitest';
 import { PAPER_DATA } from '../src/data/papers';
-import { REPRO } from '../src/data/papers/rl-bhrp';
+import { REPRO, TABLE2 } from '../src/data/papers/rl-bhrp';
 import { rlBhrpWealth } from '../src/data/vendor/rlBhrpWealth';
+import { metricsTable } from '../src/lib/paperFigures/metricsTable';
 import { pipelineFigure } from '../src/lib/paperFigures/pipelineFigure';
 import { wealthFigure, type WealthSeries } from '../src/lib/paperFigures/wealthFigure';
 import { band, cumulative, pointwiseMedian } from '../src/lib/wealth';
 
 const full = wealthFigure(REPRO, 'full'), mini = wealthFigure(REPRO, 'mini'), pipe = pipelineFigure();
+const table = metricsTable(TABLE2);
 
 const svgs = (html: string) => [...html.matchAll(/<svg\b[\s\S]*?<\/svg>/g)].map((m) => m[0]);
 const open = (svg: string) => svg.match(/^<svg\b[^>]*>/)![0];
@@ -167,13 +169,23 @@ describe('Figure 2, the growth of $1', () => {
     expect(full).not.toContain('<script');
   });
 
-  it("says in its caption that it is the second author's reproduction, its red line the median of the runs", () => {
-    const caption = full.match(/<figcaption[\s\S]*?<\/figcaption>/)![0];
-    expect(caption).toContain('the second author’s reproduction');
-    expect(caption).toContain(`The red line is the month-by-month median of the reproduction’s ${REPRO.runs} training runs`);
-    expect(caption).toContain('they ended between $2.10 and $2.17');
+  // The band is exempt from 3:1 (WCAG 1.4.11) on the condition that its values are available as text: the readout
+  // reads each month's range across the runs from these.
+  it("carries the band's two edges too, the readout's text for it, and where the data end", () => {
+    const plot = full.match(/<div class="f-plot"[^>]*>/)![0];
+    for (const k of ['lo', 'hi'] as const) {
+      expect(attr(plot, `data-${k}`)!.split(' ').map(Number), k).toEqual(REPRO[k].map((v) => Number(v.toFixed(4))));
+    }
+    expect(attr(plot, 'data-end')).toBe(REPRO.dataEnd);
     expect(full).toContain(`median of ${REPRO.runs} runs`);   // the readout's legend
+    expect(full).toMatch(/<dd data-k="band"><\/dd>/);
     expect(REPRO.runs).toBe(10);
+  });
+
+  // The caption is prose, so the explainer writes it (a :::figure container); the plugin makes the <figure>.
+  it('is the drawing alone: no <figure>, no caption', () => {
+    expect(full).not.toMatch(/<\/?figure\b|<figcaption/);
+    expect(full.startsWith('<div class="f-plot"')).toBe(true);
   });
 });
 
@@ -211,13 +223,51 @@ describe('Figure 1, the pipeline', () => {
     for (const word of ['Bayesian layer', 'Policy', 'Reward', 'PPO update', 'BHRP', 'the comparator']) {
       expect(outsideMath.split(`>${word}<`).length - 1, word).toBe(2);
     }
-    expect(pipe).toMatch(/<figcaption id="pipe-cap">/);
-    expect(pipe.match(/role="img" aria-labelledby="pipe-cap"/g)).toHaveLength(2);
+  });
+
+  // Its caption, in the explainer, says everything the drawing does, and the <figure> takes its name from it, so the
+  // drawings are hidden from assistive tech rather than read as a second copy of the caption.
+  it('is the drawing alone, hidden from assistive tech: no <figure>, no caption', () => {
+    expect(pipe).not.toMatch(/<\/?figure\b|<figcaption|role="img"|aria-labelledby/);
+    expect(pipe.match(/<div class="pp-art (?:wide|narrow)" aria-hidden="true"/g)).toHaveLength(2);
+  });
+});
+
+describe("Table 1, the paper's Table 2", () => {
+  const rows = [...table.matchAll(/<tr\b([^>]*)><th scope="row">([\s\S]*?)<\/th>((?:<td>[\s\S]*?<\/td>){3})<\/tr>/g)];
+  const cells = (r: RegExpMatchArray) => [...r[3].matchAll(/<td>([\s\S]*?)<\/td>/g)].map((m) => m[1]);
+  const row = (metric: string) => rows[TABLE2.findIndex((r) => r.metric === metric)];
+
+  it("is a booktabs table of all 18 rows, in the paper's order, under a head naming the three portfolios", () => {
+    expect(table).toMatch(/^<table class="bt">/);
+    expect(table).toContain('<thead><tr><th scope="col">Metric</th><th scope="col">RL-BHRP</th><th scope="col">BHRP</th>'
+      + '<th scope="col">Benchmark</th></tr></thead>');
+    expect(rows).toHaveLength(18);
+    expect(row('Total Cumulative Return')[2]).toBe('Total cumulative return (%)');
+    // the one gap: between the window's three rows and the figures
+    expect(rows.map((r) => r[1])).toEqual(rows.map((_, k) => (k === 3 ? ' class="gap"' : '')));
+  });
+
+  it('prints every figure from TABLE2 at two decimals, a percentage as one, with a true minus', () => {
+    expect(cells(row('Total Cumulative Return'))).toEqual(['119.96', '101.37', '91.41']);
+    expect(cells(row('Max Drawdown'))).toEqual(['−20.33', '−19.10', '−18.32']);
+    expect(cells(row('Sharpe'))).toEqual(['0.90', '0.85', '0.76']);
+    expect(cells(row('Periods'))).toEqual(['67', '67', '67']);
+    expect(table).not.toMatch(/>-\d/);   // a hyphen is not a minus
+  });
+
+  it('marks the undefined information ratio, and gives each date long and short, for the phone', () => {
+    expect(cells(row('Information Ratio'))[2]).toBe('—<sup>a</sup>');
+    expect(cells(row('Start'))[0]).toBe('<span class="d-iso">2020-02-29</span><span class="d-short">Feb 2020</span>');
+  });
+
+  it('colours and bolds nothing: no class on a cell, no <b> or <strong>', () => {
+    expect(table).not.toMatch(/<td\b[^>]+>|<b>|<strong>/);
   });
 });
 
 describe('both figures', () => {
-  for (const [name, html] of [['Figure 2', full], ['the miniature', mini], ['Figure 1', pipe]] as const) {
+  for (const [name, html] of [['Figure 2', full], ['the miniature', mini], ['Figure 1', pipe], ['Table 1', table]] as const) {
     it(`${name} prints no CJK and never says "published"`, () => {
       expect(html).not.toMatch(/[\u3000-\u9fff]/);   // the CJK block
       expect(html).not.toMatch(/published/i);
@@ -233,7 +283,7 @@ describe('both figures', () => {
   });
 
   it("are RL-BHRP's, registered under its slug: the two figures and the card's miniature", () => {
-    expect(PAPER_DATA['rl-bhrp'].figures).toEqual({ wealth: full, pipeline: pipe });
+    expect(PAPER_DATA['rl-bhrp'].figures).toEqual({ wealth: full, pipeline: pipe, metrics: table });
     expect(PAPER_DATA['rl-bhrp'].thumb).toBe(mini);
   });
 });

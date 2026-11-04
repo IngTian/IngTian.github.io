@@ -1,0 +1,709 @@
+---
+// /research/<slug> — ONE ROUTE FOR EVERY PAPER THAT HAS AN EXPLAINER. A paper's page is a file in
+// src/content/papers/ (CLAUDE.md, "Papers are files"), and this is the only page that renders one: the citation
+// head, the links and the page line from its record (profile.ts `publications`), the file's body, then what the
+// page writes itself (lib/pageStops PAPER_END): the full paper's links, the references from the file's frontmatter,
+// and the BibTeX with its corrections. The register is the research routes' paper (BaseLayout `page="paper"`):
+// still, serious, seal red the only colour.
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Button from '../../components/Button.astro';
+import SideRail from '../../components/SideRail.astro';
+import { authorName, publications } from '../../data/profile';
+import { longDate } from '../../lib/dates';
+import { refId, type PaperReport } from '../../lib/paperMarkdown';
+import { PAPER_END, paperStops } from '../../lib/pageStops';
+import { countWords, readingMinutes } from '../../lib/words';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('papers');
+  const slugs = entries.map((e) => e.data.publication);
+  const twice = slugs.find((s, i) => slugs.indexOf(s) !== i);
+  if (twice) throw new Error(`two files in src/content/papers/ explain the record "${twice}"; a paper has one page`);
+  return entries.map((entry) => ({ params: { slug: entry.data.publication }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const file = entry.filePath ?? entry.id;
+// The plugins cannot fail the build themselves (CLAUDE.md, "Papers are files"): a plugin's throw leaves the entry
+// unrendered, and every mistake they find is reported. So this page is where a malformed paper fails the build.
+if (!entry.rendered) throw new Error(`${file} did not render; its error is logged above`);
+const { Content, remarkPluginFrontmatter } = await render(entry);
+const report = remarkPluginFrontmatter as PaperReport;
+const own = new Set<string>(PAPER_END.map((s) => s.id));
+const problems = [
+  ...(report.paperProblems ?? []),
+  ...(report.sections ?? []).filter((s) => own.has(s.id)).map((s) => `section #${s.id} is one this page writes itself`),
+];
+if (problems.length) throw new Error(`${file} has ${problems.length} problem(s):\n  ${problems.join('\n  ')}`);
+
+const p = publications.find((x) => x.slug === entry.data.publication)!;
+const { references, errata, leftOut, bibliographyOmits } = entry.data;
+const sections = [...report.sections, ...PAPER_END];
+const [read, refsEnd, cite] = PAPER_END;
+
+const ORDINAL = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth', 'eleventh', 'twelfth'];
+const NUMBER = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+const count = (n: number) => NUMBER[n] ?? String(n);
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+/** "A", "A and B", "A, B and C". */
+const listed = (xs: readonly string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}` : xs[0]);
+const given = (a: string) => { const [family, first] = a.split(', '); return `${first} ${family}`; };
+
+const owner = p.authors.findIndex((a) => a.name === authorName);
+const role = p.authors.length > 1 ? `the ${ORDINAL[owner]} author` : 'its author';
+const minutes = readingMinutes(report.bodyWords + countWords(p.abstract ?? ''));
+const [subjectCode, subjectField] = (p.subject ?? '').split(' · ');
+const STATUS = { preprint: 'preprint, not peer reviewed', conference: 'conference paper', journal: 'journal article' } as const;
+const version = p.version ?? '';
+const repo = p.reproduction ? new URL(p.reproduction).pathname.slice(1) : '';
+
+// How this page's reference list stands to the paper's own bibliography.
+const fromPaper = references.filter((r) => !r.addedHere).length, added = references.length - fromPaper;
+const refnote = `${cap(count(fromPaper))} of the ${count(fromPaper + bibliographyOmits.length)} works in the paper’s bibliography`
+  + (bibliographyOmits.length ? ` (${bibliographyOmits.length > 1 ? 'the others' : `the ${ORDINAL[fromPaper] ?? 'other'}`}, ${bibliographyOmits.join('; ')}, `
+    + `${bibliographyOmits.length > 1 ? 'are' : 'is'} not drawn on here)` : '')
+  + (added ? `, plus ${count(added)} it names in its text without citing` : '') + '.';
+const link = (r: (typeof references)[number]) => r.url ?? (r.doi ? `https://doi.org/${r.doi}` : undefined);
+const noted = errata.map((e) => e.date).sort().at(-1);
+---
+<BaseLayout
+  title={`${p.title} — Ing Tian`}
+  description={p.finding}
+  page="paper"
+  veil={false}
+>
+  <main class="paper">
+    <SideRail stops={paperStops(report.sections)} id="paper-toc" />
+
+    <header class="head">
+      <a class="back" href="/research">← all research</a>
+      <h1 class="ptitle">{p.title}</h1>
+      <p class="byline">
+        {p.authors.map((a, i) => (
+          <>{i > 0 && <span class="and">{i === p.authors.length - 1 ? 'and' : ','}</span>}{a.name}{a.affiliation && <> <span class="aff">{a.affiliation}</span></>}</>
+        ))}
+      </p>
+      <p class="meta">
+        {p.arxivId ? `arXiv:${p.arxivId}${version}` : p.venue}{subjectCode && ` [${subjectCode}${subjectField ? `, ${subjectField.toLowerCase()}` : ''}]`}
+        {p.submitted && <> · submitted <time datetime={p.submitted}>{longDate(p.submitted)}</time></>} · {STATUS[p.status]}
+      </p>
+      <p class="links">
+        <a href={p.href}>abstract</a>
+        {p.pdfHref && <a href={p.pdfHref}>pdf</a>}
+        {p.reproduction && <a href={p.reproduction}>code (reproduction)</a>}
+        <a href={`#${cite.id}`}>cite</a>
+      </p>
+      <p class="pagemeta">This page: <time datetime={entry.data.pageDate}>{longDate(entry.data.pageDate)}</time> · {minutes} min read · written by {authorName}, {role}</p>
+    </header>
+
+    <nav class="toc-inline" aria-label="Contents">
+      <p class="toc-h">Contents</p>
+      <ol>
+        {sections.map((s) => <li><a href={`#${s.id}`}>{'n' in s && s.n && <span class="n">{s.n}</span>}{s.title}</a></li>)}
+      </ol>
+    </nav>
+
+    <Content />
+
+    <section id={read.id} class="sec read">
+      <h2>{read.title}</h2>
+      <p>This page explains the paper; the paper is the full account — every definition, proof and algorithm{leftOut && `, and ${leftOut} left out here`}.</p>
+      <ul class="readlinks">
+        <li><a href={p.href}>{p.arxivId ? `arXiv:${p.arxivId}` : p.venue}</a><span>{p.arxivId ? 'the abstract page and every version' : 'the publisher’s page'}</span></li>
+        {p.pdfHref && <li><a href={p.pdfHref}>PDF</a><span>{version && `version ${version.replace(/^v/, '')}`}{p.submitted && `, submitted ${longDate(p.submitted)}`}</span></li>}
+        {p.reproduction && <li><a href={p.reproduction}>Code (reproduction)</a><span>{repo} — {role}’s reproduction, rebuilt from the paper</span></li>}
+      </ul>
+    </section>
+
+    <section id={refsEnd.id} class="sec">
+      <h2>{refsEnd.title}</h2>
+      <p class="refnote">{refnote}</p>
+      <ol class="refs">
+        {references.map((r, i) => (
+          <li id={refId(r.key)}>
+            <span class="rn">[{i + 1}]</span>{listed(r.authors.map(given))}. “{r.title}.” {r.journal && <i>{r.journal}</i>}{r.journal && r.venue && ' '}{r.venue}, {r.year}.
+            {link(r) && <> <a href={link(r)}>{link(r)!.replace(/^https:\/\//, '')}</a></>}
+            {r.addedHere && <span class="added">Named in the paper ({r.addedHere}) but not in its bibliography; added here.</span>}
+          </li>
+        ))}
+      </ol>
+    </section>
+
+    <section id={cite.id} class="sec">
+      <h2>{cite.title}</h2>
+      <p class="ref-line">
+        Cited as: {listed(p.authors.map((a) => a.name))}. {p.title}. {p.arxivId ? `arXiv:${p.arxivId}${version}${subjectCode ? ` [${subjectCode}]` : ''}` : p.venue}, {p.year}.
+        {p.doi && <a href={`https://doi.org/${p.doi}`}>doi:{p.doi}</a>}
+      </p>
+      {p.bibtex && (
+        <div class="bib">
+          <pre id="bibtex">{p.bibtex}</pre>
+          <Button skin="paper" class="copy" data-copy="bibtex" aria-live="polite">Copy</Button>
+        </div>
+      )}
+      {errata.length > 0 && (
+        <details class="errata">
+          <summary><span class="runin">Corrections to {version || 'the paper'}</span>, noted <time datetime={noted}>{longDate(noted!)}</time></summary>
+          <p>{report.errataText.join(' ')}</p>
+        </details>
+      )}
+      <p class="tags"><span class="runin">Tags:</span> {p.tags.join(' · ')}</p>
+    </section>
+  </main>
+</BaseLayout>
+
+{/* ── THE PAGE'S STYLE IS is:global, nested under .paper by hand. Not a preference: the body is rendered by
+     <Content />, and its markup (and the nodes the script creates) carry no scope hash, so a scoped rule would match
+     nothing there (CLAUDE.md, Astro trap 1). Ported from the approved prototype (research-b4) onto the paper
+     register's tokens: the ground is --sheet-ground, never --paper, which is the dark theme's TEXT colour. */}
+<style is:global>
+  /* ── the measure: a reading column and a notes column, centred right of the rail. From 1101px the measure grows
+     by about a tenth (604 → 664px at 1780px), the gap and the notes with it, and the type 1px (18 → 19px), so the
+     line stays near 77 characters. At 1100px and below there is one column and the notes fall into it. ── */
+  .paper {
+    --M: clamp(604px, calc(604px + (100vw - 1100px) * 0.088235), 664px);
+    --G: clamp(40px, calc(40px + (100vw - 1140px) * 0.00625), 44px);
+    --N: clamp(214px, calc(214px + (100vw - 1140px) * 0.04375), 242px);
+    --L: max(232px, calc(90px + (100vw - var(--M) - var(--G) - var(--N)) / 2));
+    --tk: clamp(0px, calc((100vw - 1100px) / 680), 1px);
+    width: var(--M); margin-left: var(--L); padding-bottom: 96px;
+    font-family: var(--font-display); font-size: 18px; line-height: 1.66; color: var(--ink-2);
+    font-kerning: normal; text-rendering: optimizeLegibility;
+  }
+  @media (min-width: 1101px) { .paper { font-size: calc(18px + var(--tk)); } }
+  @media (min-width: 1101px) and (max-width: 1139.98px) { .paper { --G: 32px; --N: 186px; } }
+
+  .paper a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: rgba(var(--hairline-rgb), 0.5); text-underline-offset: 3px; }
+  @media (hover: hover) { .paper a:hover { color: var(--seal); text-decoration-color: currentColor; } }
+  .paper :focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; border-radius: 2px; }
+  .paper p { margin: 0 0 1.05em; text-wrap: pretty; }
+  .paper sup { font-size: 0.72em; line-height: 0; }
+  .paper code { font: 0.82em var(--font-mono); }
+  .paper math { font-family: 'STIX Two Math', 'Latin Modern Math', 'Cambria Math', math; }
+  .paper math[display='block'] { font-size: 1.06em; }
+  /* KaTeX's aligned is an mtable with columnalign="right left", which MathML Core does not honour; CSS does it. Its
+     cells get back the padding MathML Core gives them, which the site's reset (Tailwind's preflight) takes away from
+     every element: without it the rows touch and nothing parts "U" from its "=". */
+  .paper mtd { padding: 0.5ex 0.4em; }
+  .paper mtable[columnalign] > mtr > mtd:nth-child(odd) { text-align: right; }
+  .paper mtable[columnalign] > mtr > mtd:nth-child(even) { text-align: left; }
+  .paper [id] { scroll-margin-top: 96px; }
+  .paper .nw { white-space: nowrap; }
+
+  /* ── the head ── */
+  .paper .head { padding-top: 15vh; }
+  .paper .back { font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); text-decoration: none; }
+  @media (hover: hover) { .paper .back:hover { color: var(--seal); } }
+  .paper .ptitle { font-weight: 400; font-size: 35px; line-height: 1.2; letter-spacing: -0.008em; color: var(--ink-1); margin: 20px 0 0; text-wrap: balance; }
+  .paper .byline { margin: 20px 0 0; font-size: 17px; color: var(--ink-1); }
+  .paper .byline .aff { color: var(--ink-3); font-style: italic; margin-left: 0.35em; }
+  .paper .byline .and { color: var(--ink-3); margin: 0 0.6em; }
+  .paper .meta { margin: 4px 0 0; font-size: 15.5px; color: var(--ink-3); }
+  .paper .links { margin: 16px 0 0; display: flex; flex-wrap: wrap; gap: 6px 22px; font: 13px/1.4 var(--font-mono); }
+  .paper .links a { color: var(--ink-1); }
+  .paper .pagemeta { margin: 18px 0 0; padding-top: 12px; border-top: 1px solid rgba(var(--hairline-rgb), 0.25); font-size: 15px; color: var(--ink-3); }
+  .paper .toc-inline { display: none; }
+
+  /* ── sections ── */
+  .paper .sec { margin-top: 66px; }
+  .paper .sec > h2 { position: relative; font-weight: 400; font-size: 25px; line-height: 1.3; color: var(--ink-1); margin: 0 0 18px; }
+  .paper .sec > h2 .n { position: absolute; right: calc(100% + 0.75em); color: var(--ink-3); }
+  .paper .sec > h2 .aside { font-size: 16px; font-style: italic; color: var(--ink-3); }
+  /* A run-in head is the file's **bold**: italic, in full ink, at the body's weight. */
+  .paper strong { font-weight: 400; font-style: italic; color: var(--ink-1); }
+  .paper .runin { font-style: italic; color: var(--ink-1); }
+  /* A numbered section opens with its lead, the question it answers, in full ink. */
+  .paper .sec:has(> h2 > .n) > h2 + p { color: var(--ink-1); }
+
+  .paper .abstract { margin: 0; padding: 0 1.6em; font-size: 16.5px; line-height: 1.62; color: var(--ink-2); }
+  .paper .abstract p { margin: 0; }
+  /* The paragraph right after the abstract is the page's note on it. */
+  .paper .abstract + p { margin: 18px 1.6em 0; font-size: 15px; line-height: 1.55; color: var(--ink-3); }
+  .paper .inpaper { margin-top: 24px; font-size: 15px; line-height: 1.55; color: var(--ink-3); }
+
+  /* ── equations, each with its "where …" under it ── */
+  .paper .eq { position: relative; margin: 20px 0 22px; }
+  .paper .eq-row { display: flex; align-items: center; gap: 12px; }
+  .paper .eq-math { flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; text-align: center; padding: 3px 0; color: var(--ink-1); }
+  .paper .eq-narrow { display: none; }
+  .paper .eq-no { flex: none; width: 2.4em; text-align: right; font-size: 16px; color: var(--ink-3); }
+  .paper .eq > .where { margin-top: 14px; }
+  .paper .eq:has(> .where) { margin-bottom: 0; }
+  .paper .where { margin-top: -2px; }
+  .paper .thm { margin: 30px 0; padding: 18px 0 4px; border-top: 1px solid rgba(var(--hairline-rgb), 0.45); border-bottom: 1px solid rgba(var(--hairline-rgb), 0.45); }
+  /* The theorem's heads are the lines that open it and introduce a display; its words between them are body. */
+  .paper .thm > p:first-child, .paper .thm > p:has(+ .eq) { color: var(--ink-1); }
+  .paper .thm > p:not(:first-child):not(:has(+ .eq)) { margin-bottom: 0.9em; }
+  .paper .thm > p:first-child > strong:first-child { font-weight: 700; font-style: normal; }
+  .paper .eq .sym.on, .paper .notation tr.on > th { color: var(--sheet-mark); }
+  .paper .notation tr[data-sym] > th { cursor: default; }
+
+  /* ── margin notes: a definition opens with its term; "why it matters" hangs off a hairline. Placed by the script
+     beside their anchors (no two overlap); without a script they fall into the column, as on a phone. ── */
+  .paper .an { position: relative; }
+  .paper .mn { position: absolute; left: calc(100% + var(--G)); top: 0; width: var(--N); margin: 0;
+    font-size: 14px; line-height: 1.5; font-style: normal; color: var(--ink-3); hyphens: manual; text-wrap: wrap; }
+  .paper .mn dfn { font-style: italic; color: var(--ink-1); }
+  .paper .mn.why { padding-left: 11px; border-left: 1px solid rgba(var(--hairline-rgb), 0.55); }
+  .paper .mn .mk { font-style: italic; color: var(--ink-1); }
+  .paper .mn math { font-size: 1.02em; }
+
+  /* ── highlights: Underline, a broad translucent band set low against the glyphs. The finished state is this
+     background, which a drawn sweep hands over to; a pending or drawing phrase is plain. ── */
+  .paper mark.hl { color: var(--ink-1); background: linear-gradient(var(--sheet-ul), var(--sheet-ul)) left bottom / 100% 0.3em no-repeat;
+    padding-bottom: 0.02em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  .paper mark.hl[data-pending], .paper mark.hl.drawing { background: none; }
+  /* A linked term: a 1.5px seal rule under it, which no link here looks like (links are a 1px grey hairline). */
+  .paper .t.lk:not(.drawing) { background: linear-gradient(var(--sheet-mark), var(--sheet-mark)) left bottom / 100% 1.5px no-repeat;
+    -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  html[data-page='paper'] .sw-underline { z-index: -1; background: var(--sheet-ul); }
+  html[data-page='paper'] .sw-term { background: var(--sheet-mark); }
+
+  /* ── the notation table ── */
+  .paper .tbl-scroll { overflow-x: auto; }
+  .paper table.notation { border-collapse: collapse; width: 100%; margin: 20px 0 4px; font-size: 16px; line-height: 1.5; }
+  .paper .notation thead th { text-align: left; font-weight: 400; color: var(--ink-1); padding: 8px 20px 7px 0;
+    border-top: 1.5px solid var(--ink-1); border-bottom: 0.75px solid var(--ink-1); }
+  .paper .notation tbody th { font-weight: 400; text-align: left; vertical-align: top; white-space: nowrap; color: var(--ink-1); padding: 7px 22px 7px 0; }
+  .paper .notation td { vertical-align: top; color: var(--ink-2); padding: 7px 0; }
+  .paper .notation tbody tr + tr > * { border-top: 1px solid rgba(var(--hairline-rgb), 0.16); }
+  .paper .notation tbody tr:first-child > * { padding-top: 11px; }
+  .paper .notation tbody tr:last-child > * { padding-bottom: 10px; border-bottom: 1.5px solid var(--ink-1); }
+
+  /* ── figures and Table 1. The two drawings of a figure swap by class alone (lib/paperFigures says why). ── */
+  .paper figure { margin: 34px 0 36px; }
+  .paper figure svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .paper figure .narrow { display: none; }
+  .paper figcaption { margin-top: 14px; font-size: 15px; line-height: 1.56; color: var(--ink-3); }
+  .paper .fig-no { color: var(--ink-1); }
+  .paper figcaption strong { font-style: normal; color: var(--ink-2); }
+  .paper figure:has(.pp-art) { margin: 4px 0 34px; padding: 22px 0 18px; border-top: 1px solid rgba(var(--hairline-rgb), 0.3); border-bottom: 1px solid rgba(var(--hairline-rgb), 0.3); }
+  .paper figure:has(.pp-art) figcaption { margin-top: 16px; }
+
+  .paper svg text { font-family: var(--font-display); fill: var(--ink-3); }
+  .paper .f-grid { stroke: var(--sheet-grid); stroke-width: 1; }
+  .paper .f-one { stroke: var(--sheet-one); }
+  .paper .f-axis { stroke: var(--sheet-axis); stroke-width: 1; }
+  .paper .f-band { fill: var(--sheet-band); stroke: none; }
+  .paper .f-rl { fill: none; stroke: var(--seal); stroke-width: 1.7; stroke-linejoin: round; }
+  .paper .f-bhrp { fill: none; stroke: var(--ink-1); stroke-width: 1.15; stroke-linejoin: round; }
+  .paper .f-bench { fill: none; stroke: var(--ink-3); stroke-width: 1.15; stroke-dasharray: 4 3; stroke-linejoin: round; }
+  .paper .f-name { fill: var(--ink-1); }
+  .paper .f-lab-rl { fill: var(--seal); }
+  .paper .f-val { fill: var(--ink-3); }
+  .paper .f-qual { font-style: italic; font-size: 0.86em; }
+  .paper .f-ylab { font-style: italic; }
+  /* the draw: the mask shows only while the plot waits for it or draws (the markup hides it) */
+  .paper .f-plot[data-pending] .f-draw, .paper .f-plot.drawing .f-draw { visibility: visible; }
+  .paper .f-plot[data-pending] .f-labels { opacity: 0; }
+
+  .paper .p-name { color: var(--ink-1); }
+  .paper .p-ref { font-style: italic; color: var(--ink-3); }
+  .paper .p-lab { font-style: italic; color: var(--ink-3); }
+  .paper .pp-art { font-family: var(--font-display); }
+  .paper .p-arrow { stroke: rgba(var(--hairline-rgb), 0.85); stroke-width: 1; }
+  .paper .p-dash { stroke-dasharray: 3 3; }
+  .paper .p-head { stroke: rgba(var(--hairline-rgb), 0.95); stroke-width: 1.1; stroke-linejoin: round; }
+  .paper figure[data-pending] .p-arrow { opacity: 0; }
+
+  /* Figure 2's readout: a hairline at the month, a dot on each series, and the values beside it. */
+  .paper .f-plot { position: relative; touch-action: pan-y; border-radius: 2px; }
+  .paper .f-plot:focus-visible { outline-offset: 8px; }
+  .paper .f-read { pointer-events: none; }
+  .paper .f-hair { stroke: var(--ink-1); stroke-opacity: 0.5; stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .paper .f-dot-rl { fill: var(--seal); }
+  .paper .f-dot-bhrp { fill: var(--ink-1); }
+  .paper .f-dot-bench { fill: var(--sheet-ground); stroke: var(--ink-2); stroke-width: 1.2; }
+  .paper .f-tip, html[data-page='paper'] .sym-tip { position: absolute; left: 0; top: 0; opacity: 0; pointer-events: none; z-index: 2;
+    padding: 6px 10px 7px; white-space: nowrap; background: var(--sheet-ground); border: 1px solid rgba(var(--hairline-rgb), 0.45);
+    border-radius: 2px; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
+  .paper .f-tip-d { margin: 0 0 3px; font-style: italic; color: var(--ink-3); }
+  .paper .f-tip dl { display: grid; grid-template-columns: auto auto; column-gap: 16px; margin: 0; }
+  .paper .f-tip dt { color: var(--ink-1); }
+  .paper .f-tip dt.rl { color: var(--seal); }
+  .paper .f-tip dt i { color: var(--ink-3); }
+  .paper .f-tip dd { margin: 0; text-align: right; font-family: var(--font-body); font-size: 0.93em; font-feature-settings: "lnum", "tnum"; color: var(--ink-1); }
+  .paper .f-plot.reading .f-read, .paper .f-plot.reading .f-tip { opacity: 1; }
+  /* a displayed symbol's row of the Notation table, beside the symbol: the table is screens away */
+  html[data-page='paper'] .sym-tip { z-index: 40; width: max-content; max-width: min(22em, calc(100vw - 16px)); white-space: normal;
+    font-family: var(--font-display); }
+  html[data-page='paper'] .sym-tip.on { opacity: 1; }
+  html[data-page='paper'] .sym-tip b { font-weight: 400; color: var(--ink-1); margin-right: 0.5em; }
+
+  /* booktabs: rules for structure, nothing bolded or coloured. Georgia has only oldstyle figures, so the numbers
+     take the body face, whose figures are lining and tabular; the row labels stay in the serif. */
+  .paper .tbl { margin: 34px 0 36px; }
+  .paper .cap { margin: 0 0 10px; font-size: 15px; line-height: 1.5; color: var(--ink-3); }
+  .paper table.bt { border-collapse: collapse; width: 100%; font-size: 15.5px; line-height: 1.38; color: var(--ink-2); }
+  .paper .bt td { font-family: var(--font-body); font-size: 0.93em; font-feature-settings: "lnum", "tnum"; padding: 3px 0 3px 18px; text-align: right; white-space: nowrap; }
+  .paper .d-short { display: none; }
+  .paper .bt th { font-weight: 400; text-align: left; }
+  .paper .bt thead th { color: var(--ink-1); vertical-align: bottom; text-align: right; white-space: nowrap; padding: 9px 0 7px 18px;
+    border-top: 1.5px solid var(--ink-1); border-bottom: 0.75px solid var(--ink-1); }
+  .paper .bt thead th:first-child { text-align: left; padding-left: 0; }
+  .paper .bt tbody th { padding: 3px 0; white-space: nowrap; color: var(--ink-2); }
+  .paper .bt tbody tr:first-child > * { padding-top: 9px; }
+  .paper .bt tbody tr:last-child > * { padding-bottom: 9px; border-bottom: 1.5px solid var(--ink-1); }
+  .paper .bt tr.gap > * { padding-top: 12px; }
+  .paper .bt sup { color: var(--ink-3); }
+  .paper .src { margin: 10px 0 0; font-size: 14px; line-height: 1.55; color: var(--ink-3); }
+  .paper .src + .src { margin-top: 0; }
+
+  /* ── the limits, a list of run-ins ── */
+  .paper .sec ul:not([class]) { list-style: none; margin: 0 0 1.1em; padding: 0; }
+  .paper .sec ul:not([class]) > li { margin: 0 0 0.55em; padding-left: 1.6em; }
+  .paper .sec ul:not([class]) > li p { margin: 0; }
+  /* the note of an item: its host is the item's text, so it is set from the item's own edge */
+  .paper .sec ul:not([class]) > li > .an { margin-left: -1.6em; padding-left: 1.6em; }
+
+  /* ── read the full paper, references, cite ── */
+  .paper .read { padding: 24px 0 26px; border-top: 1px solid rgba(var(--hairline-rgb), 0.45); border-bottom: 1px solid rgba(var(--hairline-rgb), 0.45); }
+  .paper .read > h2 { margin-bottom: 10px; }
+  .paper .read > p { color: var(--ink-3); margin-bottom: 0; }
+  .paper .readlinks { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 12px; }
+  .paper .readlinks li { display: grid; grid-template-columns: 10.5em 1fr; column-gap: 18px; align-items: baseline; }
+  .paper .readlinks a { font-size: 19px; color: var(--ink-1); }
+  .paper .readlinks span { font-size: 15px; color: var(--ink-3); }
+  .paper .refnote { font-size: 15px; color: var(--ink-3); }
+  .paper .refs { list-style: none; margin: 0; padding: 0; font-size: 15.5px; line-height: 1.55; color: var(--ink-2); }
+  .paper .refs li { margin: 0 0 0.75em; padding-left: 2.3em; text-indent: -2.3em; overflow-wrap: anywhere; }
+  .paper .refs .rn { display: inline-block; width: 2.3em; text-indent: 0; color: var(--ink-3); }
+  .paper .refs .added { display: block; text-indent: 0; font-size: 14px; font-style: italic; color: var(--ink-3); }
+  .paper .ref-line { font-size: 16.5px; line-height: 1.6; color: var(--ink-2); }
+  .paper .bib { position: relative; margin: 20px 0 22px; background: rgba(var(--hairline-rgb), 0.06); border: 1px solid rgba(var(--hairline-rgb), 0.2); border-radius: 3px; }
+  .paper .bib pre { margin: 0; padding: 16px 112px 16px 18px; font: 13px/1.62 var(--font-mono); color: var(--ink-1); white-space: pre-wrap; word-break: break-word; }
+  .paper .bib .copy { position: absolute; top: 10px; right: 10px; }
+  .paper .errata { margin-top: 18px; font-size: 15px; line-height: 1.58; color: var(--ink-3); }
+  .paper .errata summary { cursor: pointer; }
+  .paper .errata p { margin: 8px 0 0; }
+  .paper .tags { margin-top: 30px; font-size: 15px; color: var(--ink-3); }
+
+  /* ── motion: what is still below the screen waits for its reveal (set by the script, never served), and the
+     linked marking. Under reduced motion the script holds nothing back, and nothing here moves. ── */
+  .paper [data-pending]:not(mark):not(figure):not(.f-plot) { opacity: 0; transition: none; }
+  .paper.lk-on .mn:not(.lk) { opacity: 0.9; }
+  @media (prefers-reduced-motion: no-preference) {
+    .paper .mn { transition: opacity 200ms ease-out, transform 240ms cubic-bezier(.2,.7,.2,1); }
+    .paper .f-read, .paper .f-tip, html[data-page='paper'] .sym-tip { transition: opacity 120ms ease-out; }
+  }
+  /* the linked note shifts toward the text, beside it only; ::after keeps the box it left under the pointer, or a
+     note shifted from under a pointer at its right edge would unlink, slide back and relink */
+  @media (min-width: 1101px) and (prefers-reduced-motion: no-preference) {
+    .paper .mn.lk { transform: translateX(-4px); }
+    .paper .mn.lk::after { content: ''; position: absolute; top: 0; bottom: 0; left: 100%; width: 4px; }
+  }
+
+  /* ── one column at 1100px and below (the rail hides at the same width): the Contents list replaces the rail,
+     and the notes fall in under the block they explain. Without a script, too, at any width. ── */
+  @media (max-width: 1100px) {
+    .paper { width: auto; max-width: 648px; margin: 0 auto; padding-left: 22px; padding-right: 22px; }
+    .paper .toc-inline { display: block; margin: 44px 0 0; padding: 14px 0 12px; border-top: 1px solid rgba(var(--hairline-rgb), 0.3); border-bottom: 1px solid rgba(var(--hairline-rgb), 0.3); }
+    .paper .toc-h { margin: 0 0 6px; font-style: italic; color: var(--ink-3); font-size: 16px; }
+    .paper .toc-inline ol { list-style: none; margin: 0; padding: 0; font-size: 16px; line-height: 1.5; }
+    .paper .toc-inline li { margin: 0 0 3px; }
+    .paper .toc-inline a { text-decoration: none; color: var(--ink-1); }
+    .paper .toc-inline .n { display: inline-block; width: 1.4em; color: var(--ink-3); }
+    .paper .toc-inline li:not(:has(.n)) a { padding-left: 1.4em; }
+    .paper .sec > h2 .n { position: static; margin-right: 0.6em; }
+    .paper .eq { margin: 18px 0 22px; }
+    .paper .an > p { margin-bottom: 0.6em; }
+  }
+  @media (max-width: 1100px) {
+    .paper .mn { position: static; width: auto; margin: 4px 0 18px; padding-left: 14px; border-left: 1px dotted rgba(var(--hairline-rgb), 0.7); }
+    .paper .mn.why { padding-left: 14px; border-left: 1px solid rgba(var(--hairline-rgb), 0.55); }
+  }
+  @media (scripting: none) {
+    .paper .mn { position: static; width: auto; margin: 4px 0 18px; padding-left: 14px; border-left: 1px dotted rgba(var(--hairline-rgb), 0.7); }
+    .paper .mn.why { padding-left: 14px; border-left: 1px solid rgba(var(--hairline-rgb), 0.55); }
+  }
+  @media (max-width: 640px) {
+    .paper { font-size: 17px; line-height: 1.62; }
+    .paper .head { padding-top: 96px; }
+    .paper .ptitle { font-size: 26px; line-height: 1.25; }
+    .paper .byline .and { display: block; height: 0; overflow: hidden; margin: 0; }
+    .paper .byline .aff { display: block; margin: 0 0 4px; }
+    .paper .sec > h2 { font-size: 22px; }
+    .paper .abstract { padding: 0 0.9em; font-size: 16px; }
+    .paper .abstract + p { margin-left: 0.9em; margin-right: 0.9em; }
+    .paper math[display='block'] { font-size: 0.96em; }
+    .paper .eq-wide { display: none; }
+    .paper .eq-narrow { display: block; }
+    .paper figure .wide { display: none; }
+    .paper figure .narrow { display: block; }
+    .paper table.bt { font-size: 14.5px; }
+    .paper .d-iso { display: none; }
+    .paper .d-short { display: inline; }
+    .paper .bt tbody th, .paper .bt thead th:first-child { position: sticky; left: 0; background: var(--sheet-ground); padding-right: 12px; z-index: 1; }
+    .paper .bt tbody th { white-space: normal; min-width: 7.6em; max-width: 8.4em; }
+    .paper .bt td, .paper .bt thead th { padding-left: 12px; }
+    .paper .bib pre { padding-right: 18px; padding-top: 64px; }
+    .paper .sec ul:not([class]) > li { padding-left: 0; }
+    .paper .sec ul:not([class]) > li > .an { margin-left: 0; padding-left: 0; }
+    .paper .notation tbody th { padding-right: 14px; }
+    .paper .readlinks li { grid-template-columns: 1fr; }
+  }
+</style>
+
+<script>
+  // The paper page's behaviour, ported from the approved prototype: the margin notes placed beside their anchors,
+  // a term marked with its note, a symbol with its Notation row, Figure 2's readout, and the motion (sections and
+  // notes rising in, the highlights drawn, Figure 2 drawn, Figure 1 assembled). Only transform and opacity move,
+  // each thing once and in under 2s, and what is on screen or above it when the page opens is never held back
+  // (scripts/motion.ts). Started through onPageView, so it runs at parse on a full load and once per arrival.
+  import { DRAW, stagger } from '../../lib/motionTiming';
+  import { onPageView } from '../../lib/pageView';
+  import { readoutIndex, readoutStep, readoutWhen, stackNotes, tipLeft } from '../../lib/paperPage';
+  import { onceSeen, play, sweepLines } from '../../scripts/motion';
+
+  const UP = [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }];
+  const SIDE = [{ opacity: 0, transform: 'translateX(10px)' }, { opacity: 1, transform: 'none' }];
+
+  onPageView('main.paper', () => {
+    const maybePage = document.querySelector<HTMLElement>('main.paper');
+    if (!maybePage) return undefined;
+    const page = maybePage;
+    const ac = new AbortController();
+    const { signal } = ac;
+    const live = new Set<Animation>();
+    const timers = new Set<number>();
+    const later = (fn: () => void, ms: number): void => {
+      const t = window.setTimeout(() => { timers.delete(t); fn(); }, ms);
+      timers.add(t);
+    };
+    const shown = (el: Element): boolean => el.getClientRects().length > 0;
+    const wide = matchMedia('(min-width: 1101px)');
+
+    // ── margin notes, each beside its anchor (its term, or the top of its block), none overlapping ──
+    const notes = [...page.querySelectorAll<HTMLElement>('.mn')];
+    function place(): void {
+      for (const n of notes) n.style.top = '';
+      if (!wide.matches) return;
+      const items = notes.flatMap((n) => {
+        const host = n.offsetParent;
+        if (!(host instanceof HTMLElement)) return [];
+        const hostTop = host.getBoundingClientRect().top + window.scrollY;
+        const at = n.dataset.at ? host.querySelector(`[data-n="${CSS.escape(n.dataset.at)}"]`) : null;
+        return [{ n, hostTop, top: at ? at.getBoundingClientRect().top + window.scrollY - 1 : hostTop, height: n.offsetHeight }];
+      });
+      stackNotes(items, 16).forEach((y, k) => { items[k].n.style.top = `${Math.round(y - items[k].hostTop)}px`; });
+    }
+    // Again whenever the page's box changes — a webfont landing, a resize, the 1101px line crossed — from a
+    // ResizeObserver, whose callback runs after layout and before paint, so a note is never drawn where it was.
+    // Placing moves only absolutely placed notes, which change no box it watches.
+    place();
+    const ro = new ResizeObserver(() => place());
+    ro.observe(page);
+
+    // ── reveals: a section's heading and first block rise 8px and fade in (340ms); a margin note slides in from
+    // 10px right (380ms, after its block). Several at once are 60ms apart, at most 120ms. ──
+    const rising = new WeakMap<Element, Animation>();
+    const risers = [...page.querySelectorAll('.sec > h2')].flatMap((h) => [h, h.nextElementSibling].filter((x): x is Element => !!x));
+    const batch = <T extends Element>(fn: (els: T[]) => void) => {
+      let queue: T[] = [];
+      return (el: Element): void => {
+        if (!queue.length) queueMicrotask(() => { const els = queue; queue = []; if (!signal.aborted) fn(els); });
+        queue.push(el as T);
+      };
+    };
+    const rise = batch<Element>((els) => {
+      els.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).forEach((el, k) => {
+        const note = el.classList.contains('mn'), side = note && wide.matches;
+        rising.set(el, play(el, side ? SIDE : UP, { duration: side ? 380 : 340, delay: stagger(k, els.length, { step: 60, max: 120 }) + (note ? 120 : 0) }, live));
+      });
+    });
+
+    // ── highlights draw left to right once each is wholly on screen (640ms), after the block they sit in has
+    // risen; the sweep hands over to the mark's own background ──
+    const draw = (mk: HTMLElement): void => {
+      const fs = parseFloat(getComputedStyle(mk).fontSize);
+      void sweepLines(mk, 'sw-underline', 640, live, 0.3 * fs).then(() => mk.classList.remove('drawing'));
+    };
+    const sweep = batch<HTMLElement>((marks) => marks.forEach((mk, k) => {
+      mk.classList.add('drawing');
+      const go = (): void => later(() => draw(mk), 260 + k * 200);
+      const host = rising.get(mk.closest('.sec > *') ?? mk);
+      if (host?.playState === 'running') host.finished.then(go, go);
+      else go();
+    }));
+
+    // ── Figure 2 draws left to right (1600ms), its end labels fading in at once; Figure 1's arrows appear in the
+    // order the data flows. The words never wait. ──
+    const plot = page.querySelector<HTMLElement>('.f-plot');
+    let drawn = false;
+    function drawFigure(): void {
+      if (!plot || drawn) return;
+      drawn = true;
+      plot.classList.add('drawing');
+      const masks = [...plot.querySelectorAll('svg')].filter(shown).flatMap((svg) => {
+        const labels = svg.querySelector('.f-labels'), mask = svg.querySelector<SVGGElement>('.f-mask');
+        if (labels) play(labels, [{ opacity: 0 }, { opacity: 1 }], { duration: 360, easing: 'ease-out' }, live);
+        return mask ? [play(mask, [{ transform: 'translateX(0)' }, { transform: `translateX(${mask.dataset.d}px)` }], { duration: 1600, easing: DRAW }, live)] : [];
+      });
+      void Promise.all(masks.map((a) => a.finished.catch(() => undefined))).then(() => plot.classList.remove('drawing'));
+    }
+    const pipe = page.querySelector('.pp-art')?.closest('figure');
+    const assemble = (): void => {
+      if (!pipe) return;
+      const art = [...pipe.querySelectorAll('.pp-art')].find(shown);
+      art?.querySelectorAll('.p-arrow').forEach((p, k) => play(p, [{ opacity: 0 }, { opacity: 1 }], { duration: 360, delay: k * 120 }, live));
+    };
+
+    onceSeen([...risers, ...notes.filter(shown)], rise, { signal });
+    onceSeen(page.querySelectorAll('mark.hl'), (mk) => sweep(mk), { threshold: 1, signal });
+    if (plot) onceSeen([plot], drawFigure, { threshold: 0.15, signal });
+    if (pipe) onceSeen([pipe], assemble, { threshold: 0.15, signal });
+
+    // ── a term and its note mark each other, and a displayed symbol its Notation row: by a mouse or a pen, never
+    // a tap, so nothing is left marked on a touch screen. Focus marks a note that holds a link. ──
+    const tip = document.createElement('div');
+    tip.className = 'sym-tip';
+    tip.setAttribute('aria-hidden', 'true');
+    document.body.append(tip);
+    let linked: { note: HTMLElement; term: HTMLElement } | null = null;
+    function link(target: EventTarget | null): void {
+      const el = target instanceof Element ? target.closest<HTMLElement>('.t[data-n], .mn[data-at]') : null;
+      const note = el && (el.matches('.mn') ? el : page.querySelector<HTMLElement>(`.mn[data-at="${CSS.escape(el.dataset.n ?? '')}"]`));
+      const term = note?.offsetParent?.querySelector<HTMLElement>(`.t[data-n="${CSS.escape(note.dataset.at ?? '')}"]`) ?? null;
+      if (linked && linked.note === note) return;
+      if (linked) {
+        page.classList.remove('lk-on');
+        linked.note.classList.remove('lk');
+        linked.term.classList.remove('lk', 'drawing');
+        linked = null;
+      }
+      if (!note || !term) return;
+      linked = { note, term };
+      page.classList.add('lk-on');
+      note.classList.add('lk');
+      term.classList.add('lk', 'drawing');
+      void sweepLines(term, 'sw-term', 220, live, 1.5).then(() => term.classList.remove('drawing'));
+    }
+    let symbol: Element | null = null;
+    function mark(target: EventTarget | null): void {
+      let el = target instanceof Element ? target.closest('.notation tr[data-sym], .eq .sym') : null;
+      // the outermost symbol: an index is tagged inside the symbol it indexes (W_g(i)), and pointing at it means it
+      for (let up; el?.matches('.sym') && (up = el.parentElement?.closest('.eq .sym'));) el = up;
+      if (el === symbol) return;
+      symbol = el;
+      page.querySelectorAll('.sym.on, .notation tr.on').forEach((e) => e.classList.remove('on'));
+      tip.classList.remove('on');
+      const key = el?.getAttribute('data-sym');
+      if (!el || key == null) return;
+      page.querySelectorAll(`[data-sym="${CSS.escape(key)}"]`).forEach((e) => e.classList.add('on'));
+      const row = el.matches('.sym') ? page.querySelector<HTMLTableRowElement>(`.notation tr[data-sym="${CSS.escape(key)}"]`) : null;
+      if (!row) return;
+      tip.innerHTML = `<b>${row.cells[0].innerHTML}</b>${row.cells[1].innerHTML}`;
+      const r = el.getBoundingClientRect(), tw = tip.offsetWidth;
+      const x = Math.round(Math.max(8, Math.min(window.innerWidth - tw - 8, r.left)) + window.scrollX);
+      tip.style.transform = `translate(${x}px, ${Math.round(r.bottom + 8 + window.scrollY)}px)`;
+      tip.classList.add('on');
+    }
+    document.addEventListener('pointerover', (e) => {
+      if (e.pointerType === 'touch') return;
+      link(e.target);
+      mark(e.target);
+    }, { signal });
+    document.addEventListener('pointerout', (e) => { if (!e.relatedTarget) { link(null); mark(null); } }, { signal });
+    page.addEventListener('focusin', (e) => link(e.target), { signal });
+    page.addEventListener('focusout', (e) => link(e.relatedTarget), { signal });
+
+    // ── Figure 2's readout: the month nearest the pointer, a tap or ←/→ (Shift: a year; Home/End): a hairline
+    // there, a dot on each series, and the values, the runs' range among them. A keyboard reading is spoken. ──
+    if (plot) {
+      const series = (k: string) => (plot.dataset[k] ?? '').split(' ').map(Number);
+      const dates = (plot.dataset.dates ?? '').split(' '), end = plot.dataset.end ?? '';
+      const S = { rl: series('rl'), lo: series('lo'), hi: series('hi'), bhrp: series('bhrp'), bench: series('bench') };
+      const points = S.rl.length;
+      const tipEl = plot.querySelector<HTMLElement>('.f-tip'), say = plot.querySelector('[aria-live]');
+      const runs = plot.querySelector('dt.rl i')?.textContent ?? '';
+      const usd = (v: number) => `$${v.toFixed(2)}`;
+      let at = -1, hovering = false;
+      const svgShown = () => [...plot.querySelectorAll<SVGSVGElement>('svg')].find(shown);
+      function read(i: number, speak: boolean): void {
+        // a reader who reaches for the values wants the finished figure, not dots ahead of a line still drawing
+        drawn = true;
+        plot!.removeAttribute('data-pending');
+        plot!.getAnimations({ subtree: true }).forEach((a) => a.finish());
+        const svg = svgShown();
+        if (!svg || !tipEl) return;
+        at = Math.max(0, Math.min(points - 1, i));
+        const [W, x0, x1, y0, y1, lo, hi] = (svg.dataset.g ?? '').split(' ').map(Number);
+        const X = x0 + ((x1 - x0) * at) / (points - 1), Y = (v: number) => y1 - ((y1 - y0) * (v - lo)) / (hi - lo);
+        svg.querySelector('.f-hair')?.setAttribute('transform', `translate(${X} 0)`);
+        for (const k of ['rl', 'bhrp', 'bench'] as const) {
+          svg.querySelector(`.f-dot-${k}`)?.setAttribute('transform', `translate(${X} ${Y(S[k][at])})`);
+          const dd = tipEl.querySelector(`dd[data-k="${k}"]`);
+          if (dd) dd.textContent = usd(S[k][at]);
+        }
+        const band = tipEl.querySelector('dd[data-k="band"]');
+        if (band) band.textContent = `${usd(S.lo[at])}–${usd(S.hi[at])}`;
+        const when = readoutWhen(at, dates, end);
+        const d = tipEl.querySelector('.f-tip-d');
+        if (d) d.textContent = `${when} · reproduction`;
+        // measured at the plot's left edge: laid out at the last month, a wide tip overflowed a phone's window
+        tipEl.style.transform = '';
+        plot!.classList.add('reading');
+        const sr = svg.getBoundingClientRect(), pr = plot!.getBoundingClientRect(), s = sr.width / W;
+        const left = tipLeft(sr.left - pr.left + X * s, tipEl.offsetWidth, pr.width);
+        // above the plot when the window has room, else under the axis; 14px clear of the focus ring
+        const top = sr.top - tipEl.offsetHeight - 14 >= 0 ? sr.top - pr.top - tipEl.offsetHeight - 14 : sr.bottom - pr.top + 14;
+        tipEl.style.transform = `translate(${left}px, ${Math.round(top)}px)`;
+        if (speak && say) {
+          say.textContent = `${when}: RL-BHRP, ${runs}, ${usd(S.rl[at])} (the runs ${usd(S.lo[at])} to ${usd(S.hi[at])}); `
+            + `BHRP ${usd(S.bhrp[at])}; Benchmark ${usd(S.bench[at])}.`;
+        }
+      }
+      const unread = (): void => { if (!hovering && document.activeElement !== plot) plot.classList.remove('reading'); };
+      const fromPointer = (e: PointerEvent): number => {
+        const svg = svgShown();
+        if (!svg) return at;
+        const [W, x0, x1] = (svg.dataset.g ?? '').split(' ').map(Number), r = svg.getBoundingClientRect();
+        return readoutIndex(((e.clientX - r.left) / r.width) * W, x0, x1, points);
+      };
+      plot.addEventListener('pointermove', (e) => {
+        hovering = e.pointerType !== 'touch';
+        read(fromPointer(e), false);
+      }, { signal });
+      // a tap reads where it lands, and the reading stays until the plot loses focus
+      plot.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') read(fromPointer(e), true); }, { signal });
+      plot.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') { hovering = false; unread(); } }, { signal });
+      plot.addEventListener('focus', () => read(at < 0 ? points - 1 : at, true), { signal });
+      plot.addEventListener('blur', unread, { signal });
+      plot.addEventListener('keydown', (e) => {
+        const next = readoutStep(at < 0 ? points - 1 : at, e.key, e.shiftKey, points);
+        if (next === null) return;
+        e.preventDefault();
+        read(next, true);
+      }, { signal });
+    }
+
+    // ── copy the BibTeX ──
+    const copy = page.querySelector<HTMLElement>('[data-copy]');
+    copy?.addEventListener('click', async () => {
+      const pre = document.getElementById(copy.dataset.copy ?? '');
+      if (!pre) return;
+      try {
+        await navigator.clipboard.writeText(pre.textContent ?? '');
+        copy.textContent = 'Copied';
+      } catch {
+        // no clipboard (an insecure context, or permission refused): select it, for the reader's own copy
+        const range = document.createRange();
+        range.selectNodeContents(pre);
+        getSelection()?.removeAllRanges();
+        getSelection()?.addRange(range);
+        copy.textContent = 'Selected';
+      }
+      later(() => { copy.textContent = 'Copy'; }, 1600);
+    }, { signal });
+
+    return () => {
+      ac.abort();
+      timers.forEach((t) => clearTimeout(t));
+      ro.disconnect();
+      live.forEach((a) => a.finish());
+      tip.remove();
+      page.querySelectorAll('.drawing').forEach((el) => el.classList.remove('drawing'));
+    };
+  });
+</script>

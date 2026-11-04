@@ -24,6 +24,7 @@ export interface Publication {
   arxivId?: string; doi?: string; subject?: string;
   href: string;              // where a card links when there is no explainer page
   pdfHref?: string;
+  reproduction?: string;     // the owner's own reproduction's repo, where one exists — never the paper's code
   finding: string;           // ONE plain sentence, honest and scoped — the card line
   tags: string[];
   abstract?: string;         // verbatim
@@ -64,6 +65,8 @@ export interface Project {
 export interface InProgressItem { name: string; idea: string; repo?: string }   // repo: set only once the repo exists
 
 export const name = { first: 'Ing', last: 'Tian' } as const;
+/** The name his papers carry, as their author lists spell it. */
+export const authorName = 'Zeying Tian';
 
 export const roles = 'Quant Researcher · Portfolio Optimization';
 export const rolesSub = 'Full-stack SDE / MLE';
@@ -123,6 +126,7 @@ export const publications: Publication[] = [
     // Version 1, the version every figure quoted from it describes.
     href: 'https://arxiv.org/abs/2508.11856v1',
     pdfHref: 'https://arxiv.org/pdf/2508.11856v1',
+    reproduction: 'https://github.com/IngTian/rl-bhrp',
     finding: `On one ${PAPER.start.slice(0, 4)}–${PAPER.end.slice(0, 4)} test of ${PAPER.universe} large US stocks, a policy that learns sector and stock weights under a risk-parity penalty turned $1 into ${RL['usd.rl']}, against ${RL['usd.bhrp']} for plain two-level risk parity — with somewhat more risk, and no test of whether the gap is more than chance.`,
     tags: ['reinforcement learning', 'Bayesian hierarchical risk parity', 'portfolio optimization', 'asset allocation'],
     abstract:

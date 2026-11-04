@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { projectStops, projectSectionId, experienceStops, railLabel, homeStops, flattenStops, type Stop } from '../src/lib/pageStops';
+import { projectStops, projectSectionId, experienceStops, railLabel, homeStops, flattenStops, paperStops, PAPER_END, type Stop } from '../src/lib/pageStops';
 import type { TimelineEntry } from '../src/data/profile';
 import { projects, timeline } from '../src/data/profile';
 
@@ -120,6 +120,40 @@ describe('flattenStops', () => {
       { label: 'd', target: 'd' },
     ];
     expect(flattenStops(tree).map((s) => s.target)).toEqual(['a', 'b', 'c', 'd']);
+  });
+});
+
+describe('paperStops', () => {
+  // A paper page's sections are the file's, as the plugin reports them, and then the three the page writes itself.
+  const report = [
+    { id: 'brief', title: 'In brief', rail: 'In brief' },
+    { id: 'question', n: '1', title: 'The question', rail: 'Question' },
+    { id: 'limits', n: '4', title: 'What it implies, and where it stops', rail: 'Limits' },
+  ];
+
+  it("is the file's sections, in the order reported, then Full paper, References and Cite", () => {
+    expect(paperStops(report)).toEqual([
+      { label: 'In brief', target: 'brief' },
+      { label: 'Question', target: 'question' },
+      { label: 'Limits', target: 'limits' },
+      { label: 'Full paper', target: 'read' },
+      { label: 'References', target: 'references' },
+      { label: 'Cite', target: 'cite' },
+    ]);
+  });
+
+  // The page renders its own three sections from PAPER_END, so their ids and titles are spelled once.
+  it("spells the page's own sections once, each a title and a bookmark", () => {
+    expect(PAPER_END).toEqual([
+      { id: 'read', title: 'Read the full paper', rail: 'Full paper' },
+      { id: 'references', title: 'References', rail: 'References' },
+      { id: 'cite', title: 'Cite', rail: 'Cite' },
+    ]);
+    expect(paperStops([]).map((s) => s.target)).toEqual(PAPER_END.map((s) => s.id));
+  });
+
+  it('is flat: a paper section is one stop, however much it holds', () => {
+    expect(paperStops(report).every((s) => !s.children)).toBe(true);
   });
 });
 

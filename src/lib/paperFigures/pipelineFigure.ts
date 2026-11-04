@@ -3,7 +3,7 @@
 // the reproduction's code does. The policy observes the Bayesian layer's estimates; the reward computes its penalty
 // from Σ and the weights; PPO updates the policy. BHRP takes Σ and is the comparator. The paper's state (§3.2.2)
 // does not include BHRP's weights, so no arrow leaves BHRP; the paper never says where the policy starts, and the
-// reproduction starts it at BHRP, so the caption says both. Pure.
+// reproduction starts it at BHRP, so its caption, in the explainer, says both. Pure.
 //
 // The words are HTML over an svg of arrows, so a symbol is build-time MathML like every other on the site (svg
 // <text> cannot hold <math>). Each word is placed in percentages of its drawing and sized in cqw of it, so words
@@ -72,7 +72,7 @@ function art(a: Art, cls: string): string {
   const word = ([x, y, kind, html, anchor = 'middle']: Word) => `<span class="${kind}" style="position:absolute;`
     + `left:${pc(x / a.W)};top:${pc((y - MID * SIZE[kind]) / a.H)};font-size:${Math.round((SIZE[kind] / a.W) * 1e5) / 1e3}cqw;`
     + `line-height:1;white-space:nowrap;transform:translate(${SHIFT[anchor]},-50%)">${html}</span>`;
-  return `<div class="pp-art ${cls}" role="img" aria-labelledby="pipe-cap" style="position:relative;container-type:inline-size">`
+  return `<div class="pp-art ${cls}" aria-hidden="true" style="position:relative;container-type:inline-size">`
     + `<svg viewBox="0 0 ${a.W} ${a.H}" aria-hidden="true" focusable="false" style="display:block;width:100%;height:auto;overflow:visible">`
     + `<defs><marker id="${head}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">`
     + '<path class="p-head" fill="none" d="M0,0.8 L7,4 L0,7.2"/></marker></defs>'
@@ -80,13 +80,8 @@ function art(a: Art, cls: string): string {
     + `</svg>${a.words.map(word).join('')}</div>`;
 }
 
+/** The two drawings, hidden from assistive tech: the explainer's caption (a :::figure container) says all they do,
+ *  and the <figure> around them takes its name from it. */
 export function pipelineFigure(): string {
-  return `<figure class="pipe" id="figure-1">${art(WIDE, 'wide')}${art(NARROW, 'narrow')}`
-    + '<figcaption id="pipe-cap"><span class="fig-no">Figure 1.</span> How the pieces connect each month. The policy sees '
-    + 'the Bayesian layer’s estimates (dashed) and chooses the weights; the reward scores the month’s return and charges '
-    + `for costs and for unequal risk, computed from ${SIGMA}; PPO uses the reward to update the policy’s parameters ${THETA}. `
-    + `BHRP solves its own two-level equal-risk condition from the same ${SIGMA} and is the comparator in the results. In `
-    + 'the paper’s specification (§3.2.2) the policy’s state does not include BHRP’s weights; the paper does not say whether '
-    + 'the policy starts from them, and the reproduction’s policy (Figure 2) starts exactly at them and adjusts from there. '
-    + 'Source: drawn for this page from the paper’s Alg. 4 and Def. 3.2.3.</figcaption></figure>';
+  return art(WIDE, 'wide') + art(NARROW, 'narrow');
 }

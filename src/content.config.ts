@@ -98,8 +98,9 @@ const papers = defineCollection({
     pageDate: isoDate('pageDate'),
     /**
      * What `:cite[key]` resolves against, in the page's order. An author is "Family, Given", so a citation can
-     * read "López de Prado, 2016" without guessing where a name splits. `addedHere` is where the paper names a
-     * work its own bibliography leaves out ("§1"); the page marks such a reference "added here".
+     * read "López de Prado, 2016" without guessing where a name splits. `journal` is set in italics, `venue` plain
+     * after it: a journal's volume and pages, or on its own an archive ("SSRN", "arXiv:1707.06347"). `addedHere`
+     * is where the paper names a work its own bibliography leaves out ("§1"); the page marks such a reference.
      */
     references: z
       .array(
@@ -109,14 +110,21 @@ const papers = defineCollection({
           authors: z.array(z.string().regex(/^[^,]+, [^,]+$/, { message: 'an author is written "Family, Given"' })).min(1),
           year: z.number().int(),
           title: z.string(),
-          venue: z.string(),
+          journal: z.string().optional(),
+          venue: z.string().optional(),
           doi: z.string().optional(),
           url: z.url().optional(),
           addedHere: z.string().optional(),
-        }),
+        }).refine((r) => r.journal || r.venue, { message: 'a reference names its journal, its venue, or both' }),
       )
       .refine((rs) => new Set(rs.map((r) => r.key)).size === rs.length, { message: 'reference keys must be unique' }),
-    /** Corrections to the paper's current version, each dated: the page's "Corrections to v1". */
+    /** The works in the paper's bibliography that the page does not draw on, each described ("a work by …"), so the
+     *  page can say how its reference list relates to the paper's. */
+    bibliographyOmits: z.array(z.string()).default([]),
+    /** What this page leaves out of the paper, for "Read the full paper": "the weight figures (the paper's Figs. 2–3)". */
+    leftOut: z.string().optional(),
+    /** Corrections to the paper's current version, each dated: the page's "Corrections to v1". A `:v[key]` in the
+     *  text is filled in, as in the prose. */
     errata: z.array(z.object({ date: isoDate('an erratum date'), text: z.string() })).default([]),
   }),
 });

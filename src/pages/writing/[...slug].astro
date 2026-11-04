@@ -14,6 +14,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import FluidSky from '../../components/proto/FluidSky.astro';
 import SkyWash from '../../components/SkyWash.astro';
 import { KINDS, kindSectionId } from '../../data/writing';
+import { longDate } from '../../lib/dates';
 
 export async function getStaticPaths() {
   // Drafts get no page, matching the index. Committing an unfinished note must not publish it.
@@ -30,15 +31,11 @@ const { Content } = await render(entry);
 // The kind's label, so the piece says which section it belongs to and links back to it. Falls back to the raw
 // key, which cannot happen while the schema's enum and KINDS agree — and a test asserts they do.
 const kind = KINDS.find((k) => k.key === entry.data.kind);
-const fmt = (iso: string) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
-    year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
-  });
-const longDate = fmt(entry.data.date);
+const written = longDate(entry.data.date);
 // Null unless the piece has actually gained something since it was published — the schema allows `updated` to
 // equal `date`, and printing the same date twice would be noise rather than information.
 const updatedLong =
-  entry.data.updated && entry.data.updated !== entry.data.date ? fmt(entry.data.updated) : null;
+  entry.data.updated && entry.data.updated !== entry.data.date ? longDate(entry.data.updated) : null;
 ---
 {/* preloadAccent: a piece renders Fraunces in exactly three places — `.prose h3`, `.prose em` and
      `.prose figcaption` — so the italic can be on screen before it is discovered. The index at /writing has
@@ -76,7 +73,7 @@ const updatedLong =
               speller, imported, so it cannot drift again. */}
           <a href={`/writing#${kindSectionId(entry.data.kind)}`}>{kind?.label ?? entry.data.kind}</a>
           <span aria-hidden="true">·</span>
-          <time datetime={entry.data.date}>{longDate}</time>
+          <time datetime={entry.data.date}>{written}</time>
           {/* Only when it says something new. A piece written once and never touched shows one date; a running
               collection says so, which is the whole reason the field exists. */}
           {updatedLong && (
