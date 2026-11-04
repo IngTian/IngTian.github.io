@@ -16,6 +16,7 @@ import type { offchartPositioning } from '../data/vendor/offchartPositioning';
 import type { rlBhrpWealth } from '../data/vendor/rlBhrpWealth';
 import type { witnessFacets } from '../data/vendor/witnessFacets';
 import { expandingPercentile, shareOf } from './positioning';
+import { band, cumulative, linearScale, nudgeLabels, pointwiseMedian } from './wealth';
 
 const INK = 'var(--ink-1)', DIM = 'var(--ink-3)';
 const line = (a: number) => `rgba(var(--draft-line-rgb),${a})`;
@@ -43,57 +44,39 @@ const text = (x: number, y: number, s: string, { fill = INK, size = 10, anchor }
 
 // ── rl-bhrp ─────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** Wealth from 1, month by month: one more point than there are returns. */
-function cumulative(r: readonly number[]): number[] {
-  const w = [1];
-  for (const x of r) w.push(w[w.length - 1] * (1 + x));
-  return w;
-}
-
-/** rl-bhrp's median seed (run.py: `argsort(CAGR)[len(R) // 2]`, the upper median of an even count). CAGR over a
- *  common horizon is monotone in final wealth, so ranking final wealth is the same order. */
-export function medianSeed(seeds: readonly (readonly number[])[]): number {
-  const fin = seeds.map((r) => cumulative(r).at(-1)!);
-  return fin.map((_, i) => i).sort((a, b) => fin[a] - fin[b])[Math.floor(seeds.length / 2)];
-}
-
-/** The out-of-sample wealth curve of rl-bhrp's committed REPRODUCTION run: the RL seeds as a min-max band, the
- *  median seed, BHRP and the benchmark, each labelled with its final wealth. */
+/** The out-of-sample wealth curve of rl-bhrp's committed REPRODUCTION run: the RL runs as a min-max band, their
+ *  month-by-month median (lib/wealth.ts's rule for any page that draws this run), BHRP and the benchmark, each
+ *  labelled with its final wealth. */
 export function wealthSvg(d: typeof rlBhrpWealth): string {
-  const seeds = d.rlSeeds.map(cumulative);
-  const med = seeds[medianSeed(d.rlSeeds)], bhrp = cumulative(d.bhrp), bench = cumulative(d.benchmark);
-  const n = med.length;
-  const all = [...seeds, bhrp, bench].flat();
+  const runs = d.rlSeeds.map(cumulative);
+  const med = pointwiseMedian(runs), { lo: bottom, hi: top } = band(runs);
+  const bhrp = cumulative(d.bhrp), bench = cumulative(d.benchmark);
+  const all = [...runs, bhrp, bench].flat();
   const wMin = Math.min(...all), wMax = Math.max(...all), pad = (wMax - wMin) * 0.04;
   const X0 = 16, X1 = 250, Y0 = 56, Y1 = FLOOR - 18;
-  const x = (i: number) => X0 + ((X1 - X0) * i) / (n - 1);
-  const y = (w: number) => Y1 - ((Y1 - Y0) * (w - wMin + pad)) / (wMax - wMin + 2 * pad);
+  const x = linearScale(0, med.length - 1, X0, X1), y = linearScale(wMin - pad, wMax + pad, Y1, Y0);
   const curve = (w: readonly number[]) => w.map((v, i) => [x(i), y(v)] as [number, number]);
-  const top = seeds[0].map((_, i) => Math.max(...seeds.map((s) => s[i])));
-  const bottom = seeds[0].map((_, i) => Math.min(...seeds.map((s) => s[i])));
 
   // End labels at each line's final wealth, nudged apart where two would overlap.
-  const labels = [
-    { w: med.at(-1)!, name: 'RL-BHRP' }, { w: bhrp.at(-1)!, name: 'BHRP' }, { w: bench.at(-1)!, name: 'benchmark' },
-  ].map((l) => ({ ...l, y: y(l.w) + 3 })).sort((a, b) => a.y - b.y);
-  for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + 11);
+  const ends = [{ w: med.at(-1)!, name: 'RL-BHRP' }, { w: bhrp.at(-1)!, name: 'BHRP' }, { w: bench.at(-1)!, name: 'benchmark' }];
+  const endY = nudgeLabels(ends.map((l) => y(l.w) + 3), 11);
 
   // The x labels are the years of the returns' own dates; wealth starts at 1 the month before the first of them.
   const yr = (s: string) => s.slice(0, 4);
-  const ends = seeds.map((s) => s.at(-1)!);
+  const finals = runs.map((s) => s.at(-1)!);
   const label = `Out-of-sample wealth of rl-bhrp's reproduction run, ${yr(d.dates[0])} to ${yr(d.dates.at(-1)!)}, `
-    + `from a start of 1: RL-BHRP, the median of ${d.rlSeeds.length} seeds, ends at ${med.at(-1)!.toFixed(2)}, `
+    + `from a start of 1: RL-BHRP, the month-by-month median of ${d.rlSeeds.length} runs, ends at ${med.at(-1)!.toFixed(2)}, `
     + `BHRP at ${bhrp.at(-1)!.toFixed(2)} and the benchmark at ${bench.at(-1)!.toFixed(2)}; `
-    + `the seeds end between ${Math.min(...ends).toFixed(2)} and ${Math.max(...ends).toFixed(2)}.`;
+    + `the runs end between ${Math.min(...finals).toFixed(2)} and ${Math.max(...finals).toFixed(2)}.`;
   return svg(label, [
     text(16, 28, 'Out-of-sample wealth · reproduction run'),
-    text(16, 42, `RL-BHRP: the median seed of ${d.rlSeeds.length}, shaded min to max`, { fill: DIM, size: 9 }),
+    text(16, 42, `RL-BHRP: median of ${d.rlSeeds.length} runs, shaded min to max`, { fill: DIM, size: 9 }),
     `<line x1="${X0}" x2="${X1}" y1="${r1(y(1))}" y2="${r1(y(1))}" style="stroke:${line(0.3)}" stroke-dasharray="2 3"/>`,
     `<polygon points="${pts([...curve(top), ...curve(bottom).reverse()])}" style="fill:${hi(0.18)}"/>`,
     `<polyline points="${pts(curve(bench))}" style="fill:none;stroke:${line(0.5)}" stroke-width="1.2" stroke-dasharray="3 2"/>`,
     `<polyline points="${pts(curve(bhrp))}" style="fill:none;stroke:${line(0.85)}" stroke-width="1.2"/>`,
     `<polyline points="${pts(curve(med))}" style="fill:none;stroke:${hi()}" stroke-width="1.6"/>`,
-    ...labels.map((l) => `<text style="fill:${INK};font-size:9px">${tspan(256, l.y, l.w.toFixed(2), { size: 9 })}`
+    ...ends.map((l, i) => `<text style="fill:${INK};font-size:9px">${tspan(256, endY[i], l.w.toFixed(2), { size: 9 })}`
       + `${tspan(282, null, l.name, { fill: DIM, size: 9 })}</text>`),
     text(X0, FLOOR - 4, yr(d.dates[0]), { fill: DIM, size: 9 }),
     text(X1, FLOOR - 4, yr(d.dates.at(-1)!), { fill: DIM, size: 9, anchor: 'end' }),

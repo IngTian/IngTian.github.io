@@ -12,7 +12,8 @@ import { rlBhrpWealth } from '../src/data/vendor/rlBhrpWealth';
 import { witnessFacets } from '../src/data/vendor/witnessFacets';
 import { GALLERY_ORDER } from '../src/lib/galleryLayout';
 import { expandingPercentile, shareOf } from '../src/lib/positioning';
-import { facetsSvg, medianSeed, positioningSvg, sectionsSvg, wealthSvg } from '../src/lib/projectVisuals';
+import { facetsSvg, positioningSvg, sectionsSvg, wealthSvg } from '../src/lib/projectVisuals';
+import { band, cumulative, pointwiseMedian } from '../src/lib/wealth';
 
 const unescape = (s: string) =>
   s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
@@ -69,7 +70,7 @@ const overlaps = (a: Box, z: Omit<Box, 'what'>) => a.x0 < z.x1 && a.x1 > z.x0 &&
 const numbers = (s: string) => new Set(s.match(/\d+(?:\.\d+)?/g) ?? []);
 const label = (svg: string) => unescape(svg.match(/^<svg\b[^>]*\baria-label="([^"]*)"/)?.[1] ?? '');
 
-const wealth = (r: readonly number[]) => r.reduce((w, x) => w * (1 + x), 1);
+const wealth = (r: readonly number[]) => cumulative(r).at(-1)!;
 /** Coordinates are printed to 0.1, and a value checked against a frame read back from other printed
  *  coordinates carries two roundings. */
 const near = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThanOrEqual(0.101);
@@ -177,34 +178,43 @@ describe('the gallery\'s name tag covers nothing', () => {
 describe('wealthSvg (rl-bhrp)', () => {
   const svg = ALL.wealthSvg;
   const d = rlBhrpWealth;
+  const runs = d.rlSeeds.map(cumulative);
   const months = d.dates.length + 1;   // wealth starts at 1, the month before the first return
+  const poly = pts(attr(attrsOf(svg, 'polygon')[0] ?? '', 'points'));
+  const top = poly.slice(0, months), bottom = poly.slice(months).reverse();
 
-  it('picks the median seed by rl-bhrp\'s own rule: the seed at position n/2 of the CAGR order', () => {
-    // results/shared-global/summary.json in rl-bhrp records `"median_seed": 7` for this run
-    expect(medianSeed(d.rlSeeds)).toBe(7);
-  });
-
-  it('draws one band (the seeds\' min to max) and three lines: median seed, BHRP, benchmark', () => {
-    const bands = attrsOf(svg, 'polygon');
+  it('draws one band (the runs\' min to max) and three lines: their median, BHRP, benchmark', () => {
     const lines = attrsOf(svg, 'polyline');
-    expect(bands).toHaveLength(1);
+    expect(attrsOf(svg, 'polygon')).toHaveLength(1);
     expect(lines).toHaveLength(3);
-    const band = pts(attr(bands[0], 'points'));
-    expect(band).toHaveLength(2 * months);
-    // drawn back to front, so the median seed is painted last, over the other two
+    expect(poly).toHaveLength(2 * months);
+    // drawn back to front, so the median is painted last, over the other two
     const [bench, bhrp, med] = lines.map((l) => pts(attr(l, 'points')));
     for (const line of [med, bhrp, bench]) expect(line).toHaveLength(months);
     expect(attr(lines[2], 'style')).toContain('--draft-hi-rgb');   // and it is the one in the seal
-    // the median seed is one of the seeds, so it lies inside their band at every month (y grows downward)
-    const top = band.slice(0, months), bottom = band.slice(months).reverse();
+    // a median lies between the min and the max, so the line sits inside the band at every month (y grows downward)
     med.forEach(([x, y], i) => {
       near(x, top[i][0]);
       expect(y).toBeGreaterThanOrEqual(top[i][1]);
       expect(y).toBeLessThanOrEqual(bottom[i][1]);
     });
-    // BHRP ends below the band (it lost to every seed); the benchmark ends below BHRP
+    // BHRP ends below the band (it lost to every run); the benchmark ends below BHRP
     expect(bhrp.at(-1)![1]).toBeGreaterThan(bottom.at(-1)![1]);
     expect(bench.at(-1)![1]).toBeGreaterThan(bhrp.at(-1)![1]);
+  });
+
+  // Every page that draws this run draws this line (lib/wealth.ts), so it never shows two. Month by month:
+  // picking one run by where it ended would choose the line by its test-period outcome. Read against the band's
+  // own frame (its highest and lowest points), the line is that median and not any single run: every run strays
+  // at least 0.42px from it somewhere, against a 0.16px tolerance.
+  it('draws the runs\' month-by-month median, and says so', () => {
+    expect(printed(svg)).toContain(`median of ${d.rlSeeds.length} runs`);
+    const { lo, hi } = band(runs);
+    const i = hi.indexOf(Math.max(...hi)), j = lo.indexOf(Math.min(...lo));
+    const y = (w: number) => top[i][1] + ((w - hi[i]) * (bottom[j][1] - top[i][1])) / (lo[j] - hi[i]);
+    const med = pts(attr(attrsOf(svg, 'polyline')[2], 'points'));
+    const off = pointwiseMedian(runs).map((w, k) => Math.abs(med[k][1] - y(w)));
+    expect(Math.max(...off)).toBeLessThanOrEqual(0.16);   // three 0.1 roundings, two of them in the frame
   });
 
   // The reproduction's numbers, never the paper's Table 2 (profile.ts): an allow-list, so it also keeps those out.
@@ -212,7 +222,7 @@ describe('wealthSvg (rl-bhrp)', () => {
     expect(printed(svg)).toMatch(/reproduction/i);
     const allowed = new Set([
       d.dates[0].slice(0, 4), d.dates.at(-1)!.slice(0, 4), String(d.rlSeeds.length),
-      ...[d.rlSeeds[medianSeed(d.rlSeeds)], d.bhrp, d.benchmark].map((r) => wealth(r).toFixed(2)),
+      ...[pointwiseMedian(runs).at(-1)!, wealth(d.bhrp), wealth(d.benchmark)].map((w) => w.toFixed(2)),
     ]);
     const nums = printed(svg).match(/\d+(?:\.\d+)?/g) ?? [];
     expect(nums.length).toBeGreaterThan(0);

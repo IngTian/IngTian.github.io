@@ -1,14 +1,17 @@
 import katex from 'katex';
+import { fixMathVariants } from './mathml';
 
 // Pre-rendered at build/import time to MathML only (output:'mathml'), so the
-// client ships NO KaTeX runtime, CSS, or fonts — just the static <math> markup.
+// client ships NO KaTeX runtime, CSS, or fonts — just the static <math> markup,
+// with script and blackboard letters written as Unicode letters (lib/mathml.ts).
 // ∇f = 0 is the honest stationarity condition for this unconstrained surface;
 // the KKT line is the general constrained form (a rarer Easter egg).
 const opts = { output: 'mathml' as const, throwOnError: false, displayMode: false };
+const tex = (src: string, o: typeof opts) => fixMathVariants(katex.renderToString(src, o));
 
 export const EQUATIONS = {
-  gradZero: katex.renderToString('\\nabla f = 0', opts),
-  kkt: katex.renderToString('\\nabla f + J_h^{\\top}\\lambda + J_g^{\\top}\\mu = 0', opts),
+  gradZero: tex('\\nabla f = 0', opts),
+  kkt: tex('\\nabla f + J_h^{\\top}\\lambda + J_g^{\\top}\\mu = 0', opts),
 };
 
 // Display-mode (centered, larger) for the /research showcase panel.
@@ -20,18 +23,18 @@ const display = { ...opts, displayMode: true };
 // paper's actual definitions (honesty rule).
 export const PAPER_EQUATIONS = {
   // Two-level composition: final asset weight = sector weight × within-sector weight.
-  weightMap: katex.renderToString('w_i = W_{g(i)}\\,\\eta_{i\\mid g(i)}', display),
+  weightMap: tex('w_i = W_{g(i)}\\,\\eta_{i\\mid g(i)}', display),
   // Average-reward MDP reward: gross return − transaction cost − risk-dispersion
   // penalty. Even in the wide left column this is too long for one line at full
   // body size, so it breaks across two aligned lines at the second minus.
-  reward: katex.renderToString(
+  reward: tex(
     '\\begin{aligned} U_{t+1} = {}& w_t^{\\top} R_{t+1} - c\\lVert w_t - w_{t-1}\\rVert_1 \\\\ &{} - \\lambda\\big[\\alpha V_{\\text{within}} + (1-\\alpha) V_{\\text{across}}\\big] \\end{aligned}',
     display,
   ),
   // Risk-contribution conservation: contributions sum to portfolio variance.
-  riskConservation: katex.renderToString('\\sum_{i=1}^{N} \\mathrm{RC}_i(w) = \\sigma_p^2(w)', display),
+  riskConservation: tex('\\sum_{i=1}^{N} \\mathrm{RC}_i(w) = \\sigma_p^2(w)', display),
   // Sector-level composite covariance from within-sector weights.
-  sectorCov: katex.renderToString('\\tilde{\\Sigma}_{gh} = (\\eta^{(g)})^{\\top}\\Sigma_{gh}\\,\\eta^{(h)}', display),
+  sectorCov: tex('\\tilde{\\Sigma}_{gh} = (\\eta^{(g)})^{\\top}\\Sigma_{gh}\\,\\eta^{(h)}', display),
 };
 
 // ── THE FACTOR MODEL IS GONE, AND IT WAS REJECTED BEFORE IT WAS DEAD ────────────────────────────────────
@@ -70,14 +73,14 @@ export const PAPER_EQUATIONS = {
 // Baked to MathML at build time like everything else here, so the client ships no KaTeX runtime.
 export const BELLMAN_EQUATIONS = {
   /** The recursion itself. Finite-horizon, expectation over next state — the standard form. */
-  recursion: katex.renderToString(
+  recursion: tex(
     String.raw`V_t(x) \;=\; \max_{u \in U(x)} \Big\{\, r(x,u) \;+\; \mathbb{E}\big[\,V_{t+1}(x')\,\big] \Big\}`,
     display,
   ),
   /** Where it breaks: the state space is exponential in the number of assets. */
-  curse: katex.renderToString(String.raw`\lvert \mathcal{X} \rvert \;=\; m^{N}`, display),
+  curse: tex(String.raw`\lvert \mathcal{X} \rvert \;=\; m^{N}`, display),
   /** The number, with the slide's own m and N substituted — inline, so it can sit in a sentence. */
-  atScale: katex.renderToString(String.raw`10^{3000}`, opts),
+  atScale: tex(String.raw`10^{3000}`, opts),
 };
 
 // ── THE METHOD SLIDE HAS NO EQUATION, and that is the correction ─────────────────────────────────────────

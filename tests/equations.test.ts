@@ -10,6 +10,14 @@ describe('baked equations', () => {
     // mathml-only output must not include the html .katex span tree
     expect(EQUATIONS.gradZero).not.toContain('class="katex-html"');
   });
+  // Chrome's MathML Core draws mathvariant="double-struck"/"script" as a plain italic letter.
+  it('writes blackboard and script letters as Unicode letters, which every engine draws', () => {
+    for (const set of [EQUATIONS, PAPER_EQUATIONS, BELLMAN_EQUATIONS]) {
+      for (const [k, v] of Object.entries(set)) expect(v, k).not.toMatch(/mathvariant="(?:script|double-struck)"/);
+    }
+    expect(BELLMAN_EQUATIONS.recursion).toContain('𝔼');
+    expect(BELLMAN_EQUATIONS.curse).toContain('𝒳');
+  });
 });
 
 describe('paper equations (research showcase)', () => {
