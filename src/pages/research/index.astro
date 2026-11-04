@@ -191,13 +191,10 @@ const STATUS: Record<PublicationStatus, string> = { preprint: 'Preprint', confer
   // Started through onPageView, so it runs at parse on a full load and once per arrival, after the last arrival's
   // teardown.
   import { DRAW, mergeLines } from '../../lib/motionTiming';
-  import { onPageView } from '../../lib/pageView';
+  import { onPageView } from '../../scripts/pageView';
   import { play, riseOnceSeen } from '../../scripts/motion';
 
-  onPageView('main.research', () => {
-    const maybePage = document.querySelector<HTMLElement>('main.research');
-    if (!maybePage) return undefined;
-    const page = maybePage;
+  onPageView('main.research', (page) => {
     const ac = new AbortController();
     const { signal } = ac;
     const live = new Set<Animation>();

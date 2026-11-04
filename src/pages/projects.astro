@@ -200,15 +200,13 @@ const bootDecider = `(function () {
   import { BUBBLE_MS, HELLO_DELAY_MS, IDLE_EVERY_MS, TYPE_MS, idleLines, mayIdle, nextLine } from '../lib/cowTalk';
   import { askPoint } from '../lib/galleryLayout';
   import { prefersReducedMotion } from '../lib/motion';
-  import { onPageView } from '../lib/pageView';
+  import { onPageView } from '../scripts/pageView';
   import { isPhone } from '../lib/viewport';
 
-  // Started with the boot (lib/pageView.ts), not at window `load`: the boot can be skipped once the header's script
+  // Started with the boot (scripts/pageView.ts), not at window `load`: the boot can be skipped once the header's script
   // runs, right after parse, and the press that skips it must already find this listening — and ProjectAsk, which
   // starts the same way, there to answer the clicks this turns into asks.
-  onPageView('main.projects-page', () => {
-    const page = document.querySelector<HTMLElement>('main.projects-page');
-    if (!page) return;
+  onPageView('main.projects-page', (page) => {
     // A PRESS THAT SKIPS THE BOOT DOES NOTHING ELSE: the click ending it neither asks nor falls through to the repo.
     // During the boot the gallery is still the pile and the rows are invisible, so what is under the pointer is not
     // what the reader aimed at. Read at pointerdown, in the capture phase on window, because the boot's skip removes
@@ -251,13 +249,12 @@ const bootDecider = `(function () {
   // phone's one column a bubble the reader did not ask for is a box over what they are reading.
   // STARTED AT PARSE, like the dispatcher above that sends it `cow:say`: started at window `load` it missed every ask
   // made before then, and then greeted ("Click one. I'll explain.") a reader whose pop-up was already open.
-  onPageView('.cow-wrap--talk', () => {
-    const wrap = document.querySelector<HTMLElement>('.cow-wrap--talk');
-    const maybeBtn = wrap?.querySelector<HTMLButtonElement>('[data-cow]');
-    const maybeBubble = wrap?.querySelector<HTMLElement>('.cow-bubble');
-    const maybeA = wrap?.querySelector<HTMLElement>('[data-said-a]');
-    const maybeB = wrap?.querySelector<HTMLElement>('[data-said-b]');
-    const maybeLive = wrap?.querySelector<HTMLElement>('[data-cow-live]');
+  onPageView('.cow-wrap--talk', (wrap) => {
+    const maybeBtn = wrap.querySelector<HTMLButtonElement>('[data-cow]');
+    const maybeBubble = wrap.querySelector<HTMLElement>('.cow-bubble');
+    const maybeA = wrap.querySelector<HTMLElement>('[data-said-a]');
+    const maybeB = wrap.querySelector<HTMLElement>('[data-said-b]');
+    const maybeLive = wrap.querySelector<HTMLElement>('[data-cow-live]');
     if (!maybeBtn || !maybeBubble || !maybeA || !maybeB || !maybeLive) return;
     const btn = maybeBtn, bubble = maybeBubble, lineA = maybeA, lineB = maybeB, live = maybeLive;
     const root = document.documentElement;

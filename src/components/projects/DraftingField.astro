@@ -36,15 +36,14 @@
   } from '../../lib/draftingField';
   import { isoSegments } from '../../lib/marchingSquares';
   import { prefersReducedMotion } from '../../lib/motion';
-  import { onPageView } from '../../lib/pageView';
+  import { onPageView } from '../../scripts/pageView';
   import { isPhone } from '../../lib/viewport';
 
-  function init(): (() => void) | undefined {
-    const maybeCvs = document.querySelector<HTMLCanvasElement>('[data-drafting-field]');
-    const maybeCtx = maybeCvs?.getContext('2d');
-    if (!maybeCvs || !maybeCtx) return;
-    // Non-null aliases: TypeScript does not carry the guard's narrowing into the hoisted functions below.
-    const cvs = maybeCvs, ctx = maybeCtx;
+  function init(cvs: HTMLCanvasElement): (() => void) | undefined {
+    const maybeCtx = cvs.getContext('2d');
+    if (!maybeCtx) return;
+    // Non-null alias: TypeScript does not carry the guard's narrowing into the hoisted functions below.
+    const ctx = maybeCtx;
     const root = document.documentElement;
     const animate = !prefersReducedMotion() && !isPhone();
     // The still frame is always t = 0, so a resize or a theme flip repaints the same picture, not a jump.
@@ -154,7 +153,7 @@
     };
   }
 
-  // Started at parse on a full load (lib/pageView.ts), not at window `load` (which waits for the fonts), so the field
+  // Started at parse on a full load (scripts/pageView.ts), not at window `load` (which waits for the fonts), so the field
   // paints with the banner rather than after it; then once per new DOM, and a page without the canvas just tears
   // the last one down, which is what stops the loop when a reader leaves /projects.
   onPageView('[data-drafting-field]', init);

@@ -176,17 +176,13 @@ const cards = GALLERY_ORDER.map((slug, i) => {
 <script>
   import { READY_MS, videoPlays } from '../../lib/galleryLayout';
   import { MOTION_LIMIT_MS, prefersReducedMotion } from '../../lib/motion';
-  import { onPageView } from '../../lib/pageView';
+  import { onPageView } from '../../scripts/pageView';
   import { isPhone } from '../../lib/viewport';
 
   // manifold's motion waits for the fan to settle: its .55s transform plus the deal's stagger across six cards.
   const MOTION_AFTER_MS = 900;
 
-  function init(): (() => void) | undefined {
-    const maybeGallery = document.querySelector<HTMLElement>('[data-gallery]');
-    if (!maybeGallery) return;
-    // Non-null alias: TypeScript does not carry the guard's narrowing into the hoisted functions below.
-    const gallery = maybeGallery;
+  function init(gallery: HTMLElement): (() => void) | undefined {
     const root = document.documentElement;
     const shots = [...gallery.querySelectorAll<HTMLElement>('.shot')];
     const timers: number[] = [];
@@ -306,7 +302,7 @@ const cards = GALLERY_ORDER.map((slug, i) => {
     };
   }
 
-  // Started at parse on a full load (lib/pageView.ts), not at window `load`, which waits for the fonts: started
+  // Started at parse on a full load (scripts/pageView.ts), not at window `load`, which waits for the fonts: started
   // there, a slow card sat as a bare tone with no shimmer until `load`, and a picture landing before it popped in
   // unfaded — the loading state above exists for exactly that picture.
   onPageView('[data-gallery]', init);

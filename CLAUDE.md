@@ -249,6 +249,7 @@ src/
   lib/dates.ts                      # the one date helper: longDate, monthYear (UTC)
   lib/motionTiming.ts               # the motion module's pure half: EASE/DRAW, RAIL_ENTER_MS, stagger, sweepDurations, mergeLines
   scripts/motion.ts                 # THE ONE MOTION MODULE, its DOM half: play, onceSeen, riseOnceSeen, sweepLines — the rail and both research routes; the reduced-motion gate is inside it
+  scripts/pageView.ts               # onPageView(selector, init): starts nine scripts right after parse, not at window `load`, handing init its element — /projects' (all but two), SideRail's and both research routes' (see Interactivity)
   data/papers/{index,rl-bhrp}.ts    # PAPER_DATA (values, figures, thumb) and RL-BHRP's Table 2, window and reproduction series
   lib/mathml.ts                     # the one MathML letter fix: fixMathVariants for lib/equations.ts, rehypeMathVariants for every .md
   data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline, publications, projects + inProgress, awards, links
@@ -289,7 +290,6 @@ src/
   lib/asciiBanner.ts                # the PROJECTS banner as SVG rects from letter matrices (the mono subset has no block glyphs)
   lib/projectsListing.ts            # the header's `ls -l` lines and the summary counts, computed from the records
   lib/projectsBoot.ts               # the boot: shouldBoot (WHETHER — shipped as source by projects.astro's is:inline decider) + bootSteps/bootState (WHAT, at each ms)
-  lib/pageView.ts                   # onPageView(): starts nine scripts right after parse, not at window `load` — /projects' (all but two), SideRail's and both research routes' (see Interactivity)
   lib/{cowTalk,galleryLayout}.ts    # when the /projects cow talks and which line; the fan's poses + the one click rule every project surface shares
   lib/{positioning,projectVisuals}.ts # offchart's percentile, ported; the four COMPUTED pictures as SVG strings, coloured only by CSS variables
   data/{cowLines,projectVisuals}.ts # the /projects cow's lines (stored as PAIRS); which picture each project shows
@@ -350,8 +350,8 @@ is a plain Astro component or page with a `<script>`, **not** an island (see *St
 
 **Counting it:** `grep -rln '<script' src` also hits three `lib/` files that say `<script>`
 in comments. Filtered to `src/{components,sections,pages,layouts}` it returns the 24 above
-(`ProjectPicture.astro` and `Button.astro` have none). `scripts/artGallery.ts` and
-`scripts/motion.ts` are modules those scripts import, not scripts of their own.
+(`ProjectPicture.astro` and `Button.astro` have none). `scripts/artGallery.ts`,
+`scripts/motion.ts` and `scripts/pageView.ts` are modules those scripts import, not scripts of their own.
 
 **Three files break the contract below on purpose, with `is:inline` scripts that must run
 before first paint** (`grep -rn '<script is:inline' src` → 4 in 3 files). A bundled script
@@ -382,8 +382,9 @@ Everything else here:
     font and eager subresource — and never comes if one never arrives. (Every
     `/projects` picture is `loading="lazy"`; in headless Chrome 156 a held lazy
     picture did not hold `load`, held fonts did.) So nine scripts start
-    through `lib/pageView.ts`'s `onPageView()`, at module evaluation right after
-    parse and then once per new DOM on `astro:page-load`. Six are /projects': `TerminalHeader`,
+    through `scripts/pageView.ts`'s `onPageView()`, at module evaluation right after
+    parse and then once per new DOM on `astro:page-load`, with the element its selector
+    found (a page without one gets only the last teardown). Six are /projects': `TerminalHeader`,
     `ProjectAsk`, `Gallery`, `DraftingField`, and `pages/projects.astro`'s ask
     dispatcher and cow. The other three are `SideRail`, whose first marks must land while
     its rows are still entering; the paper page, whose notes must be placed and whose

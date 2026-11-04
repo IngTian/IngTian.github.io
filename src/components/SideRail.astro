@@ -172,16 +172,13 @@ const gap = stagger(1, flat.length, { step: 40, total: RAIL_ENTER_MS - ROW_MS })
   //   in the reading band is one quiet mark appearing and then one slide, and a rail click is one dash travelling.
   // The first marks appear at once, inside the rows' CSS entrance. Reduced motion: the same marks, at once.
   import { EASE } from '../lib/motionTiming';
-  import { onPageView } from '../lib/pageView';
+  import { onPageView } from '../scripts/pageView';
   import { type Marks, markStops } from '../lib/scrollspy';
   import { motionAllowed, play } from '../scripts/motion';
 
   const SLIDE = 280, GROW = 160, GROW_IN = 240, FADE = 200;
 
-  onPageView('.side-rail', () => {
-    const maybeRail = document.querySelector<HTMLElement>('.side-rail');
-    if (!maybeRail) return undefined;
-    const rail = maybeRail;
+  onPageView('.side-rail', (rail) => {
     const stops = [...rail.querySelectorAll<HTMLAnchorElement>('a')].flatMap((a) => {
       const el = document.getElementById(decodeURIComponent(a.hash.slice(1)));
       const rule = a.querySelector<HTMLElement>('.rule');

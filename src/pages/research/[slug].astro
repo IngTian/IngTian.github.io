@@ -463,14 +463,11 @@ const noted = errata.map((e) => e.date).sort().at(-1);
   // each thing once and in under 2s, and what is on screen or above it when the page opens is never held back
   // (scripts/motion.ts). Started through onPageView, so it runs at parse on a full load and once per arrival.
   import { DRAW } from '../../lib/motionTiming';
-  import { onPageView } from '../../lib/pageView';
+  import { onPageView } from '../../scripts/pageView';
   import { readoutIndex, readoutStep, readoutWhen, stackNotes, tipLeft } from '../../lib/paperPage';
   import { batch, onceSeen, play, riseOnceSeen, sweepLines } from '../../scripts/motion';
 
-  onPageView('main.paper', () => {
-    const maybePage = document.querySelector<HTMLElement>('main.paper');
-    if (!maybePage) return undefined;
-    const page = maybePage;
+  onPageView('main.paper', (page) => {
     const ac = new AbortController();
     const { signal } = ac;
     const live = new Set<Animation>();
