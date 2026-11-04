@@ -53,6 +53,15 @@ export function projectStops(projects: readonly Project[]): Stop[] {
   ];
 }
 
+/** The /research index's rail: the papers, then the research interests. The page renders each section's id from
+ *  this, so the two are spelled here and nowhere else. */
+export function researchIndexStops(): Stop[] {
+  return [
+    { label: 'Papers', target: 'r-papers' },
+    { label: 'Interests', target: 'r-interests' },
+  ];
+}
+
 /** The sections a paper page writes itself after its file's body, in order: each id, the title its heading and the
  *  phone's Contents print, and its rail bookmark. Spelled once, so the page and the rail cannot disagree. */
 export const PAPER_END = [

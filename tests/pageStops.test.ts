@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   projectStops, projectSectionId, experienceStops, railLabel, homeStops, flattenStops, paperPageOwns, paperSections, paperStops,
-  PAPER_END, type Stop,
+  researchIndexStops, PAPER_END, type Stop,
 } from '../src/lib/pageStops';
 import { refId } from '../src/lib/paperMarkdown';
 import type { TimelineEntry } from '../src/data/profile';
@@ -164,6 +164,16 @@ describe('paperStops', () => {
   it('is paperSections, each a stop', () => {
     expect(paperSections(report)).toEqual([...report, ...PAPER_END]);
     expect(paperStops(report)).toEqual(paperSections(report).map((s) => ({ label: s.rail, target: s.id })));
+  });
+});
+
+// The page renders its two sections' ids from this tree, so they are spelled here and nowhere else.
+describe('researchIndexStops', () => {
+  it('is Papers then Interests, flat', () => {
+    expect(researchIndexStops()).toEqual([
+      { label: 'Papers', target: 'r-papers' },
+      { label: 'Interests', target: 'r-interests' },
+    ]);
   });
 });
 

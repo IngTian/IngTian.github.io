@@ -221,10 +221,12 @@ else.
 ```
 src/
   styles/{tokens.css, global.css}   # palette + type roles; the .descent gradient, atmosphere washes and the .is-slides slide metrics live in global.css
+  styles/paper.css                  # what the two research routes share: the measure (--M --G --N --L --tk) and the wealth figure's series marks
   layouts/BaseLayout.astro          # head, astro:fonts, meta/OG/JSON-LD, favicons, the page-load veil, CornerNav, ClientRouter
   content.config.ts                 # the two content collections, `writing` and `papers`, their frontmatter schemas and the one isoDate helper
   content/writing/*.md              # the pieces themselves — a new one is a FILE, not a code change
   content/papers/*.md               # one paper's explainer each (rl-bhrp.md) — see Papers are files
+  pages/research/index.astro        # /research: the papers as cards, newest first (a card opens its paper's page when a file explains it), then the interests
   pages/research/[slug].astro       # the one paper page: the record's head, the file's body, references, BibTeX; its script places the notes and runs the motion
   lib/paperMarkdown/{index,remarkPaper,rehypePaper}.ts # the markdown chain (spelled once) + the paper format's compiler and checks — see Papers are files
   lib/paperFigures/{wealthFigure,pipelineFigure,metricsTable}.ts # a paper's drawings and Table 1, as HTML strings from its data; a :::figure places each
@@ -289,7 +291,7 @@ more prototype routes existed and the table below still named all four.
 | Route | What it is |
 | --- | --- |
 | `/` | the descent — the homepage deck |
-| `/research` | the papers, as a list of their records |
+| `/research` | the papers as cards, newest first, each opening its page here or its publisher's; then the research interests |
 | `/research/<slug>` | one paper explained, rendered from `src/content/papers/<file>.md` (today `/research/rl-bhrp`) |
 | `/writing` | the writing shelf — kinds, each listing its markdown pieces |
 | `/writing/<slug>` | one piece, rendered from `src/content/writing/<slug>.md` |

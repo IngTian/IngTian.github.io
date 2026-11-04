@@ -23,10 +23,13 @@ const ROLE = ['--paper', '--ink-1', '--ink-2', '--ink-3', '--ink-4', '--ink-5', 
   '--hairline-rgb', '--bg'];
 const SHEET = ['--sheet-ground', '--sheet-ul', '--sheet-band', '--sheet-axis', '--sheet-one', '--sheet-grid', '--sheet-mark'];
 
-// The paper page's own stylesheet, comments stripped: the alphas its marks are drawn at are read from it, so the
-// number measured is the one drawn.
-const pageCss = readFileSync(new URL('../src/pages/research/[slug].astro', import.meta.url), 'utf8')
-  .match(/<style is:global>([\s\S]*?)<\/style>/)?.[1].replace(/\/\*[\s\S]*?\*\//g, '') ?? '';
+// The paper page's own stylesheet and the sheet it shares with the index (styles/paper.css, where Figure 2's series
+// are coloured), comments stripped: the alphas its marks are drawn at are read from them, so the number measured is
+// the one drawn.
+const pageCss = [
+  readFileSync(new URL('../src/pages/research/[slug].astro', import.meta.url), 'utf8').match(/<style is:global>([\s\S]*?)<\/style>/)?.[1] ?? '',
+  readFileSync(new URL('../src/styles/paper.css', import.meta.url), 'utf8'),
+].join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
 /** The declarations of the page's rule whose selector is exactly `sel`. */
 function rule(sel: string): string {
   const body = new RegExp(`(?:^|[}\\s])${sel.replace(/[.()[\]*+?^$|\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(pageCss)?.[1];

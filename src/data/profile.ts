@@ -17,7 +17,7 @@ export interface Publication {
   title: string;             // exactly as the paper prints it
   authors: Author[];
   status: PublicationStatus;
-  venue: string;             // e.g. 'arXiv', 'Proc. SPIE 12290 (CNSSE 2022)'
+  venue: string;             // e.g. 'arXiv', 'Proc. SPIE 12290 (CNSSE)': never the year, which every surface prints after it
   year: string;
   submitted?: string;        // YYYY-MM-DD
   version?: string;          // e.g. 'v1'
@@ -80,9 +80,8 @@ export const bio: { text: string; strong: string[] } = {
   strong: ['University of Toronto', 'multi-period portfolio optimization'],
 };
 
-// Research interests — shown as themed entries atop /research, with a one-line
-// teaser linking in from the homepage. Grounded in the RL-BHRP paper + the
-// incoming OR PhD focus; kept to areas actually worked in.
+// Research interests — a quiet list after the papers on /research, each its label and a one-line gloss.
+// Grounded in the RL-BHRP paper + the incoming OR PhD focus; kept to areas actually worked in.
 export const researchInterests: ResearchInterest[] = [
   { label: 'Multi-period portfolio optimization', gloss: 'Allocation across horizons, rebalancing as conditions change — not single-shot mean–variance.' },
   { label: 'Risk parity & hierarchical methods', gloss: 'Distributing risk across structure — sectors, then assets — rather than chasing returns.' },
@@ -146,7 +145,7 @@ export const publications: Publication[] = [
     title: 'Self-Attention on RNN-based Text Classification',
     authors: [{ name: 'Dailun Li' }, { name: 'Zeying Tian' }, { name: 'Yining Duan' }],
     status: 'conference',
-    venue: 'Proc. SPIE 12290 (CNSSE 2022)',
+    venue: 'Proc. SPIE 12290 (CNSSE)',
     year: '2022',
     doi: '10.1117/12.2641031',
     href: 'https://doi.org/10.1117/12.2641031',

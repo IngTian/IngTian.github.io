@@ -1,0 +1,256 @@
+---
+// /research — THE PAPERS, NEWEST FIRST, AS CARDS, THEN THE RESEARCH INTERESTS (the order of the approved prototype).
+// A card opens the paper's page here when a file in src/content/papers/ explains it, and otherwise where the paper
+// is published, saying so. Its records are profile.ts `publications`, its picture PAPER_DATA's `thumb`. The register
+// is the research routes' paper (BaseLayout `page="paper"`), with no veil: it would replay on every card click and
+// every "← all research", holding the text back.
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import SideRail from '../../components/SideRail.astro';
+import { PAPER_DATA } from '../../data/papers';
+import { publications, researchInterests, type PublicationStatus } from '../../data/profile';
+import { researchIndexStops } from '../../lib/pageStops';
+import { hyphenatedParts } from '../../lib/words';
+import '../../styles/paper.css';
+
+const stops = researchIndexStops();
+const [papers, interests] = stops;
+// The records with a page of their own, read from the collection, so a paper's card opens its page once its file exists.
+const explained = new Set((await getCollection('papers')).map((e) => e.data.publication));
+const STATUS: Record<PublicationStatus, string> = { preprint: 'Preprint', conference: 'Conference paper', journal: 'Journal article' };
+// A title keeps its hyphenated words whole ("RNN-based", "(RL-BHRP)"). A card's meta ("status · venue · year") and its
+// tags keep each part nowrap with the separator before it, so a line may break before a separator, never after one.
+---
+<BaseLayout
+  title="Research — Ing Tian"
+  description="Research by Ing Tian (Zeying Tian) on portfolio optimization and machine learning, including RL-BHRP, a reinforcement learning embedded Bayesian hierarchical risk parity approach to allocation."
+  page="paper"
+  veil={false}
+>
+  <main class="research">
+    <SideRail stops={stops} id="research-toc" />
+
+    <header class="head">
+      <a class="back" href="/">← back</a>
+      <h1>Research</h1>
+      <p class="lede">I work on portfolio optimization, at the seam of operations research and machine learning.</p>
+    </header>
+
+    <section id={papers.target} class="block">
+      <h2 class="label">Papers, newest first</h2>
+      <div class="papers">
+        {publications.map((p) => {
+          const here = explained.has(p.slug);
+          const thumb = PAPER_DATA[p.slug]?.thumb;
+          const title = hyphenatedParts(p.title).map((s, i) => (i % 2 ? <span class="nw">{s}</span> : s));
+          return (
+            <article class="pc">
+              {thumb && (
+                <div class="p-fig">
+                  <Fragment set:html={thumb.svg} />
+                  <p class="p-figcap">{thumb.caption}</p>
+                  <p class="p-figtag">{thumb.tag}</p>
+                </div>
+              )}
+              <h3 class="p-title">{here
+                ? <a href={`/research/${p.slug}`}>{title}</a>
+                : <a href={p.href} target="_blank" rel="noopener noreferrer" aria-describedby={`out-${p.slug}`}>{title}<span class="ext" aria-hidden="true"> ↗</span></a>}</h3>
+              <p class="p-auth">{p.authors.map((a) => a.name).join(', ')}</p>
+              <p class="p-meta">{[STATUS[p.status], p.venue, p.year].map((t, i) => <>{i > 0 && ' '}<span class="nw">{i > 0 && '· '}{t}</span></>)}{!here && <span class="out" id={`out-${p.slug}`}>opens the publisher’s page ↗</span>}</p>
+              <p class="p-find">{p.finding}</p>
+              <p class="p-tags">{p.tags.map((t, i) => <>{i > 0 && ' '}<span class="nw">{i > 0 && '· '}{t}</span></>)}</p>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+
+    <section id={interests.target} class="block">
+      <h2 class="label">Research interests</h2>
+      <ul class="interests">
+        {researchInterests.map((r) => <li><span class="it">{r.label}.</span> {r.gloss}</li>)}
+      </ul>
+    </section>
+  </main>
+</BaseLayout>
+
+{/* is:global, nested under .research by hand: the picture is set:html and the underline's spans are the script's, so
+    neither carries a scope hash and a scoped rule would match nothing there (CLAUDE.md, Astro trap 1). */}
+<style is:global>
+  /* ── the composition: the reading column of styles/paper.css's measure; a card spans the reading column and the
+     notes column, its picture in the notes column. At 1100px and below, one column (the rail hides there). ── */
+  .research { width: var(--M); margin-left: var(--L); padding-bottom: 96px; font-family: var(--font-display);
+    line-height: 1.5; color: var(--ink-2); font-kerning: normal; text-rendering: optimizeLegibility; }
+  .research p { margin: 0; text-wrap: pretty; }
+  .research :focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; border-radius: 2px; }
+  .research [id] { scroll-margin-top: 96px; }
+  .research .head { padding-top: 15vh; }
+  .research .back { font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); text-decoration: none; }
+  @media (hover: hover) { .research .back:hover { color: var(--seal); } }
+  .research h1 { font-weight: 400; font-size: 54px; line-height: 1.04; letter-spacing: -0.012em; color: var(--ink-1); margin: 20px 0 0; }
+  .research .lede { margin-top: 18px; max-width: 31em; font-size: 20px; line-height: 1.5; color: var(--ink-3); }
+  .research .block { margin-top: 76px; }
+  .research .label { margin: 0 0 26px; padding-top: 14px; border-top: 1px solid rgba(var(--hairline-rgb), 0.3);
+    font-weight: 400; font-style: italic; font-size: 17px; line-height: 1.3; color: var(--ink-3); }
+
+  /* ── a card. The whole card is its title's link: the link's ::after covers it. ── */
+  .research .papers { width: calc(var(--M) + var(--G) + var(--N)); border-bottom: 1px solid rgba(var(--hairline-rgb), 0.3); }
+  .research .pc { position: relative; display: grid; padding: 26px 0 28px; border-top: 1px solid rgba(var(--hairline-rgb), 0.3);
+    grid-template-columns: var(--M) var(--N); column-gap: var(--G); row-gap: 5px;
+    grid-template-areas: 'title fig' 'auth fig' 'meta fig' 'find fig' 'tags fig'; grid-template-rows: auto auto auto auto 1fr; }
+  .research .p-title { grid-area: title; margin: 0; font-weight: 400; font-size: 21px; line-height: 1.3; color: var(--ink-1); text-wrap: balance; }
+  .research .p-title a { color: inherit; text-decoration: none; }
+  .research .p-title a::after { content: ''; position: absolute; inset: 0; z-index: 1; }
+  .research .p-title a:focus-visible { outline: none; }
+  .research .ext { color: var(--ink-3); }
+  .research .p-auth { grid-area: auth; margin-top: 4px; font-size: 16px; line-height: 1.45; color: var(--ink-2); }
+  .research .p-meta { grid-area: meta; font-size: 15px; line-height: 1.45; color: var(--ink-3); }
+  .research .p-meta .out { display: block; }
+  .research .nw { white-space: nowrap; }
+  .research .p-find { grid-area: find; margin-top: 6px; font-size: 16.5px; line-height: 1.58; color: var(--ink-2); }
+  @media (min-width: 1101px) { .research .p-find { font-size: calc(16.5px + var(--tk)); } }
+  .research .p-tags { grid-area: tags; margin-top: 4px; font: 12px/1.5 var(--font-mono); letter-spacing: 0.02em; color: var(--ink-3); }
+
+  /* the picture: Figure 2's series in miniature, coloured as Figure 2 is (styles/paper.css); its strokes keep their
+     width however far the drawing is scaled */
+  .research .p-fig { grid-area: fig; align-self: start; margin-top: 4px; }
+  .research .mini { display: block; width: 100%; height: auto; border: 1px solid rgba(var(--hairline-rgb), 0.3); }
+  .research .mini polyline, .research .mini line { vector-effect: non-scaling-stroke; }
+  .research .mini .f-rl { stroke-width: 1.6; }
+  .research .mini .f-bhrp, .research .mini .f-bench { stroke-width: 1.1; }
+  .research .mini.drawing .f-draw { visibility: visible; }
+  .research .p-figcap { margin-top: 6px; font-size: 12.5px; line-height: 1.4; font-style: italic; color: var(--ink-3); }
+  .research .p-figtag { display: none; }
+
+  /* ── hover and focus: the card lifts 2px inside a hairline frame drawn outside its text, so nothing in it moves, and
+     its title's underline slides in a line at a time (the script's spans; it redraws the picture too). Hover is the
+     script's .is-hover, for a mouse or a pen and never a touch; focus is a keyboard's, so a tap leaves nothing on. ── */
+  .research .pc::before { content: ''; position: absolute; inset: -1px -20px; border: 1px solid rgba(var(--hairline-rgb), 0.6);
+    border-radius: 2px; opacity: 0; pointer-events: none; }
+  .research .ul { position: absolute; height: 1px; background: var(--ink-1); pointer-events: none; transform: scaleX(0); transform-origin: 0 50%; }
+  .research .pc:has(a:focus-visible) { z-index: 2; }
+  .research .pc:has(a:focus-visible)::before { opacity: 1; }
+  .research .pc:has(a:focus-visible) .ul { transform: none; }
+  /* without the script there are no spans, and a focused title is underlined the plain way */
+  .research .pc:not(:has(> .ul)) .p-title a:focus-visible { text-decoration: underline 1px; text-underline-offset: 4px; }
+  @media (hover: hover) {
+    .research .pc.is-hover { z-index: 2; }
+    .research .pc.is-hover::before { opacity: 1; }
+    .research .pc.is-hover .ul { transform: none; }
+    /* the 2px the lift leaves below the card stays the card's, so its bottom edge cannot unhover it */
+    .research .pc.is-hover::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 2px; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .research .pc { transition: transform 260ms cubic-bezier(.2,.7,.2,1); }
+    .research .pc::before { transition: opacity 200ms ease-out; }
+    .research .ul { transition: transform 200ms ease-in; }
+    .research .pc:has(a:focus-visible) { transform: translateY(-2px); }
+    .research .pc:has(a:focus-visible) .ul { transition: transform 320ms cubic-bezier(.2,.7,.2,1) calc(var(--k) * 110ms); }
+  }
+  @media (prefers-reduced-motion: no-preference) and (hover: hover) {
+    .research .pc.is-hover { transform: translateY(-2px); }
+    .research .pc.is-hover .ul { transition: transform 320ms cubic-bezier(.2,.7,.2,1) calc(var(--k) * 110ms); }
+  }
+
+  .research .interests { list-style: none; margin: 0; padding: 0; font-size: 16.5px; line-height: 1.58; color: var(--ink-3); }
+  .research .interests li { margin: 0 0 10px; }
+  .research .interests .it { color: var(--ink-1); }
+
+  @media (max-width: 1100px) {
+    .research { width: auto; max-width: 648px; margin: 0 auto; padding-left: 22px; padding-right: 22px; }
+    .research .papers { width: auto; }
+    .research .pc { padding: 22px 0 24px; grid-template-columns: 1fr 150px; column-gap: 24px; }
+    .research .pc::before { inset: -1px -12px; }
+    .research .pc:not(:has(> .p-fig)) > :not(.ul) { grid-column: 1 / -1; }
+  }
+  @media (max-width: 640px) {
+    .research .head { padding-top: 96px; }
+    .research h1 { font-size: 42px; }
+    .research .lede { font-size: 18px; }
+    /* a phone card: the picture beside the title and the meta only, its caption a short tag; the finding and the tags
+       take the full width */
+    .research .pc { grid-template-columns: 1fr 112px; column-gap: 16px;
+      grid-template-areas: 'title fig' 'auth fig' 'meta fig' 'find find' 'tags tags'; grid-template-rows: auto auto auto auto auto; }
+    .research .p-title { font-size: 18.5px; }
+    .research .p-figcap { display: none; }
+    .research .p-figtag { display: block; margin-top: 4px; font-size: 11px; line-height: 1.3; font-style: italic; color: var(--ink-3); }
+  }
+</style>
+
+<script>
+  // The cards' hover and focus. The lift and the frame are CSS on .is-hover and :focus-visible; this sets .is-hover
+  // (a mouse or a pen on a device that hovers, never a touch), lays each title's underline on its lines, and redraws
+  // a card's picture the first time it is hovered or focused in a page view. Started through onPageView, so it runs
+  // at parse on a full load and once per arrival, after the last arrival's teardown.
+  import { DRAW, mergeLines } from '../../lib/motionTiming';
+  import { onPageView } from '../../lib/pageView';
+  import { play } from '../../scripts/motion';
+
+  onPageView('main.research', () => {
+    const maybePage = document.querySelector<HTMLElement>('main.research');
+    if (!maybePage) return undefined;
+    const page = maybePage;
+    const ac = new AbortController();
+    const { signal } = ac;
+    const live = new Set<Animation>();
+    const cards = [...page.querySelectorAll<HTMLElement>('.pc')];
+    const hover = matchMedia('(hover: hover)');
+
+    // ── the title's underline: a 1px span on each of its lines (a line's fragments merged), which the CSS scales in
+    // from the left, a line 110ms after the one above. Laid again whenever the title's box changes, as its lines
+    // break anew; a ResizeObserver runs after layout and before paint, so no span is drawn where a line was. ──
+    function underline(card: HTMLElement): void {
+      card.querySelectorAll(':scope > .ul').forEach((u) => u.remove());
+      const a = card.querySelector('.p-title a');
+      if (!a) return;
+      const box = card.getBoundingClientRect();
+      mergeLines([...a.getClientRects()]).forEach((l, k) => {
+        const u = document.createElement('span');
+        u.className = 'ul';
+        u.setAttribute('aria-hidden', 'true');
+        u.style.cssText = `left:${l.left - box.left - card.clientLeft}px;top:${l.top + l.height - box.top - card.clientTop - 1}px;width:${l.width}px`;
+        u.style.setProperty('--k', String(k));
+        card.append(u);
+      });
+    }
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) {
+        const card = e.target.closest<HTMLElement>('.pc');
+        if (card) underline(card);
+      }
+    });
+    for (const card of cards) {
+      const title = card.querySelector('.p-title');
+      if (title) ro.observe(title);
+    }
+
+    // ── the picture redraws once a page view: the mask over its series slides off to the right (750ms) ──
+    const redrawn = new Set<Element>();
+    function redraw(card: HTMLElement): void {
+      const svg = card.querySelector('.mini'), mask = svg?.querySelector<SVGGElement>('.f-mask');
+      if (!svg || !mask || redrawn.has(card)) return;
+      redrawn.add(card);
+      svg.classList.add('drawing');
+      void play(mask, [{ transform: 'translateX(0)' }, { transform: `translateX(${mask.dataset.d}px)` }], { duration: 750, easing: DRAW }, live)
+        .finished.catch(() => undefined).then(() => svg.classList.remove('drawing'));
+    }
+
+    for (const card of cards) {
+      card.addEventListener('pointerenter', (e) => {
+        if (e.pointerType === 'touch' || !hover.matches) return;
+        card.classList.add('is-hover');
+        redraw(card);
+      }, { signal });
+      card.addEventListener('pointerleave', () => card.classList.remove('is-hover'), { signal });
+      card.addEventListener('focusin', (e) => {
+        if (e.target instanceof Element && e.target.matches(':focus-visible')) redraw(card);
+      }, { signal });
+    }
+
+    return () => {
+      ac.abort();
+      ro.disconnect();
+      live.forEach((a) => a.finish());
+    };
+  });
+</script>

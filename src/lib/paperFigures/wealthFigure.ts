@@ -108,6 +108,8 @@ function drawing(d: WealthSeries, f: typeof WIDE, cls: string, dom: ReturnType<t
 export function wealthFigure(d: WealthSeries, size: 'full' | 'mini'): string {
   const dom = domain(d);
   if (size === 'mini') {
+    // ponytail: the mask's ids (fm-mini, fm-mini-clip) are fixed, so two papers' wealth miniatures on the /research
+    // index would share them and the second card's url(#…) would resolve to the first's; key them by slug then.
     const f = MINI;
     return `<svg class="mini" viewBox="0 0 ${f.W} ${f.H}" aria-hidden="true" focusable="false">`
       + `${series(d, f, dom, { id: 'fm-mini', top: f.y0 - 6, bottom: f.y1 + 4 }).svg}</svg>`;

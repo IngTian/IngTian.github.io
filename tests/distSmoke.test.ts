@@ -8,10 +8,11 @@ import {
   INTRO_DURATION_MS, INTRO_DUR_MIN_MS, INTRO_DUR_MAX_MS,
 } from '../src/lib/introTimeline';
 import { INTRO_SEEN_KEY } from '../src/lib/introSession';
-import { inProgress, projects, publications, timeline } from '../src/data/profile';
+import { inProgress, projects, publications, researchInterests, timeline, type Publication } from '../src/data/profile';
 import { PAPER_DATA } from '../src/data/papers';
 import {
   type Stop, experienceStops, flattenStops, paperPageOwns, paperSections, paperStops, projectSectionId, projectStops,
+  researchIndexStops,
 } from '../src/lib/pageStops';
 import type { PaperReport } from '../src/lib/paperMarkdown';
 import { countWords, readingMinutes } from '../src/lib/words';
@@ -52,6 +53,16 @@ import { PHONE_QUERY } from '../src/lib/viewport';
    ================================================================================================ */
 
 const DIST = fileURLToPath(new URL('../dist/', import.meta.url));
+const PUBLIC = fileURLToPath(new URL('../public/', import.meta.url));
+const CONTENT = fileURLToPath(new URL('../src/content/', import.meta.url));
+
+/** A collection's files, each its name (the slug its glob loader gives it) and its frontmatter block. */
+const contentFiles = (dir: string): { name: string; front: string }[] => readdirSync(join(CONTENT, dir))
+  .filter((f) => f.endsWith('.md'))
+  .map((f) => ({ name: f.slice(0, -3), front: /^---\n([\s\S]*?)\n---/.exec(readFileSync(join(CONTENT, dir, f), 'utf8'))?.[1] ?? '' }));
+/** The records with a page of their own: the one each paper file explains (its `publication`). */
+const explained = (): Set<string> =>
+  new Set(contentFiles('papers').map((f) => /^publication:\s*(\S+)/m.exec(f.front)?.[1] ?? `(${f.name} names no publication)`));
 
 const NEEDS_BUILD =
   'tests/distSmoke.test.ts found no HTML in dist/. It inspects the BUILT site, so `npm run build` ' +
@@ -213,6 +224,20 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
     // First, so that a missing dist/ reads as "you did not build" once, instead of as four
     // unrelated-looking failures further down.
     expect(pages().length, NEEDS_BUILD).toBeGreaterThan(5);
+  });
+
+  // The eight page files' routes, then one per published writing piece and one per paper file: ten today, the
+  // "10 page(s) built" CLAUDE.md quotes. The content routes are counted from src/content/ rather than typed, because
+  // a new piece or paper is a file and nothing else may need an edit. A deleted page that still builds, or a page
+  // that stopped building, fails by name. (dist/ also holds public/'s one .html, which no page builds.)
+  it('builds exactly its routes: eight pages, one per writing piece and one per paper (ten today)', () => {
+    const built = pages().filter((p) => !existsSync(join(PUBLIC, p.file))).map((p) => p.route).sort();
+    const want = [
+      '/', '/404.html', '/art', '/experience', '/projects', '/proto-sketches', '/research', '/writing',
+      ...contentFiles('writing').filter((f) => !/^draft:\s*true\b/m.test(f.front)).map((f) => `/writing/${f.name}`),
+      ...[...explained()].map((slug) => `/research/${slug}`),
+    ].sort();
+    expect(built).toEqual(want);
   });
 
   // ── 1. EVERY INTERNAL LINK RESOLVES ──────────────────────────────────────────────────────────
@@ -656,8 +681,8 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
   const flat = (stops: readonly Stop[], depth = 0): { target: string; label: string; depth: number }[] =>
     stops.flatMap((s) => [{ target: s.target, label: s.label, depth }, ...flat(s.children ?? [], depth + 1)]);
 
-  it('is on /experience, /projects, /research/rl-bhrp and /writing', () => {
-    expect(railPages().map((p) => p.route).sort()).toEqual(['/experience', '/projects', '/research/rl-bhrp', '/writing']);
+  it('is on /experience, /projects, /research, /research/rl-bhrp and /writing', () => {
+    expect(railPages().map((p) => p.route).sort()).toEqual(['/experience', '/projects', '/research', '/research/rl-bhrp', '/writing']);
   });
 
   // The label is two layers in the markup and two more in CSS (::before, ::after, from data-l), so its states
@@ -685,6 +710,7 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
     expect(strip(itemsOf(projectsPage()))).toEqual(flat(projectStops(projects)));
     expect(strip(itemsOf(builtPage('/experience')))).toEqual(flat(experienceStops(timeline)));
     expect(strip(itemsOf(builtPage('/research/rl-bhrp')))).toEqual(flat(paperStops((await paperReport('rl-bhrp')).sections)));
+    expect(strip(itemsOf(builtPage('/research')))).toEqual(flat(researchIndexStops()));
     expect(new Set(itemsOf(builtPage('/writing')).map((i) => i.depth))).toEqual(new Set([0, 1]));
   });
 
@@ -1099,6 +1125,98 @@ describe('/projects — repo links, private repos, and what assistive tech is to
     expect(live.length, `live regions: ${live.join(' ')}`).toBe(1);
     expect(live[0]).toMatch(/\saria-live="polite"/);
     expect(live[0]).toMatch(/\sdata-cow-live\b/);
+  });
+});
+
+describe('/research — the papers as cards, newest first, then the interests', () => {
+  const page = (): Page => builtPage('/research');
+  const text = (html: string): string => html.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&nbsp;|\s+/g, ' ').trim();
+  /** Each card in order: its title link's attributes and href, and its markup. */
+  const cards = () => [...page().markup.matchAll(/<article\b[^>]*\sclass="pc"[^>]*>([\s\S]*?)<\/article>/g)].map((m) => {
+    const attrs = /<h3 class="p-title"><a\b([^>]*)>/.exec(m[1])?.[1] ?? '';
+    return { attrs, href: /\shref="([^"]*)"/.exec(attrs)?.[1] ?? '', html: m[1] };
+  });
+  // A record that a paper file explains opens that page; any other opens where the paper is published.
+  const want = (p: Publication): string => (explained().has(p.slug) ? `/research/${p.slug}` : p.href);
+
+  it('renders one card per publication, newest first', () => {
+    expect(cards().map((c) => c.href)).toEqual(publications.map(want));
+    const dates = publications.map((p) => p.submitted ?? p.year);
+    expect(dates).toEqual([...dates].sort().reverse());
+  });
+
+  it("opens a paper's own page when it has one, and otherwise the record's href, saying so", () => {
+    for (const [i, c] of cards().entries()) {
+      const p = publications[i];
+      if (c.href.startsWith('/')) {
+        expect(byRoute().has(c.href), `${p.slug}: ${c.href} is not a built route`).toBe(true);
+        expect(text(c.html), p.slug).not.toContain('opens the publisher');
+      } else {
+        expect(c.href, p.slug).toBe(p.href);
+        expect(c.attrs, p.slug).toMatch(/\starget="_blank"/);
+        expect(c.attrs, p.slug).toMatch(/\srel="noopener noreferrer"/);
+        expect(text(c.html), p.slug).toContain('opens the publisher’s page ↗');
+        // and says so to a reader who reaches the link from a list of links, too
+        const said = /\saria-describedby="([^"]*)"/.exec(c.attrs)?.[1] ?? '';
+        expect(new RegExp(`<span class="out" id="${said}">opens the publisher’s page`).test(c.html), p.slug).toBe(true);
+      }
+    }
+    // both kinds are on the page today, so neither branch above is vacuous
+    expect(cards().map((c) => c.href.startsWith('/')).sort()).toEqual([false, true]);
+  });
+
+  // The venue never carries the year itself: a card reads "Conference paper · Proc. SPIE 12290 (CNSSE) · 2022".
+  it("prints each card's status, venue and year, the year once", () => {
+    expect(cards()).toHaveLength(publications.length);
+    for (const [i, c] of cards().entries()) {
+      const p = publications[i];
+      const meta = text(/<p class="p-meta">([\s\S]*?)<\/p>/.exec(c.html)?.[1] ?? '');
+      expect(meta, p.slug).toContain(` · ${p.venue} · ${p.year}`);
+      expect(meta.split(p.year).length - 1, meta).toBe(1);
+    }
+  });
+
+  it("shows a paper's miniature on its card, captioned as the reproduction, and no picture on one without", () => {
+    expect(cards()).toHaveLength(publications.length);
+    for (const [i, c] of cards().entries()) {
+      const thumb = PAPER_DATA[publications[i].slug]?.thumb;
+      if (!thumb) {
+        expect(c.html, publications[i].slug).not.toMatch(/<svg\b/);
+        continue;
+      }
+      expect(c.html).toContain(thumb.svg);
+      expect(thumb.caption).toMatch(/reproduction/);
+      expect(text(c.html)).toContain(thumb.caption);
+    }
+    expect(PAPER_DATA['rl-bhrp'].thumb, "RL-BHRP's card has no miniature").toBeDefined();
+  });
+
+  it('emits the id of every rail stop, the papers before the interests', () => {
+    const ids = researchIndexStops().map((s) => s.target);
+    expect(ids.filter((id) => !page().ids.has(id))).toEqual([]);
+    const at = ids.map((id) => page().markup.indexOf(` id="${id}"`));
+    expect(at).toEqual([...at].sort((a, b) => a - b));
+    for (const r of researchInterests) expect(text(page().markup)).toContain(`${r.label}. ${r.gloss}`);
+  });
+
+  // The page it replaced folded each paper into a card that a head script opened (`html.paper-js`), and kept the
+  // closed panels inert.
+  it('carries nothing of the folding page it replaced', () => {
+    expect(page().html).not.toMatch(/paper-js/);
+    expect(page().html).not.toMatch(/\binert\b/);
+  });
+
+  it('never says a paper was published or peer-reviewed', () => {
+    expect(text(page().markup)).not.toMatch(/published|peer[- ]reviewed/i);
+  });
+
+  // The generated sitemap lists every route. public/sitemap.xml is an index that points at it, so it lists none.
+  it('reaches the generated sitemap with every paper page', () => {
+    const map = readFileSync(join(DIST, 'sitemap-0.xml'), 'utf8');
+    for (const route of ['/research', ...[...explained()].map((s) => `/research/${s}`)]) {
+      expect(map, route).toContain(`<loc>https://ingtian.github.io${route}/</loc>`);
+    }
+    expect(readFileSync(join(DIST, 'sitemap.xml'), 'utf8')).toContain('<loc>https://ingtian.github.io/sitemap-0.xml</loc>');
   });
 });
 

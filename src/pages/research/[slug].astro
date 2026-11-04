@@ -14,6 +14,7 @@ import { longDate } from '../../lib/dates';
 import { refId, type PaperReport } from '../../lib/paperMarkdown';
 import { PAPER_END, paperPageOwns, paperSections, paperStops } from '../../lib/pageStops';
 import { countWords, readingMinutes } from '../../lib/words';
+import '../../styles/paper.css';
 
 export async function getStaticPaths() {
   const entries = await getCollection('papers');
@@ -157,21 +158,15 @@ const noted = errata.map((e) => e.date).sort().at(-1);
      nothing there (CLAUDE.md, Astro trap 1). Ported from the approved prototype (research-b4) onto the paper
      register's tokens: the ground is --sheet-ground, never --paper, which is the dark theme's TEXT colour. */}
 <style is:global>
-  /* ── the measure: a reading column and a notes column, centred right of the rail. From 1101px the measure grows
-     by about a tenth (604 → 664px at 1780px), the gap and the notes with it, and the type 1px (18 → 19px), so the
-     line stays near 77 characters. At 1100px and below there is one column and the notes fall into it. ── */
+  /* ── the measure (styles/paper.css): a reading column and a notes column, centred right of the rail, the type 1px
+     larger from 1101px (18 → 19px) as the measure grows. At 1100px and below there is one column and the notes fall
+     into it. ── */
   .paper {
-    --M: clamp(604px, calc(604px + (100vw - 1100px) * 0.088235), 664px);
-    --G: clamp(40px, calc(40px + (100vw - 1140px) * 0.00625), 44px);
-    --N: clamp(214px, calc(214px + (100vw - 1140px) * 0.04375), 242px);
-    --L: max(232px, calc(90px + (100vw - var(--M) - var(--G) - var(--N)) / 2));
-    --tk: clamp(0px, calc((100vw - 1100px) / 680), 1px);
     width: var(--M); margin-left: var(--L); padding-bottom: 96px;
     font-family: var(--font-display); font-size: 18px; line-height: 1.66; color: var(--ink-2);
     font-kerning: normal; text-rendering: optimizeLegibility;
   }
   @media (min-width: 1101px) { .paper { font-size: calc(18px + var(--tk)); } }
-  @media (min-width: 1101px) and (max-width: 1139.98px) { .paper { --G: 32px; --N: 186px; } }
 
   .paper a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: rgba(var(--hairline-rgb), 0.5); text-underline-offset: 3px; }
   @media (hover: hover) { .paper a:hover { color: var(--seal); text-decoration-color: currentColor; } }
@@ -281,13 +276,8 @@ const noted = errata.map((e) => e.date).sort().at(-1);
   .paper figure:has(.pp-art) figcaption { margin-top: 16px; }
 
   .paper svg text { font-family: var(--font-display); fill: var(--ink-3); }
-  .paper .f-grid { stroke: var(--sheet-grid); stroke-width: 1; }
-  .paper .f-one { stroke: var(--sheet-one); }
+  /* the series' marks are styles/paper.css's, shared with the index card's miniature */
   .paper .f-axis { stroke: var(--sheet-axis); stroke-width: 1; }
-  .paper .f-band { fill: var(--sheet-band); stroke: none; }
-  .paper .f-rl { fill: none; stroke: var(--seal); stroke-width: 1.7; stroke-linejoin: round; }
-  .paper .f-bhrp { fill: none; stroke: var(--ink-1); stroke-width: 1.15; stroke-linejoin: round; }
-  .paper .f-bench { fill: none; stroke: var(--ink-3); stroke-width: 1.15; stroke-dasharray: 4 3; stroke-linejoin: round; }
   .paper .f-name { fill: var(--ink-1); }
   .paper .f-lab-rl { fill: var(--seal); }
   .paper .f-val { fill: var(--ink-3); }

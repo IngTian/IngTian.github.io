@@ -284,6 +284,6 @@ describe('both figures', () => {
 
   it("are RL-BHRP's, registered under its slug: the two figures and the card's miniature", () => {
     expect(PAPER_DATA['rl-bhrp'].figures).toEqual({ wealth: full, pipeline: pipe, metrics: table });
-    expect(PAPER_DATA['rl-bhrp'].thumb).toBe(mini);
+    expect(PAPER_DATA['rl-bhrp'].thumb?.svg).toBe(mini);
   });
 });
