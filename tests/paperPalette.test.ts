@@ -59,6 +59,10 @@ describe('the paper palette (tokens.css)', () => {
         const band = over(ul, alpha, ground);
         expect(onGround(tk['--sheet-ground'], band), 'the underline against the sheet').toBeGreaterThanOrEqual(NON_TEXT);
         expect(onGround(tk['--ink-1'], band), 'ink-1 over the underline').toBeGreaterThanOrEqual(AA_BODY);
+        // Pins tokens.css's "bare sheet only" for --sheet-mark. The band's contrast with the sheet times the seal's
+        // with the band is the seal's own on the sheet (~5.2), so the two cannot both reach 3:1: a band that reads as
+        // a mark leaves the seal under 3:1 over it (and so does the prototype's 0.42).
+        expect(onGround(tk['--sheet-mark'], band), '--sheet-mark over the underline').toBeLessThan(NON_TEXT);
       });
 
       it('--on-accent clears AA on the accent (the nav pill on hover)', () => {

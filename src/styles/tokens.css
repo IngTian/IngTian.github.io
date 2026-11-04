@@ -182,7 +182,9 @@ html[data-page='drafting'][data-theme='dark'] {
      --sheet-ul    the underline highlight, a band under the words. 0.7 is the least seal that clears 3:1 against the
                    ground as a mark in both themes; ink-1 over it stays above 4.5:1.
      --sheet-band  the figure's band of runs
-     --sheet-mark  a marked symbol in an equation, and a linked term's rule
+     --sheet-mark  a marked symbol in an equation, and a linked term's rule, ON THE BARE SHEET ONLY. Over --sheet-ul
+                   it is seal on a seal band, under 3:1 at 0.7 and at the prototype's 0.42 alike, so nothing marked
+                   over a highlight may use it.
    BOTH BLOCKS DECLARE EVERY TOKEN, for the reason the drafting header gives.
    ============================================================ */
 html[data-page='paper'] {
