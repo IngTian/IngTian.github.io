@@ -543,33 +543,45 @@ describe("/art's image payload, measured on the built output", () => {
   });
 });
 
-describe("BaseLayout's per-page hooks ship on /projects and ONLY on /projects", () => {
-  // `page` puts `data-page` on <html>, the scope tokens.css hangs the drafting palette from; `veil={false}` drops
-  // the descent veil, because /projects' boot is its entrance and two entrances back to back would put readable
-  // text ~4.4s away. Both are props, so what this guards is a default changing under every other route.
+describe("BaseLayout's per-page hooks: /projects is the drafting page, the research routes the paper page", () => {
+  // `page` puts `data-page` on <html>, the scope tokens.css hangs a register's palette from; `veil={false}` drops
+  // the descent veil — on /projects because its boot is its entrance, on the research routes because the veil would
+  // replay on every card click and every way back, holding the text ~1.1s. Both are props, so what this guards is a
+  // default changing under every other route.
   // Read from `markup` (scripts stripped): the veil's own inline script names `[data-veil]` on every page.
   const veilEl = /<div\b[^>]*\sdata-veil\b/;
+  const pageOf = (markup: string): string | undefined => /<html\b[^>]*\sdata-page="([^"]*)"/.exec(markup)?.[1];
+  const isResearch = (route: string): boolean => route === '/research' || route.startsWith('/research/');
+  const research = (): Page[] => pages().filter((p) => isResearch(p.route));
+
+  it('marks /projects as drafting, every research route as paper, and no other route at all', () => {
+    expect(research().length, 'no research route was built').toBeGreaterThan(0);
+    const want = (route: string): string | undefined =>
+      route === '/projects' ? 'drafting' : isResearch(route) ? 'paper' : undefined;
+    const wrong = pages().filter((p) => pageOf(p.markup) !== want(p.route))
+      .map((p) => `${p.route}: data-page=${pageOf(p.markup) ?? '(none)'}`);
+    expect(wrong).toEqual([]);
+  });
 
   // `.test()` rather than `toMatch` so a failure names the defect instead of printing the whole page.
-  it('marks /projects as the drafting page, on <html>, and renders it no veil', () => {
-    const { markup } = projectsPage();
-    expect(/<html\b[^>]*\sdata-page="drafting"/.test(markup), '<html> on /projects lacks data-page="drafting"')
-      .toBe(true);
-    expect(veilEl.test(markup), '/projects renders a [data-veil] element').toBe(false);
+  it('renders /projects and the research routes no veil, and /writing its veil', () => {
+    for (const p of [projectsPage(), ...research()]) {
+      expect(veilEl.test(p.markup), `${p.route} renders a [data-veil] element`).toBe(false);
+    }
+    expect(veilEl.test(builtPage('/writing').markup), '/writing lost its [data-veil] element').toBe(true);
   });
 
-  it('leaves every other page unmarked, and /research its veil', () => {
-    expect(veilEl.test(builtPage('/research').markup), '/research lost its [data-veil] element').toBe(true);
-    const marked = pages().filter((p) => p.route !== '/projects' && /\sdata-page=/.test(p.markup)).map((p) => p.route);
-    expect(marked).toEqual([]);
-  });
-
-  // The drafting ink is sized for the drafting ground (tests/draftingPalette.test.ts), not for the reading sky:
-  // light --ink-3 over --reading-grad's lower stops measured 4.20 and 3.89. So the page must not paint a sky.
-  it('paints /projects no fluid sky and no sky wash, so its ink sits on the ground it was measured on', () => {
-    const { markup } = projectsPage();
-    expect(/class="fluid-sky"/.test(markup), '/projects renders the fluid-sky canvas').toBe(false);
-    expect(/class="sky-wash"/.test(markup), '/projects renders the SkyWash layer').toBe(false);
+  // Each register's ink is sized for its own ground (tests/draftingPalette.test.ts, tests/paperPalette.test.ts), not
+  // for the reading sky: light drafting --ink-3 over --reading-grad's lower stops measured 4.20 and 3.89. So neither
+  // page paints a sky. /writing is the control: the sky it keeps is the markup these patterns look for.
+  it('paints /projects and the research routes no fluid sky and no sky wash, and /writing both', () => {
+    for (const p of [projectsPage(), ...research()]) {
+      expect(/class="fluid-sky"/.test(p.markup), `${p.route} renders the fluid-sky canvas`).toBe(false);
+      expect(/class="sky-wash"/.test(p.markup), `${p.route} renders the SkyWash layer`).toBe(false);
+    }
+    const { markup } = builtPage('/writing');
+    expect(/class="fluid-sky"/.test(markup), '/writing lost the fluid-sky canvas').toBe(true);
+    expect(/class="sky-wash"/.test(markup), '/writing lost the SkyWash layer').toBe(true);
   });
 
   // A face declared below the weight a rule asks for gets a FAKE bold (the engine clamps, then emboldens), and a

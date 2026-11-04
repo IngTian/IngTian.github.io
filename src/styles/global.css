@@ -343,18 +343,11 @@ html[data-theme='dark'] .descent::after {
 @media (min-width: 641px) {
   .descent.is-fluid.fluid-live { background: var(--bg); }
 
-  /* Reading pages must NEVER fall through to --bg (a near-black page base), not even
-     for one frame — their text is dark ink. Pin the pale reading ramp as their
-     fluid-live base instead. */
-  .research.descent.is-fluid.fluid-live { background: var(--reading-grad); }
-
   /* Explicitly restore each archetype's own gradient when the canvas is off, rather
      than relying on revert-layer (whose cascade-layer semantics don't apply here —
      these are all in the same layer, so it would resolve to nothing). */
   html[data-fluid-strength='0'] .descent.is-fluid.fluid-live,
   html[data-fluid='off'] .descent.is-fluid.fluid-live { background: var(--descent-grad); }
-  html[data-fluid-strength='0'] .research.descent.is-fluid.fluid-live,
-  html[data-fluid='off'] .research.descent.is-fluid.fluid-live { background: var(--reading-grad); }
 
   /* SkyWash's woven warm/cold strokes are the same broken-colour idea the shader
      now does natively at higher fidelity; doubling them muddies both. */

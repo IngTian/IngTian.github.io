@@ -1,20 +1,15 @@
 ---
 // The papers as a plain list, each title linking to where the paper can be read.
 import BaseLayout from '../layouts/BaseLayout.astro';
-import FluidSky from '../components/proto/FluidSky.astro';
-import SkyWash from '../components/SkyWash.astro';
 import { publications } from '../data/profile';
 ---
 <BaseLayout
   title="Research — Ing Tian"
   description="Research by Ing Tian (Zeying Tian) on portfolio optimization and machine learning, including RL-BHRP, a reinforcement learning embedded Bayesian hierarchical risk parity approach to allocation."
-  veilLine="a researcher by day"
-  veilOnLoad={true}
-  navZone="light"
+  page="paper"
+  veil={false}
 >
-  <main class="research descent is-fluid">
-    <FluidSky strength={4} variant="reading" yStart={1.15} />
-    <SkyWash />
+  <main class="research">
     <a class="back" href="/">← back</a>
     <h1>Research</h1>
     <ul>
@@ -22,8 +17,3 @@ import { publications } from '../data/profile';
     </ul>
   </main>
 </BaseLayout>
-
-<style>
-  /* The ground the sky's ink is measured on, and a stacking context above the canvas. */
-  .research { position: relative; z-index: 0; min-height: 100vh; background: var(--reading-grad); }
-</style>

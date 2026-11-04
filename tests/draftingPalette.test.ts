@@ -5,38 +5,16 @@
 // so every shared component on the page — the corner nav, the rail, the cow — reskins with no edit. That is also
 // why it needs a test: a shared component chose its ink assuming the site's grounds, and here it lands on a
 // different one. The numbers below are the ones a reader actually gets.
-//
-// tokens.css is read as TEXT (comments stripped): the values live in a stylesheet, not a module.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { AA_BODY, contrastRatio, wcagLuminance } from '../src/lib/skyLegibility';
-
-const css = readFileSync(new URL('../src/styles/tokens.css', import.meta.url), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '');
-
-/** The custom properties declared in the rule whose selector is exactly `sel`. */
-function tokens(sel: string): Record<string, string> {
-  const at = css.indexOf(`${sel} {`);
-  if (at < 0) throw new Error(`tokens.css has no "${sel} {" rule`);
-  const body = css.slice(css.indexOf('{', at) + 1, css.indexOf('}', at));
-  return Object.fromEntries([...body.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
-}
+import { AA_BODY } from '../src/lib/skyLegibility';
+import { onGround, over, ratio, rgbaOf, rgbOf, tokens, type RGB } from './helpers/palette';
 
 const src = (f: string): string => readFileSync(new URL(`../src/components/projects/${f}`, import.meta.url), 'utf8');
 const fieldSrc = src('DraftingField.astro');
 const rowsSrc = src('SelectedRows.astro');
 const cardsSrc = src('WorkshopCards.astro');
 
-type RGB = [number, number, number];
-const rgbOf = (hex: string): RGB => {
-  expect(hex, `${hex} is not a #rrggbb literal`).toMatch(/^#[0-9a-f]{6}$/i);
-  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as RGB;
-};
-const lum = (hex: string): number => wcagLuminance(rgbOf(hex));
-const ratio = (fg: string, bg: string): number => contrastRatio(lum(fg), lum(bg));
-/** `top` at alpha `a` composited over `under`. */
-const over = (top: readonly number[], a: number, under: RGB): RGB => under.map((u, i) => top[i] * a + u * (1 - a)) as RGB;
-const onGround = (ink: string, ground: RGB): number => contrastRatio(lum(ink), wcagLuminance(ground));
 const rgbToken = (v: string): number[] => v.split(',').map(Number);
 
 /** The ground at the darkest point of the edge vignette: a corner, the farthest point of the box from the gradient's
@@ -47,9 +25,8 @@ function vignetteCorner(tk: Record<string, string>, ground: string): RGB {
   const [rx, ry, cx, cy, stop] = g!.slice(1).map((n) => Number(n) / 100);
   const d = Math.hypot(Math.max(cx, 1 - cx) / rx, Math.max(cy, 1 - cy) / ry);
   const share = Math.min(1, Math.max(0, (d - stop) / (1 - stop)));
-  const v = /^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/.exec(tk['--draft-vig']);
-  expect(v, `--draft-vig is not an rgba(): ${tk['--draft-vig']}`).not.toBeNull();
-  return over(v!.slice(1, 4).map(Number), Number(v![4]) * share, rgbOf(ground));
+  const [vig, alpha] = rgbaOf(tk['--draft-vig']);
+  return over(vig, alpha * share, rgbOf(ground));
 }
 
 /** The two ends of the vignette's ramp: the bare ground at its transparent centre, and its darkest corner. */
