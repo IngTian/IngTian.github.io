@@ -4,6 +4,8 @@
 // unprompted lines — stop on their own instead. The video's rule is
 // lib/galleryLayout.ts' videoPlays() and the cow's is lib/cowTalk.ts' idleLines(), each in its own spec; this holds
 // the limit and the cursor, which is CSS, so its literals are read from the stylesheet the way artSizes pins CAL_MAX_H.
+// It also holds the paper page's margin-note backstop, a pending state whose end is a CSS delay, to the same limit
+// scripts/motion.ts' reveals end by.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { MOTION_LIMIT_MS } from '../src/lib/motion';
@@ -32,5 +34,17 @@ describe("the idle prompt's cursor (TerminalHeader.astro)", () => {
 
   it('starts counting when it appears, not while the boot is hiding it', () => {
     expect(src).toMatch(/:global\(html\.projects-boot\) \.idle \.cur \{ animation: none; \}/);
+  });
+});
+
+describe("the margin notes' backstop (research/[slug].astro)", () => {
+  const src = readFileSync(new URL('../src/pages/research/[slug].astro', import.meta.url), 'utf8');
+
+  it('holds a wide note hidden until placed, and shows it after MOTION_LIMIT_MS if the script never runs', () => {
+    const held = /@media \(min-width: 1101px\) and \(scripting: enabled\) \{\s*\.paper \.mn:not\(\.is-placed\) \{ visibility: hidden; animation: mn-unheld 0s (\d+)ms forwards; \}\s*\}/.exec(src);
+    expect(held, 'the `.paper .mn:not(.is-placed)` hold').not.toBeNull();
+    expect(Number(held![1])).toBe(MOTION_LIMIT_MS);
+    expect(src).toMatch(/@keyframes mn-unheld \{ to \{ visibility: visible; \} \}/);
+    expect(src, 'place() marks a note placed').toContain("classList.add('is-placed')");
   });
 });

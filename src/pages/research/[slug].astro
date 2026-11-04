@@ -242,6 +242,14 @@ const noted = errata.map((e) => e.date).sort().at(-1);
   .paper .mn.why { padding-left: 11px; border-left: 1px solid rgba(var(--hairline-rgb), 0.55); }
   .paper .mn .mk { font-style: italic; color: var(--ink-1); }
   .paper .mn math { font-size: 1.02em; }
+  /* Wide, a note is hidden until the script has placed it (place() adds .is-placed): shown at its block's top first,
+     it would then jump to its anchor in view, a layout shift. Hidden keeps its box, so nothing moves when it shows.
+     The animation is the backstop, shown after MOTION_LIMIT_MS (lib/motion.ts) if the script never runs; without
+     a script the query does not match and every note falls into the column. */
+  @media (min-width: 1101px) and (scripting: enabled) {
+    .paper .mn:not(.is-placed) { visibility: hidden; animation: mn-unheld 0s 5000ms forwards; }
+  }
+  @keyframes mn-unheld { to { visibility: visible; } }
 
   /* ── highlights: Underline, a broad translucent band set low against the glyphs. The finished state is this
      background, which a drawn sweep hands over to; a pending or drawing phrase is plain. ── */
@@ -474,7 +482,10 @@ const noted = errata.map((e) => e.date).sort().at(-1);
         const at = n.dataset.at ? host.querySelector(`[data-n="${CSS.escape(n.dataset.at)}"]`) : null;
         return [{ n, hostTop, top: at ? at.getBoundingClientRect().top + window.scrollY - 1 : hostTop, height: n.offsetHeight }];
       });
-      stackNotes(items, 16).forEach((y, k) => { items[k].n.style.top = `${Math.round(y - items[k].hostTop)}px`; });
+      stackNotes(items, 16).forEach((y, k) => {
+        items[k].n.style.top = `${Math.round(y - items[k].hostTop)}px`;
+        items[k].n.classList.add('is-placed'); // shown now (the CSS above holds a note until this)
+      });
     }
     // Again whenever the page's box changes — a webfont landing, a resize, the 1101px line crossed — from a
     // ResizeObserver, whose callback runs after layout and before paint, so a note is never drawn where it was.
