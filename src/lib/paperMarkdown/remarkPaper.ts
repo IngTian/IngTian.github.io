@@ -1,8 +1,10 @@
 // src/lib/paperMarkdown/remarkPaper.ts
 // The remark half of the paper format: it turns a paper's directives (CLAUDE.md, "Papers are files") into the
 // page's markup and reports every mistake it finds into the file's frontmatter, for the page to throw on.
-// Astro runs one markdown processor for every .md, so on a file that is not in the papers collection it only puts
-// back the text remark-directive took for a directive: a ":word" in /writing stays the text it was.
+// Astro runs one markdown processor for every .md, so the directive syntax itself is switched on only while a
+// paper is parsed (remarkPaperSyntax): any other file is parsed as if remark-directive were not installed.
+import remarkDirective from 'remark-directive';
+import { unified, type Processor } from 'unified';
 
 /** A markdown (mdast) or HTML (hast) node, as loosely as both plugins need. */
 export interface Node {
@@ -12,7 +14,7 @@ export interface Node {
   children?: Node[];
   value?: string;
   meta?: string | null;
-  data?: { hName?: string; hProperties?: Record<string, unknown>; directiveLabel?: boolean };
+  data?: { hName?: string; hProperties?: Record<string, unknown>; hChildren?: Node[]; directiveLabel?: boolean };
   position?: { start: { offset?: number }; end: { offset?: number } };
   tagName?: string;
   properties?: Record<string, unknown>;
@@ -32,6 +34,31 @@ interface File { path?: string; value: unknown; data: { astro?: { frontmatter?: 
 interface Reference { key: string; authors: string[]; year: number }
 
 export const isPaper = (file: unknown) => ((file as File).path ?? '').includes('/src/content/papers/');
+
+type Extensions = { micromarkExtensions?: unknown[]; fromMarkdownExtensions?: unknown[] };
+// remark-directive's syntax, taken from a processor of its own rather than from the packages under it.
+const DIRECTIVES = unified().use(remarkDirective).freeze().data() as Extensions;
+
+/** remark-directive, for papers only. remark-parse reads its extensions on every call, so the directive syntax
+ *  is added for the length of a paper's parse and taken away after: every other file is parsed exactly as it is
+ *  without it, and a ":word", a ":::" line or a "mailto:me@…" in /writing never becomes a directive at all.
+ *  Goes after remark-parse, whose parser it wraps. */
+export function remarkPaperSyntax(this: Processor) {
+  const self = this, parse = self.parser!;
+  self.parser = (doc, file) => {
+    if (!isPaper(file)) return parse(doc, file);
+    const data = self.data() as Extensions;
+    const mm = (data.micromarkExtensions ??= []), fm = (data.fromMarkdownExtensions ??= []);
+    mm.push(...DIRECTIVES.micromarkExtensions!);
+    fm.push(...DIRECTIVES.fromMarkdownExtensions!);
+    try {
+      return parse(doc, file);
+    } finally {
+      mm.length -= DIRECTIVES.micromarkExtensions!.length;
+      fm.length -= DIRECTIVES.fromMarkdownExtensions!.length;
+    }
+  };
+}
 
 export function report(file: unknown): PaperReport & Record<string, unknown> {
   const astro = ((file as File).data.astro ??= {});
@@ -58,32 +85,16 @@ function citeLabel(r: Reference): string {
   return `${family.length > 2 ? `${family[0]} et al.` : family.join(' and ')}, ${r.year}`;
 }
 
-// A directive written in a file that is not a paper, back as the text it was. A text directive keeps its
-// label's children, which remark has already parsed as the markdown they would have been anyway.
-// ponytail: a leaf or container line comes back as one paragraph of its source, which equals the plain
-// rendering only while it is a line on its own; walk its children instead if /writing ever needs more.
-function literal(n: Node, src: string, labelEnd?: number): Node[] {
-  const start = n.position?.start.offset ?? 0, s = src.slice(start, n.position?.end.offset);
-  if (n.type !== 'textDirective') return [{ type: 'paragraph', children: [text(s)] }];
-  const head = `:${n.name}`;
-  if (s[head.length] !== '[') return [text(s)];
-  const close = labelEnd === undefined ? head.length + 1 : labelEnd - start;
-  return [text(`${head}[`), ...(n.children ?? []), text(s.slice(close))];
-}
-
-function restore(parent: Node, src: string): void {
-  if (!parent.children) return;
-  parent.children = parent.children.flatMap((c) => {
-    const labelEnd = c.children?.at(-1)?.position?.end.offset;
-    restore(c, src);
-    return isDirective(c) ? literal(c, src, labelEnd) : [c];
-  });
-}
+// A value written into TeX: the characters TeX reads as syntax are escaped, so "$2.20" is not the end of the
+// maths and "15%" does not comment out the rest of the line.
+const inTeX = (value: string) => value.replace(/[$%#&]/g, '\\$&');
+// What smartypants (Astro's, before these plugins) curls in text but never sees in an attribute.
+const UNCURLED = /['"]|--|\.\.\./;
 
 export function remarkPaper({ papers }: { papers: Record<string, PaperData> }) {
   return (tree: unknown, file: unknown) => {
+    if (!isPaper(file)) return;
     const root = tree as Node, src = String((file as File).value);
-    if (!isPaper(file)) return restore(root, src);
 
     const fm = report(file);
     const data = papers[String(fm.publication)] ?? { values: {}, figures: {} };
@@ -94,13 +105,36 @@ export function remarkPaper({ papers }: { papers: Record<string, PaperData> }) {
     const problem = (p: string) => problems.push(p);
     const claim = (id: string) => { if (ids.has(id)) problem(`id #${id} is used twice`); ids.add(id); };
 
+    // remark-math takes $…$ before any directive is parsed, so a :v in maths is still text here: it is expanded
+    // in the TeX, and in the copy of it remark-math made for rehype-katex. No other directive works in maths.
+    function maths(n: Node): void {
+      const tex = (n.value ?? '').replace(/:v\[\s*([^\]]*?)\s*\]/g, (_, key: string) => {
+        const value = data.values[key];
+        if (value === undefined) problem(`unknown :v key "${key}"`);
+        return inTeX(value ?? key);
+      });
+      for (const [d] of tex.matchAll(/:(?:cite|t|hl)\[/g)) problem(`${d}…] in $${tex}$ — only :v works in maths`);
+      if (/\\tag\b/.test(tex)) problem(`\\tag in $$${tex}$$ — number it with ::::eq{n=…}`);
+      n.value = tex;
+      walk({ type: 'root', children: n.data?.hChildren ?? [] }, (t) => { if (t.type === 'text') t.value = tex; });
+    }
+
     // What is wrong wherever it is. A container that closes too early leaves its fence behind as text, and one
     // that never closes swallows the rest of the file, so both are looked for here rather than trusted.
     walk(root, (n) => {
       if (n.type === 'text' && FENCE.test(n.value ?? '')) problem('a stray ":::" — a container holding another needs more colons than the one inside it');
       if (n.type === 'containerDirective' && !/\n\s*:{3,}\s*$/.test(src.slice(n.position?.start.offset, n.position?.end.offset))) problem(`:::${n.name} is never closed`);
       if (n.type === 'html') problem(`raw HTML in a paper: ${n.value} — write it with the directives`);
-      if ((n.type === 'math' || n.type === 'inlineMath') && /\\tag\b/.test(n.value ?? '')) problem(`\\tag in $$${n.value}$$ — number it with ::::eq{n=…}`);
+      // A fenced block would be coloured by shiki's inline styles, and seal red is the only colour on these pages.
+      if (n.type === 'code') problem(`a code block in a paper: "${(n.value ?? '').slice(0, 40)}"`);
+      // Astro would slug an unnamed heading into an id no check here sees, and could repeat a section's.
+      if (n.type === 'heading') problem(`a markdown heading in a paper: "${plain(n)}" — a title is a ::::section[label]`);
+      if (n.type === 'math' || n.type === 'inlineMath') maths(n);
+      // Smartypants never sees maths, so a quote right after it reads as one after a space and opens: "$g$'s"
+      // drew as g‘s. The maths is the word the quote closes on.
+      n.children?.forEach((c, i) => {
+        if (c.type === 'text' && n.children![i - 1]?.type === 'inlineMath') c.value = c.value!.replace(/^['‘]/, '’').replace(/^["“]/, '”');
+      });
     });
     for (const n of root.children ?? []) {
       if (!(n.type === 'containerDirective' && n.name === 'section')) problem(`content outside a section: "${plain(n).replace(/\s+/g, ' ').trim().slice(0, 40)}"`);
@@ -117,7 +151,6 @@ export function remarkPaper({ papers }: { papers: Record<string, PaperData> }) {
     }
 
     function one(n: Node, atRoot: boolean, inHl: boolean): Node[] {
-      const labelEnd = n.children?.at(-1)?.position?.end.offset;
       const known = `${n.type}:${n.name}`;
       switch (known) {
         case 'containerDirective:section':
@@ -155,7 +188,7 @@ export function remarkPaper({ papers }: { papers: Record<string, PaperData> }) {
           return [text(value ?? key)];
         }
         default:
-          if (isDirective(n)) { problem(`unknown directive ${COLONS[n.type]}${n.name}`); return literal(n, src, labelEnd); }
+          if (isDirective(n)) { problem(`unknown directive ${COLONS[n.type]}${n.name} — \\: is a literal colon`); return []; }
       }
       if (n.children) blocks(n, inHl);
       return [n];
@@ -168,6 +201,7 @@ export function remarkPaper({ papers }: { papers: Record<string, PaperData> }) {
       if (!id) problem(`:::section${label ? ` [${plain(label)}]` : ''} has no #id`);
       else claim(id);
       if (!label) problem(`:::section #${id} has no [title]`);
+      if (rail && UNCURLED.test(rail)) problem(`rail="${rail}" keeps straight quotes and dashes the title would not — write ’ “ ” – — …`);
       const title = label ? plain(label).trim() : '';
       sections.push({ id, ...(num ? { n: num } : {}), title, rail: rail ?? title });
       // The h2 takes an id of its own: left without one, Astro's heading pass would slug "Notation" into a

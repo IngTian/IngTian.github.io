@@ -6,6 +6,8 @@ A paper about :t[risk parity]{#rp}, in brief.
 :::
 
 :hl[One dollar grew to :v[usd.rl].] The rest is detail.
+
+Yearly, that is $:v[wealth.rl]^{12/67}-1$, or $:v[usd.rl]$ at the end.
 ::::
 
 ::::section[Notation]{#notation}
@@ -44,8 +46,4 @@ It keeps the weights adding up to one.
 ::::
 
 ::figure{name=pipe}
-
-```text
-code is not read
-```
 :::::

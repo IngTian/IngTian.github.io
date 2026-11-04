@@ -93,7 +93,7 @@ export default defineConfig({
   // katex is a devDependency, and stays one — nothing about it is shipped, only its output.
   //
   // The chain lives in src/lib/paperMarkdown/index.ts, so its spec runs exactly this. It adds the paper format
-  // (remark-directive and the two paper plugins, inert on any file outside the papers collection) and the MathML
+  // (remark-directive's syntax, parsed only in a paper, and the two paper plugins, inert on any other file) and the MathML
   // letter fix for every file. PAPER_DATA goes in as an option so it is part of the config digest: when a paper's
   // number changes, its cached render is thrown away rather than served stale.
   markdown: markdownPlugins(PAPER_DATA),

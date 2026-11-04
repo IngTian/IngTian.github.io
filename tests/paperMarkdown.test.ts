@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import katex from 'katex';
 import rehypeKatex from 'rehype-katex';
 import rehypeStringify from 'rehype-stringify';
 import remarkGfm from 'remark-gfm';
@@ -7,13 +8,24 @@ import remarkParse from 'remark-parse';
 import remarkRehype from 'remark-rehype';
 import { unified, type PluggableList } from 'unified';
 import { describe, expect, it } from 'vitest';
+import { fixMathVariants } from '../src/lib/mathml';
 import { markdownPlugins, type PaperReport } from '../src/lib/paperMarkdown';
 
 // The site's markdown plugins, inside the chain Astro runs them in (node_modules/@astrojs/markdown-remark/dist/index.js):
-// parse and GFM before them, remark-rehype with raw HTML allowed and stringify after. Astro's smartypants, shiki,
-// heading-id and image passes and its final rehype-raw are left out; the plugins do not depend on any of them.
+// parse and GFM before them, remark-rehype with raw HTML allowed and stringify after. Astro's other passes are
+// left out, and the format is written so that none of them reaches what is checked here:
+// - smartypants runs before the plugins and curls the text of a directive's label, so a title is curled. What a
+//   plugin reads from a label as a key cannot hold what it rewrites (a reference key has no "--"), a rail=
+//   attribute, which it never sees, is refused if it would need curling, and the one quote it gets wrong, the
+//   one right after inline maths, the plugin closes. Otherwise the build's quotes are curly where these are straight.
+// - shiki colours code blocks and the heading-id pass names unnamed headings; a paper may hold neither.
+// - rehype-raw parses what is still raw HTML, which in a paper is only a ::figure: the build re-serialises the
+//   figure's markup through parse5 where this chain prints it as it is.
 const PAPERS = {
-  simple: { values: { 'usd.rl': '$2.20' }, figures: { pipe: '<svg class="pipe" aria-hidden="true"><text>Policy</text></svg>' } },
+  simple: {
+    values: { 'usd.rl': '$2.20', 'wealth.rl': '2.1996' },
+    figures: { pipe: '<svg class="pipe" aria-hidden="true"><text>Policy</text></svg>' },
+  },
 };
 const REFERENCES = [{
   key: 'maillard2008', authors: ['Maillard, Sébastien', 'Roncalli, Thierry', 'Teïletche, Jérôme'], year: 2008,
@@ -59,6 +71,14 @@ describe('a paper file', async () => {
     expect(html).toContain('<mark class="hl">One dollar grew to $2.20.</mark> The rest is detail.');
   });
 
+  it('expands a :v inside maths too, as TeX, where remark-math had already taken it as text', () => {
+    expect(html).toContain('<annotation encoding="application/x-tex">2.1996^{12/67}-1</annotation>');
+    expect(html).toContain('<mn>2.1996</mn>');
+    // the value's $ is escaped, so it is a dollar sign and not the end of the maths
+    expect(html).toContain('<annotation encoding="application/x-tex">\\$2.20</annotation>');
+    expect(html).not.toContain(':v[');
+  });
+
   it('numbers an equation outside its MathML, with its wide and narrow forms, its where and its notes', () => {
     const eq = html.slice(html.indexOf('<div class="eq an" id="eq-1">'), html.indexOf('<svg class="pipe"'));
     expect(eq).toMatch(/^<div class="eq an" id="eq-1"><div class="eq-row"><div class="eq-math"><div class="eq-wide"><span class="katex"><math[^>]*display="block"/);
@@ -79,6 +99,11 @@ describe('a paper file', async () => {
     expect(html).not.toContain('text-only');
   });
 
+  it('closes a quote right after inline maths, which smartypants (before the plugins in the build) would open', () => {
+    // "Sector $g$'s risk": smartypants never sees the g, reads a quote after a space and writes ‘
+    expect(html).toMatch(/Sector <span class="katex"><math[^]*?<\/math><\/span>’s risk/);
+  });
+
   it('tags W_g in each display that contains it, and not a bare W there', () => {
     const tagged = html.match(/<msub class="sym" data-sym="1"><mi>W<\/mi><mi>g<\/mi><\/msub>/g) ?? [];
     expect(tagged).toHaveLength(2);
@@ -93,16 +118,16 @@ describe('a paper file', async () => {
     expect(html.match(/class="sym"/g)).toHaveLength(4);
   });
 
-  it('inlines a figure from the paper data as it is', () => {
+  it('inlines a figure from the paper data', () => {
     expect(html).toContain(PAPERS.simple.figures.pipe);
   });
 
   it('reports no problem, and the words a reader reads', () => {
     expect(report.paperProblems).toEqual([]);
-    // Counted by hand, every element boundary a word boundary and maths, tables and code left out:
-    // brief 33 (title 2, paragraph 7, the def 15 with its citation, the highlight's line 9), notation 1 (its
-    // title), method 35 (title 3 with its number, paragraph 5, "(1)" 1, the where 5, the def 10, the why 11).
-    expect(report.bodyWords).toBe(69);
+    // Counted by hand, every element boundary a word boundary and maths and tables left out: brief 40 (title 2,
+    // paragraph 7, the def 15 with its citation, the highlight's line 9, the line with two maths 7), notation 1
+    // (its title), method 35 (title 3 with its number, paragraph 5, "(1)" 1, the where 5, the def 10, the why 11).
+    expect(report.bodyWords).toBe(76);
   });
 });
 
@@ -114,6 +139,11 @@ describe('a malformed paper', async () => {
     const want = [
       'unknown :cite key "nobody1999"',
       'unknown :v key "usd.nobody"',
+      'unknown :v key "in.maths"',
+      ':cite[…] in $:cite[nobody1999]$ — only :v works in maths',
+      'rail="Don\'t" keeps straight quotes and dashes the title would not',
+      'a markdown heading in a paper: "A heading of its own"',
+      'a code block in a paper: "a code block"',
       'notation row $Q_{t}$ matches no display — mark it {text-only} if it is only in the prose',
       'TeX error in $\\frac{1$: KaTeX parse error',
       ':::def for=ghost names no term',
@@ -144,9 +174,13 @@ describe('a malformed paper', async () => {
 });
 
 describe('any other markdown file', () => {
-  it('keeps text that reads like a directive as it was written', async () => {
-    const md = 'A ratio of 3:x, a word:break, a :name[with **bold**]{a=1} and :::fence\n\n::leaf\n';
-    expect((await render(md, WRITING_PATH)).html).toBe((await render(md, WRITING_PATH, false)).html);
+  it('is parsed without the directive syntax, so text that reads like one stays as it was written', async () => {
+    const md = 'A ratio of 3:x, a word:break, a :name[with **bold**]{a="1"} and :::fence\n\n::leaf\n\n'
+      + 'Write to mailto:me@example.com.\n\n:::note\n\n## Heading\n\nA *quote*.\n\n- item\n';
+    const { html } = await render(md, WRITING_PATH);
+    expect(html).toBe((await render(md, WRITING_PATH, false)).html);
+    expect(html).toContain('<a href="mailto:me@example.com">');
+    expect(html).toContain('<h2>Heading</h2>');
   });
 
   it('renders the writing pieces byte for byte as before', async () => {
@@ -163,6 +197,15 @@ describe('any other markdown file', () => {
   });
 
   it('fails on a letter Unicode has no form for, naming the TeX it was in', async () => {
-    await expect(render('A $\\mathcal{\\lambda}$ here.', WRITING_PATH)).rejects.toThrow(/λ.*\\mathcal\{\\lambda\}/);
+    await expect(render('A $\\mathcal{\\lambda}$ here.', WRITING_PATH)).rejects.toThrow(/^rehypeMathVariants: .*λ.*\\mathcal\{\\lambda\}/);
+  });
+
+  // lib/equations.ts fixes a string and markdown fixes a tree. Both take the variants they rewrite from one table,
+  // so they draw every alphabet KaTeX writes the same way, the ones neither rewrites yet included.
+  it('draws every alphabet as lib/equations.ts does', async () => {
+    for (const tex of ['\\mathcal{X}', '\\mathscr{G}', '\\mathbb{R}', '\\mathbb{12}', '\\mathbf{x}', '\\boldsymbol{\\beta}', '\\mathfrak{g}', '\\mathrm{RC}']) {
+      const md = (await render(`$${tex}$`, WRITING_PATH)).html.match(/<math[^]*<\/math>/)?.[0];
+      expect(md, tex).toBe(fixMathVariants(katex.renderToString(tex, { output: 'mathml' })).match(/<math[^]*<\/math>/)?.[0]);
+    }
   });
 });

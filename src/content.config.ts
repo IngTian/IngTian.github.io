@@ -104,7 +104,8 @@ const papers = defineCollection({
     references: z
       .array(
         z.object({
-          key: z.string().regex(/^[a-z0-9-]+$/, { message: 'a reference key is a-z, 0-9 and -, as it becomes the id #ref-<key>' }),
+          // One hyphen at a time: smartypants turns a "--" in the :cite[…] that names the key into a dash.
+          key: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { message: 'a reference key is a-z and 0-9 joined by single hyphens, as it becomes the id #ref-<key>' }),
           authors: z.array(z.string().regex(/^[^,]+, [^,]+$/, { message: 'an author is written "Family, Given"' })).min(1),
           year: z.number().int(),
           title: z.string(),

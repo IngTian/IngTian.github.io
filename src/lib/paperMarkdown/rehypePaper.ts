@@ -55,7 +55,7 @@ function tag(n: Node, symbols: { key: string; nodes: Node[] }[], seen: Set<strin
   n.children = out;
 }
 
-const UNREAD = new Set(['math', 'svg', 'table', 'pre']);
+const UNREAD = new Set(['math', 'table']);
 function words(n: Node, out: string[] = []): string[] {
   if (n.type === 'text') out.push(n.value ?? '');
   else if (!(isEl(n) && UNREAD.has(n.tagName!))) n.children?.forEach((c) => words(c, out));
@@ -84,8 +84,9 @@ export function rehypePaper() {
       if (!seen.has(key)) problems.push(`notation row $${tex}$ matches no display — mark it {text-only} if it is only in the prose`);
     }
 
-    // One word per space-separated token, every element boundary a space, as the page reads: maths, figures,
-    // tables and code are not read as prose. A figure is still raw HTML here, so it is not counted either.
+    // One word per space-separated token, every element boundary a space, as the page reads: maths and tables
+    // are not read as prose. A figure is still a raw node here, so it is not counted either, and a paper holds
+    // no other HTML and no code (remarkPaper refuses both).
     fm.bodyWords = countWords(words(root).join(' '));
   };
 }

@@ -1,5 +1,13 @@
-::::section[Checked]{#checked}
+::::section[Checked]{#checked rail="Don't"}
 A :cite[nobody1999] reference, a value :v[usd.nobody], and math that does not parse: $\frac{1$.
+
+In maths, a value with no key, $:v[in.maths]$, and a citation, $:cite[nobody1999]$.
+
+### A heading of its own
+
+```text
+a code block
+```
 
 :hl[A highlight with a :t[linked term]{#inner} inside it.]
 

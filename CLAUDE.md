@@ -100,9 +100,10 @@ When in doubt, remove rather than add.
     node until Astro's rehype-raw runs, after every user plugin), and MDX's `@astrojs/mdx` brings
     an integration, a JSX parser over the prose and, at its latest, Astro 7.
   - **`unified`, `remark-parse`, `remark-gfm`, `remark-rehype`, `rehype-stringify`** are
-    declared only so `tests/paperMarkdown.test.ts` can run the site's plugins inside the chain
-    Astro runs them in. Astro already installs all five at these versions, so declaring them
-    downloads nothing.
+    declared so `tests/paperMarkdown.test.ts` can run the site's plugins inside the chain
+    Astro runs them in, and `unified` also so `remarkPaperSyntax` can take remark-directive's
+    syntax from a processor of its own. Astro already installs all five at these versions, so
+    declaring them downloads nothing.
   - This bullet used to say the opposite, at length: that `three` was "a real
     dependency", imported once in `lib/fanScene.ts` behind a dynamic `import()` in
     `FactorFan.astro`, code-split into a 483KB chunk for `/proto-showpiece`, and it
@@ -153,7 +154,10 @@ When in doubt, remove rather than add.
   - **The MathML letter fix runs on every markdown file**, as `rehypeMathVariants` in
     `lib/mathml.ts` right after rehype-katex: Chrome honours no `mathvariant` but
     "normal", so KaTeX's `\mathcal`/`\mathbb` letters are rewritten as Unicode letters, the
-    same table `fixMathVariants` uses for `lib/equations.ts`. One fix, one module. It throws
+    same table `fixMathVariants` uses for `lib/equations.ts`. One fix, one module: the table's
+    keys (`ALPHABETS`) are the only statement of which variants are rewritten, so a bold alphabet
+    added there is drawn by both paths at once, and the spec compares the two on every alphabet
+    KaTeX writes. It throws
     on a letter Unicode has no form for, naming the TeX, and a markdown plugin's throw does
     not fail the build by itself (Astro logs it and stores the entry unrendered), so
     `/writing/<slug>` throws on an unrendered entry rather than ship an empty piece.
@@ -700,7 +704,8 @@ file holds is the prose; everything else has one home of its own:
 | `:::notation` with a GFM table `\| Symbol \| Meaning \|` `:::` | `<div class="tbl-scroll"><table class="notation">`, each row `<tr data-sym><th scope="row">`. Each row's symbols (split at commas) are matched **structurally** in every display's MathML and tagged `class="sym" data-sym`: an equal subtree, the largest first, nothing inside a tagged one tagged again — so `W_{g}` tags `W_g` and not a bare `W`. A row that is only in the prose ends its Symbol cell with `{text-only}`. |
 | `:cite[markowitz1952]` | `<a class="cite" href="#ref-markowitz1952">Markowitz, 1952</a>` — one author, two (`Feng and He`), more (`Maillard et al.`) |
 | `:v[usd.rl]` | the text of `PAPER_DATA[slug].values['usd.rl']`. **Every number the prose prints is a `:v`**, and a `$` amount is always `:v` or `\$` — a bare `$` starts maths |
-| `::figure{name=wealth}` | `PAPER_DATA[slug].figures.wealth`, inlined as it is |
+| `$:v[wealth.rl]^{12/67}-1$` | the same value written into the TeX, with `$ % # &` escaped — the one directive that works inside maths, so an equation's numbers are computed too. A `:cite`, `:t` or `:hl` there is refused |
+| `::figure{name=wealth}` | `PAPER_DATA[slug].figures.wealth`, inlined; Astro's rehype-raw re-serialises its markup |
 
 - **Nesting takes colons.** A container holding another needs more colons than the one inside it:
   `:::` for a note or a where, `::::` for an eq or a section of notes, `:::::` for a section that
@@ -709,27 +714,43 @@ file holds is the prose; everything else has one home of its own:
   section).
 - **Raw HTML is refused.** It would stay an opaque `raw` node until Astro's rehype-raw, after every
   check here, and an HTML comment would ship.
+- **So are a code block and a markdown heading.** Shiki writes a fence's colours as inline styles
+  (`github-dark`, a `#24292e` slab), and seal red is the only colour on the research routes; a
+  heading without an id gets one slugged by Astro after every check here, which can repeat a
+  section's. A section's title is its `[label]`.
+- **Smartypants runs before the plugins** (Astro puts it ahead of every user remark plugin), so a
+  title from a `[label]` is curled. An attribute is not, so a `rail="…"` holding a straight quote,
+  `--` or `...` is refused (write the character), and a reference key is joined by single hyphens,
+  since `--` in the `:cite[…]` naming it would become a dash. Smartypants never sees maths either, so
+  it opens a quote that follows inline maths (`$g$'s` drew as g‘s); `remarkPaper` closes it (g’s).
 - **Every mistake is reported, by name, and fails the build.** A plugin cannot fail the build
   itself — Astro logs a plugin's throw and stores the entry unrendered, an empty page with a green
   build — so the plugins collect problems into `remarkPluginFrontmatter.paperProblems` and the
-  paper page throws on any, or on an entry with no `rendered`. Reported: an unknown `:cite`, `:v`,
-  `::figure` or directive; a TeX error (rehype-katex otherwise draws it in red and moves on); a
+  paper page throws on any, or on an entry with no `rendered`. Reported: an unknown `:cite`, `:v`
+  (in prose or in maths), `::figure` or directive; a directive other than `:v` in maths; a TeX
+  error (rehype-katex otherwise draws it in red and moves on); a
   notation row matching no display; a note whose `for` names no term, or a term outside its note's
   host; a term marked twice, or inside a highlight (seal over the seal band is under 3:1, so its
   linked rule would vanish); a `def` without its `**Name.**`; a section without its `#id` or
   `[title]`; an id used twice; an eq without one display or a wide/narrow pair, or with `\tag`;
-  `:::where` outside an eq; raw HTML; the nesting traces above.
+  `:::where` outside an eq; raw HTML, a code block or a heading; a `rail` that needs curling; the
+  nesting traces above.
   `tests/fixtures/papers/malformed.md` holds one of each and `tests/paperMarkdown.test.ts` names them.
 - **The render also reports** `sections` (`{ id, n?, title, rail }`, for the rail and Contents) and
   `bodyWords` — `countWords` from `lib/words.ts` over the body's text, every element boundary a
-  space, with `math`, `svg`, `table`, `pre` and the raw figures left out.
-- **Inert everywhere else.** Astro runs one processor for every `.md`, so on a file outside the
-  papers collection `remarkPaper` only puts back the text remark-directive took for a directive (a
-  `:word` stays `:word`). Verified: `dist` byte-identical with and without the plugins, and the spec
-  compares `favourite-quotes.md` both ways. The one plugin that is not paper-only is the MathML
-  letter fix (*Stack*).
+  space, with `math`, `table` and the raw figures left out.
+- **Inert everywhere else, by construction.** Astro runs one processor for every `.md`, so the
+  directive syntax is not a plugin in the list: `remarkPaperSyntax` wraps remark-parse and adds
+  remark-directive's extensions only for the length of a paper's parse. Any other file is parsed
+  exactly as it would be without them — a `:word`, a `:::` line or a `mailto:me@…` in /writing is
+  never a directive, so nothing has to be put back. Verified: `dist` byte-identical with and
+  without the plugins, and the spec compares `favourite-quotes.md` and a file of directive-like
+  text both ways. The one plugin that is not paper-only is the MathML letter fix (*Stack*).
 - The chain is spelled once, in `lib/paperMarkdown/index.ts`; the spec runs it inside Astro's own
-  order (parse, GFM, the site's remark plugins, remark-rehype, the site's rehype plugins).
+  order (parse, GFM, the site's remark plugins, remark-rehype, the site's rehype plugins). Astro's
+  other passes — smartypants, shiki, heading ids, images, rehype-raw — are left out of the spec,
+  and the rules above are what keep each of them from reaching anything the plugins check; the
+  spec's header says which rule answers which pass.
 
 ## Identity & voice (a design constraint)
 
