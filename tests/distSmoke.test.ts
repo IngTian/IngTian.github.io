@@ -11,7 +11,7 @@ import { INTRO_SEEN_KEY } from '../src/lib/introSession';
 import { inProgress, projects, timeline } from '../src/data/profile';
 import { type Stop, experienceStops, flattenStops, projectSectionId, projectStops } from '../src/lib/pageStops';
 import { GALLERY_ORDER } from '../src/lib/galleryLayout';
-import { EASE } from '../src/lib/motionTiming';
+import { EASE, RAIL_ENTER_MS } from '../src/lib/motionTiming';
 import { listingLines } from '../src/lib/projectsListing';
 import { BOOT_CMD, BOOT_DEADLINE_MS, BOOT_SEEN_KEY } from '../src/lib/projectsBoot';
 import { PHONE_QUERY } from '../src/lib/viewport';
@@ -654,10 +654,15 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
 
   // CLAUDE.md, Motion: only transform and opacity animate. The old rail transitioned `width` (its dash, which pushed
   // the label sideways) and `color`.
+  /** Every shipped rule that styles the rail, from the pages' inline styles and the bundled sheets, scope hashes
+   *  stripped: [whole, selector, body]. */
+  const railCss = (): string => [...railPages().flatMap((p) => [...p.html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)]
+    .map((m) => m[1])), distCss()].join('\n').replace(/\[data-astro-cid-[\w-]+\]/g, '');
+  const railRules = (): RegExpMatchArray[] => [...railCss().matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(([, sel]) => /\.side-rail\b|#projects-toc\b/.test(sel));
+
   it('transitions nothing but opacity and transform', () => {
-    const css = [...railPages().flatMap((p) => [...p.html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1])), distCss()]
-      .join('\n');
-    const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(([, sel]) => /\.side-rail\b|#projects-toc\b/.test(sel));
+    const rules = railRules();
     expect(rules.length, 'no shipped rule styles the rail').toBeGreaterThan(5);
     const moving = rules.flatMap(([, sel, body]) => [...body.matchAll(/(?:^|;)\s*transition(?:-property)?\s*:([^;]*)/g)]
       .flatMap((t) => t[1].split(/,(?![^(]*\))/).map((x) => x.trim().split(/\s+/)[0]))
@@ -667,6 +672,33 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
     // CSS cannot import lib/motionTiming, so the curve is a literal there: hold it to EASE.
     const curves = new Set(rules.flatMap(([, , body]) => body.match(/cubic-bezier\([^)]*\)/g) ?? []));
     expect([...curves].map((c) => c.replace(/\s+/g, ''))).toEqual([EASE]);
+  });
+
+  // The bundled script runs after the browser has painted, so the entrance's from-state is held by an inline
+  // decider that parses BEFORE the rail, on every arrival too (data-astro-rerun), and ends itself at RAIL_ENTER_MS.
+  // Run as shipped: it holds, and its timer lets go.
+  it('holds its entrance from before the rail parses, for RAIL_ENTER_MS at most, and only where motion is allowed', () => {
+    for (const p of railPages()) {
+      const m = /<script data-astro-rerun>([^<]*)<\/script>\s*<nav\b[^>]*\sclass="side-rail"/.exec(p.html);
+      expect(m, `${p.route}: no data-astro-rerun decider right before the rail`).not.toBeNull();
+      const classes = new Set<string>();
+      let timer: { fn: () => void; ms: number } | undefined;
+      const run = new Function('document', 'setTimeout', m![1]);
+      run({ documentElement: { classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c) } } },
+        (fn: () => void, ms: number) => { timer = { fn, ms }; });
+      expect([...classes], p.route).toEqual(['rail-enter']);
+      expect(timer?.ms, p.route).toBe(RAIL_ENTER_MS);
+      timer!.fn();
+      expect(classes.size, `${p.route}: the deadline did not end the hold`).toBe(0);
+    }
+    expect(railCss()).toMatch(/@media ?\(prefers-reduced-motion:no-preference\)\{html\.rail-enter \.side-rail a\{opacity:0;transform:translate(?:X)?\(-6px\)\}/);
+  });
+
+  // A touch laptop's primary pointer can hover, so a tap there leaves :hover on the tapped row until the next tap
+  // elsewhere. The script's .is-hover is set for a mouse or a pen only.
+  it("styles hover by the script's .is-hover, never by :hover", () => {
+    expect(railRules().map(([, sel]) => sel.trim()).filter((sel) => /:hover\b/.test(sel))).toEqual([]);
+    expect(railRules().some(([, sel]) => /\.is-hover/.test(sel)), 'no rule reads .is-hover').toBe(true);
   });
 });
 

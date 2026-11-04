@@ -6,7 +6,7 @@
 // `--sheet-ground`, and `--bg` is that ground so the body paints it. Every ink a reader gets is measured on it here.
 import { describe, expect, it } from 'vitest';
 import { AA_BODY } from '../src/lib/skyLegibility';
-import { onGround, over, ratio, rgbaOf, rgbOf, tokens } from './helpers/palette';
+import { between, onGround, over, railMark, ratio, rgbaOf, rgbOf, tokens } from './helpers/palette';
 
 /** WCAG 1.4.11: a mark that is not text — a rule, a band under words — against what it sits on. */
 const NON_TEXT = 3;
@@ -51,6 +51,11 @@ describe('the paper palette (tokens.css)', () => {
           expect(onGround(tk[ink], ground)).toBeGreaterThanOrEqual(AA_BODY);
         });
       }
+
+      // The rail's labels are ink-3, ink-2 and ink-1 (above); its dash is a mark, ink-1 at SideRail's strength.
+      it("the rail's dash clears 3:1 on the sheet", () => {
+        expect(between(over(rgbOf(tk['--ink-1']), railMark(), ground), ground)).toBeGreaterThanOrEqual(NON_TEXT);
+      });
 
       // The underline highlight is emphasis under words that stay legible on their own, so what is measured is the
       // text over it, not the band as a mark.

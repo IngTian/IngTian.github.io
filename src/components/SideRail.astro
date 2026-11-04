@@ -8,12 +8,18 @@
 // page's ground). The copies are `content: attr(data-l) / ''`, so find-in-page, a copied selection and the
 // accessible name see each label once. The dash hangs in a 20px gutter left of the label, so no label ever moves.
 //
-// Not an island (the site has none): a vanilla <script>, started through onPageView, with a teardown.
+// Not an island (the site has none): a vanilla <script>, started through onPageView, with a teardown. Plus one
+// `is:inline` line just above the <nav>, the entrance's decider. The bundled script runs after parse and after its
+// imports arrive, and a browser paints while it waits, so a from-state set by it can land on a rail already painted
+// at rest (over a 150ms-latency network: 11-18 frames at rest, then hidden, then the slide). Inline, it runs before
+// the rail is parsed. data-astro-rerun runs it again on each ClientRouter arrival, which would otherwise skip a
+// script it has run once, and an arrival paints while the new page's scripts load too.
 //
 // Scope note: the site has two OTHER rails — Toc.astro (post-hero fade-in) and the /art rail (coupled to gallery
 // formation). Both carry behaviour this component deliberately does not model, so they are left alone rather than
 // half-migrated.
 import { type Stop } from '../lib/pageStops';
+import { RAIL_ENTER_MS } from '../lib/motionTiming';
 
 interface Props {
   stops: Stop[];
@@ -24,10 +30,16 @@ interface Props {
   depth?: number;
 }
 const { stops, id, label = 'On this page', depth } = Astro.props;
+// The hold is the class; its own timer ends it, so a script that never comes cannot keep the rail hidden.
+const enterDecider = `(function(){var r=document.documentElement;r.classList.add('rail-enter');`
+  + `setTimeout(function(){r.classList.remove('rail-enter')},${RAIL_ENTER_MS})})()`;
 ---
 {depth === undefined ? (
   stops.length > 0 && (
-    <nav class="side-rail" id={id} aria-label={label}><Astro.self stops={stops} id={id} depth={0} /></nav>
+    <>
+      <script is:inline data-astro-rerun set:html={enterDecider} />
+      <nav class="side-rail" id={id} aria-label={label}><Astro.self stops={stops} id={id} depth={0} /></nav>
+    </>
   )
 ) : (
   <ul class={depth > 0 ? 'sub' : undefined}>
@@ -55,9 +67,10 @@ const { stops, id, label = 'On this page', depth } = Astro.props;
        everywhere to fix one string. */
     max-width: 200px;
     padding-left: 30px;
-    /* The dash's strength, read by the script for its slide: ink-1 at 0.55 clears 3:1 as a mark on every rail
-       page's ground (worst measured, 3.74:1 over the light reading sky). */
-    --mk: 0.55;
+    /* The dash's strength: ink-1 at 55% clears 3:1 as a mark on every rail page's ground (worst measured, 3.74:1
+       over the light reading sky; tests/paperPalette.test.ts and tests/draftingPalette.test.ts hold the sheets).
+       It is the alpha of the dash's colour, not its opacity, so a page can ring the dash with an opaque knockout. */
+    --mk: 55%;
   }
   .side-rail ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
   /* Nested lists breathe less than top-level ones, so a group reads as a group — but not below 12px, at any depth.
@@ -94,6 +107,7 @@ const { stops, id, label = 'On this page', depth } = Astro.props;
     position: absolute; left: -30px; top: 50%; width: 20px; height: 1px; margin-top: -0.5px;
     background: var(--ink-1); opacity: 0; transform-origin: 0 50%; pointer-events: none;
   }
+  .side-rail .rule { background: color-mix(in srgb, var(--ink-1) var(--mk), transparent); }
   .side-rail a::after { content: ''; }
 
   /* THE MARKS, set by the script (lib/scrollspy's markStops). The lead, the one current stop the moving dash is at,
@@ -105,11 +119,13 @@ const { stops, id, label = 'On this page', depth } = Astro.props;
   .side-rail a.is-active .lbl::after { opacity: 1; }
   .side-rail a:is(.is-ancestor, .is-quiet) .lbl::before { opacity: 1; }
   .side-rail a.is-active.is-quiet .lbl::after { opacity: 0; }
-  .side-rail a:is(.is-active, .is-ancestor) .rule { opacity: var(--mk); }
+  .side-rail a:is(.is-active, .is-ancestor) .rule { opacity: 1; }
   .side-rail a:is(.is-ancestor, .is-quiet) .rule { transform: scaleX(0.6); }
 
+  /* HOVER IS .is-hover, NOT :hover: the script sets it for a mouse or a pen and ignores a touch, so a tap on a
+     touch laptop (whose primary pointer can hover) never leaves a row nudged and previewed. */
   @media (hover: hover) {
-    .side-rail a:not(.is-active):hover::after { opacity: 0.2; }
+    .side-rail a.is-hover:not(.is-active)::after { opacity: 0.2; }
   }
   .side-rail a:not(.is-active):focus-visible::after { opacity: 0.2; }
   .side-rail a:focus-visible { outline: 1px solid var(--ochre); outline-offset: 3px; border-radius: 2px; }
@@ -125,7 +141,13 @@ const { stops, id, label = 'On this page', depth } = Astro.props;
     .side-rail a:focus-visible .lbl { transform: translateX(2px); }
   }
   @media (prefers-reduced-motion: no-preference) and (hover: hover) {
-    .side-rail a:hover .lbl { transform: translateX(2px); }
+    .side-rail a.is-hover .lbl { transform: translateX(2px); }
+  }
+  /* THE ENTRANCE'S FROM-STATE, held while the decider's class is on <html>: from before the rail is parsed until
+     the script starts the entrance from it, or the decider's own timer ends it. `a` has no transition, so neither
+     the hold nor its end animates. */
+  @media (prefers-reduced-motion: no-preference) {
+    :global(html.rail-enter) .side-rail a { opacity: 0; transform: translateX(-6px); }
   }
 
   /* The rail is a wide-viewport affordance; below this the page re-centers. */
@@ -139,16 +161,22 @@ const { stops, id, label = 'On this page', depth } = Astro.props;
   //   mid-flight; 280ms) and grows to its length (160ms); with nowhere to slide from, it grows in place (240ms).
   //   Any other current stop takes the quiet mark, fading in and out where it stands (200ms). So a section boundary
   //   in the reading band is one quiet mark appearing and then one slide, and a rail click is one dash travelling.
-  // - On each page view the rows come in from 6px left, all within 500ms, and the lead's dash grows.
+  // - On each page view the rows come in from 6px left, all within RAIL_ENTER_MS, and the lead's dash grows. They
+  //   come from the from-state the decider above the <nav> has held since before the rail was parsed; if that hold
+  //   has already ended, the rail is showing at rest, and it stays at rest.
   // Reduced motion: the same marks, at once, and no entrance.
-  import { EASE, stagger } from '../lib/motionTiming';
+  import { EASE, RAIL_ENTER_MS, stagger } from '../lib/motionTiming';
   import { onPageView } from '../lib/pageView';
   import { type Marks, markStops } from '../lib/scrollspy';
   import { motionAllowed, play } from '../scripts/motion';
 
-  const SLIDE = 280, GROW = 160, GROW_IN = 240, FADE = 200, ENTER = 180, ENTER_ALL = 500;
+  const SLIDE = 280, GROW = 160, GROW_IN = 240, FADE = 200, ENTER = 180;
 
   onPageView('.side-rail', () => {
+    // Taken first, so no early return below can leave the rail held until the decider's timer.
+    const root = document.documentElement;
+    const entering = root.classList.contains('rail-enter');
+    root.classList.remove('rail-enter');
     const maybeRail = document.querySelector<HTMLElement>('.side-rail');
     if (!maybeRail) return undefined;
     const rail = maybeRail;
@@ -237,11 +265,10 @@ const { stops, id, label = 'On this page', depth } = Astro.props;
           const { a, rule } = stops[lead];
           const r = a.getBoundingClientRect();
           const dx = src.x - (r.left + rule.offsetLeft), dy = src.y - (r.top + r.height / 2);
-          const mk = parseFloat(getComputedStyle(rail).getPropertyValue('--mk'));
           flyDash(lead, [
-            { transform: `translate(${dx}px, ${dy}px) scaleX(1)`, opacity: mk, easing: EASE },
-            { transform: 'translate(0px, 0px) scaleX(0.45)', opacity: mk, offset: SLIDE / (SLIDE + GROW), easing: EASE },
-            { transform: 'translate(0px, 0px) scaleX(1)', opacity: mk },
+            { transform: `translate(${dx}px, ${dy}px) scaleX(1)`, opacity: 1, easing: EASE },
+            { transform: 'translate(0px, 0px) scaleX(0.45)', opacity: 1, offset: SLIDE / (SLIDE + GROW), easing: EASE },
+            { transform: 'translate(0px, 0px) scaleX(1)', opacity: 1 },
           ], { duration: SLIDE + GROW, easing: 'linear' });
         } else if (lead !== null) {
           flyDash(lead, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: GROW_IN });
@@ -267,12 +294,13 @@ const { stops, id, label = 'On this page', depth } = Astro.props;
     }
     const spy = (): void => { if (!raf) raf = requestAnimationFrame(frame); };
 
-    // The first marks at once, then the entrance, whose from-state is set here — before first paint on a full load.
+    // The first marks at once, then the entrance from the held from-state. The class went above, in this same task,
+    // so no frame paints between the hold and the animation that takes it over.
     frame();
-    if (was && motionAllowed()) {
+    if (entering && was && motionAllowed()) {
       const shown = stops.flatMap((s, i) => (s.a.getClientRects().length > 0 ? [i] : []));
       shown.forEach((i, k) => {
-        const delay = stagger(k, shown.length, { step: 40, total: ENTER_ALL - ENTER });
+        const delay = stagger(k, shown.length, { step: 40, total: RAIL_ENTER_MS - ENTER });
         play(stops[i].a, [{ opacity: 0, transform: 'translateX(-6px)' }, { opacity: 1, transform: 'none' }], { duration: ENTER, delay }, live);
         if (i === lead) flyDash(i, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: GROW_IN, delay: delay + 120 });
       });
@@ -280,6 +308,11 @@ const { stops, id, label = 'On this page', depth } = Astro.props;
 
     window.addEventListener('scroll', spy, { passive: true, signal: ac.signal });
     window.addEventListener('resize', spy, { passive: true, signal: ac.signal });
+    // Hover is a mouse's or a pen's; a tap reports 'touch' and is ignored (the CSS reads .is-hover, not :hover).
+    for (const a of rail.querySelectorAll('a')) {
+      a.addEventListener('pointerenter', (e) => a.classList.toggle('is-hover', e.pointerType !== 'touch'), { signal: ac.signal });
+      a.addEventListener('pointerleave', () => a.classList.remove('is-hover'), { signal: ac.signal });
+    }
     // Started at parse, so the first marks were measured before the webfonts: measure again once they land.
     void document.fonts.ready.then(() => { if (!ac.signal.aborted) spy(); });
 

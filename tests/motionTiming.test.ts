@@ -65,4 +65,18 @@ describe('mergeLines', () => {
     expect(mergeLines([r(10, 300, 100, 124), r(300, 300.4, 100, 124), r(0, 120, 130, 154)]))
       .toEqual([{ left: 10, top: 100, width: 290, height: 24 }, { left: 0, top: 130, width: 120, height: 24 }]);
   });
+
+  // What getClientRects() really returns: a DOMRect keeps its edges as getters on its prototype, so an object
+  // spread of one copies nothing. Measured in Chrome, that gave every sweep span NaN geometry (no width, no place).
+  it('reads a DOMRect, whose edges are prototype getters, not own properties', () => {
+    class Rect {
+      constructor(private readonly e: [number, number, number, number]) {}
+      get left(): number { return this.e[0]; }
+      get right(): number { return this.e[1]; }
+      get top(): number { return this.e[2]; }
+      get bottom(): number { return this.e[3]; }
+    }
+    expect(mergeLines([new Rect([10, 80, 100, 124]), new Rect([80, 140, 98, 124]), new Rect([0, 120, 130, 154])]))
+      .toEqual([{ left: 10, top: 98, width: 130, height: 26 }, { left: 0, top: 130, width: 120, height: 24 }]);
+  });
 });

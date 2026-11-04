@@ -8,12 +8,23 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { AA_BODY } from '../src/lib/skyLegibility';
-import { onGround, over, ratio, rgbaOf, rgbOf, tokens, type RGB } from './helpers/palette';
+import { between, onGround, over, railMark, ratio, rgbaOf, rgbOf, tokens, type RGB } from './helpers/palette';
 
 const src = (f: string): string => readFileSync(new URL(`../src/components/projects/${f}`, import.meta.url), 'utf8');
 const fieldSrc = src('DraftingField.astro');
 const rowsSrc = src('SelectedRows.astro');
 const cardsSrc = src('WorkshopCards.astro');
+const pageSrc = readFileSync(new URL('../src/pages/projects.astro', import.meta.url), 'utf8');
+
+/** The field's stroke alphas, read from DraftingField.astro: minor and major per theme, and a lit ping's peak. */
+function strokeAlphas(theme: 'light' | 'dark'): { minor: number; major: number; lit: number } {
+  const m = /const \[minorA, majorA\] = light \? \[([\d.]+), ([\d.]+)\] : \[([\d.]+), ([\d.]+)\];/.exec(fieldSrc);
+  const p = /rgba\(\$\{hi\},\$\{([\d.]+) \+ ([\d.]+) \* fade\}\)/.exec(fieldSrc);
+  expect(m, "DraftingField.astro's minor/major alphas moved").not.toBeNull();
+  expect(p, "DraftingField.astro's lit-line alpha moved").not.toBeNull();
+  const [lm, lM, dm, dM] = m!.slice(1).map(Number);
+  return { ...(theme === 'light' ? { minor: lm, major: lM } : { minor: dm, major: dM }), lit: Number(p![1]) + Number(p![2]) };
+}
 
 const rgbToken = (v: string): number[] => v.split(',').map(Number);
 
@@ -122,6 +133,29 @@ describe('the drafting palette (tokens.css)', () => {
         const m = /background: linear-gradient\(rgba\(var\(--draft-line-rgb\), ([\d.]+)\), rgba\(var\(--draft-line-rgb\), \1\)\), var\(--draft-ground\);/.exec(body);
         expect(m, `WorkshopCards.astro's .cmd is not a tint on var(--draft-ground): ${body}`).not.toBeNull();
         expect(onGround(tk['--ochre'], over(rgbToken(tk['--draft-line-rgb']), Number(m![1]), rgbOf(ground)))).toBeGreaterThanOrEqual(AA_BODY);
+      });
+
+      // THE RAIL'S DASH is a mark (3:1), and it lies straight on the field. Bare, a major line BESIDE it is what it
+      // is read against, and in light that is 2.39:1. So the page rings it with the bare ground (the knockout its
+      // labels wear, as a box-shadow), and what lies beside it is always that ground; what lies UNDER it can be
+      // the bare ground, any of the three strokes, and either end of the vignette, and each is checked.
+      it("the rail's dash clears 3:1 wherever the field runs under it, ringed with the bare ground", () => {
+        expect(pageSrc).toContain(':global(#projects-toc .rule) { box-shadow: 0 0 0 2px var(--knock); }');
+        const line = rgbToken(tk['--draft-line-rgb']), hi = rgbToken(tk['--draft-hi-rgb']);
+        const a = strokeAlphas(t.theme);
+        const ink = rgbOf(tk['--ink-1']), bare = rgbOf(ground);
+        for (const [end, field] of vignetteRamp(tk, ground).entries()) {
+          const unders: [string, RGB][] = [['the ground', field], ['a minor line', over(line, a.minor, field)],
+            ['a major line', over(line, a.major, field)], ['a lit line', over(hi, a.lit, field)]];
+          for (const [what, under] of unders) {
+            const where = `on ${what}, vignette ${end ? 'corner' : 'centre'}`;
+            expect(between(over(ink, railMark(), under), bare), where).toBeGreaterThanOrEqual(3);
+          }
+        }
+        // and the case the ring is for: unringed, a major line beside the dash in light is under 3:1
+        if (t.theme === 'light') {
+          expect(between(over(ink, railMark(), bare), over(line, a.major, bare))).toBeLessThan(3);
+        }
       });
 
       // The computed pictures (lib/projectVisuals.ts) print their words in ink-1 and ink-3 on --draft-ph, not on

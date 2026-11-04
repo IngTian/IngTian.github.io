@@ -6,6 +6,10 @@ export const EASE = 'cubic-bezier(.2,.7,.2,1)';
 /** A figure drawing itself: a gentle start, then the same long settle. */
 export const DRAW = 'cubic-bezier(.33,.08,.24,1)';
 
+/** The rail's entrance: every row in within this. It is also how long the rail waits hidden for its script before it
+ *  shows at rest instead, since an entrance that started later would end after it was meant to. */
+export const RAIL_ENTER_MS = 500;
+
 /**
  * The delay of item `i` of `n` entering together: `step` apart; closer when that would start the last item after
  * `total` (so everything starts within `total`, whatever `n` is); and never more than `max` late.
@@ -39,7 +43,10 @@ export function mergeLines(rects: readonly LineRect[]): { left: number; top: num
     if (l) {
       l.left = Math.min(l.left, r.left); l.right = Math.max(l.right, r.right);
       l.top = Math.min(l.top, r.top); l.bottom = Math.max(l.bottom, r.bottom);
-    } else lines.push({ ...r });
+    } else {
+      // Named, not spread: a DOMRect's edges are getters on its prototype, and a spread copies none of them.
+      lines.push({ left: r.left, right: r.right, top: r.top, bottom: r.bottom });
+    }
   }
   return lines.map((l) => ({ left: l.left, top: l.top, width: l.right - l.left, height: l.bottom - l.top }));
 }

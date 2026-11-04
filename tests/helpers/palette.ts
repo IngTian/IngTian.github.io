@@ -42,3 +42,15 @@ export const over = (top: readonly number[], a: number, under: RGB): RGB =>
   under.map((u, i) => top[i] * a + u * (1 - a)) as RGB;
 /** The contrast of a #rrggbb ink on a ground given as channels (a composite, typically). */
 export const onGround = (ink: string, ground: RGB): number => contrastRatio(lum(ink), wcagLuminance(ground));
+/** The contrast of two colours given as channels (a mark composited on what lies under it, against what lies beside it). */
+export const between = (a: RGB, b: RGB): number => contrastRatio(wcagLuminance(a), wcagLuminance(b));
+
+/** The rail dash's strength: the alpha of ink-1 in its colour, read from SideRail.astro along with the rule that
+ *  paints it, so the number measured is the one drawn. */
+export function railMark(): number {
+  const src = readFileSync(new URL('../../src/components/SideRail.astro', import.meta.url), 'utf8');
+  expect(src, "SideRail.astro's dash is not ink-1 at --mk").toContain('.side-rail .rule { background: color-mix(in srgb, var(--ink-1) var(--mk), transparent); }');
+  const m = /--mk:\s*([\d.]+)%;/.exec(src);
+  expect(m, 'SideRail.astro declares no --mk: N%').not.toBeNull();
+  return Number(m![1]) / 100;
+}
