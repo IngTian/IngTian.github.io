@@ -178,8 +178,8 @@ describe('researchIndexStops', () => {
 });
 
 describe('paperPageOwns', () => {
-  it('owns the ids a paper page writes around its file: its sections, rail, BibTeX, the nav list, every reference', () => {
-    for (const id of [...PAPER_END.map((s) => s.id), 'paper-toc', 'bibtex', 'cnav-list', refId('markowitz1952')]) {
+  it('owns the ids a paper page writes around its file: its sections, BibTeX, the nav list, every reference', () => {
+    for (const id of [...PAPER_END.map((s) => s.id), 'bibtex', 'cnav-list', refId('markowitz1952')]) {
       expect(paperPageOwns(id), id).toBe(true);
     }
   });

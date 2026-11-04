@@ -84,9 +84,9 @@ export function paperStops(sections: readonly PaperSection[]): Stop[] {
   return paperSections(sections).map((s) => ({ label: s.rail, target: s.id }));
 }
 
-// The ids a paper page writes around its file's body: PAPER_END's sections, its rail, its BibTeX and the corner
-// nav's list. Its references' are `ref-<key>` (lib/paperMarkdown refId).
-const PAPER_PAGE_IDS = new Set<string>([...PAPER_END.map((s) => s.id), 'paper-toc', 'bibtex', 'cnav-list']);
+// The ids a paper page writes around its file's body: PAPER_END's sections, its BibTeX and the corner nav's
+// list. Its references' are `ref-<key>` (lib/paperMarkdown refId).
+const PAPER_PAGE_IDS = new Set<string>([...PAPER_END.map((s) => s.id), 'bibtex', 'cnav-list']);
 
 /** Whether a paper page writes `id` itself. A file that writes it too makes a second element with that id, and a
  *  #fragment or getElementById finds the first, so the page refuses the file. distSmoke holds this to the built

@@ -221,7 +221,7 @@ describe('the rail reskins through role tokens only', () => {
 
   it('no page styles the rail', () => {
     const styled = files.filter((f) => f.startsWith('pages/')).flatMap((f) => [...text(f).matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)]
-      .filter((m) => /#projects-toc\b|\.side-rail\b/.test(m[1])).map(() => f));
+      .filter((m) => /\.side-rail\b/.test(m[1])).map(() => f));
     expect(styled).toEqual([]);
   });
 });

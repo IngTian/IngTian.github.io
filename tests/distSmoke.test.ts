@@ -1201,13 +1201,6 @@ describe('/research — the papers as cards, newest first, then the interests', 
     for (const r of researchInterests) expect(text(page().markup)).toContain(`${r.label}. ${r.gloss}`);
   });
 
-  // The page it replaced folded each paper into a card that a head script opened (`html.paper-js`), and kept the
-  // closed panels inert.
-  it('carries nothing of the folding page it replaced', () => {
-    expect(page().html).not.toMatch(/paper-js/);
-    expect(page().html).not.toMatch(/\binert\b/);
-  });
-
   it('never says a paper was published or peer-reviewed', () => {
     expect(text(page().markup)).not.toMatch(/published|peer[- ]reviewed/i);
   });

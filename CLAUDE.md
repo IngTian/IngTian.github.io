@@ -858,8 +858,8 @@ file holds is the prose; everything else has one home of its own:
   `tests/fixtures/papers/malformed.md` holds one of each and `tests/paperMarkdown.test.ts` names them.
 - **A file id the page writes itself fails the build too.** The plugin reports every id the file
   carries (`ids`) and the page refuses any that `paperPageOwns()` (`lib/pageStops.ts`) claims:
-  PAPER_END's `read`, `references` and `cite`, the rail's `paper-toc`, `bibtex`, the corner nav's
-  `cnav-list` and every `ref-…`. A second element with an id takes none of its links — a `#fragment`
+  PAPER_END's `read`, `references` and `cite`, `bibtex`, the corner nav's `cnav-list` and every
+  `ref-…`. A second element with an id takes none of its links — a `#fragment`
   and `getElementById` find the first — so `{#bibtex}` would have Copy BibTeX copy a section, and
   `{#ref-markowitz1952}` would take every cite of it. `tests/distSmoke.test.ts` holds the list to the
   built page: each id there is the file's or the page's, never both and never neither, so an id the
@@ -1179,7 +1179,7 @@ galaxy). The whole system is **token override**, not per-component branching:
   would win in dark.
   - **drafting** adds `--knockout` (the label knockout, one 1px ring of the bare sheet that
     `<main>`'s text and `SideRail`'s labels both read — the rail with a `none` fallback, so
-    the page never styles `#projects-toc`), `--rail-dash-halo` (the rail dash's 2px ring)
+    the page never styles the rail), `--rail-dash-halo` (the rail dash's 2px ring)
     and eight `--draft-*` tokens. `tests/draftingPalette.test.ts` checks that the two sets
     match and the inks clear AA.
   - **paper** adds seven `--sheet-*` tokens: `--sheet-ground` (the ground — never `--paper`,

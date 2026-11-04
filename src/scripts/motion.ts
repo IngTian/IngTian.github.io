@@ -8,11 +8,6 @@
 import { MOTION_LIMIT_MS, prefersReducedMotion } from '../lib/motion';
 import { EASE, mergeLines, stagger, sweepDurations } from '../lib/motionTiming';
 
-/** Whether anything may move: the reduced-motion gate, asked once per call. */
-export function motionAllowed(): boolean {
-  return !prefersReducedMotion();
-}
-
 /**
  * Play an animation that hands back to the element's own style. `fill: 'both'` holds the first frame through any
  * delay (so a from-state set now is what paints) and the last until the animation finishes; then it is cancelled, so
@@ -21,7 +16,7 @@ export function motionAllowed(): boolean {
  * time: the last frame at once, then the CSS.
  */
 export function play(el: Element, frames: Keyframe[], opts: KeyframeAnimationOptions, live: Set<Animation>): Animation {
-  const still = motionAllowed() ? {} : { duration: 0, delay: 0, endDelay: 0 };
+  const still = prefersReducedMotion() ? { duration: 0, delay: 0, endDelay: 0 } : {};
   const a = el.animate(frames, { easing: EASE, fill: 'both', ...opts, ...still });
   live.add(a);
   a.finished.then(() => { live.delete(a); a.cancel(); }, () => live.delete(a));
@@ -69,7 +64,7 @@ export function onceSeen(
   els: Iterable<Element>, run: (el: Element) => void, opts: { threshold?: number; signal: AbortSignal },
 ): void {
   const { threshold = 0, signal } = opts;
-  if (signal.aborted || !motionAllowed()) return;
+  if (signal.aborted || prefersReducedMotion()) return;
   const waiting = new Map<Element, number | undefined>(); // element -> its on-screen backstop, while one is armed
   /** Stop waiting, so the element shows its finished state; true if it was waiting. */
   const settle = (el: Element): boolean => {
@@ -158,12 +153,12 @@ export function riseOnceSeen(
  * Where the spans sit, and what they paint over, are the caller's to know:
  * - They are placed absolutely on <body>, in document coordinates, which is right while neither <html> nor <body>
  *   is positioned or transformed and <body> has no margin: true on every page (Tailwind's preflight zeroes it).
- * - Each covers its line's box, or with `foot` only the bottom `foot` px of it: a band under the words, or a
- *   hairline, measured in the target's own type (the span itself is set in <body>'s).
+ * - Each covers the bottom `foot` px of its line's box: a band under the words, or a hairline, measured in the
+ *   target's own type (the span itself is set in <body>'s).
  * - They are appended last and carry no z-index, so they paint OVER the text. A band meant to lie under the words
  *   needs `z-index: -1` in `cls`, and that shows only where no ancestor of the text paints a background of its own.
  */
-export function sweepLines(target: Element, cls: string, totalMs: number, live: Set<Animation>, foot?: number): Promise<void> {
+export function sweepLines(target: Element, cls: string, totalMs: number, live: Set<Animation>, foot: number): Promise<void> {
   const lines = mergeLines([...target.getClientRects()]);
   const durations = sweepDurations(lines.map((l) => l.width), totalMs);
   // One line takes the house curve; a run of lines goes nearly linear, so a sweep does not stall at each break.
@@ -173,9 +168,8 @@ export function sweepLines(target: Element, cls: string, totalMs: number, live: 
     const s = document.createElement('span');
     s.className = cls;
     s.setAttribute('aria-hidden', 'true');
-    const h = foot ?? l.height;
-    s.style.cssText = `position:absolute;left:${l.left + window.scrollX}px;top:${l.top + l.height - h + window.scrollY}px;`
-      + `width:${l.width}px;height:${h}px;transform-origin:0 50%;pointer-events:none`;
+    s.style.cssText = `position:absolute;left:${l.left + window.scrollX}px;top:${l.top + l.height - foot + window.scrollY}px;`
+      + `width:${l.width}px;height:${foot}px;transform-origin:0 50%;pointer-events:none`;
     document.body.append(s);
     const a = play(s, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: durations[k], delay, easing }, live);
     delay += durations[k];

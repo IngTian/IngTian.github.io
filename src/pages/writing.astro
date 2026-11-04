@@ -59,7 +59,7 @@ const total = totalEntries(kinds);
     {/* NO RAIL WHEN THERE IS NOTHING TO POINT AT. The kind sections only render once something is published,
         so rendering the rail unconditionally would leave a column of anchors pointing at ids that do not
         exist. */}
-    {total > 0 && <SideRail stops={stops} id="writing-toc" />}
+    {total > 0 && <SideRail stops={stops} />}
 
     <div class="writing-block">
       <header class="writing-head">

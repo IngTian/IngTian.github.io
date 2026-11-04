@@ -58,7 +58,7 @@ const bootDecider = `(function () {
   <script is:inline set:html={bootDecider} />
   {/* The rail before the field, so the rail's script runs first and its first marks land inside its entrance: the
       field's init (a whole frame of isolines) is the longest on the page. */}
-  <SideRail stops={stops} id="projects-toc" />
+  <SideRail stops={stops} />
   <DraftingField />
 
   <main class="projects-page">

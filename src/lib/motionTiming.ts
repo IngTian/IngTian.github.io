@@ -29,7 +29,7 @@ export function sweepDurations(widths: readonly number[], total: number): number
   return d;
 }
 
-export interface LineRect { left: number; right: number; top: number; bottom: number }
+interface LineRect { left: number; right: number; top: number; bottom: number }
 
 /** One box per line of a run of inline text. getClientRects() returns a rect per fragment, and a line breaks into
  *  several around an inline child (a nowrap span, an equation), so fragments sharing a baseline merge; slivers of

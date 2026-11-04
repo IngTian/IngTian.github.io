@@ -23,15 +23,12 @@ import { RAIL_ENTER_MS, stagger } from '../lib/motionTiming';
 
 interface Props {
   stops: Stop[];
-  /** DOM id on the <nav>: a stable handle for tests and for #-linking to the rail. */
-  id: string;
-  label?: string;
   /** Set only by the template's own recursion: the depth of the list being rendered. */
   depth?: number;
   /** Set only by the template's own recursion: the whole rail in document order, which numbers its rows. */
   flat?: Stop[];
 }
-const { stops, id, label = 'On this page', depth, flat = flattenStops(stops) } = Astro.props;
+const { stops, depth, flat = flattenStops(stops) } = Astro.props;
 // The entrance: each row ROW_MS long (the CSS animation's duration, below), 40ms after the one before, closer on a
 // long rail so the last is in by RAIL_ENTER_MS. With no `max`, stagger(i) is i x stagger(1), so the CSS multiplies.
 const ROW_MS = 180;
@@ -39,14 +36,14 @@ const gap = stagger(1, flat.length, { step: 40, total: RAIL_ENTER_MS - ROW_MS })
 ---
 {depth === undefined ? (
   stops.length > 0 && (
-    <nav class="side-rail" id={id} aria-label={label} style={`--gap:${gap}ms`}><Astro.self stops={stops} id={id} depth={0} flat={flat} /></nav>
+    <nav class="side-rail" aria-label="On this page" style={`--gap:${gap}ms`}><Astro.self stops={stops} depth={0} flat={flat} /></nav>
   )
 ) : (
   <ul class={depth > 0 ? 'sub' : undefined}>
     {stops.map((s) => (
       <li>
         <a href={`#${s.target}`} style={`--i:${flat.indexOf(s)}`}><span class="rule" aria-hidden="true"></span><span class="lbl" data-l={s.label}><span class="dim">{s.label}</span></span></a>
-        {s.children && s.children.length > 0 && <Astro.self stops={s.children} id={id} depth={depth + 1} flat={flat} />}
+        {s.children && s.children.length > 0 && <Astro.self stops={s.children} depth={depth + 1} flat={flat} />}
       </li>
     ))}
   </ul>
@@ -171,10 +168,11 @@ const gap = stagger(1, flat.length, { step: 40, total: RAIL_ENTER_MS - ROW_MS })
   //   Any other current stop takes the quiet mark, fading in and out where it stands (200ms). So a section boundary
   //   in the reading band is one quiet mark appearing and then one slide, and a rail click is one dash travelling.
   // The first marks appear at once, inside the rows' CSS entrance. Reduced motion: the same marks, at once.
+  import { prefersReducedMotion } from '../lib/motion';
   import { EASE } from '../lib/motionTiming';
-  import { onPageView } from '../scripts/pageView';
   import { type Marks, markStops } from '../lib/scrollspy';
-  import { motionAllowed, play } from '../scripts/motion';
+  import { play } from '../scripts/motion';
+  import { onPageView } from '../scripts/pageView';
 
   const SLIDE = 280, GROW = 160, GROW_IN = 240, FADE = 200;
 
@@ -288,7 +286,7 @@ const gap = stagger(1, flat.length, { step: 40, total: RAIL_ENTER_MS - ROW_MS })
     function frame(): void {
       raf = 0;
       const shown = rail.getClientRects().length > 0; // display: none at 1100px and below
-      if (shown) apply(measure(), was && motionAllowed());
+      if (shown) apply(measure(), was && !prefersReducedMotion());
       was = shown;
     }
     const spy = (): void => { if (!raf) raf = requestAnimationFrame(frame); };

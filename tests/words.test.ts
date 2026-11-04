@@ -14,7 +14,6 @@ describe('countWords', () => {
 describe('readingMinutes', () => {
   it('rounds words over 230 a minute', () => {
     expect(readingMinutes(4520)).toBe(20);
-    expect(readingMinutes(4520, 452)).toBe(10);
   });
   it('is never under a minute', () => {
     expect(readingMinutes(10)).toBe(1);

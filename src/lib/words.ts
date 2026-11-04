@@ -6,9 +6,11 @@ export function countWords(text: string): number {
   return text.split(/\s+/).filter((t) => /[A-Za-z0-9]/.test(t)).length;
 }
 
-/** Minutes to read `words` at `wpm` words a minute, rounded, never under one. */
-export function readingMinutes(words: number, wpm = 230): number {
-  return Math.max(1, Math.round(words / wpm));
+const WPM = 230;
+
+/** Minutes to read `words` at WPM words a minute, rounded, never under one. */
+export function readingMinutes(words: number): number {
+  return Math.max(1, Math.round(words / WPM));
 }
 
 /** `text` split so that its odd parts are its hyphenated words ("RNN-based", "(RL-BHRP)"), for a renderer to keep

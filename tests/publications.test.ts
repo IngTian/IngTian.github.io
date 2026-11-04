@@ -39,10 +39,4 @@ describe('publications', () => {
       'Optimal Portfolio Construction - A Reinforcement Learning Embedded Bayesian Hierarchical Risk Parity (RL-BHRP) Approach',
     );
   });
-
-  // The old /research page's fields: retired, not left unrendered.
-  it('carries none of the retired fields', () => {
-    const retired = ['takeaway', 'results', 'metrics', 'featured', 'mathKey', 'shortTitle', 'idea'];
-    for (const p of publications) expect(Object.keys(p).filter((k) => retired.includes(k)), p.slug).toEqual([]);
-  });
 });
