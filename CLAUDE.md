@@ -674,40 +674,24 @@ phone treatment is *bug fixes only*, and the whole of it is:
   and /projects (the homepage's `Toc` and the /art rail are separate, each coupled to
   behaviour of its own page). It hides at 1100px and below, where a paper page shows its
   Contents list instead.
-  - **Its marking rule is `markStops()` in `lib/scrollspy.ts`**, pure and specified. Every
-    visible stop whose target overlaps the reading band, 10%–62% down the viewport, is
-    current — so two are lit at a section boundary, on purpose: the reader is looking at
-    both — and a lit stop's ancestors are lit with it. Where nothing overlaps the band
-    (above the first section, or at the page bottom, which a short last section never
-    reaches) the one current stop is `activeStopIndex`'s, over the stops sorted by measured
-    top. One current stop is the **lead**: not an ancestor of another current stop, then
-    the larger share of the band (so a link just followed leads), then the higher box. The
-    lead alone gets full ink and the whole dash; another current stop and an ancestor wear
-    the quiet mark, `--ink-2` and a 12px dash, so the rail shows one "here" at a time. A
-    stop whose target does not render leaves the rail. Links carry `aria-current="true"`,
-    which is valid on more than one.
-  - **Every label clears 4.5:1 at rest, on every rail page's ground.** A label is three
-    layers of the same text — the served one in `--ink-3`, and `--ink-2` and `--ink-1`
-    copies generated from `data-l` as `content: attr(data-l) / ''`, which find-in-page, a
-    copied selection and the accessible name never see — so a mark is a cross-fade of
-    opacities, never a colour transition, and every state is a solid ink. The dash is
-    `--ink-1` at 55% (`--mk`), a mark that clears 3:1. The sheets' numbers are held by
-    `tests/paperPalette.test.ts` and `tests/draftingPalette.test.ts`; over the reading sky
-    they were measured on screen (inactive labels 5.53 / 5.74 on /writing and 5.54 / 5.63
-    on /experience, light / dark; the dash at least 3.74:1).
-  - **Its motion is the rule's, and every piece of it runs once.** The entrance is CSS
-    (`side-rail-enter`: each row in from 6px left over 180ms, staggered so the last is in by
-    `RAIL_ENTER_MS`, 500ms) — CSS because a bundled script runs after first paint, and a
-    from-state it set could land on a rail already drawn at rest. Then one dash moves: when
-    the lead changes it slides from wherever the old one is (280ms) and grows to its length
-    (160ms), or grows in place (240ms); a quiet mark fades where it stands (200ms); a hovered
-    or focused row nudges 2px with a faint dash preview. Hover is `.is-hover`, set for a
-    mouse or a pen and never for `pointerType === 'touch'`. Reduced motion: the same marks,
-    at once.
-  - **A register reskins it through two role tokens and nothing else**: `--knockout` (the
-    labels' `text-shadow`) and `--rail-dash-halo` (the dash's `box-shadow`), each read with a
-    `none` fallback and declared by a register whose ground has strokes under the text —
-    today only /projects'. No page styles the rail; `tests/draftingPalette.test.ts` checks.
+  - **Its marking rule is `markStops()` in `lib/scrollspy.ts`**, pure and specified (its doc
+    comment is the rule). Two stops are lit at a section boundary **on purpose** — the reader
+    is looking at both — and one of them leads; links carry `aria-current="true"`, which is
+    valid on more than one.
+  - **Every label clears 4.5:1 at rest, on every rail page's ground**, because a label is three
+    layers of one text (`SideRail.astro`'s header says how): a mark is a cross-fade of
+    opacities, never a colour transition, so every state is a solid ink. The sheets' numbers are
+    held by `tests/paperPalette.test.ts` and `tests/draftingPalette.test.ts`; over the reading sky
+    they were measured on screen (inactive labels 5.53 / 5.74 on /writing and 5.54 / 5.63 on
+    /experience, light / dark; the dash at least 3.74:1).
+  - **Its motion is the rule's, and every piece of it runs once** (the timings are in
+    `SideRail.astro`). The entrance is CSS because a bundled script runs after first paint, and
+    a from-state it set could land on a rail already drawn at rest. Hover is `.is-hover`, not
+    `:hover`, set for a mouse or a pen and never for `pointerType === 'touch'`. Reduced motion:
+    the same marks, at once.
+  - **A register reskins it through two role tokens and nothing else**, `--knockout` and
+    `--rail-dash-halo`, each read with a `none` fallback. No page styles the rail;
+    `tests/draftingPalette.test.ts` checks.
 
 ## The content model rule
 
@@ -827,9 +811,8 @@ file holds is the prose; everything else has one home of its own:
 - **Nesting takes colons.** A container holding another needs more colons than the one inside it:
   `:::` for a note or a where, `::::` for an eq or a section of notes, `:::::` for a section that
   holds an eq (or a theorem that holds one, whose section then takes `::::::`). With as many, the
-  inner fence closes both, silently — so the checks below look for
-  exactly the traces that leaves (a stray `:::`, a container never closed, content outside a
-  section).
+  inner fence closes both, silently — so the build refuses exactly
+  the traces that leaves (a stray `:::`, a container never closed, content outside a section).
 - **Raw HTML is refused.** It would stay an opaque `raw` node until Astro's rehype-raw, after every
   check here, and an HTML comment would ship.
 - **So are a code block and a markdown heading.** Shiki writes a fence's colours as inline styles
@@ -844,20 +827,11 @@ file holds is the prose; everything else has one home of its own:
 - **Every mistake is reported, by name, and fails the build.** A plugin cannot fail the build
   itself — Astro logs a plugin's throw and stores the entry unrendered, an empty page with a green
   build — so the plugins collect problems into `remarkPluginFrontmatter.paperProblems` and the
-  paper page throws on any, or on an entry with no `rendered`. Reported: an unknown `:cite`, `:v`
-  (in prose, in maths or in an erratum), figure name or directive (a literal colon is `\:`, as in
-  `arXiv\:2508.11856`); a `:::figure` without its `n` or its caption; a `::abstract` whose record
-  has none; a directive other than `:v` in maths; a TeX
-  error (rehype-katex otherwise draws it in red and moves on); a
-  notation row matching no display; a note whose `for` names no term, or a term outside its note's
-  host; a note with no block before it to explain (first in its section, after only the heading,
-  or first in a theorem); a term marked twice, or inside a highlight (seal over the seal band is under 3:1, so its
-  linked rule would vanish); a `def` without its `**Name.**`; a section without its `#id` or
-  `[title]`; an id used twice, counting a heading's (`<id>-title`) and those inside a figure's drawing (so a second
-  wealth figure on one page is refused, its `fm-*` ids repeated); an eq without one display or a wide/narrow pair, or with `\tag`;
-  `:::where` outside an eq; raw HTML, a code block or a heading; a `rail` or `aside` that needs
-  curling; the nesting traces above.
-  `tests/fixtures/papers/malformed.md` holds one of each and `tests/paperMarkdown.test.ts` names them.
+  paper page throws on any, or on an entry with no `rendered`. The checks are in `lib/paperMarkdown/`,
+  the less obvious ones with their reason beside them; `tests/fixtures/papers/malformed.md` holds one
+  of each mistake and `tests/paperMarkdown.test.ts` names them. One is an authoring rule rather than
+  a refusal: an unknown directive is reported, so a literal colon is written `\:`, as in
+  `arXiv\:2508.11856`.
 - **A file id the page writes itself fails the build too.** The plugin reports every id the file
   carries (`ids`) and the page refuses any that `paperPageOwns()` (`lib/pageStops.ts`) claims:
   PAPER_END's `read`, `references` and `cite`, `bibtex`, the corner nav's `cnav-list` and every
@@ -1184,19 +1158,12 @@ galaxy). The whole system is **token override**, not per-component branching:
     the page never styles the rail), `--rail-dash-halo` (the rail dash's 2px ring)
     and eight `--draft-*` tokens. `tests/draftingPalette.test.ts` checks that the two sets
     match and the inks clear AA.
-  - **paper** adds seven `--sheet-*` tokens: `--sheet-ground` (the ground — never `--paper`,
-    which in the dark convention is the light text colour), `--sheet-ul` (the underline
-    highlight, 0.42 of the seal, the strength the owner approved; emphasis under words that
-    read on their own, so not a WCAG 1.4.11 mark), `--sheet-band` (Figure 2's band of runs),
-    `--sheet-axis` and `--sheet-one` (the axis and the break-even line, each clearing 3:1),
-    `--sheet-grid` (the other grid lines) and `--sheet-mark` (a marked symbol, a linked term's
-    rule — on the bare sheet only). The band and the grid are **exempt from 3:1 by name**,
-    every value they help read being text (the labelled ticks, the end labels, the readout,
-    which also gives each month's range across the runs). It needs no knockout: nothing
-    strokes under its text, so the rail reads its `none` fallbacks. `ink-1` to `ink-4`
-    (`ink-4` is `ink-3`) and `--sheet-mark` clear 4.5:1 on the sheet; `ink-5`, the midpoint of
-    `ink-3` and the ground, is declared for completeness and read by nothing on these routes. `tests/paperPalette.test.ts` holds all of it,
-    exemptions included, and that the page's own CSS never paints a ground with `--paper`.
+  - **paper** adds seven `--sheet-*` tokens, each glossed in `tokens.css`'s paper header. The
+    ground is `--sheet-ground`, never `--paper`, which in the dark convention is the light text
+    colour; the band of runs and the grid are **exempt from 3:1 by name**, every value they help
+    read being text. It needs no knockout: nothing strokes under its text, so the rail reads its
+    `none` fallbacks. `tests/paperPalette.test.ts` holds the numbers, exemptions included, and
+    that the page's own CSS never paints a ground with `--paper`.
 - **Surfaces that can't inherit CSS tokens** (handle per-theme by hand):
   the **terrain canvas** (JS-painted — `TerrainHero.astro` picks a `TerrainRamp`
   + walker palette off `data-theme`; dark = the cyan-blue **"Glacier"** ramp,
@@ -1489,19 +1456,13 @@ titles came to rest hard against the browser chrome — the lead is a number in
     PlushCow's transition and hop literals and `TYPE_MS`, ~3.4s, and holds it under the
     limit.
     **The research routes and the rail are held to it, and to 2s per animation.** What moves
-    there unasked moves once, by `transform` and `opacity` (through `scripts/motion.ts`): a section's
-    heading and first block rise 8px and fade in over 340ms when first seen (several together
-    60ms apart, at most 120ms); a margin note follows its block by 120ms, beside the text
-    sliding 10px in from the right over 380ms; an underline highlight draws left to right in
-    640ms once wholly on screen; Figure 2 draws in 1600ms, its end labels fading in; Figure 1's
-    arrows appear in the order the data flows (360ms each, 120ms apart). On the index the
-    headings, cards and interests rise the same way, a hovered or focused card lifts 2px and
-    underlines its title line by line, and its picture redraws once a page view (750ms).
-    Nothing on the screen the reader lands on is held back, nor anything above it (a deep link,
-    a restored scroll), and what waits runs at the latest after `MOTION_LIMIT_MS` on screen.
-    Under reduced motion each is its finished state at once. The rail's motion is in
-    *Navigation*. **Everything older is not held to it yet, and this is the list known, not a
-    guarantee**: the hero terrain, the fluid sky, the drafting field, SkyWash's three breathe
+    there unasked moves once, by `transform` and `opacity` (the rail's entrance in CSS, the rest
+    through `scripts/motion.ts`), and ends within 2s — no test holds that bound; this sentence is
+    its record. Nothing on the screen the reader lands on is held back, nor anything above it (a
+    deep link, a restored scroll), and what waits runs at the latest after `MOTION_LIMIT_MS` on
+    screen. Under reduced motion each is its finished state at once. The timings are in the code
+    that plays them — `scripts/motion.ts`, the two research pages and `SideRail.astro` — not here.
+    **Everything older is not held to it yet, and this is the list known, not a guarantee**: the hero terrain, the fluid sky, the drafting field, SkyWash's three breathe
     loops and the `.descent::before/::after` drifts run for as long as they are on screen, and
     `/`'s `.scroll-cue` bobs forever in the foreground (`Heights.astro`). That is the site's
     older pattern and a known gap against 2.2.2, not a precedent for new motion in the
