@@ -8,8 +8,9 @@
 // The words are HTML over an svg of arrows, so a symbol is build-time MathML like every other on the site (svg
 // <text> cannot hold <math>). Each word is placed in percentages of its drawing and sized in cqw of it, so words
 // and arrows scale together as svg text would. Two drawings, .pp-art.wide and .pp-art.narrow, for the page's CSS
-// to swap at the phone breakpoint; the arrows are .p-arrow paths in the order the data flows, for the page to fade
-// in one by one. The words never wait.
+// to swap at the phone breakpoint: the swap hides the div, since its words are the svg's siblings, so the rule is
+// by class alone (`figure .narrow`), which also reaches Figure 2's svg.wide/svg.narrow. The arrows are .p-arrow
+// paths in the order the data flows, for the page to fade in one by one. The words never wait.
 import { inlineMath as m } from '../equations';
 
 type Anchor = 'start' | 'middle' | 'end';

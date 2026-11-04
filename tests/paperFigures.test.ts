@@ -31,6 +31,19 @@ const stretched: WealthSeries = {
 };
 // three lines ending at one value: the end labels have to be pushed apart
 const tied: WealthSeries = { ...REPRO, bhrp: REPRO.rl, bench: REPRO.rl };
+// Georgia's advance widths in 2048ths of an em (macOS's Georgia.ttf, hmtx), for the glyphs the end labels use.
+// The face has no kern or GPOS table, so a run's width is the sum of its advances.
+const GEORGIA: Record<string, number> = {
+  '-': 766, '.': 552, 0: 1257, 1: 880, 2: 1144, 3: 1130, 4: 1157, 5: 1082, 6: 1159, 7: 1029, 8: 1221, 9: 1159,
+  B: 1339, H: 1669, L: 1236, P: 1249, R: 1437, a: 1032, c: 930, e: 990, h: 1192, k: 1097, m: 1804, n: 1210, r: 839,
+};
+const georgia = (s: string, fs: number) => [...s].reduce((w, c) => {
+  if (!(c in GEORGIA)) throw new Error(`no Georgia advance for "${c}": add it from the font`);
+  return w + GEORGIA[c];
+}, 0) * fs / 2048;
+/** Every element carrying the class `wide` or `narrow`, as tag.class.list. */
+const variants = (html: string) => [...html.matchAll(/<(\w+)\b[^>]*\sclass="([^"]*)"/g)]
+  .filter((m) => /\b(?:wide|narrow)\b/.test(m[2])).map((m) => [m[1], ...m[2].split(' ')].join('.'));
 
 describe('REPRO, the series the reproduction is drawn from', () => {
   it('is the month-by-month median of the runs, their band, BHRP and the benchmark, from $1', () => {
@@ -89,6 +102,36 @@ describe('Figure 2, the growth of $1', () => {
     });
   }
 
+  it('fits its end labels inside the drawing, set in Georgia, the widest face --font-display names', () => {
+    for (const svg of svgs(full)) {
+      const W = frame(svg).W, fs = Number(open(svg).match(/font-size:([\d.]+)px/)![1]);
+      const ends = [...svg.matchAll(/<text class="f-end" x="([\d.]+)"[^>]*><tspan class="f-name[^"]*">([^<]*)<\/tspan><tspan class="f-val" dx="([\d.]+)">([^<]*)</g)];
+      expect(ends).toHaveLength(3);
+      for (const [, x, name, dx, v] of ends) {
+        expect(Number(x) + georgia(name, fs) + Number(dx) + georgia(v, fs), `${name} ${v}`).toBeLessThanOrEqual(W);
+      }
+    }
+  });
+
+  it('clips the draw mask to where it lies at rest, inside the drawing, and slides it wholly out of the clip', () => {
+    for (const svg of [...svgs(full), ...svgs(mini)]) {
+      const W = Number(attr(open(svg), 'viewBox')!.split(' ')[2]);
+      const id = attr(svg.match(/<g class="f-draw"[^>]*>/)![0], 'clip-path')!.match(/^url\(#([\w-]+)\)$/)![1];
+      const box = (tag: string) => ['x', 'y', 'width', 'height'].map((k) => Number(attr(tag, k)));
+      const [cx, cy, cw, ch] = box(svg.match(new RegExp(`<clipPath id="${id}"><rect\\b[^>]*>`))![0]);
+      expect(cx).toBeGreaterThanOrEqual(0);
+      expect(cx + cw).toBeLessThanOrEqual(W);
+      const d = Number(attr(svg.match(/<g class="f-mask"[^>]*>/)![0], 'data-d'));
+      const rects = [...svg.match(/<g class="f-mask"[\s\S]*?<\/g>/)![0].matchAll(/<rect\b[^>]*>/g)].map((m) => box(m[0]));
+      expect(rects).toHaveLength(2);
+      for (const [x, y, w, h] of rects) {
+        expect([y, h]).toEqual([cy, ch]);
+        expect(x + w).toBeLessThanOrEqual(cx + cw);    // at rest the mask ends inside the clip
+        expect(x + d).toBeGreaterThanOrEqual(cx + cw);  // at the slide's end none of it is left inside the clip
+      }
+    }
+  });
+
   it('draws in under a mask of the sheet\'s ground, never --paper (the dark theme\'s TEXT colour)', () => {
     expect(full).not.toContain('--paper');
     expect(mini).not.toContain('--paper');
@@ -101,7 +144,7 @@ describe('Figure 2, the growth of $1', () => {
   });
 
   it('waits on no script: the mask and the readout are hidden in the markup, for a script to show', () => {
-    for (const svg of [...svgs(full), ...svgs(mini)]) expect(svg).toMatch(/<g class="f-draw" aria-hidden="true" visibility="hidden">/);
+    for (const svg of [...svgs(full), ...svgs(mini)]) expect(svg).toMatch(/<g class="f-draw" aria-hidden="true" visibility="hidden"[ >]/);
     for (const svg of svgs(full)) expect(svg).toMatch(/<g class="f-read" aria-hidden="true" opacity="0">/);
   });
 
@@ -180,6 +223,14 @@ describe('both figures', () => {
       expect(html).not.toMatch(/published/i);
     });
   }
+
+  // The page swaps the drawings with one rule by class, `figure .narrow`: Figure 1's must hide the div that holds its
+  // words, not only its svg. So the classes sit on each drawing's outermost element and nowhere else.
+  it('mark their two drawings wide and narrow, on the element that holds the whole drawing', () => {
+    expect(variants(full)).toEqual(['svg.wide', 'svg.narrow']);
+    expect(variants(pipe)).toEqual(['div.pp-art.wide', 'div.pp-art.narrow']);
+    expect(variants(mini)).toEqual([]);
+  });
 
   it("are RL-BHRP's, registered under its slug: the two figures and the card's miniature", () => {
     expect(PAPER_DATA['rl-bhrp'].figures).toEqual({ wealth: full, pipeline: pipe });

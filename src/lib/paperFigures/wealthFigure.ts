@@ -9,7 +9,8 @@
 //   at y1 - (y1 - y0) * (v - lo) / (hi - lo).
 // - g.f-draw, a mask over the data and under the grid, filled with the sheet's ground (--sheet-ground; --paper is
 //   the dark theme's TEXT colour). It is hidden in the markup, so nothing waits on a script: the draw shows it,
-//   slides g.f-mask right by its data-d, and hides it again.
+//   slides g.f-mask right by its data-d, and hides it again. It is clipped to where it lies at rest, so the slide
+//   never paints outside the drawing, whatever the svg's overflow.
 // - g.f-labels, the end labels; g.f-read, the readout's hairline and dots at the origin, unshown (opacity 0).
 // - .f-plot, the readout's target: the three series it reads on data-rl, data-bhrp and data-bench (4 dp; point 0
 //   is the start, point i the month-end data-dates[i - 1]), its legend .f-tip and a live region.
@@ -26,8 +27,10 @@ export interface WealthSeries {
 }
 
 interface Frame { W: number; H: number; x0: number; x1: number; y0: number; y1: number }
+// x1 leaves room right of the plot for the end labels, which have to end inside W when set in Georgia
+// (--font-display, the widest face its stack names); tests/paperFigures.test.ts measures them.
 const WIDE = { W: 612, H: 330, x0: 34, x1: 512, y0: 30, y1: 296, fs: 12.5 };
-const NARROW = { W: 350, H: 262, x0: 28, x1: 268, y0: 26, y1: 234, fs: 11 };
+const NARROW = { W: 350, H: 262, x0: 28, x1: 260, y0: 26, y1: 234, fs: 11 };
 const MINI: Frame = { W: 320, H: 200, x0: 10, x1: 310, y0: 14, y1: 186 };
 
 const EDGE = 18;      // the mask's soft leading edge
@@ -52,14 +55,17 @@ function series(d: WealthSeries, f: Frame, dom: ReturnType<typeof domain>, mask:
   const x = linearScale(0, d.rl.length - 1, f.x0, f.x1), y = linearScale(dom.lo, dom.hi, f.y1, f.y0);
   const pts = (s: readonly number[]) => s.map((v, i) => `${r1(x(i))},${r1(y(v))}`);
   const line = (cls: string, s: readonly number[]) => `<polyline class="${cls}" fill="none" points="${pts(s).join(' ')}"/>`;
-  const h = mask.bottom - mask.top;
+  const h = mask.bottom - mask.top, w = f.x1 - f.x0 + 6;
+  // The slide carries the mask a plot's width past x1, out of the drawing and over whatever sits beside the figure
+  // once its svg overflows; the clip ends the mask where it ends at rest, so sliding can only uncover.
   const svg = `<polygon class="f-band" points="${[...pts(d.hi), ...pts(d.lo).reverse()].join(' ')}"/>`
     + line('f-bench', d.bench) + line('f-bhrp', d.bhrp) + line('f-rl', d.rl)
-    + '<g class="f-draw" aria-hidden="true" visibility="hidden">'
-    + `<defs><linearGradient id="${mask.id}"><stop offset="0" style="stop-color:${GROUND};stop-opacity:0"/><stop offset="1" style="stop-color:${GROUND}"/></linearGradient></defs>`
-    + `<g class="f-mask" data-d="${f.x1 - f.x0 + 6 + EDGE}">`
+    + `<g class="f-draw" aria-hidden="true" visibility="hidden" clip-path="url(#${mask.id}-clip)">`
+    + `<defs><linearGradient id="${mask.id}"><stop offset="0" style="stop-color:${GROUND};stop-opacity:0"/><stop offset="1" style="stop-color:${GROUND}"/></linearGradient>`
+    + `<clipPath id="${mask.id}-clip"><rect x="0" y="${mask.top}" width="${f.x0 + w}" height="${h}"/></clipPath></defs>`
+    + `<g class="f-mask" data-d="${w + EDGE}">`
     + `<rect x="${f.x0 - EDGE}" y="${mask.top}" width="${EDGE}" height="${h}" fill="url(#${mask.id})"/>`
-    + `<rect x="${f.x0}" y="${mask.top}" width="${f.x1 - f.x0 + 6}" height="${h}" style="fill:${GROUND}"/></g></g>`
+    + `<rect x="${f.x0}" y="${mask.top}" width="${w}" height="${h}" style="fill:${GROUND}"/></g></g>`
     + dom.grid.map((v) => `<line class="f-grid${v === 1 ? ' f-one' : ''}" x1="${f.x0}" x2="${f.x1}" y1="${r1(y(v))}" y2="${r1(y(v))}"/>`).join('');
   return { x, y, svg };
 }
