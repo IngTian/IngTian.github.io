@@ -470,7 +470,13 @@ const noted = errata.map((e) => e.date).sort().at(-1);
     const shown = (el: Element): boolean => el.getClientRects().length > 0;
     const wide = matchMedia('(min-width: 1101px)');
 
-    // ── margin notes, each beside its anchor (its term, or the top of its block), none overlapping ──
+    // ── margin notes, each beside its anchor (its term's line, or the top of its block), none overlapping
+    // (stackNotes, 16px apart). Only a script knows where a term's line falls, so from 1101px a note is held
+    // `visibility: hidden` until place() marks it .is-placed: hidden keeps its box, so its first paint is where it
+    // rests and nothing shifts (CLS 0 at 1440x900, 1280x720, 1101x700 and 1101x600, cold, throttled, from a
+    // #results deep link and on a restored-scroll reload). The hold is CSS alone, `@media (scripting: enabled)`, and
+    // its backstop a CSS animation that shows every note after MOTION_LIMIT_MS if this never runs; without a script
+    // the query does not match and the notes fall into the column. ──
     const notes = [...page.querySelectorAll<HTMLElement>('.mn')];
     function place(): void {
       for (const n of notes) n.style.top = '';

@@ -24,11 +24,11 @@
 // one hit. The level it was built to pick has been picked and shipped (AMP_BY_LEVEL, below), the
 // route is retired, and that grep is now 0 — so the prop, its class pair and its uniform branch
 // are gone. Deliberately NOT kept "in case": a mode with no caller is a branch nobody exercises,
-// and this component runs on every page, where an untested branch is the expensive kind.
+// and this component runs on every route with a sky, where an untested branch is the expensive kind.
 //
 // (Note the house habit: this rationale is a frontmatter comment, not an HTML one. Astro emits
-// HTML comments into the build, and FluidSky renders on every route — an explanation this long
-// would ship to every visitor on every page. Frontmatter `//` never reaches the output.)
+// HTML comments into the build, and FluidSky renders on every route with a sky — an explanation this long
+// would ship to every visitor on each of them. Frontmatter `//` never reaches the output.)
 interface Props {
   strength?: 0 | 1 | 2 | 3 | 4;
   /** 'descent' (paper text, dawn→ground) | 'reading' (dark ink, luminous) */

@@ -1,17 +1,12 @@
 // Which stops does a page's marginal rail carry, and what does each one point at?
 //
 // This is the rail's CONTENT rule, kept pure so it can be unit-tested and so the
-// rail component stays dumb markup. It exists because /research had the bug this
-// module makes impossible: the page rendered N featured papers with
-// `featured.map(...)` but built its rail with `featured.some(...)`, so N papers
-// collapsed into ONE flat anchor set — pointing at IDs that were emitted once per
-// paper and therefore duplicated. getElementById resolves the first match, so
-// every "Method" link jumped to paper 1.
-//
-// The fix is structural, not a patch: the SAME function that names a stop's
-// anchor also hands the page the id to render (`sectionId`). A stop can no longer
-// point at an id the page didn't emit, because there is only one place that
-// spells it.
+// rail component stays dumb markup. The SAME function that names a stop's anchor
+// also hands the page the id to render (`projectSectionId`, `experienceSectionId`,
+// `paperSections`), so a stop cannot point at an id the page did not emit: there is
+// one place that spells it. A rail built apart from its page fails silently — a
+// repeated id is resolved to its first match by getElementById and by a #fragment,
+// so every link naming it lands on the first section.
 
 import type { Project, TimelineEntry } from '../data/profile';
 import {
@@ -208,11 +203,10 @@ export function homeStops(): (Stop & { zone: 'light' | 'dark' })[] {
   ];
 }
 
-/** Flatten a stop tree depth-first (parent before its children).
- *  NOTE this is TREE order, which need not be top-to-bottom VISUAL order — a stop
- *  in a side column can sit higher on screen than its tree position implies.
- *  SideRail therefore sorts by measured position before running the scrollspy; do
- *  not assume this order is geometrically monotonic. */
+/** Flatten a stop tree depth-first (parent before its children): SideRail numbers its rows by it for their
+ *  entrance. NOTE this is TREE order, which need not be top-to-bottom VISUAL order — a page may set a section
+ *  higher on screen than its tree position implies — so lib/scrollspy's markStops sorts by measured top where the
+ *  order matters; do not assume this order is geometrically monotonic. */
 export function flattenStops(stops: readonly Stop[]): Stop[] {
   const out: Stop[] = [];
   for (const s of stops) {

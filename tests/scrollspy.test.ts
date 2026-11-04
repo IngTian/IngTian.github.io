@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { activeStopIndex, BAND, markStops } from '../src/lib/scrollspy';
+import { activeStopIndex, markStops } from '../src/lib/scrollspy';
 
 // Viewport 1000px tall => reference line at 400px. A stop is "active" once its
 // top has scrolled to/above that line; the last such stop wins.
@@ -44,7 +44,10 @@ const box = (top: number, bottom: number, parent: number | null = null, visible 
 
 describe('markStops', () => {
   it('reads the band SideRail has always used: 10% to 62% down the viewport', () => {
-    expect(BAND).toEqual({ top: 0.10, bottom: 0.62 });
+    // 100–620px: a box reaching 1px into it at either edge is current; 1px short of it, neither is, and the
+    // fallback's one stop is
+    expect(markStops([box(-500, 101), box(619, 1400)], VH, 900, DOC).current).toEqual([0, 1]);
+    expect(markStops([box(-500, 99), box(621, 1400)], VH, 900, DOC).current).toEqual([0]);
   });
 
   it('marks a stop whose box is inside the band as current, and it leads', () => {

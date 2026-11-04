@@ -46,7 +46,7 @@ export interface StopBox { top: number; bottom: number; visible: boolean; parent
 export interface Marks { current: number[]; ancestors: number[]; lead: number | null }
 
 /** The reading band, as fractions of the viewport's height. */
-export const BAND = { top: 0.10, bottom: 0.62 } as const;
+const BAND = { top: 0.10, bottom: 0.62 } as const;
 
 /**
  * SideRail's marking rule. Every visible stop whose box overlaps the reading band is CURRENT, so two are current
