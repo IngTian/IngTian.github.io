@@ -115,7 +115,7 @@ export interface DimensionDepth {
  * Depth per dimension.
  *
  * The distinction this makes visible is the one the fan alone hid: Experience has the LARGEST
- * share (many items) but a LOW mean score (mostly 1s and 2s), while Projects has fewer items at
+ * share (many items) but a LOW mean score (mostly 1s and 2s), while Research has fewer items at
  * a higher mean. Volume and quality are different axes, and a profile that only showed share
  * implied they were the same.
  */

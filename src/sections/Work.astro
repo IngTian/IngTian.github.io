@@ -63,6 +63,11 @@ const span = `${monthYear(PAPER.start, 'short')} – ${monthYear(PAPER.end, 'sho
 const lineFor = (p: Publication) => p.slug === 'rl-bhrp'
   ? `$1 → ${rl['usd.rl']}, ${span} · Sharpe ${rl['sharpe.rl']} vs ${rl['sharpe.bhrp']} BHRP · ${p.status}`
   : `${p.venue} · ${p.year}`;
+
+// A title's hyphenated words never break at their hyphen: without this the full RL-BHRP title wraps as "(RL-" /
+// "BHRP)" at 1440 and 390, splitting the paper's own name. Fraunces has no U+2011, so a non-breaking hyphen would
+// fall back to another face. Odd parts of the split are the hyphenated words.
+const titleParts = (title: string) => title.split(/(\S*-\S*)/);
 ---
 {/* THE APPENDIX — the work AND the footer, as one slide. The owner: "i noticed that when i scroll down to the
      work, it seems like you aligned the bottom with the footer so that leaves a huge space below the cow. why not
@@ -84,7 +89,7 @@ const lineFor = (p: Publication) => p.slug === 'rl-bhrp'
           <p class="wk-col-kicker">Publications</p>
           {publications.map((p) => (
             <div class="wk-item">
-              <p class="wk-item-name">{p.title}</p>
+              <p class="wk-item-name">{titleParts(p.title).map((s, i) => (i % 2 ? <span class="wk-nobreak">{s}</span> : s))}</p>
               <p class="wk-item-line">{lineFor(p)}</p>
             </div>
           ))}
@@ -231,6 +236,7 @@ const lineFor = (p: Publication) => p.slug === 'rl-bhrp'
     font-family: var(--font-accent); font-weight: 500; font-size: clamp(17px, 1.35vw, 20px);
     line-height: 1.28; color: var(--wk-ink); margin: 0;
   }
+  .wk-nobreak { white-space: nowrap; }
   .wk-item-line {
     font-size: clamp(13.5px, 1vw, 15px); line-height: 1.58; color: var(--wk-ink-faint);
     margin: 6px 0 0; max-width: 40ch;

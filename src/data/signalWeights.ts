@@ -46,13 +46,18 @@
 // quote follows its item. None was re-scored, because none touched what capped the score: bookkeeping,
 // self-reproduction, a private repo. tests/signalWeights.test.ts checks every quoted span is still in its item.
 //
-// THIRD PASS — Claude Opus 5.5, 2026-11-03 — one item, re-scored because its record gained a DOI link:
-// publications:self-attention-rnn-text. Three raters, RUBRIC_PROMPT, none seeing another's output, gave 1, 1
-// and 2; the committed score is the median, 1, and the `because` is the median rater's sentence verbatim. The
-// item scored was the title alone, "Self-Attention on RNN-based Text Classification", so the sentence's "no
-// venue, link" describes that text, not the record, which now carries both. The same pass keyed both
-// publications by slug and set RL-BHRP's label to the paper's title spelling, without re-scoring it: the
-// evidence its score rests on did not change.
+// THIRD PASS — Claude Opus 5.5 (us.anthropic.claude-opus-5-5), 2026-11-04 — one item, re-scored because its
+// record gained a DOI link: publications:self-attention-rnn-text. Three separate, stateless calls, none seeing
+// another's output, each given RUBRIC_PROMPT verbatim, the item, and a one-line stance (sceptical, literal, a
+// quant hiring for a buy-side seat). The item was its record text from profile.ts — title, authors, status ·
+// venue · year · href, then the finding in quotes — exactly:
+//   Self-Attention on RNN-based Text Classification. Dailun Li, Zeying Tian, Yining Duan. conference · Proc.
+//   SPIE 12290 (CNSSE 2022) · 2022 · https://doi.org/10.1117/12.2641031. "Testing the claim that
+//   self-attention always helps, it found that the gain grows with the size of the dataset, that attention can
+//   hurt on small datasets, and that the same dataset can show opposite effects in different models."
+// They gave 4, 4 and 4; the committed score is the median, 4, and the `because` is rater 2's sentence verbatim
+// (the median rater; all three tied). The same pass keyed both publications by slug and set RL-BHRP's label to
+// the paper's title spelling, without re-scoring it: the evidence its score rests on did not change.
 
 import type { SignalWeights } from '../lib/signalRubric';
 
@@ -114,9 +119,9 @@ export const SIGNAL_WEIGHTS: SignalWeights = {
       because: 'arXiv:2508.11856 with a public PDF and a full out-of-sample metrics table over a stated train/test split is fully checkable — but a preprint is not peer-reviewed.',
     },
     {
-      id: 'publications:self-attention-rnn-text', factor: 'research', score: 1,
+      id: 'publications:self-attention-rnn-text', factor: 'research', score: 4,
       label: 'Self-Attention on RNN-based Text Classification',
-      because: 'The item is only a title, "Self-Attention on RNN-based Text Classification", with no venue, link, dataset or reported metric for a reader to check, and text classification is NLP modelling rather than quantitative research, so the text gives nothing beyond a mention.',
+      because: 'The DOI link (https://doi.org/10.1117/12.2641031) to a published Proc. SPIE 12290 paper lets a reader check it, but the text never says it was peer-reviewed or adopted by others, so it cannot reach 5.',
     },
     {
       id: 'interests:0', factor: 'research', score: 1,
