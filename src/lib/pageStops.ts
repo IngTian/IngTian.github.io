@@ -61,16 +61,34 @@ export const PAPER_END = [
   { id: 'cite', title: 'Cite', rail: 'Cite' },
 ] as const;
 
+interface PaperSection { id: string; n?: string; title: string; rail: string }
+
 /**
- * A paper page's rail: its file's sections, as the markdown plugin reports them (lib/paperMarkdown, `sections`), in
- * order, then the page's own (PAPER_END). The ids are the file's as written: a paper has a page of its own, so no
- * other paper's ids are ever beside them, and a deep link reads `/research/rl-bhrp#results`. The plugin refuses an
- * id used twice in the file, and the page refuses one of PAPER_END's.
- *
- * Flat, though a section holds equations and figures: the rail bookmarks the sections a reader moves between.
+ * A paper page's sections: its file's, as the markdown plugin reports them (lib/paperMarkdown, `sections`), in
+ * order, then the page's own (PAPER_END). The rail (paperStops) and the phone's Contents both list exactly this.
+ * The ids are the file's as written: a paper has a page of its own, so no other paper's ids are ever beside them,
+ * and a deep link reads `/research/rl-bhrp#results`. The plugin refuses an id used twice in the file, and the page
+ * one it writes itself (paperPageOwns).
  */
-export function paperStops(sections: readonly { id: string; rail: string }[]): Stop[] {
-  return [...sections, ...PAPER_END].map((s) => ({ label: s.rail, target: s.id }));
+export function paperSections(sections: readonly PaperSection[]): PaperSection[] {
+  return [...sections, ...PAPER_END];
+}
+
+/** A paper page's rail. Flat, though a section holds equations and figures: the rail bookmarks the sections a
+ *  reader moves between. */
+export function paperStops(sections: readonly PaperSection[]): Stop[] {
+  return paperSections(sections).map((s) => ({ label: s.rail, target: s.id }));
+}
+
+// The ids a paper page writes around its file's body: PAPER_END's sections, its rail, its BibTeX and the corner
+// nav's list. Its references' are `ref-<key>` (lib/paperMarkdown refId).
+const PAPER_PAGE_IDS = new Set<string>([...PAPER_END.map((s) => s.id), 'paper-toc', 'bibtex', 'cnav-list']);
+
+/** Whether a paper page writes `id` itself. A file that writes it too makes a second element with that id, and a
+ *  #fragment or getElementById finds the first, so the page refuses the file. distSmoke holds this to the built
+ *  page: each id there is either the file's (the plugin's `ids`) or the page's, never both, never neither. */
+export function paperPageOwns(id: string): boolean {
+  return PAPER_PAGE_IDS.has(id) || id.startsWith('ref-');
 }
 
 /** Experience section id — one speller, so rail and page cannot disagree. */

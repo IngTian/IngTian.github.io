@@ -28,10 +28,13 @@ export type PaperRecord = Pick<Publication, 'slug' | 'abstract' | 'href'>;
 
 /** What a paper's render reports on `render(entry).remarkPluginFrontmatter`. A plugin cannot fail the build
  *  (Astro logs a plugin's throw and stores the entry unrendered), so the paper page throws on any problem.
+ *  `ids` is every id the rendered file carries (its sections', their headings', its equations', theorems' and
+ *  figures', and those inside a figure's drawing), for the page to refuse one it writes itself.
  *  `errataText` is the frontmatter's errata, in order, each with its `:v` filled in. */
 export interface PaperReport {
   paperProblems: string[];
   sections: { id: string; n?: string; title: string; rail: string }[];
+  ids: string[];
   bodyWords: number;
   errataText: string[];
 }
@@ -112,7 +115,12 @@ export function remarkPaper({ papers, publications }: { papers: Record<string, P
     const ids = new Set<string>(), terms = new Map<string, Node>(), hosts = new WeakSet<Node>();
     const notes: { note: Node; host: Node }[] = [];
     const problem = (p: string) => problems.push(p);
-    const claim = (id: string) => { if (ids.has(id)) problem(`id #${id} is used twice`); ids.add(id); };
+    /** Every id the file's markup carries goes through here; false if it was already taken. */
+    const claim = (id: string): boolean => {
+      if (ids.has(id)) { problem(`id #${id} is used twice`); return false; }
+      ids.add(id);
+      return true;
+    };
     // The one lookup of a :v, wherever it is written: in prose, in maths and in the errata.
     const value = (key: string): string => {
       const v = data.values[key];
@@ -220,7 +228,7 @@ export function remarkPaper({ papers, publications }: { papers: Record<string, P
       const [first, ...body] = n.children ?? [];
       const label = first?.data?.directiveLabel ? first : undefined;
       if (!id) problem(`:::section${label ? ` [${plain(label)}]` : ''} has no #id`);
-      else claim(id);
+      else if (claim(id)) claim(`${id}-title`);
       if (!label) problem(`:::section #${id} has no [title]`);
       for (const [k, a] of [['rail', rail], ['aside', aside]]) {
         if (a && UNCURLED.test(a)) problem(`${k}="${a}" keeps straight quotes and dashes the title would not — write ’ “ ” – — …`);
@@ -277,6 +285,7 @@ export function remarkPaper({ papers, publications }: { papers: Record<string, P
       if (!num) problem(`:::figure ${name} has no n=`);
       const table = /^<table\b/.test(art ?? ''), id = `${table ? 'table' : 'figure'}-${num}`;
       if (num) claim(id);
+      for (const [, inner] of (art ?? '').matchAll(/\sid="([^"]+)"/g)) claim(inner);
       const paras: Node[] = [], asides: Node[] = [];
       for (const c of n.children ?? []) {
         if (c.type === 'paragraph') { blocks(c, false); paras.push(c); }
@@ -356,5 +365,6 @@ export function remarkPaper({ papers, publications }: { papers: Record<string, P
     fm.errataText = errata.map((e) => String(e.text ?? '').replace(VALUE, (_, key: string) => value(key)));
     fm.paperProblems = problems;
     fm.sections = sections;
+    fm.ids = [...ids];
   };
 }

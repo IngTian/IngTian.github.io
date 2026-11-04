@@ -88,10 +88,11 @@ const items: Item[] = [
   </button>
   <ul id="cnav-list">
     {/* THE PAGES, first and in words — this is the part a visitor needs and must not have to hunt for.
-        aria-current marks the page you are on, so the nav answers "where am I" as well as "where can I go". */}
+        aria-current marks the page you are on, so the nav answers "where am I" as well as "where can I go": "page"
+        on its own link, "true" on its section's when the page is under one (/research/<slug>, /writing/<slug>). */}
     {PAGES.map((p) => (
       <li>
-        <a class="page" href={p.href} {...(current === p.href ? { 'aria-current': 'page' } : {})}>
+        <a class="page" href={p.href} aria-current={current === p.href ? 'page' : current.startsWith(`${p.href}/`) ? 'true' : undefined}>
           <span class="pill" aria-hidden="true"></span>
           <span class="content"><span class="page-label">{p.label}</span></span>
         </a>
@@ -273,14 +274,14 @@ const items: Item[] = [
     .cnav .mark { padding: 9px 14px; }
   }
 
-  /* THE PAGE YOU ARE ON: a 6px dot in the accent role token (--ochre, so seal red on /projects) plus weight 600 —
-     shape plus colour; the bloom pill stays hover's. The dot sits in the link's left padding, never inside the
-     label, and every page link reserves the same 20px, so no label moves between pages (the capsule is
-     right-anchored). 20 is the shared 14 + 6, so the dot sits 7px off the link's edge and 7px off the label; at 14
-     it sat flush on the edge (the owner: "almost on the edge"). */
+  /* THE PAGE YOU ARE ON, or the section it is under (either aria-current): a 6px dot in the accent role token
+     (--ochre, so seal red on /projects) plus weight 600 — shape plus colour; the bloom pill stays hover's. The dot
+     sits in the link's left padding, never inside the label, and every page link reserves the same 20px, so no
+     label moves between pages (the capsule is right-anchored). 20 is the shared 14 + 6, so the dot sits 7px off
+     the link's edge and 7px off the label; at 14 it sat flush on the edge (the owner: "almost on the edge"). */
   .cnav .page { padding-left: 20px; }
   .cnav .page .page-label { display: inline-block; position: relative; }
-  .cnav a[aria-current='page'] .page-label::before {
+  .cnav a[aria-current] .page-label::before {
     content: '';
     position: absolute;
     right: calc(100% + 7px); top: 50%;
@@ -289,7 +290,7 @@ const items: Item[] = [
     background: var(--ochre);
     box-shadow: 0 0 9px color-mix(in oklab, var(--ochre) 75%, transparent);
   }
-  .cnav a[aria-current='page'] { font-weight: 600; }
+  .cnav a[aria-current] { font-weight: 600; }
 
   /* sun/moon swap: show the glyph for the ACTION (moon = go dark in light
      theme; sun = go light in dark theme). Default (light) shows moon. */

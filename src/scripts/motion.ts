@@ -29,19 +29,20 @@ export function play(el: Element, frames: Keyframe[], opts: KeyframeAnimationOpt
 }
 
 /**
- * The bottom of the screen the reader is landing on, in viewport coordinates. A script started at parse runs before
- * the browser scrolls to a fragment (/research/rl-bhrp#results) and before the router restores a reload's position
- * (history.state, ClientRouter), so "the screen now" is still the top of the page. What the reader lands on is the
- * fragment's target, less its scroll margin, or the restored position; else where the window is.
+ * The bottom of the lowest screen the reader may be landing on, in viewport coordinates. A script started at parse
+ * on a full load runs before the browser scrolls to a fragment (/research/rl-bhrp#results); on a reload or a Back,
+ * the router (ClientRouter) has already restored history.state's position, and the URL keeps the fragment it was
+ * left with — Back to `#results` lands wherever the reader had read on to, far below it. So the reader may land
+ * where the window is, at the restored position or at the fragment's target (less its scroll margin), and nothing
+ * on any of those screens is held back.
  */
 function landingBottom(): number {
   const id = decodeURIComponent(window.location.hash.slice(1));
   const target = id ? document.getElementById(id) : null;
   const restored = (history.state as { scrollY?: unknown } | null)?.scrollY;
-  const top = target
-    ? target.getBoundingClientRect().top - (parseFloat(getComputedStyle(target).scrollMarginTop) || 0)
-    : Math.max(0, (typeof restored === 'number' ? restored : 0) - window.scrollY);
-  return top + window.innerHeight;
+  const targetTop = target ? target.getBoundingClientRect().top - (parseFloat(getComputedStyle(target).scrollMarginTop) || 0) : 0;
+  const restoredTop = typeof restored === 'number' ? restored - window.scrollY : 0;
+  return Math.max(0, targetTop, restoredTop) + window.innerHeight;
 }
 
 /**

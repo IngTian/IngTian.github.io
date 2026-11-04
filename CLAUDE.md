@@ -558,7 +558,10 @@ phone treatment is *bug fixes only*, and the whole of it is:
   asserts every href resolves to a real route, with no duplicate hrefs or labels.
   `CornerNav` renders it.
 - **The page you are on is marked by a lit DOT before its label**, on every page:
-  `aria-current="page"` on the link, a 6px dot plus a glow, and the label at weight 600.
+  `aria-current="page"` on the link, a 6px dot plus a glow, and the label at weight 600. A page
+  under a door (`/research/<slug>`, `/writing/<slug>`) marks its section's link the same way, with
+  `aria-current="true"` — it is in that section, not on that page; `tests/distSmoke.test.ts` checks
+  every built route.
   It replaced a 1px accent hairline under the label at weight 500, which the owner found
   unclear — that thin, it reads as an underline or as nothing. The dot is shape plus
   colour, so it does not rely on colour alone; the **bloom pill stays hover's and
@@ -709,7 +712,7 @@ file holds is the prose; everything else has one home of its own:
 
 | write | renders |
 | --- | --- |
-| `::::section[The question]{#question n=1 rail="Question"}` … `::::` | `<section class="sec" id="question">` with `<h2><span class="n">1</span>The question</h2>`. `n` is optional (In brief has none), `rail` defaults to the title, an `aside="…"` follows the title in the heading only (`· in the paper’s own words`). The rail and the phone Contents come from these; the ids are the file's as written (one paper to a page), and the page refuses one it writes itself (`read`, `references`, `cite`). A numbered section opens with its lead, set in full ink. |
+| `::::section[The question]{#question n=1 rail="Question"}` … `::::` | `<section class="sec" id="question">` with `<h2><span class="n">1</span>The question</h2>`. `n` is optional (In brief has none), `rail` defaults to the title, an `aside="…"` follows the title in the heading only (`· in the paper’s own words`). The rail and the phone Contents come from these; the ids are the file's as written (one paper to a page), and the page refuses one it writes itself (see below). A numbered section opens with its lead, set in full ink. |
 | `::abstract` | the record's abstract, verbatim, as `<blockquote class="abstract" cite="<record href>">`; the paragraph after it is the page's note on it. Raw HTML, so not in `bodyWords` (the page adds it to the reading time) |
 | `**The problem.** …` | a run-in head: `<strong>`, set italic in full ink at the body's weight |
 | `:t[risk parity]{#rp}` | `<i class="t" data-n="rp">` — a term at first use, the anchor of its note |
@@ -754,10 +757,19 @@ file holds is the prose; everything else has one home of its own:
   notation row matching no display; a note whose `for` names no term, or a term outside its note's
   host; a term marked twice, or inside a highlight (seal over the seal band is under 3:1, so its
   linked rule would vanish); a `def` without its `**Name.**`; a section without its `#id` or
-  `[title]`; an id used twice; an eq without one display or a wide/narrow pair, or with `\tag`;
+  `[title]`; an id used twice, counting a heading's (`<id>-title`) and those inside a figure's drawing (so a second
+  wealth figure on one page is refused, its `fm-*` ids repeated); an eq without one display or a wide/narrow pair, or with `\tag`;
   `:::where` outside an eq; raw HTML, a code block or a heading; a `rail` or `aside` that needs
   curling; the nesting traces above.
   `tests/fixtures/papers/malformed.md` holds one of each and `tests/paperMarkdown.test.ts` names them.
+- **A file id the page writes itself fails the build too.** The plugin reports every id the file
+  carries (`ids`) and the page refuses any that `paperPageOwns()` (`lib/pageStops.ts`) claims:
+  PAPER_END's `read`, `references` and `cite`, the rail's `paper-toc`, `bibtex`, the corner nav's
+  `cnav-list` and every `ref-…`. A second element with an id takes none of its links — a `#fragment`
+  and `getElementById` find the first — so `{#bibtex}` would have Copy BibTeX copy a section, and
+  `{#ref-markowitz1952}` would take every cite of it. `tests/distSmoke.test.ts` holds the list to the
+  built page: each id there is the file's or the page's, never both and never neither, so an id the
+  layout gains fails by name.
 - **The render also reports** `sections` (`{ id, n?, title, rail }`, for the rail and Contents),
   `errataText` (the errata with their `:v` filled in) and `bodyWords` — `countWords` from
   `lib/words.ts` over the body's text, every element boundary a space, with `math`, `table` and the

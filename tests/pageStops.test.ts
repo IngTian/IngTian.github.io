@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { projectStops, projectSectionId, experienceStops, railLabel, homeStops, flattenStops, paperStops, PAPER_END, type Stop } from '../src/lib/pageStops';
+import {
+  projectStops, projectSectionId, experienceStops, railLabel, homeStops, flattenStops, paperPageOwns, paperSections, paperStops,
+  PAPER_END, type Stop,
+} from '../src/lib/pageStops';
+import { refId } from '../src/lib/paperMarkdown';
 import type { TimelineEntry } from '../src/data/profile';
 import { projects, timeline } from '../src/data/profile';
 
@@ -154,6 +158,26 @@ describe('paperStops', () => {
 
   it('is flat: a paper section is one stop, however much it holds', () => {
     expect(paperStops(report).every((s) => !s.children)).toBe(true);
+  });
+
+  // The phone's Contents lists paperSections and the rail paperStops: one list, so the two cannot drift.
+  it('is paperSections, each a stop', () => {
+    expect(paperSections(report)).toEqual([...report, ...PAPER_END]);
+    expect(paperStops(report)).toEqual(paperSections(report).map((s) => ({ label: s.rail, target: s.id })));
+  });
+});
+
+describe('paperPageOwns', () => {
+  it('owns the ids a paper page writes around its file: its sections, rail, BibTeX, the nav list, every reference', () => {
+    for (const id of [...PAPER_END.map((s) => s.id), 'paper-toc', 'bibtex', 'cnav-list', refId('markowitz1952')]) {
+      expect(paperPageOwns(id), id).toBe(true);
+    }
+  });
+
+  it("leaves the file's own ids to the file", () => {
+    for (const id of ['brief', 'brief-title', 'results', 'eq-4', 'figure-2', 'fm-wide', 'cited', 'references-title']) {
+      expect(paperPageOwns(id), id).toBe(false);
+    }
   });
 });
 

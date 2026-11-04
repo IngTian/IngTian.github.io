@@ -65,6 +65,10 @@ A where outside an eq.
 :::
 :::::
 
+:::section[Clash]{#eqs-title}
+A section whose id is another section's heading's.
+:::
+
 :::section{#checked}
 Untitled, and an id already used.
 :::

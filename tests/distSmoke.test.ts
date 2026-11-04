@@ -10,7 +10,9 @@ import {
 import { INTRO_SEEN_KEY } from '../src/lib/introSession';
 import { inProgress, projects, publications, timeline } from '../src/data/profile';
 import { PAPER_DATA } from '../src/data/papers';
-import { type Stop, PAPER_END, experienceStops, flattenStops, paperStops, projectSectionId, projectStops } from '../src/lib/pageStops';
+import {
+  type Stop, experienceStops, flattenStops, paperPageOwns, paperSections, paperStops, projectSectionId, projectStops,
+} from '../src/lib/pageStops';
 import type { PaperReport } from '../src/lib/paperMarkdown';
 import { countWords, readingMinutes } from '../src/lib/words';
 import { renderMarkdown } from './helpers/paperChain';
@@ -601,10 +603,25 @@ describe("BaseLayout's per-page hooks: /projects is the drafting page, the resea
     expect(/class="sky-wash"/.test(markup), '/writing lost the SkyWash layer').toBe(true);
   });
 
+  // The dot is on every page under a door: its own link's ("page"), or on a page under one (/research/<slug>,
+  // /writing/<slug>) its section's ("true"). No other link is marked.
+  it('marks the page you are on in the corner nav, or the section it is under', () => {
+    const wrong: string[] = [];
+    for (const p of pages()) {
+      const nav = /<ul id="cnav-list"[^>]*>[\s\S]*?<\/ul>/.exec(p.markup)?.[0] ?? '';
+      const marked = [...nav.matchAll(/<a\b[^>]*\shref="([^"]*)"[^>]*\saria-current="([^"]*)"/g)].map((m) => `${m[1]}=${m[2]}`);
+      const door = PAGES.find((x) => p.route === x.href || p.route.startsWith(`${x.href}/`));
+      const want = door ? [`${door.href}=${p.route === door.href ? 'page' : 'true'}`] : [];
+      if (marked.join() !== want.join()) wrong.push(`${p.route}: ${marked.join() || '(none)'}, want ${want.join() || '(none)'}`);
+    }
+    expect(pages().some((p) => p.route === '/research/rl-bhrp'), 'no nested route was built').toBe(true);
+    expect(wrong).toEqual([]);
+  });
+
   // A face declared below the weight a rule asks for gets a FAKE bold (the engine clamps, then emboldens), and a
   // computed style cannot show that: it reads 600 either way. So compare the request with the declared face.
   it("declares JetBrains Mono up to the nav's current-page weight, so that weight is real, not synthesised", () => {
-    const want = /aria-current=page\][^{]*\{font-weight:(\d+)/.exec(distCss());
+    const want = /aria-current\][^{]*\{font-weight:(\d+)/.exec(distCss());
     const face = /@font-face\{font-family:"JetBrains Mono-[^"]*";[^}]*font-weight:(\d+) (\d+)/.exec(builtPage('/research').html);
     expect(want, "no font-weight rule for the nav's current link in dist/_astro/*.css").not.toBeNull();
     expect(face, 'no JetBrains Mono @font-face with a weight range on /research').not.toBeNull();
@@ -1104,14 +1121,23 @@ describe('/research/rl-bhrp — a paper explained, from its file', async () => {
     expect(all.filter((id, i) => all.indexOf(id) !== i)).toEqual([]);
   });
 
-  // Below 1100px the Contents list replaces the rail: the same stops, each by its title, a section's number before it.
+  // The page refuses a file id it writes itself (paperPageOwns), so the build fails. That holds only while the plugin
+  // reports every id the file writes and paperPageOwns knows every id the page and the layout write: each id here is
+  // the one or the other. An id the layout gains, or the plugin writes unreported, fails here by name.
+  it("carries no id but its file's and its own", () => {
+    const file = new Set(report.ids);
+    expect([...page().ids].filter((id) => file.has(id) === paperPageOwns(id))).toEqual([]);
+  });
+
+  // Below 1100px the Contents list replaces the rail: the rail's stops, each by its title, a section's number before it.
   it('lists the same sections in its Contents as in its rail, each by its title', () => {
-    const nav = /<nav\b[^>]*\sclass="toc-inline"[\s\S]*?<\/nav>/.exec(page().markup)?.[0] ?? '';
-    const items = [...nav.matchAll(/<a\b[^>]*\shref="#([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)].map((m) => ({ target: m[1], label: text(m[2]).trim() }));
-    const want = [...report.sections, ...PAPER_END].map((s) => ({
-      target: s.id, label: [('n' in s && s.n) || '', s.title].filter(Boolean).join(' '),
-    }));
-    expect(items).toEqual(want);
+    const links = (cls: string) => [...(new RegExp(`<nav\\b[^>]*\\sclass="${cls}"[\\s\\S]*?</nav>`).exec(page().markup)?.[0] ?? '')
+      .matchAll(/<a\b[^>]*\shref="#([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)];
+    const contents = links('toc-inline');
+    expect(contents.length).toBeGreaterThan(3);
+    expect(contents.map((m) => m[1])).toEqual(links('side-rail').map((m) => m[1]));
+    expect(contents.map((m) => text(m[2]).trim()))
+      .toEqual(paperSections(report.sections).map((s) => [s.n, s.title].filter(Boolean).join(' ')));
   });
 
   it("prints the paper's Table 2 whole: all 18 rows", () => {

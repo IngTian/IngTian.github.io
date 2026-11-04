@@ -12,7 +12,7 @@ import SideRail from '../../components/SideRail.astro';
 import { authorName, publications } from '../../data/profile';
 import { longDate } from '../../lib/dates';
 import { refId, type PaperReport } from '../../lib/paperMarkdown';
-import { PAPER_END, paperStops } from '../../lib/pageStops';
+import { PAPER_END, paperPageOwns, paperSections, paperStops } from '../../lib/pageStops';
 import { countWords, readingMinutes } from '../../lib/words';
 
 export async function getStaticPaths() {
@@ -30,16 +30,15 @@ const file = entry.filePath ?? entry.id;
 if (!entry.rendered) throw new Error(`${file} did not render; its error is logged above`);
 const { Content, remarkPluginFrontmatter } = await render(entry);
 const report = remarkPluginFrontmatter as PaperReport;
-const own = new Set<string>(PAPER_END.map((s) => s.id));
 const problems = [
   ...(report.paperProblems ?? []),
-  ...(report.sections ?? []).filter((s) => own.has(s.id)).map((s) => `section #${s.id} is one this page writes itself`),
+  ...(report.ids ?? []).filter(paperPageOwns).map((id) => `id #${id} is one this page writes itself`),
 ];
 if (problems.length) throw new Error(`${file} has ${problems.length} problem(s):\n  ${problems.join('\n  ')}`);
 
 const p = publications.find((x) => x.slug === entry.data.publication)!;
 const { references, errata, leftOut, bibliographyOmits } = entry.data;
-const sections = [...report.sections, ...PAPER_END];
+const sections = paperSections(report.sections);
 const [read, refsEnd, cite] = PAPER_END;
 
 const ORDINAL = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth', 'eleventh', 'twelfth'];
@@ -100,7 +99,7 @@ const noted = errata.map((e) => e.date).sort().at(-1);
     <nav class="toc-inline" aria-label="Contents">
       <p class="toc-h">Contents</p>
       <ol>
-        {sections.map((s) => <li><a href={`#${s.id}`}>{'n' in s && s.n && <span class="n">{s.n}</span>}{s.title}</a></li>)}
+        {sections.map((s) => <li><a href={`#${s.id}`}>{s.n && <span class="n">{s.n}</span>}{s.title}</a></li>)}
       </ol>
     </nav>
 
@@ -318,7 +317,9 @@ const noted = errata.map((e) => e.date).sort().at(-1);
   .paper .f-tip, html[data-page='paper'] .sym-tip { position: absolute; left: 0; top: 0; opacity: 0; pointer-events: none; z-index: 2;
     padding: 6px 10px 7px; white-space: nowrap; background: var(--sheet-ground); border: 1px solid rgba(var(--hairline-rgb), 0.45);
     border-radius: 2px; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
-  .paper .f-tip-d { margin: 0 0 3px; font-style: italic; color: var(--ink-3); }
+  /* The date line may wrap: the tip is as wide as its widest line up to the plot's width (tipLeft keeps it inside),
+     and "13 August 2025, where the data end · reproduction" is wider than a 320px phone's plot. */
+  .paper .f-tip-d { margin: 0 0 3px; font-style: italic; color: var(--ink-3); white-space: normal; }
   .paper .f-tip dl { display: grid; grid-template-columns: auto auto; column-gap: 16px; margin: 0; }
   .paper .f-tip dt { color: var(--ink-1); }
   .paper .f-tip dt.rl { color: var(--seal); }
@@ -581,9 +582,7 @@ const noted = errata.map((e) => e.date).sort().at(-1);
     }
     let symbol: Element | null = null;
     function mark(target: EventTarget | null): void {
-      let el = target instanceof Element ? target.closest('.notation tr[data-sym], .eq .sym') : null;
-      // the outermost symbol: an index is tagged inside the symbol it indexes (W_g(i)), and pointing at it means it
-      for (let up; el?.matches('.sym') && (up = el.parentElement?.closest('.eq .sym'));) el = up;
+      const el = target instanceof Element ? target.closest('.notation tr[data-sym], .eq .sym') : null;
       if (el === symbol) return;
       symbol = el;
       page.querySelectorAll('.sym.on, .notation tr.on').forEach((e) => e.classList.remove('on'));
@@ -665,8 +664,19 @@ const noted = errata.map((e) => e.date).sort().at(-1);
         hovering = e.pointerType !== 'touch';
         read(fromPointer(e), false);
       }, { signal });
-      // a tap reads where it lands, and the reading stays until the plot loses focus
-      plot.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') read(fromPointer(e), true); }, { signal });
+      // A tap reads where it lands, focusing the plot (not every touch browser focuses on a tap), and the reading
+      // stays until the plot loses focus; a touch anywhere else takes it away. A swipe that the browser takes as a
+      // scroll ends in pointercancel, not pointerup, so it reads nothing and leaves nothing on.
+      plot.addEventListener('pointerup', (e) => {
+        if (e.pointerType !== 'touch') return;
+        const i = fromPointer(e);
+        if (document.activeElement === plot) read(i, true);
+        else { at = i; plot.focus({ preventScroll: true }); }
+      }, { signal });
+      plot.addEventListener('pointercancel', unread, { signal });
+      document.addEventListener('pointerdown', (e) => {
+        if (document.activeElement === plot && !(e.target instanceof Node && plot.contains(e.target))) plot.blur();
+      }, { signal });
       plot.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') { hovering = false; unread(); } }, { signal });
       plot.addEventListener('focus', () => read(at < 0 ? points - 1 : at, true), { signal });
       plot.addEventListener('blur', unread, { signal });

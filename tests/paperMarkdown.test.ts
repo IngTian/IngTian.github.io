@@ -17,7 +17,7 @@ const PAPERS = {
   simple: {
     values: { 'usd.rl': '$2.20', 'wealth.rl': '2.1996' },
     figures: {
-      pipe: '<svg class="pipe" aria-hidden="true"><text>Policy</text></svg>',
+      pipe: '<svg class="pipe" aria-hidden="true"><marker id="ah"></marker><text>Policy</text></svg>',
       table: '<table class="bt"><tbody><tr><th scope="row">Rows</th><td>1</td></tr></tbody></table>',
     },
   },
@@ -54,6 +54,14 @@ describe('a paper file', async () => {
       { id: 'notation', title: 'Notation', rail: 'Notation' },
       { id: 'method', n: '1', title: 'The method', rail: 'Method' },
     ]);
+  });
+
+  // Every id the file's markup carries, for the page to refuse one it writes itself (pages/research/[slug].astro):
+  // a section's and its heading's, an equation's, a theorem's, a figure's, and those inside a figure's drawing.
+  it('reports every id it writes, and no other', () => {
+    const written = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+    expect([...report.ids].sort()).toEqual(written.sort());
+    expect(report.ids).toEqual(expect.arrayContaining(['brief', 'brief-title', 'eq-1', 'thm-1', 'figure-1', 'table-1', 'ah']));
   });
 
   // The aside is the heading's, not the title's: the rail and the phone's Contents name the section "Abstract".
@@ -230,6 +238,9 @@ describe('a malformed paper', async () => {
       ':::where outside an ::::eq',
       ':::section #checked has no [title]',
       'id #checked is used twice',
+      // a heading's id is the section's and "-title", and a figure's drawing carries ids of its own (pipe's marker)
+      'id #eqs-title is used twice',
+      'id #ah is used twice',
       // the section [Short] holds a :::def with as many colons: the def's fence closes the section, so the def
       // never closes, the rest of the section falls outside it and its own fence is left over as text
       'a stray ":::" — a container holding another needs more colons than the one inside it',
