@@ -425,7 +425,7 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
 
 describe('the homepage intro ships on / and ONLY on /', () => {
   // MOVING THE INTRO UP INTO BaseLayout IS THE ONE EDIT that would hand a 5.2-second construction
-  // animation to all nine routes — including /404 and the proto gallery. The retired first-visit gate
+  // animation to every route — including /404 and the proto gallery. The retired first-visit gate
   // verified the equivalent property by reading built HTML ("5 data-gate references on /, zero on the
   // other eight"), and this is that check for its replacement.
   //

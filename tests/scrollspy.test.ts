@@ -44,10 +44,12 @@ const box = (top: number, bottom: number, parent: number | null = null, visible 
 
 describe('markStops', () => {
   it('reads the band SideRail has always used: 10% to 62% down the viewport', () => {
-    // 100–620px: a box reaching 1px into it at either edge is current; 1px short of it, neither is, and the
-    // fallback's one stop is
+    // 100–620px: a box reaching 1px into it at either edge is current
     expect(markStops([box(-500, 101), box(619, 1400)], VH, 900, DOC).current).toEqual([0, 1]);
-    expect(markStops([box(-500, 99), box(621, 1400)], VH, 900, DOC).current).toEqual([0]);
+    // 1px short at either edge, neither is. The fallback must pick a third box, or it could not tell "nothing in
+    // the band" from "box 0 in the band": box 2 is the last top above 400px, so a band widened at its top reads [0]
+    // and one widened at its bottom [1]
+    expect(markStops([box(-500, 99), box(621, 1400), box(-400, -300)], VH, 900, DOC).current).toEqual([2]);
   });
 
   it('marks a stop whose box is inside the band as current, and it leads', () => {

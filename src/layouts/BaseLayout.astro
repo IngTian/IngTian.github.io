@@ -177,8 +177,8 @@ const personLd = {
         double-dash form restores byte-identical output. So when a comment here needs to name a utility class,
         write the CSS variable with its dashes or describe it — never the bare class name.
 
-        Preloaded everywhere, the other seven routes — /research, /writing, /projects, /experience, /art, /404
-        and /proto-sketches — would fetch 82,184 bytes (36,560 + 45,624: the roman and the italic) at the
+        Preloaded everywhere, the other eight routes — /research, /research/<slug>, /writing, /projects,
+        /experience, /art, /404 and /proto-sketches — would fetch 82,184 bytes (36,560 + 45,624: the roman and the italic) at the
         HIGHEST priority, ahead of their own content, for a face no rule on them ever asks for. A preload for
         an unused resource is worse than no preload: it is bandwidth spent competing with the bytes that do
         get painted.
@@ -187,8 +187,8 @@ const personLd = {
         resolvable everywhere and any page that later grows an accent rule still renders it (just discovered
         normally). Only the <link rel=preload> tags are conditional. Verified from dist: of the two opted-in
         routes, `/` carries two preload links (it passes `true` — the Work slide uses both the roman and the
-        italic) while /writing/<slug> carries ONE (it passes `'italic'`, see just below); the other seven carry
-        zero, and all nine still carry the Fraunces @font-face block. */}
+        italic) while /writing/<slug> carries ONE (it passes `'italic'`, see just below); the other eight carry
+        zero, and all ten still carry the Fraunces @font-face block. */}
     {/* `'italic'` narrows the preload to the one file the page can actually use. Astro's filter takes a
         list of variant predicates (see filterPreloads in astro/dist/assets/fonts/core/), so this emits one
         <link> instead of two and still leaves the full @font-face block in place — a page that later grows a
