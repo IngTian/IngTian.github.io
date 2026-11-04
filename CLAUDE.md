@@ -91,8 +91,18 @@ When in doubt, remove rather than add.
 - **THERE IS NO 3D LIBRARY, AND THE RUNTIME DEPENDENCY LIST IS FOUR PACKAGES.**
   `dependencies` is `astro`, `@astrojs/sitemap`, `@tailwindcss/vite` and
   `tailwindcss`; everything else — `katex`, `remark-math`, `rehype-katex`,
-  `@astrojs/check`, `typescript`, `vitest` — is a devDependency, and only output
-  ships. `grep -c three package.json` → 0.
+  `remark-directive`, `unified`, `remark-parse`, `remark-gfm`, `remark-rehype`,
+  `rehype-stringify`, `@astrojs/check`, `typescript`, `vitest` — is a devDependency, and only
+  output ships. `grep -c three package.json` → 0.
+  - **`remark-directive`** is the paper format's syntax (`:t[…]`, `:::def`, `::::eq` — see
+    *Papers are files*): the one package it added, plus 9 small ones under it. Raw HTML in the
+    `.md` would have needed nothing, but it is opaque to the build-time checks (it stays a `raw`
+    node until Astro's rehype-raw runs, after every user plugin), and MDX's `@astrojs/mdx` brings
+    an integration, a JSX parser over the prose and, at its latest, Astro 7.
+  - **`unified`, `remark-parse`, `remark-gfm`, `remark-rehype`, `rehype-stringify`** are
+    declared only so `tests/paperMarkdown.test.ts` can run the site's plugins inside the chain
+    Astro runs them in. Astro already installs all five at these versions, so declaring them
+    downloads nothing.
   - This bullet used to say the opposite, at length: that `three` was "a real
     dependency", imported once in `lib/fanScene.ts` behind a dynamic `import()` in
     `FactorFan.astro`, code-split into a 483KB chunk for `/proto-showpiece`, and it
@@ -131,7 +141,8 @@ When in doubt, remove rather than add.
     `--font-display`/`-body`/`-mono`: those are the site's role tokens, and that
     collision is what stopped every webfont from loading. Fraunces keeps its
     preload — removing it measured a worse FCP (1956 → 2333ms; see BaseLayout).
-- **Math in markdown is typeset at build time.** `astro.config.mjs` wires
+- **Math in markdown is typeset at build time.** The markdown chain (spelled once, in
+  `lib/paperMarkdown/index.ts`, which `astro.config.mjs` calls) runs
   `remark-math` + `rehype-katex` with **`output: 'mathml'`**, which is the
   load-bearing option: KaTeX's default HTML tree needs `katex.min.css` and ~half a
   megabyte of `KaTeX_*` webfonts, and a third downloaded family is against the font
@@ -139,6 +150,13 @@ When in doubt, remove rather than add.
   zero fonts. `katex` is a **devDependency** and stays one; only its output ships.
   `lib/equations.ts` holds the same guarantee for build-time equations in `.astro`,
   and `tests/equations.test.ts` asserts it.
+  - **The MathML letter fix runs on every markdown file**, as `rehypeMathVariants` in
+    `lib/mathml.ts` right after rehype-katex: Chrome honours no `mathvariant` but
+    "normal", so KaTeX's `\mathcal`/`\mathbb` letters are rewritten as Unicode letters, the
+    same table `fixMathVariants` uses for `lib/equations.ts`. One fix, one module. It throws
+    on a letter Unicode has no form for, naming the TeX, and a markdown plugin's throw does
+    not fail the build by itself (Astro logs it and stores the entry unrendered), so
+    `/writing/<slug>` throws on an unrendered entry rather than ship an empty piece.
 - `astro:assets` optimizes gallery images (responsive `widths`, **webp — not avif**). This line said
   "webp/avif" for a long time; `ls dist/_astro/*.avif` is empty and nothing in `astro.config.mjs` asks
   for avif, so no page has ever shipped one. Either add the format deliberately or leave it — but do
@@ -199,8 +217,10 @@ else.
 src/
   styles/{tokens.css, global.css}   # palette + type roles; the .descent gradient, atmosphere washes and the .is-slides slide metrics live in global.css
   layouts/BaseLayout.astro          # head, astro:fonts, meta/OG/JSON-LD, favicons, the page-load veil, CornerNav, ClientRouter
-  content.config.ts                 # the `writing` collection + its frontmatter schema (the ONLY content collection)
+  content.config.ts                 # the two content collections, `writing` and `papers`, their frontmatter schemas and the one isoDate helper
   content/writing/*.md              # the pieces themselves — a new one is a FILE, not a code change
+  lib/paperMarkdown/{index,remarkPaper,rehypePaper}.ts # the markdown chain (spelled once) + the paper format's compiler and checks — see Papers are files
+  lib/mathml.ts                     # the one MathML letter fix: fixMathVariants for lib/equations.ts, rehypeMathVariants for every .md
   data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline, publications, projects + inProgress, awards, links
   data/nav.ts                       # PAGES — the canonical page set (see Navigation)
   data/writing.ts                   # the writing TAXONOMY (KINDS) + buildKinds(), the one seam to the markdown
@@ -596,7 +616,7 @@ This is the structural conclusion of the audit, and it is policy, not preference
 - **Unbounded prose with exactly one renderer becomes a content collection.**
   Writing is that: one route renders it, there is no upper bound on how much of it
   there will be, and its author should never open an editor on a `.ts` file to add a
-  piece.
+  piece. So is a paper's explainer (*Papers are files*), beside its record, which stays data.
 
 **Do not converge them.** Turning `profile.ts` into markdown would break every
 cross-reference and every computed number; turning writing back into a TS array
@@ -647,6 +667,69 @@ kind and gets its own page at `/writing/<slug>`. Nothing else is edited.
 - **Empty kinds are shown**, with copy that names what is coming rather than
   "coming soon" — it states intent, and it's honest in a way a silently-missing
   section is not. A test enforces that the empty copy is specific.
+
+## Papers are files
+
+**A new paper page is a FILE, not a code change.** A paper's explainer is one `.md` in the
+`papers` collection (`src/content/papers/`), written in a small directive syntax that
+`remark-directive` parses and `lib/paperMarkdown/` compiles and checks at build time. What the
+file holds is the prose; everything else has one home of its own:
+
+- **The record** (title, authors, abstract, BibTeX, links, tags) is the paper's entry in
+  `profile.ts` `publications`, never repeated in the file.
+- **The frontmatter** (zod, `content.config.ts`): `publication` (a slug in `publications`),
+  `pageDate`, `references` (`{ key, authors, year, title, venue, doi?, url?, addedHere? }[]`,
+  an author written `Family, Given` so a citation can read "López de Prado, 2016"; `addedHere` is
+  where the paper names a work its bibliography leaves out) and `errata` (`{ date, text }[]`).
+- **The numbers and pictures** are `PAPER_DATA[slug]` (`src/data/papers/`): `values`, strings
+  computed from the paper's data, and `figures`, SVG/HTML strings drawn from vendored data. They
+  reach the plugins as **options** from `astro.config.mjs`, so they are in Astro's config digest
+  and a moved number re-renders the paper. Plugin *code* is not in the digest: after editing a
+  plugin, delete `node_modules/.astro/data-store.json` before building or the old render is served.
+
+**The syntax** — every construct has a case in `tests/fixtures/papers/simple.md`:
+
+| write | renders |
+| --- | --- |
+| `::::section[The question]{#question n=1 rail="Question"}` … `::::` | `<section class="sec" id="question">` with `<h2><span class="n">1</span>The question</h2>`. `n` is optional (In brief has none), `rail` defaults to the title. The rail and the phone Contents come from these. |
+| `:t[risk parity]{#rp}` | `<i class="t" data-n="rp">` — a term at first use, the anchor of its note |
+| `:::def{for=rp}` `**Risk parity.** …` `:::` | `<aside class="mn def" data-at="rp"><dfn>Risk parity.</dfn> …` — joins the block before it in one `<div class="an">` host, which must hold the term (the page looks for it there) |
+| `:::why{for=…}` … `:::` | `<aside class="mn why"><span class="mk">Why it matters.</span> …`; `for` optional on both kinds |
+| `:hl[…]` | `<mark class="hl">` — Underline, the one highlight style |
+| `::::eq{#eq-4 n=4}` `$$` … `$$` `:::where` … `:::` notes `::::` | `<div class="eq an" id="eq-4">`: the display, its number `(4)` as HTML outside `<math>` (never `\tag`), `<p class="where">`, then its notes. One `$$`, or a `$$ wide` and a `$$ narrow` |
+| `:::notation` with a GFM table `\| Symbol \| Meaning \|` `:::` | `<div class="tbl-scroll"><table class="notation">`, each row `<tr data-sym><th scope="row">`. Each row's symbols (split at commas) are matched **structurally** in every display's MathML and tagged `class="sym" data-sym`: an equal subtree, the largest first, nothing inside a tagged one tagged again — so `W_{g}` tags `W_g` and not a bare `W`. A row that is only in the prose ends its Symbol cell with `{text-only}`. |
+| `:cite[markowitz1952]` | `<a class="cite" href="#ref-markowitz1952">Markowitz, 1952</a>` — one author, two (`Feng and He`), more (`Maillard et al.`) |
+| `:v[usd.rl]` | the text of `PAPER_DATA[slug].values['usd.rl']`. **Every number the prose prints is a `:v`**, and a `$` amount is always `:v` or `\$` — a bare `$` starts maths |
+| `::figure{name=wealth}` | `PAPER_DATA[slug].figures.wealth`, inlined as it is |
+
+- **Nesting takes colons.** A container holding another needs more colons than the one inside it:
+  `:::` for a note or a where, `::::` for an eq or a section of notes, `:::::` for a section that
+  holds an eq. With as many, the inner fence closes both, silently — so the checks below look for
+  exactly the traces that leaves (a stray `:::`, a container never closed, content outside a
+  section).
+- **Raw HTML is refused.** It would stay an opaque `raw` node until Astro's rehype-raw, after every
+  check here, and an HTML comment would ship.
+- **Every mistake is reported, by name, and fails the build.** A plugin cannot fail the build
+  itself — Astro logs a plugin's throw and stores the entry unrendered, an empty page with a green
+  build — so the plugins collect problems into `remarkPluginFrontmatter.paperProblems` and the
+  paper page throws on any, or on an entry with no `rendered`. Reported: an unknown `:cite`, `:v`,
+  `::figure` or directive; a TeX error (rehype-katex otherwise draws it in red and moves on); a
+  notation row matching no display; a note whose `for` names no term, or a term outside its note's
+  host; a term marked twice, or inside a highlight (seal over the seal band is under 3:1, so its
+  linked rule would vanish); a `def` without its `**Name.**`; a section without its `#id` or
+  `[title]`; an id used twice; an eq without one display or a wide/narrow pair, or with `\tag`;
+  `:::where` outside an eq; raw HTML; the nesting traces above.
+  `tests/fixtures/papers/malformed.md` holds one of each and `tests/paperMarkdown.test.ts` names them.
+- **The render also reports** `sections` (`{ id, n?, title, rail }`, for the rail and Contents) and
+  `bodyWords` — `countWords` from `lib/words.ts` over the body's text, every element boundary a
+  space, with `math`, `svg`, `table`, `pre` and the raw figures left out.
+- **Inert everywhere else.** Astro runs one processor for every `.md`, so on a file outside the
+  papers collection `remarkPaper` only puts back the text remark-directive took for a directive (a
+  `:word` stays `:word`). Verified: `dist` byte-identical with and without the plugins, and the spec
+  compares `favourite-quotes.md` both ways. The one plugin that is not paper-only is the MathML
+  letter fix (*Stack*).
+- The chain is spelled once, in `lib/paperMarkdown/index.ts`; the spec runs it inside Astro's own
+  order (parse, GFM, the site's remark plugins, remark-rehype, the site's rehype plugins).
 
 ## Identity & voice (a design constraint)
 

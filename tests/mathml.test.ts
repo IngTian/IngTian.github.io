@@ -46,6 +46,10 @@ describe('fixMathVariants', () => {
     expect(one('double-struck', '1', 'mn').codePointAt(0)).toBe(0x1d7d9);
   });
 
+  it('rewrites each digit of a number KaTeX writes as one <mn>', () => {
+    expect(fixMathVariants(mathml('\\mathbb{12}'))).toContain('<mn>𝟙𝟚</mn>');
+  });
+
   it('throws on a letter it has no Unicode form for, naming it', () => {
     expect(() => fixMathVariants('<mi mathvariant="script">λ</mi>')).toThrow(/λ/);
     expect(() => fixMathVariants(mathml('\\mathcal{2}'))).toThrow(/2/);

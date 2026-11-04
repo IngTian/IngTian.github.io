@@ -22,6 +22,9 @@ export async function getStaticPaths() {
 }
 
 const { entry } = Astro.props;
+// A markdown plugin's throw (the MathML letter fix's, on a letter Unicode has no form for) does not fail the
+// build: Astro logs it and stores the entry unrendered, which would ship an empty piece. So the page fails.
+if (!entry.rendered) throw new Error(`${entry.filePath ?? entry.id} did not render; its error is logged above`);
 const { Content } = await render(entry);
 
 // The kind's label, so the piece says which section it belongs to and links back to it. Falls back to the raw
