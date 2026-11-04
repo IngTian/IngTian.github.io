@@ -124,11 +124,15 @@ html[data-theme='dark'] {
    The ink ramp comes from the mockup's two levels — `--ink` is ink-1, `--dim` is ink-3 AND ink-4 (both must
    clear 4.5:1 on the ground; tests/draftingPalette.test.ts holds the numbers) — with ink-2 the midpoint of
    the two and ink-5 the midpoint of dim and the ground.
-   The rail's halos are the label knockout <main>'s text wears (projects.astro), for the shared rail: it lies straight
-   on the field, so --rail-halo rings every glyph with 1px of the bare ground (eight unblurred offsets, the diagonals
-   closed too) and --rail-dash-halo rings its dash with 2px (the 1px dash sits at a fractional y and covers two pixel
-   rows in part, so a 1px ring leaves the rows beside those partly line). The pixels touching the rail are then the
-   ground its inks are measured on; bare, light --ink-3 on a major line is 3.04:1 and the dash beside one 2.39:1.
+   THE LABEL KNOCKOUT, the way a drafting sheet clears the contours around a label. <main> and the rail have no
+   background, so their text lies straight on the field's strokes, and a stroke under a glyph takes light --ink-3 from
+   5.00:1 to 4.10 (minor line), 3.03 (major) and 1.34 (a fresh lit ping). --knockout rings every glyph with 1px of the
+   bare ground (eight unblurred offsets, so the ring is opaque and the diagonals are closed too); <main>'s text
+   (projects.astro) and the shared rail's labels both read it. --rail-dash-halo rings the rail's dash with 2px (the
+   1px dash sits at a fractional y and covers two pixel rows in part, so a 1px ring leaves the rows beside those partly
+   line; bare, the dash beside a major line is 2.39:1). The pixels touching the text are then the ground its inks are
+   measured on: over a major line, all but 10 of 424 of a rail label's, and those few, at the ring's anti-aliased edge,
+   within 26/255 of it. A component with its own opaque ground sets `text-shadow: none`.
    BOTH BLOCKS DECLARE EVERY TOKEN. The light block and `html[data-theme='dark']` have equal specificity, so in
    dark theme the light drafting value would beat the site's dark one by source order alone.
    ============================================================ */
@@ -143,7 +147,7 @@ html[data-page='drafting'] {
   --on-accent: #fff8f4;
   --hairline-rgb: var(--draft-line-rgb);
   --bg: var(--draft-ground);   /* the page base IS the sheet here, so overscroll shows paper, not ink */
-  --rail-halo: -1px -1px 0 var(--draft-ground), 0 -1px 0 var(--draft-ground), 1px -1px 0 var(--draft-ground),
+  --knockout: -1px -1px 0 var(--draft-ground), 0 -1px 0 var(--draft-ground), 1px -1px 0 var(--draft-ground),
     -1px 0 0 var(--draft-ground), 1px 0 0 var(--draft-ground), -1px 1px 0 var(--draft-ground),
     0 1px 0 var(--draft-ground), 1px 1px 0 var(--draft-ground);
   --rail-dash-halo: 0 0 0 2px var(--draft-ground);
@@ -168,7 +172,7 @@ html[data-page='drafting'][data-theme='dark'] {
   --on-accent: #160c0a;
   --hairline-rgb: var(--draft-line-rgb);
   --bg: var(--draft-ground);
-  --rail-halo: -1px -1px 0 var(--draft-ground), 0 -1px 0 var(--draft-ground), 1px -1px 0 var(--draft-ground),
+  --knockout: -1px -1px 0 var(--draft-ground), 0 -1px 0 var(--draft-ground), 1px -1px 0 var(--draft-ground),
     -1px 0 0 var(--draft-ground), 1px 0 0 var(--draft-ground), -1px 1px 0 var(--draft-ground),
     0 1px 0 var(--draft-ground), 1px 1px 0 var(--draft-ground);
   --rail-dash-halo: 0 0 0 2px var(--draft-ground);

@@ -1065,9 +1065,10 @@ galaxy). The whole system is **token override**, not per-component branching:
   `page` prop; only /projects, as `page="drafting"`). Its two blocks in `tokens.css`,
   `html[data-page='drafting']` and `…[data-theme='dark']`, re-declare `--paper`, the ink
   ramp, `--ochre` (→ the seal), `--on-accent`, `--hairline-rgb` and `--bg` (= the sheet,
-  light in the light theme, so overscroll shows paper), the rail's `--rail-halo` and
-  `--rail-dash-halo` (the label knockout, which `SideRail` reads with a `none` fallback, so
-  the page never styles `#projects-toc`), plus eight `--draft-*` tokens. That
+  light in the light theme, so overscroll shows paper), `--knockout` (the label knockout, one
+  1px ring of the bare sheet that `<main>`'s text and `SideRail`'s labels both read — the rail
+  with a `none` fallback, so the page never styles `#projects-toc`) and `--rail-dash-halo` (the
+  rail dash's 2px ring), plus eight `--draft-*` tokens. That
   is how the shared nav, rail and cow reskin with no edit. **Both theme blocks declare every
   token**: `[data-page]` and `[data-theme='dark']` tie on specificity, so a light-only value
   would win in dark. `tests/draftingPalette.test.ts` checks that the two sets match and the

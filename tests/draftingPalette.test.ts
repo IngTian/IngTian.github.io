@@ -62,9 +62,10 @@ const ROLE = ['--paper', '--ink-1', '--ink-2', '--ink-3', '--ink-4', '--ink-5', 
 // rendered it; it is gone rather than left to read as if the nav were reskinned here.
 const DRAFT = ['--draft-ground', '--draft-line-rgb', '--draft-hi-rgb', '--draft-panel',
   '--draft-shadow', '--draft-ph', '--draft-tag', '--draft-vig'];
-// The rail's halos: role tokens only this register declares, so the shared rail (SideRail.astro, which falls back to
-// `none`) wears the label knockout here without the page restyling it.
-const RAIL = ['--rail-halo', '--rail-dash-halo'];
+// The knockouts: role tokens only this register declares. --knockout rings every glyph on the sheet, <main>'s text
+// (projects.astro) and the shared rail's labels (SideRail.astro, which falls back to `none`) alike; --rail-dash-halo
+// rings the rail's dash. So the rail wears the knockout here without the page restyling it.
+const KNOCKOUTS = ['--knockout', '--rail-dash-halo'];
 
 describe('the drafting palette (tokens.css)', () => {
   it('declares the same tokens in both themes', () => {
@@ -72,7 +73,7 @@ describe('the drafting palette (tokens.css)', () => {
     // theme the drafting light block beats the site's dark block by source order. A token set only in the light
     // drafting block would therefore show its LIGHT value in dark theme. Both blocks must declare every token.
     const [light, dark] = THEMES.map((t) => Object.keys(tokens(t.sel)).sort());
-    expect(light).toEqual([...ROLE, ...RAIL, ...DRAFT].sort());
+    expect(light).toEqual([...ROLE, ...KNOCKOUTS, ...DRAFT].sort());
     expect(dark).toEqual(light);
   });
 
@@ -137,11 +138,11 @@ describe('the drafting palette (tokens.css)', () => {
         expect(onGround(tk['--ochre'], over(rgbToken(tk['--draft-line-rgb']), Number(m![1]), rgbOf(ground)))).toBeGreaterThanOrEqual(AA_BODY);
       });
 
-      // THE RAIL'S LABELS lie straight on the field, so each glyph wears the knockout <main>'s text wears: an opaque
+      // THE PAGE'S TEXT AND THE RAIL'S LABELS lie straight on the field, so each glyph wears the knockout: an opaque
       // 1px ring of the bare ground, eight unblurred offsets so the diagonals are closed too. The pixels touching a
       // glyph are then the ground, where the inks above clear AA.
-      it("--rail-halo rings the rail's labels with the bare ground", () => {
-        const offsets = tk['--rail-halo'].split(/,(?![^(]*\))/).map((s) => {
+      it('--knockout rings every glyph on the sheet with the bare ground', () => {
+        const offsets = tk['--knockout'].split(/,(?![^(]*\))/).map((s) => {
           const p = /^(-?\d+)(?:px)? (-?\d+)(?:px)? 0 var\(--draft-ground\)$/.exec(s.trim());
           expect(p, `"${s}" is not an unblurred offset in var(--draft-ground)`).not.toBeNull();
           return `${Number(p![1])},${Number(p![2])}`;
@@ -189,7 +190,7 @@ describe('the drafting palette (tokens.css)', () => {
   }
 });
 
-// CLAUDE.md, The concept: a page reskins a shared component only through role tokens. So the halos are declared in
+// CLAUDE.md, The concept: a page reskins a shared component only through role tokens. So the knockouts are declared in
 // the two drafting blocks and nowhere else (the key-set test above holds both blocks), SideRail reads them, and no
 // page's stylesheet reaches into the rail.
 describe('the rail reskins through role tokens only', () => {
@@ -197,8 +198,8 @@ describe('the rail reskins through role tokens only', () => {
   const files = readdirSync(SRC, { recursive: true, encoding: 'utf8' }).filter((f) => /\.(astro|css|ts)$/.test(f));
   const text = (f: string): string => readFileSync(new URL(f, SRC), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 
-  it('declares the halos in tokens.css alone, once per drafting block', () => {
-    for (const token of RAIL) {
+  it('declares the knockouts in tokens.css alone, once per drafting block', () => {
+    for (const token of KNOCKOUTS) {
       const where = files.flatMap((f) => [...text(f).matchAll(new RegExp(`${token}\\s*:`, 'g'))].map(() => f));
       expect(where, token).toEqual(['styles/tokens.css', 'styles/tokens.css']);
     }
@@ -206,8 +207,16 @@ describe('the rail reskins through role tokens only', () => {
 
   it('SideRail reads them, falling back to none', () => {
     const rail = text('components/SideRail.astro');
-    expect(rail).toMatch(/\.side-rail \.lbl \{[^}]*text-shadow: var\(--rail-halo, none\);/);
+    expect(rail).toMatch(/\.side-rail \.lbl \{[^}]*text-shadow: var\(--knockout, none\);/);
     expect(rail).toMatch(/\.side-rail \.rule \{[^}]*box-shadow: var\(--rail-dash-halo, none\);/);
+  });
+
+  // One knockout, one name: <main>'s text reads the same token as the rail, and no file spells the ring a second
+  // time, neither as a page variable nor as the eight offsets written out.
+  it("/projects' text reads --knockout, and the ring has no second spelling", () => {
+    expect(text('pages/projects.astro')).toMatch(/\.projects-page \{[^}]*text-shadow: var\(--knockout\);/);
+    const elsewhere = files.filter((f) => f !== 'styles/tokens.css' && /--knock\b|--rail-halo\b|-1px -1px 0 /.test(text(f)));
+    expect(elsewhere).toEqual([]);
   });
 
   it('no page styles the rail', () => {

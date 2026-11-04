@@ -86,19 +86,9 @@ const bootDecider = `(function () {
 <style>
   /* Above the field (z 0). The right gutter from 1180px is the cow's column, mirroring the rail on the left. */
   .projects-page { position: relative; z-index: 1; max-width: 1500px; padding: 0 6vw 180px; }
-  /* THE LABEL KNOCKOUT: every glyph in main wears a 1px ring of the bare ground, the way a drafting sheet clears the
-     contours around a label. main has no background, so its text sits straight on the field's strokes, and a stroke
-     under a glyph takes light --ink-3 from 5.00:1 to 4.10 (minor line), 3.03 (major) and 1.34 (a fresh lit ping) —
-     the 4.5:1 rule held only between strokes. With the ring, the pixels touching a glyph are the ground the palette
-     was measured on (tests/draftingPalette.test.ts) — measured on the rail's labels, which wear the same ring
-     (tokens.css' --rail-halo), over a major line: all but 10 of 424 of them, and those few, at the ring's
-     anti-aliased edge, within 26/255 of it. Offsets with no blur, so the ring is opaque; eight of them so the
-     diagonals are closed too. A component with its own opaque ground should set `text-shadow: none`. */
-  .projects-page {
-    --knock: var(--draft-ground);
-    text-shadow: -1px -1px 0 var(--knock), 0 -1px 0 var(--knock), 1px -1px 0 var(--knock), -1px 0 0 var(--knock),
-      1px 0 0 var(--knock), -1px 1px 0 var(--knock), 0 1px 0 var(--knock), 1px 1px 0 var(--knock);
-  }
+  /* THE LABEL KNOCKOUT: main has no background, so every glyph in it wears a 1px ring of the bare ground, the one
+     tokens.css declares for this register (and says why). The rail's labels wear the same token. */
+  .projects-page { text-shadow: var(--knockout); }
   /* Clears SideRail where it shows (it hides at ≤1100px). Every label sits past the dash's gutter whatever its
      state; measured, the rail's right edge ("THE WORKSHOP") is at x=159.4 at 1101px and x=171.0 at 2000px, 2px more
      under the hover nudge, against content starting at 190 and 230. */

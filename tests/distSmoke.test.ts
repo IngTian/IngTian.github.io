@@ -866,23 +866,14 @@ describe('/projects — the page shell on the drafting field', () => {
   });
 
   // Neither main nor the rail has a background, so their text sits straight on the field's strokes. The knockout
-  // gives every glyph an opaque 1px ring of the ground: eight offsets, none blurred, in the ground colour. <main> is
-  // the page's own; the rail is shared, so it wears the same ring through the role tokens the drafting blocks declare
-  // (tests/draftingPalette.test.ts holds their values), and the page does not touch it.
+  // gives every glyph an opaque 1px ring of the ground. It is ONE role token, --knockout, which the drafting blocks
+  // declare (tests/draftingPalette.test.ts holds its value and that it has no second spelling): <main>'s text and the
+  // shared rail's labels both read it, so the page does not touch the rail.
   it("rings every glyph in <main> and in the rail with the bare ground, so no stroke touches the page's text", () => {
     const css = shippedCss();
-    expect(css).toMatch(/\.side-rail \.lbl\{(?:[^}]*;)?text-shadow:var\(--rail-halo,\s*none\)/);
+    expect(css).toMatch(/\.side-rail \.lbl\{(?:[^}]*;)?text-shadow:var\(--knockout,\s*none\)/);
     expect(css).toMatch(/\.side-rail \.rule\{(?:[^}]*;)?box-shadow:var\(--rail-dash-halo,\s*none\)/);
-    const rule = /\.projects-page\{([^}]*text-shadow:[^}]*)\}/.exec(css);
-    expect(rule, 'no text-shadow rule for .projects-page').not.toBeNull();
-    expect(rule![1]).toMatch(/--knock:\s*var\(--draft-ground\)/);
-    const shadows = /text-shadow:([^;}]*)/.exec(rule![1])![1].split(/,(?![^(]*\))/).map((s) => s.trim());
-    const offsets = shadows.map((s) => {
-      const p = /^(-?\d+)(?:px)? (-?\d+)(?:px)? 0(?:px)? var\(--knock\)$/.exec(s);
-      expect(p, `"${s}" is not an unblurred offset in var(--knock)`).not.toBeNull();
-      return `${Number(p![1])},${Number(p![2])}`;
-    });
-    expect(new Set(offsets)).toEqual(new Set(['-1,-1', '0,-1', '1,-1', '-1,0', '1,0', '-1,1', '0,1', '1,1']));
+    expect(css).toMatch(/\.projects-page\{(?:[^}]*;)?text-shadow:var\(--knockout\)(;|\})/);
   });
 });
 

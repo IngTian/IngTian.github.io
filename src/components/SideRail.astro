@@ -12,7 +12,7 @@
 // is CSS, not the script's: a bundled script runs after the browser has painted, so a from-state it set could land
 // on a rail already painted at rest. Each row carries its index (--i) and the rail the gap between rows (--gap).
 //
-// A page reskins it only through role tokens (CLAUDE.md, The concept): --rail-halo and --rail-dash-halo, declared
+// A page reskins it only through role tokens (CLAUDE.md, The concept): --knockout and --rail-dash-halo, declared
 // by the registers whose ground needs them (today /projects' drafting sheet), `none` everywhere else.
 //
 // Scope note: the site has two OTHER rails — Toc.astro (post-hero fade-in) and the /art rail (coupled to gallery
@@ -89,10 +89,11 @@ const gap = stagger(1, flat.length, { step: 40, total: RAIL_ENTER_MS - ROW_MS })
   .side-rail .sub a { font-size: 10px; letter-spacing: 0.12em; }
 
   /* ONE LINE PER ROW: a label that cannot fit ends in an ellipsis rather than wrapping, which would break the even
-     rhythm and push its neighbours off-centre. All three layers clip the same way, so they stay one word. The halo
-     is a register's knockout for a ground with strokes under the text (on /projects, a 1px ring of the bare sheet
-     around every glyph, so no field line touches one); the copies inherit it. */
-  .side-rail .lbl { position: relative; min-width: 0; text-shadow: var(--rail-halo, none); }
+     rhythm and push its neighbours off-centre. All three layers clip the same way, so they stay one word.
+     --knockout is a register's ring for a ground with strokes under the text (on /projects, 1px of the bare sheet
+     around every glyph, so no field line touches one; the page's own text wears the same token); the copies inherit
+     it. */
+  .side-rail .lbl { position: relative; min-width: 0; text-shadow: var(--knockout, none); }
   .side-rail .dim,
   .side-rail .lbl::before,
   .side-rail .lbl::after { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
