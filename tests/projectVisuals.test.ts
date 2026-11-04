@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { projects } from '../src/data/profile';
 import { visualFor } from '../src/data/projectVisuals';
 import { macbootSections } from '../src/data/vendor/macbootSections';
+import { REPRO } from '../src/data/papers/rl-bhrp';
 import { offchartPositioning } from '../src/data/vendor/offchartPositioning';
 import { rlBhrpWealth } from '../src/data/vendor/rlBhrpWealth';
 import { witnessFacets } from '../src/data/vendor/witnessFacets';
@@ -76,7 +77,7 @@ const wealth = (r: readonly number[]) => cumulative(r).at(-1)!;
 const near = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThanOrEqual(0.101);
 
 const ALL = {
-  wealthSvg: wealthSvg(rlBhrpWealth),
+  wealthSvg: wealthSvg(REPRO),
   positioningSvg: positioningSvg(offchartPositioning),
   facetsSvg: facetsSvg(witnessFacets),
   sectionsSvg: sectionsSvg(macbootSections),

@@ -1,11 +1,12 @@
 // src/lib/projectVisuals.ts
 // THE COMPUTED PICTURES on /projects — for the four projects whose picture is their own output rather than a
 // screenshot, drawn at build time from data vendored with its provenance (src/data/vendor, written by
-// tools/vendor-projects.mjs). Each returns an SVG string, 350x220, coloured ONLY through CSS variables, so one
+// tools/vendor-projects.mjs; rl-bhrp's as data/papers/rl-bhrp.ts derives REPRO from it, the one series both
+// pages draw). Each returns an SVG string, 350x220, coloured ONLY through CSS variables, so one
 // drawing re-themes with the page (the drafting palette in tokens.css) and is never CSS-inverted.
 //
 // Rules the drawings keep, each pinned by tests/projectVisuals.test.ts:
-// - numbers come only from the vendored data, never the paper's Table 2 (data/papers/rl-bhrp.ts);
+// - numbers come only from the vendored data (rl-bhrp's: REPRO), never the paper's Table 2 beside it;
 // - text is --ink-1/--ink-3 on --draft-ph, in the mono subset;
 // - `meet`, never `slice` (workshop thumbs run 1.75:1 to 3.6:1);
 // - the gallery's three draw nothing below FLOOR;
@@ -13,10 +14,10 @@
 // Pure: returns markup, touches no DOM.
 import type { macbootSections } from '../data/vendor/macbootSections';
 import type { offchartPositioning } from '../data/vendor/offchartPositioning';
-import type { rlBhrpWealth } from '../data/vendor/rlBhrpWealth';
 import type { witnessFacets } from '../data/vendor/witnessFacets';
 import { expandingPercentile, shareOf } from './positioning';
-import { band, cumulative, linearScale, nudgeLabels, pointwiseMedian } from './wealth';
+import type { WealthSeries } from './paperFigures/wealthFigure';
+import { linearScale, nudgeLabels } from './wealth';
 
 const INK = 'var(--ink-1)', DIM = 'var(--ink-3)';
 const line = (a: number) => `rgba(var(--draft-line-rgb),${a})`;
@@ -44,14 +45,13 @@ const text = (x: number, y: number, s: string, { fill = INK, size = 10, anchor }
 
 // ── rl-bhrp ─────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** The out-of-sample wealth curve of rl-bhrp's committed REPRODUCTION run: the RL runs as a min-max band, their
- *  month-by-month median (lib/wealth.ts's rule for any page that draws this run), BHRP and the benchmark, each
- *  labelled with its final wealth. */
-export function wealthSvg(d: typeof rlBhrpWealth): string {
-  const runs = d.rlSeeds.map(cumulative);
-  const med = pointwiseMedian(runs), { lo: bottom, hi: top } = band(runs);
-  const bhrp = cumulative(d.bhrp), bench = cumulative(d.benchmark);
-  const all = [...runs, bhrp, bench].flat();
+/** The out-of-sample wealth curve of rl-bhrp's committed REPRODUCTION run, as REPRO reads it: the RL runs as a
+ *  min-max band, their month-by-month median (lib/wealth.ts's rule for any page that draws this run), BHRP and the
+ *  benchmark, each labelled with its final wealth. */
+export function wealthSvg(d: WealthSeries): string {
+  const { rl: med, lo: bottom, hi: top, bhrp, bench } = d;
+  // The band holds every run, so its edges bound them all; the median lies inside it.
+  const all = [bottom, top, bhrp, bench].flat();
   const wMin = Math.min(...all), wMax = Math.max(...all), pad = (wMax - wMin) * 0.04;
   const X0 = 16, X1 = 250, Y0 = 56, Y1 = FLOOR - 18;
   const x = linearScale(0, med.length - 1, X0, X1), y = linearScale(wMin - pad, wMax + pad, Y1, Y0);
@@ -63,14 +63,13 @@ export function wealthSvg(d: typeof rlBhrpWealth): string {
 
   // The x labels are the years of the returns' own dates; wealth starts at 1 the month before the first of them.
   const yr = (s: string) => s.slice(0, 4);
-  const finals = runs.map((s) => s.at(-1)!);
   const label = `Out-of-sample wealth of rl-bhrp's reproduction run, ${yr(d.dates[0])} to ${yr(d.dates.at(-1)!)}, `
-    + `from a start of 1: RL-BHRP, the month-by-month median of ${d.rlSeeds.length} runs, ends at ${med.at(-1)!.toFixed(2)}, `
+    + `from a start of 1: RL-BHRP, the month-by-month median of ${d.runs} runs, ends at ${med.at(-1)!.toFixed(2)}, `
     + `BHRP at ${bhrp.at(-1)!.toFixed(2)} and the benchmark at ${bench.at(-1)!.toFixed(2)}; `
-    + `the runs end between ${Math.min(...finals).toFixed(2)} and ${Math.max(...finals).toFixed(2)}.`;
+    + `the runs end between ${bottom.at(-1)!.toFixed(2)} and ${top.at(-1)!.toFixed(2)}.`;
   return svg(label, [
     text(16, 28, 'Out-of-sample wealth · reproduction run'),
-    text(16, 42, `RL-BHRP: median of ${d.rlSeeds.length} runs, shaded min to max`, { fill: DIM, size: 9 }),
+    text(16, 42, `RL-BHRP: median of ${d.runs} runs, shaded min to max`, { fill: DIM, size: 9 }),
     `<line x1="${X0}" x2="${X1}" y1="${r1(y(1))}" y2="${r1(y(1))}" style="stroke:${line(0.3)}" stroke-dasharray="2 3"/>`,
     `<polygon points="${pts([...curve(top), ...curve(bottom).reverse()])}" style="fill:${hi(0.18)}"/>`,
     `<polyline points="${pts(curve(bench))}" style="fill:none;stroke:${line(0.5)}" stroke-width="1.2" stroke-dasharray="3 2"/>`,
