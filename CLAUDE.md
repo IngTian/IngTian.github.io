@@ -368,7 +368,9 @@ The research routes need none: nothing on them is hidden by markup. What waits f
 carries `data-pending`, set by a bundled script and only on what is still below the screen the
 reader lands on (`onceSeen` in `scripts/motion.ts`), so nothing a reader can see flips; and a
 wide margin note is held by CSS alone, `@media (scripting: enabled)`, until the script places
-it (*Papers are files*).
+it (*Papers are files*). Every hold-back rule is inside `@media screen`: a printout is laid out
+where no observer sees it and no backstop runs, so it gets the finished page
+(`tests/distSmoke.test.ts` fails on a hold-back outside one).
 
 Everything else here:
 
@@ -845,7 +847,8 @@ file holds is the prose; everything else has one home of its own:
   has none; a directive other than `:v` in maths; a TeX
   error (rehype-katex otherwise draws it in red and moves on); a
   notation row matching no display; a note whose `for` names no term, or a term outside its note's
-  host; a term marked twice, or inside a highlight (seal over the seal band is under 3:1, so its
+  host; a note with no block before it to explain (first in its section, after only the heading,
+  or first in a theorem); a term marked twice, or inside a highlight (seal over the seal band is under 3:1, so its
   linked rule would vanish); a `def` without its `**Name.**`; a section without its `#id` or
   `[title]`; an id used twice, counting a heading's (`<id>-title`) and those inside a figure's drawing (so a second
   wealth figure on one page is refused, its `fm-*` ids repeated); an eq without one display or a wide/narrow pair, or with `\tag`;
@@ -1349,6 +1352,11 @@ titles came to rest hard against the browser chrome — the lead is a number in
 - **Lighthouse bar:** Perf ≥99 / A11y 100 / Best-practices 100 / SEO 100. Don't
   regress a11y: there's a `<main>` landmark; nav is real `<button>`/`<a>`; decorative
   canvases, rails and the cow bubble are `aria-hidden` or labeled.
+  - **A11y 100 does not test WCAG 1.4.13** (content on hover or focus), and neither does axe.
+    A tip that covers text must be dismissible and hoverable: the paper page's two (Figure 2's
+    readout, a symbol's Notation row) go on Escape, without the pointer or the focus moving,
+    and stay while the pointer crosses onto them (a shown tip takes the pointer, and a bridge
+    spans its gap; `tests/distSmoke.test.ts` reads both in the built CSS).
 - **Pure logic is tested.** Anything non-trivial in `lib/` gets a vitest spec, and
   so does every *invariant between two files* (`nav.test.ts`: every nav href is a
   real route; `writingContent.test.ts`: the schema enum matches `KINDS`;

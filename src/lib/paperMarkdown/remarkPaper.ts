@@ -338,9 +338,11 @@ export function remarkPaper({ papers, publications }: { papers: Record<string, P
       return set(n, 'aside', { className: ['mn', kind], ...(at ? { dataAt: at } : {}) });
     }
 
+    // A note with nothing before it but its section's heading (or nothing at all, opening a theorem) has no block to
+    // explain: hosted, it would wrap the heading and the section's styles would miss it.
     function attach(aside: Node, out: Node[]): void {
       const prev = out.at(-1);
-      if (!prev) { out.push(aside); return; }
+      if (!prev || prev.data?.hName === 'h2') { problem(`${noteLabel(aside)} must follow the block it explains`); return; }
       const host = hosts.has(prev) ? prev : el('div', { className: ['an'] }, [prev]);
       hosts.add(host);
       out[out.length - 1] = host;

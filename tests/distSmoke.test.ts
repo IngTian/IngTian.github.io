@@ -1336,3 +1336,37 @@ describe('/research/rl-bhrp — a paper explained, from its file', async () => {
     }
   });
 });
+
+describe('the research routes — what a reader prints or hovers', () => {
+  // A printout is laid out where no IntersectionObserver sees it and no on-screen backstop runs, so a hold-back
+  // that applied there would print the page blank below its first screen, Figure 2 under its mask. Every rule that
+  // holds something back (a `[data-pending]` reveal, an unplaced margin note) is inside an `@media screen` block.
+  // Outside one such a rule may say only `transition: none`: kept in every medium, it makes the print layout's
+  // dropping of a hold a snap, where a note's opacity transition would otherwise start from 0 and print it there.
+  it('holds nothing back in print: every hold-back rule is screen-only', () => {
+    const css = distCss();
+    const screen = /@media screen\b[^{]*\{((?:[^{}]*\{[^{}]*\})*)\}/g;
+    const holds = (s: string) => [...s.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter(([, sel]) => /\[data-pending\]|:not\(\.is-placed\)/.test(sel))
+      .map(([, sel, body]) => ({ sel: sel.trim(), body }));
+    const guarded = [...css.matchAll(screen)].flatMap((m) => holds(m[1]));
+    expect(guarded.length, 'the seven hold-back rules written today').toBeGreaterThanOrEqual(7);
+    const outside = holds(css.replace(screen, ''));
+    expect(outside.length, "the two pages' transition: none").toBeGreaterThanOrEqual(2);
+    expect(outside.filter((r) => r.body !== 'transition:none').map((r) => r.sel)).toEqual([]);
+  });
+
+  // WCAG 1.4.13, which neither Lighthouse nor axe tests: content shown on hover must be hoverable. Each of the paper
+  // page's two tips takes the pointer while it shows, and bridges the gap to what it reads, so the pointer can cross.
+  it('makes each tip hoverable: a shown tip takes the pointer, and a bridge spans its gap', () => {
+    const rules = [...distCss().matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, sel, body]) => ({ sels: sel.split(',').map((s) => s.trim()), body }));
+    const body = (sel: string) => rules.filter((r) => r.sels.includes(sel)).map((r) => r.body).join(';');
+    for (const shown of ['.paper .f-plot.reading .f-tip', 'html[data-page=paper] .sym-tip.on']) {
+      expect(body(shown), shown).toMatch(/(^|;)pointer-events:auto\b/);
+    }
+    for (const bridge of ['.paper .f-tip:after', 'html[data-page=paper] .sym-tip:before']) {
+      expect(body(bridge), bridge).toMatch(/(^|;)content:""/);
+      expect(body(bridge), bridge).toMatch(/(^|;)height:\d+px/);
+    }
+  });
+});

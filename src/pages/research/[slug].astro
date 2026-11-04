@@ -245,8 +245,8 @@ const noted = errata.map((e) => e.date).sort().at(-1);
   /* Wide, a note is hidden until the script has placed it (place() adds .is-placed): shown at its block's top first,
      it would then jump to its anchor in view, a layout shift. Hidden keeps its box, so nothing moves when it shows.
      The animation is the backstop, shown after MOTION_LIMIT_MS (lib/motion.ts) if the script never runs; without
-     a script the query does not match and every note falls into the column. */
-  @media (min-width: 1101px) and (scripting: enabled) {
+     a script the query does not match and every note falls into the column. A printout holds nothing (screen). */
+  @media screen and (min-width: 1101px) and (scripting: enabled) {
     .paper .mn:not(.is-placed) { visibility: hidden; animation: mn-unheld 0s 5000ms forwards; }
   }
   @keyframes mn-unheld { to { visibility: visible; } }
@@ -255,7 +255,7 @@ const noted = errata.map((e) => e.date).sort().at(-1);
      background, which a drawn sweep hands over to; a pending or drawing phrase is plain. ── */
   .paper mark.hl { color: var(--ink-1); background: linear-gradient(var(--sheet-ul), var(--sheet-ul)) left bottom / 100% 0.3em no-repeat;
     padding-bottom: 0.02em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
-  .paper mark.hl[data-pending], .paper mark.hl.drawing { background: none; }
+  @media screen { .paper mark.hl[data-pending], .paper mark.hl.drawing { background: none; } }
   /* A linked term: a 1.5px seal rule under it, which no link here looks like (links are a 1px grey hairline). */
   .paper .t.lk:not(.drawing) { background: linear-gradient(var(--sheet-mark), var(--sheet-mark)) left bottom / 100% 1.5px no-repeat;
     -webkit-box-decoration-break: clone; box-decoration-break: clone; }
@@ -292,8 +292,10 @@ const noted = errata.map((e) => e.date).sort().at(-1);
   .paper .f-qual { font-style: italic; font-size: 0.86em; }
   .paper .f-ylab { font-style: italic; }
   /* the draw: the mask shows only while the plot waits for it or draws (the markup hides it) */
-  .paper .f-plot[data-pending] .f-draw, .paper .f-plot.drawing .f-draw { visibility: visible; }
-  .paper .f-plot[data-pending] .f-labels { opacity: 0; }
+  @media screen {
+    .paper .f-plot[data-pending] .f-draw, .paper .f-plot.drawing .f-draw { visibility: visible; }
+    .paper .f-plot[data-pending] .f-labels { opacity: 0; }
+  }
 
   .paper .p-name { color: var(--ink-1); }
   .paper .p-ref { font-style: italic; color: var(--ink-3); }
@@ -302,7 +304,7 @@ const noted = errata.map((e) => e.date).sort().at(-1);
   .paper .p-arrow { stroke: rgba(var(--hairline-rgb), 0.85); stroke-width: 1; }
   .paper .p-dash { stroke-dasharray: 3 3; }
   .paper .p-head { stroke: rgba(var(--hairline-rgb), 0.95); stroke-width: 1.1; stroke-linejoin: round; }
-  .paper figure[data-pending] .p-arrow { opacity: 0; }
+  @media screen { .paper figure[data-pending] .p-arrow { opacity: 0; } }
 
   /* Figure 2's readout: a hairline at the month, a dot on each series, and the values beside it. */
   .paper .f-plot { position: relative; touch-action: pan-y; border-radius: 2px; }
@@ -324,6 +326,12 @@ const noted = errata.map((e) => e.date).sort().at(-1);
   .paper .f-tip dt i { color: var(--ink-3); }
   .paper .f-tip dd { margin: 0; text-align: right; font-family: var(--font-body); font-size: 0.93em; font-feature-settings: "lnum", "tnum"; color: var(--ink-1); }
   .paper .f-plot.reading .f-read, .paper .f-plot.reading .f-tip { opacity: 1; }
+  /* Hoverable (WCAG 1.4.13): a shown tip takes the pointer, and a bridge spans the gap to what it reads (the plot,
+     14px off, above or .below it; the symbol, 8px over it), so the pointer can cross onto the tip and keep it. */
+  .paper .f-plot.reading .f-tip, html[data-page='paper'] .sym-tip.on { pointer-events: auto; }
+  .paper .f-tip::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 16px; }
+  .paper .f-tip.below::after { top: auto; bottom: 100%; }
+  html[data-page='paper'] .sym-tip::before { content: ''; position: absolute; left: 0; right: 0; bottom: 100%; height: 10px; }
   /* a displayed symbol's row of the Notation table, beside the symbol: the table is screens away */
   html[data-page='paper'] .sym-tip { z-index: 40; width: max-content; max-width: min(22em, calc(100vw - 16px)); white-space: normal;
     font-family: var(--font-display); }
@@ -379,8 +387,12 @@ const noted = errata.map((e) => e.date).sort().at(-1);
   .paper .tags { margin-top: 30px; font-size: 15px; color: var(--ink-3); }
 
   /* ── motion: what is still below the screen waits for its reveal (set by the script, never served), and the
-     linked marking. Under reduced motion the script holds nothing back, and nothing here moves. ── */
-  .paper [data-pending]:not(mark):not(figure):not(.f-plot) { opacity: 0; transition: none; }
+     linked marking. Under reduced motion the script holds nothing back, and nothing here moves. Every hold-back
+     rule on this page is screen-only: a printout is laid out where no observer sees it, so nothing would end the
+     wait, and it gets the finished page. Its transition: none is not, or a note's opacity transition would run
+     from 0 as the print layout drops the hold, and print the note at its start. ── */
+  .paper [data-pending]:not(mark):not(figure):not(.f-plot) { transition: none; }
+  @media screen { .paper [data-pending]:not(mark):not(figure):not(.f-plot) { opacity: 0; } }
   .paper.lk-on .mn:not(.lk) { opacity: 0.9; }
   @media (prefers-reduced-motion: no-preference) {
     .paper .mn { transition: opacity 200ms ease-out, transform 240ms cubic-bezier(.2,.7,.2,1); }
@@ -591,7 +603,8 @@ const noted = errata.map((e) => e.date).sort().at(-1);
       tip.classList.add('on');
     }
     document.addEventListener('pointerover', (e) => {
-      if (e.pointerType === 'touch') return;
+      // over the symbol's tip, the symbol stays marked (hoverable, as the CSS says)
+      if (e.pointerType === 'touch' || (e.target instanceof Node && tip.contains(e.target))) return;
       link(e.target);
       mark(e.target);
     }, { signal });
@@ -601,6 +614,7 @@ const noted = errata.map((e) => e.date).sort().at(-1);
 
     // ── Figure 2's readout: the month nearest the pointer, a tap or ←/→ (Shift: a year; Home/End): a hairline
     // there, a dot on each series, and the values, the runs' range among them. A keyboard reading is spoken. ──
+    let dismissed = false; // Escape put the readout's tip away, until the reader asks for another reading
     if (plot) {
       const series = (k: string) => (plot.dataset[k] ?? '').split(' ').map(Number);
       const dates = (plot.dataset.dates ?? '').split(' '), end = plot.dataset.end ?? '';
@@ -619,6 +633,7 @@ const noted = errata.map((e) => e.date).sort().at(-1);
         const svg = svgShown();
         if (!svg || !tipEl) return;
         at = Math.max(0, Math.min(points - 1, i));
+        dismissed = false;
         const [W, x0, x1, y0, y1, lo, hi] = (svg.dataset.g ?? '').split(' ').map(Number);
         const X = x0 + ((x1 - x0) * at) / (points - 1), Y = (v: number) => y1 - ((y1 - y0) * (v - lo)) / (hi - lo);
         svg.querySelector('.f-hair')?.setAttribute('transform', `translate(${X} 0)`);
@@ -638,7 +653,9 @@ const noted = errata.map((e) => e.date).sort().at(-1);
         const sr = svg.getBoundingClientRect(), pr = plot!.getBoundingClientRect(), s = sr.width / W;
         const left = tipLeft(sr.left - pr.left + X * s, tipEl.offsetWidth, pr.width);
         // above the plot when the window has room, else under the axis; 14px clear of the focus ring
-        const top = sr.top - tipEl.offsetHeight - 14 >= 0 ? sr.top - pr.top - tipEl.offsetHeight - 14 : sr.bottom - pr.top + 14;
+        const above = sr.top - tipEl.offsetHeight - 14 >= 0;
+        const top = above ? sr.top - pr.top - tipEl.offsetHeight - 14 : sr.bottom - pr.top + 14;
+        tipEl.classList.toggle('below', !above);
         tipEl.style.transform = `translate(${left}px, ${Math.round(top)}px)`;
         if (speak && say) {
           say.textContent = `${when}: RL-BHRP, ${runs}, ${usd(S.rl[at])} (the runs ${usd(S.lo[at])} to ${usd(S.hi[at])}); `
@@ -652,15 +669,19 @@ const noted = errata.map((e) => e.date).sort().at(-1);
         const [W, x0, x1] = (svg.dataset.g ?? '').split(' ').map(Number), r = svg.getBoundingClientRect();
         return readoutIndex(((e.clientX - r.left) / r.width) * W, x0, x1, points);
       };
+      // The pointer on the tip is reading it: the month stays where it is.
+      const onTip = (e: Event): boolean => e.target instanceof Node && !!tipEl?.contains(e.target);
       plot.addEventListener('pointermove', (e) => {
+        if (onTip(e)) return;
         hovering = e.pointerType !== 'touch';
-        read(fromPointer(e), false);
+        const i = fromPointer(e);
+        if (!(dismissed && i === at)) read(i, false);
       }, { signal });
       // A tap reads where it lands, focusing the plot (not every touch browser focuses on a tap), and the reading
       // stays until the plot loses focus; a touch anywhere else takes it away. A swipe that the browser takes as a
       // scroll ends in pointercancel, not pointerup, so it reads nothing and leaves nothing on.
       plot.addEventListener('pointerup', (e) => {
-        if (e.pointerType !== 'touch') return;
+        if (e.pointerType !== 'touch' || onTip(e)) return;
         const i = fromPointer(e);
         if (document.activeElement === plot) read(i, true);
         else { at = i; plot.focus({ preventScroll: true }); }
@@ -679,6 +700,15 @@ const noted = errata.map((e) => e.date).sort().at(-1);
         read(next, true);
       }, { signal });
     }
+
+    // ── Escape puts either tip away without moving the pointer or the focus (WCAG 1.4.13): the symbol's until the
+    // pointer comes to another symbol (mark() keeps `symbol`), the readout's until another month is asked for ──
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      tip.classList.remove('on');
+      page.querySelectorAll('.sym.on, .notation tr.on').forEach((el) => el.classList.remove('on'));
+      if (plot?.classList.contains('reading')) { plot.classList.remove('reading'); dismissed = true; }
+    }, { signal });
 
     // ── copy the BibTeX ──
     const copy = page.querySelector<HTMLElement>('[data-copy]');

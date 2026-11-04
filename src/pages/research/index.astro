@@ -151,9 +151,12 @@ const STATUS: Record<PublicationStatus, string> = { preprint: 'Preprint', confer
     .research .pc.is-hover { transform: translateY(-2px); }
     .research .pc.is-hover .ul { transition: transform 320ms cubic-bezier(.2,.7,.2,1) calc(var(--k) * 110ms); }
   }
-  /* what is still below the screen waits for its reveal (set by the script, never served). After the card's
-     transition above, so that its transition: none wins at the same specificity. */
-  .research [data-pending] { opacity: 0; transition: none; }
+  /* what is still below the screen waits for its reveal (set by the script, never served), on screen only: a
+     printout is laid out where no observer sees it, so nothing would end the wait. Its transition: none holds in
+     every medium, so a print layout dropping the hold snaps to the finished state. After the card's transition
+     above, so that it wins at the same specificity. */
+  .research [data-pending] { transition: none; }
+  @media screen { .research [data-pending] { opacity: 0; } }
 
   .research .interests { list-style: none; margin: 0; padding: 0; font-size: 16.5px; line-height: 1.58; color: var(--ink-3); }
   .research .interests li { margin: 0 0 10px; }

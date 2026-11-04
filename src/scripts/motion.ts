@@ -52,7 +52,9 @@ function landingBottom(): number {
  * them past (End, a rail click): the moment its top is above the screen it is settled,
  * finished and not run, rather than kept waiting until the reader scrolls back up to it. Each element that waits
  * carries `data-pending` until then, so its hold-back state is CSS on that attribute, set by script and never served
- * (a hold-back rule on an element with a transition must say `transition: none`, or it animates into hiding).
+ * (a hold-back rule on an element with a transition must say `transition: none`, or it animates into hiding), and
+ * inside `@media screen`: a printout is laid out where no observer sees it, so a hold-back there would never end.
+ * The `transition: none` stays outside it, so the print layout dropping the hold snaps rather than animates.
  * Under reduced motion nothing is held back and nothing runs: the CSS finished state stands.
  *
  * The root reaches far above the screen, so that a jump from below an element to past it crosses an edge (not

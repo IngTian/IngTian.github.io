@@ -41,7 +41,7 @@ describe("the margin notes' backstop (research/[slug].astro)", () => {
   const src = readFileSync(new URL('../src/pages/research/[slug].astro', import.meta.url), 'utf8');
 
   it('holds a wide note hidden until placed, and shows it after MOTION_LIMIT_MS if the script never runs', () => {
-    const held = /@media \(min-width: 1101px\) and \(scripting: enabled\) \{\s*\.paper \.mn:not\(\.is-placed\) \{ visibility: hidden; animation: mn-unheld 0s (\d+)ms forwards; \}\s*\}/.exec(src);
+    const held = /@media screen and \(min-width: 1101px\) and \(scripting: enabled\) \{\s*\.paper \.mn:not\(\.is-placed\) \{ visibility: hidden; animation: mn-unheld 0s (\d+)ms forwards; \}\s*\}/.exec(src);
     expect(held, 'the `.paper .mn:not(.is-placed)` hold').not.toBeNull();
     expect(Number(held![1])).toBe(MOTION_LIMIT_MS);
     expect(src).toMatch(/@keyframes mn-unheld \{ to \{ visibility: visible; \} \}/);

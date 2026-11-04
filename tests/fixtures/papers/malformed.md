@@ -73,6 +73,20 @@ A section whose id is another section's heading's.
 Untitled, and an id already used.
 :::
 
+:::::section[Unhosted]{#unhosted}
+:::why
+A note before any block.
+:::
+
+::::thm
+:::def
+**Opening.** A note that opens a theorem.
+:::
+
+The theorem's words.
+::::
+:::::
+
 :::section[Short]{#short}
 :::def
 **Inner.** Mis-nested: this fence closes the section too.

@@ -241,6 +241,9 @@ describe('a malformed paper', async () => {
       // a heading's id is the section's and "-title", and a figure's drawing carries ids of its own (pipe's marker)
       'id #eqs-title is used twice',
       'id #ah is used twice',
+      // a note first in its section (after only the heading) or first in a theorem has no block to join
+      ':::why must follow the block it explains',
+      ':::def must follow the block it explains',
       // the section [Short] holds a :::def with as many colons: the def's fence closes the section, so the def
       // never closes, the rest of the section falls outside it and its own fence is left over as text
       'a stray ":::" — a container holding another needs more colons than the one inside it',
