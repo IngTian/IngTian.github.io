@@ -9,6 +9,9 @@ import { fixMathVariants } from './mathml';
 const opts = { output: 'mathml' as const, throwOnError: false, displayMode: false };
 const tex = (src: string, o: typeof opts) => fixMathVariants(katex.renderToString(src, o));
 
+/** Inline maths for any other build-time markup (a figure's labels and caption), on the same terms. */
+export const inlineMath = (src: string) => tex(src, opts);
+
 export const EQUATIONS = {
   gradZero: tex('\\nabla f = 0', opts),
   kkt: tex('\\nabla f + J_h^{\\top}\\lambda + J_g^{\\top}\\mu = 0', opts),

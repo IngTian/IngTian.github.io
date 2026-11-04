@@ -3,13 +3,13 @@
 // its window or the vendored reproduction moved under a sentence that quotes them, which is the point: the
 // prose cannot be edited to follow, because it types no number.
 import { describe, it, expect } from 'vitest';
-import { TABLE2, PAPER } from '../src/data/papers/rl-bhrp';
+import { TABLE2, PAPER, REPRO } from '../src/data/papers/rl-bhrp';
 import { PAPER_DATA } from '../src/data/papers';
 import { rlBhrpValues } from '../src/lib/paperNumbers';
 import { rlBhrpWealth } from '../src/data/vendor/rlBhrpWealth';
 import { cumulative } from '../src/lib/wealth';
 
-const v = rlBhrpValues(TABLE2, PAPER);
+const v = rlBhrpValues(TABLE2, PAPER, REPRO);
 
 describe("Table 2, as the paper prints it", () => {
   it('has all 18 rows, in the paper\'s order (paper-pdf.txt, Table 2)', () => {

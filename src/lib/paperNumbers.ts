@@ -1,18 +1,17 @@
 // src/lib/paperNumbers.ts
 // The figures RL-BHRP's prose quotes, as the strings it prints. The paper's come from its Table 2 and stated
-// window (data/papers/rl-bhrp.ts); the reproduction's from its vendored returns (data/vendor/rlBhrpWealth.ts)
-// through lib/wealth.ts. Every value is a magnitude at a fixed precision, so a sentence supplies its own words
-// ("a fall of", "about") and never a figure. Pure.
-import type { TABLE2, PAPER } from '../data/papers/rl-bhrp';
-import { rlBhrpWealth } from '../data/vendor/rlBhrpWealth';
-import { cagr, cumulative, maxDrawdownFromStart, pointwiseMedian } from './wealth';
+// window, the reproduction's from the series its figures draw (all three in data/papers/rl-bhrp.ts). Every value
+// is a magnitude at a fixed precision, so a sentence supplies its own words ("a fall of", "about") and never a
+// figure. Pure.
+import type { TABLE2, PAPER, REPRO } from '../data/papers/rl-bhrp';
+import { cagr, maxDrawdownFromStart } from './wealth';
 
 const COLUMNS = ['rl', 'bhrp', 'bench'] as const;
 const pct = (x: number) => (x * 100).toFixed(2);
 const usd = (wealth: number) => `$${wealth.toFixed(2)}`;
 
 /** Keys are `<measure>.<column>` (columns rl, bhrp, bench) or a bare name for a single figure. */
-export function rlBhrpValues(t: typeof TABLE2, p: typeof PAPER): Record<string, string> {
+export function rlBhrpValues(t: typeof TABLE2, p: typeof PAPER, repro: typeof REPRO): Record<string, string> {
   const row = (metric: string): readonly number[] => {
     const r = t.find((x) => x.metric === metric);
     if (!r || r.values.some((x) => typeof x !== 'number')) throw new Error(`Table 2 has no numeric "${metric}" row`);
@@ -57,16 +56,15 @@ export function rlBhrpValues(t: typeof TABLE2, p: typeof PAPER): Record<string, 
   v['top15.hi'] = p.top15.hi.toFixed(2);
   v.top15Equal = String(Math.round((15 / p.universe) * 100));      // % that any 15 hold at equal weights
 
-  // The reproduction: the month-by-month median of its runs (the line its figures draw), BHRP and the benchmark.
-  const runs = rlBhrpWealth.rlSeeds.map(cumulative);
-  const median = pointwiseMedian(runs), bhrp = cumulative(rlBhrpWealth.bhrp);
-  const months = rlBhrpWealth.dates.length, finals = runs.map((w) => w[w.length - 1]);
-  v.reproRuns = String(runs.length);
-  v.reproEnd = usd(median[median.length - 1]);
-  v.reproLo = usd(Math.min(...finals));
-  v.reproHi = usd(Math.max(...finals));
-  v.reproGap = ((cagr(median[median.length - 1] - 1, months) - cagr(bhrp[bhrp.length - 1] - 1, months)) * 100).toFixed(1);
+  // The reproduction: the month-by-month median of its runs (the red line), the band's ends (the lowest and the
+  // highest run's), BHRP and the benchmark.
+  const { rl, lo, hi, bhrp, bench, dates } = repro, months = dates.length;
+  v.reproRuns = String(repro.runs);
+  v.reproEnd = usd(rl.at(-1)!);
+  v.reproLo = usd(lo.at(-1)!);
+  v.reproHi = usd(hi.at(-1)!);
+  v.reproGap = ((cagr(rl.at(-1)! - 1, months) - cagr(bhrp.at(-1)! - 1, months)) * 100).toFixed(1);
   v['mdd0.bhrp'] = pct(-maxDrawdownFromStart(bhrp));
-  v['mdd0.bench'] = pct(-maxDrawdownFromStart(cumulative(rlBhrpWealth.benchmark)));
+  v['mdd0.bench'] = pct(-maxDrawdownFromStart(bench));
   return v;
 }

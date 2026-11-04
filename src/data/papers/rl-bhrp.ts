@@ -1,6 +1,10 @@
 // src/data/papers/rl-bhrp.ts
-// RL-BHRP's own numbers (arXiv:2508.11856v1), at the paper's precision, so every figure its explainer and the
-// homepage quote is computed from them (lib/paperNumbers.ts) rather than typed into prose.
+// RL-BHRP's own numbers (arXiv:2508.11856v1), at the paper's precision, and its reproduction's series, so every
+// figure its explainer and the homepage quote is computed from them (lib/paperNumbers.ts) rather than typed into
+// prose, and every picture drawn from them (lib/paperFigures/).
+import { rlBhrpWealth } from '../vendor/rlBhrpWealth';
+import type { WealthSeries } from '../../lib/paperFigures/wealthFigure';
+import { band, cumulative, pointwiseMedian } from '../../lib/wealth';
 
 /** Table 2, "Full-Period Metrics": all 18 rows in the paper's order, values as printed (6 dp). Columns are
  *  RL-BHRP | BHRP | Benchmark. The benchmark's information ratio is NaN in the paper: its tracking error
@@ -46,3 +50,17 @@ export const PAPER = {
   turnoverP95: 0.85,
   top15: { mean: 0.50, lo: 0.40, hi: 0.61 },
 } as const;
+
+const runs = rlBhrpWealth.rlSeeds.map(cumulative);
+
+/** The second author's reproduction (data/vendor/rlBhrpWealth.ts), as its figures and its quoted numbers read it:
+ *  growth of $1 from the start of the month `dates[0]` ends, then one point at each month-end. `rl` is the
+ *  month-by-month median of the `runs` and `lo`/`hi` their band (lib/wealth.ts says why a median and not a run). */
+export const REPRO: WealthSeries = {
+  dates: rlBhrpWealth.dates,
+  runs: runs.length,
+  rl: pointwiseMedian(runs),
+  ...band(runs),
+  bhrp: cumulative(rlBhrpWealth.bhrp),
+  bench: cumulative(rlBhrpWealth.benchmark),
+};

@@ -686,9 +686,10 @@ file holds is the prose; everything else has one home of its own:
   an author written `Family, Given` so a citation can read "López de Prado, 2016"; `addedHere` is
   where the paper names a work its bibliography leaves out) and `errata` (`{ date, text }[]`).
 - **The numbers and pictures** are `PAPER_DATA[slug]` (`src/data/papers/`): `values`, strings
-  computed from the paper's data, and `figures`, SVG/HTML strings drawn from vendored data. They
-  reach the plugins as **options** from `astro.config.mjs`, so they are in Astro's config digest
-  and a moved number re-renders the paper. Plugin *code* is not in the digest: after editing a
+  computed from the paper's data; `figures`, HTML strings drawn from vendored data by
+  `lib/paperFigures/` (each a whole `<figure>` with its caption, the maths in it build-time MathML);
+  and `thumb`, the index card's picture, for a paper that has one. They reach the plugins as
+  **options** from `astro.config.mjs`, so they are in Astro's config digest and a moved number re-renders the paper. Plugin *code* is not in the digest: after editing a
   plugin, delete `node_modules/.astro/data-store.json` before building or the old render is served.
 
 **The syntax** — every construct has a case in `tests/fixtures/papers/simple.md`:
