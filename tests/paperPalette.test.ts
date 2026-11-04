@@ -52,16 +52,14 @@ describe('the paper palette (tokens.css)', () => {
         });
       }
 
-      // The underline highlight is a band laid under the words, so it is measured both ways: as a mark on the
-      // sheet, and as the ground the ink-1 text above it reads against.
-      it('the underline highlight reads as a mark, and keeps ink-1 legible over it', () => {
+      // The underline highlight is emphasis under words that stay legible on their own, so what is measured is the
+      // text over it, not the band as a mark.
+      it('keeps ink-1 legible over the underline highlight', () => {
         const [ul, alpha] = rgbaOf(tk['--sheet-ul']);
         const band = over(ul, alpha, ground);
-        expect(onGround(tk['--sheet-ground'], band), 'the underline against the sheet').toBeGreaterThanOrEqual(NON_TEXT);
         expect(onGround(tk['--ink-1'], band), 'ink-1 over the underline').toBeGreaterThanOrEqual(AA_BODY);
-        // Pins tokens.css's "bare sheet only" for --sheet-mark. The band's contrast with the sheet times the seal's
-        // with the band is the seal's own on the sheet (~5.2), so the two cannot both reach 3:1: a band that reads as
-        // a mark leaves the seal under 3:1 over it (and so does the prototype's 0.42).
+        // Pins tokens.css's "bare sheet only" for --sheet-mark: seal over the seal band is under 3:1, which is why
+        // the explainer format refuses a linked term inside a highlight.
         expect(onGround(tk['--sheet-mark'], band), '--sheet-mark over the underline').toBeLessThan(NON_TEXT);
       });
 

@@ -179,12 +179,13 @@ html[data-page='drafting'][data-theme='dark'] {
    `--bg` is the ground, so the body paints it and overscroll shows paper.
    ink-1..3 are the approved prototype's; ink-4 is ink-3 (both must clear 4.5:1 on the ground) and ink-5 the midpoint
    of ink-3 and the ground. tests/paperPalette.test.ts holds the numbers.
-     --sheet-ul    the underline highlight, a band under the words. 0.7 is the least seal that clears 3:1 against the
-                   ground as a mark in both themes; ink-1 over it stays above 4.5:1.
+     --sheet-ul    the underline highlight: a band under words that stay fully legible on their own, so it is
+                   emphasis, not a mark the reader needs (WCAG 1.4.11 does not apply). Its strength, 0.42, is the one
+                   the owner approved on the prototype; ink-1 over it stays above 8:1.
      --sheet-band  the figure's band of runs
      --sheet-mark  a marked symbol in an equation, and a linked term's rule, ON THE BARE SHEET ONLY. Over --sheet-ul
-                   it is seal on a seal band, under 3:1 at 0.7 and at the prototype's 0.42 alike, so nothing marked
-                   over a highlight may use it.
+                   it is seal on a seal band, under 3:1 at any strength that still reads as a band, so the explainer
+                   format refuses a linked term inside a highlight.
    BOTH BLOCKS DECLARE EVERY TOKEN, for the reason the drafting header gives.
    ============================================================ */
 html[data-page='paper'] {
@@ -200,7 +201,7 @@ html[data-page='paper'] {
   --bg: var(--sheet-ground);
 
   --sheet-ground: #f4efe4;
-  --sheet-ul: rgba(178, 58, 46, 0.7);
+  --sheet-ul: rgba(178, 58, 46, 0.42);
   --sheet-band: rgba(178, 58, 46, 0.15);
   --sheet-mark: #b23a2e;
 }
@@ -217,7 +218,7 @@ html[data-page='paper'][data-theme='dark'] {
   --bg: var(--sheet-ground);
 
   --sheet-ground: #0d0d11;
-  --sheet-ul: rgba(224, 87, 74, 0.7);
+  --sheet-ul: rgba(224, 87, 74, 0.42);
   --sheet-band: rgba(224, 87, 74, 0.2);
   --sheet-mark: #e0574a;
 }
