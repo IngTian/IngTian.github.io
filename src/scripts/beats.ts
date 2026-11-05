@@ -23,8 +23,8 @@ const HOLD_MS = 4600;
 export interface Beats {
   /** The beat buttons, in order. */
   buttons: HTMLElement[];
-  /** Paint beat `i`. `animate` is false for the first paint and the reduced-motion rest, true for a pick or a step
-   *  (Solve replays move one's reveal on it). */
+  /** Paint beat `i`. `animate` is true for a step of the walk and a pick (Solve replays move one's reveal on it), and
+   *  false for the first paint and everything under reduced motion, its rest and its picks. */
   show: (i: number, animate: boolean) => void;
   /** Ms from the slide being seen to the walk's first step. */
   firstMs: number;
@@ -66,7 +66,7 @@ function walk(section: HTMLElement, beats: Beats): () => void {
     frozen = true;
     stop();
     step = i;
-    show(i, true);
+    show(i, !reduced);
   };
 
   buttons.forEach((b, i) => {
