@@ -243,8 +243,8 @@ function openLB(src: string, alt: string, w?: number, h?: number) {
   // leaves the browser painting the PREVIOUS decoded image until the new one arrives, so every open after
   // the first showed the wrong photograph for the length of a 0.5-1.4 MB fetch. Removing the attribute
   // renders nothing, which is honest; the reserved box above keeps that from being a layout shift.
-  // Deliberately NOT done with `opacity: 0` — an element whose resting state is invisible is the defect
-  // trap 6 in CLAUDE.md is about, and a failed decode would leave the lightbox permanently blank.
+  // Deliberately NOT done with `opacity: 0` — nothing the reader came for rests invisible (CLAUDE.md, Rejected,
+  // Boot A), and a failed decode would leave the lightbox permanently blank.
   lbImg.removeAttribute('src');
   lbImg.alt = alt; zs = 1; zx = 0; zy = 0; tf();
   lb.showModal();

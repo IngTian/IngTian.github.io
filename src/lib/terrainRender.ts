@@ -31,8 +31,8 @@ export interface GridPoint { x: number; y: number; nx: number; ny: number; nz: n
 /**
  * Per-dot stellar character, for the dark theme's "terminal galaxy".
  *
- * The dark theme already reads the terrain's dots as a star field (see
- * CLAUDE.md), so this makes that literal: each dot gets a stable pseudo-random
+ * The dark theme already reads the terrain's dots as a star field, so this
+ * makes that literal: each dot gets a stable pseudo-random
  * identity derived from its lattice position — a twinkle phase, a twinkle rate,
  * and a stellar-temperature tint (blue-white O/B → white A → violet → amber
  * K/M). Deterministic in (x, y), so a dot's identity never changes between
