@@ -57,7 +57,9 @@
 //   hurt on small datasets, and that the same dataset can show opposite effects in different models."
 // They gave 4, 4 and 4; the committed score is the median, 4, and the `because` is rater 2's sentence verbatim
 // (the median rater; all three tied). The same pass keyed both publications by slug and set RL-BHRP's label to
-// the paper's title spelling, without re-scoring it: the evidence its score rests on did not change.
+// the paper's title spelling, without re-scoring it: the evidence its score rests on did not change. The item's
+// venue was edited after scoring, its year and then its volume removed (the record now reads "SPIE (CNSSE)"); not
+// re-scored, as the DOI link the score rests on is unchanged.
 
 import type { SignalWeights } from '../lib/signalRubric';
 

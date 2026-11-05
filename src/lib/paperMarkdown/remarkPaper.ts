@@ -100,7 +100,6 @@ const inTeX = (value: string) => value.replace(/[$%#&]/g, '\\$&');
 // What smartypants (Astro's, before these plugins) curls in text but never sees in an attribute.
 const UNCURLED = /['"]|--|\.\.\./;
 const VALUE = /:v\[\s*([^\]]*?)\s*\]/g;
-const html = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 export function remarkPaper({ papers, publications }: { papers: Record<string, PaperData>; publications: readonly PaperRecord[] }) {
   return (tree: unknown, file: unknown) => {
@@ -195,7 +194,7 @@ export function remarkPaper({ papers, publications }: { papers: Record<string, P
         }
         case 'leafDirective:abstract':
           if (!record?.abstract) { problem(`::abstract, and the record "${String(fm.publication)}" has no abstract`); return []; }
-          return [{ type: 'html', value: `<blockquote class="abstract" cite="${html(record.href)}"><p>${html(record.abstract)}</p></blockquote>` }];
+          return [el('blockquote', { className: ['abstract'], cite: record.href }, [el('p', {}, [text(record.abstract)])])];
         case 'textDirective:sup': blocks(n, inHl); return [set(n, 'sup')];
         case 'textDirective:t': {
           const id = n.attributes?.id;

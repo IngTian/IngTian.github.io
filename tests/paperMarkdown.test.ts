@@ -11,8 +11,8 @@ import { renderMarkdown } from './helpers/paperChain';
 //   attribute, which it never sees, is refused if it would need curling, and the one quote it gets wrong, the
 //   one right after inline maths, the plugin closes. Otherwise the build's quotes are curly where these are straight.
 // - shiki colours code blocks and the heading-id pass names unnamed headings; a paper may hold neither.
-// - rehype-raw parses what is still raw HTML, which in a paper is only a figure's drawing and the record's
-//   abstract: the build re-serialises them through parse5 where this chain prints them as they are.
+// - rehype-raw parses what is still raw HTML, which in a paper is only a figure's drawing: the build
+//   re-serialises it through parse5 where this chain prints it as it is.
 const PAPERS = {
   simple: {
     values: { 'usd.rl': '$2.20', 'wealth.rl': '2.1996' },
@@ -25,6 +25,7 @@ const PAPERS = {
 const PUBLICATIONS = [
   { slug: 'simple', abstract: 'We propose & test.', href: 'https://example.org/abs' },
   { slug: 'bare', href: 'https://example.org/bare' },
+  { slug: 'named', abstract: 'A portfolio method (RL-BHRP) that spreads risk.', href: 'https://example.org/named' },
 ];
 const REFERENCES = [{
   key: 'maillard2008', authors: ['Maillard, Sébastien', 'Roncalli, Thierry', 'Teïletche, Jérôme'], year: 2008,
@@ -69,9 +70,10 @@ describe('a paper file', async () => {
     expect(html).toContain('<section class="sec" id="abstract"><h2 id="abstract-title">Abstract <span class="aside">· in the paper’s own words</span></h2>');
   });
 
-  // The record's abstract, verbatim and escaped, as raw HTML: not the file's prose, so not in bodyWords either.
+  // The record's abstract, verbatim, as the page's own nodes: counted with the words a reader reads, and kept whole
+  // where a name would break (below) as the file's prose is.
   it("quotes the record's abstract where ::abstract stands, citing the record's page", () => {
-    expect(html).toContain('<blockquote class="abstract" cite="https://example.org/abs"><p>We propose &amp; test.</p></blockquote>'
+    expect(html).toContain('<blockquote class="abstract" cite="https://example.org/abs"><p>We propose &#x26; test.</p></blockquote>'
       + '<p>What the abstract leaves out.</p>');
   });
 
@@ -161,13 +163,21 @@ describe('a paper file', async () => {
 
   it('reports no problem, and the words a reader reads', () => {
     expect(report.paperProblems).toEqual([]);
-    // Counted by hand, every element boundary a word boundary and maths, tables and raw HTML (the figures' drawings,
-    // the abstract) left out: brief 40 (title 2, paragraph 7, the def 15 with its citation, the highlight's line 9,
-    // the line with two maths 7), abstract 11 (title 1, aside 5, paragraph 5), notation 1 (its title), method 85
-    // (title 3 with its number, paragraph 5, "(1)" 1, the where 5, the def 10, the why 11; the theorem 13 with
-    // "(2)"; Figure 1's caption 10 with its number; Table 1's 22: caption 6, its two notes 3 and 6, the def 7; the
-    // pointer 5).
-    expect(report.bodyWords).toBe(137);
+    // Counted by hand, every element boundary a word boundary and maths, tables and the figures' drawings (raw
+    // HTML) left out: brief 40 (title 2, paragraph 7, the def 15 with its citation, the highlight's line 9, the line
+    // with two maths 7), abstract 14 (title 1, aside 5, the record's abstract 3, paragraph 5), notation 1 (its
+    // title), method 85 (title 3 with its number, paragraph 5, "(1)" 1, the where 5, the def 10, the why 11; the
+    // theorem 13 with "(2)"; Figure 1's caption 10 with its number; Table 1's 22: caption 6, its two notes 3 and 6,
+    // the def 7; the pointer 5).
+    expect(report.bodyWords).toBe(140);
+  });
+});
+
+describe('the words a reader reads', () => {
+  // A :v is a text node of its own, but no word boundary: the title, then From, mid-$2.20, to and $2.20–$2.20.
+  it('counts a value as part of the word it is written into', async () => {
+    const md = '::::section[S]{#s}\nFrom mid-:v[usd.rl] to :v[usd.rl]–:v[usd.rl].\n::::\n';
+    expect((await render(md, PAPER_PATH)).report.bodyWords).toBe(5);
   });
 });
 
@@ -178,6 +188,12 @@ describe('a line break', () => {
     const { html } = await render(md, PAPER_PATH);
     expect(html).toContain('<p><span class="nw">RL-BHRP</span>’s test, $2.20 on <span class="nw">2025-08-13</span>, and Ledoit–Wolf, over <span class="nw">2012–2019</span>.</p>');
   });
+
+  it("never falls inside one in the record's abstract either", async () => {
+    const md = ':::section[Abstract]{#abstract}\n::abstract\n:::\n';
+    const { html } = await render(md, PAPER_PATH, true, { publication: 'named' });
+    expect(html).toContain('<p>A portfolio method (<span class="nw">RL-BHRP</span>) that spreads risk.</p>');
+  });
 });
 
 describe('a notation row', async () => {
@@ -186,14 +202,23 @@ describe('a notation row', async () => {
     + '::::section[Eq]{#eq}\n:::eq{#e}\n$$\nw_{i}=W_{g(i)}\\,\\eta_{i\\mid g(i)}\n$$\n:::\n::::\n';
   const { html, report } = await render(md, PAPER_PATH);
 
-  // i ∈ 𝓘_g introduces i: the row is its symbols split at the relation as well as at commas.
-  it('splits at a relation, so i ∈ I_g tags each i that no larger symbol holds', () => {
-    expect(html.match(/<mi class="sym" data-sym="1">i<\/mi>/g)).toHaveLength(2);   // in w_i and in W_g(i)
+  // i ∈ 𝓘_g introduces i, and g, the index of its set: the row is its symbols split at the relation as well as at
+  // commas, the set's index among them.
+  it('splits at a relation, so i ∈ I_g tags every i and every g', () => {
+    expect(html.match(/<mi class="sym" data-sym="1">i<\/mi>/g)).toHaveLength(4);   // in w_i, W_g(i) and η's twice
+    expect(html.match(/<mi class="sym" data-sym="1">g<\/mi>/g)).toHaveLength(2);   // in W_g(i) and η's
   });
 
   it('matches a scripted symbol written with other indices: η_{i|g} is η_{i|g(i)} as well', () => {
     expect(html).toMatch(/<msub class="sym" data-sym="2"><mi>η<\/mi>/);
     expect(report.paperProblems).toEqual([]);
+  });
+
+  // A symbol's scripts are symbols of their own, so hovering the i ∈ I_g row lights the i inside η_{i|g(i)}; its
+  // letter is not tagged again, as η is the symbol and not a second one inside it.
+  it('tags what a tagged symbol holds, never its own letter', () => {
+    expect(html).toMatch(/<msub class="sym" data-sym="2"><mi>η<\/mi><mrow><mi class="sym" data-sym="1">i<\/mi>/);
+    expect(html.match(/<mi class="sym" data-sym="2">η<\/mi>/g)).toBeNull();
   });
 });
 

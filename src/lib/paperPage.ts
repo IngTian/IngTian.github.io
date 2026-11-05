@@ -40,6 +40,13 @@ export function readoutWhen(i: number, dates: readonly string[], dataEnd: string
   return `End of ${monthYear(dates[i - 1])}`;
 }
 
+/** What the readout says at a point, for a reader who hears it rather than sees the tip: the same reading, and
+ *  whose it is, as the tip's date line says, since each value alone would pass for the paper's. `v` is each value
+ *  as the tip prints it. */
+export function readoutSays(when: string, runs: string, v: Record<'rl' | 'lo' | 'hi' | 'bhrp' | 'bench', string>): string {
+  return `${when}, reproduction: RL-BHRP, ${runs}, ${v.rl} (the runs ${v.lo} to ${v.hi}); BHRP ${v.bhrp}; Benchmark ${v.bench}.`;
+}
+
 /** The readout's tip, `tw` wide, centred on `px` and kept inside a plot `width` wide: floored, so a fraction can
  *  never carry it past the right edge. */
 export function tipLeft(px: number, tw: number, width: number): number {

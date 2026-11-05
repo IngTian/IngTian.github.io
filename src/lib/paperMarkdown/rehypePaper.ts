@@ -16,8 +16,8 @@ function same(a: Node, b: Node): boolean {
     && ka.length === kb.length && ka.every((c, i) => same(c, kb[i]));
 }
 
-/** A row's symbols: its maths split at the commas between them (`N,\ G` is two) and at a membership (`i ∈ 𝓘_g`
- *  introduces i), spaces dropped. */
+/** A row's symbols: its maths split at the commas between them (`N,\ G` is two) and at a membership, which
+ *  introduces its element and the index of its set (`i ∈ 𝓘_g`, stock i of sector g: i, g and 𝓘_g), spaces dropped. */
 function symbolsOf(row: Node): { tex: string; parts: Node[][] } {
   let math: Node | undefined;
   walk(row.children?.find((c) => isEl(c, 'th')) ?? row, (n) => { math ??= isEl(n, 'math') ? n : undefined; });
@@ -25,12 +25,16 @@ function symbolsOf(row: Node): { tex: string; parts: Node[][] } {
   const body = semantics?.children?.filter((c) => isEl(c) && c.tagName !== 'annotation') ?? [];
   const seq = body.length === 1 && body[0].tagName === 'mrow' ? body[0].children ?? [] : body;
   const parts: Node[][] = [[]];
+  let set: Node[] | undefined;
   for (const c of seq) {
-    if (isEl(c, 'mo') && (c.properties?.separator === 'true' || plain(c) === '∈')) parts.push([]);
+    const member = isEl(c, 'mo') && plain(c) === '∈';
+    if (member || (isEl(c, 'mo') && c.properties?.separator === 'true')) parts.push([]);
     else if (!(isEl(c, 'mspace') || (isEl(c, 'mtext') && !plain(c).trim()))) parts.at(-1)!.push(c);
+    if (member) set = parts.at(-1);
   }
+  const index = set?.length === 1 && base(set[0]) ? set[0].children!.filter((c) => isEl(c)).slice(1).map((c) => [c]) : [];
   const tex = semantics?.children?.find((c) => isEl(c, 'annotation'));
-  return { tex: tex ? plain(tex) : plain(row), parts: parts.filter((p) => p.length) };
+  return { tex: tex ? plain(tex) : plain(row), parts: [...parts, ...index].filter((p) => p.length) };
 }
 
 const mark = (n: Node, key: string) => {
@@ -46,25 +50,38 @@ const ofFamily = (n: Node, symbol: Node) => {
   return b !== undefined && (same(n, b) || (base(n) !== undefined && same(base(n)!, b)));
 };
 
-// Top down, so the largest match wins and nothing inside a tagged symbol is tagged again: a row `W_{g}` tags the
-// whole msub, not its W. An exact match comes before a family one. A symbol that is several siblings (`RC_i(w)`)
-// gets an mrow round it.
-function tag(n: Node, symbols: { key: string; nodes: Node[] }[], seen: Set<string>): void {
+/** An element whose first child is the letter it scripts or accents: the w of w_i, the Σ of Σ̃. */
+const LETTERED = new Set([...SCRIPTS, 'mover', 'munder', 'munderover']);
+type Symbols = { key: string; nodes: Node[] }[];
+
+// Top down, so the largest match wins: a row `W_{g}` tags the whole msub. An exact match comes before a family one,
+// and a symbol that is several siblings (`RC_i(w)`) gets an mrow round it. Inside a tagged symbol the search goes on
+// through what it holds, so a Notation row lights every place its symbol stands: the i and g of W_{g(i)}, the w of
+// RC_i(w), the η of Σ̃(η). Not through its letter: W is not tagged again inside W_{g(i)}, nor Σ inside Σ̃. The
+// page takes a pointer on a nested symbol to mean the outermost.
+function tag(n: Node, symbols: Symbols, seen: Set<string>): void {
   const whole = symbols.find((s) => s.nodes.length === 1 && same(n, s.nodes[0]))
     ?? symbols.find((s) => s.nodes.length === 1 && ofFamily(n, s.nodes[0]));
-  if (whole) { mark(n, whole.key); seen.add(whole.key); return; }
+  if (whole) { mark(n, whole.key); seen.add(whole.key); inside(n, symbols, seen); return; }
   const kids = n.children ?? [], out: Node[] = [];
   for (let i = 0; i < kids.length;) {
     const run = symbols.find((s) => s.nodes.length > 1 && s.nodes.every((x, j) => kids[i + j] && same(kids[i + j], x)));
     if (run) {
-      const mrow: Node = { type: 'element', tagName: 'mrow', properties: {}, children: kids.slice(i, i + run.nodes.length) };
+      const parts = kids.slice(i, i + run.nodes.length);
+      const mrow: Node = { type: 'element', tagName: 'mrow', properties: {}, children: parts };
       mark(mrow, run.key); seen.add(run.key); out.push(mrow); i += run.nodes.length;
+      for (const p of parts) if (isEl(p)) (LETTERED.has(p.tagName!) ? inside : tag)(p, symbols, seen);
     } else {
       if (isEl(kids[i])) tag(kids[i], symbols, seen);
       out.push(kids[i++]);
     }
   }
   n.children = out;
+}
+
+/** What a tagged symbol holds past its letter: its scripts or its accent. A bare letter holds nothing more. */
+function inside(n: Node, symbols: Symbols, seen: Set<string>): void {
+  if (LETTERED.has(n.tagName!)) n.children?.slice(1).forEach((c) => { if (isEl(c)) tag(c, symbols, seen); });
 }
 
 // A hyphenated name in capitals (RL-BHRP), a span of years and an ISO date each read as one word, so a line never
@@ -93,10 +110,12 @@ function keepWhole(n: Node): void {
 }
 
 const UNREAD = new Set(['math', 'table']);
-function words(n: Node, out: string[] = []): string[] {
-  if (n.type === 'text') out.push(n.value ?? '');
-  else if (!(isEl(n) && UNREAD.has(n.tagName!))) n.children?.forEach((c) => words(c, out));
-  return out;
+/** The text a reader reads under `n`. An element's edges are word boundaries; two text nodes side by side are not,
+ *  since a :v is a text node of its own and "mid-" before "August 2025" is two words, not three. */
+function words(n: Node): string {
+  if (n.type === 'text') return n.value ?? '';
+  if (isEl(n) && UNREAD.has(n.tagName!)) return ' ';
+  return (n.children ?? []).map((c) => (c.type === 'text' ? words(c) : ` ${words(c)} `)).join('');
 }
 
 export function rehypePaper() {
@@ -121,10 +140,10 @@ export function rehypePaper() {
       if (!seen.has(key)) problems.push(`notation row $${tex}$ matches no display — mark it {text-only} if it is only in the prose`);
     }
 
-    // One word per space-separated token, every element boundary a space, as the page reads: maths and tables
-    // are not read as prose. A figure is still a raw node here, so it is not counted either, and a paper holds
-    // no other HTML and no code (remarkPaper refuses both).
-    fm.bodyWords = countWords(words(root).join(' '));
+    // One word per space-separated token, as the page reads: maths and tables are not read as prose. A figure's
+    // drawing is still a raw node here, so it is not counted either, and a paper holds no other HTML and no code
+    // (remarkPaper refuses both).
+    fm.bodyWords = countWords(words(root));
     keepWhole(root);
   };
 }

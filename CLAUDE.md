@@ -792,7 +792,7 @@ file holds is the prose; everything else has one home of its own:
 | write | renders |
 | --- | --- |
 | `::::section[The question]{#question n=1 rail="Question"}` … `::::` | `<section class="sec" id="question">` with `<h2><span class="n">1</span>The question</h2>`. `n` is optional (In brief has none), `rail` defaults to the title, an `aside="…"` follows the title in the heading only (`· in the paper’s own words`). The rail and the phone Contents come from these; the ids are the file's as written (one paper to a page), and the page refuses one it writes itself (see below). A numbered section opens with its lead, set in full ink. |
-| `::abstract` | the record's abstract, verbatim, as `<blockquote class="abstract" cite="<record href>">`; the paragraph after it is the page's note on it. Raw HTML, so not in `bodyWords` (the page adds it to the reading time) |
+| `::abstract` | the record's abstract, verbatim, as `<blockquote class="abstract" cite="<record href>">`; the paragraph after it is the page's note on it. Built as nodes, so it is counted in `bodyWords` and its `RL-BHRP` kept whole like the file's |
 | `**The problem.** …` | a run-in head: `<strong>`, set italic in full ink at the body's weight |
 | `:t[risk parity]{#rp}` | `<i class="t" data-n="rp">` — a term at first use, the anchor of its note |
 | `:::def{for=rp}` `**Risk parity.** …` `:::` | `<aside class="mn def" data-at="rp"><dfn>Risk parity.</dfn> …` — joins the block before it in one `<div class="an">` host, which must hold the term (the page looks for it there) |
@@ -800,9 +800,9 @@ file holds is the prose; everything else has one home of its own:
 | `:hl[…]` | `<mark class="hl">` — Underline, the one highlight style |
 | `::::eq{#eq-4 n=4}` `$$` … `$$` `:::where` … `:::` notes `::::` | `<div class="eq an" id="eq-4">`: the display, its number `(4)` as HTML outside `<math>` (never `\tag`), `<p class="where">`, then its notes. One `$$`, or a `$$ wide` and a `$$ narrow` |
 | `:::::thm{#thm-3-1-11}` … `:::::` | `<div class="thm">`, a theorem's frame, its displays inside it; the paragraphs that open it and introduce a display are its heads |
-| `:::notation` with a GFM table `\| Symbol \| Meaning \|` `:::` | `<div class="tbl-scroll"><table class="notation">`, each row `<tr data-sym><th scope="row">`. Each row's symbols (split at commas, and at `∈`: `i\in\mathcal{I}_{g}` introduces `i`) are matched **structurally** in every display's MathML and tagged `class="sym" data-sym`: an equal subtree first, else the symbol's family — a scripted `W_{g}` also stands for `W` with any other script (`W_{g(i)}`, `W^{\top}`) and for `W` alone; the largest first, nothing inside a tagged one tagged again. A row that is only in the prose ends its Symbol cell with `{text-only}`. |
+| `:::notation` with a GFM table `\| Symbol \| Meaning \|` `:::` | `<div class="tbl-scroll"><table class="notation">`, each row `<tr data-sym><th scope="row">`. Each row's symbols (split at commas, and at `∈`, which introduces the element and its set's index: `i\in\mathcal{I}_{g}` is `i`, `g` and `𝓘_g`) are matched **structurally** in every display's MathML and tagged `class="sym" data-sym`: an equal subtree first, else the symbol's family — a scripted `W_{g}` also stands for `W` with any other script (`W_{g(i)}`, `W^{\top}`) and for `W` alone; the largest first, then on through what a tagged symbol holds (the `i` and `g` of `W_{g(i)}`, the `w` of `RC_i(w)`) but never its own letter (`W` is not tagged again inside `W_{g(i)}`, nor `Σ` inside `Σ̃`). The page reads a pointer on a nested symbol as the outermost. A row that is only in the prose ends its Symbol cell with `{text-only}`. |
 | `:cite[markowitz1952]` | `<a class="cite" href="#ref-markowitz1952">Markowitz, 1952</a>` — one author, two (`Feng and He`), more (`Maillard et al.`) |
-| `:v[usd.rl]` | the text of `PAPER_DATA[slug].values['usd.rl']`. **Every number the prose prints is a `:v`**, and a `$` amount is always `:v` or `\$` — a bare `$` starts maths |
+| `:v[usd.rl]` | the text of `PAPER_DATA[slug].values['usd.rl']`. **Every quantity the prose prints that comes from data is a `:v`** — a return, a ratio, a count of stocks, sectors, months or runs, a date or year of the window, a cost, a turnover. Typed by hand, and only these: a reference into the paper (§4.1, eq. (4), Alg. 1, Def. 3.2.3, Table 2), a year that names an event rather than a measurement ("the 2020 crash and the 2022 sell-off"), and a constant of a method or a convention, stated by the paper or the field (the \$1 every growth figure starts from, the 15 of its top-15 share, 1.96 at the 5% level, VaR 5%, 12 months to a year, a basis point's 0.01%). A `$` amount is always `:v` or `\$` — a bare `$` starts maths |
 | `$:v[wealth.rl]^{12/67}-1$` | the same value written into the TeX, with `$ % # &` escaped — the one directive that works inside maths, so an equation's numbers are computed too. A `:cite`, `:t` or `:hl` there is refused |
 | `:::figure{name=wealth n=2}` caption `:::` | `<figure class="fig" id="figure-2">`: `PAPER_DATA[slug].figures.wealth`, then the container's prose as its `<figcaption>`, "Figure 2." before it, and any notes beside it. A drawing that is a `<table>` is a table: `<figure class="tbl" id="table-1">`, its first paragraph the caption above it, "Table 1.", the table in its own scroll box, its other paragraphs `<p class="src">` under it. Astro's rehype-raw re-serialises the drawing's markup |
 | `:::inpaper` `**In the paper:** …` `:::` | `<p class="inpaper">`, the pointer to what the page leaves to the paper |
@@ -842,9 +842,13 @@ file holds is the prose; everything else has one home of its own:
   layout gains fails by name.
 - **The render also reports** `sections` (`{ id, n?, title, rail }`, for the rail and Contents),
   `errataText` (the errata with their `:v` filled in) and `bodyWords` — `countWords` from
-  `lib/words.ts` over the body's text, every element boundary a space, with `math`, `table` and the
-  raw figures and abstract left out. The page's reading time is
-  `readingMinutes(bodyWords + countWords(abstract))`.
+  `lib/words.ts` over the body's text, the abstract in it, every element boundary a space, with
+  `math`, `table` and the figures' drawings (still raw) left out. The page's reading time counts
+  every word a reader reads, as the approved prototype did: `bodyWords` plus the prose the page writes
+  round the file (the head, Read the full paper, the note on the references, the cite line, the
+  corrections, the tags), listed beside the count in `pages/research/[slug].astro`. Not the controls,
+  the Contents, the reference list or the BibTeX. `tests/distSmoke.test.ts` recounts the built page
+  by that rule, and the body to the word.
 - **A line never breaks inside a hyphenated name in capitals (RL-BHRP), a span of years or an ISO
   date**: the last pass wraps each in `<span class="nw">`, after the words are counted.
 - **The margin notes are placed by the page's script, and held until placed.** From 1101px a note

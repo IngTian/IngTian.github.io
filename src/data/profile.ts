@@ -16,10 +16,11 @@ export interface Publication {
   title: string;             // exactly as the paper prints it
   authors: Author[];
   status: PublicationStatus;
-  venue: string;             // e.g. 'arXiv', 'Proc. SPIE 12290 (CNSSE)': never the year, which every surface prints after it
+  venue: string;             // e.g. 'arXiv', 'SPIE (CNSSE)': never the year, which every surface prints after it, nor a volume, which the DOI carries
   year: string;
   submitted?: string;        // YYYY-MM-DD
   version?: string;          // e.g. 'v1'
+  versions?: number;         // how many versions arXiv lists (its abstract page's submission history)
   arxivId?: string; doi?: string; subject?: string;
   href: string;              // where a card links when there is no explainer page
   pdfHref?: string;
@@ -115,6 +116,7 @@ export const publications: Publication[] = [
     year: '2025',
     submitted: '2025-08-16',
     version: 'v1',
+    versions: 1,               // arXiv's submission history lists [v1] alone, read 3 November 2026
     arxivId: '2508.11856',
     doi: '10.48550/arXiv.2508.11856',
     subject: 'q-fin.PM · Portfolio Management',
@@ -142,7 +144,7 @@ export const publications: Publication[] = [
     title: 'Self-Attention on RNN-based Text Classification',
     authors: [{ name: 'Dailun Li' }, { name: 'Zeying Tian' }, { name: 'Yining Duan' }],
     status: 'conference',
-    venue: 'Proc. SPIE 12290 (CNSSE)',
+    venue: 'SPIE (CNSSE)',     // Proc. SPIE vol. 12290, which the DOI carries
     year: '2022',
     doi: '10.1117/12.2641031',
     href: 'https://doi.org/10.1117/12.2641031',

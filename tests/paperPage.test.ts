@@ -1,7 +1,7 @@
 // tests/paperPage.test.ts — the pure half of the paper page's script (lib/paperPage.ts): where the margin notes
 // go, and what Figure 2's readout reads and says.
 import { describe, expect, it } from 'vitest';
-import { readoutIndex, readoutStep, readoutWhen, stackNotes, tipLeft } from '../src/lib/paperPage';
+import { readoutIndex, readoutSays, readoutStep, readoutWhen, stackNotes, tipLeft } from '../src/lib/paperPage';
 
 describe('stackNotes', () => {
   it('puts each note at its anchor while the one above has ended', () => {
@@ -41,6 +41,12 @@ describe('the readout', () => {
     expect(readoutWhen(0, dates, '2025-08-13')).toBe('Start of February 2020');
     expect(readoutWhen(2, dates, '2025-08-13')).toBe('End of March 2020');
     expect(readoutWhen(3, dates, '2025-08-13')).toBe('13 August 2025, where the data end');
+  });
+
+  // Spoken, as the tip's date line shows it: each value alone would pass for the paper's.
+  it("says a reading as the reproduction's", () => {
+    expect(readoutSays('End of March 2020', 'median of 10 runs', { rl: '$0.91', lo: '$0.90', hi: '$0.93', bhrp: '$0.92', bench: '$0.88' }))
+      .toBe('End of March 2020, reproduction: RL-BHRP, median of 10 runs, $0.91 (the runs $0.90 to $0.93); BHRP $0.92; Benchmark $0.88.');
   });
 
   it('centres its tip on the month, inside the plot, never past its right edge', () => {

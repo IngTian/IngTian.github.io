@@ -208,15 +208,15 @@ const namesAFile = (path: string): boolean => /\/[^/]*\.[a-z0-9]+$/i.test(path);
 const isProto = (p: Page): boolean => p.route.startsWith('/proto-');
 
 /**
- * What the markdown plugins report for a paper's file (its sections, its words), from the file itself, through the
- * chain the build runs (tests/helpers/paperChain.ts) — a second reading of the file, so a page that renders its rail
- * from anything else is caught. The frontmatter is read for what the report needs: which record it explains.
+ * A paper's file rendered, and what the markdown plugins report for it (its sections, its words), through the chain
+ * the build runs (tests/helpers/paperChain.ts) — a second reading of the file, so a page that renders its rail from
+ * anything else is caught. The frontmatter is read for what the report needs: which record it explains. Without its
+ * references a citation renders as its key, so the words are this render's, not the built page's.
  */
-const paperReport = async (slug: string): Promise<PaperReport> => {
+const paperRender = async (slug: string): Promise<{ html: string; report: PaperReport }> => {
   const path = fileURLToPath(new URL(`../src/content/papers/${slug}.md`, import.meta.url));
   const body = readFileSync(path, 'utf8').replace(/^---\n[\s\S]*?\n---\n/, '');
-  const { report } = await renderMarkdown(body, path, { papers: PAPER_DATA, publications, frontmatter: { publication: slug } });
-  return report;
+  return renderMarkdown(body, path, { papers: PAPER_DATA, publications, frontmatter: { publication: slug } });
 };
 
 describe('the built site (dist/) — rendered-output smoke test', () => {
@@ -709,7 +709,7 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
     const strip = (xs: Item[]) => xs.map(({ target, label, depth }) => ({ target, label, depth }));
     expect(strip(itemsOf(projectsPage()))).toEqual(flat(projectStops(projects)));
     expect(strip(itemsOf(builtPage('/experience')))).toEqual(flat(experienceStops(timeline)));
-    expect(strip(itemsOf(builtPage('/research/rl-bhrp')))).toEqual(flat(paperStops((await paperReport('rl-bhrp')).sections)));
+    expect(strip(itemsOf(builtPage('/research/rl-bhrp')))).toEqual(flat(paperStops((await paperRender('rl-bhrp')).report.sections)));
     expect(strip(itemsOf(builtPage('/research')))).toEqual(flat(researchIndexStops()));
     expect(new Set(itemsOf(builtPage('/writing')).map((i) => i.depth))).toEqual(new Set([0, 1]));
   });
@@ -1159,15 +1159,17 @@ describe('/research — the papers as cards, newest first, then the interests', 
     expect(cards().map((c) => c.href.startsWith('/')).sort()).toEqual([false, true]);
   });
 
-  // The venue never carries the year itself: a card reads "Conference paper · Proc. SPIE 12290 (CNSSE) · 2022".
+  // The venue never carries the year itself, nor a volume, which the DOI carries: a card reads, as spec §3 has it,
+  // "Conference paper · SPIE (CNSSE) · 2022".
   it("prints each card's status, venue and year, the year once", () => {
     expect(cards()).toHaveLength(publications.length);
-    for (const [i, c] of cards().entries()) {
+    const metas = cards().map((c) => text(/<p class="p-meta">([\s\S]*?)<\/p>/.exec(c.html)?.[1] ?? ''));
+    for (const [i, meta] of metas.entries()) {
       const p = publications[i];
-      const meta = text(/<p class="p-meta">([\s\S]*?)<\/p>/.exec(c.html)?.[1] ?? '');
       expect(meta, p.slug).toContain(` · ${p.venue} · ${p.year}`);
       expect(meta.split(p.year).length - 1, meta).toBe(1);
     }
+    expect(metas.some((m) => m.startsWith('Conference paper · SPIE (CNSSE) · 2022'))).toBe(true);
   });
 
   it("shows a paper's miniature on its card, captioned as the reproduction, and no picture on one without", () => {
@@ -1217,7 +1219,7 @@ describe('/research — the papers as cards, newest first, then the interests', 
 
 describe('/research/rl-bhrp — a paper explained, from its file', async () => {
   const page = (): Page => builtPage('/research/rl-bhrp');
-  const report = await paperReport('rl-bhrp');
+  const { html: rendered, report } = await paperRender('rl-bhrp');
   const rl = publications.find((p) => p.slug === 'rl-bhrp')!;
   const text = (html: string): string => html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;|\s+/g, ' ');
 
@@ -1305,20 +1307,71 @@ describe('/research/rl-bhrp — a paper explained, from its file', async () => {
     expect(button).toMatch(/\sclass="btn btn--paper\b/);
   });
 
-  // The reading time is computed from the words, never typed: the file's own (the plugin's count) and the abstract's.
-  it('computes its reading time from the words a reader reads', () => {
-    const minutes = readingMinutes(report.bodyWords + countWords(rl.abstract!));
-    expect(text(page().markup)).toContain(`· ${minutes} min read · written by Zeying Tian, the second author`);
+  // The reading time counts every word a reader reads on the page, as the approved prototype did: the head, the
+  // abstract, the body with its captions and notes, Read the full paper, the note on the references, the cite line,
+  // the corrections and the tags. Not the controls (the back link, the links, Copy), the maths, the figures'
+  // drawings, the tables, the Contents, the reference list or the BibTeX. Recounted here by that rule, from the
+  // markup: the plugin's count of the file to the word, and the built page's minutes.
+  it('computes its reading time from every word a reader reads', () => {
+    const unread = [/<(math|svg|table|pre|nav|button)\b[\s\S]*?<\/\1>/g, /<a class="back"[\s\S]*?<\/a>/g,
+      /<p class="links">[\s\S]*?<\/p>/g, /<ol class="refs">[\s\S]*?<\/ol>/g, /(?<=<figure class="fig\b[^>]*>)[\s\S]*?(?=<figcaption>)/g];
+    // a name kept whole is one word, as the plugin counted it before the span went round it
+    const words = (html: string) => countWords(unread.reduce((s, re) => s.replace(re, ' '), html)
+      .replace(/<span class="nw">([^<]*)<\/span>/g, '$1').replace(/<[^>]+>|&nbsp;/g, ' ').replace(/&[#\w]+;/g, ''));
+    expect(words(rendered)).toBe(report.bodyWords);
+    const markup = page().markup, main = markup.slice(markup.indexOf('<main'), markup.indexOf('</main>'));
+    expect(text(main)).toContain(`· ${readingMinutes(words(main))} min read · written by Zeying Tian, the second author`);
+  });
+
+  it("keeps the paper's name whole in its abstract, as in the rest of its prose", () => {
+    const abstract = /<blockquote class="abstract"[\s\S]*?<\/blockquote>/.exec(page().markup)?.[0] ?? '';
+    expect(rl.abstract).toContain('(RL-BHRP)');
+    expect(abstract).toContain('(<span class="nw">RL-BHRP</span>)');
+  });
+
+  // Corrections are against the version the page explains; the record says arXiv lists no other, so none to read.
+  it('says the corrections are against the only version arXiv lists', () => {
+    const summary = /<details class="errata">\s*<summary>([\s\S]*?)<\/summary>/.exec(page().markup)?.[1] ?? '';
+    expect(rl.versions).toBe(1);
+    expect(summary.replace(/<[^>]+>/g, '')).toBe(`Corrections to ${rl.version}, noted 3 November 2026 (arXiv lists ${rl.version} only)`);
   });
 
   // The caption is the explainer's, so it says here what the figure is: the owner's reproduction, not the paper's run.
+  // A month-by-month median is no single run and has no turnover: the one run's turnover is named as that run's.
   it("captions Figure 2 as the second author's reproduction, with the paper's own figure beside it", () => {
     const cap = /<figure class="fig" id="figure-2">[\s\S]*?<figcaption>([\s\S]*?)<\/figcaption>/.exec(page().markup)?.[1] ?? '';
     const v = PAPER_DATA['rl-bhrp'].values;
     expect(text(cap)).toContain('Figure 2. A reproduction, not the paper’s run:');
     expect(text(cap)).toContain(`median of the reproduction’s ${v.reproRuns} training runs`);
     expect(text(cap)).toContain(`where the paper reports ${v['usd.rl']} from its original run`);
+    expect(text(cap)).toContain(`the run with the median growth turns over ${v.reproTurnover}`);
+    expect(text(cap)).not.toMatch(/median run|its median,/);
     expect(text(cap)).toContain('not fresh evidence');
+  });
+
+  // Which fell deepest depends on where the count starts (Results says why), so each such claim says whose count.
+  it("qualifies every claim of the deepest fall as the paper's count", () => {
+    const claims = text(page().markup).split(/(?<=\.)\s/).filter((s) => /\bdeepe(?:r|st)\b/.test(s));
+    expect(claims.length).toBeGreaterThanOrEqual(3);
+    for (const s of claims) expect(s).toMatch(/by the paper’s count/i);
+  });
+
+  // Hovering a Notation row lights every place its symbols stand in the displays, an index inside the symbol it
+  // indexes too, as the approved prototype did: these are its counts, over eq. (4)'s wide and narrow forms both.
+  it("tags each Notation row's symbols wherever a display uses them", () => {
+    const markup = page().markup;
+    const rows = new Map([...markup.matchAll(/<tr data-sym="(\d+)">\s*<th scope="row">[\s\S]*?<annotation encoding="application\/x-tex">([^<]*)<\/annotation>/g)]
+      .map((m) => [m[1], m[2]]));
+    const lit: Record<string, number> = {};
+    for (const [, eq] of markup.matchAll(/<div class="eq-math">([\s\S]*?)<span class="eq-no/g)) {
+      for (const [, k] of eq.matchAll(/\sdata-sym="(\d+)"/g)) lit[rows.get(k)!] = (lit[rows.get(k)!] ?? 0) + 1;
+    }
+    expect(lit).toEqual({
+      'N,\\ G': 1, 'i\\in\\mathcal{I}_{g}': 14, 'w,\\ w_{i}': 20, 'W_{g}': 5, '\\eta_{i\\mid g},\\ \\eta^{(g)}': 3,
+      'R_{t+1}': 2, '\\Sigma,\\ \\Sigma_{t}': 5, '\\widetilde{\\Sigma}(\\eta)': 2, '\\sigma_{p}^{2}(w)': 2,
+      '\\mathrm{RC}_{i}(w),\\ \\mathrm{RC}_{g}(w)': 3, c: 2, '\\mathcal{V}_{\\mathrm{within}},\\ \\mathcal{V}_{\\mathrm{across}}': 4,
+      '\\lambda,\\ \\alpha': 6, 'U_{t+1}': 2,
+    });
   });
 
   it('shows exactly one drawing per figure in the markup the CSS swaps: a wide and a narrow, by class', () => {

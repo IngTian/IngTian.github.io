@@ -65,7 +65,7 @@ errata:
   - date: 2026-11-03
     text: '§3.2.2 refers to the two-level weights as “Definition ??”, an unresolved reference.'
   - date: 2026-11-03
-    text: 'Def. 3.2.3 centres the within-sector penalty over all :v[universe] stocks, while Alg. 1 centres it within each sector; with sectors of different sizes the two disagree (see “A catch in the definition”, under eq. (4)).'
+    text: 'Def. 3.2.3 centres the within-sector penalty over all :v[universe] stocks, while Alg. 1’s stopping test measures that dispersion within each sector; with sectors of different sizes the two disagree (see “A catch in the definition”, under eq. (4)).'
 ---
 
 ::::section[In brief]{#brief}
@@ -79,13 +79,13 @@ errata:
 
 **What happened.** On one test — :v[universe] large US stocks, :v[startMonth] to :v[endMonth], a period kept out of the model’s design — \$1 grew to :v[usd.rl], against :v[usd.bhrp] for BHRP (Bayesian hierarchical risk parity, the paper’s static model) and :v[usd.bench] for an equal-weight mix of :v[sectors] sector funds.
 
-**The catch.** The edge over BHRP, about :v[gapPP] percentage points a year, came with more volatility and a deeper worst fall, rests on one path through one market, and has not been tested against chance.
+**The catch.** The edge over BHRP, about :v[gapPP] percentage points a year, came with more volatility and, by the paper’s count, a deeper worst fall, rests on one path through one market, and has not been tested against chance.
 ::::
 
 :::section[Abstract]{#abstract aside="in the paper’s own words"}
 ::abstract
 
-Three phrases in it need the table beside them (Table 1 below, which is the paper’s Table 2). The “comparable” drawdown is RL-BHRP’s fall of :v[mdd.rl]%, the deepest of the three. The “more stable” performance swung more than BHRP’s and about as much as the benchmark’s. And the paper runs no test that would support “adds value” (paper §5.5).
+Three phrases in it need the table beside them (Table 1 below, which is the paper’s Table 2). The “comparable” drawdown is RL-BHRP’s fall of :v[mdd.rl]%, the deepest of the three by the paper’s count. The “more stable” performance swung more than BHRP’s and about as much as the benchmark’s. And the paper runs no test that would support “adds value” (paper §5.5).
 :::
 
 ::::section[Notation]{#notation}
@@ -299,10 +299,10 @@ As a steady yearly rate — the :t[compound annual growth rate]{#cagr}, or CAGR 
 :::
 
 :::figure{name=wealth n=2}
-**A reproduction, not the paper’s run:** growth of \$1, :v[startMonth] to :v[endMonth] (the last month is partial). The paper’s own curve is its Figure 1 (paper §4.1); it does not release the monthly series, so this figure redraws the second author’s reproduction instead. The red line is the month-by-month median of the reproduction’s :v[reproRuns] training runs and the band their range: they ended between :v[reproLo] and :v[reproHi], where the paper reports :v[usd.rl] from its original run. It rebuilds BHRP and the benchmark to match the paper’s, and the direction of RL-BHRP’s gain, with a policy that starts at BHRP and trades about a quarter as much as the paper’s (its median run turns over :v[reproTurnover] of the portfolio a month, against :v[turnover]); its median, :v[reproEnd], is an edge over BHRP of about :v[reproGap] percentage points a year rather than :v[gapPP]. Some of its settings were chosen after the test period had been seen, so it is not fresh evidence. Source: [IngTian/rl-bhrp](https://github.com/IngTian/rl-bhrp), `results/shared-global`.
+**A reproduction, not the paper’s run:** growth of \$1, :v[startMonth] to :v[endMonth] (the last month is partial). The paper’s own curve is its Figure 1 (paper §4.1); it does not release the monthly series, so this figure redraws the second author’s reproduction instead. The red line is the month-by-month median of the reproduction’s :v[reproRuns] training runs and the band their range: they ended between :v[reproLo] and :v[reproHi], where the paper reports :v[usd.rl] from its original run. It rebuilds BHRP and the benchmark to match the paper’s, and the direction of RL-BHRP’s gain, with a policy that starts at BHRP and trades about a quarter as much as the paper’s (the run with the median growth turns over :v[reproTurnover] of the portfolio a month, against :v[turnover]); the red line ends at :v[reproEnd], an edge over BHRP of about :v[reproGap] percentage points a year rather than :v[gapPP]. Some of its settings were chosen after the test period had been seen, so it is not fresh evidence. Source: [IngTian/rl-bhrp](https://github.com/IngTian/rl-bhrp), `results/shared-global`.
 :::
 
-:hl[Against BHRP, the extra return came with extra risk.] RL-BHRP was more :t[volatile]{#vol} than BHRP — :v[vol.rl]% a year against :v[vol.bhrp]% — and about as volatile as the benchmark, at :v[vol.bench]%. It also had the deepest :t[maximum drawdown]{#mdd}, a fall of :v[mdd.rl]% from its peak, against :v[mdd.bhrp]% for BHRP and :v[mdd.bench]% for the benchmark. Those falls are measured from the first month-end, so they leave out :v[startMonth], the first month of the COVID crash. Counted from the start, in the reproduction’s matching series, BHRP’s deepens to :v[mdd0.bhrp]% and the benchmark’s to :v[mdd0.bench]%; RL-BHRP’s own cannot be recounted, because the paper does not release its monthly series. Per unit of risk RL-BHRP still comes out ahead, by margins the paper does not test: its :t[Sharpe ratio]{#sr} is :v[sharpe.rl], against :v[sharpe.bhrp] and :v[sharpe.bench], and its growth per unit of worst fall (the Calmar ratio) is the highest, :v[calmar.rl]. Table 1 gives every row of the paper’s Table 2.
+:hl[Against BHRP, the extra return came with extra risk.] RL-BHRP was more :t[volatile]{#vol} than BHRP — :v[vol.rl]% a year against :v[vol.bhrp]% — and about as volatile as the benchmark, at :v[vol.bench]%. By the paper’s count it also had the deepest :t[maximum drawdown]{#mdd}, a fall of :v[mdd.rl]% from its peak, against :v[mdd.bhrp]% for BHRP and :v[mdd.bench]% for the benchmark. Those falls are measured from the first month-end, so they leave out :v[startMonth], the first month of the COVID crash. Counted from the start, in the reproduction’s matching series, BHRP’s deepens to :v[mdd0.bhrp]% and the benchmark’s to :v[mdd0.bench]%; RL-BHRP’s own cannot be recounted, because the paper does not release its monthly series, so for the paper’s run the order on that count is not known. The reproduction is the one place all three are counted from the start, and there the median of its runs (Figure 2’s red line) falls :v[mdd0.rl]%, less than BHRP’s, though the runs range from :v[mdd0.runsLo]% to :v[mdd0.runsHi]%, either side of it. Per unit of risk RL-BHRP still comes out ahead, by margins the paper does not test: its :t[Sharpe ratio]{#sr} is :v[sharpe.rl], against :v[sharpe.bhrp] and :v[sharpe.bench], and its growth per unit of worst fall (the Calmar ratio) is the highest, :v[calmar.rl]. Table 1 gives every row of the paper’s Table 2.
 
 :::def{for=vol}
 **Volatility.** The standard deviation of monthly returns, scaled to a year. The usual one-number measure of how much a portfolio swings.

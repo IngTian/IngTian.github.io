@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { TABLE2, PAPER, REPRO, REPRO_NOTES, paperValue } from '../src/data/papers/rl-bhrp';
 import { PAPER_DATA } from '../src/data/papers';
 import { rlBhrpWealth } from '../src/data/vendor/rlBhrpWealth';
-import { cumulative } from '../src/lib/wealth';
+import { cumulative, maxDrawdownFromStart } from '../src/lib/wealth';
 
 const v = PAPER_DATA['rl-bhrp'].values;
 
@@ -83,19 +83,33 @@ describe('VALUES — the paper\'s figures', () => {
 });
 
 describe('VALUES — the reproduction\'s figures, from its vendored returns', () => {
-  it("quotes the median run's edge over BHRP", () => {
+  it("quotes the median line's edge over BHRP", () => {
     expect(v.reproGap).toBe('1.1');
   });
 
   it('quotes the drawdowns counted from the starting $1, which Table 2 cannot', () => {
     expect(v['mdd0.bhrp']).toBe('20.53');
     expect(v['mdd0.bench']).toBe('21.93');
+    // RL-BHRP's own: the median line's, and the runs' shallowest and deepest
+    expect([v['mdd0.rl'], v['mdd0.runsLo'], v['mdd0.runsHi']]).toEqual(['20.45', '19.95', '20.83']);
+  });
+
+  // The prose says the median line falls less than BHRP's, and that its runs fall either side of BHRP's.
+  it('keeps the order the drawdown sentence states, unrounded and printed', () => {
+    const fall = (w: readonly number[]) => -maxDrawdownFromStart(w);
+    const runs = rlBhrpWealth.rlSeeds.map((r) => fall(cumulative(r))), bhrp = fall(REPRO.bhrp);
+    expect(fall(REPRO.rl)).toBeLessThan(bhrp);
+    expect(Math.min(...runs)).toBeLessThan(bhrp);
+    expect(Math.max(...runs)).toBeGreaterThan(bhrp);
+    expect(Number(v['mdd0.rl'])).toBeLessThan(Number(v['mdd0.bhrp']));
+    expect(Number(v['mdd0.runsLo'])).toBeLessThan(Number(v['mdd0.bhrp']));
+    expect(Number(v['mdd0.runsHi'])).toBeGreaterThan(Number(v['mdd0.bhrp']));
   });
 
   it("quotes its diagnostics from the vendored summary: turnover, BHRP's share in its top 15 and its cost", () => {
     expect([v.reproTurnover, v.reproTurnoverBhrp, v.reproTop15Bhrp]).toEqual(['0.14', '0.014', '51']);
     expect(v.reproCostPPYearBhrp).toBe('0.008');   // 0.014 a month at 5 bps, a year
-    // the caption says its median run trades "about a quarter as much as the paper's"
+    // the caption says the run with the median growth trades "about a quarter as much as the paper's"
     const share = REPRO_NOTES.turnover.rl / PAPER.turnover;
     expect(share).toBeGreaterThan(0.2);
     expect(share).toBeLessThan(0.3);

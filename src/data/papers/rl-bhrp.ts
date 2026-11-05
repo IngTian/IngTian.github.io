@@ -79,9 +79,11 @@ export const REPRO: WealthSeries = {
 };
 
 /** What the explainer quotes about the reproduction beside its series (data/vendor/rlBhrpDiagnostics.ts): the
- *  monthly turnover of its median run and of BHRP, BHRP's share in its 15 largest weights, and each run's CAGR under
- *  both readings of the paper's penalty: centred over all the stocks (Def. 3.2.3 as written, the runs above) and
- *  within each sector (as its Alg. 1 centres). */
+ *  monthly turnover of BHRP and of one run, the one with the median growth (of ten, the upper middle by CAGR, as the
+ *  reproduction's run.py picks its "median seed"; the vendored summary gives no other run's), BHRP's share in its 15
+ *  largest weights, and each run's CAGR under both readings of the paper's penalty: centred over all the stocks
+ *  (Def. 3.2.3 as written, the runs above) and within each sector (as its Alg. 1's stopping test measures the
+ *  dispersion). */
 export const REPRO_NOTES = {
   turnover: rlBhrpDiagnostics.turnover,
   top15: rlBhrpDiagnostics.top15,
@@ -177,10 +179,16 @@ function values(): Record<string, string> {
   v.reproLo = usd(lo.at(-1)!);
   v.reproHi = usd(hi.at(-1)!);
   v.reproGap = ((cagr(rl.at(-1)! - 1, months) - cagr(bhrp.at(-1)! - 1, months)) * 100).toFixed(1);
+  // falls counted from the starting $1, the one count all three series share: RL-BHRP's as the median line's, with the
+  // shallowest and the deepest run's
+  const falls = runs.map((w) => -maxDrawdownFromStart(w));
+  v['mdd0.rl'] = pct(-maxDrawdownFromStart(rl));
+  v['mdd0.runsLo'] = pct(Math.min(...falls));
+  v['mdd0.runsHi'] = pct(Math.max(...falls));
   v['mdd0.bhrp'] = pct(-maxDrawdownFromStart(bhrp));
   v['mdd0.bench'] = pct(-maxDrawdownFromStart(bench));
-  // its diagnostics: the median run's and BHRP's monthly turnover, BHRP's share in its top 15 and what its turnover costs a
-  // year at the paper's rate, and the mean CAGR of the runs under each reading of the penalty
+  // its diagnostics: the monthly turnover of the run with the median growth and of BHRP, BHRP's share in its top 15
+  // and what its turnover costs a year at the paper's rate, and the mean CAGR of the runs under each reading of the penalty
   v.reproTurnover = REPRO_NOTES.turnover.rl.toFixed(2);
   v.reproTurnoverBhrp = REPRO_NOTES.turnover.bhrp.toFixed(3);
   v.reproTop15Bhrp = String(Math.round(REPRO_NOTES.top15.bhrp * 100));
