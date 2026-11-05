@@ -10,7 +10,7 @@
 // reverse-chronological — and claims authorization. This lists ARTEFACTS and where to read them. The
 // distinction is that every row here is a thing a reader can go and check.
 import { getCollection } from 'astro:content';
-import { publications, projects, appendixProjects, type Publication } from '../data/profile';
+import { STATUS_LABEL, publications, projects, appendixProjects, type Publication } from '../data/profile';
 import { PAPER_DATA } from '../data/papers';
 import { monthYear } from '../lib/dates';
 import { hyphenatedParts } from '../lib/words';
@@ -54,7 +54,7 @@ const kindLabel = (key: string) => KINDS.find((k) => k.key === key)?.label ?? ke
 // any other is its venue and year.
 const lineFor = (p: Publication) => {
   const line = PAPER_DATA[p.slug]?.line;
-  return line ? `${line} · ${p.status}` : `${p.venue} · ${p.year}`;
+  return line ? `${line} · ${STATUS_LABEL[p.status].toLowerCase()}` : `${p.venue} · ${p.year}`;
 };
 
 // A title's hyphenated words never break at their hyphen (lib/words hyphenatedParts): without this the full RL-BHRP

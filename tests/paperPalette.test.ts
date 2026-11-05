@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { AA_BODY } from '../src/lib/skyLegibility';
-import { between, onGround, over, railMark, ratio, rgbaOf, rgbOf, tokens, type RGB } from './helpers/palette';
+import { ROLE_TOKENS, between, onGround, over, railMark, ratio, rgbaOf, rgbOf, tokens, type RGB } from './helpers/palette';
 
 const rgbToken = (v: string): number[] => v.split(',').map(Number);
 
@@ -19,8 +19,6 @@ const THEMES = [
   { theme: 'dark', sel: "html[data-page='paper'][data-theme='dark']", base: "html[data-theme='dark']" },
 ] as const;
 
-const ROLE = ['--paper', '--ink-1', '--ink-2', '--ink-3', '--ink-4', '--ink-5', '--ochre', '--on-accent',
-  '--hairline-rgb', '--bg'];
 const SHEET = ['--sheet-ground', '--sheet-ul', '--sheet-band', '--sheet-axis', '--sheet-one', '--sheet-grid', '--sheet-mark',
   '--sheet-link'];
 
@@ -59,7 +57,7 @@ describe('the paper palette (tokens.css)', () => {
     // `html[data-page='paper']` and `html[data-theme='dark']` have EQUAL specificity, so a token set only in the
     // light paper block would show its light value in dark theme. Both blocks must declare every token.
     const [light, dark] = THEMES.map((t) => Object.keys(tokens(t.sel)).sort());
-    expect(light).toEqual([...ROLE, ...SHEET].sort());
+    expect(light).toEqual([...ROLE_TOKENS, ...SHEET].sort());
     expect(dark).toEqual(light);
   });
 

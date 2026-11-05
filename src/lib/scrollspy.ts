@@ -1,5 +1,5 @@
 // Shared scrollspy core: "which section is the reader in?", pure and unit-tested. Three rails ask it: the homepage
-// TOC (Toc.astro) and the /art rail (scripts/artGallery.ts) use activeStopIndex directly; SideRail uses markStops,
+// TOC (Toc.astro) and the /art rail (scripts/artGallery.ts) use activeStopIndex directly; SideRail uses railMarks,
 // which falls back to it. Each call site keeps its own thin DOM wrapper (measuring boxes, toggling classes); only
 // the decision lives here.
 
@@ -60,7 +60,7 @@ const BAND = { top: 0.10, bottom: 0.62 } as const;
  * holds its child's, so it would always win the band), then the larger share of the band, so a link just followed
  * leads, then the higher box, then tree order.
  */
-export function markStops(boxes: readonly StopBox[], vh: number, scrollY: number, docHeight: number): Marks {
+export function railMarks(boxes: readonly StopBox[], vh: number, scrollY: number, docHeight: number): Marks {
   const top = vh * BAND.top;
   const bottom = vh * BAND.bottom;
   const overlap = (i: number): number => Math.min(boxes[i].bottom, bottom) - Math.max(boxes[i].top, top);

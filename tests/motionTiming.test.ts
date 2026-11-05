@@ -1,10 +1,79 @@
+// tests/motionTiming.test.ts — the motion module's pure half (lib/motionTiming.ts): its curves and durations, and
+// that the code which moves things states none of its own; then the arithmetic of a stagger and of a sweep.
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { DRAW, EASE, mergeLines, stagger, sweepDurations } from '../src/lib/motionTiming';
+import { MOTION_LIMIT_MS } from '../src/lib/motion';
+import { CARD, DRAW, EASE, PAPER_PAGE, RAIL, REVEAL, SWEEP, mergeLines, stagger, sweepDurations } from '../src/lib/motionTiming';
 
-describe('the two curves', () => {
-  it('are the prototype’s: EASE for every move, DRAW for a figure drawing itself', () => {
+describe('the curves', () => {
+  it('are the prototype’s: EASE for every move, DRAW for a figure drawing itself, SWEEP for a run of lines', () => {
     expect(EASE).toBe('cubic-bezier(.2,.7,.2,1)');
     expect(DRAW).toBe('cubic-bezier(.33,.08,.24,1)');
+    expect(SWEEP).toBe('cubic-bezier(.3,.2,.4,1)');
+  });
+});
+
+describe('the durations', () => {
+  it('end every move within 2s, the longest a figure drawing itself', () => {
+    const all = [REVEAL, RAIL, PAPER_PAGE, CARD].flatMap((g) => Object.values(g));
+    expect(Math.max(...all)).toBe(PAPER_PAGE.draw);
+    expect(PAPER_PAGE.draw).toBeLessThanOrEqual(2000);
+  });
+});
+
+// Every curve and duration the rail and the research routes move by is lib/motionTiming's. Their scripts import it;
+// their CSS cannot, so each motion declaration in it is held here to the constant it carries, in source order, and a
+// literal added without one fails by name. CSS's own keywords (ease-out, ease-in) name standard curves.
+describe('the code that moves things', () => {
+  const src = (path: string) => readFileSync(new URL(`../src/${path}`, import.meta.url), 'utf8');
+  // the blocks open at the start of a line, so a comment that names a <script> or a <style> opens none
+  const css = (path: string) => [...src(path).matchAll(/^<style\b[^>]*>([\s\S]*?)<\/style>/gm)].map((m) => m[1]).join('\n');
+  const scripts = (path: string) => [...src(path).matchAll(/^<script\b[^>]*>([\s\S]*?)<\/script>/gm)].map((m) => m[1]).join('\n');
+  /** Each transition and animation that states a duration or a curve, as written. */
+  const moves = (style: string) => [...style.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:transition|animation)\s*:\s*([^;]*);/g)]
+    .map((m) => m[1].trim()).filter((d) => /\d+m?s\b|cubic-bezier|var\(/.test(d));
+
+  it("holds the rail's CSS to RAIL and EASE, and its entrance to the frontmatter's --row", () => {
+    expect(moves(css('components/SideRail.astro'))).toEqual([
+      `opacity ${RAIL.fade}ms ease-out`,
+      `opacity ${RAIL.preview}ms ease-out`,
+      `transform ${RAIL.nudge}ms ${EASE}`,
+      `side-rail-enter var(--row) ${EASE} backwards`,
+    ]);
+    expect(src('components/SideRail.astro')).toContain('style={`--gap:${gap}ms;--row:${RAIL.row}ms`}');
+  });
+
+  it("holds a paper page's CSS to PAPER_PAGE, EASE and MOTION_LIMIT_MS", () => {
+    expect(moves(css('pages/research/[slug].astro'))).toEqual([
+      `mn-unheld 0s ${MOTION_LIMIT_MS}ms forwards`,
+      `opacity ${PAPER_PAGE.noteFade}ms ease-out, transform ${PAPER_PAGE.noteShift}ms ${EASE}`,
+      `opacity ${PAPER_PAGE.tip}ms ease-out`,
+    ]);
+  });
+
+  it("holds the /research cards' CSS to CARD and EASE", () => {
+    expect(moves(css('pages/research/index.astro'))).toEqual([
+      `transform ${CARD.lift}ms ${EASE}`,
+      `opacity ${CARD.frame}ms ease-out`,
+      `transform ${CARD.underlineOut}ms ease-in`,
+      `transform ${CARD.underline}ms ${EASE} calc(var(--k) * ${CARD.underlineStep}ms)`,
+      `transform ${CARD.underline}ms ${EASE} calc(var(--k) * ${CARD.underlineStep}ms)`,
+    ]);
+  });
+
+  it('states no curve or duration in a script: each reads one from lib/motionTiming', () => {
+    const sources = {
+      'scripts/motion.ts': src('scripts/motion.ts'),
+      'components/SideRail.astro': scripts('components/SideRail.astro'),
+      'pages/research/[slug].astro': scripts('pages/research/[slug].astro'),
+      'pages/research/index.astro': scripts('pages/research/index.astro'),
+    };
+    for (const [path, code] of Object.entries(sources)) {
+      expect(code.length, path).toBeGreaterThan(500);
+      // (a zero is no motion: `play` under reduced motion takes no time)
+      const own = code.replace(/\/\/.*$/gm, '').match(/cubic-bezier\(|\b(?:duration|delay|step|max|total)\s*:\s*[1-9]|\b\d+\s*\+\s*k\s*\*/g);
+      expect(own, path).toBeNull();
+    }
   });
 });
 

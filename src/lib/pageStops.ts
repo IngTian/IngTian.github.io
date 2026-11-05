@@ -205,7 +205,7 @@ export function homeStops(): (Stop & { zone: 'light' | 'dark' })[] {
 
 /** Flatten a stop tree depth-first (parent before its children): SideRail numbers its rows by it for their
  *  entrance. NOTE this is TREE order, which need not be top-to-bottom VISUAL order — a page may set a section
- *  higher on screen than its tree position implies — so lib/scrollspy's markStops sorts by measured top where the
+ *  higher on screen than its tree position implies — so lib/scrollspy's railMarks sorts by measured top where the
  *  order matters; do not assume this order is geometrically monotonic. */
 export function flattenStops(stops: readonly Stop[]): Stop[] {
   const out: Stop[] = [];

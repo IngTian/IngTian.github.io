@@ -16,8 +16,7 @@ import type { macbootSections } from '../data/vendor/macbootSections';
 import type { offchartPositioning } from '../data/vendor/offchartPositioning';
 import type { witnessFacets } from '../data/vendor/witnessFacets';
 import { expandingPercentile, shareOf } from './positioning';
-import type { WealthSeries } from './paperFigures/wealthFigure';
-import { linearScale, nudgeLabels } from './wealth';
+import { linearScale, nudgeLabels, type WealthSeries } from './wealth';
 
 const INK = 'var(--ink-1)', DIM = 'var(--ink-3)';
 const line = (a: number) => `rgba(var(--draft-line-rgb),${a})`;

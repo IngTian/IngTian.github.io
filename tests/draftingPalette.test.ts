@@ -8,7 +8,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { AA_BODY } from '../src/lib/skyLegibility';
-import { between, onGround, over, railMark, ratio, rgbaOf, rgbOf, tokens, type RGB } from './helpers/palette';
+import { ROLE_TOKENS, between, onGround, over, railMark, ratio, rgbaOf, rgbOf, tokens, type RGB } from './helpers/palette';
 
 const src = (f: string): string => readFileSync(new URL(`../src/components/projects/${f}`, import.meta.url), 'utf8');
 const fieldSrc = src('DraftingField.astro');
@@ -56,8 +56,6 @@ const THEMES = [
   { theme: 'dark', sel: "html[data-page='drafting'][data-theme='dark']", base: "html[data-theme='dark']" },
 ] as const;
 
-const ROLE = ['--paper', '--ink-1', '--ink-2', '--ink-3', '--ink-4', '--ink-5', '--ochre', '--on-accent',
-  '--hairline-rgb', '--bg'];
 // No --draft-glass: it was the mockup's nav glass, and the real CornerNav keeps its own (spec §3), so nothing
 // rendered it; it is gone rather than left to read as if the nav were reskinned here.
 const DRAFT = ['--draft-ground', '--draft-line-rgb', '--draft-hi-rgb', '--draft-panel',
@@ -73,7 +71,7 @@ describe('the drafting palette (tokens.css)', () => {
     // theme the drafting light block beats the site's dark block by source order. A token set only in the light
     // drafting block would therefore show its LIGHT value in dark theme. Both blocks must declare every token.
     const [light, dark] = THEMES.map((t) => Object.keys(tokens(t.sel)).sort());
-    expect(light).toEqual([...ROLE, ...KNOCKOUTS, ...DRAFT].sort());
+    expect(light).toEqual([...ROLE_TOKENS, ...KNOCKOUTS, ...DRAFT].sort());
     expect(dark).toEqual(light);
   });
 
@@ -211,11 +209,11 @@ describe('the rail reskins through role tokens only', () => {
     expect(rail).toMatch(/\.side-rail \.rule \{[^}]*box-shadow: var\(--rail-dash-halo, none\);/);
   });
 
-  // One knockout, one name: <main>'s text reads the same token as the rail, and no file spells the ring a second
-  // time, neither as a page variable nor as the eight offsets written out.
-  it("/projects' text reads --knockout, and the ring has no second spelling", () => {
+  // One knockout, one spelling: <main>'s text reads the same token as the rail, and no file writes the ring's eight
+  // offsets out again.
+  it("/projects' text reads --knockout, and the ring is written out in tokens.css alone", () => {
     expect(text('pages/projects.astro')).toMatch(/\.projects-page \{[^}]*text-shadow: var\(--knockout\);/);
-    const elsewhere = files.filter((f) => f !== 'styles/tokens.css' && /--knock\b|--rail-halo\b|-1px -1px 0 /.test(text(f)));
+    const elsewhere = files.filter((f) => f !== 'styles/tokens.css' && /-1px -1px 0 /.test(text(f)));
     expect(elsewhere).toEqual([]);
   });
 

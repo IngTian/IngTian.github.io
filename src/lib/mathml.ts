@@ -33,17 +33,21 @@ const letters = (variant: string, text: string) => [...text].map((c) => letter(v
 // alphabet added there is drawn by lib/equations.ts and by every markdown file at once.
 const VARIANT = Object.keys(ALPHABETS).join('|');
 const ON_LETTER = new RegExp(`<(mi|mn) mathvariant="(${VARIANT})">([^<]*)</\\1>`, 'g');
-const LEFT = new RegExp(`mathvariant="(?:${VARIANT})"`);
-const notOnLetter = (attr: string) => `a ${attr} not on a single <mi> or <mn> letter`;
+// Whatever is left after the rewrite but "normal", the one mathvariant Chrome's MathML Core honours.
+const LEFT = /mathvariant="((?!normal")[^"]*)"/;
+/** Why a mathvariant left in would be drawn plain: one this rewrites, not on a letter, or one it has no rewrite for. */
+const unrewritten = (variant: string) => (Object.hasOwn(ALPHABETS, variant)
+  ? `a mathvariant="${variant}" not on a single <mi> or <mn> letter`
+  : `mathvariant="${variant}" has no rewrite (Chrome draws it plain): add its alphabet to lib/mathml.ts, or write the letter`);
 
 /** Rewrites KaTeX's script and double-struck letters as Unicode math letters. Throws on a letter with no Unicode
- *  form (a script Greek letter, a script digit) and on any such mathvariant it could not rewrite, so a glyph is
- *  never silently drawn plain. */
+ *  form (a script Greek letter, a script digit) and on any mathvariant but "normal" it leaves (one it could not
+ *  rewrite, or bold, fraktur and the others it has no alphabet for), so a glyph is never silently drawn plain. */
 export function fixMathVariants(mathml: string): string {
   try {
     const out = mathml.replace(ON_LETTER, (_, tag: string, variant: string, c: string) => `<${tag}>${letters(variant, c)}</${tag}>`);
-    const left = out.match(LEFT);
-    if (left) throw new Error(notOnLetter(left[0]));
+    const left = LEFT.exec(out);
+    if (left) throw new Error(unrewritten(left[1]));
     return out;
   } catch (e) {
     throw new Error(`fixMathVariants: ${(e as Error).message}`);
@@ -61,11 +65,11 @@ export function rehypeMathVariants() {
 function fixTree(n: HNode, tex: string): void {
   if (n.tagName === 'math') tex = annotation(n) ?? tex;
   const variant = n.properties?.mathvariant;
-  if (typeof variant === 'string' && Object.hasOwn(ALPHABETS, variant)) {
+  if (typeof variant === 'string' && variant !== 'normal') {
     const t = n.children?.[0];
     try {
-      if ((n.tagName !== 'mi' && n.tagName !== 'mn') || n.children?.length !== 1 || t?.type !== 'text') {
-        throw new Error(notOnLetter(`mathvariant="${variant}"`));
+      if (!Object.hasOwn(ALPHABETS, variant) || (n.tagName !== 'mi' && n.tagName !== 'mn') || n.children?.length !== 1 || t?.type !== 'text') {
+        throw new Error(unrewritten(variant));
       }
       t.value = letters(variant, t.value ?? '');
     } catch (e) {

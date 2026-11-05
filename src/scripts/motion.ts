@@ -6,7 +6,7 @@
 // and lands on the element's own finished style; under reduced motion nothing plays and nothing waits, because the
 // gate is here and not in the callers: `play` lands on its last frame at once, and `onceSeen` holds nothing back.
 import { MOTION_LIMIT_MS, prefersReducedMotion } from '../lib/motion';
-import { EASE, mergeLines, stagger, sweepDurations } from '../lib/motionTiming';
+import { EASE, REVEAL, SWEEP, mergeLines, stagger, sweepDurations } from '../lib/motionTiming';
 import { fragmentId } from '../lib/pageStops';
 
 /**
@@ -121,9 +121,9 @@ const SIDE: Keyframe[] = [{ opacity: 0, transform: 'translateX(10px)' }, { opaci
 
 /**
  * The research pages' reveal: each of `els`, the first time it is seen (`onceSeen`, so nothing on the landing screen
- * or above it waits), rises 8px and fades in over 340ms. A margin note (`note` says where it stands) follows its
- * block by 120ms, and beside the text slides in from 10px right instead, over 380ms. Several seen together go top to
- * bottom, 60ms apart and at most 120ms. While an element waits it carries `data-pending`, and the page's CSS holds
+ * or above it waits), rises 8px and fades in. A margin note (`note` says where it stands) follows its block, and
+ * beside the text slides in from 10px right instead. Several seen together go top to bottom, a stagger apart; the
+ * times are lib/motionTiming's REVEAL. While an element waits it carries `data-pending`, and the page's CSS holds
  * it at opacity 0 there, with `transition: none`. Returns each element's animation, for a caller that waits on a
  * block's rise.
  */
@@ -136,8 +136,8 @@ export function riseOnceSeen(
   onceSeen(els, batch((seen) => {
     seen.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).forEach((el, k) => {
       const at = note(el), side = at === 'beside';
-      const delay = stagger(k, seen.length, { step: 60, max: 120 }) + (at ? 120 : 0);
-      rising.set(el, play(el, side ? SIDE : UP, { duration: side ? 380 : 340, delay }, live));
+      const delay = stagger(k, seen.length, { step: REVEAL.step, max: REVEAL.max }) + (at ? REVEAL.noteAfter : 0);
+      rising.set(el, play(el, side ? SIDE : UP, { duration: side ? REVEAL.beside : REVEAL.rise, delay }, live));
     });
   }, signal), { signal });
   return rising;
@@ -146,8 +146,8 @@ export function riseOnceSeen(
 /**
  * Sweep `target`'s text, line by line, left to right: one span of class `cls` per merged line box, laid over the
  * line and scaled in from its left edge, each line's share of `totalMs` in proportion to its width so the sweep
- * keeps one speed across a break. What a span paints (a band, a hairline at the line's foot) is `cls`'s CSS, which
- * must be global: the spans are created here. A line that has finished stays drawn (its span back at its CSS full
+ * keeps one speed across a break (a run of lines on SWEEP, one line on EASE). What a span paints (a band, a hairline
+ * at the line's foot) is `cls`'s CSS, which must be global: the spans are created here. A line that has finished stays drawn (its span back at its CSS full
  * width) until the LAST one has; then every span goes at once and the promise resolves, finished or cancelled, so a
  * caller that holds its own finished state back until then hands over in one frame and no line blinks out early.
  *
@@ -162,8 +162,7 @@ export function riseOnceSeen(
 export function sweepLines(target: Element, cls: string, totalMs: number, live: Set<Animation>, foot: number): Promise<void> {
   const lines = mergeLines([...target.getClientRects()]);
   const durations = sweepDurations(lines.map((l) => l.width), totalMs);
-  // One line takes the house curve; a run of lines goes nearly linear, so a sweep does not stall at each break.
-  const easing = lines.length > 1 ? 'cubic-bezier(.3,.2,.4,1)' : EASE;
+  const easing = lines.length > 1 ? SWEEP : EASE;
   let delay = 0;
   const anims = lines.map((l, k) => {
     const s = document.createElement('span');

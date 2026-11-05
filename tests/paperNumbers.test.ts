@@ -130,8 +130,11 @@ describe('VALUES — the reproduction\'s figures, from its vendored returns', ()
 });
 
 describe('paperValue and the homepage line', () => {
-  it('throws on a key VALUES does not have, as an unknown :v fails the build', () => {
+  // Both halves: tsc refuses the key (the directive fails the typecheck if it ever stops being an error), and the
+  // build, which strips types unchecked, throws on it.
+  it('refuses a key VALUES does not have, as a type error and as a throw, as an unknown :v fails the build', () => {
     expect(paperValue('usd.rl')).toBe(v['usd.rl']);
+    // @ts-expect-error 'usd.rll' is not a key of VALUES
     expect(() => paperValue('usd.rll')).toThrow('unknown value "usd.rll" for rl-bhrp');
   });
 

@@ -42,7 +42,9 @@ export interface PaperReport {
 interface File { path?: string; value: unknown; data: { astro?: { frontmatter?: Record<string, unknown> } } }
 interface Reference { key: string; authors: string[]; year: number }
 
-export const isPaper = (file: unknown) => ((file as File).path ?? '').includes('/src/content/papers/');
+/** Where the papers collection lives (content.config.ts loads it from here): a file under it is a paper. */
+export const PAPERS_DIR = 'src/content/papers';
+export const isPaper = (file: unknown) => ((file as File).path ?? '').includes(`/${PAPERS_DIR}/`);
 
 type Extensions = { micromarkExtensions?: unknown[]; fromMarkdownExtensions?: unknown[] };
 // remark-directive's syntax, taken from a processor of its own rather than from the packages under it.
@@ -302,7 +304,11 @@ export function remarkPaper({ papers, publications }: { papers: Record<string, P
       return set(n, 'figure', { className: [table ? 'tbl' : 'fig', ...(asides.length ? ['an'] : [])], ...(num ? { id } : {}) });
     }
 
+    // A row is keyed by its position, so a second table's rows would take the first's keys and light its symbols.
+    let notated = false;
     function notation(n: Node): Node {
+      if (notated) problem('a second :::notation — a paper has one Notation table, and its rows key the symbols');
+      notated = true;
       const [table, ...extra] = n.children ?? [];
       if (table?.type !== 'table' || extra.length) problem(':::notation holds one table, | Symbol | Meaning |, and nothing else');
       (table?.children ?? []).forEach((row, k) => {

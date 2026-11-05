@@ -1,13 +1,40 @@
-// The pure half of the motion module (scripts/motion.ts): the curves, the one stagger formula, and the arithmetic of
-// a sweep laid along a run of text. Pure so it can be specified; the DOM half only measures and plays.
+// The pure half of the motion module (scripts/motion.ts): the curves and the durations every move on the rail and
+// the research routes is made of, the one stagger formula, and the arithmetic of a sweep laid along a run of text.
+// Pure so it can be specified; the DOM half only measures and plays. CSS cannot import these, so
+// tests/motionTiming.test.ts holds every curve and duration the rail's and the research routes' CSS states to them.
 
 /** Every move: a quick start and a long settle. */
 export const EASE = 'cubic-bezier(.2,.7,.2,1)';
 /** A figure drawing itself: a gentle start, then the same long settle. */
 export const DRAW = 'cubic-bezier(.33,.08,.24,1)';
+/** A sweep along a run of lines: nearly linear, so it does not stall at each break. A sweep of one line takes EASE. */
+export const SWEEP = 'cubic-bezier(.3,.2,.4,1)';
 
-/** The rail's entrance (SideRail.astro, in CSS): every row in within this. */
-export const RAIL_ENTER_MS = 500;
+// ── The durations, in ms. ──
+
+/** The research routes' reveal (riseOnceSeen): a block rises over `rise`; a margin note beside the text slides in
+ *  over `beside`, `noteAfter` after its block; several seen together go `step` apart, the last at most `max` late. */
+export const REVEAL = { rise: 340, beside: 380, noteAfter: 120, step: 60, max: 120 } as const;
+
+/** The rail (SideRail.astro). Its entrance, in CSS: each row `row` long and `rowStep` after the one before, closer on
+ *  a long rail, so that every row is in by `enter`. Between marks, its script: the lead's dash slides for `slide` and
+ *  grows for `grow`, or grows in place over `growIn`, and a quiet mark fades over `fade`, as a label's inks
+ *  cross-fade. A hovered or focused row's preview dash fades over `preview` and its label nudges over `nudge`. */
+export const RAIL = { enter: 500, row: 180, rowStep: 40, slide: 280, grow: 160, growIn: 240, fade: 200, preview: 160, nudge: 160 } as const;
+
+/** A paper page (pages/research/[slug].astro). A highlight sweeps in over `highlight`, `highlightAfter` after its
+ *  block has risen and `highlightStep` after the one before it; a linked term's rule draws over `term`. Figure 2
+ *  draws over `draw`, its end labels fading in over `labels`; Figure 1's arrows fade in over `arrow`, `arrowStep`
+ *  apart. A margin note dims over `noteFade` and shifts toward its term over `noteShift`; a tip fades over `tip`. */
+export const PAPER_PAGE = {
+  highlight: 640, highlightAfter: 260, highlightStep: 200, term: 220, draw: 1600, labels: 360, arrow: 360, arrowStep: 120,
+  noteFade: 200, noteShift: 240, tip: 120,
+} as const;
+
+/** The /research cards (pages/research/index.astro): a card lifts over `lift` and its frame fades in over `frame`;
+ *  its title's underline draws in over `underline`, a line `underlineStep` after the one above, and withdraws over
+ *  `underlineOut`; its miniature redraws over `redraw`. */
+export const CARD = { lift: 260, frame: 200, underline: 320, underlineStep: 110, underlineOut: 200, redraw: 750 } as const;
 
 /**
  * The delay of item `i` of `n` entering together: `step` apart; closer when that would start the last item after

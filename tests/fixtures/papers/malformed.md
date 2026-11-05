@@ -73,6 +73,40 @@ A section whose id is another section's heading's.
 Untitled, and an id already used.
 :::
 
+:::section[No id]
+A section without one.
+:::
+
+::::::section[Misplaced]{#misplaced}
+::::section[Inner]{#inner}
+A section inside a section.
+::::
+
+A :t[nameless] term.
+
+:::::eq{#eq-8 n=8}
+$$
+y = 2
+$$
+
+A paragraph inside an equation.
+:::::
+
+::::figure{name=pipe n=5}
+A caption.
+
+- a list inside a figure
+::::
+
+::::inpaper
+- a list inside a pointer
+::::
+
+::::notation
+A paragraph, and no table, in a second notation.
+::::
+::::::
+
 :::::section[Unhosted]{#unhosted}
 :::why
 A note before any block.

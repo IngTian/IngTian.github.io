@@ -12,6 +12,11 @@ import { contrastRatio, wcagLuminance } from '../../src/lib/skyLegibility';
 const css = readFileSync(new URL('../../src/styles/tokens.css', import.meta.url), 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, '');
 
+/** The role tokens a page's register overrides (CLAUDE.md, Themes): what the shared components read, so a register
+ *  that declares them all reskins the nav, the rail and the cow without an edit to any of them. */
+export const ROLE_TOKENS = ['--paper', '--ink-1', '--ink-2', '--ink-3', '--ink-4', '--ink-5', '--ochre', '--on-accent',
+  '--hairline-rgb', '--bg'] as const;
+
 /** The custom properties declared in the rule whose selector is exactly `sel`. */
 export function tokens(sel: string): Record<string, string> {
   const at = css.indexOf(`${sel} {`);

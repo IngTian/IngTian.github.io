@@ -10,6 +10,9 @@ export interface TimelineEntry {
 
 export interface Author { name: string; affiliation?: string }
 export type PublicationStatus = 'preprint' | 'conference' | 'journal';
+/** What a status is called wherever one is printed: as written on a /research card, in lower case in the homepage
+ *  line and in a paper page's head (which adds ", not peer reviewed" to a preprint). */
+export const STATUS_LABEL: Record<PublicationStatus, string> = { preprint: 'Preprint', conference: 'Conference paper', journal: 'Journal article' };
 
 export interface Publication {
   slug: string;              // URL segment and stable id (signal ids: `publications:${slug}`)

@@ -55,6 +55,18 @@ describe('fixMathVariants', () => {
     expect(() => fixMathVariants(mathml('\\mathcal{2}'))).toThrow(/2/);
   });
 
+  it('throws on a variant it rewrites that is not on a letter, rather than leave it drawn plain', () => {
+    expect(() => fixMathVariants('<mrow mathvariant="script"><mi>G</mi></mrow>'))
+      .toThrow('fixMathVariants: a mathvariant="script" not on a single <mi> or <mn> letter');
+  });
+
+  // Chrome's MathML Core honours "normal" alone, so any other variant left in would draw as a plain letter.
+  it('throws on every variant it has no rewrite for, naming it', () => {
+    for (const [tex, variant] of [['\\mathbf{x}', 'bold'], ['\\boldsymbol{\\beta}', 'bold-italic'], ['\\mathfrak{g}', 'fraktur']]) {
+      expect(() => fixMathVariants(mathml(tex)), tex).toThrow(`fixMathVariants: mathvariant="${variant}" has no rewrite`);
+    }
+  });
+
   it('leaves everything else as it was', () => {
     const plain = mathml('\\mathrm{RC}_i(w) = \\sigma_p^2');
     expect(fixMathVariants(plain)).toBe(plain);

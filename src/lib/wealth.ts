@@ -1,6 +1,20 @@
 // src/lib/wealth.ts
-// Growth-of-$1 arithmetic and chart scaffolding for every picture of a wealth run (lib/projectVisuals.ts draws
-// /projects' one), so a run drawn on two pages shows one line and one set of numbers. Pure.
+// Growth-of-$1 arithmetic, the shape of a prepared series and chart scaffolding for every picture of a wealth run
+// (lib/paperFigures/wealthFigure.ts draws the paper page's, lib/projectVisuals.ts /projects' one), so a run drawn on
+// two pages shows one line and one set of numbers. Pure.
+
+/** A reproduction's runs as every picture of them reads them, each series as wealth from 1 (data/papers/rl-bhrp.ts
+ *  REPRO prepares RL-BHRP's): the runs' month-by-month median and their band, BHRP and the benchmark. */
+export interface WealthSeries {
+  dates: readonly string[];   // the month-ends; every series has one point more, the start
+  dataEnd: string;            // the last day of data: the last month runs from its month-end to here
+  runs: number;               // how many runs `rl` is the median of, and `lo`/`hi` the band of
+  rl: readonly number[];
+  lo: readonly number[];
+  hi: readonly number[];
+  bhrp: readonly number[];
+  bench: readonly number[];
+}
 
 /** Wealth from 1, period by period: one more point than there are returns. */
 export function cumulative(returns: readonly number[]): number[] {

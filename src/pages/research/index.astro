@@ -8,7 +8,7 @@ import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import SideRail from '../../components/SideRail.astro';
 import { PAPER_DATA } from '../../data/papers';
-import { publications, researchInterests, type PublicationStatus } from '../../data/profile';
+import { STATUS_LABEL, publications, researchInterests } from '../../data/profile';
 import { researchIndexStops } from '../../lib/pageStops';
 import { hyphenatedParts } from '../../lib/words';
 import '../../styles/paper.css';
@@ -17,7 +17,6 @@ const stops = researchIndexStops();
 const [papers, interests] = stops;
 // The records with a page of their own, read from the collection, so a paper's card opens its page once its file exists.
 const explained = new Set((await getCollection('papers')).map((e) => e.data.publication));
-const STATUS: Record<PublicationStatus, string> = { preprint: 'Preprint', conference: 'Conference paper', journal: 'Journal article' };
 // A title keeps its hyphenated words whole ("RNN-based", "(RL-BHRP)"). A card's meta ("status · venue · year") and its
 // tags keep each part nowrap with the separator before it, so a line may break before a separator, never after one.
 ---
@@ -49,7 +48,7 @@ const STATUS: Record<PublicationStatus, string> = { preprint: 'Preprint', confer
                 ? <a href={`/research/${p.slug}`}>{title}</a>
                 : <a href={p.href} target="_blank" rel="noopener noreferrer" aria-describedby={`out-${p.slug}`}>{title}<span class="ext" aria-hidden="true"> ↗</span></a>}</h3>
               <p class="p-auth">{p.authors.map((a) => a.name).join(', ')}</p>
-              <p class="p-meta">{[STATUS[p.status], p.venue, p.year].map((t, i) => <>{i > 0 && ' '}<span class="nw">{i > 0 && '· '}{t}</span></>)}{!here && <span class="out" id={`out-${p.slug}`}>opens the publisher’s page<span aria-hidden="true"> ↗</span></span>}</p>
+              <p class="p-meta">{[STATUS_LABEL[p.status], p.venue, p.year].map((t, i) => <>{i > 0 && ' '}<span class="nw">{i > 0 && '· '}{t}</span></>)}{!here && <span class="out" id={`out-${p.slug}`}>opens the publisher’s page<span aria-hidden="true"> ↗</span></span>}</p>
               <p class="p-find">{p.finding}</p>
               <p class="p-tags">{p.tags.map((t, i) => <>{i > 0 && ' '}<span class="nw">{i > 0 && '· '}{t}</span></>)}</p>
               {thumb && (
@@ -190,7 +189,7 @@ const STATUS: Record<PublicationStatus, string> = { preprint: 'Preprint', confer
   // underline on its lines, and redraws a card's picture the first time it is hovered or focused in a page view.
   // Started through onPageView, so it runs at parse on a full load and once per arrival, after the last arrival's
   // teardown.
-  import { DRAW, mergeLines } from '../../lib/motionTiming';
+  import { CARD, DRAW, mergeLines } from '../../lib/motionTiming';
   import { onPageView } from '../../scripts/pageView';
   import { play, riseOnceSeen } from '../../scripts/motion';
 
@@ -204,7 +203,7 @@ const STATUS: Record<PublicationStatus, string> = { preprint: 'Preprint', confer
     riseOnceSeen(page.querySelectorAll('.block > h2, .pc, .interests'), { signal, live });
 
     // ── the title's underline: a 1px span on each of its lines (a line's fragments merged), which the CSS scales in
-    // from the left, a line 110ms after the one above. Laid again whenever the title's box changes, as its lines
+    // from the left, each line a step after the one above. Laid again whenever the title's box changes, as its lines
     // break anew; a ResizeObserver runs after layout and before paint, so no span is drawn where a line was. ──
     function underline(card: HTMLElement): void {
       card.querySelectorAll(':scope > .ul').forEach((u) => u.remove());
@@ -231,14 +230,14 @@ const STATUS: Record<PublicationStatus, string> = { preprint: 'Preprint', confer
       if (title) ro.observe(title);
     }
 
-    // ── the picture redraws once a page view: the mask over its series slides off to the right (750ms) ──
+    // ── the picture redraws once a page view: the mask over its series slides off to the right ──
     const redrawn = new Set<Element>();
     function redraw(card: HTMLElement): void {
       const svg = card.querySelector('.mini'), mask = svg?.querySelector<SVGGElement>('.f-mask');
       if (!svg || !mask || redrawn.has(card)) return;
       redrawn.add(card);
       svg.classList.add('drawing');
-      void play(mask, [{ transform: 'translateX(0)' }, { transform: `translateX(${mask.dataset.d}px)` }], { duration: 750, easing: DRAW }, live)
+      void play(mask, [{ transform: 'translateX(0)' }, { transform: `translateX(${mask.dataset.d}px)` }], { duration: CARD.redraw, easing: DRAW }, live)
         .finished.catch(() => undefined).then(() => svg.classList.remove('drawing'));
     }
 

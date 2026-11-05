@@ -6,9 +6,23 @@ import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
 import { rehypeMathVariants } from '../mathml';
 import { rehypePaper } from './rehypePaper';
-import { remarkPaper, remarkPaperSyntax, type PaperData, type PaperRecord } from './remarkPaper';
+import { remarkPaper, remarkPaperSyntax, PAPERS_DIR, type PaperData, type PaperRecord, type PaperReport } from './remarkPaper';
 
-export { refId, type PaperData, type PaperRecord, type PaperReport } from './remarkPaper';
+export { PAPERS_DIR, refId, type PaperData, type PaperRecord, type PaperReport } from './remarkPaper';
+
+/** A paper's render report (`render(entry).remarkPluginFrontmatter`), checked: the plugins cannot fail the build (a
+ *  plugin's throw leaves the entry unrendered), so the paper page fails it here, naming `file`, on every problem they
+ *  found, on an id the page writes itself (`pageOwns`, lib/pageStops' paperPageOwns), and on a file they never
+ *  compiled, whose render reports nothing. */
+export function checkedReport(file: string, frontmatter: unknown, pageOwns: (id: string) => boolean): PaperReport {
+  const report = frontmatter as Partial<PaperReport>;
+  if (!Array.isArray(report.paperProblems) || !Array.isArray(report.ids)) {
+    throw new Error(`${file} has no paper report: only a file under ${PAPERS_DIR}/ is compiled as a paper`);
+  }
+  const problems = [...report.paperProblems, ...report.ids.filter(pageOwns).map((id) => `id #${id} is one this page writes itself`)];
+  if (problems.length) throw new Error(`${file} has ${problems.length} problem(s):\n  ${problems.join('\n  ')}`);
+  return report as PaperReport;
+}
 
 /** `papers` is each paper's computed values and figures, by publication slug, and `publications` the records
  *  (profile.ts) a paper quotes its abstract from. Both are passed as options, not imported by the plugin, so they

@@ -2,6 +2,7 @@ import { defineCollection } from 'astro:content';
 import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
 import { publications } from './data/profile';
+import { PAPERS_DIR } from './lib/paperMarkdown';
 
 /**
  * An ISO date, normalised to YYYY-MM-DD: every date in every collection is one of these.
@@ -88,7 +89,8 @@ const writing = defineCollection({
  * repeated in the file, where the two copies could disagree.
  */
 const papers = defineCollection({
-  loader: glob({ base: './src/content/papers', pattern: '**/*.md' }),
+  // the one spelling of the directory: the plugins compile a file as a paper by its path under it
+  loader: glob({ base: `./${PAPERS_DIR}`, pattern: '**/*.md' }),
   schema: z.object({
     /** The record this page explains: a slug in profile.ts `publications`. */
     publication: z.string().refine((s) => publications.some((p) => p.slug === s), {

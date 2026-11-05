@@ -18,7 +18,7 @@ import type { PaperReport } from '../src/lib/paperMarkdown';
 import { countWords, readingMinutes } from '../src/lib/words';
 import { renderMarkdown } from './helpers/paperChain';
 import { GALLERY_ORDER } from '../src/lib/galleryLayout';
-import { EASE, RAIL_ENTER_MS, stagger } from '../src/lib/motionTiming';
+import { EASE, RAIL, stagger } from '../src/lib/motionTiming';
 import { listingLines } from '../src/lib/projectsListing';
 import { BOOT_CMD, BOOT_DEADLINE_MS, BOOT_SEEN_KEY } from '../src/lib/projectsBoot';
 import { PHONE_QUERY } from '../src/lib/viewport';
@@ -722,8 +722,8 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
     expect(new Set(itemsOf(builtPage('/writing')).map((i) => i.depth))).toEqual(new Set([0, 1]));
   });
 
-  // CLAUDE.md, Motion: only transform and opacity animate. The old rail transitioned `width` (its dash, which pushed
-  // the label sideways) and `color`.
+  // CLAUDE.md, Motion: only transform and opacity animate, so the dash never grows by `width` (which would push the
+  // label sideways) and a label never fades by `color`.
   /** Every shipped rule that styles the rail, from the pages' inline styles and the bundled sheets, scope hashes
    *  stripped: [whole, selector, body]. */
   const railCss = (): string => [...railPages().flatMap((p) => [...p.html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)]
@@ -746,9 +746,9 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
 
   // THE ENTRANCE IS CSS, so it runs from the first frame with no script to wait for (a bundled script runs after
   // the browser has painted). Each row comes in from 6px left, --i (its index) times the rail's --gap late, with a
-  // backwards fill so it waits in its from-state; --gap is lib/motionTiming's stagger() over the rail's rows, so
-  // every row is in by RAIL_ENTER_MS however long the rail is. Read as shipped, the duration and the gaps.
-  it('enters by CSS alone, where motion is allowed: opacity and transform, each row --i x --gap late, all in by RAIL_ENTER_MS', () => {
+  // backwards fill so it waits in its from-state; --row is RAIL.row and --gap lib/motionTiming's stagger() over the
+  // rail's rows, so every row is in by RAIL.enter however long the rail is. Read as shipped, the duration and the gaps.
+  it('enters by CSS alone, where motion is allowed: opacity and transform, each row --i x --gap late, all in by RAIL.enter', () => {
     const css = railCss();
     const frames = /@keyframes side-rail-enter\{((?:[^{}]*\{[^{}]*\})*)\}/.exec(css);
     expect(frames, 'no @keyframes side-rail-enter').not.toBeNull();
@@ -760,19 +760,20 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
     const rule = /\.side-rail a\{(animation:side-rail-enter [^}]*)\}/.exec(gated);
     expect(rule, 'the entrance is not on .side-rail a under prefers-reduced-motion: no-preference').not.toBeNull();
     expect([...css.matchAll(/animation(?:-name)?:side-rail-enter\b/g)], 'the entrance is also set outside the motion gate').toHaveLength(1);
-    const m = /^animation:side-rail-enter (\d*\.?\d+)(m?s) (cubic-bezier\([^)]*\)) backwards;animation-delay:calc\(var\(--i\) ?\* ?var\(--gap\)\)$/.exec(rule![1]);
+    const m = /^animation:side-rail-enter var\(--row\) (cubic-bezier\([^)]*\)) backwards;animation-delay:calc\(var\(--i\) ?\* ?var\(--gap\)\)$/.exec(rule![1]);
     expect(m, `the entrance's declarations: ${rule![1]}`).not.toBeNull();
-    const row = Number(m![1]) * (m![2] === 's' ? 1000 : 1);
-    expect(m![3]).toBe(EASE);
+    expect(m![1]).toBe(EASE);
 
     for (const p of railPages()) {
-      const gap = /<nav\b[^>]*\sclass="side-rail"[^>]*\sstyle="--gap:([\d.]+)ms"/.exec(p.html);
-      expect(gap, `${p.route}: the rail carries no --gap`).not.toBeNull();
+      const vars = /<nav\b[^>]*\sclass="side-rail"[^>]*\sstyle="--gap:([\d.]+)ms;--row:([\d.]+)ms"/.exec(p.html);
+      expect(vars, `${p.route}: the rail carries no --gap and --row`).not.toBeNull();
+      const gap = Number(vars![1]), row = Number(vars![2]);
+      expect(row, p.route).toBe(RAIL.row);
       const n = itemsOf(p).length; // and each row's --i is its index (the markup test above)
       for (let i = 0; i < n; i += 1) {
-        expect(i * Number(gap![1]), `${p.route} row ${i}`).toBeCloseTo(stagger(i, n, { step: 40, total: RAIL_ENTER_MS - row }), 6);
+        expect(i * gap, `${p.route} row ${i}`).toBeCloseTo(stagger(i, n, { step: RAIL.rowStep, total: RAIL.enter - row }), 6);
       }
-      expect((n - 1) * Number(gap![1]) + row, p.route).toBeLessThanOrEqual(RAIL_ENTER_MS + 1e-9);
+      expect((n - 1) * gap + row, p.route).toBeLessThanOrEqual(RAIL.enter + 1e-9);
     }
   });
 
@@ -1187,7 +1188,7 @@ describe('/research — the papers as cards, newest first, then the interests', 
       }
     }
     // both kinds are on the page today, so neither branch above is vacuous
-    expect(cards().map((c) => c.href.startsWith('/')).sort()).toEqual([false, true]);
+    expect(new Set(cards().map((c) => c.href.startsWith('/')))).toEqual(new Set([false, true]));
   });
 
   // The venue never carries the year itself, nor a volume, which the DOI carries: a card reads, as spec §3 has it,

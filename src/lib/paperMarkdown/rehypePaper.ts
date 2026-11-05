@@ -16,25 +16,37 @@ function same(a: Node, b: Node): boolean {
     && ka.length === kb.length && ka.every((c, i) => same(c, kb[i]));
 }
 
-/** A row's symbols: its maths split at the commas between them (`N,\ G` is two) and at a membership, which
- *  introduces its element and the index of its set (`i ∈ 𝓘_g`, stock i of sector g: i, g and 𝓘_g), spaces dropped. */
+/** A row's symbols: every maths in its Symbol cell (`$N$, $G$` is two), each split at the commas between symbols
+ *  (`N,\ G` is two as well) and at a membership, which introduces its element and the index of its set (`i ∈ 𝓘_g`,
+ *  stock i of sector g: i, g and 𝓘_g), spaces dropped. `tex` is the cell as written, for a problem to name. */
 function symbolsOf(row: Node): { tex: string; parts: Node[][] } {
-  let math: Node | undefined;
-  walk(row.children?.find((c) => isEl(c, 'th')) ?? row, (n) => { math ??= isEl(n, 'math') ? n : undefined; });
-  const semantics = math?.children?.find((c) => isEl(c, 'semantics'));
-  const body = semantics?.children?.filter((c) => isEl(c) && c.tagName !== 'annotation') ?? [];
-  const seq = body.length === 1 && body[0].tagName === 'mrow' ? body[0].children ?? [] : body;
-  const parts: Node[][] = [[]];
-  let set: Node[] | undefined;
-  for (const c of seq) {
-    const member = isEl(c, 'mo') && plain(c) === '∈';
-    if (member || (isEl(c, 'mo') && c.properties?.separator === 'true')) parts.push([]);
-    else if (!(isEl(c, 'mspace') || (isEl(c, 'mtext') && !plain(c).trim()))) parts.at(-1)!.push(c);
-    if (member) set = parts.at(-1);
+  const cell = row.children?.find((c) => isEl(c, 'th')) ?? row, maths: Node[] = [];
+  walk(cell, (n) => { if (isEl(n, 'math')) maths.push(n); });
+  const parts = maths.flatMap((math) => {
+    const semantics = math.children?.find((c) => isEl(c, 'semantics'));
+    const body = semantics?.children?.filter((c) => isEl(c) && c.tagName !== 'annotation') ?? [];
+    const seq = body.length === 1 && body[0].tagName === 'mrow' ? body[0].children ?? [] : body;
+    const own: Node[][] = [[]];
+    let set: Node[] | undefined;
+    for (const c of seq) {
+      const member = isEl(c, 'mo') && plain(c) === '∈';
+      if (member || (isEl(c, 'mo') && c.properties?.separator === 'true')) own.push([]);
+      else if (!(isEl(c, 'mspace') || (isEl(c, 'mtext') && !plain(c).trim()))) own.at(-1)!.push(c);
+      if (member) set = own.at(-1);
+    }
+    const index = set?.length === 1 && base(set[0]) ? set[0].children!.filter((c) => isEl(c)).slice(1).map((c) => [c]) : [];
+    return [...own, ...index];
+  });
+  return { tex: written(cell).trim(), parts: parts.filter((p) => p.length) };
+}
+
+/** A cell as its author wrote it, each maths as its TeX: "$N$, $G$". */
+function written(n: Node): string {
+  if (n.tagName === 'math') {
+    const tex = n.children?.find((c) => isEl(c, 'semantics'))?.children?.find((c) => isEl(c, 'annotation'));
+    return `$${plain(tex ?? n)}$`;
   }
-  const index = set?.length === 1 && base(set[0]) ? set[0].children!.filter((c) => isEl(c)).slice(1).map((c) => [c]) : [];
-  const tex = semantics?.children?.find((c) => isEl(c, 'annotation'));
-  return { tex: tex ? plain(tex) : plain(row), parts: [...parts, ...index].filter((p) => p.length) };
+  return n.type === 'text' ? n.value ?? '' : (n.children ?? []).map(written).join('');
 }
 
 const mark = (n: Node, key: string) => {
@@ -137,7 +149,7 @@ export function rehypePaper() {
     const seen = new Set<string>();
     for (const d of displays) tag(d, symbols, seen);
     for (const { key, tex } of keyed) {
-      if (!seen.has(key)) problems.push(`notation row $${tex}$ matches no display — mark it {text-only} if it is only in the prose`);
+      if (!seen.has(key)) problems.push(`notation row ${tex} matches no display — mark it {text-only} if it is only in the prose`);
     }
 
     // One word per space-separated token, as the page reads: maths and tables are not read as prose. A figure's

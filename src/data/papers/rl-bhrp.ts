@@ -4,9 +4,8 @@
 // and every picture drawn from them (lib/paperFigures/).
 import { rlBhrpDiagnostics } from '../vendor/rlBhrpDiagnostics';
 import { rlBhrpWealth } from '../vendor/rlBhrpWealth';
-import type { WealthSeries } from '../../lib/paperFigures/wealthFigure';
 import { longDate, monthYear } from '../../lib/dates';
-import { band, cagr, cumulative, maxDrawdownFromStart, pointwiseMedian } from '../../lib/wealth';
+import { band, cagr, cumulative, maxDrawdownFromStart, pointwiseMedian, type WealthSeries } from '../../lib/wealth';
 
 /** Table 2, "Full-Period Metrics": all 18 rows in the paper's order, values as printed (6 dp). Columns are
  *  RL-BHRP | BHRP | Benchmark. The benchmark's information ratio is NaN in the paper: its tracking error
@@ -103,109 +102,114 @@ const pct = (x: number) => (x * 100).toFixed(2);
 const usd = (wealth: number) => `$${wealth.toFixed(2)}`;
 const mean = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 
-function values(): Record<string, string> {
+function values() {
   const row = (metric: string): readonly number[] => {
     const r = TABLE2.find((x) => x.metric === metric);
     if (!r || r.values.some((x) => typeof x !== 'number')) throw new Error(`Table 2 has no numeric "${metric}" row`);
     return r.values as readonly number[];
   };
-  const v: Record<string, string> = {};
-  const each = (key: string, metric: string, fmt: (x: number) => string) =>
-    row(metric).forEach((x, i) => { v[`${key}.${COLUMNS[i]}`] = fmt(x); });
+  /** One Table 2 row as three values, `<key>.rl`, `<key>.bhrp` and `<key>.bench`. */
+  const each = <K extends string>(key: K, metric: string, fmt: (x: number) => string) =>
+    Object.fromEntries(row(metric).map((x, i) => [`${key}.${COLUMNS[i]}`, fmt(x)])) as Record<`${K}.${(typeof COLUMNS)[number]}`, string>;
 
-  const tot = row('Total Cumulative Return'), cg = row('CAGR (Geometric Ann.)');
+  const tot = row('Total Cumulative Return'), cg = row('CAGR (Geometric Ann.)'), ir = row('Information Ratio')[0];
   const years = PAPER.months / 12;
-  each('usd', 'Total Cumulative Return', (x) => usd(1 + x));
-  v['wealth.rl'] = (1 + tot[0]).toFixed(4);                        // the base of the CAGR worked example
-  each('cagr', 'CAGR (Geometric Ann.)', pct);
-  each('tableCagr', 'CAGR (Geometric Ann.)', (x) => x.toFixed(6));   // as Table 2 prints it
-  each('vol', 'Annual Volatility', pct);
-  each('mdd', 'Max Drawdown', (x) => pct(-x));                     // a fall, from the first month-end
-  each('sharpe', 'Sharpe', (x) => x.toFixed(2));
-  each('calmar', 'Calmar', (x) => x.toFixed(2));
-  v['ir.rl'] = row('Information Ratio')[0].toFixed(2);
-  v['beta.rl'] = row('Beta')[0].toFixed(2);
-  v.gapPP = ((cg[0] - cg[1]) * 100).toFixed(1);                     // percentage points a year over BHRP
-  v['gapPP.bench'] = ((cg[0] - cg[2]) * 100).toFixed(1);
-  v.years = years.toFixed(1);
-  // t of the gap to the benchmark with roughly independent months: information ratio x sqrt(years)
-  v.tstat = (row('Information Ratio')[0] * Math.sqrt(years)).toFixed(1);
   // one standard error of an annual Sharpe ratio from iid monthly returns (Lo, 2002): sqrt((1 + SR_m^2 / 2) / T),
   // annualised by sqrt(12)
   const srMonthly = row('Sharpe')[0] / Math.sqrt(12);
-  v.sharpeSE = (Math.sqrt((1 + srMonthly ** 2 / 2) / PAPER.months) * Math.sqrt(12)).toFixed(1);
-
-  v.months = String(PAPER.months);
-  v.start = PAPER.start;
-  v.end = PAPER.end;
-  v.dataEndIso = PAPER.dataEnd;
-  v.startMonth = monthYear(PAPER.start);
-  v.endMonth = monthYear(PAPER.end);
-  v.dataEnd = longDate(PAPER.dataEnd);
-  v.startYear = PAPER.start.slice(0, 4);
-  v.endYear = PAPER.end.slice(0, 4);
-  v.trainFrom = String(PAPER.train.from);
-  v.trainTo = String(PAPER.train.to);
-  v.decisions = String((PAPER.train.to - PAPER.train.from + 1) * 12);   // a decision at each month-end of the training years
-
   const sizes = Object.values(PAPER.sectorSizes), it = PAPER.sectorSizes['Information Technology'];
-  v.universe = String(PAPER.universe);
-  v.sectors = String(PAPER.sectors);
-  v.sectorMin = String(Math.min(...sizes));
-  v.sectorMax = String(Math.max(...sizes));
-  v.itStocks = String(it);
-  // the IT sector's share of the risk when every stock carries an equal share, and when every sector does
-  v.itShareStocks = String(Math.round((it / PAPER.universe) * 100));
-  v.itShareSectors = String(Math.round((1 / PAPER.sectors) * 100));
-
-  v.costBps = String(PAPER.costBps);
-  v.costPct = (PAPER.costBps / 100).toFixed(2);                         // a basis point is 0.01%
-  v.costPctMonth = ((PAPER.turnover * PAPER.costBps) / 100).toFixed(2);     // the month's turnover at that cost
-  v.turnover = PAPER.turnover.toFixed(2);
-  v.turnoverPct = String(Math.round(PAPER.turnover * 100));
-  v.turnoverP95 = PAPER.turnoverP95.toFixed(2);
-  v.costBpsMonth = (PAPER.turnover * PAPER.costBps).toFixed(0);
-  v.costPPYear = ((PAPER.turnover * PAPER.costBps * 12) / 100).toFixed(2);
-  v['top15.mean'] = PAPER.top15.mean.toFixed(2);
-  v['top15.lo'] = PAPER.top15.lo.toFixed(2);
-  v['top15.hi'] = PAPER.top15.hi.toFixed(2);
-  v.top15Equal = String(Math.round((15 / PAPER.universe) * 100));      // % that any 15 hold at equal weights
-
   // The reproduction: the month-by-month median of its runs (the red line), the band's ends (the lowest and the
   // highest run's), BHRP and the benchmark.
   const { rl, lo, hi, bhrp, bench, dates } = REPRO, months = dates.length;
-  v.reproRuns = String(REPRO.runs);
-  v.reproEnd = usd(rl.at(-1)!);
-  v.reproLo = usd(lo.at(-1)!);
-  v.reproHi = usd(hi.at(-1)!);
-  v.reproGap = ((cagr(rl.at(-1)! - 1, months) - cagr(bhrp.at(-1)! - 1, months)) * 100).toFixed(1);
   // falls counted from the starting $1, the one count all three series share: RL-BHRP's as the median line's, with the
   // shallowest and the deepest run's
   const falls = runs.map((w) => -maxDrawdownFromStart(w));
-  v['mdd0.rl'] = pct(-maxDrawdownFromStart(rl));
-  v['mdd0.runsLo'] = pct(Math.min(...falls));
-  v['mdd0.runsHi'] = pct(Math.max(...falls));
-  v['mdd0.bhrp'] = pct(-maxDrawdownFromStart(bhrp));
-  v['mdd0.bench'] = pct(-maxDrawdownFromStart(bench));
-  // its diagnostics: the monthly turnover of the run with the median growth and of BHRP, BHRP's share in its top 15
-  // and what its turnover costs a year at the paper's rate, and the mean CAGR of the runs under each reading of the penalty
-  v.reproTurnover = REPRO_NOTES.turnover.rl.toFixed(2);
-  v.reproTurnoverBhrp = REPRO_NOTES.turnover.bhrp.toFixed(3);
-  v.reproTop15Bhrp = String(Math.round(REPRO_NOTES.top15.bhrp * 100));
-  v.reproCostPPYearBhrp = ((REPRO_NOTES.turnover.bhrp * PAPER.costBps * 12) / 100).toFixed(3);
-  v.reproCagrGlobal = pct(mean(REPRO_NOTES.cagr.global));
-  v.reproCagrSector = pct(mean(REPRO_NOTES.cagr.sector));
-  return v;
+
+  return {
+    ...each('usd', 'Total Cumulative Return', (x) => usd(1 + x)),
+    'wealth.rl': (1 + tot[0]).toFixed(4),                          // the base of the CAGR worked example
+    ...each('cagr', 'CAGR (Geometric Ann.)', pct),
+    ...each('tableCagr', 'CAGR (Geometric Ann.)', (x) => x.toFixed(6)),   // as Table 2 prints it
+    ...each('vol', 'Annual Volatility', pct),
+    ...each('mdd', 'Max Drawdown', (x) => pct(-x)),               // a fall, from the first month-end
+    ...each('sharpe', 'Sharpe', (x) => x.toFixed(2)),
+    ...each('calmar', 'Calmar', (x) => x.toFixed(2)),
+    'ir.rl': ir.toFixed(2),
+    'beta.rl': row('Beta')[0].toFixed(2),
+    gapPP: ((cg[0] - cg[1]) * 100).toFixed(1),                       // percentage points a year over BHRP
+    'gapPP.bench': ((cg[0] - cg[2]) * 100).toFixed(1),
+    years: years.toFixed(1),
+    // t of the gap to the benchmark with roughly independent months: information ratio x sqrt(years)
+    tstat: (ir * Math.sqrt(years)).toFixed(1),
+    sharpeSE: (Math.sqrt((1 + srMonthly ** 2 / 2) / PAPER.months) * Math.sqrt(12)).toFixed(1),
+
+    months: String(PAPER.months),
+    start: PAPER.start,
+    end: PAPER.end,
+    dataEndIso: PAPER.dataEnd,
+    startMonth: monthYear(PAPER.start),
+    endMonth: monthYear(PAPER.end),
+    dataEnd: longDate(PAPER.dataEnd),
+    startYear: PAPER.start.slice(0, 4),
+    endYear: PAPER.end.slice(0, 4),
+    trainFrom: String(PAPER.train.from),
+    trainTo: String(PAPER.train.to),
+    decisions: String((PAPER.train.to - PAPER.train.from + 1) * 12),   // a decision at each month-end of the training years
+
+    universe: String(PAPER.universe),
+    sectors: String(PAPER.sectors),
+    sectorMin: String(Math.min(...sizes)),
+    sectorMax: String(Math.max(...sizes)),
+    itStocks: String(it),
+    // the IT sector's share of the risk when every stock carries an equal share, and when every sector does
+    itShareStocks: String(Math.round((it / PAPER.universe) * 100)),
+    itShareSectors: String(Math.round((1 / PAPER.sectors) * 100)),
+
+    costBps: String(PAPER.costBps),
+    costPct: (PAPER.costBps / 100).toFixed(2),                           // a basis point is 0.01%
+    costPctMonth: ((PAPER.turnover * PAPER.costBps) / 100).toFixed(2),   // the month's turnover at that cost
+    turnover: PAPER.turnover.toFixed(2),
+    turnoverPct: String(Math.round(PAPER.turnover * 100)),
+    turnoverP95: PAPER.turnoverP95.toFixed(2),
+    costBpsMonth: (PAPER.turnover * PAPER.costBps).toFixed(0),
+    costPPYear: ((PAPER.turnover * PAPER.costBps * 12) / 100).toFixed(2),
+    'top15.mean': PAPER.top15.mean.toFixed(2),
+    'top15.lo': PAPER.top15.lo.toFixed(2),
+    'top15.hi': PAPER.top15.hi.toFixed(2),
+    top15Equal: String(Math.round((15 / PAPER.universe) * 100)),        // % that any 15 hold at equal weights
+
+    reproRuns: String(REPRO.runs),
+    reproEnd: usd(rl.at(-1)!),
+    reproLo: usd(lo.at(-1)!),
+    reproHi: usd(hi.at(-1)!),
+    reproGap: ((cagr(rl.at(-1)! - 1, months) - cagr(bhrp.at(-1)! - 1, months)) * 100).toFixed(1),
+    'mdd0.rl': pct(-maxDrawdownFromStart(rl)),
+    'mdd0.runsLo': pct(Math.min(...falls)),
+    'mdd0.runsHi': pct(Math.max(...falls)),
+    'mdd0.bhrp': pct(-maxDrawdownFromStart(bhrp)),
+    'mdd0.bench': pct(-maxDrawdownFromStart(bench)),
+    // its diagnostics: the monthly turnover of the run with the median growth and of BHRP, BHRP's share in its top 15
+    // and what its turnover costs a year at the paper's rate, and the mean CAGR of the runs under each reading of the penalty
+    reproTurnover: REPRO_NOTES.turnover.rl.toFixed(2),
+    reproTurnoverBhrp: REPRO_NOTES.turnover.bhrp.toFixed(3),
+    reproTop15Bhrp: String(Math.round(REPRO_NOTES.top15.bhrp * 100)),
+    reproCostPPYearBhrp: ((REPRO_NOTES.turnover.bhrp * PAPER.costBps * 12) / 100).toFixed(3),
+    reproCagrGlobal: pct(mean(REPRO_NOTES.cagr.global)),
+    reproCagrSector: pct(mean(REPRO_NOTES.cagr.sector)),
+  };
 }
 
 /** Every figure the explainer (a `:v`) and the homepage quote. Keys are `<measure>.<column>` (columns rl, bhrp,
  *  bench) or a bare name for a single figure. */
 export const VALUES = values();
+/** A key of VALUES: what TypeScript may quote. */
+export type ValueKey = keyof typeof VALUES;
 
-/** One of VALUES, for the TypeScript that quotes them. An unknown key throws, so a typo or a renamed key fails the
- *  build, as an unknown `:v` does, rather than printing "undefined". */
-export function paperValue(key: string): string {
-  const v = VALUES[key];
+/** One of VALUES, for the TypeScript that quotes them. The key is typed, so a typo or a renamed key is a type error;
+ *  and since the build strips types without checking them, an unknown key also throws, as an unknown `:v` fails the
+ *  build, rather than printing "undefined". */
+export function paperValue(key: ValueKey): string {
+  const v = (VALUES as Record<string, string | undefined>)[key];
   if (v === undefined) throw new Error(`unknown value "${key}" for rl-bhrp`);
   return v;
 }

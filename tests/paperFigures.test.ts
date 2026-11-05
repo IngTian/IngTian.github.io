@@ -9,9 +9,9 @@ import { REPRO, TABLE2 } from '../src/data/papers/rl-bhrp';
 import { rlBhrpWealth } from '../src/data/vendor/rlBhrpWealth';
 import { metricsTable } from '../src/lib/paperFigures/metricsTable';
 import { pipelineFigure } from '../src/lib/paperFigures/pipelineFigure';
-import { wealthFigure, type WealthSeries } from '../src/lib/paperFigures/wealthFigure';
+import { wealthFigure } from '../src/lib/paperFigures/wealthFigure';
 import { readoutWhen } from '../src/lib/paperPage';
-import { band, cumulative, pointwiseMedian } from '../src/lib/wealth';
+import type { WealthSeries } from '../src/lib/wealth';
 
 const full = wealthFigure(REPRO, 'full'), mini = wealthFigure(REPRO, 'mini'), pipe = pipelineFigure();
 const table = metricsTable(TABLE2);
@@ -48,16 +48,19 @@ const georgia = (s: string, fs: number) => [...s].reduce((w, c) => {
 const variants = (html: string) => [...html.matchAll(/<(\w+)\b[^>]*\sclass="([^"]*)"/g)]
   .filter((m) => /\b(?:wide|narrow)\b/.test(m[2])).map((m) => [m[1], ...m[2].split(' ')].join('.'));
 
+// That REPRO's line is the runs' median and its band their range is held where it is drawn: projectVisuals.test.ts
+// reads both back from /projects' picture against the vendored runs. Here, only what every drawing of it relies on.
 describe('REPRO, the series the reproduction is drawn from', () => {
-  it('is the month-by-month median of the runs, their band, BHRP and the benchmark, from $1', () => {
-    const runs = rlBhrpWealth.rlSeeds.map(cumulative);
+  it('counts every vendored run, and gives each series one point a month from $1, the median inside the band', () => {
     expect(REPRO.runs).toBe(rlBhrpWealth.rlSeeds.length);
-    expect(REPRO.rl).toEqual(pointwiseMedian(runs));
-    expect({ lo: REPRO.lo, hi: REPRO.hi }).toEqual(band(runs));
-    expect(REPRO.bhrp).toEqual(cumulative(rlBhrpWealth.bhrp));
-    expect(REPRO.bench).toEqual(cumulative(rlBhrpWealth.benchmark));
-    expect(REPRO.dates).toEqual(rlBhrpWealth.dates);
-    for (const s of [REPRO.rl, REPRO.lo, REPRO.hi, REPRO.bhrp, REPRO.bench]) expect(s.length).toBe(REPRO.dates.length + 1);
+    for (const s of [REPRO.rl, REPRO.lo, REPRO.hi, REPRO.bhrp, REPRO.bench]) {
+      expect(s.length).toBe(REPRO.dates.length + 1);
+      expect(s[0]).toBe(1);
+    }
+    REPRO.rl.forEach((w, i) => {
+      expect(w).toBeGreaterThanOrEqual(REPRO.lo[i]);
+      expect(w).toBeLessThanOrEqual(REPRO.hi[i]);
+    });
   });
 });
 
@@ -104,6 +107,11 @@ describe('Figure 2, the growth of $1', () => {
       }
     });
   }
+
+  // "reproduction" is set on the line above RL-BHRP's label, which is clear only while that label is the top one.
+  it('refuses a series whose RL-BHRP line does not end on top, rather than set its qualifier over another label', () => {
+    expect(() => wealthFigure({ ...REPRO, rl: REPRO.bench, bench: REPRO.rl }, 'full')).toThrow(/not the top one/);
+  });
 
   it('fits its end labels inside the drawing, set in Georgia, the widest face --font-display names', () => {
     for (const svg of svgs(full)) {
@@ -233,7 +241,7 @@ describe('Figure 1, the pipeline', () => {
     expect(pipe).not.toContain('katex-error');
   });
 
-  it("is wired as the paper specifies: BHRP takes Σ and feeds nothing; the policy's state is dashed", () => {
+  it("draws six arrows, the policy's state dashed, and names every stage, in both drawings", () => {
     for (const art of pipe.match(/<div class="pp-art (?:wide|narrow)"[\s\S]*?<\/svg>/g)!) {
       expect(art.match(/<path class="p-arrow[^"]*"/g)).toHaveLength(6);
       expect(art.match(/<path class="p-arrow p-dash"/g)).toHaveLength(1);

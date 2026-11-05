@@ -1,7 +1,9 @@
-// tests/paperPage.test.ts — the pure half of the paper page's script (lib/paperPage.ts): where the margin notes
-// go, and what Figure 2's readout reads and says.
+// tests/paperPage.test.ts — the paper page's pure half (lib/paperPage.ts): the prose it writes round the file,
+// where the margin notes go, and what Figure 2's readout reads and says.
 import { describe, expect, it } from 'vitest';
-import { READOUT_LABEL, readoutIndex, readoutSays, readoutStep, readoutWhen, stackNotes, tipLeft } from '../src/lib/paperPage';
+import {
+  READOUT_LABEL, authorRole, givenFirst, listed, readoutIndex, readoutSays, readoutStep, readoutWhen, referenceNote, stackNotes, tipLeft,
+} from '../src/lib/paperPage';
 
 describe('stackNotes', () => {
   it('puts each note at its anchor while the one above has ended', () => {
@@ -61,5 +63,57 @@ describe('the readout', () => {
     expect(tipLeft(300, 100, 600)).toBe(250);
     expect(tipLeft(20, 100, 600)).toBe(0);
     expect(tipLeft(590, 100, 600.5)).toBe(500);
+  });
+});
+
+// The prose the page writes round the file, from the record and the frontmatter: every case a second paper could bring.
+describe("the page's own prose", () => {
+  it('lists names as a sentence does', () => {
+    expect(listed(['A'])).toBe('A');
+    expect(listed(['A', 'B'])).toBe('A and B');
+    expect(listed(['A', 'B', 'C'])).toBe('A, B and C');
+  });
+
+  it('writes a reference author given name first', () => {
+    expect(givenFirst('López de Prado, Marcos')).toBe('Marcos López de Prado');
+  });
+
+  it("names the owner's place among the authors, or says he is the only one", () => {
+    const authors = [{ name: 'Kwon, Roy' }, { name: 'Tian, Zeying' }];
+    expect(authorRole(authors, 'Tian, Zeying')).toBe('the second author');
+    expect(authorRole([{ name: 'Tian, Zeying' }], 'Tian, Zeying')).toBe('its author');
+    expect(() => authorRole(authors, 'Nobody')).toThrow(/Nobody/);
+  });
+
+  describe('the note on the references', () => {
+    it("says how many of the bibliography's works it draws on, which it leaves out, and what it adds", () => {
+      expect(referenceNote(5, ['a work by Ninsin listed with no venue or year'], 3)).toBe('Five of the six works in the paper’s '
+        + 'bibliography (the sixth, a work by Ninsin listed with no venue or year, is not drawn on here), plus three it names in its text without citing.');
+      expect(referenceNote(4, ['A', 'B'], 0)).toBe('Four of the six works in the paper’s bibliography (the others, A; B, are not drawn on here).');
+      expect(referenceNote(1, ['A'], 1)).toBe('One of the two works in the paper’s bibliography (the second, A, is not drawn on here), '
+        + 'plus one it names in its text without citing.');
+    });
+
+    it('draws on every work, or on the only one', () => {
+      expect(referenceNote(3, [], 0)).toBe('All three works in the paper’s bibliography.');
+      expect(referenceNote(1, [], 2)).toBe('The one work in the paper’s bibliography, plus two it names in its text without citing.');
+    });
+
+    it('draws on none of them', () => {
+      expect(referenceNote(0, ['A'], 0)).toBe('None of the paper’s bibliography is drawn on here (A).');
+      expect(referenceNote(0, ['A', 'B'], 1)).toBe('None of the paper’s bibliography is drawn on here (A; B); listed here, one work it names in its text without citing.');
+    });
+
+    // `references: []`, which the schema allows
+    it('has no bibliography to draw on', () => {
+      expect(referenceNote(0, [], 0)).toBe('The paper has no bibliography.');
+      expect(referenceNote(0, [], 2)).toBe('The paper has no bibliography; listed here, two works it names in its text without citing.');
+    });
+
+    // (Tailwind reads this file's text for class names, so the word for "first, second …" is not written here.)
+    it('counts in figures past twelve, and calls a work past the twelfth "the other"', () => {
+      expect(referenceNote(13, [], 0)).toBe('All 13 works in the paper’s bibliography.');
+      expect(referenceNote(13, ['A'], 0)).toBe('13 of the 14 works in the paper’s bibliography (the other, A, is not drawn on here).');
+    });
   });
 });

@@ -169,11 +169,12 @@ When in doubt, remove rather than add.
     "normal", so KaTeX's `\mathcal`/`\mathbb` letters are rewritten as Unicode letters, the
     same table `fixMathVariants` uses for `lib/equations.ts`. One fix, one module: the table's
     keys (`ALPHABETS`) are the only statement of which variants are rewritten, so a bold alphabet
-    added there is drawn by both paths at once, and the spec compares the two on every alphabet
-    KaTeX writes. It throws
-    on a letter Unicode has no form for, naming the TeX, and a markdown plugin's throw does
-    not fail the build by itself (Astro logs it and stores the entry unrendered), so
-    `/writing/<slug>` throws on an unrendered entry rather than ship an empty piece.
+    added there is drawn by both paths at once, and the spec compares the two on each alphabet
+    they rewrite. It throws on a letter Unicode has no form for and on any `mathvariant` but
+    "normal" it leaves (bold, fraktur and the others it has no alphabet for), naming the TeX, so
+    a letter is never drawn plain in silence. A markdown plugin's throw does not fail the build
+    by itself (Astro logs it and stores the entry unrendered), so `/writing/<slug>` throws on an
+    unrendered entry rather than ship an empty piece.
 - `astro:assets` optimizes gallery images (responsive `widths`, **webp — not avif**). This line said
   "webp/avif" for a long time; `ls dist/_astro/*.avif` is empty and nothing in `astro.config.mjs` asks
   for avif, so no page has ever shipped one. Either add the format deliberately or leave it — but do
@@ -242,14 +243,14 @@ src/
   pages/research/[slug].astro       # the one paper page: the record's head, the file's body, references, BibTeX; its script places the notes and runs the motion
   lib/paperMarkdown/{index,remarkPaper,rehypePaper}.ts # the markdown chain (spelled once) + the paper format's compiler and checks — see Papers are files
   lib/paperFigures/{wealthFigure,pipelineFigure,metricsTable}.ts # a paper's drawings and Table 1, as HTML strings from its data; a :::figure places each
-  lib/paperPage.ts                  # the paper page script's pure half: note stacking, the readout's month, step, point names, spoken line and instructions
-  lib/wealth.ts                     # the one wealth module: growth of $1, CAGR, drawdown, the band of runs, scales and ticks — the paper page's figures and /projects' rl-bhrp picture
+  lib/paperPage.ts                  # the paper page's pure half: the prose its frontmatter writes (authorRole, givenFirst, listed, referenceNote), note stacking, the readout's month, step, point names, spoken line and instructions
+  lib/wealth.ts                     # the one wealth module: growth of $1, CAGR, drawdown, the band of runs, WealthSeries (the prepared series every picture of a run reads; REPRO is RL-BHRP's), scales and ticks — the paper page's figures and /projects' rl-bhrp picture
   lib/words.ts                      # the one word counter (countWords, readingMinutes) + hyphenatedParts, so a title keeps "RL-BHRP" whole
   lib/dates.ts                      # the one date helper: longDate, monthYear (UTC)
-  lib/motionTiming.ts               # the motion module's pure half: EASE/DRAW, RAIL_ENTER_MS, stagger, sweepDurations, mergeLines
+  lib/motionTiming.ts               # the motion module's pure half: every curve (EASE, DRAW, SWEEP) and duration (REVEAL, RAIL, PAPER_PAGE, CARD) the rail and the research routes move by, stagger, sweepDurations, mergeLines; tests/motionTiming.test.ts holds their CSS literals to it
   scripts/motion.ts                 # THE ONE MOTION MODULE, its DOM half: play, onceSeen, riseOnceSeen, sweepLines — the rail and both research routes; the reduced-motion gate is inside it
   scripts/pageView.ts               # onPageView(selector, init): starts nine scripts right after parse, not at window `load`, handing init its element — /projects' (all but two), SideRail's and both research routes' (see Interactivity)
-  data/papers/{index,rl-bhrp}.ts    # PAPER_DATA (values, figures, the homepage line, thumb); RL-BHRP's Table 2, window, reproduction series, and VALUES — every figure its prose prints, as the string it prints (a :v reads one; TypeScript reads one through paperValue, which throws on an unknown key)
+  data/papers/{index,rl-bhrp}.ts    # PAPER_DATA (values, figures, the homepage line, thumb); RL-BHRP's Table 2, window, reproduction series, and VALUES — every figure its prose prints, as the string it prints (a :v reads one; TypeScript reads one through paperValue, whose key is typed as VALUES' keys and which also throws on an unknown one)
   lib/mathml.ts                     # the one MathML letter fix: fixMathVariants for lib/equations.ts, rehypeMathVariants for every .md
   data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline, publications, projects + inProgress, awards, links
   data/nav.ts                       # PAGES — the canonical page set (see Navigation)
@@ -268,7 +269,7 @@ src/
   lib/introTimeline.ts              # the homepage intro's SCHEDULE only — pure. The decision and the ?dur= clamp live in pages/index.astro's is:inline script (it must run before first paint, so it cannot import); lib/introSession.ts reads what that publishes
   lib/descentPath.ts, trajectory.ts # the career descent graph's field and route
   lib/{bellman,factorModel,problemSize,complexity,policyPnl,scenario,split}.ts   # the explainer slides' real math
-  lib/scrollspy.ts                  # activeStopIndex (the homepage Toc, the /art rail) + markStops, SideRail's marking rule — see Navigation
+  lib/scrollspy.ts                  # activeStopIndex (the homepage Toc, the /art rail) + railMarks, SideRail's marking rule — see Navigation
   lib/{justify,pixels,cowSpeech,knowledge,capability,equations,signalRubric}.ts
   lib/sketches/{kit,batch1}.ts      # the showpiece prototype harness — a sketch is (ctx) -> SVG string; /proto-sketches is its gallery
   sections/{Heights,Interlude,Choice,Rules,Solve,Story,Work}.astro   # the homepage, in scroll order — ALL of sections/, there is nothing else in it
@@ -411,6 +412,11 @@ Everything else here:
   what is first seen, `sweepLines` draws a highlight line by line. The reduced-motion gate
   is inside it, not in the callers: under it `play` lands on its last frame at once and
   `onceSeen` holds nothing back. A teardown finishes every live animation.
+  - **Every curve and duration they move by is stated once, in `lib/motionTiming.ts`**, and a
+    script imports it. CSS cannot, so `tests/motionTiming.test.ts` reads each transition and
+    animation in the rail's and the research routes' styles and holds it to its constant, in
+    order: a literal added without one fails by name. The rail's entrance duration is passed in
+    instead (`--row` on the nav, beside `--gap`), as the frontmatter's stagger is computed from it.
 
 ## The homepage — the deck
 
@@ -669,7 +675,7 @@ phone treatment is *bug fixes only*, and the whole of it is:
     starting at 143, and the rail printed over the words.
   - `flattenStops()` is *tree* order, which need not be visual order (a page may set a
     section higher on screen than its tree position). `SideRail` numbers its rows by it
-    for their entrance and nothing else; `markStops` sorts by measured top where order
+    for their entrance and nothing else; `railMarks` sorts by measured top where order
     matters — don't assume monotonicity.
 - **`SideRail` is the one rail**, on /research, /research/&lt;slug&gt;, /writing, /experience
   and /projects (the homepage's `Toc` and the /art rail are separate, each coupled to
@@ -687,7 +693,7 @@ phone treatment is *bug fixes only*, and the whole of it is:
   - **Under forced colours** (Windows High Contrast) every ink becomes one system colour and the
     dash, a background, is painted as Canvas, so nothing would tell the current stop apart; there
     the dash is `Highlight` and the current label is underlined.
-  - **Its marking rule is `markStops()` in `lib/scrollspy.ts`**, pure and specified (its doc
+  - **Its marking rule is `railMarks()` in `lib/scrollspy.ts`**, pure and specified (its doc
     comment is the rule). Two stops are lit at a section boundary **on purpose** — the reader
     is looking at both — and one of them leads; links carry `aria-current="true"`, which is
     valid on more than one.
@@ -782,6 +788,11 @@ file holds is the prose; everything else has one home of its own:
 - **The record** (title, authors, abstract, BibTeX, links, the owner's `reproduction`, tags) is
   the paper's entry in `profile.ts` `publications`, never repeated in the file. The page is
   `/research/<record slug>`, and it says which author wrote it from `profile.ts` `authorName`.
+  A status is called what `STATUS_LABEL` beside its type says, on every surface that prints one (a
+  card as written, the homepage line and the paper's head in lower case, a preprint's head adding
+  ", not peer reviewed"). The prose the page writes round the file from these (the owner's place
+  among the authors, the note on the references, for any count of them, none included) is
+  `lib/paperPage.ts`'s, specified.
 - **The frontmatter** (zod, `content.config.ts`): `publication` (a slug in `publications`),
   `pageDate`, `references` (`{ key, authors, year, title, journal?, venue?, doi?, url?, addedHere? }[]`,
   an author written `Family, Given` so a citation can read "López de Prado, 2016"; `journal` is set
@@ -794,8 +805,9 @@ file holds is the prose; everything else has one home of its own:
   `lib/paperFigures/` (HTML strings, the maths in them build-time MathML; a figure's caption is the
   file's); `line`, the homepage appendix's line, for a paper whose line quotes its numbers; and `thumb`,
   the index card's picture, for a paper that has one. TypeScript that quotes a value (`profile.ts`'s
-  finding, the line) reads it through `paperValue`, which throws on an unknown key, as an unknown `:v`
-  fails the build; a bare `values[key]` would print "undefined" with every gate green. They reach the plugins as
+  finding, the line) reads it through `paperValue`, whose key is typed as `VALUES`' keys, so a typo is a
+  type error; and since the build strips types unchecked, it also throws on an unknown key, as an unknown
+  `:v` fails the build. A bare `values[key]` would print "undefined" with every gate green. They reach the plugins as
   **options** from `astro.config.mjs`, with the records (for `::abstract`), so they are in Astro's
   config digest and a moved number re-renders the paper. Plugin *code* is not in the digest: after editing a
   plugin, delete `node_modules/.astro/data-store.json` before building or the old render is served.
@@ -813,7 +825,7 @@ file holds is the prose; everything else has one home of its own:
 | `:hl[…]` | `<mark class="hl">` — Underline, the one highlight style |
 | `::::eq{#eq-4 n=4}` `$$` … `$$` `:::where` … `:::` notes `::::` | `<div class="eq an" id="eq-4">`: the display, its number `(4)` as HTML outside `<math>` (never `\tag`), `<p class="where">`, then its notes. One `$$`, or a `$$ wide` and a `$$ narrow` |
 | `:::::thm{#thm-3-1-11}` … `:::::` | `<div class="thm">`, a theorem's frame, its displays inside it; the paragraphs that open it and introduce a display are its heads |
-| `:::notation` with a GFM table `\| Symbol \| Meaning \|` `:::` | `<div class="tbl-scroll"><table class="notation">`, each row `<tr data-sym><th scope="row">`. Each row's symbols (split at commas, and at `∈`, which introduces the element and its set's index: `i\in\mathcal{I}_{g}` is `i`, `g` and `𝓘_g`) are matched **structurally** in every display's MathML and tagged `class="sym" data-sym`: an equal subtree first, else the symbol's family — a scripted `W_{g}` also stands for `W` with any other script (`W_{g(i)}`, `W^{\top}`) and for `W` alone; the largest first, then on through what a tagged symbol holds (the `i` and `g` of `W_{g(i)}`, the `w` of `RC_i(w)`) but never its own letter (`W` is not tagged again inside `W_{g(i)}`, nor `Σ` inside `Σ̃`). The page reads a pointer on a nested symbol as the outermost. A row that is only in the prose ends its Symbol cell with `{text-only}`. |
+| `:::notation` with a GFM table `\| Symbol \| Meaning \|` `:::` | `<div class="tbl-scroll"><table class="notation">`, each row `<tr data-sym><th scope="row">`. Each row's symbols (every maths in its Symbol cell, `$N$, $G$` as well as `$N,\ G$`, split at commas, and at `∈`, which introduces the element and its set's index: `i\in\mathcal{I}_{g}` is `i`, `g` and `𝓘_g`) are matched **structurally** in every display's MathML and tagged `class="sym" data-sym`: an equal subtree first, else the symbol's family — a scripted `W_{g}` also stands for `W` with any other script (`W_{g(i)}`, `W^{\top}`) and for `W` alone; the largest first, then on through what a tagged symbol holds (the `i` and `g` of `W_{g(i)}`, the `w` of `RC_i(w)`) but never its own letter (`W` is not tagged again inside `W_{g(i)}`, nor `Σ` inside `Σ̃`). The page reads a pointer on a nested symbol as the outermost. A row that is only in the prose ends its Symbol cell with `{text-only}`. A row is keyed by its position, so a paper has one `:::notation`, and a second is refused. |
 | `:cite[markowitz1952]` | `<a class="cite" href="#ref-markowitz1952">Markowitz, 1952</a>` — one author, two (`Feng and He`), more (`Maillard et al.`) |
 | `:v[usd.rl]` | the text of `PAPER_DATA[slug].values['usd.rl']`. **Every quantity the prose prints that comes from data is a `:v`** — a return, a ratio, a count of stocks, sectors, months or runs, a date or year of the window, a cost, a turnover. Typed by hand, and only these: a reference to the paper or into it (arXiv:2508.11856v1, §4.1, eq. (4), Alg. 1, Def. 3.2.3, Table 2), or to the page's own figures and table (Figure 2, Table 1); a year that names an event rather than a measurement ("the 2020 crash and the 2022 sell-off"); a constant of a method or a convention, stated by the paper or the field (the \$1 every growth figure starts from, the 15 of its top-15 share, 1.96 at the 5% level, VaR 5%, 12 months to a year, a basis point's 0.01%); and a quotation of what the paper itself prints, quoted to correct or discuss it (the errata's "Feb - 2020 to Aug - 2020" and "13.37%" are the paper's misprints: as a `:v` each would print the correction in place of the error it corrects). A word that glosses a value printed beside it ("about a quarter as much", "about half the money") is not a second quantity; where the value is computed, a spec holds the word to it (`tests/paperNumbers.test.ts`, the quarter). A `$` amount is always `:v` or `\$` — a bare `$` starts maths |
 | `$:v[wealth.rl]^{12/67}-1$` | the same value written into the TeX, with `$ % # &` escaped — the one directive that works inside maths, so an equation's numbers are computed too. A `:cite`, `:t` or `:hl` there is refused |
@@ -840,9 +852,13 @@ file holds is the prose; everything else has one home of its own:
 - **Every mistake is reported, by name, and fails the build.** A plugin cannot fail the build
   itself — Astro logs a plugin's throw and stores the entry unrendered, an empty page with a green
   build — so the plugins collect problems into `remarkPluginFrontmatter.paperProblems` and the
-  paper page throws on any, or on an entry with no `rendered`. The checks are in `lib/paperMarkdown/`,
-  the less obvious ones with their reason beside them; `tests/fixtures/papers/malformed.md` holds one
-  of each mistake and `tests/paperMarkdown.test.ts` names them. One is an authoring rule rather than
+  paper page throws on an entry with no `rendered`, then through `checkedReport` (`lib/paperMarkdown/`)
+  on any problem, on an id it writes itself (below) and on a render with no report at all: a file the
+  plugins never compiled, as they compile only what is under `PAPERS_DIR`, the one spelling of the
+  directory, which `content.config.ts` loads too. The checks are in `lib/paperMarkdown/`, the less
+  obvious ones with their reason beside them; `tests/fixtures/papers/malformed.md` holds one of each
+  mistake a file can make (a record with no abstract is the spec's own case), and
+  `tests/paperMarkdown.test.ts` names each, and checks `checkedReport`'s refusals. One is an authoring rule rather than
   a refusal: an unknown directive is reported, so a literal colon is written `\:`, as in
   `arXiv\:2508.11856`.
 - **A file id the page writes itself fails the build too.** The plugin reports every id the file
@@ -1169,7 +1185,8 @@ galaxy). The whole system is **token override**, not per-component branching:
   body and overscroll show paper), plus the register's own tokens. That is how the shared
   nav, rail, button anatomy and cow reskin with no edit. **Both theme blocks declare every
   token**: `[data-page]` and `[data-theme='dark']` tie on specificity, so a light-only value
-  would win in dark.
+  would win in dark. The role tokens a register must declare are one list, `ROLE_TOKENS` in
+  `tests/helpers/palette.ts`, which both palette specs read.
   - **drafting** adds `--knockout` (the label knockout, one 1px ring of the bare sheet that
     `<main>`'s text and `SideRail`'s labels both read — the rail with a `none` fallback, so
     the page never styles the rail), `--rail-dash-halo` (the rail dash's 2px ring)

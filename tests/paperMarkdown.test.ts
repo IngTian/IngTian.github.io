@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import katex from 'katex';
 import { describe, expect, it } from 'vitest';
 import { fixMathVariants } from '../src/lib/mathml';
+import { PAPERS_DIR, checkedReport } from '../src/lib/paperMarkdown';
 import { renderMarkdown } from './helpers/paperChain';
 
 // The site's markdown plugins, inside the chain Astro runs them in (tests/helpers/paperChain.ts). Astro's other
@@ -35,7 +36,7 @@ const FRONTMATTER = {
   publication: 'simple', references: REFERENCES,
   errata: [{ date: '2026-11-03', text: 'It printed :v[usd.rl] as $2.21.' }],
 };
-const PAPER_PATH = '/site/src/content/papers/simple.md';
+const PAPER_PATH = `/site/${PAPERS_DIR}/simple.md`;
 const WRITING_PATH = '/site/src/content/writing/piece.md';
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/papers/${name}.md`, import.meta.url), 'utf8');
 
@@ -220,6 +221,19 @@ describe('a notation row', async () => {
     expect(html).toMatch(/<msub class="sym" data-sym="2"><mi>η<\/mi><mrow><mi class="sym" data-sym="1">i<\/mi>/);
     expect(html.match(/<mi class="sym" data-sym="2">η<\/mi>/g)).toBeNull();
   });
+
+  // A Symbol cell may set each symbol as maths of its own, `$N$, $G$`: every one of them is the row's, and the row is
+  // matched by any of them, as by any symbol of `N,\ G`.
+  it('reads every maths in its Symbol cell, and names the cell as written when none is in a display', async () => {
+    const two = '::::section[Notation]{#notation}\n:::notation\n| Symbol | Meaning |\n| --- | --- |\n'
+      + '| $N$, $G$ | The stocks, and the sectors. |\n:::\n::::\n\n::::section[Eq]{#eq}\n:::eq{#e}\n$$\nN + G\n$$\n:::\n::::\n';
+    const { html: both, report: ok } = await render(two, PAPER_PATH);
+    expect(both).toContain('<mi class="sym" data-sym="1">N</mi>');
+    expect(both).toContain('<mi class="sym" data-sym="1">G</mi>');
+    expect(ok.paperProblems).toEqual([]);
+    const { report: none } = await render(two.replace('N + G', 'M + H'), PAPER_PATH);
+    expect(none.paperProblems).toEqual(['notation row $N$, $G$ matches no display — mark it {text-only} if it is only in the prose']);
+  });
 });
 
 describe('a malformed paper', async () => {
@@ -263,6 +277,15 @@ describe('a malformed paper', async () => {
       ':::where outside an ::::eq',
       ':::section #checked has no [title]',
       'id #checked is used twice',
+      ':::section [No id] has no #id',
+      // the section [Misplaced] holds one of each block holding what it may not
+      ':::section #inner is inside another block — sections are top level',
+      'a term without an #id: "nameless"',
+      '::::eq #eq-8 holds a paragraph — an eq holds its display, its :::where and its notes',
+      ':::figure pipe holds a list — a figure holds its caption and its notes',
+      ':::inpaper holds a list — it is a paragraph pointing into the paper',
+      ':::notation holds one table, | Symbol | Meaning |, and nothing else',
+      'a second :::notation — a paper has one Notation table, and its rows key the symbols',
       // a heading's id is the section's and "-title", and a figure's drawing carries ids of its own (pipe's marker)
       'id #eqs-title is used twice',
       'id #ah is used twice',
@@ -279,6 +302,34 @@ describe('a malformed paper', async () => {
     ];
     for (const w of want) expect(problems.some((p) => p.startsWith(w)), w).toBe(true);
     expect(problems.filter((p) => !want.some((w) => p.startsWith(w)))).toEqual([]);
+  });
+});
+
+// What the paper page does with a render's report (pages/research/[slug].astro): the plugins cannot fail the build, so
+// it fails there, on every problem, on an id the page writes itself, and on a file the plugins never compiled.
+describe("the paper page's check of a render", () => {
+  const owns = (id: string) => id === 'cite';
+
+  it('hands back the report of a paper with no problem', async () => {
+    const { report } = await render(fixture('simple'), PAPER_PATH);
+    expect(checkedReport('simple.md', report, owns)).toBe(report);
+  });
+
+  it('fails on every problem, naming the file and each', async () => {
+    const { report } = await render(fixture('malformed'), PAPER_PATH);
+    expect(() => checkedReport('malformed.md', report, owns))
+      .toThrow(`malformed.md has ${report.paperProblems.length} problem(s):\n  ${report.paperProblems.join('\n  ')}`);
+  });
+
+  it('fails on an id the page writes itself', async () => {
+    const { report } = await render(':::section[Cite]{#cite}\nText.\n:::\n', PAPER_PATH);
+    expect(() => checkedReport('cite.md', report, owns)).toThrow('cite.md has 1 problem(s):\n  id #cite is one this page writes itself');
+  });
+
+  // A file outside the papers directory is not compiled as a paper, so its render reports nothing at all.
+  it('fails on a render with no report, rather than on a TypeError later', async () => {
+    const { report } = await render(fixture('simple'), WRITING_PATH);
+    expect(() => checkedReport('piece.md', report, owns)).toThrow(`piece.md has no paper report: only a file under ${PAPERS_DIR}/ is compiled as a paper`);
   });
 });
 
@@ -310,11 +361,18 @@ describe('any other markdown file', () => {
   });
 
   // lib/equations.ts fixes a string and markdown fixes a tree. Both take the variants they rewrite from one table,
-  // so they draw every alphabet KaTeX writes the same way, the ones neither rewrites yet included.
+  // so they draw every alphabet they rewrite the same way, and refuse the same others.
   it('draws every alphabet as lib/equations.ts does', async () => {
-    for (const tex of ['\\mathcal{X}', '\\mathscr{G}', '\\mathbb{R}', '\\mathbb{12}', '\\mathbf{x}', '\\boldsymbol{\\beta}', '\\mathfrak{g}', '\\mathrm{RC}']) {
+    for (const tex of ['\\mathcal{X}', '\\mathscr{G}', '\\mathbb{R}', '\\mathbb{12}', '\\mathrm{RC}']) {
       const md = (await render(`$${tex}$`, WRITING_PATH)).html.match(/<math[^]*<\/math>/)?.[0];
       expect(md, tex).toBe(fixMathVariants(katex.renderToString(tex, { output: 'mathml' })).match(/<math[^]*<\/math>/)?.[0]);
+    }
+  });
+
+  it('refuses, as lib/equations.ts does, an alphabet it has no rewrite for, which Chrome would draw plain', async () => {
+    for (const [tex, variant] of [['\\mathbf{x}', 'bold'], ['\\boldsymbol{\\beta}', 'bold-italic'], ['\\mathfrak{g}', 'fraktur']]) {
+      const escaped = tex.replace(/[\\{}]/g, '\\$&');
+      await expect(render(`A $${tex}$ here.`, WRITING_PATH), tex).rejects.toThrow(new RegExp(`^rehypeMathVariants: mathvariant="${variant}" has no rewrite.*, in \\$${escaped}\\$`));
     }
   });
 });

@@ -1,7 +1,51 @@
 // src/lib/paperPage.ts
-// The pure half of the paper page's script (pages/research/[slug].astro): where the margin notes go, and what
-// Figure 2's readout reads, says and tells a reader it does. The script measures and paints; this decides. Pure.
+// The paper page's pure half (pages/research/[slug].astro): the prose its frontmatter writes round the file (the
+// owner's place among the authors, a reference's names, the note on the references), where its script puts the
+// margin notes, and what Figure 2's readout reads, says and tells a reader it does. The page measures, paints and
+// prints; this decides. Pure.
 import { longDate, monthYear } from './dates';
+
+const NUMBER = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+const ORDINAL = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth', 'eleventh', 'twelfth'];
+/** A count as prose writes it: in words to twelve, in figures past. */
+const count = (n: number) => NUMBER[n] ?? String(n);
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+
+/** "A", "A and B", "A, B and C". */
+export function listed(xs: readonly string[]): string {
+  return xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}` : xs[0];
+}
+
+/** An author written "Family, Given", as a reference list reads it: "Given Family". */
+export function givenFirst(author: string): string {
+  const [family, given] = author.split(', ');
+  return `${given} ${family}`;
+}
+
+/** Who the owner is to the paper, for "written by …, the second author": his place among several, or its author. */
+export function authorRole(authors: readonly { name: string }[], owner: string): string {
+  const i = authors.findIndex((a) => a.name === owner);
+  if (i < 0 || !ORDINAL[i]) throw new Error(`"${owner}" is not one of the paper's first ${ORDINAL.length} authors`);
+  return authors.length > 1 ? `the ${ORDINAL[i]} author` : 'its author';
+}
+
+/** The note above the page's references: how its list stands to the paper's bibliography. `fromPaper` of the
+ *  references are works in the bibliography, `omits` describes each work of it the page does not draw on, and
+ *  `added` are works the paper names in its text without citing. */
+export function referenceNote(fromPaper: number, omits: readonly string[], added: number): string {
+  const total = fromPaper + omits.length;
+  const named = `${count(added)} ${added === 1 ? 'work' : 'works'} it names in its text without citing`;
+  if (!fromPaper) {
+    const bibliography = total ? `None of the paper’s bibliography is drawn on here (${omits.join('; ')})` : 'The paper has no bibliography';
+    return `${bibliography}${added ? `; listed here, ${named}` : ''}.`;
+  }
+  const of = fromPaper === total
+    ? (total === 1 ? 'The one work' : `All ${count(total)} works`)
+    : `${cap(count(fromPaper))} of the ${count(total)} works`;
+  const left = omits.length > 1 ? ` (the others, ${omits.join('; ')}, are not drawn on here)`
+    : omits.length ? ` (the ${ORDINAL[fromPaper] ?? 'other'}, ${omits[0]}, is not drawn on here)` : '';
+  return `${of} in the paper’s bibliography${left}${added ? `, plus ${count(added)} it names in its text without citing` : ''}.`;
+}
 
 /**
  * Margin notes, each at its anchor's top unless the note above it has not ended: then a `gap` below that one, so

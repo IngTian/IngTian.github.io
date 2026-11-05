@@ -23,18 +23,7 @@
 // The <figure> and its caption are the explainer's (a :::figure container), so this is the drawing alone.
 import { monthYear } from '../dates';
 import { readoutWhen } from '../paperPage';
-import { linearScale, niceDomain, nudgeLabels } from '../wealth';
-
-export interface WealthSeries {
-  dates: readonly string[];   // the month-ends; every series has one point more, the start
-  dataEnd: string;            // the last day of data: the last month runs from its month-end to here
-  runs: number;               // how many runs `rl` is the median of, and `lo`/`hi` the band of
-  rl: readonly number[];
-  lo: readonly number[];
-  hi: readonly number[];
-  bhrp: readonly number[];
-  bench: readonly number[];
-}
+import { linearScale, niceDomain, nudgeLabels, type WealthSeries } from '../wealth';
 
 interface Frame { W: number; H: number; x0: number; x1: number; y0: number; y1: number }
 // x1 leaves room right of the plot for the end labels, which have to end inside W when set in Georgia
