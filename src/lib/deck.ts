@@ -163,3 +163,30 @@ export function easeInOutCubic(t: number): number {
   const p = t <= 0 ? 0 : t >= 1 ? 1 : t;
   return p < 0.5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2;
 }
+
+/** Wheel travel, in px, a gesture must cover before it moves a slide: less is a brush of the trackpad. */
+export const WHEEL_THRESHOLD = 18;
+
+/**
+ * What the deck does with one wheel event: 'start' a slide, 'swallow' it (preventDefault, move nothing), or
+ * 'pass' it to the browser's own scroll.
+ *
+ * - `live`: a slide is moving, the gesture that started it is still streaming, or the browser is running a
+ *   jump the deck did not start (a rail link, an #anchor). Everything is swallowed then, so leftover momentum
+ *   cannot advance a slide the reader did not ask for, and a wheel during a jump cannot cut it short.
+ * - `travel`: the gesture's travel so far, this event included, signed. Under the threshold it is swallowed,
+ *   NOT passed: Chrome lets a gesture's events be cancelled only if its first one was. Measured on a phased
+ *   trackpad gesture when the deck passed a small opener: [6.2px cancelable, 70 not, 43.1 not, 30.7 not], so
+ *   the rest of the gesture, momentum included, scrolled natively under the deck's tween.
+ * - At an end (no stop in travel's direction) it passes, so the page's ends never feel locked.
+ */
+export function wheelAction(
+  travel: number,
+  live: boolean,
+  stops: readonly number[],
+  y: number,
+): 'start' | 'swallow' | 'pass' {
+  if (live) return 'swallow';
+  if (nextStop(stops, y, travel > 0 ? 1 : -1) === null) return 'pass';
+  return Math.abs(travel) < WHEEL_THRESHOLD ? 'swallow' : 'start';
+}

@@ -189,7 +189,7 @@ src/
   data/artworks.ts                  # gallery: calligraphy entries + globbed photos (+ photoNotes.ts for per-photo copy)
   data/{define,desk,making,story}.ts # the homepage explainer's copy + numbers, per slide
   data/{cowGlyph,ruleGlyphs,tickerGlyphs}.ts # pixel-art matrices: the cow's and the slides'
-  lib/deck.ts                       # pure deck stops: WHERE the homepage scroll may rest, and what's next
+  lib/deck.ts                       # pure deck stops: WHERE the homepage scroll may rest, what's next, and what one wheel event does (wheelAction)
   lib/pageStops.ts                  # pure Stop trees: one tree per page drives BOTH its rail and its section ids; + fragmentId, the one decode of a URL fragment
   lib/viewport.ts                   # PHONE_MAX_WIDTH = 640, its PHONE_QUERY + isPhone() — the one phone gate; WIDE_QUERY, the wide layout past 1100px
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate; MOTION_LIMIT_MS, WCAG 2.2.2's five seconds
@@ -371,9 +371,19 @@ scroll guides you to the next slide. It's not a free scroll."*
 - **Tall slides get interior stops**, one viewport apart, so the deck pages *through* them; a slide only
   barely taller than the viewport is treated as fitting (`slack`), because an 84px "advance" is exactly the
   free-scroll feel being replaced.
-- **What it deliberately does not break**: keyboard (Home/End/PageUp/PageDown/space/arrows), find-in-page and
-  `#anchor` jumps (programmatic scrolls are ignored), resize/zoom (re-measured), trackpad momentum (one flick
-  is coalesced into one slide).
+- **What it deliberately does not break**: keyboard (Home/End/PageUp/PageDown/space/arrows), find-in-page (it
+  picks up wherever the browser lands), resize/zoom (re-measured), trackpad momentum (one flick is coalesced
+  into one slide), and `#anchor` jumps, the rail's included.
+  - **A jump the deck did not start wins.** On `popstate` or `hashchange` it cancels its own tween and swallows
+    the wheel until the browser's scroll ends (`scrollend`, or 300ms without a scroll event). Before, a rail
+    click "did nothing" with the hash changed: the tween's next instant `scrollTo` cancelled the browser's
+    smooth scroll (a click 250ms into a PageDown missed 4 of 4), or a wheel during the jump started a slide
+    from mid-flight. `wheelAction` in `lib/deck.ts` is the decision, specified; the wiring shows only in a
+    browser.
+  - **A small wheel event is swallowed, not passed**, while a stop lies that way: Chrome lets a gesture's
+    events be cancelled only if its first one was, and a trackpad gesture opens at 5–6px, under the 18px
+    `WHEEL_THRESHOLD`. Passing the opener left the rest of the gesture, momentum included, scrolling natively
+    under the tween. A gesture starts a slide once its travel reaches the threshold.
 - **It does not engage under reduced motion, and it does not engage on a phone.** Both fall back to an
   ordinary free scroll, which is a *finished* state.
 

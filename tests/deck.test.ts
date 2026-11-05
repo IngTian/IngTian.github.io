@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deckStops, nextStop, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide } from '../src/lib/deck';
+import { deckStops, nextStop, wheelAction, WHEEL_THRESHOLD, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide } from '../src/lib/deck';
 
 // A REPRESENTATIVE mixed-height page, not today's: the homepage's geometry as measured in Chrome at 1700x1050
 // when the deck was built, six slides in an earlier order (the labels name them). What it holds is the mix of
@@ -293,5 +293,32 @@ describe('deck transition easing', () => {
     // frames at low velocity and the same distance has to be covered in the middle.
     expect(DECK_TWEEN_MS).toBeGreaterThanOrEqual(450);
     expect(DECK_TWEEN_MS).toBeLessThanOrEqual(900);
+  });
+});
+
+/**
+ * ONE WHEEL EVENT. The wiring (popstate and hashchange set the deck yielding; the tween is cancelled) can only be
+ * seen in a browser; this holds the decision every wheel event goes through.
+ */
+describe('wheelAction', () => {
+  const STOPS = [0, 1000, 2000];
+
+  it('never starts a slide while one is live: moving, still streaming, or a jump the deck did not start', () => {
+    for (const travel of [-400, -6, 6, 40, 400]) {
+      for (const y of [0, 1000, 2000]) expect(wheelAction(travel, true, STOPS, y)).toBe('swallow');
+    }
+  });
+
+  it('swallows a gesture under the threshold rather than passing it, so the rest of it stays cancelable', () => {
+    expect(wheelAction(6, false, STOPS, 1000)).toBe('swallow');
+    expect(wheelAction(-6, false, STOPS, 1000)).toBe('swallow');
+    expect(wheelAction(WHEEL_THRESHOLD - 0.1, false, STOPS, 1000)).toBe('swallow');
+    expect(wheelAction(WHEEL_THRESHOLD, false, STOPS, 1000)).toBe('start');
+    expect(wheelAction(-WHEEL_THRESHOLD, false, STOPS, 1000)).toBe('start');
+  });
+
+  it("passes at an end, small or not, so the page's ends never feel locked", () => {
+    for (const travel of [6, 40]) expect(wheelAction(travel, false, STOPS, 2000)).toBe('pass');
+    for (const travel of [-6, -40]) expect(wheelAction(travel, false, STOPS, 0)).toBe('pass');
   });
 });
