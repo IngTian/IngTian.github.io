@@ -156,7 +156,8 @@ const personLd = {
         the display face — nothing above the fold waits for it. But a page that USES it downloads the file
         either way, and without the preload it is discovered late in the critical chain: measured three times
         on a production build, FCP went 1956ms -> 2333ms for identical bytes. Late and unannounced is worse
-        than early and announced.
+        than early and announced. That measurement compared both styles preloaded against none; the one-style
+        preload each page has now (below) was not measured on its own.
 
         But it does not belong on every page either. `grep -rn -- --font-accent src`
         finds exactly two consuming FILES — sections/Work.astro (so the homepage) and writing/[...slug].astro —

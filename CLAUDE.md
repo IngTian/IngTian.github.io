@@ -154,9 +154,10 @@ When in doubt, remove rather than add.
   - They live under their own `--ff-*` variables. Never point `cssVariable` at
     `--font-display`/`-body`/`-mono`: those are the site's role tokens, and that
     collision is what stopped every webfont from loading. Fraunces keeps its
-    preload — removing it measured a worse FCP (1956 → 2333ms; see BaseLayout) — but only
-    on a page that shows it, and only the style it shows (`preloadAccent`: `/` the normal,
-    `/writing/<slug>` the italic), as each file is a high-priority fetch of its own.
+    preload — removing it measured a worse FCP (1956 → 2333ms, both styles preloaded against
+    none; see BaseLayout) — but only on a page that shows it, and only the style it shows
+    (`preloadAccent`: `/` the normal, `/writing/<slug>` the italic), as each file is a
+    high-priority fetch of its own. The one-style preload has not been measured on its own.
 - **Math in markdown is typeset at build time.** The markdown chain (spelled once, in
   `lib/paperMarkdown/index.ts`, which `astro.config.mjs` calls) runs
   `remark-math` + `rehype-katex` with **`output: 'mathml'`**, which is the
@@ -251,7 +252,7 @@ src/
   lib/wealth.ts                     # the one wealth module: growth of $1, CAGR, drawdown, the band of runs, WealthSeries (the prepared series every picture of a run reads; REPRO is RL-BHRP's), scales and ticks — the paper page's figures and /projects' rl-bhrp picture
   lib/words.ts                      # the one word counter (countWords, readingMinutes) + wholeParts, the one rule for what never breaks across a line ("RL-BHRP")
   lib/dates.ts                      # the one date helper: longDate, monthYear (UTC)
-  lib/motionTiming.ts               # the motion module's pure half: every curve (EASE, DRAW, SWEEP) and duration (REVEAL, RAIL, PAPER_PAGE, CARD) the rail and the research routes move by, stagger, sweepDurations, mergeLines; tests/motionTiming.test.ts holds their CSS literals to it
+  lib/motionTiming.ts               # the motion module's pure half: every curve (EASE, DRAW, SWEEP, FADE, WITHDRAW) and duration (REVEAL, RAIL, PAPER_PAGE, CARD, MOVE_MAX) the rail and the research routes move by, stagger and the paper page's batches (highlightDelay, arrowDelay), sweepDurations, mergeLines; tests/motionTiming.test.ts holds their CSS literals to it
   scripts/motion.ts                 # THE ONE MOTION MODULE, its DOM half: play, onceSeen, riseOnceSeen, sweepLines — the rail and both research routes; the reduced-motion gate is inside it
   scripts/pageView.ts               # onPageView(selector, init): starts nine scripts right after parse, not at window `load`, handing init its element — /projects' (all but two), SideRail's and both research routes' (see Interactivity)
   data/papers/{index,rl-bhrp}.ts    # PAPER_DATA (values, figures, the homepage line, thumb); RL-BHRP's Table 2, window, reproduction series, and VALUES — every figure its prose prints, as the string it prints (a :v reads one; TypeScript reads one through paperValue, whose key is typed as VALUES' keys and which also throws on an unknown one)
@@ -418,9 +419,15 @@ Everything else here:
   `onceSeen` holds nothing back. A teardown finishes every live animation.
   - **Every curve and duration they move by is stated once, in `lib/motionTiming.ts`**, and a
     script imports it. CSS cannot, so `tests/motionTiming.test.ts` reads each transition and
-    animation in the rail's and the research routes' styles and holds it to its constant, in
-    order: a literal added without one fails by name. The rail's entrance duration is passed in
-    instead (`--row` on the nav, beside `--gap`), as the frontmatter's stagger is computed from it.
+    animation declaration, shorthand or longhand (`-duration`, `-delay`, `-timing-function`), in
+    `SideRail.astro`'s, the two research pages' `<style>` blocks and `styles/paper.css`, and holds
+    it to its constant, in order: a literal added there without one fails by name. In those scripts
+    and `scripts/motion.ts` it fails a curve written out (`cubic-bezier(`, or a keyword such as
+    `'ease-out'`; `'linear'` is no curve), and a number of ms of two digits or more after
+    `duration:`/`delay:`/`step:`/`max:`/`total:` or as a `later()`/`setTimeout()` delay. A literal in
+    a stylesheet other than those four, or a duration a script builds some other way, it does not
+    see. The rail's entrance duration is passed in instead (`--row` on the nav, beside `--gap`), as
+    the frontmatter's stagger is computed from it.
 
 ## The homepage — the deck
 
@@ -691,9 +698,12 @@ phone treatment is *bug fixes only*, and the whole of it is:
     or OS-scaled window can be 1100.83 CSS px wide (1321px at 120%), which a pair of bounds leaves
     to neither: measured there, the rail showed while the paper's 24 notes went unplaced, 8 of them
     overlapping, /projects' content sat under the rail, and the homepage's Choice slide stacked.
-    `tests/viewport.test.ts` fails on a `min-width: 1101px` anywhere in `src`, and on any other
-    breakpoint written as two bounds a pixel apart (/projects' cow column is `(max-width: 1179px)`
-    and its negation for the same reason).
+    `tests/viewport.test.ts` reads SideRail's hide query and the paper page's one-column query and
+    holds `WIDE_QUERY` to their exact negation, so a breakpoint retuned in the CSS alone fails; it
+    also fails on any breakpoint in `src` written as two bounds a pixel apart (/projects' cow column
+    is `(max-width: 1179px)` and its negation for the same reason). The homepage slides are not this
+    breakpoint: Choice and Rules reclaim the Toc's gutter at 1100px and below, Story, Solve and Work
+    at 1099px and below.
   - **Under forced colours** (Windows High Contrast) every ink becomes one system colour and the
     dash, a background, is painted as Canvas, so nothing would tell the current stop apart; there
     the dash is `Highlight` and the current label is underlined.
@@ -1506,13 +1516,18 @@ titles came to rest hard against the browser chrome — the lead is a number in
     limit.
     **The research routes and the rail are held to it, and to 2s per animation.** What moves
     there unasked moves once, by `transform` and `opacity` (the rail's entrance in CSS, the rest
-    through `scripts/motion.ts`), and ends within 2s. `tests/motionTiming.test.ts` holds each
-    single duration and delay to 2s at most; what it does not hold is delay plus duration across a
-    staggered batch, and this sentence is that half's only record. Nothing on the screen the reader
+    through `scripts/motion.ts`), and ends within 2s (`MOVE_MAX`). `tests/motionTiming.test.ts`
+    holds each single duration to it, and each staggered batch as it is computed: the rail's entrance
+    (`stagger` over `RAIL`, every row in by `RAIL.enter`), the paper page's highlights and a figure's
+    arrows (`highlightDelay`, `arrowDelay`: the last ends within `MOVE_MAX` of the first's start,
+    however many), and the reveal, whose `REVEAL.max` caps any one delay. Not held: the /research
+    cards' title underlines, `--k` lines × `CARD.underlineStep` in CSS, which stay within 2s up to a title
+    of sixteen lines (the titles have two or three), and the time a highlight waits for its block to
+    rise before its batch starts. Nothing on the screen the reader
     lands on is held back, nor anything above it (a deep link, a restored scroll), and what waits
     runs at the latest after `MOTION_LIMIT_MS` on screen. Under reduced motion each is its finished
-    state at once. The timings are `lib/motionTiming.ts`'s (`REVEAL`, `RAIL`, `PAPER_PAGE`, `CARD`),
-    not here.
+    state at once. The timings are `lib/motionTiming.ts`'s (`REVEAL`, `RAIL`, `PAPER_PAGE`, `CARD`,
+    `MOVE_MAX`), not here.
     **Everything older is not held to it yet, and this is the list known, not a guarantee**: the hero terrain, the fluid sky, the drafting field, SkyWash's three breathe
     loops and the `.descent::before/::after` drifts run for as long as they are on screen, and
     `/`'s `.scroll-cue` bobs forever in the foreground (`Heights.astro`). That is the site's

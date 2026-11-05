@@ -71,8 +71,21 @@ describe('viewport phone gate', () => {
 // is a 1321px window at 120%), to neither layout: there the rail shows and the paper's two columns stand, while its
 // script, asking the other bound, leaves every note unplaced at its block's top.
 describe('the wide layout', () => {
-  it('is the exact negation of the one-column query, so no width falls between the two', () => {
-    expect(WIDE_QUERY).toBe('not all and (max-width: 1100px)');
+  // WIDE_QUERY is the paper page's script's question; the answer the page shows is two stylesheets' (lib/viewport
+  // says which). Read from them, so a breakpoint retuned in the CSS alone fails here.
+  it("is the exact negation of the query SideRail hides at and the paper page's one column is set at", () => {
+    const read = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8');
+    const hides = /@media ([^{]+?) ?\{ ?\.side-rail \{ display: none; \} ?\}/.exec(read('components/SideRail.astro'));
+    const page = read('pages/research/[slug].astro');
+    const column = /@media ([^{]+?) ?\{\s*\.paper \{ width: auto;/.exec(page);
+    expect(hides, "SideRail's hide rule").not.toBeNull();
+    expect(column, "the paper page's one-column block").not.toBeNull();
+    expect(`not all and ${hides![1]}`).toBe(WIDE_QUERY);
+    expect(`not all and ${column![1]}`).toBe(WIDE_QUERY);
+    // and the page's own wide blocks ask the same
+    const negations = [...page.matchAll(/@media (not all and \([^)]*\))/g)].map((m) => m[1]);
+    expect(negations.length).toBeGreaterThan(0);
+    expect(new Set(negations)).toEqual(new Set([WIDE_QUERY]));
   });
 
   // Not only this breakpoint: any (min-width: N) beside a (max-width: M) with N - 1 <= M < N leaves the widths between

@@ -20,10 +20,12 @@ export const PHONE_MAX_WIDTH = 640;
  *  decider, which cannot import isPhone(), is handed this string instead. */
 export const PHONE_QUERY = `(max-width: ${PHONE_MAX_WIDTH}px)`;
 
-/** The wide layout, for a script that must agree with the CSS on it: the rail shown, a paper's notes in their own
- *  column. Every stylesheet sets the one-column layout at `(max-width: 1100px)` and writes the wide side as this, the
- *  exact negation of that query, never as a second bound a pixel above it: a zoomed or OS-scaled window can be
- *  1100.8 CSS px wide, which a pair of bounds leaves to neither layout. tests/viewport.test.ts holds both. */
+/** The wide layout, for the paper page's script, which must agree with the CSS on it: the rail shown, a paper's
+ *  notes in their own column. It mirrors two stylesheets: components/SideRail.astro hides the rail at
+ *  `(max-width: 1100px)`, and pages/research/[slug].astro sets a paper in one column at that query and writes its wide
+ *  side as this, the exact negation, never as a second bound a pixel above it: a zoomed or OS-scaled window can be
+ *  1100.8 CSS px wide, which a pair of bounds leaves to neither layout. tests/viewport.test.ts reads both sheets'
+ *  queries and holds this to their negation. */
 export const WIDE_QUERY = 'not all and (max-width: 1100px)';
 
 /**

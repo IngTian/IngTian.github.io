@@ -142,7 +142,8 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
   .side-rail a:focus-visible { outline: 1px solid var(--ochre); outline-offset: 3px; border-radius: 2px; }
 
   /* The label's cross-fade and the 2px nudge toward a hovered or focused row. The dash's slide and the quiet marks'
-     fades are the script's. The times are lib/motionTiming's RAIL, the curve its EASE (tests/motionTiming.test.ts). */
+     fades are the script's. The times are lib/motionTiming's RAIL, the curves its FADE and EASE
+     (tests/motionTiming.test.ts). */
   @media (prefers-reduced-motion: no-preference) {
     .side-rail .dim,
     .side-rail .ink2,

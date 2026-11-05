@@ -1,5 +1,6 @@
 // The pure half of the motion module (scripts/motion.ts): the curves and the durations every move on the rail and
-// the research routes is made of, the one stagger formula, and the arithmetic of a sweep laid along a run of text.
+// the research routes is made of, the one stagger formula and the paper page's batches made with it, and the
+// arithmetic of a sweep laid along a run of text.
 // Pure so it can be specified; the DOM half only measures and plays. CSS cannot import these, so
 // tests/motionTiming.test.ts holds every curve and duration the rail's and the research routes' CSS states to them.
 
@@ -9,8 +10,15 @@ export const EASE = 'cubic-bezier(.2,.7,.2,1)';
 export const DRAW = 'cubic-bezier(.33,.08,.24,1)';
 /** A sweep along a run of lines: nearly linear, so it does not stall at each break. A sweep of one line takes EASE. */
 export const SWEEP = 'cubic-bezier(.3,.2,.4,1)';
+/** A fade: an opacity easing out. */
+export const FADE = 'ease-out';
+/** A withdrawal: a card's underline leaving, gathering speed as it goes. */
+export const WITHDRAW = 'ease-in';
 
 // ── The durations, in ms. ──
+
+/** The longest any one move runs, and any batch of them seen together, from its first start to its last end. */
+export const MOVE_MAX = 2000;
 
 /** The research routes' reveal (riseOnceSeen): a block rises over `rise`; a margin note beside the text slides in
  *  over `beside`, `noteAfter` after its block; several seen together go `step` apart, the last at most `max` late. */
@@ -30,6 +38,19 @@ export const PAPER_PAGE = {
   highlight: 640, highlightAfter: 260, highlightStep: 200, term: 220, draw: 1600, labels: 360, arrow: 360, arrowStep: 120,
   noteFade: 200, noteShift: 240, tip: 120,
 } as const;
+
+/** When highlight `k` of `n` seen together starts to sweep, once its block has risen: `highlightAfter`, then
+ *  `highlightStep` after the one before, closer on a long batch, so the last has swept within MOVE_MAX. */
+export function highlightDelay(k: number, n: number): number {
+  const { highlight, highlightAfter, highlightStep } = PAPER_PAGE;
+  return highlightAfter + stagger(k, n, { step: highlightStep, total: MOVE_MAX - highlightAfter - highlight });
+}
+
+/** When arrow `k` of a figure's `n` starts to fade in: `arrowStep` after the one before, closer on a figure with
+ *  many, so the last is in within MOVE_MAX. */
+export function arrowDelay(k: number, n: number): number {
+  return stagger(k, n, { step: PAPER_PAGE.arrowStep, total: MOVE_MAX - PAPER_PAGE.arrow });
+}
 
 /** The /research cards (pages/research/index.astro): a card lifts over `lift` and its frame fades in over `frame`;
  *  its title's underline draws in over `underline`, a line `underlineStep` after the one above, and withdraws over

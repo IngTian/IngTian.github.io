@@ -55,8 +55,9 @@ const introVars = {
 
 {/* preloadAccent: the Work slide's sub-headlines are the homepage's only Fraunces, in the normal style (its
      italic editorial line shows only while /writing has no piece), and the homepage is the measurement that
-     put this preload back (FCP 1956 -> 2333ms without it, three runs on a production build). See the note
-     next to <Font> in BaseLayout. */}
+     put this preload back (FCP 1956 -> 2333ms without any, three runs on a production build, measured when
+     both styles were preloaded; the normal style alone has not been measured). See the note next to <Font>
+     in BaseLayout. */}
 <BaseLayout veilLine="a researcher by day" veilOnLoad={false} preloadAccent="normal">
   {/* THE INTRO IS DECIDED HERE, BEFORE FIRST PAINT, and that timing is the whole point.
 

@@ -356,8 +356,9 @@ html[data-theme='dark'] .descent::after {
 }
 
 /* (No `.terminal-chrome` fill here: the scripted terminal and the whole src/components/terminal/ directory are
-   DELETED, and `grep -rn terminal-chrome src` plus a grep over every dist/**.html return nothing, so a rule for
-   it could match no element on any route — it would only ship in the critical-path stylesheet on every page.) */
+   DELETED, and no element and no rule in src or dist carries the class — this comment is its only mention — so a
+   rule for it could match no element on any route; it would only ship in the critical-path stylesheet on every
+   page.) */
 
 /* ── THE THEME-TOGGLE CROSSFADE IS GONE, and this note is why nobody should add it back.
    It wrapped the flip in document.startViewTransition() for a ~0.5s dissolve and claimed to fade

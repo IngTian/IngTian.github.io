@@ -475,7 +475,7 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
   // notes rising in, the highlights drawn, Figure 2 drawn, Figure 1 assembled). Only transform and opacity move,
   // each thing once and in under 2s, and what is on screen or above it when the page opens is never held back
   // (scripts/motion.ts). Started through onPageView, so it runs at parse on a full load and once per arrival.
-  import { DRAW, PAPER_PAGE } from '../../lib/motionTiming';
+  import { DRAW, FADE, PAPER_PAGE, arrowDelay, highlightDelay } from '../../lib/motionTiming';
   import { onPageView } from '../../scripts/pageView';
   import { readoutIndex, readoutLabel, readoutSays, readoutStep, stackNotes, tipLeft } from '../../lib/paperPage';
   import { WIDE_QUERY } from '../../lib/viewport';
@@ -544,7 +544,7 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
     };
     const sweep = batch<HTMLElement>((marks) => marks.forEach((mk, k) => {
       mk.classList.add('drawing');
-      const go = (): void => later(() => draw(mk), PAPER_PAGE.highlightAfter + k * PAPER_PAGE.highlightStep);
+      const go = (): void => later(() => draw(mk), highlightDelay(k, marks.length));
       const host = rising.get(mk.closest('.sec > *') ?? mk);
       if (host?.playState === 'running') host.finished.then(go, go);
       else go();
@@ -560,7 +560,7 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
       plot.classList.add('drawing');
       const masks = [...plot.querySelectorAll('svg')].filter(shown).flatMap((svg) => {
         const labels = svg.querySelector('.f-labels'), mask = svg.querySelector<SVGGElement>('.f-mask');
-        if (labels) play(labels, [{ opacity: 0 }, { opacity: 1 }], { duration: PAPER_PAGE.labels, easing: 'ease-out' }, live);
+        if (labels) play(labels, [{ opacity: 0 }, { opacity: 1 }], { duration: PAPER_PAGE.labels, easing: FADE }, live);
         if (!mask) return [];
         return [play(mask, [{ transform: 'translateX(0)' }, { transform: `translateX(${mask.dataset.d}px)` }], { duration: PAPER_PAGE.draw, easing: DRAW }, live)];
       });
@@ -570,8 +570,9 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
     const assemble = (): void => {
       if (!pipe) return;
       const art = [...pipe.querySelectorAll('.pp-art')].find(shown);
-      art?.querySelectorAll('.p-arrow').forEach((p, k) =>
-        play(p, [{ opacity: 0 }, { opacity: 1 }], { duration: PAPER_PAGE.arrow, delay: k * PAPER_PAGE.arrowStep }, live));
+      const arrows = art?.querySelectorAll('.p-arrow') ?? [];
+      arrows.forEach((p, k) =>
+        play(p, [{ opacity: 0 }, { opacity: 1 }], { duration: PAPER_PAGE.arrow, delay: arrowDelay(k, arrows.length) }, live));
     };
 
     onceSeen(page.querySelectorAll('mark.hl'), (mk) => sweep(mk), { threshold: 1, signal });
@@ -740,7 +741,8 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
       if (plot?.classList.contains('reading')) { plot.classList.remove('reading'); dismissed = true; }
     }, { signal });
 
-    // ── copy the BibTeX ──
+    // ── copy the BibTeX; the button says what happened, then Copy again after SAID_MS (a label, not a move) ──
+    const SAID_MS = 1600;
     const copy = page.querySelector<HTMLElement>('[data-copy]');
     copy?.addEventListener('click', async () => {
       const pre = document.getElementById(copy.dataset.copy ?? '');
@@ -756,7 +758,7 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
         getSelection()?.addRange(range);
         copy.textContent = 'Selected';
       }
-      later(() => { copy.textContent = 'Copy'; }, 1600);
+      later(() => { copy.textContent = 'Copy'; }, SAID_MS);
     }, { signal });
 
     return () => {
