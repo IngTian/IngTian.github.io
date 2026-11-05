@@ -32,8 +32,8 @@ const PANEL = { light: '#c4b7a1', dark: '#14161a' } as const;
  * How far down the page the sky under the rail can be. The rail shows once the hero's bottom is above mid-screen,
  * and every slide after the Interlude is an opaque panel, so the sky it sits on ends at the Interlude's foot: with
  * the hero at its 108vh and every slide at its 100vh floor, (1.08 + 1) / (1.08 + 6) = 0.294 of the page. A taller
- * slide below only lowers it; a hero taller than its floor raises it, and a window 520px tall or less makes the hero
- * 1.6 screens: the worst case, held here.
+ * slide below only lowers it; a hero taller than its floor raises it. A hero of 1.6 screens (a short window, where
+ * its content outgrows 108vh) is the case held here: an assumed worst case, computed rather than measured.
  */
 const SKY_DEPTH = (1.6 + 1) / (1.6 + 6);
 

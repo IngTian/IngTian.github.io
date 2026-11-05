@@ -510,8 +510,8 @@ and reverted every time** — do not rebuild it. The phone treatment is *bug fix
     the sky at its deepest under the rail; dark `--ink-3`) and the focus ring `--rail-focus` (light `--ink-1`,
     9.32:1 on the tan, where `--ochre` is 1.19; dark `--ochre`), held with the marks and the dash by
     `tests/deckPalette.test.ts` on the panels and on the sky's CSS gradient, its no-WebGL state, down to the
-    Interlude's foot on a window 520px tall, and under the static Grain overlay; the last screen is Work's
-    panel. Not held: the live sky a desktop with WebGL draws over that gradient (FluidSky, SkyWash, the
+    Interlude's foot with the hero at 1.6 screens (a short window; computed, not measured), the label inks
+    also under the static Grain overlay; the last screen is Work's panel. Not held: the live sky a desktop with WebGL draws over that gradient (FluidSky, SkyWash, the
     `.descent` washes). The descent variant's policy guards against a lighter sky under its paper-coloured text
     and lets it darken nearly freely, and a darker sky is the danger to the light theme's dark labels.
   - **Its motion is the rule's: each piece runs once per showing** (the timings are `lib/motionTiming.ts`'s
