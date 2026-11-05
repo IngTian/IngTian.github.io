@@ -101,10 +101,12 @@ rather than add.
   - **No CJK webfont** (a CJK face is megabytes): Chinese renders in the reader's system faces, and no stack
     names one. The fallback already keeps the register on a Mac (measured in Chrome): after Georgia it is
     Songti, a serif; after the system UI stack and JetBrains Mono, PingFang, a sans. Naming `Songti SC` would
-    force Simplified forms on Traditional text. **Chinese text carries `lang`** (`zh-Hant` or `zh-Hans`, by its
-    script): it picks the glyph forms (Songti TC or SC) and the screen-reader voice, and lets a stack's closing
-    generic find the browser's CJK default. Not in the accent role: Han has no italic, and Fraunces falls back
-    to PingFang, a sans, unless a `zh` `lang` sends it on to Songti.
+    force Simplified forms on Traditional text. **New Chinese text carries `lang`** (`zh-Hant` or `zh-Hans`, by
+    its script): it picks the glyph forms (Songti TC or SC) and the screen-reader voice, and lets a stack's
+    closing generic find the browser's CJK default. The one Chinese the site sets today does not yet: /art's
+    placard kicker (`Calligraphy · 隸書`, `Calligraphy · 行草`), one string `scripts/artGallery.ts` sets by
+    `textContent`. Not in the accent role: Han has no italic, and Fraunces falls back to PingFang, a sans,
+    unless a `zh` `lang` sends it on to Songti.
     /projects' listing and computed pictures stay inside JetBrains Mono's latin subset
     (`tests/projectsListing.test.ts`, `tools/vendor-projects.mjs`' `DRAWABLE`), a font-coverage rule, not a
     language rule.
@@ -375,11 +377,11 @@ scroll guides you to the next slide. It's not a free scroll."*
   picks up wherever the browser lands), resize/zoom (re-measured), trackpad momentum (one flick is coalesced
   into one slide), and `#anchor` jumps, the rail's included.
   - **A jump the deck did not start wins.** On `popstate` or `hashchange` it cancels its own tween and swallows
-    the wheel until the browser's scroll ends (`scrollend`, or 300ms without a scroll event). Before, a rail
-    click "did nothing" with the hash changed: the tween's next instant `scrollTo` cancelled the browser's
-    smooth scroll (a click 250ms into a PageDown missed 4 of 4), or a wheel during the jump started a slide
-    from mid-flight. `wheelAction` in `lib/deck.ts` is the decision, specified; the wiring shows only in a
-    browser.
+    the wheel until 300ms after the jump's last scroll event. Not on `scrollend`: each of the tween's instant
+    steps fires one, which ended the hold a frame after the click. Measured without this: a rail click 250ms
+    into a PageDown rested on the deck's target with the hash set to the link's (4 of 4), and a wheel during
+    the jump started a slide from mid-flight. `wheelAction` in `lib/deck.ts` is the decision, specified; the
+    wiring shows only in a browser.
   - **A small wheel event is swallowed, not passed**, while a stop lies that way: Chrome lets a gesture's
     events be cancelled only if its first one was, and a trackpad gesture opens at 5–6px, under the 18px
     `WHEEL_THRESHOLD`. Passing the opener left the rest of the gesture, momentum included, scrolling natively
@@ -443,11 +445,11 @@ and reverted every time** — do not rebuild it. The phone treatment is *bug fix
     greeting and no idle lines, so the idle timer is never set. A 343px column has no room for the bubble on
     the prompt's row or above it, so on a phone it opens below the prompt, tail turned up, into a fixed strip
     sized for its tallest line (four rows at 320px); `tests/cowTalk.test.ts` word-wraps every line at 320px
-    from the stylesheets' own literals and fails on a fifth row. Across 0–1179px the cow is top-aligned in its
-    row and set 12px under the summary, so a wrapping line does not move it and its hop does not cover the
-    summary; the measurements are in `projects.astro`'s comment on the 1179px block. A probe that watches the
-    gallery and not the cow reports "nothing moves when it speaks" while the cow moves: assert the cow's rect
-    for every line.
+    from the stylesheets' own literals and fails on a fifth row (Latin advances only: it refuses a Han line until
+    it is taught Han's widths). Across 0–1179px the cow is top-aligned in its row and set 12px under the
+    summary, so a wrapping line does not move it and its hop does not cover the summary; the measurements are
+    in `projects.astro`'s comment on the 1179px block. A probe that watches the gallery and not the cow
+    reports "nothing moves when it speaks" while the cow moves: assert the cow's rect for every line.
 
 ## Navigation & structure
 

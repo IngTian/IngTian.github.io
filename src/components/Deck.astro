@@ -14,7 +14,7 @@
 // WHAT THIS DELIBERATELY DOES NOT BREAK, because hijacking the wheel is the easiest way to ruin a page:
 //   · keyboard — Home/End/PageUp/PageDown/space/arrows keep working, and Tab focus is never fought
 //   · #anchor links, the rail's included — a jump the deck did not start wins: it drops its own slide and
-//     swallows the wheel until the browser's scroll ends (onNavigate)
+//     swallows the wheel until 300ms after the jump's last scroll event (onNavigate)
 //   · find-in-page — the deck picks up from wherever the browser put the page
 //   · zoom and small viewports — recomputed on resize; disabled when a slide barely exceeds the screen
 //   · REDUCED MOTION — the deck does not engage at all; the page is an ordinary free scroll, which is
@@ -258,13 +258,16 @@
     // it is the reader's, where a wheel tail is often momentum.
     let yielding = false;
     let yieldTimer = 0;
-    // The fallback end, from the last scroll event: a jump with nothing to scroll (its slide already on
-    // screen) fires no scrollend, and neither does a browser without it.
-    // ponytail: a jump whose frames stall past this loses its hold (seen only under software GL, a 1.4s stall);
-    // wait on scrollend alone where it exists if a real machine ever shows it.
+    // The scroll ends 300ms after its last scroll event (or after the click, for a jump with nothing to
+    // scroll). NOT on `scrollend`: each of the tween's instant steps fires one, so the step before the
+    // cancel ends the yield one frame after the click, before the browser's smooth scroll has moved.
+    // ponytail: a jump whose frames stall past this loses its hold (seen only under software GL, a 1.4s
+    // stall); if a real machine shows it, lengthen YIELD_MS rather than wait on scrollend.
     const YIELD_MS = 300;
-    function endYield(): void { yielding = false; window.clearTimeout(yieldTimer); }
-    function holdYield(): void { window.clearTimeout(yieldTimer); yieldTimer = window.setTimeout(endYield, YIELD_MS); }
+    function holdYield(): void {
+      window.clearTimeout(yieldTimer);
+      yieldTimer = window.setTimeout(() => { yielding = false; }, YIELD_MS);
+    }
     function onNavigate(): void {
       cancelTween();
       release();
@@ -293,7 +296,6 @@
     window.addEventListener('touchend', onTouchEnd, { passive: true });
     window.addEventListener('resize', onResize, { passive: true });
     window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('scrollend', endYield);
     window.addEventListener('popstate', onNavigate);
     window.addEventListener('hashchange', onNavigate);
 
@@ -304,7 +306,6 @@
       window.removeEventListener('touchend', onTouchEnd);
       window.removeEventListener('resize', onResize);
       window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('scrollend', endYield);
       window.removeEventListener('popstate', onNavigate);
       window.removeEventListener('hashchange', onNavigate);
       window.clearTimeout(quietTimer);

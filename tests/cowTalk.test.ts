@@ -191,7 +191,10 @@ describe("the phone's strip (projects.astro, ≤640px)", () => {
     const perRow = Math.floor(text / (ADVANCE_EM * font));
     expect(perRow).toBeGreaterThan(0);
     // Greedy word wrap, as the browser does it: a half breaks only at spaces, and a word longer than a row overflows.
+    // It models Latin mono advances only: Han is ~1em wide and breaks between any two characters.
     const wrap = (s: string): number => {
+      expect(s, 'wrap() counts 0.6em advances; teach it Han (~1em, a break between characters) before a Chinese line')
+        .not.toMatch(/\p{Script=Han}/u);
       let n = 1, at = 0;
       for (const w of s.split(' ')) {
         expect(w.length, `"${w}" is wider than a row`).toBeLessThanOrEqual(perRow);
