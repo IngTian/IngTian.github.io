@@ -257,6 +257,7 @@ src/
   lib/motionTiming.ts               # the motion module's pure half: every curve (EASE, DRAW, SWEEP, FADE, WITHDRAW) and duration (REVEAL, RAIL, PAPER_PAGE, CARD, MOVE_MAX) the rail and the research routes move by, stagger and the paper page's batches (highlightDelay, arrowDelay), sweepDurations, mergeLines; tests/motionTiming.test.ts holds their CSS literals to it
   scripts/motion.ts                 # THE ONE MOTION MODULE, its DOM half: play, onceSeen, riseOnceSeen, sweepLines — the rail and both research routes; the reduced-motion gate is inside it
   scripts/pageView.ts               # onPageView(selector, init): starts nine scripts right after parse, not at window `load`, handing init its element — /projects' (all but two), SideRail's and both research routes' (see Interactivity)
+  scripts/beats.ts                  # walkBeats(selector, setup): the beat walk the three explainer slides share — the timer, freeze on a click or an arrow, the observer at 0.3, the reduced-motion rest, the teardown, astro:page-load; each slide brings its own show, dwells and options. Its pure half, arrowBeat (the key map), is lib/beats.ts
   data/papers/{index,rl-bhrp}.ts    # PAPER_DATA (values, figures, the homepage line, thumb); RL-BHRP's Table 2, window, reproduction series, and VALUES — every figure its prose prints, as the string it prints (a :v reads one; TypeScript reads one through paperValue, whose key is typed as VALUES' keys and which also throws on an unknown one)
   lib/mathml.ts                     # the one MathML letter fix: fixMathVariants for lib/equations.ts, rehypeMathVariants for every .md
   data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline, publications, projects + inProgress, awards, contact
@@ -352,7 +353,7 @@ is a plain Astro component or page with a `<script>`, **not** an island (see *St
 
 **Counting it:** `grep -rln '<script' src` also hits three `lib/` files that say `<script>`
 in comments. Filtered to `src/{components,sections,pages,layouts}` it returns the 23 above
-(`ProjectPicture.astro` and `Button.astro` have none). `scripts/artGallery.ts`,
+(`ProjectPicture.astro` and `Button.astro` have none). `scripts/artGallery.ts`, `scripts/beats.ts`,
 `scripts/motion.ts` and `scripts/pageView.ts` are modules those scripts import, not scripts of their own.
 
 **Three files break the contract below on purpose, with `is:inline` scripts that must run

@@ -664,6 +664,8 @@ const allBeats = [...BEATS, BEAT4];
 </style>
 
 <script>
+  import { walkBeats, type Beats } from '../scripts/beats';
+
   // THE DEFINITION BUILDS: beat 1, beat 2, beat 3, then it holds and repeats. Sequential because a definition
   // is an ORDER — what a portfolio is, then what optimising means, then what multi-period adds — and showing
   // all three at once is a wall of text that a reader has to sort themselves.
@@ -682,9 +684,7 @@ const allBeats = [...BEATS, BEAT4];
   // just "solve-js", #choice grew from 900px to 1585px, every panel fell back to position: relative and all four
   // stacked at once, and the beat buttons became silent no-ops. solve-js was the survivor precisely because
   // Solve.astro already adds its class inside its init, which re-runs on astro:page-load. This now matches it.
-  function initDefine(): (() => void) | null {
-    const section = document.querySelector<HTMLElement>('#choice');
-    if (!section) return null;
+  function initDefine(section: HTMLElement): Beats | null {
     const beats = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-beat]'));
     const panels = Array.from(section.querySelectorAll<HTMLElement>('[data-panel]'));
     // Nothing to sequence — hand the slide back to its CSS default. Returning before the class is added is why
@@ -692,92 +692,26 @@ const allBeats = [...BEATS, BEAT4];
     if (beats.length !== panels.length || !beats.length) return null;
     document.documentElement.classList.add('define-js');
 
-    const show = (i: number) => {
-      beats.forEach((el, k) => {
-        el.classList.toggle('is-on', k === i);
-        el.setAttribute('aria-pressed', String(k === i));
-      });
-      panels.forEach((el, k) => el.classList.toggle('is-on', k === i));
-    };
-
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      // Finished state: every beat legible, first panel shown. No automatic walk — but the buttons still work,
-      // so a reduced-motion reader gets exactly the same control, just without anything moving on its own.
-      for (const el of beats) el.classList.add('is-on');
-      panels[0].classList.add('is-on');
-      const pickStill = (e: Event) => {
-        const i = beats.indexOf(e.currentTarget as HTMLButtonElement);
-        if (i >= 0) show(i);
-      };
-      for (const b of beats) b.addEventListener('click', pickStill);
-      return () => { for (const b of beats) b.removeEventListener('click', pickStill); };
-    }
-
-    let step = 0;
-    let timer = 0;
-    // FROZEN ONCE CLICKED, and it stays frozen. The owner: "once i clicked it should freeze there (i dont know
-    // if it's wise to add a timer so it starts automatic again) i need time to read."
-    // It is not wise, so there is no resume timer. A timer that restarts is the original complaint in a new
-    // costume: it would pull the slide out from under a reader in the middle of the beat they deliberately
-    // asked for. No interval is both long enough to be safe for a chart that takes a while to read and short
-    // enough to feel automatic. The walk exists to show a reader there is something here; a click says they
-    // already know, and from then on the slide is theirs.
-    let frozen = false;
-
-    const stop = () => { window.clearTimeout(timer); timer = 0; };
-
-    show(0);
-    const advance = () => {
-      step = (step + 1) % beats.length;
-      show(step);
+    return {
+      buttons: beats,
+      show: (i) => {
+        beats.forEach((el, k) => {
+          el.classList.toggle('is-on', k === i);
+          el.setAttribute('aria-pressed', String(k === i));
+        });
+        panels.forEach((el, k) => el.classList.toggle('is-on', k === i));
+      },
+      firstMs: 4600,
       // Hold longest on the last beat: it is the one the slide is named after, and it carries a chart.
-      timer = window.setTimeout(advance, step === beats.length - 1 ? 6200 : 4600);
-    };
-
-    const freeze = (i: number) => {
-      frozen = true;
-      stop();
-      section.dataset.frozen = 'true';
-      step = i;
-      show(i);
-    };
-
-    const pick = (e: Event) => {
-      const i = beats.indexOf(e.currentTarget as HTMLButtonElement);
-      if (i >= 0) freeze(i);
-    };
-    for (const b of beats) b.addEventListener('click', pick);
-
-    // Arrow keys walk the group the way a tablist does, so a keyboard reader need not tab through four buttons
-    // to reach the last beat. Arrowing freezes too — it is just as deliberate as a click.
-    const onKey = (e: KeyboardEvent) => {
-      const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1
-        : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
-      if (!dir) return;
-      e.preventDefault();
-      freeze((step + dir + beats.length) % beats.length);
-      beats[step].focus();
-    };
-    for (const b of beats) b.addEventListener('keydown', onKey);
-
-    const io = new IntersectionObserver((entries) => {
-      const visible = entries.some((e) => e.isIntersecting);
-      if (frozen) return;                        // a reader's choice outranks the observer
-      if (visible && !timer) timer = window.setTimeout(advance, 4600);
-      else if (!visible) stop();
-    }, { threshold: 0.3 });
-    io.observe(section);
-
-    return () => {
-      stop();
-      io.disconnect();
-      for (const b of beats) { b.removeEventListener('click', pick); b.removeEventListener('keydown', onKey); }
+      lastMs: 6200,
+      // Reduced motion: every beat legible, first panel shown, and no walk. A click still picks a beat; the arrow
+      // keys stay the page's here, where Rules and Solve walk their beats with them.
+      still: () => {
+        for (const el of beats) el.classList.add('is-on');
+        panels[0].classList.add('is-on');
+      },
     };
   }
 
-  let teardown: (() => void) | null = null;
-  document.addEventListener('astro:page-load', () => {
-    teardown?.();
-    teardown = initDefine();
-  });
+  walkBeats('#choice', initDefine);
 </script>

@@ -394,6 +394,8 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
 </style>
 
 <script>
+  import { walkBeats, type Beats } from '../scripts/beats';
+
   // THE ALGORITHM, ANIMATED IN ITS OWN DIRECTION.
   //
   // Backward induction fills the value surface from the horizon toward today, so the mesh reveals right to
@@ -405,9 +407,7 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
   // the CSS show the fully solved picture, so a JS failure leaves the finished diagram rather than a blank box.
   document.documentElement.classList.add('no-lattice-js');
 
-  function initLattice(): (() => void) | null {
-    const section = document.querySelector<HTMLElement>('#solve');
-    if (!section) return null;
+  function initLattice(section: HTMLElement): Beats | null {
     const ribs = Array.from(section.querySelectorAll<SVGPolylineElement>('[data-t]'));
     const spines = Array.from(section.querySelectorAll<SVGPolylineElement>('[data-s]'));
     const cands = section.querySelector<SVGGElement>('[data-cands]');
@@ -426,8 +426,9 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     // four phases (mesh backward, candidates, route forward, settled) — so the moves map onto it 1:1 rather than
     // needing a new animation. What changes is that a reader can now DRIVE it: the phases became states.
     //
-    // Interaction copied deliberately from the two slides before it — auto-advance, click to freeze, and frozen
-    // stays frozen. Same dwell times too, so the three explainer slides feel like one instrument.
+    // One walk drives all three explainer slides (scripts/beats.ts), so they feel like one instrument:
+    // auto-advance, click to freeze, and frozen stays frozen. The dwells are each slide's own: here 4200ms to the
+    // first move and 6400ms on the last, as on Rules; Choice waits 4600ms and holds its last beat 6200ms.
     const terms = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-term]'));
     const moves = Array.from(section.querySelectorAll<HTMLElement>('[data-move]'));
     const chart = section.querySelector<SVGSVGElement>('.so-chart');
@@ -439,12 +440,6 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
 
     const meshIn = (on: boolean) => {
       for (const el of [...ribs, ...spines]) el.classList.toggle('is-in', on);
-    };
-    const solvedLattice = () => {
-      meshIn(true);
-      cands.classList.add('is-in');
-      opt.classList.add('is-in');
-      for (const n of nodes) n.classList.add('is-in');
     };
 
     let meshTimers: number[] = [];
@@ -484,80 +479,18 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
       read.textContent = terms[i].dataset.readline ?? '';
     };
 
-    let step = 0;
-    let timer = 0;
-    let frozen = false;
-    const stop = () => { window.clearTimeout(timer); timer = 0; };
-
-    const freeze = (i: number) => {
-      frozen = true;
-      stop();
-      section.dataset.frozen = 'true';
-      step = i;
-      show(i, i === 0);
-    };
-
-    const pick = (e: Event) => {
-      const i = terms.indexOf(e.currentTarget as HTMLButtonElement);
-      if (i >= 0) freeze(i);
-    };
-    for (const t of terms) t.addEventListener('click', pick);
-
-    // Arrow keys walk the four terms, so a keyboard reader need not tab to reach the last one.
-    const onKey = (e: KeyboardEvent) => {
-      const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1
-        : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
-      if (!dir) return;
-      e.preventDefault();
-      freeze((step + dir + terms.length) % terms.length);
-      terms[step].focus();
-    };
-    for (const t of terms) t.addEventListener('keydown', onKey);
-
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      // Finished state: the LAST move, which is the one the slide rests on — our own objective. The solved
-      // lattice, and the buttons still work, so nothing is lost by not animating.
-      step = terms.length - 1;
-      show(step, false);
-      solvedLattice();
-      return () => {
-        clearMesh();
-        for (const t of terms) { t.removeEventListener('click', pick); t.removeEventListener('keydown', onKey); }
-      };
-    }
-
-    show(0, false);
-
-    const advance = () => {
-      step = (step + 1) % terms.length;
-      show(step, true);
+    return {
+      buttons: terms,
+      show,
+      firstMs: 4200,
       // Hold longest on the last move: it is the slide's whole point, and it is the one describing our own work.
-      timer = window.setTimeout(advance, step === terms.length - 1 ? 6400 : 4600);
-    };
-
-    const io = new IntersectionObserver((entries) => {
-      const visible = entries.some((e) => e.isIntersecting);
-      if (frozen) return;                        // a reader's choice outranks the observer
-      if (visible && !timer) {
-        if (step === 0) revealMesh();
-        timer = window.setTimeout(advance, 4200);
-      } else if (!visible) {
-        stop();
-      }
-    }, { threshold: 0.3 });
-    io.observe(section);
-
-    return () => {
-      stop();
-      clearMesh();
-      io.disconnect();
-      for (const t of terms) { t.removeEventListener('click', pick); t.removeEventListener('keydown', onKey); }
+      // It is also where reduced motion rests, with the lattice solved: show(i, false) draws all of it.
+      lastMs: 6400,
+      // The walk starting on move one replays its reveal; starting anywhere else leaves the mesh as it is.
+      onSeen: (s) => { if (s === 0) revealMesh(); },
+      teardown: clearMesh,
     };
   }
 
-  let teardown: (() => void) | null = null;
-  document.addEventListener('astro:page-load', () => {
-    teardown?.();
-    teardown = initLattice();
-  });
+  walkBeats('#solve', initLattice);
 </script>

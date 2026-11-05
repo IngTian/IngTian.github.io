@@ -777,7 +777,9 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
 </style>
 
 <script>
-  // THE FOUR BEATS, in order, and the reader can take the wheel.
+  import { walkBeats, type Beats } from '../scripts/beats';
+
+  // THE FOUR BEATS, in order, and the reader can take the wheel (scripts/beats.ts walks them).
   //
   // PROGRESSIVE ENHANCEMENT in the only safe direction: the CSS default is beat one shown with all four beats
   // legible as text, and html.complex-js — added only once the sequence is about to run — is what switches on
@@ -787,9 +789,7 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
   // ADDED INSIDE initComplex, NOT AT MODULE SCOPE, for the reason spelled out at the same point in
   // Choice.astro: Astro's ClientRouter swaps <html> and its class list on every in-site navigation, while this
   // bundled module runs once — so the class did not survive the reader's first trip to another page and back.
-  function initComplex(): (() => void) | null {
-    const section = document.querySelector<HTMLElement>('#rules');
-    if (!section) return null;
+  function initComplex(section: HTMLElement): Beats | null {
     const beats = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-beat]'));
     const panels = Array.from(section.querySelectorAll<HTMLElement>('[data-panel]'));
     const heads = Array.from(section.querySelectorAll<HTMLElement>('[data-head]'));
@@ -844,90 +844,28 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     };
     window.addEventListener('resize', onResize, { passive: true });
 
-    const show = (i: number) => {
-      beats.forEach((b, k) => {
-        b.classList.toggle('is-on', k === i);
-        b.setAttribute('aria-pressed', String(k === i));
-      });
-      panels.forEach((p, k) => p.classList.toggle('is-on', k === i));
-      // TWO elements share each head index — the figure's heading and the caption — so match on the attribute
-      // VALUE rather than on position in the list.
-      heads.forEach((h) => h.classList.toggle('is-on', Number(h.dataset.head) === i));
-    };
-
-    let step = 0;
-    let timer = 0;
-    // FROZEN ONCE CLICKED, and it stays frozen — the same rule as the two neighbouring slides. These beats carry
-    // numbers a reader will want to sit with, and a timer that resumed would pull the slide away mid-thought.
-    let frozen = false;
-    const stop = () => { window.clearTimeout(timer); timer = 0; };
-
-    const freeze = (i: number) => {
-      frozen = true;
-      stop();
-      section.dataset.frozen = 'true';
-      step = i;
-      show(i);
-    };
-
-    const pick = (e: Event) => {
-      const i = beats.indexOf(e.currentTarget as HTMLButtonElement);
-      if (i >= 0) freeze(i);
-    };
-    for (const b of beats) b.addEventListener('click', pick);
-
-    // Arrow keys walk the group, so a keyboard reader need not tab through four buttons to reach the last beat.
-    const onKey = (e: KeyboardEvent) => {
-      const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1
-        : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
-      if (!dir) return;
-      e.preventDefault();
-      freeze((step + dir + beats.length) % beats.length);
-      beats[step].focus();
-    };
-    for (const b of beats) b.addEventListener('keydown', onKey);
-
-    show(0);
-
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      // Finished state: the LAST beat, which is the one the slide's argument rests on. The buttons still work,
-      // so a reduced-motion reader gets the same control without anything moving on its own.
-      step = beats.length - 1;
-      show(step);
-      return () => {
+    return {
+      buttons: beats,
+      show: (i) => {
+        beats.forEach((b, k) => {
+          b.classList.toggle('is-on', k === i);
+          b.setAttribute('aria-pressed', String(k === i));
+        });
+        panels.forEach((p, k) => p.classList.toggle('is-on', k === i));
+        // TWO elements share each head index — the figure's heading and the caption — so match on the attribute
+        // VALUE rather than on position in the list.
+        heads.forEach((h) => h.classList.toggle('is-on', Number(h.dataset.head) === i));
+      },
+      firstMs: 4200,
+      // Hold longest on the last beat: it is the slide's whole point and it carries the most to read. It is also
+      // where reduced motion rests, the beat the slide's argument rests on.
+      lastMs: 6400,
+      teardown: () => {
         if (resizeTick) cancelAnimationFrame(resizeTick);
         window.removeEventListener('resize', onResize);
-        for (const b of beats) { b.removeEventListener('click', pick); b.removeEventListener('keydown', onKey); }
-      };
-    }
-
-    const advance = () => {
-      step = (step + 1) % beats.length;
-      show(step);
-      // Hold longest on the last beat: it is the slide's whole point and it carries the most to read.
-      timer = window.setTimeout(advance, step === beats.length - 1 ? 6400 : 4600);
-    };
-
-    const io = new IntersectionObserver((entries) => {
-      const visible = entries.some((e) => e.isIntersecting);
-      if (frozen) return;                        // a reader's choice outranks the observer
-      if (visible && !timer) timer = window.setTimeout(advance, 4200);
-      else if (!visible) stop();
-    }, { threshold: 0.3 });
-    io.observe(section);
-
-    return () => {
-      stop();
-      io.disconnect();
-      if (resizeTick) cancelAnimationFrame(resizeTick);
-      window.removeEventListener('resize', onResize);
-      for (const b of beats) { b.removeEventListener('click', pick); b.removeEventListener('keydown', onKey); }
+      },
     };
   }
 
-  let teardown: (() => void) | null = null;
-  document.addEventListener('astro:page-load', () => {
-    teardown?.();
-    teardown = initComplex();
-  });
+  walkBeats('#rules', initComplex);
 </script>
