@@ -222,6 +222,9 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
         if (!li) wrong.push(`${p.route}: no ${c.label} link in the corner nav`);
         else if (/\bprofile\b/.test(li[1])) wrong.push(`${p.route}: ${c.label} is hidden below 1200px`);
       }
+      // and every link in it goes somewhere: the link check skips an empty href and every off-site one, so a contact
+      // href emptied in profile.ts would ship a link to the page itself
+      for (const [a] of list.matchAll(/<a\b[^>]*>/g)) if (!/\shref="[^"]+"/.test(a)) wrong.push(`${p.route}: ${a}`);
     }
     expect(wrong).toEqual([]);
     // and no rule hides the marks wholesale: below 1200px only `.profile` goes.
