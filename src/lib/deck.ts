@@ -7,7 +7,7 @@
 // and it looked like it should work. It cannot, at this page's proportions (measured at 1700x1050 on an
 // earlier slide order; the arithmetic, not the order, is the point):
 //
-//   slide gaps:          819px to 2346px
+//   slide gaps:          581px to 2346px
 //   one wheel gesture:   ~320px  — i.e. every gap is 1.8x to 7.3x a single scroll
 //
 // With `scroll-snap-type: y mandatory`, one gesture proposes a destination ~320px away, and the

@@ -6,7 +6,7 @@
 // from lib/deck.ts (pure and unit-tested); this file is only the event plumbing.
 //
 // WHY JS AT ALL, when CSS scroll-snap exists. Snap was built first and measured; it cannot do this at
-// the page's real proportions. Slide gaps are 819-2346px while one wheel gesture is ~320px, so
+// the page's real proportions. Slide gaps are 581-2346px while one wheel gesture is ~320px, so
 // `scroll-snap-type: y mandatory` re-snapped to the slide it started from and the page froze at y=84
 // through eight consecutive gestures. `proximity`, `scroll-snap-stop: always`, and a hero shrunk to
 // exactly 100vh all measured identically stuck. The full numbers are in lib/deck.ts.

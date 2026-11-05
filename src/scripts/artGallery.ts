@@ -161,7 +161,7 @@ function updateToc() {
   updateTocZone();
 }
 
-// ── THE RAIL'S INK HAS TO FOLLOW THE SKY, and until now it did not.
+// ── THE RAIL'S INK HAS TO FOLLOW THE SKY.
 //
 // /art rides the whole descent — luminous paper at the top to near-black at the ground — and this rail is
 // position: fixed at top: 50%, so the gradient behind it changes completely while its colour did not. The ink
@@ -170,13 +170,14 @@ function updateToc() {
 // actually in was invisible — and the inactive one 2.46:1 against a 4.5:1 requirement. True at 1440 and at
 // 3440, so it was never an ultrawide quirk.
 //
-// CornerNav already solves this for itself with a data-zone flipped off the descent fraction, but its zone
-// cannot be borrowed: it probes at the TOP of the viewport and this rail sits at the MIDDLE, so the rail must
-// go dark earlier. What CAN be shared is the listener — this runs inside the scrollspy's existing rAF-throttled
-// handler rather than adding a second scroll listener, which is how the same fix stays one mechanism.
+// CornerNav solves this for itself with a data-zone flipped off the descent fraction, but its zone cannot be
+// borrowed: it is taken at the nav, near the TOP of the viewport, and this rail sits at the MIDDLE. What CAN be
+// shared is the listener — this runs inside the scrollspy's existing rAF-throttled handler rather than adding a
+// second scroll listener, which is how the same fix stays one mechanism.
 const tocEl = document.getElementById('art-toc');
 const descentEl = document.querySelector<HTMLElement>('.descent');
-// Not CornerNav's 0.57: that probes at the top of the viewport, and this rail sits at the middle (above).
+// Not CornerNav's 0.57. Both fractions are taken at their own element, so position is not the difference: this
+// rail's inks sit on the bare sky, with no frosted glass, and cross over at their own depth.
 const DARK_FROM = 0.42;
 function updateTocZone() {
   if (!tocEl || !descentEl) return;

@@ -458,10 +458,9 @@ every block has its own route, and the corner nav carries the doors.
 `sections/Mountains.astro` — the old résumé section — **is deleted**, and so is
 /proto-paper, the last route that rendered it. This file used to say it was "kept on
 purpose … so the markup is recoverable without git archaeology"; it isn't kept, and
-git is the archive. What *does* still reference it is a handful of comments that
-were written while it existed: `lib/skyShader.ts` and `components/FluidSky.astro`
-each explain an amplitude decision in terms of where Mountains used to sit, which is
-a historical note on a live decision and is fine to leave.
+git is the archive. What still names it is `pages/index.astro`'s one-line deletion
+marker and the labels of `tests/deck.test.ts`'s fixture, a geometry measured on an
+earlier slide order.
 
 ### THE DECK — one gesture, one slide
 
@@ -470,7 +469,7 @@ The brief: *"like a PPT, one scroll guides you to the next slide. It's not a fre
 scroll."*
 
 - **It is not CSS scroll-snap, and that was measured, not assumed.** Slide gaps
-  are 819–2346px while one wheel gesture is ~320px, so `scroll-snap-type: y
+  are 581–2346px while one wheel gesture is ~320px, so `scroll-snap-type: y
   mandatory` re-snapped to the slide it started from: the scroll sat at **y=84
   through eight consecutive gestures**, and through a 12-event trackpad flick.
   `proximity`, `scroll-snap-stop: always`, and a hero shrunk to exactly 100vh all
