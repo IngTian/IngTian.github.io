@@ -82,7 +82,8 @@ function walk(section: HTMLElement, beats: Beats): () => void {
   });
 
   if (reduced) {
-    // No walk, but the buttons still work: the same control with nothing moving on its own.
+    // No walk. A click still picks a beat, and so do the arrow keys, except on a slide that passes `still`
+    // (Choice), where they stay the page's.
     if (still) still();
     else { step = n - 1; show(step, false); }
   } else {
