@@ -25,7 +25,8 @@ html[data-theme='dark'] .slide-paper {
 }
 
 /* Clears the fixed rail (SideRail), whose widest label ends at x=145 at most (lib/pageStops' homeStops has the
-   arithmetic). The rail hides at 1100px and below, and the gutter goes with it, on the same query. */
+   arithmetic, and tests/pageStops.test.ts reads the 168 here). The rail hides at 1100px and below, and the gutter
+   goes with it, on the same query (tests/viewport.test.ts holds the two together). */
 .slide-gutter {
   padding-left: clamp(168px, 10.4vw, 200px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
 }

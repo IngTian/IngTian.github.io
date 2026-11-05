@@ -203,8 +203,11 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
       for (const [a] of list.matchAll(/<a\b[^>]*>/g)) if (!/\shref="[^"]+"/.test(a)) wrong.push(`${p.route}: ${a}`);
     }
     expect(wrong).toEqual([]);
-    // and no rule hides the marks wholesale: below 1200px only `.profile` goes.
-    const hides = /\.cnav\[[^\]]+\] \.mark(?:-li)?\[[^\]]+\][^{}]*\{[^}]*display:none/.exec(distCss());
+    // and no rule hides the marks wholesale: below 1200px only `.profile` goes. Read from every byte of CSS the pages
+    // ship, and known to be reading the corner nav's: the `.profile` rule is found first.
+    const css = shippedCss(pages());
+    expect(css, 'the corner nav hides `.profile` below 1200px').toMatch(/\.cnav\[[^\]]+\] \.profile\[[^\]]+\][^{}]*\{[^}]*display:none/);
+    const hides = /\.cnav\[[^\]]+\] \.mark(?:-li)?\[[^\]]+\][^{}]*\{[^}]*display:none/.exec(css);
     expect(hides?.[0], 'a corner-nav rule hides every contact mark').toBeUndefined();
   });
 
@@ -1154,6 +1157,7 @@ describe('/research/rl-bhrp — a paper explained, from its file', async () => {
   // would go unseen: each is here once (by its outermost tag), and no page still says FIGURE_NAME, the placeholder
   // a drawing names itself by until its :::figure numbers it.
   it('places every drawing its data registers, once, each named by its :::figure', () => {
+    expect(Object.keys(PAPER_DATA['rl-bhrp'].figures).sort()).toEqual(['metrics', 'pipeline', 'wealth']);
     for (const [name, html] of Object.entries(PAPER_DATA['rl-bhrp'].figures)) {
       const head = /^<\w+ class="[^"]*"/.exec(html)?.[0] ?? `(${name} opens with no class)`;
       expect(page().markup.split(head).length - 1, `${name}: ${head}`).toBe(1);

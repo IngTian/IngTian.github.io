@@ -71,17 +71,20 @@ describe('viewport phone gate', () => {
 // is a 1321px window at 120%), to neither layout: there the rail shows and the paper's two columns stand, while its
 // script, asking the other bound, leaves every note unplaced at its block's top.
 describe('the wide layout', () => {
-  // WIDE_QUERY is the paper page's script's question; the answer the page shows is two stylesheets' (lib/viewport
+  // WIDE_QUERY is the paper page's script's question; the answer the pages show is three stylesheets' (lib/viewport
   // says which). Read from them, so a breakpoint retuned in the CSS alone fails here.
-  it("is the exact negation of the query SideRail hides at and the paper page's one column is set at", () => {
+  it("is the exact negation of the query SideRail hides at, the paper page's one column is set at and the homepage's panels give the rail's gutter back at", () => {
     const read = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8');
     const hides = /@media ([^{]+?) ?\{ ?\.side-rail \{ display: none; \} ?\}/.exec(read('components/SideRail.astro'));
     const page = read('pages/research/[slug].astro');
     const column = /@media ([^{]+?) ?\{\s*\.paper \{ width: auto;/.exec(page);
+    const gutter = /@media ([^{]+?) ?\{ ?\.slide-gutter \{/.exec(read('styles/slides.css'));
     expect(hides, "SideRail's hide rule").not.toBeNull();
     expect(column, "the paper page's one-column block").not.toBeNull();
+    expect(gutter, "the panels' gutter rule").not.toBeNull();
     expect(`not all and ${hides![1]}`).toBe(WIDE_QUERY);
     expect(`not all and ${column![1]}`).toBe(WIDE_QUERY);
+    expect(`not all and ${gutter![1]}`).toBe(WIDE_QUERY);
     // and the page's own wide blocks ask the same
     const negations = [...page.matchAll(/@media (not all and \([^)]*\))/g)].map((m) => m[1]);
     expect(negations.length).toBeGreaterThan(0);

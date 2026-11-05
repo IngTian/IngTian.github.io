@@ -490,11 +490,11 @@ and reverted every time** — do not rebuild it. The phone treatment is *bug fix
     paper page's note placement), never a second bound at 1101px. A zoomed or OS-scaled window can be 1100.83
     CSS px wide (1321px at 120%), which a pair of bounds leaves to neither: measured there, the rail showed
     while the paper's 24 notes went unplaced, 8 of them overlapping, /projects' content sat under the rail,
-    and the homepage's Choice slide stacked. `tests/viewport.test.ts` holds `WIDE_QUERY` to the exact negation
-    of SideRail's hide query and the paper page's one-column query, and fails on any breakpoint in `src`
-    written as two bounds a pixel apart (/projects' cow column is `(max-width: 1179px)` and its negation for
-    the same reason). The homepage's five paper slides give the rail's gutter back on this same query, once
-    (`.slide-gutter` in `styles/slides.css`).
+    and the homepage's Choice slide stacked. The homepage's five paper slides give the rail's gutter back on
+    this same query, once (`.slide-gutter` in `styles/slides.css`). `tests/viewport.test.ts` holds `WIDE_QUERY`
+    to the exact negation of SideRail's hide query, the paper page's one-column query and the gutter's, and
+    fails on any breakpoint in `src` written as two bounds a pixel apart (/projects' cow column is
+    `(max-width: 1179px)` and its negation for the same reason).
   - **Under forced colours** (Windows High Contrast) every ink becomes one system colour and the dash, a
     background, is painted as Canvas; there the dash is `Highlight` and the current label is underlined.
   - **Its marking rule is `railMarks()` in `lib/scrollspy.ts`**, pure and specified (its doc comment is the
@@ -506,13 +506,14 @@ and reverted every time** — do not rebuild it. The phone treatment is *bug fix
     generated text). The sheets' numbers are held by `tests/paperPalette.test.ts` and
     `tests/draftingPalette.test.ts`; over the reading sky they were measured on screen (inactive labels 5.53 /
     5.74 on /writing and 5.54 / 5.63 on /experience, light / dark; the dash at least 3.74:1). On `/` a resting
-    label is `--rail-ink` (light `#4e483d`: 4.59:1 on the tan panels, where `--ink-3` is 3.80; dark `--ink-3`)
-    and the focus ring `--rail-focus` (light `--ink-1`, 9.32:1 on the tan, where `--ochre` is 1.19; dark
-    `--ochre`), held with the marks and the dash by `tests/deckPalette.test.ts` on the panels and on the sky's
-    CSS gradient, its no-WebGL state, down to the Interlude's foot; the last screen is Work's panel. Not held:
-    the live sky a desktop with WebGL draws over that gradient (FluidSky, SkyWash, the `.descent` washes). The
-    descent variant's policy guards against a lighter sky under its paper-coloured text and lets it darken
-    nearly freely, and a darker sky is the danger to the light theme's dark labels.
+    label is `--rail-ink` (light `#494339`: 4.96:1 on the tan panels, where `--ink-3` is 3.80, and 4.69:1 on
+    the sky at its deepest under the rail; dark `--ink-3`) and the focus ring `--rail-focus` (light `--ink-1`,
+    9.32:1 on the tan, where `--ochre` is 1.19; dark `--ochre`), held with the marks and the dash by
+    `tests/deckPalette.test.ts` on the panels and on the sky's CSS gradient, its no-WebGL state, down to the
+    Interlude's foot on a window 520px tall, and under the static Grain overlay; the last screen is Work's
+    panel. Not held: the live sky a desktop with WebGL draws over that gradient (FluidSky, SkyWash, the
+    `.descent` washes). The descent variant's policy guards against a lighter sky under its paper-coloured text
+    and lets it darken nearly freely, and a darker sky is the danger to the light theme's dark labels.
   - **Its motion is the rule's: each piece runs once per showing** (the timings are `lib/motionTiming.ts`'s
     `RAIL`; the entrance's duration reaches the CSS as `--row`). The entrance is CSS because a bundled script
     runs after first paint, and a from-state it set could land on a rail already drawn at rest. On `/` the
@@ -973,12 +974,13 @@ of sky over a full-bleed panel.
 
 ## Taste rules (these define the look — hold the line)
 
-- **Palette discipline:** ONLY the tokens in `tokens.css` (paper, ink-1..5, ochre, indigo, seal, plus the
-  derived `--hairline-rgb` and `--rule`); under a page register, its own tokens and its overrides of the role
-  tokens (/projects' eight `--draft-*` and two knockouts, the research routes' eight `--sheet-*`; *Themes*);
-  and on `/`, which is not a register, `--rail-ink` and `--rail-focus` (*Navigation*), the six `--panel-*` of
-  `styles/slides.css` (the five paper panels' ground and inks per theme), Choice's chart colours `--c-h*` and
-  `--c-p*`, and Story's two graph-line tones, `--story-line` and `--story-line-soft`.
+- **Palette discipline:** the shared palette is the tokens in `tokens.css` (paper, ink-1..5, ochre, indigo,
+  seal, plus the derived `--hairline-rgb` and `--rule`); under a page register, its own tokens and its overrides
+  of the role tokens (/projects' eight `--draft-*` and two knockouts, the research routes' eight `--sheet-*`;
+  *Themes*); and on `/`, which is not a register, `--rail-ink` and `--rail-focus` (*Navigation*), the six
+  `--panel-*` of `styles/slides.css` (the five paper panels' ground and inks per theme), Choice's chart colours
+  `--c-h*` and `--c-p*`, and Story's two graph-line tones, `--story-line` and `--story-line-soft`. Beyond
+  those, a component may hold a literal for a drawing of its own (the cow's coat, /experience's timeline dots).
   - **An undeclared `var()` voids the whole shorthand** (every longhand falls back to its initial, and
     `border-style`'s is `none`): /experience's dividers never drew against an undefined `--rule`, which is now
     `rgba(var(--hairline-rgb), 0.32)`. `tests/cssVars.test.ts` fails on any `var(--x)` without a fallback that

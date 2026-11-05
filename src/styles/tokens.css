@@ -255,16 +255,16 @@ html[data-page='paper'][data-theme='dark'] {
 /* ============================================================
    DECK — the homepage (BaseLayout `page="deck"`). Not a register: no role token changes, only the rail's two.
    The rail (SideRail) sits over the Interlude's sky and then the five opaque paper panels, where light --ink-3,
-   its resting ink on every other page, is 3.80:1 on the tan. --rail-ink is that resting ink here: 4.59:1 on the
-   tan and 5.24:1 on the sky's CSS gradient (its no-WebGL state) at its darkest under the rail, and still short of
-   --ink-2, the quiet mark's ink, so a resting label and a marked one stay apart. Dark --ink-3 clears the slate
-   panel (5.74:1), so the dark block names it. --rail-focus is the focus ring, --ochre on every other page: light
-   ochre is 1.19:1 on the tan, so the light block draws it in --ink-1 (9.32:1); dark emerald clears the slate
-   (8.33:1). tests/deckPalette.test.ts holds the numbers. Both blocks declare both tokens: nothing else declares
+   its resting ink on every other page, is 3.80:1 on the tan. --rail-ink is that resting ink here: 4.96:1 on the
+   tan and 4.69:1 on the sky's CSS gradient (its no-WebGL state) at its darkest under the rail, a window 520px tall,
+   with room for the Grain overlay's cost, and still short of --ink-2, the quiet mark's ink, so a resting label and
+   a marked one stay apart. Dark --ink-3 clears the slate panel (5.74:1), so the dark block names it. --rail-focus
+   is the focus ring, --ochre on every other page: light ochre is 1.19:1 on the tan, so the light block draws it in
+   --ink-1 (9.32:1); dark emerald clears the slate (8.33:1). tests/deckPalette.test.ts holds the numbers. Both blocks declare both tokens: nothing else declares
    them, so without a dark block the light values would apply in dark too.
    ============================================================ */
 html[data-page='deck'] {
-  --rail-ink: #4e483d;
+  --rail-ink: #494339;
   --rail-focus: var(--ink-1);
 }
 html[data-page='deck'][data-theme='dark'] {

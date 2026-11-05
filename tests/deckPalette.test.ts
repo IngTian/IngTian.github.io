@@ -17,7 +17,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { rampFor, type Theme } from '../src/lib/skyPalette';
-import { AA_BODY, NEBULA, NEBULA_CEILING } from '../src/lib/skyLegibility';
+import { AA_BODY, NEBULA, NEBULA_CEILING, wcagLuminance } from '../src/lib/skyLegibility';
 import { between, onGround, over, railMark, ratio, rgbOf, tokens, type RGB } from './helpers/palette';
 
 const THEMES = [
@@ -32,9 +32,22 @@ const PANEL = { light: '#c4b7a1', dark: '#14161a' } as const;
  * How far down the page the sky under the rail can be. The rail shows once the hero's bottom is above mid-screen,
  * and every slide after the Interlude is an opaque panel, so the sky it sits on ends at the Interlude's foot: with
  * the hero at its 108vh and every slide at its 100vh floor, (1.08 + 1) / (1.08 + 6) = 0.294 of the page. A taller
- * slide below only lowers it; a hero taller than its floor (a short window) raises it, to 0.342 at 1.6 screens.
+ * slide below only lowers it; a hero taller than its floor raises it, and a window 520px tall or less makes the hero
+ * 1.6 screens: the worst case, held here.
  */
-const SKY_DEPTH = 0.3;
+const SKY_DEPTH = (1.6 + 1) / (1.6 + 6);
+
+/**
+ * The static Grain overlay (components/Grain.astro: fixed over the whole homepage, the rail included, multiply at
+ * 0.09), as the darkening its median puts on each channel: in a real browser the tan #c4b7a1 rendered #c2b59f under
+ * it. It darkens a label and its ground alike, so darkening only the lighter of the two is a bound on what it costs.
+ * Measured: the old resting ink #4e483d, 4.59:1 declared on the tan, rendered 4.52:1 under it (this bound: 4.49).
+ */
+const GRAIN: RGB = [0xc2 / 0xc4, 0xb5 / 0xb7, 0x9f / 0xa1];
+const underGrain = (ink: string, g: RGB): number => {
+  const i = rgbOf(ink), dim = (c: RGB) => c.map((v, k) => v * GRAIN[k]) as RGB;
+  return wcagLuminance(i) > wcagLuminance(g) ? between(dim(i), g) : between(i, dim(g));
+};
 
 /** The descent sky from the top down to `depth`: every ramp stop above it, and the ramp at it. */
 function skyTo(theme: Theme, depth: number): RGB[] {
@@ -83,9 +96,12 @@ describe("the homepage's rail ink (tokens.css)", () => {
         : [g]);
       const grounds = [panel, ...sky];
 
-      it('clears 4.5:1 on the panel and the sky, resting and marked', () => {
+      it('clears 4.5:1 on the panel and the sky, resting and marked, under the Grain too', () => {
         for (const [name, ink] of [['resting', rest], ['quiet', base['--ink-2']], ['lead', base['--ink-1']]]) {
-          for (const g of grounds) expect(onGround(ink, g), `${name} ${ink} on ${g.map(Math.round)}`).toBeGreaterThanOrEqual(AA_BODY);
+          for (const g of grounds) {
+            expect(onGround(ink, g), `${name} ${ink} on ${g.map(Math.round)}`).toBeGreaterThanOrEqual(AA_BODY);
+            expect(underGrain(ink, g), `${name} ${ink} under the Grain on ${g.map(Math.round)}`).toBeGreaterThanOrEqual(AA_BODY);
+          }
         }
       });
 

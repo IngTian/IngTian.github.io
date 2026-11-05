@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import {
   projectStops, projectSectionId, experienceStops, railLabel, homeStops, flattenStops, fragmentId, paperPageOwns, paperSections,
@@ -272,9 +273,14 @@ describe('homeStops', () => {
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
   });
 
-  // The slides' text starts at x=168 beside the rail, so these lengths are what keep the labels off it: 11
-  // characters end at x=162 at most, 8 nested ones at 138 (homeStops has the arithmetic).
-  it('keeps rail labels short enough for the slides’ 168px gutter', () => {
+  // The slides' text starts at the gutter's minimum beside the rail, so these lengths are what keep the labels off
+  // it: 11 characters end at x=162 at most, 8 nested ones at 138 (homeStops has the arithmetic).
+  it('keeps rail labels short enough for the slides’ gutter', () => {
+    const css = readFileSync(new URL('../src/styles/slides.css', import.meta.url), 'utf8');
+    const gutter = Number(/\.slide-gutter \{\s*padding-left: clamp\((\d+)px/.exec(css)?.[1]);
+    // the rail's left at most (38px) + its 30px dash gutter + the label: 8.58px a character, or 7.2px after a 12px indent
+    expect(38 + 30 + 11 * 8.58, 'the gutter').toBeLessThanOrEqual(gutter);
+    expect(38 + 30 + 12 + 8 * 7.2, 'the gutter').toBeLessThanOrEqual(gutter);
     for (const s of stops) expect(s.label.length, s.label).toBeLessThanOrEqual(11);
     for (const c of stops.flatMap((s) => s.children ?? [])) {
       expect(c.label.length, c.label).toBeLessThanOrEqual(8);
