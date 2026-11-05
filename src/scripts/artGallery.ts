@@ -153,7 +153,7 @@ const stops = tocLinks
   .map((a) => ({ a, el: document.getElementById(a.dataset.target || '') }))
   .filter((s): s is { a: HTMLAnchorElement; el: HTMLElement } => !!s.el);
 function updateToc() {
-  // shared pure rule (see lib/scrollspy.ts) — same active-stop logic as the homepage TOC
+  // shared pure rule (see lib/scrollspy.ts); SideRail's railMarks falls back to it
   const idx = activeStopIndex(
     stops.map((s) => s.el.getBoundingClientRect().top),
     window.innerHeight,

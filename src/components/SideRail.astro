@@ -16,8 +16,8 @@
 //
 // A page reskins it only through role tokens (CLAUDE.md, The concept): --knockout and --rail-dash-halo, declared
 // by the registers whose ground needs them (today /projects' drafting sheet), `none` everywhere else; and
-// --rail-ink, the resting label's ink, declared by the homepage (tokens.css, `deck`), whose tan panels --ink-3 does
-// not clear.
+// --rail-ink and --rail-focus, the resting label's ink and the focus ring's (else --ink-3 and --ochre), declared by
+// the homepage (tokens.css, `deck`), whose tan panels neither light --ink-3 nor light ochre clears.
 //
 // The site's one other rail is /art's, coupled to its gallery's formation and left alone.
 import { type Stop, flattenStops } from '../lib/pageStops';
@@ -145,7 +145,7 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
     .side-rail a.is-hover:not(.is-active)::after { opacity: 0.2; }
   }
   .side-rail a:not(.is-active):focus-visible::after { opacity: 0.2; }
-  .side-rail a:focus-visible { outline: 1px solid var(--ochre); outline-offset: 3px; border-radius: 2px; }
+  .side-rail a:focus-visible { outline: 1px solid var(--rail-focus, var(--ochre)); outline-offset: 3px; border-radius: 2px; }
 
   /* The label's cross-fade and the 2px nudge toward a hovered or focused row. The dash's slide and the quiet marks'
      fades are the script's. The times are lib/motionTiming's RAIL, the curves its FADE and EASE

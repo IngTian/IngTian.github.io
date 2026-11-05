@@ -66,8 +66,8 @@ and which kind a component is decides how a page may change it:
   `html[data-page='paper']` block in `tokens.css` overrides the *role* tokens (`--paper`,
   the ink ramp, `--ochre` → the seal), so the nav's dot, pill and focus ring turn seal red
   there by reading the same variable they read everywhere. The homepage is no register, but
-  its `html[data-page='deck']` block sets the one token the rail needs there, `--rail-ink`
-  (see *Navigation*). A change to one of these is a change to every page.
+  its `html[data-page='deck']` block sets the two tokens the rail needs there, `--rail-ink`
+  and `--rail-focus` (see *Navigation*). A change to one of these is a change to every page.
 - **Page-own: buttons.** One anatomy, a skin per page. `components/Button.astro` owns
   the size, label, arrow, press, focus ring and the `<a>`/`<button>` behaviour; a page's
   look is a `skin` value plus one `.btn--<skin>` block. The skins today are
@@ -725,19 +725,25 @@ phone treatment is *bug fixes only*, and the whole of it is:
     held by `tests/paperPalette.test.ts` and `tests/draftingPalette.test.ts`; over the reading sky
     they were measured on screen (inactive labels 5.53 / 5.74 on /writing and 5.54 / 5.63 on
     /experience, light / dark; the dash at least 3.74:1). On `/` a resting label is `--rail-ink`
-    (light `#4e483d`: 4.59:1 on the tan panels, where `--ink-3` is 3.80; dark `--ink-3`), held
-    with the marks and the dash on the panels and the sky by `tests/deckPalette.test.ts`. Not
-    held: the footer's near-black ground, behind the rail only in a window under ~560px tall
-    at the last screen.
+    (light `#4e483d`: 4.59:1 on the tan panels, where `--ink-3` is 3.80; dark `--ink-3`) and the
+    focus ring `--rail-focus` (light `--ink-1`, 9.32:1 on the tan, where `--ochre` is 1.19; dark
+    `--ochre`), held with the marks and the dash by `tests/deckPalette.test.ts` on the panels and
+    on the sky's CSS gradient, its no-WebGL state, down to the Interlude's foot. Not held: the
+    footer's near-black ground, behind the rail only in a window under ~560px tall at the last
+    screen; and the live sky a desktop with WebGL draws over that gradient (FluidSky, SkyWash,
+    the `.descent` washes), which the descent variant lets darken nearly freely, since what it
+    guards against is a lighter sky under its paper-coloured text — a danger to the light
+    theme's dark labels.
   - **Its motion is the rule's, and every piece of it runs once** (the timings are
     `lib/motionTiming.ts`'s `RAIL`; the entrance's duration reaches the CSS as `--row`). The entrance is CSS because a bundled script runs after first paint, and
     a from-state it set could land on a rail already drawn at rest. Hover is `.is-hover`, not
     `:hover`, set for a mouse or a pen and never for `pointerType === 'touch'`. Reduced motion:
     the same marks, at once. On `/` the entrance plays as the reader leaves the hero, and again
     each time they come back down past it (a CSS animation restarts when its element renders).
-  - **A page reskins it through three role tokens and nothing else**: `--knockout` and
+  - **A page reskins it through four role tokens and nothing else**: `--knockout` and
     `--rail-dash-halo`, each read with a `none` fallback (the drafting register's), and
-    `--rail-ink`, read with `--ink-3` (the homepage's). No page styles the rail;
+    `--rail-ink` and `--rail-focus`, read with `--ink-3` and `--ochre` (the homepage's). No page
+    styles the rail;
     `tests/draftingPalette.test.ts` checks.
 
 ## The content model rule
@@ -1219,8 +1225,8 @@ galaxy). The whole system is **token override**, not per-component branching:
   token**: `[data-page]` and `[data-theme='dark']` tie on specificity, so a light-only value
   would win in dark. The role tokens a register must declare are one list, `ROLE_TOKENS` in
   `tests/helpers/palette.ts`, which both palette specs read. The homepage's `page="deck"` is
-  not a register: its two blocks declare only `--rail-ink`, the rail's resting ink
-  (`tests/deckPalette.test.ts`; see *Navigation*).
+  not a register: its two blocks declare only `--rail-ink` and `--rail-focus`, the rail's
+  resting ink and focus ring (`tests/deckPalette.test.ts`; see *Navigation*).
   - **drafting** adds `--knockout` (the label knockout, one 1px ring of the bare sheet that
     `<main>`'s text and `SideRail`'s labels both read — the rail with a `none` fallback, so
     the page never styles the rail), `--rail-dash-halo` (the rail dash's 2px ring)
@@ -1478,7 +1484,9 @@ titles came to rest hard against the browser chrome — the lead is a number in
 - **Palette discipline:** ONLY the tokens in `tokens.css` (paper, ink-1..5,
   ochre, indigo, seal, plus the derived `--hairline-rgb` and `--rule` — and, under a page
   register only, its own tokens and its overrides of the role tokens: /projects' eight
-  `--draft-*` and two knockouts, the research routes' eight `--sheet-*`; see *Themes*).
+  `--draft-*` and two knockouts, the research routes' eight `--sheet-*`; see *Themes* — and on
+  `/`, which is not a register, `--rail-ink` and `--rail-focus`, the rail's resting ink and
+  focus ring; see *Navigation*).
   - **`--rule` exists because `/experience` was already using it.** Two rules there declared
     `border-bottom: 1px solid var(--rule)` against a property defined nowhere, which by spec makes the whole
     shorthand invalid at computed-value time — every longhand falls back to its initial, and
