@@ -86,6 +86,12 @@ describe('the wide layout', () => {
     const negations = [...page.matchAll(/@media (not all and \([^)]*\))/g)].map((m) => m[1]);
     expect(negations.length).toBeGreaterThan(0);
     expect(new Set(negations)).toEqual(new Set([WIDE_QUERY]));
+    // and every one-column bound the page writes (the notes' drop into the column among them) is that same width;
+    // only the phone's own breakpoint differs.
+    const hideWidth = /\(max-width: (\d+)px\)/.exec(hides![1])![1];
+    const bounds = [...page.matchAll(/\(max-width: (\d+)px\)/g)].map((m) => m[1]).filter((w) => w !== String(PHONE_MAX_WIDTH));
+    expect(bounds.length).toBeGreaterThan(1);
+    expect(new Set(bounds)).toEqual(new Set([hideWidth]));
   });
 
   // Not only this breakpoint: any (min-width: N) beside a (max-width: M) with N - 1 <= M < N leaves the widths between

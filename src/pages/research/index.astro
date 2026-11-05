@@ -49,7 +49,7 @@ const explained = new Set((await getCollection('papers')).map((e) => e.data.publ
                 : <a href={p.href} target="_blank" rel="noopener noreferrer" aria-describedby={`out-${p.slug}`}>{title}<span class="ext" aria-hidden="true"> ↗</span></a>}</h3>
               <p class="p-auth">{p.authors.map((a) => a.name).join(', ')}</p>
               <p class="p-meta">{[STATUS_LABEL[p.status], p.venue, p.year].map((t, i) => <>{i > 0 && ' '}<span class="nw">{i > 0 && '· '}{t}</span></>)}{!here && <span class="out" id={`out-${p.slug}`}>opens the publisher’s page<span aria-hidden="true"> ↗</span></span>}</p>
-              <p class="p-find">{p.finding}</p>
+              <p class="p-find">{wholeParts(p.finding).map((s, i) => (i % 2 ? <span class="nw">{s}</span> : s))}</p>
               <p class="p-tags">{p.tags.map((t, i) => <>{i > 0 && ' '}<span class="nw">{i > 0 && '· '}{t}</span></>)}</p>
               {thumb && (
                 <div class="p-fig">
