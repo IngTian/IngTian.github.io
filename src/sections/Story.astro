@@ -8,10 +8,9 @@
 // spread, but its CONTENT was photograph notes — "after all we are not an artist". So this keeps that
 // typographic register and puts the actual subject in it.
 //
-// WHY A PAPER GROUND. The rest of the homepage is a sky you descend through. This section is the one
-// place that stops and talks, so it gets a different surface: an editorial paper panel, full-bleed,
-// with the sky visible above and below it. That is also the elegant thing the owner picked out about
-// the light theme, and the panel colour is chosen per theme rather than shared.
+// WHY A PAPER GROUND. Its panel is one of the homepage's five `.slide-paper` panels, its colours per
+// theme from styles/slides.css: an editorial paper surface, full-bleed, with the sky visible above and
+// below it. That is also the elegant thing the owner picked out about the light theme.
 //
 // Every number here is COMPUTED at build time from the same field the graph draws, so the prose and
 // the picture cannot drift apart. Nothing is hand-typed.
@@ -41,8 +40,8 @@ import { STORY } from '../data/story';
          STICKY, so it stays visible while its explanation scrolls past — the whole point of merging is
          that you can read the claim and check the picture at the same time. */}
     <div class="story-split slide-gutter">
-      {/* The graph, on the same paper. Passed in as a slot so this component owns the surface and the
-           ink tokens, and DescentPath stays a self-contained piece that inherits them. */}
+      {/* The graph, on the same paper: a slot, so DescentPath inherits the panel's inks
+           (styles/slides.css) and Story's two line tones, and stays self-contained. */}
       <div class="story-figure-slot"><slot /></div>
 
       <div class="story-inner">

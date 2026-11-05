@@ -1486,7 +1486,8 @@ titles came to rest hard against the browser chrome — the lead is a number in
   register only, its own tokens and its overrides of the role tokens: /projects' eight
   `--draft-*` and two knockouts, the research routes' eight `--sheet-*`; see *Themes* — and on
   `/`, which is not a register, `--rail-ink` and `--rail-focus`, the rail's resting ink and
-  focus ring; see *Navigation*).
+  focus ring (see *Navigation*), the six `--panel-*` of `styles/slides.css`, the five paper
+  panels' ground and inks per theme, and Choice's own chart colours, `--c-h*` and `--c-p*`).
   - **`--rule` exists because `/experience` was already using it.** Two rules there declared
     `border-bottom: 1px solid var(--rule)` against a property defined nowhere, which by spec makes the whole
     shorthand invalid at computed-value time — every longhand falls back to its initial, and
