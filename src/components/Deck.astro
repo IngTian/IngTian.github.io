@@ -254,11 +254,11 @@
     // short, so the click landed nowhere while the hash said it had: the deck's tween, whose next instant
     // scrollTo cancels the browser's smooth scroll (a rail click 250ms into a PageDown missed 4 of 4), and a
     // wheel during the jump, taken as a new gesture and tweened from mid-flight. So the deck drops its slide
-    // and swallows the wheel (wheelAction's `live`) until the scroll ends. A key press still moves a slide:
+    // and swallows the wheel (wheelAction's `live`) while it holds, below. A key press still moves a slide:
     // it is the reader's, where a wheel tail is often momentum.
     let yielding = false;
     let yieldTimer = 0;
-    // The scroll ends 300ms after its last scroll event (or after the click, for a jump with nothing to
+    // The hold ends 300ms after the jump's last scroll event (or after the click, for a jump with nothing to
     // scroll). NOT on `scrollend`: each of the tween's instant steps fires one, so the step before the
     // cancel ends the yield one frame after the click, before the browser's smooth scroll has moved.
     // ponytail: a jump whose frames stall past this loses its hold (seen only under software GL, a 1.4s
