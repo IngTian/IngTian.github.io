@@ -321,8 +321,9 @@ const allBeats = [...BEATS, BEAT4];
     --c-p0: #7d8798; --c-p1: #d3d8d2; --c-p2: #a98cb0; --c-p3: #5f6763; --c-p4: var(--c-accent);
   }
   .ch-inner {
-    /* Clears the fixed Toc rail, whose right edge moved from x=129 to x=151 once it gained an indented tier
-       ("Problem / Limits / Method" under "The field"). Shared across the five paper slides. */
+    /* Clears the fixed rail (SideRail), whose widest label ends at x=145 at most (lib/pageStops' homeStops has
+       the arithmetic). The rail hides at 1100px and below, and this gutter goes with it. Shared across the five
+       paper slides. */
     padding-left: clamp(168px, 10.4vw, 200px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
   }
   @media (max-width: 1100px) { .ch-inner { padding-left: clamp(28px, 6vw, 80px); } }

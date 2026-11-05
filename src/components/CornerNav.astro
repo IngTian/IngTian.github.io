@@ -3,13 +3,11 @@
 // (GitHub · Email · CV · LinkedIn) from the very first paint, so a visitor
 // never has to scroll to the foot of the page to make contact (issue #21).
 //
-// Mirrors the Toc pattern: plain Astro + a bundled vanilla <script> (NOT a
-// React island), re-inits on astro:page-load with a teardown, and adapts its
-// color to the sky beneath it. Where the Toc sits at the viewport MIDDLE and
-// flips per-section, this nav is pinned to the TOP edge — so it flips on the
-// gradient fraction painted directly behind it, dark ink on the pale upper
-// sky → paper once the descent sinks into dusk. Ochre on hover, the site's
-// one interaction accent.
+// Plain Astro + a bundled vanilla <script> (NOT a React island), re-inits on
+// astro:page-load with a teardown, and adapts its color to the sky beneath it.
+// Pinned to the TOP edge, it flips on the gradient fraction painted directly
+// behind it, dark ink on the pale upper sky → paper once the descent sinks
+// into dusk. Ochre on hover, the site's one interaction accent.
 //
 // Hrefs come from profile.ts (the single source of résumé facts); the icons
 // live here (presentation, not content). Built so the deferred light/dark
@@ -146,7 +144,7 @@ const items: Item[] = [
     position: fixed;
     top: clamp(14px, 2vw, 22px);
     right: clamp(14px, 7vw, 64px);
-    z-index: 40;                 /* above Toc (30) and content */
+    z-index: 40;                 /* above the rail (30) and content */
   }
 
   /* ── The frosted-glass capsule. A rounded, lucid panel the links sit inside
@@ -606,7 +604,7 @@ const items: Item[] = [
     // long task (worst rAF gap 34ms, one frame of the hero's own 30fps throttle).
     function repaintForTheme() {
       // A DEDICATED EVENT, never astro:page-load: re-firing that re-runs every page script's init (the deck's
-      // re-measure, the Toc's observers, the beat steppers, the cow), none of which a colour change affects. Isolated
+      // re-measure, the rail, the beat steppers, the cow), none of which a colour change affects. Isolated
       // by measurement: 357ms of long task on the homepage against 55ms on /404, and unchanged when the View
       // Transition was disabled, so the cost was always this re-init and never the transition.
       document.dispatchEvent(new Event('theme:change'));

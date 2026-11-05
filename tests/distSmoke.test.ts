@@ -11,8 +11,8 @@ import { INTRO_SEEN_KEY } from '../src/lib/introSession';
 import { inProgress, projects, publications, researchInterests, timeline, type Publication } from '../src/data/profile';
 import { PAPER_DATA } from '../src/data/papers';
 import {
-  type Stop, experienceStops, flattenStops, paperPageOwns, paperSections, paperStops, projectSectionId, projectStops,
-  researchIndexStops,
+  type Stop, experienceStops, flattenStops, homeStops, paperPageOwns, paperSections, paperStops, projectSectionId,
+  projectStops, researchIndexStops,
 } from '../src/lib/pageStops';
 import { FIGURE_NAME, PAPERS_DIR, type PaperReport } from '../src/lib/paperMarkdown';
 import { countWords, readingMinutes, wholeParts } from '../src/lib/words';
@@ -547,7 +547,8 @@ describe("/art's image payload, measured on the built output", () => {
 });
 
 describe("BaseLayout's per-page hooks: /projects is the drafting page, the research routes the paper page", () => {
-  // `page` puts `data-page` on <html>, the scope tokens.css hangs a register's palette from; `veil={false}` drops
+  // `page` puts `data-page` on <html>, the scope tokens.css hangs a register's palette from (and, on `/`, 'deck',
+  // the rail's resting ink); `veil={false}` drops
   // the descent veil — on /projects because its boot is its entrance, on the research routes because the veil would
   // replay on every card click and every way back, holding the text ~1.1s. Both are props, so what this guards is a
   // default changing under every other route.
@@ -557,10 +558,10 @@ describe("BaseLayout's per-page hooks: /projects is the drafting page, the resea
   const isResearch = (route: string): boolean => route === '/research' || route.startsWith('/research/');
   const research = (): Page[] => pages().filter((p) => isResearch(p.route));
 
-  it('marks /projects as drafting, every research route as paper, and no other route at all', () => {
+  it('marks /projects as drafting, every research route as paper, / as deck, and no other route at all', () => {
     expect(research().length, 'no research route was built').toBeGreaterThan(0);
     const want = (route: string): string | undefined =>
-      route === '/projects' ? 'drafting' : isResearch(route) ? 'paper' : undefined;
+      route === '/projects' ? 'drafting' : isResearch(route) ? 'paper' : route === '/' ? 'deck' : undefined;
     const wrong = pages().filter((p) => pageOf(p.markup) !== want(p.route))
       .map((p) => `${p.route}: data-page=${pageOf(p.markup) ?? '(none)'}`);
     expect(wrong).toEqual([]);
@@ -640,8 +641,18 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
   const flat = (stops: readonly Stop[], depth = 0): { target: string; label: string; depth: number }[] =>
     stops.flatMap((s) => [{ target: s.target, label: s.label, depth }, ...flat(s.children ?? [], depth + 1)]);
 
-  it('is on /experience, /projects, /research, /research/rl-bhrp and /writing', () => {
-    expect(railPages().map((p) => p.route).sort()).toEqual(['/experience', '/projects', '/research', '/research/rl-bhrp', '/writing']);
+  it('is on /, /experience, /projects, /research, /research/rl-bhrp and /writing', () => {
+    expect(railPages().map((p) => p.route).sort()).toEqual(['/', '/experience', '/projects', '/research', '/research/rl-bhrp', '/writing']);
+  });
+
+  // The homepage's rail stays off its hero (SideRail's hideOver): a script marks it passed, and until then a plain
+  // rule outside any query keeps it display: none, so it is out of the tab order with no script too. The id it
+  // names must be the page's, or the rail never shows.
+  it('stays off the element its page names, which the page emits, and on / that is the hero', () => {
+    const over = (p: Page) => /<nav\b[^>]*\sclass="side-rail"[^>]*\sdata-hide-over="([^"]*)"/.exec(p.markup)?.[1];
+    expect(railPages().filter((p) => over(p) !== undefined).map((p) => [p.route, over(p)])).toEqual([['/', 'heights']]);
+    expect(builtPage('/').ids.has('heights')).toBe(true);
+    expect(railCss()).toMatch(/(?:^|\})\.side-rail\[data-hide-over\]:not\(\[data-past\]\)\{display:none\}/);
   });
 
   // The label is three layers of its text, so its states cross-fade by opacity: the dim one, the link's name and the
@@ -672,6 +683,7 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
     expect(strip(itemsOf(builtPage('/experience')))).toEqual(flat(experienceStops(timeline)));
     expect(strip(itemsOf(builtPage('/research/rl-bhrp')))).toEqual(flat(paperStops((await paperRender('rl-bhrp')).report.sections)));
     expect(strip(itemsOf(builtPage('/research')))).toEqual(flat(researchIndexStops()));
+    expect(strip(itemsOf(builtPage('/')))).toEqual(flat(homeStops()));
     expect(new Set(itemsOf(builtPage('/writing')).map((i) => i.depth))).toEqual(new Set([0, 1]));
   });
 

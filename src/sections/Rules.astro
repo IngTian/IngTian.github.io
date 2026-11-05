@@ -402,8 +402,9 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     --r-soft: #a8b0a9; --r-faint: #6d746e; --r-accent: #7fc9a0;
   }
   .ru-inner {
-    /* Clears the fixed Toc rail, whose right edge sits at x=151 once it carries its indented tier. Shared
-       across the five paper slides, so it is edited in all of them together or in none. */
+    /* Clears the fixed rail (SideRail), whose widest label ends at x=145 at most (lib/pageStops' homeStops has
+       the arithmetic). The rail hides at 1100px and below, and this gutter goes with it. Shared across the five
+       paper slides. */
     padding-left: clamp(168px, 10.4vw, 200px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
   }
   @media (max-width: 1100px) { .ru-inner { padding-left: clamp(28px, 6vw, 80px); } }

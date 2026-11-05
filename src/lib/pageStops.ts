@@ -175,17 +175,22 @@ export function writingStops(kinds: readonly WritingKind[]): Stop[] {
  *
  * The three children keep the mathematical names rather than the slide names, because those are the words a
  * reader will meet again everywhere else in the field.
+ *
+ * SideRail renders it, as on every rail page. Unlike theirs, this parent's section (#interlude) does not hold its
+ * children's: the slides are siblings. So on an explainer slide "The field" is lit as its ancestor, and current
+ * only while the Interlude itself is in the reading band.
  */
-export function homeStops(): (Stop & { zone: 'light' | 'dark' })[] {
+export function homeStops(): Stop[] {
   return [
-    { label: 'About', target: 'heights', zone: 'light' },
+    { label: 'About', target: 'heights' },
     {
       label: 'The field',
       target: 'interlude',
-      zone: 'light',
-      // SHORT labels. Measured: with "The problem" and "Constraints" the indented tier's right edge reached
-      // x=151 while the slide headline starts at 143 (at 1440px) — the rail printed over the words. A rail
-      // label is a bookmark, not a sentence.
+      // SHORT labels: a bookmark, not a sentence, and the rail must clear the slides' text, which starts at x=168
+      // or more wherever the rail shows (above 1100px). SideRail's right edge is its left (clamp(18px, 2.4vw,
+      // 38px)) + its 30px dash gutter + the widest label, and 11px mono at 0.18em tracking is 8.58px a character:
+      // "The field" ends at x=145 at most, and the 11 characters tests/pageStops.test.ts allows a top-level label
+      // at 162. A child is 7.2px a character after a 12px indent, so its 8 end at 138.
       children: [
         { label: 'Problem', target: 'choice' },
         { label: 'Limits', target: 'rules' },
@@ -194,12 +199,11 @@ export function homeStops(): (Stop & { zone: 'light' | 'dark' })[] {
         { label: 'Open', target: 'solve' },
       ],
     },
-    { label: 'The climb', target: 'story', zone: 'light' },
+    { label: 'The climb', target: 'story' },
     // ONE STOP, NOT TWO. 'The work' and 'Links' were separate sections and so separate deck stops, which left
     // 161px of empty panel below the work and made the last stop a 193px footer strip. They are one section now
-    // (see sections/Work.astro), so the rail names it once. 'light' because the stop begins on the tan panel;
-    // the footer inside it is where the descent reaches its dark ground.
-    { label: 'Appendix', target: 'appendix', zone: 'light' },
+    // (see sections/Work.astro), so the rail names it once.
+    { label: 'Appendix', target: 'appendix' },
   ];
 }
 

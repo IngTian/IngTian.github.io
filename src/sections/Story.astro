@@ -146,13 +146,9 @@ import { STORY } from '../data/story';
     grid-template-columns: 64fr 36fr;
     gap: 0 clamp(28px, 3vw, 64px);
     align-items: start;
-    /* Clears the fixed Toc rail, which spans x=34..129 at 1700px — the previous clamp resolved to 128px
-       and the rail's labels sat on the graph's own header. Shared with the other paper slides. */
-    /* Clears the fixed Toc rail. The rail now carries an INDENTED tier ("Problem / Limits / Method" nested
-       under "The field"), so its right edge moved from x=129 to x=151 at 1700px and the old clamp left as
-       little as 5px of air — measured at 1440px on this slide. 168px min / 10.4vw keeps at least ~20px of
-       margin at every width the rail is shown (it collapses to dots below 1100px). Shared across the five
-       paper slides, so it is edited in all of them together or in none. */
+    /* Clears the fixed rail (SideRail), whose widest label ends at x=145 at most (lib/pageStops' homeStops has
+       the arithmetic). The rail hides at 1100px and below; this gutter goes at 1099px, a pixel later, as in Solve
+       and Work (Choice and Rules drop it at 1100px). Shared across the five paper slides. */
     padding-left: clamp(168px, 10.4vw, 200px);
     padding-right: clamp(20px, 2.4vw, 52px);
     box-sizing: border-box;

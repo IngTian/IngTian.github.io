@@ -256,3 +256,19 @@ html[data-page='paper'][data-theme='dark'] {
   --sheet-mark: #e0574a;
   --sheet-link: rgba(205, 200, 190, 0.5);
 }
+
+/* ============================================================
+   DECK — the homepage (BaseLayout `page="deck"`). Not a register: no role token changes, only the rail's.
+   The rail (SideRail) sits over the Interlude's sky and then the five opaque paper panels, where light --ink-3,
+   its resting ink on every other page, is 3.80:1 on the tan. --rail-ink is that resting ink here: 4.59:1 on the
+   tan and 5.24:1 on the sky at its darkest under the rail, and still short of --ink-2, the quiet mark's ink, so a
+   resting label and a marked one stay apart. Dark --ink-3 clears the slate panel (5.74:1), so the dark block
+   names it. tests/deckPalette.test.ts holds the numbers. Both blocks declare the token: `[data-page]` and
+   `[data-theme='dark']` tie, so a light-only value would win in dark.
+   ============================================================ */
+html[data-page='deck'] {
+  --rail-ink: #4e483d;
+}
+html[data-page='deck'][data-theme='dark'] {
+  --rail-ink: var(--ink-3);
+}

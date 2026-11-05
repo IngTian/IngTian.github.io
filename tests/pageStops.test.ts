@@ -267,23 +267,19 @@ describe('homeStops', () => {
     expect(problem!.label.toLowerCase()).not.toBe('choice');
   });
 
-  // TREE ORDER MUST MATCH DOCUMENT ORDER. The scrollspy walks stops as rendered and marks the last one whose
-  // top crossed the reference line; a rail whose order disagrees with the page lights stops out of sequence.
+  // TREE ORDER MUST MATCH DOCUMENT ORDER. railMarks sorts by measured top where it must, but a rail whose rows
+  // disagree with the page reads as a different page, and its marks would step up and down the list.
   it('lists stops in the order the page renders them', () => {
     const positions = flat.map((s) => RENDERED.indexOf(s.target));
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
   });
 
-  // A thin left margin is the constraint that shortened these labels: at "The problem" / "Constraints" the
-  // indented tier measured past the slide's text edge.
-  it('keeps rail labels short enough for an 11px mono margin', () => {
+  // The slides' text starts at x=168 beside the rail, so these lengths are what keep the labels off it: 11
+  // characters end at x=162 at most, 8 nested ones at 138 (homeStops has the arithmetic).
+  it('keeps rail labels short enough for the slides’ 168px gutter', () => {
     for (const s of stops) expect(s.label.length, s.label).toBeLessThanOrEqual(11);
     for (const c of stops.flatMap((s) => s.children ?? [])) {
       expect(c.label.length, c.label).toBeLessThanOrEqual(8);
     }
-  });
-
-  it('zones every top-level stop, since the label colour follows the sky behind it', () => {
-    for (const s of stops) expect(['light', 'dark']).toContain(s.zone);
   });
 });

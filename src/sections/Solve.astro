@@ -177,8 +177,9 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     --s-soft: #a8b0a9; --s-faint: #6d746e; --s-accent: #7fc9a0;
   }
   .so-inner {
-    /* Clears the fixed Toc rail, whose right edge moved from x=129 to x=151 once it gained an indented tier
-       ("Problem / Limits / Method" under "The field"). Shared across the five paper slides. */
+    /* Clears the fixed rail (SideRail), whose widest label ends at x=145 at most (lib/pageStops' homeStops has
+       the arithmetic). The rail hides at 1100px and below; this gutter goes at 1099px, a pixel later, as in Story
+       and Work (Choice and Rules drop it at 1100px). Shared across the five paper slides. */
     padding-left: clamp(168px, 10.4vw, 200px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
     /* Measured: content ended at y=902 in a 1050px slide, so 148px sat dead at the foot. Centring the block
        spends that slack on the drawing and the type. (Tested as the cause of the Lighthouse point and cleared —

@@ -16,8 +16,9 @@ interface Props {
    *  replaces it (/projects' boot), or that a reader moves in and out of too often to hold back (/research). */
   veil?: boolean;
   /** Sets `data-page` on <html>; tokens.css re-skins the role tokens from it ('drafting' is /projects, 'paper' the
-   *  research routes). ClientRouter copies <html>'s attributes, so it leaves with the page. */
-  page?: 'drafting' | 'paper';
+   *  research routes, 'deck' the homepage, whose block sets only the rail's resting ink). ClientRouter copies
+   *  <html>'s attributes, so it leaves with the page. */
+  page?: 'drafting' | 'paper' | 'deck';
   /**
    * How the corner nav picks its (light-theme) text color:
    *  - 'scroll' (default): flip dark→paper by the descent fraction behind it

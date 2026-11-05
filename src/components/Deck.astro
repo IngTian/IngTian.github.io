@@ -21,7 +21,7 @@
 //   · trackpad momentum — a gesture is coalesced, so one flick is one slide rather than five
 //
 // No island — the site has none since the terminal was deleted (CLAUDE.md, Stack). Vanilla script, re-inits on astro:page-load with a
-// teardown, matching TerrainHero / Toc / DescentPath.
+// teardown, matching TerrainHero / DescentPath.
 ---
 <script>
   import { deckStops, nextStop, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide } from '../lib/deck';
@@ -319,7 +319,7 @@
   }
 
   // Re-init on first load AND after every View Transition swap, with teardown — the project's pattern
-  // for vanilla scripts (see TerrainHero / Toc). Without the teardown the listeners would stack up and
+  // for vanilla scripts (see TerrainHero). Without the teardown the listeners would stack up and
   // one gesture would advance several slides after a couple of navigations.
   let deckTeardown: (() => void) | null = null;
   function reinit(): void {

@@ -28,10 +28,10 @@
 // it. Such sentences are the opposite of rot and must not be flagged. So this does not ask "does every path exist" — it asks "does any path appear in a
 // sentence claiming it is HERE". A deletion marker nearby means the prose already knows, and it passes.
 //
-// WHAT IT DELIBERATELY DOES NOT DO: it cannot judge a false claim about live code. The same audit found
-// `components/Toc.astro` asserting "the Solve slide is dark in both themes" — false since that design was
-// rejected, and a live legibility defect — but it names no path, so no gate can see it. This covers the
-// mechanical half, which is where the damage has actually come from.
+// WHAT IT DELIBERATELY DOES NOT DO: it cannot judge a false claim about live code. The same audit found the
+// homepage's old rail (`components/Toc.astro`, since deleted) asserting "the Solve slide is dark in both
+// themes" — false since that design was rejected, and a live legibility defect — but it names no path, so no
+// gate can see it. This covers the mechanical half, which is where the damage has actually come from.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';

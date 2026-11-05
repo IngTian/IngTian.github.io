@@ -65,8 +65,9 @@ and which kind a component is decides how a page may change it:
   A register reskins them without an edit: its `html[data-page='drafting']` or
   `html[data-page='paper']` block in `tokens.css` overrides the *role* tokens (`--paper`,
   the ink ramp, `--ochre` → the seal), so the nav's dot, pill and focus ring turn seal red
-  there by reading the same variable they read everywhere. A change to one of these is a
-  change to every page.
+  there by reading the same variable they read everywhere. The homepage is no register, but
+  its `html[data-page='deck']` block sets the one token the rail needs there, `--rail-ink`
+  (see *Navigation*). A change to one of these is a change to every page.
 - **Page-own: buttons.** One anatomy, a skin per page. `components/Button.astro` owns
   the size, label, arrow, press, focus ring and the `<a>`/`<button>` behaviour; a page's
   look is a `skin` value plus one `.btn--<skin>` block. The skins today are
@@ -274,7 +275,7 @@ src/
   lib/introTimeline.ts              # the homepage intro's SCHEDULE only — pure. The decision and the ?dur= clamp live in pages/index.astro's is:inline script (it must run before first paint, so it cannot import); lib/introSession.ts reads what that publishes
   lib/descentPath.ts, trajectory.ts # the career descent graph's field and route
   lib/{bellman,problemSize,complexity,policyPnl,scenario,split}.ts   # the explainer slides' real math
-  lib/scrollspy.ts                  # activeStopIndex (the homepage Toc, the /art rail) + railMarks, SideRail's marking rule — see Navigation
+  lib/scrollspy.ts                  # activeStopIndex (the /art rail, and railMarks' fallback) + railMarks, SideRail's marking rule — see Navigation
   lib/{justify,pixels,cowSpeech,knowledge,equations}.ts
   sections/{Heights,Interlude,Choice,Rules,Solve,Story,Work}.astro   # the homepage, in scroll order — ALL of sections/, there is nothing else in it
   sections/Signature.astro          # links + seal — rendered INSIDE Work.astro, not as its own slide
@@ -283,8 +284,7 @@ src/
   components/SkyWash.astro          # woven warm/cold broken-color wash over the sky — CSS + a small script (it is in the Interactivity list below; this line used to say "pure CSS")
   components/TerrainHero.astro      # the hero's terrain canvas (Heights only)
   components/DescentPath.astro      # the career descent graph (inside Story)
-  components/SideRail.astro         # the one marginal rail (/research, /research/<slug>, /writing, /experience, /projects), driven by a Stop tree — see Navigation
-  components/Toc.astro              # the homepage's thin left-margin TOC, driven by homeStops()
+  components/SideRail.astro         # the one marginal rail (/, /research, /research/<slug>, /writing, /experience, /projects), driven by a Stop tree — see Navigation
   components/CornerNav.astro        # the always-visible glass nav + theme toggle
   components/PlushCow.astro         # the cow, at three scales, with a pixel speech bubble; `talk` is /projects' cow, driven by that page's script
   components/Button.astro           # the shared button ANATOMY + a per-page skin ('sticker', /projects'; 'paper', the research routes') — see The concept
@@ -339,7 +339,7 @@ list) and to the page count above, and retiring one is deleting its page and bot
 
 ### Interactivity — vanilla scripts, and the contract they keep
 
-`Deck`, `Toc`, `SideRail`, `CornerNav`, `TerrainHero`, `FluidSky`, `SkyWash`,
+`Deck`, `SideRail`, `CornerNav`, `TerrainHero`, `FluidSky`, `SkyWash`,
 `DescentPath`, `PlushCow`, the three explainer slides (`Choice`, `Rules`, `Solve`),
 `BaseLayout`'s no-FOUC theme resolver and veil, `pages/index.astro`'s intro decider,
 the `/art` page, both research routes (`pages/research/index.astro`, the cards' reveals,
@@ -347,11 +347,11 @@ hover and focus; `pages/research/[slug].astro`, the margin notes, the linking, F
 readout and the motion), and `/projects` — `pages/projects.astro` (the boot
 decider, the ask dispatcher and the cow's talk) plus six of `components/projects/*`:
 `DraftingField`, `Gallery`, `SelectedRows`, `WorkshopCards`, `ProjectAsk` and
-`TerminalHeader` (the boot) — all need JS. That is the whole list, 24 files. Every one
+`TerminalHeader` (the boot) — all need JS. That is the whole list, 23 files. Every one
 is a plain Astro component or page with a `<script>`, **not** an island (see *Stack*).
 
 **Counting it:** `grep -rln '<script' src` also hits three `lib/` files that say `<script>`
-in comments. Filtered to `src/{components,sections,pages,layouts}` it returns the 24 above
+in comments. Filtered to `src/{components,sections,pages,layouts}` it returns the 23 above
 (`ProjectPicture.astro` and `Button.astro` have none). `scripts/artGallery.ts`,
 `scripts/motion.ts` and `scripts/pageView.ts` are modules those scripts import, not scripts of their own.
 
@@ -522,16 +522,16 @@ string itself is built once, as `PHONE_QUERY`: `isPhone()`, the deck's change li
 **The number lives in two places and they are synced BY HAND.** `@media
 (max-width: var(--x))` is not valid CSS, so there is no way to feed one value to
 both. **If you change `PHONE_MAX_WIDTH`, change every `@media (max-width: 640px)`
-block with it.** `grep -rn 'max-width: *640px' src` returns **22 hits in 15 files**,
-and **four of the 22 are prose, not rules** — `viewport.ts` ×2 (its own doc
+block with it.** `grep -rn 'max-width: *640px' src` returns **21 hits in 14 files**,
+and **four of the 21 are prose, not rules** — `viewport.ts` ×2 (its own doc
 comments) plus `global.css:178` and `global.css:327`, which describe the
 breakpoint in comments rather than declaring it — and **one is a `sizes` hint**:
 `projects/Gallery`'s `sizes="(max-width: 640px) 240px, 330px"`, the phone strip's
-card width, which must move with the strip's block. So there are **17 real CSS
-blocks across 14 files**: `experience` ×2, `projects/Gallery` ×2 and `global.css` ×2
+card width, which must move with the strip's block. So there are **16 real CSS
+blocks across 13 files**: `experience` ×2, `projects/Gallery` ×2 and `global.css` ×2
 (one of each pair is `@media not all and (max-width: 640px)` — Gallery's desktop-only
 card lift and global.css's sky suppression), and one each in `CornerNav`,
-`Toc`, `DescentPath`, `FluidSky`, `Heights`, `projects.astro` (the phone's strip
+`DescentPath`, `FluidSky`, `Heights`, `projects.astro` (the phone's strip
 for the cow's bubble), `projects/TerminalHeader`, `404`, `research/index`,
 `research/[slug]` and `writing/[...slug]`. **The wide side is always written as that
 negation, never as `min-width: 641px`**: a second bound leaves a zoomed window 640.5 CSS
@@ -562,7 +562,8 @@ phone treatment is *bug fixes only*, and the whole of it is:
   swipe scrolling twice, a light flick going nowhere, one swipe skipping a screen —
   follow from the deck resting *inside* slides, and turning it off removes all four
   by deleting behaviour rather than adding compensation;
-- the **Toc hides** (`display: none` — a 38px margin rail has no margin to sit in);
+- the **homepage's rail hides**: it is `SideRail`, which every rail page hides at 1100px
+  and below, where the slides take its gutter back;
 - the **descent graph** drops its in-frame labels and becomes a block with its own
   height, with the sentence that explains it read *after* it rather than across it;
 - the **fluid sky canvas is skipped** entirely under 640px;
@@ -675,19 +676,25 @@ phone treatment is *bug fixes only*, and the whole of it is:
   emit.** Add a section to a page → add it to its `*Stops()` and render the id from
   the same helper. A paper page's sections are its file's, as the plugin reports them,
   then the page's own (`paperSections()`, `PAPER_END`); its rail and its phone Contents
-  both list exactly that. `SideRail` (every rail page) and `Toc` (homepage, via
-  `homeStops()`) are both dumb markup over these trees.
-  - Rail labels are **bookmarks, not sentences**: measured, "The problem" /
-    "Constraints" pushed the indented tier's right edge to x=151 against a headline
-    starting at 143, and the rail printed over the words.
+  both list exactly that. `SideRail` is dumb markup over these trees, on every rail page
+  (the homepage's is `homeStops()`).
+  - Rail labels are **bookmarks, not sentences**: on `/` the rail must end left of the
+    slides' 168px gutter, and `tests/pageStops.test.ts` holds the label lengths that keep it
+    there (the arithmetic is beside `homeStops()`).
   - `flattenStops()` is *tree* order, which need not be visual order (a page may set a
     section higher on screen than its tree position). `SideRail` numbers its rows by it
     for their entrance and nothing else; `railMarks` sorts by measured top where order
     matters — don't assume monotonicity.
-- **`SideRail` is the one rail**, on /research, /research/&lt;slug&gt;, /writing, /experience
-  and /projects (the homepage's `Toc` and the /art rail are separate, each coupled to
-  behaviour of its own page). It hides at 1100px and below, where a paper page shows its
-  Contents list instead.
+- **`SideRail` is the one rail**, on /, /research, /research/&lt;slug&gt;, /writing, /experience
+  and /projects (the /art rail is separate, coupled to its gallery). It hides at 1100px and
+  below, where a paper page shows its Contents list instead.
+  - **On `/` it stays off the hero**, through its one page-facing prop, `hideOver="heights"`:
+    `display: none` (so its links leave the tab order too) until the script finds the hero's
+    bottom above mid-screen, as it is when the deck rests on the Interlude. With no script it
+    stays hidden, since over the hero it would print across the name on a short window. A
+    rail click is a plain `#anchor` jump, which the deck leaves to the browser, and at every
+    deck rest one slide fills the reading band, so one stop leads (an explainer slide with
+    "The field" lit as its ancestor).
   - **That breakpoint is one query, `(max-width: 1100px)`, and the wide side is always its exact
     negation**, `not all and (max-width: 1100px)` (`WIDE_QUERY` in `lib/viewport.ts`, for the one
     script that asks: the paper page's note placement), never a second bound at 1101px. A zoomed
@@ -698,7 +705,7 @@ phone treatment is *bug fixes only*, and the whole of it is:
     holds `WIDE_QUERY` to their exact negation, so a breakpoint retuned in the CSS alone fails; it
     also fails on any breakpoint in `src` written as two bounds a pixel apart (/projects' cow column
     is `(max-width: 1179px)` and its negation for the same reason). The homepage slides are not this
-    breakpoint: Choice and Rules reclaim the Toc's gutter at 1100px and below, Story, Solve and Work
+    breakpoint: Choice and Rules reclaim the rail's gutter at 1100px and below, Story, Solve and Work
     at 1099px and below.
   - **Under forced colours** (Windows High Contrast) every ink becomes one system colour and the
     dash, a background, is painted as Canvas, so nothing would tell the current stop apart; there
@@ -717,14 +724,20 @@ phone treatment is *bug fixes only*, and the whole of it is:
     which would otherwise hold a label three times. The sheets' numbers are
     held by `tests/paperPalette.test.ts` and `tests/draftingPalette.test.ts`; over the reading sky
     they were measured on screen (inactive labels 5.53 / 5.74 on /writing and 5.54 / 5.63 on
-    /experience, light / dark; the dash at least 3.74:1).
+    /experience, light / dark; the dash at least 3.74:1). On `/` a resting label is `--rail-ink`
+    (light `#4e483d`: 4.59:1 on the tan panels, where `--ink-3` is 3.80; dark `--ink-3`), held
+    with the marks and the dash on the panels and the sky by `tests/deckPalette.test.ts`. Not
+    held: the footer's near-black ground, behind the rail only in a window under ~560px tall
+    at the last screen.
   - **Its motion is the rule's, and every piece of it runs once** (the timings are
     `lib/motionTiming.ts`'s `RAIL`; the entrance's duration reaches the CSS as `--row`). The entrance is CSS because a bundled script runs after first paint, and
     a from-state it set could land on a rail already drawn at rest. Hover is `.is-hover`, not
     `:hover`, set for a mouse or a pen and never for `pointerType === 'touch'`. Reduced motion:
-    the same marks, at once.
-  - **A register reskins it through two role tokens and nothing else**, `--knockout` and
-    `--rail-dash-halo`, each read with a `none` fallback. No page styles the rail;
+    the same marks, at once. On `/` the entrance plays as the reader leaves the hero, and again
+    each time they come back down past it (a CSS animation restarts when its element renders).
+  - **A page reskins it through three role tokens and nothing else**: `--knockout` and
+    `--rail-dash-halo`, each read with a `none` fallback (the drafting register's), and
+    `--rail-ink`, read with `--ink-3` (the homepage's). No page styles the rail;
     `tests/draftingPalette.test.ts` checks.
 
 ## The content model rule
@@ -1205,7 +1218,9 @@ galaxy). The whole system is **token override**, not per-component branching:
   nav, rail, button anatomy and cow reskin with no edit. **Both theme blocks declare every
   token**: `[data-page]` and `[data-theme='dark']` tie on specificity, so a light-only value
   would win in dark. The role tokens a register must declare are one list, `ROLE_TOKENS` in
-  `tests/helpers/palette.ts`, which both palette specs read.
+  `tests/helpers/palette.ts`, which both palette specs read. The homepage's `page="deck"` is
+  not a register: its two blocks declare only `--rail-ink`, the rail's resting ink
+  (`tests/deckPalette.test.ts`; see *Navigation*).
   - **drafting** adds `--knockout` (the label knockout, one 1px ring of the bare sheet that
     `<main>`'s text and `SideRail`'s labels both read — the rail with a `none` fallback, so
     the page never styles the rail), `--rail-dash-halo` (the rail dash's 2px ring)
@@ -1403,7 +1418,8 @@ titles came to rest hard against the browser chrome — the lead is a number in
     part*) means deletions get written down on purpose, and `index.astro` naming the
     terminal's deleted `data/script.ts` is the opposite of rot. A deletion marker
     near the mention passes. **What no gate can catch is a false claim about LIVE
-    code** — the same audit found `Toc.astro` asserting "the Solve slide is dark in
+    code** — the same audit found the homepage's old rail (`Toc.astro`, since replaced by
+    `SideRail`) asserting "the Solve slide is dark in
     both themes", false since that design was rejected, and a real legibility defect.
     That half is still a human reading carefully.
 - **A TEST IS NOT A CONSUMER. `noUnusedLocals` cannot see a dead export,** so
