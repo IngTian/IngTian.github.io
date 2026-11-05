@@ -113,9 +113,9 @@ import { STORY } from '../data/story';
     --story-ink-soft: #423b30;
     --story-ink-faint: #6a6153;
     --story-accent: #7c5522;
-    /* The graph's own ink, dark-on-paper. The canvas reads these (see DescentPath) because its
-       default tokens — --paper, --ink-3..5 — are LIGHT inks chosen for the dark sky, and on a light
-       paper ground they render invisible. Same reason the panel can't reuse --paper as a background. */
+    /* The graph's own ink, dark-on-paper. The canvas reads these (see DescentPath) rather than the
+       global ramp — --paper, --ink-3..5 — whose LIGHT inks are chosen for the dark sky and render
+       invisible on a light paper ground. Same reason the panel can't reuse --paper as a background. */
     /* Darker than before to hold up on the toned ground: the old values were chosen against a near-white
        panel, and a 0.72-alpha mid-grey on 0.48 luminance stock loses the faint contour dots. */
     --story-line: rgba(46, 40, 31, 0.8);

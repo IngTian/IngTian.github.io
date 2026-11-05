@@ -91,37 +91,36 @@ import { STORY_CODA } from '../data/story';
 </section>
 
 <style>
-  /* ── INK IS CONTEXTUAL, and this is what makes the piece portable onto the paper panel.
-     Both the CSS and the CANVAS read these --dp-* tokens instead of the global ink ramp. The
-     defaults below are the sky values (light ink on a dark descent); when this section renders
-     inside .story-paper, that panel redefines them to dark-on-paper. Without the indirection the
-     labels drew in --paper — a near-white — directly onto light paper, i.e. invisible. */
+  /* ── THE INK IS STORY'S PAPER PANEL'S, the one ground this renders on (Story.astro's .story-paper sets
+     the --story-* values, per theme). Both the CSS and the CANVAS read these --dp-* tokens, never the
+     global ink ramp: that ramp is light ink for the sky, and on paper it drew near-invisible.
+     `position: relative` makes this the containing block for the overlaid header. No vertical padding:
+     the panel opens with its own, and the stage is sized to the viewport. */
   .dp {
-    position: relative; padding: 12vh 0 8vh;
-    --dp-strong: var(--paper);
-    --dp-body: var(--ink-3);
-    --dp-quiet: var(--ink-4);
-    --dp-line: var(--ink-5);
-    --dp-line-soft: var(--ink-4);
-    --dp-accent: var(--ochre);
+    position: relative; display: grid;
+    --dp-strong: var(--story-ink);
+    --dp-body: var(--story-ink-soft);
+    --dp-quiet: var(--story-ink-faint);
+    --dp-line: var(--story-line);
+    --dp-line-soft: var(--story-line-soft);
+    --dp-accent: var(--story-accent);
+    /* The seal red is the brand mark in both themes and reads correctly on paper, so the climb keeps
+       it rather than being recoloured. */
     --dp-alert: var(--seal);
   }
-  .dp-head { max-width: 70ch; }
+  /* The graph shares the section with the writing, so its title is scaled to sit BESIDE "Why the climb"
+     as a peer rather than out-shouting it, and kept to one line. */
   .dp-head h2 {
-    font-family: var(--font-display); font-size: clamp(26px, 3vw, 38px); font-weight: 300;
-    color: var(--dp-strong); margin: 0;
+    font-family: var(--font-display); font-size: clamp(25px, 2.2vw, 40px); font-weight: 300;
+    color: var(--dp-strong); margin: 0; text-wrap: balance;
   }
-  /* On the paper panel the graph shares the section with the writing, so its title is scaled to sit
-     BESIDE "Why the climb" as a peer rather than out-shouting it, and kept to one line. */
-  :global(.story-paper) .dp-head h2 { font-size: clamp(25px, 2.2vw, 40px); text-wrap: balance; }
-  :global(.story-paper) .dp-lede { max-width: 44ch; }
   /* No `.dp-lede strong` rule, and none is wanted: the lede is one plain sentence by design — see "NO
      MEASUREMENTS IN THE COPY" at the top of this file — so there is no emphasis to accent. The rule that used
      to sit here arrived in the same commit as the element and the element never contained a `<strong>` in any
      revision, so it never matched. Deleting it also removes the temptation to bold a number back into a
      sentence the file's own header explains must not carry one. */
   .dp-lede {
-    font-size: 15.5px; line-height: 1.75; color: var(--dp-body); margin: 14px 0 0;
+    font-size: 15.5px; line-height: 1.75; color: var(--dp-body); margin: 14px 0 0; max-width: 44ch;
   }
 
   .dp-readout {
@@ -158,11 +157,7 @@ import { STORY_CODA } from '../data/story';
   .dp-btn:focus-visible { outline: 1px solid var(--dp-accent); outline-offset: 2px; }
 
 
-  .dp-stage {
-    position: relative; margin: 3vh 0 0; width: 100%; aspect-ratio: 16 / 9;
-    transition: opacity .18s ease;
-  }
-  /* ── ON THE PAPER PANEL: the graph owns the whole slide, and the header OVERLAYS it.
+  /* ── THE GRAPH OWNS ITS COLUMN, and the header OVERLAYS it.
      The measurement that forced this layout. The drawing must keep the field's true aspect or the
      contour rings render as flattened ovals — the world box is 4.61 x 3.64, aspect 1.27, and the field
      is only 5.2 units wide so it cannot be widened to suit a letterbox frame. With the header stacked
@@ -171,17 +166,14 @@ import { STORY_CODA } from '../data/story';
      the binding constraint, so the fix is to stop spending height on stacked text.
      The header now sits over the drawing's empty upper-left (the field's content runs lower-right, so
      nothing is covered), and the stage takes the full slide: ~1043px of drawing, close to double. */
-  :global(.story-paper) .dp { display: grid; }
-  :global(.story-paper) .dp-stage {
-    aspect-ratio: auto;
+  .dp-stage {
+    position: relative; width: 100%;
     /* Sized to the viewport, not a ratio: the graph is sticky in a column beside the writing, so it must
-       fit one screen with its overlaid header. The strip that used to be reserved for the "why the
-       climb" cue is reclaimed — that cue is gone, since the writing is now beside the graph rather
-       than on a slide below it. */
+       fit one screen with its overlaid header. */
     height: min(80vh, 88vw);
-    margin: 0;
+    transition: opacity .18s ease;
   }
-  :global(.story-paper) .dp-head {
+  .dp-head {
     position: absolute;
     top: 0; left: 0;
     /* Wide enough to keep "A descent, with one climb" on one line — at 42% it wrapped after "one",
@@ -191,11 +183,11 @@ import { STORY_CODA } from '../data/story';
     z-index: 2;
     pointer-events: none;      /* the drawing is not interactive, but never block it either */
   }
-  :global(.story-paper) .dp-head .dp-btn { pointer-events: auto; }
+  .dp-head .dp-btn { pointer-events: auto; }
   /* Narrow screens keep the stacked flow: there is no empty corner to overlay into. */
   @media (max-width: 1000px) {
-    :global(.story-paper) .dp-head { position: static; max-width: 70ch; }
-    :global(.story-paper) .dp-stage { height: min(56vh, 90vw); margin: 3vh 0 0; }
+    .dp-head { position: static; max-width: 70ch; }
+    .dp-stage { height: min(56vh, 90vw); margin: 3vh 0 0; }
   }
   .dp-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
@@ -286,10 +278,8 @@ import { STORY_CODA } from '../data/story';
      follows underneath it. The drawing gets a square-ish box of its own, and the sentence that explains it is
      read after it rather than across it. */
   @media (max-width: 640px) {
-    :global(.story-paper) .dp-stage,
     .dp-stage {
       height: auto;
-      aspect-ratio: auto;
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -305,24 +295,6 @@ import { STORY_CODA } from '../data/story';
       bottom: auto;
       max-width: none;
     }
-  }
-
-  /* ON THE PAPER PANEL: dark ink, and no top padding — the panel already opens with 9vh, and the
-     section's own 12vh on top of it left the title floating. */
-  :global(.story-paper) .dp {
-    /* No vertical padding here: the panel already opens with its own, and the stage is sized to the
-       viewport. `position: relative` makes this the containing block for the overlaid header/footnote. */
-    position: relative;
-    padding: 0;
-    --dp-strong: var(--story-ink);
-    --dp-body: var(--story-ink-soft);
-    --dp-quiet: var(--story-ink-faint);
-    --dp-line: var(--story-line);
-    --dp-line-soft: var(--story-line-soft);
-    --dp-accent: var(--story-accent);
-    /* The seal red is the brand mark in both themes and reads correctly on paper, so the climb keeps
-       it rather than being recoloured. */
-    --dp-alert: var(--seal);
   }
 </style>
 
@@ -410,9 +382,8 @@ import { STORY_CODA } from '../data/story';
     // itself was never the problem: only ~270 draw calls per frame, and the pure maths costs 10ms.
     // Read the tokens once and invalidate only when the theme attribute changes.
     // Read from the SECTION, not the document root, and read the --dp-* tokens rather than the global
-    // ink ramp. The section inherits sky ink by default and dark-on-paper ink when it renders inside
-    // .story-paper, so the same canvas code draws correctly on either ground. Reading the root would
-    // always return the light sky inks — invisible on light paper.
+    // ink ramp: the section carries the paper panel's dark-on-paper inks, and the root would return the
+    // light sky inks — invisible on light paper.
     type Pal = Record<string, string>;
     let palCache: Pal | null = null;
     const readPalette = (): Pal => {

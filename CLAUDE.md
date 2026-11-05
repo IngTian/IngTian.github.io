@@ -333,7 +333,9 @@ starting with `/proto-` `noindex` itself, whatever the page passes, and `astro.c
 filters `/proto-` from the sitemap. That matters because the head is one either/or — no
 noindex means a self-referential `<link rel="canonical">`, an explicit request to index
 the page — and two proto routes once shipped exactly that by forgetting the prop. So a
-new prototype needs no prop and no edit elsewhere, and retiring one is deleting its page.
+new prototype needs no `noindex` prop. It is still a page like any other: add its route to
+the census in `tests/distSmoke.test.ts` (`want`, which fails by name on a route it does not
+list) and to the page count above, and retiring one is deleting its page and both of those.
 
 ### Interactivity — vanilla scripts, and the contract they keep
 
