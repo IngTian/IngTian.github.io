@@ -713,10 +713,12 @@ phone treatment is *bug fixes only*, and the whole of it is:
     valid on more than one.
   - **Every label clears 4.5:1 at rest, on every rail page's ground**, because a label is three
     layers of one text (`SideRail.astro`'s header says how): a mark is a cross-fade of
-    opacities, never a colour transition, so every state is a solid ink. All three are elements in
-    the markup and the two inks over the label are `aria-hidden`, so in every engine a link's
-    accessible name is its label once; generated text (`content: attr()`) is not used, because
-    whether it joins the name depends on the engine. The sheets' numbers are
+    opacities, never a colour transition, so every state is a solid ink. The label is the only text
+    in the markup; the two inks over it are empty `aria-hidden` elements whose text is generated
+    (`::before { content: attr(data-l) }`). `aria-hidden` is what keeps them out of the accessible
+    name in every engine — generated text alone joins the name in some and not others — and being
+    generated is what keeps them out of a selection, find-in-page and the unstyled page, each of
+    which would otherwise hold a label three times. The sheets' numbers are
     held by `tests/paperPalette.test.ts` and `tests/draftingPalette.test.ts`; over the reading sky
     they were measured on screen (inactive labels 5.53 / 5.74 on /writing and 5.54 / 5.63 on
     /experience, light / dark; the dash at least 3.74:1).

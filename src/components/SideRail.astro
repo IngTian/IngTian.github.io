@@ -5,10 +5,10 @@
 // Each label is three layers of the same text — the dim one (--ink-3), which is the link's name, and two copies over
 // it, .ink2 for the quieter mark and .ink1 for the lead — so a state change is a cross-fade of opacities, never a
 // colour transition, and every state is a solid ink at rest (the inactive one clears 4.5:1 on every rail page's
-// ground). The copies are elements, aria-hidden, so every engine names a link by its label once (generated text is
-// named by some engines and not by others), and they cannot be selected, so a copy of a selection holds each label
-// once; find-in-page, which reads them, can match a label up to three times. The dash hangs in a 20px gutter left
-// of the label, so no label ever moves.
+// ground). The copies are empty aria-hidden elements whose text is generated (::before, from data-l): aria-hidden
+// keeps them out of the link's name in every engine (generated text alone is named by some and not by others), and
+// generated text is in no selection, no find-in-page and no unstyled page, so each of those holds a label once. The
+// dash hangs in a 20px gutter left of the label, so no label ever moves.
 //
 // Not an island (the site has none): a vanilla <script>, started through onPageView, with a teardown. The entrance
 // is CSS, not the script's: a bundled script runs after the browser has painted, so a from-state it set could land
@@ -44,7 +44,7 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
   <ul class={depth > 0 ? 'sub' : undefined}>
     {stops.map((s) => (
       <li>
-        <a href={`#${s.target}`} style={`--i:${flat.indexOf(s)}`}><span class="rule" aria-hidden="true"></span><span class="lbl"><span class="dim">{s.label}</span><span class="ink2" aria-hidden="true">{s.label}</span><span class="ink1" aria-hidden="true">{s.label}</span></span></a>
+        <a href={`#${s.target}`} style={`--i:${flat.indexOf(s)}`}><span class="rule" aria-hidden="true"></span><span class="lbl"><span class="dim">{s.label}</span><span class="ink2" aria-hidden="true" data-l={s.label}></span><span class="ink1" aria-hidden="true" data-l={s.label}></span></span></a>
         {s.children && s.children.length > 0 && <Astro.self stops={s.children} depth={depth + 1} flat={flat} />}
       </li>
     ))}
@@ -98,7 +98,9 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
   .side-rail .ink1 { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .side-rail .dim { color: var(--ink-3); }
   .side-rail .ink2,
-  .side-rail .ink1 { position: absolute; inset: 0; opacity: 0; -webkit-user-select: none; user-select: none; }
+  .side-rail .ink1 { position: absolute; inset: 0; opacity: 0; }
+  .side-rail .ink2::before,
+  .side-rail .ink1::before { content: attr(data-l); }
   .side-rail .ink2 { color: var(--ink-2); }
   .side-rail .ink1 { color: var(--ink-1); }
 

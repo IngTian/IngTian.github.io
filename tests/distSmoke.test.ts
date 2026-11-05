@@ -693,18 +693,19 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
     expect(railPages().map((p) => p.route).sort()).toEqual(['/experience', '/projects', '/research', '/research/rl-bhrp', '/writing']);
   });
 
-  // The label is three layers of its text in the markup, so its states cross-fade by opacity: the dim one, which is
-  // the link's name, and two inks over it, each aria-hidden, so every engine names the link by its label once. The
-  // dash is its own aria-hidden span. The marks are the script's: none is served. The one thing served on a link is
-  // its place in the entrance, --i, its index in document order.
-  it('renders every link as href + aria-hidden dash + its label and two aria-hidden copies, its --i, and no state', () => {
+  // The label is three layers of its text, so its states cross-fade by opacity: the dim one, the link's name and the
+  // only text in the markup, and two inks over it, each an empty aria-hidden element whose text is generated from
+  // its data-l, so every engine names the link by its label once and find-in-page sees it once. The dash is its own
+  // aria-hidden span. The marks are the script's: none is served. The one thing served on a link is its place in the
+  // entrance, --i, its index in document order.
+  it('renders every link as href + aria-hidden dash + its label and two empty aria-hidden copies, its --i, and no state', () => {
     const bad: string[] = [];
     for (const p of railPages()) {
       for (const [k, it] of itemsOf(p).entries()) {
-        const parts = /^<span class="rule" aria-hidden="true"[^>]*><\/span><span class="lbl"[^>]*><span class="dim"[^>]*>([^<]*)<\/span><span class="ink2" aria-hidden="true"[^>]*>([^<]*)<\/span><span class="ink1" aria-hidden="true"[^>]*>([^<]*)<\/span><\/span>$/
+        const parts = /^<span class="rule" aria-hidden="true"[^>]*><\/span><span class="lbl"[^>]*><span class="dim"[^>]*>([^<]*)<\/span><span class="ink2" aria-hidden="true" data-l="([^"]*)"[^>]*><\/span><span class="ink1" aria-hidden="true" data-l="([^"]*)"[^>]*><\/span><\/span>$/
           .exec(it.inner);
         if (!parts) bad.push(`${p.route} #${it.target}: ${it.inner}`);
-        else if (parts[2] !== parts[1] || parts[3] !== parts[1]) bad.push(`${p.route} #${it.target}: a copy ≠ its label`);
+        else if (decode(parts[2]) !== decode(parts[1]) || decode(parts[3]) !== decode(parts[1])) bad.push(`${p.route} #${it.target}: a copy ≠ its label`);
         if (!p.ids.has(it.target)) bad.push(`${p.route}: the rail links #${it.target}, which the page does not emit`);
         if (/\s(aria-current|class)=/.test(it.tag)) bad.push(`${p.route} #${it.target}: served with ${it.tag}`);
         if (/\sstyle="([^"]*)"/.exec(it.tag)?.[1] !== `--i:${k}`) bad.push(`${p.route} #${it.target}: not style="--i:${k}" in ${it.tag}`);
@@ -786,15 +787,14 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
   });
 
   // Generated text is in the accessible name in some engines and not in others (the alt text after a slash that
-  // keeps it out does not parse before Safari 17.4 and Firefox 128), so no label is generated: every layer of one is
-  // in the markup above. The rail's one generated box is the hover preview's dash, which holds no text. The copies
-  // cannot be selected, so a copied selection holds each label once.
-  it('generates no label text, and keeps the copies out of a selection', () => {
+  // keeps it out does not parse before Safari 17.4 and Firefox 128), so a label's text is generated only inside the
+  // copies, whose aria-hidden keeps it out of the name everywhere (the markup test above). Generated, the copies are in
+  // no selection and no find-in-page; real text in them would be in both. The rail's one other generated box is the
+  // hover preview's dash, which holds no text.
+  it('generates label text only in the aria-hidden copies, and nothing else', () => {
     const content = railRules().flatMap(([, sel, body]) => [...body.matchAll(/(?:^|;)content:([^;]*)/g)]
-      .map((m) => `${sel.trim().replace('::', ':')} ${m[1].replace(/\s+/g, '')}`));
-    expect(content).toEqual(['.side-rail a:after ""']);
-    expect(railRules().some(([, sel, body]) => /\.ink2\b/.test(sel) && /\.ink1\b/.test(sel) && /user-select:none/.test(body)),
-      'the copies can be selected').toBe(true);
+      .map((m) => `${sel.trim().replace(/::/g, ':')} ${m[1].replace(/\s+/g, '')}`));
+    expect(content.sort()).toEqual(['.side-rail .ink2:before,.side-rail .ink1:before attr(data-l)', '.side-rail a:after ""']);
   });
 
   // Forced colours (Windows High Contrast) map every ink to one system colour and paint backgrounds as Canvas, so the

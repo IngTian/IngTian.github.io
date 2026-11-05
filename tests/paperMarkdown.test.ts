@@ -235,6 +235,18 @@ describe('a notation row', async () => {
     expect(own.match(/class="sym"/g)).toHaveLength(4);   // so neither ℝ nor ℝ^N is tagged
   });
 
+  // An index is the membership row's only while no row has it as its own symbol: a g row owns g, wherever it sits.
+  it("gives an index to its own row over a membership's, whichever comes first", async () => {
+    const md = '::::section[Notation]{#notation}\n:::notation\n| Symbol | Meaning |\n| --- | --- |\n'
+      + '| $i\\in\\mathcal{I}_{g}$ | A stock of sector $g$. |\n| $g$ | A sector. |\n:::\n::::\n\n'
+      + '::::section[Eq]{#eq}\n:::eq{#e}\n$$\nx_{i} + y_{g}\n$$\n:::\n::::\n';
+    const { html: own, report: ok } = await render(md, PAPER_PATH);
+    expect(ok.paperProblems).toEqual([]);
+    expect(own).toContain('<mi class="sym" data-sym="1">i</mi>');
+    expect(own).toContain('<mi class="sym" data-sym="2">g</mi>');
+    expect(own).not.toContain('<mi class="sym" data-sym="1">g</mi>');
+  });
+
   // A Symbol cell may set each symbol as maths of its own, `$N$, $G$`: every one of them is the row's, and the row is
   // matched by any of them, as by any symbol of `N,\ G`.
   it('reads every maths in its Symbol cell, and names the cell as written when none is in a display', async () => {

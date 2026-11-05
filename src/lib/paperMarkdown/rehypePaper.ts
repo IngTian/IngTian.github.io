@@ -19,9 +19,9 @@ function same(a: Node, b: Node): boolean {
 /** A row's symbols: every maths in its Symbol cell (`$N$, $G$` is two), each split at the commas between symbols
  *  (`N,\ G` is two as well), spaces dropped. A membership introduces its subject and its set's index, a subscript:
  *  `i ∈ 𝓘_g`, stock i of sector g, is i and g. Not the set, which is where the subject lives, nor a superscript of
- *  it: in `w ∈ ℝ^N` only w, as N is a dimension, a symbol only through a row of its own. `tex` is the cell as
- *  written, for a problem to name. */
-function symbolsOf(row: Node): { tex: string; parts: Node[][] } {
+ *  it: in `w ∈ ℝ^N` only w, as N is a dimension, a symbol only through a row of its own. An index yields to a row
+ *  that has it as its own symbol (`index`). `tex` is the cell as written, for a problem to name. */
+function symbolsOf(row: Node): { tex: string; parts: { nodes: Node[]; index: boolean }[] } {
   const cell = row.children?.find((c) => isEl(c, 'th')) ?? row, maths: Node[] = [];
   walk(cell, (n) => { if (isEl(n, 'math')) maths.push(n); });
   const parts = maths.flatMap((math) => {
@@ -37,11 +37,12 @@ function symbolsOf(row: Node): { tex: string; parts: Node[][] } {
     }
     const index = sets.flatMap(([s, ...more]) => {
       const sub = !more.length && (isEl(s, 'msub') || isEl(s, 'msubsup')) ? s.children!.filter((c) => isEl(c))[1] : undefined;
-      return sub ? [[sub]] : [];
+      return sub ? [sub] : [];
     });
-    return [...own.filter((p) => !sets.includes(p)), ...index];
+    return [...own.filter((p) => !sets.includes(p)).map((nodes) => ({ nodes, index: false })),
+      ...index.map((sub) => ({ nodes: [sub], index: true }))];
   });
-  return { tex: written(cell).trim(), parts: parts.filter((p) => p.length) };
+  return { tex: written(cell).trim(), parts: parts.filter((p) => p.nodes.length) };
 }
 
 /** A cell as its author wrote it, each maths as its TeX: "$N$, $G$". */
@@ -141,8 +142,9 @@ export function rehypePaper() {
     });
 
     const keyed = rows.map((row) => ({ key: String(row.properties!.dataSym), ...symbolsOf(row) }));
-    const symbols = keyed.flatMap(({ key, parts }) => parts.map((nodes) => ({ key, nodes })))
-      .sort((a, b) => b.nodes.length - a.nodes.length);
+    // The longest first; at one length, a row's own symbol before another row's index (`find` takes the first).
+    const symbols = keyed.flatMap(({ key, parts }) => parts.map((p) => ({ key, ...p })))
+      .sort((a, b) => b.nodes.length - a.nodes.length || Number(a.index) - Number(b.index));
     const seen = new Set<string>();
     for (const d of displays) tag(d, symbols, seen);
     for (const { key, tex } of keyed) {
