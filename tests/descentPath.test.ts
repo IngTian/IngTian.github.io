@@ -66,20 +66,11 @@ describe('storyContours', () => {
 });
 
 describe('the basin wash\'s eligible loops — an invariant between two files', () => {
-  // WHY THIS EXISTS, and it is not a hypothetical. The marching-squares kernel was extracted and its
-  // stitch fixed (first-match → nearest), which is strictly better geometry: it retains MORE segments
-  // (2821 vs 2772 at res 150) and stops dropping contour fragments. But it changes the RUN STRUCTURE —
-  // 190 runs became 17 — and `DescentPath.astro`'s basin wash is run-structure sensitive: it fills only
-  // runs of ≥12 points whose endpoints are within 0.08, at a per-level opacity of `0.034 - i*0.005`.
-  //
-  // Measured across that change, the fill count stayed at 3 but MOVED LEVELS: lv1×1 + lv2×2 before,
-  // lv0×1 + lv3×1 + lv4×1 after — including a new fill on lv0, the deepest level and the strongest
-  // opacity, which previously got none. The Story slide now washes different basins at different
-  // strengths than the version the owner approved.
-  //
-  // The specs above pin the memo, `length > 3` and the bounds — all of which pass identically at 190 runs
-  // and at 17. So this is the guard: the exact predicate the renderer applies, asserted on the geometry, in
-  // the category CLAUDE.md calls "an invariant between two files".
+  // `DescentPath.astro`'s basin wash is RUN-STRUCTURE sensitive: it fills only runs of ≥12 points whose
+  // endpoints are within 0.08, at a per-level opacity of `0.034 - i*0.005`. A change to the kernel's stitch
+  // (first-match → nearest, 190 runs → 17) kept the fill count at 3 but moved the fills to other levels,
+  // which the specs above (memo, length, bounds) could not see. So this asserts the renderer's exact
+  // predicate on the geometry: an invariant between two files.
   const MIN_PTS = 12;       // `run.length < 12` → skip
   const CLOSE_TOL = 0.08;   // endpoints within 0.08 → a closed loop
 

@@ -176,20 +176,13 @@ describe('paintTerrain — the intro\'s elevation lift', () => {
     // at 0 and at 1. This is what makes the timeline's eased `lift` produce eased MOTION rather than
     // something subtly non-linear layered on top of the easing.
     //
-    // ZOOMED OUT SO NOTHING IS CULLED, and that is the point of this setup rather than an arbitrary
-    // choice. `paintTerrain` skips dots outside the viewport, and whether a dot is outside DEPENDS ON
-    // LIFT — flattening the terrain pulls the high ground back on screen. A first version of this test
-    // compared the three runs at the shipped zoom and failed on count (982 vs 956), which looked like a
-    // linearity bug and was really the cull doing its job. At zoom 0.2 the whole field fits, every dot
-    // is drawn at every lift, and the distributions are comparable.
+    // ZOOMED OUT SO NOTHING IS CULLED: `paintTerrain` skips dots outside the viewport, and which ones
+    // DEPENDS ON LIFT, so at the shipped zoom the dot counts differ (982 vs 956). At zoom 0.2 every dot is
+    // drawn at every lift.
     //
-    // ASSERTED ON THE MEAN, because the mean is the order-independent linear statistic and dot identity
-    // is not recoverable from the recorder. Per dot, screen y is `c(x,y) + field(x,y)·lift·sinT·sc` —
-    // affine in lift — so the mean over all dots is affine in lift too, and a mean is unaffected by the
-    // painter's depth sort. Sorted distributions are NOT: the i-th smallest y at lift 0.5 need not be
-    // the midpoint of the i-th smallest at 0 and 1, because which dot is i-th changes with lift. A
-    // version of this test that compared sorted arrays failed by 0.37px for exactly that reason, which
-    // is a property of sorting rather than a bug in the lift.
+    // ASSERTED ON THE MEAN: dot identity is not recoverable from the recorder, and per dot screen y is
+    // affine in lift, so the mean is too and is unaffected by the depth sort. Sorted distributions are not
+    // (which dot is i-th changes with lift; comparing them fails by 0.37px for that reason alone).
     const meanY = (lift: number) => {
       const { ctx, calls } = recordingCtx();
       paintTerrain(ctx, grid, cfg, 1400, 1400, 1, 0, 0, lift, 0.2);

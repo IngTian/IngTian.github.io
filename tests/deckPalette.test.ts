@@ -32,7 +32,7 @@ const PANEL = { light: '#c4b7a1', dark: '#14161a' } as const;
  * How far down the page the sky under the rail can be. The rail shows once the hero's bottom is above mid-screen,
  * and every slide after the Interlude is an opaque panel, so the sky it sits on ends at the Interlude's foot: with
  * the hero at its 108vh and every slide at its 100vh floor, (1.08 + 1) / (1.08 + 6) = 0.294 of the page. A taller
- * slide below only lowers it.
+ * slide below only lowers it; a hero taller than its floor (a short window) raises it, to 0.342 at 1.6 screens.
  */
 const SKY_DEPTH = 0.3;
 
@@ -49,7 +49,7 @@ function skyTo(theme: Theme, depth: number): RGB[] {
 
 describe("the homepage's rail ink (tokens.css)", () => {
   it('is two tokens, declared in both themes', () => {
-    // `html[data-page='deck']` and `html[data-theme='dark']` tie on specificity, so a light-only value would win in dark.
+    // Nothing else declares these, so without the dark block the light values would apply in dark too.
     for (const t of THEMES) expect(Object.keys(tokens(t.sel)), t.sel).toEqual(['--rail-ink', '--rail-focus']);
   });
 

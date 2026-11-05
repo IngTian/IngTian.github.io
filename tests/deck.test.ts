@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { deckStops, nextStop, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide } from '../src/lib/deck';
 
-// A mixed-height page: the homepage as it was measured in Chrome at 1700x1050 when the deck was built
-// (six slides then; mountains, ground and signature are gone). These numbers are the reason the deck is
-// not CSS scroll-snap: every gap between slides is 1.8x-7.3x a single ~320px wheel gesture, so mandatory
-// snap re-snapped backwards and the page froze at y=84.
+// A REPRESENTATIVE mixed-height page, not today's: the homepage's geometry as measured in Chrome at 1700x1050
+// when the deck was built, six slides in an earlier order (the labels name them). What it holds is the mix of
+// slides that fit and slides that need interior stops, and gaps 1.8x-7.3x a single ~320px wheel gesture,
+// which is why the deck is not CSS scroll-snap.
 const VH = 1050;
 const HOME: DeckSlide[] = [
   { top: 0, height: 1134 },     // heights   — 1.08vh, just over one screen
@@ -216,7 +216,7 @@ describe('a mixed-height page (HOME)', () => {
 
   it('never skips a full screen of content in one advance', () => {
     // The bound that actually protects the reading: no gesture may leap more than a screen of TEXT.
-    // Slides carrying prose (story, mountains) are paged, so their internal steps stay under a screen.
+    // The two tall prose slides (HOME[2], HOME[3]) are paged, so their internal steps stay under a screen.
     const prose = deckStops([HOME[2], HOME[3]], VH, MAX_Y);
     for (let i = 1; i < prose.length; i++) {
       expect(prose[i] - prose[i - 1]).toBeLessThanOrEqual(VH);

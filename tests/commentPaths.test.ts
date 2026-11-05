@@ -2,36 +2,13 @@
 //
 // A COMMENT MAY NOT ASSERT THAT A FILE IS THERE WHEN IT IS NOT.
 //
-// This repo deliberately stores decisions, measurements and architecture in prose — CLAUDE.md makes that
-// policy, and a comment recording a measured lesson is load-bearing by design. The consequence nobody priced
-// is that such a comment is also a REFERENCE, and references rot on every delete. There is no compiler and no
-// test on comment text, so a falsified comment is indistinguishable from a true one, and the next agent reads
-// it as a spec. CLAUDE.md's own opening paragraph says three live defects came from exactly that.
-//
-// THE AUDIT THIS CAME FROM FOUND SIX LIVE INSTANCES, and the worst were not typos — they were promises.
-// `sections/Rules.astro` and `lib/complexity.ts` both stated, in the present tense, that the two retired
-// Rules drawings "stay in the tree, unreferenced and still fully tested, so nothing verified was thrown away
-// and either can return if a later slide wants it." Both modules and both specs had been deleted. An agent
-// asked to reconsider that slide would have gone looking for verified code that is not there — and CLAUDE.md
-// lists those same drawings under "Rejected — do not rebuild", so the comment was pointing the next reader
-// straight at the work the guide exists to prevent.
-//
-// WHY A TEST AND NOT A HABIT. This class was swept by hand twice before (CLAUDE.md records both passes) and
-// came back both times, because the falsifying event is a DELETE in one file while the false sentence sits in
-// another — nobody is looking at it. The build is happy, and neither `astro check` nor `tsc` reads a comment.
-// Same reasoning as tests/cssVars.test.ts (a `var(--x)` nothing declares) and tests/nav.test.ts (a page with
-// no nav href): an invariant between two files gets a spec.
-//
-// THE HARD PART IS THAT A CORRECT COMMENT ALSO NAMES MISSING FILES, and the first version of this test got
-// that wrong. CLAUDE.md's rule is "say what is true rather than only deleting the false part", so deletions
-// here are documented ON PURPOSE: pages/index.astro explains that the terminal's `data/script.ts` went with
-// it. Such sentences are the opposite of rot and must not be flagged. So this does not ask "does every path exist" — it asks "does any path appear in a
-// sentence claiming it is HERE". A deletion marker nearby means the prose already knows, and it passes.
-//
-// WHAT IT DELIBERATELY DOES NOT DO: it cannot judge a false claim about live code. The same audit found the
-// homepage's old rail (`components/Toc.astro`, since deleted) asserting "the Solve slide is dark in both
-// themes" — false since that design was rejected, and a live legibility defect — but it names no path, so no
-// gate can see it. This covers the mechanical half, which is where the damage has actually come from.
+// Comments here carry decisions and measurements by policy (CLAUDE.md), which makes them references, and a
+// reference rots when a file it names is deleted from somewhere else; no compiler reads a comment. (The case
+// behind this: two comments promised that deleted Rules drawings stayed "in the tree, unreferenced and still
+// fully tested".) Deletions are written down on purpose (pages/index.astro says the terminal's `data/script.ts`
+// went with it), so this does not ask whether every path exists: it asks whether a path appears in a sentence
+// claiming it is HERE, and a deletion marker nearby passes. A false claim about live code that names no path is
+// beyond it; that half is careful reading.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -76,11 +53,8 @@ function commentsOf(text: string): string {
 }
 
 /**
- * Repo-relative paths mentioned in prose.
- *
- * THE EXTENSION IS OPTIONAL, and that detail is what makes this work at all. The audit's first grep used
- * a pattern requiring `.ts` and found nothing, wrongly clearing the file: the comments name the module bare,
- * without an extension, because that is how a person writes it. Requiring one misses half the real instances.
+ * Repo-relative paths mentioned in prose. THE EXTENSION IS OPTIONAL: comments name a module bare, as a person
+ * writes it, and a pattern requiring `.ts` misses half the real instances.
  */
 const PATH_RE = /\b(?:src|tests|lib|data|components|sections|pages|scripts|layouts|styles|public|docs)\/[A-Za-z0-9_[\].-]+(?:\/[A-Za-z0-9_[\].-]+)*/g;
 
@@ -107,14 +81,9 @@ function resolves(cand: string): boolean {
 const GONE = /\b(delet|remov|retir|no longer|used to|gitignored|never existed|does not exist|doesn't exist|is gone|are gone|went with|replaced by|superseded)/i;
 
 /**
- * How far either side of the mention to look for that marker — roughly one clause, not one paragraph.
- *
- * TUNED DOWN FROM 200, which produced a false NEGATIVE on a real defect. sections/Story.astro reads "The
- * figure row is deleted … so the measurement imports go with it — [three functions] were only ever called
- * here to fill those three numbers. The modules stay: lib/sensitivity and lib/knowledge are what the GRAPH is
- * drawn from, and they keep their own specs." The "deleted" belongs to the figure row, 200 characters
- * upstream, and it masked a sentence that explicitly asserts a module which does not exist. A marker has to
- * be near enough to plausibly govern the mention.
+ * How far either side of the mention to look for that marker — roughly one clause, not one paragraph. TUNED
+ * DOWN FROM 200, where a "deleted" governing the previous clause masked a sentence asserting a module that
+ * never existed. A marker has to be near enough to plausibly govern the mention.
  */
 const WINDOW = 110;
 

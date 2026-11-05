@@ -9,7 +9,7 @@
 // THE ASSERTION THAT MATTERS MOST IS THE t=1 LANDING. The intro has to end on exactly the frame the hero
 // already paints at rest, because the handoff to the live breath loop depends on it: `TerrainHero` ramps
 // breath 0 → 0.04 from the static frame, and that ramp is only the right continuation if the intro
-// finished where the static frame is. A ±8.8px version of getting that wrong has already shipped once.
+// finished where the static frame is.
 import { describe, expect, it } from 'vitest';
 import {
   INTRO_DURATION_MS, INTRO_PHASES, INTRO_SURVEY_STAGGER, introFrame, surveyProgress,
@@ -103,12 +103,8 @@ describe('introFrame — the shape of the motion', () => {
     // The design's sequence: a map is drawn, THEN the ground rises out of it. If the lift leads, the
     // lines are deforming a surface the viewer never saw flat, and the idea is lost.
     //
-    // ASSERTED ON WHAT IS DRAWN, not on the linear phase progress. The first version of this test read
-    // `introFrame(liftStart).survey > 0.8` — the phase clock — which measures how far through the
-    // survey's ALLOTTED TIME we are, not how much map is on screen. Those differ by the per-level
-    // schedule, which is the whole mechanism. When `liftStart` moved from 0.36 to 0.28 to kill a dead
-    // patch, the phase reading dropped to 0.70 and the test failed while the thing it cares about got
-    // slightly stronger: 93% of the map is stroked when the ground starts to move.
+    // ASSERTED ON WHAT IS DRAWN, not on `introFrame(t).survey`, the phase clock: how far through the
+    // survey's allotted time we are is not how much map is on screen (the per-level schedule differs).
     expect(drawn(INTRO_PHASES.liftStart)).toBeGreaterThan(0.85);
     // and the ground really has not moved yet
     expect(introFrame(INTRO_PHASES.liftStart).lift).toBe(0);
@@ -119,10 +115,8 @@ describe('introFrame — the shape of the motion', () => {
     // "the map becomes the territory" idea, and if the fade leads the lift the lines just disappear off
     // a flat plane.
     //
-    // `toBeGreaterThanOrEqual`, not `toBeGreaterThan`: with the judged phase values the lift at
-    // fadeStart is smoother((0.62 - 0.36) / (0.88 - 0.36)) = smoother(0.5), which is EXACTLY 0.5. The
-    // original assertion said `> 0.5` and failed on that exact midpoint. The phases are the values the
-    // owner judged, so the boundary is what moved, not the animation.
+    // `toBeGreaterThanOrEqual`, not `toBeGreaterThan`: halfway is the requirement, and a phase set the
+    // owner judges may put the lift at fadeStart on exactly 0.5.
     const atFade = introFrame(INTRO_PHASES.fadeStart);
     expect(atFade.lift).toBeGreaterThanOrEqual(0.5);
     // and the lift has genuinely been underway for a while by then, not just started
@@ -135,16 +129,9 @@ describe('introFrame — the shape of the motion', () => {
   });
 
   it('NEVER PLATEAUS — no 150ms window where nothing visible moves', () => {
-    // THE BUG THIS EXISTS FOR, found by review and not by this suite's first version. The per-level
-    // survey schedule used to live as three inline literals in TerrainHero's draw call, re-clamping the
-    // already-eased `survey` through its own 0.45-wide window. The last level therefore finished at
-    // t≈0.19 while `lift` did not become perceptible until t≈0.42 — a ~620ms FROZEN FRAME in the middle
-    // of a 3600ms animation, roughly a fifth of it. The spec's stated reason for overlapping the phases
-    // is "so there is no beat of stillness between them"; the shipped version had exactly that beat.
-    //
-    // The module's own `survey` channel kept moving (0.855 → 0.999) across the plateau, so nothing here
-    // could see it. This assertion measures what is actually DRAWN — the mean per-level progress — plus
-    // the other three channels, which is the quantity a viewer perceives.
+    // A ~620ms frozen frame once shipped while the module's own `survey` channel kept moving, so this
+    // measures what is actually DRAWN (the mean per-level progress) plus the other three channels: the
+    // quantity a viewer perceives.
     //
     // This is the mirror of the no-step test above: a step is motion with no time, a plateau is time
     // with no motion, and both read as broken.
@@ -237,19 +224,10 @@ describe('introFrame — the shape of the motion', () => {
   });
 
   it('never un-resolves the sky — `sky` is monotonically non-increasing', () => {
-    // THE SKY MAY ONLY RESOLVE, NEVER FLATTEN AGAIN, and this is pinned because a headless capture
-    // appeared to show otherwise: a recording of `--intro-flatten` read 1 -> 0.000 -> **1.000** -> 0.000
-    // across two frames 5ms apart near t=0.97, and the hero's legibility halos flashed out with it.
-    //
-    // It was an instrument artifact, and the shape of the artifact is worth knowing. A CDP target created
-    // with `Target.createTarget` and never brought to front has `document.hidden === true`, and FluidSky's
-    // `start()` bails on exactly that — so the sky's rAF loop never ran and the only draws were the
-    // init/settle/MutationObserver ones, forced out of order by `Page.captureScreenshot`. With a running
-    // loop `nowMs` is monotonic, so `sky` is too.
-    //
-    // This assertion is the honest version of that check: it tests the property the browser trace was
-    // trying to observe, in-process, where no composite can lie about it. If a future change makes the
-    // sky's channel depend on anything other than elapsed time, this is what goes red.
+    // THE SKY MAY ONLY RESOLVE, NEVER FLATTEN AGAIN. Checked here, in-process, because a headless capture
+    // once seemed to show it flatten again: a CDP target never brought to front has `document.hidden`, so
+    // FluidSky's loop never ran and the screenshots forced its draws out of order. If the channel ever
+    // depends on anything but elapsed time, this goes red.
     let prev = Infinity;
     for (let i = 0; i <= 2000; i++) {
       const s = introFrame(i / 2000).sky;

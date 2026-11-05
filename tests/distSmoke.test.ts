@@ -25,26 +25,13 @@ import { BOOT_CMD, BOOT_DEADLINE_MS, BOOT_SEEN_KEY } from '../src/lib/projectsBo
 import { PHONE_QUERY } from '../src/lib/viewport';
 
 /* ================================================================================================
-   THE FIRST TEST THAT LOOKS AT WHAT THE SITE ACTUALLY SHIPS.
+   WHAT THE SITE ACTUALLY SHIPS. This is a static site, so the build output IS the product, and the
+   failures a unit test cannot reach are two files that were supposed to agree and don't: a link whose
+   target got renamed, a prop nobody passed, a page list that drifted.
 
-   Before this file the suite was ~820 assertions and every one of them called a function. Nothing
-   had ever read a byte of dist/. That is a specific, and expensive, shape of blind spot: this is a
-   static site, so the build output IS the product, and the interesting failures are not wrong
-   arithmetic inside lib/ — they are two files that were supposed to agree and don't, a link whose
-   target got renamed, a prop nobody passed. Those cannot be reached from a unit test, because from
-   a unit test's point of view every part in isolation is correct. Three of the four defects in the
-   batch this file was written for would have been caught here:
-
-     - a "back to the section" link pointing at /writing#misc while the section renders id="w-misc";
-     - the footer's page list drifting from data/nav.ts's, silently dropping a whole route;
-     - two prototype routes shipping a self-referential <link rel="canonical"> instead of noindex (BaseLayout
-       now gives every /proto- path noindex itself, so no page can forget it).
-
-   HOW IT READS THE HTML. Regex over the built files, no parser. That is a deliberate choice, not a
-   shortcut: adding jsdom/cheerio to devDependencies to grep for `id="x"` would put a dependency in
-   the deploy path for a job four regexes do, and tests/writingContent.test.ts already establishes
-   node:fs + a regex as how this repo reads a file it cannot import. The cost is that the queries
-   have to stay simple. Where that cost bites, it is written down next to the assertion.
+   HOW IT READS THE HTML. Regex over the built files, no parser: jsdom or cheerio would put a dependency
+   in the deploy path for a job a few regexes do. The cost is that the queries stay simple; where that
+   bites, it is written down next to the assertion.
 
    IT NEEDS A BUILD: tests/helpers/dist.ts reads dist/ for this file and cssVars, and throws, never skips,
    when there is none.
@@ -99,9 +86,8 @@ const internalHrefs = (p: Page): string[] =>
  *
  * The dividing line is a dot in the last segment. It is a heuristic, and the way it could be wrong is a
  * route whose final segment contains a dot — a writing slug like `v1.0-notes` would be mistaken for a
- * file and looked for on disk. No such
- * route exists today; if one is ever added, this is the line to fix, and it will fail loudly rather
- * than quietly pass.
+ * file and looked for on disk. No such route exists today; if one is ever added, this is the line to fix,
+ * and it will fail loudly rather than quietly pass.
  */
 const namesAFile = (path: string): boolean => /\/[^/]*\.[a-z0-9]+$/i.test(path);
 
@@ -148,18 +134,9 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
   });
 
   // ── 1. EVERY INTERNAL LINK RESOLVES ──────────────────────────────────────────────────────────
-  // EVERY page, with no exclusion.
-  //
-  // IT USED TO CHECK ONLY THE HREFS CONTAINING A '#'. The loop opened with `if (hash === -1)
-  // continue;`, which is a much narrower promise than the test's name implied, and the gap was not
-  // theoretical: dist/writing/index.html links its only piece as href="/writing/favourite-quotes",
-  // with no fragment — so the sole door to the sole writing piece was checked by nothing at all here.
-  // A renamed .md file (the slug IS the filename) or a moved route would have shipped a 404 on the
-  // newest section of the site with all three gates green.
-  //
-  // So the fragment is now the OPTIONAL half of the question. Every internal href is resolved to a
-  // path first and that path must exist; an href that also names a fragment must additionally find
-  // the id on the page it lands on. Same walk, same failure list, strictly more coverage.
+  // EVERY page, with no exclusion, and every href, not only those with a '#' (a renamed .md is a moved
+  // route, and its link has no fragment). Each resolves to a path that must exist; an href that also
+  // names a fragment must find the id on the page it lands on.
   it('resolves every internal link to a built page, and every fragment to an id on it', () => {
     const routes = byRoute();
     const dead: string[] = [];
@@ -170,8 +147,7 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
         const frag = hash === -1 ? null : href.slice(hash + 1);
         // `href="#"` is a no-op affordance and `#top` is defined by the HTML spec to mean the document
         // itself, so neither needs an element to exist. Only the ID half is waived, not the whole
-        // href: the old version `continue`d here, which meant a link to a page that does not exist
-        // escaped the check entirely as long as it ended in "#top".
+        // href, so a link to a missing page cannot escape by ending in "#top".
         const waiveId = frag === '' || frag === 'top';
 
         // Resolve against the page's own served URL so a same-page "#x", a sibling "writing#x", an
@@ -285,14 +261,8 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
 
 describe('the homepage intro ships on / and ONLY on /', () => {
   // MOVING THE INTRO UP INTO BaseLayout IS THE ONE EDIT that would hand a 5.2-second construction
-  // animation to every route — including /404. The retired first-visit gate
-  // verified the equivalent property by reading built HTML ("5 data-gate references on /, zero on the
-  // other eight"), and this is that check for its replacement.
-  //
-  // The marker is `data-intro` on the terrain canvas. It is an attribute rather than a class because a
-  // class would be a styling hook nobody styles, and nothing in the page reads it — it exists so this
-  // assertion can exist. `TerrainHero` renders only via `Heights`, which renders only on the homepage,
-  // so today this is one attribute and one regex; the point is that it stays that way.
+  // animation to every route — including /404. The marker is `data-intro` on the terrain canvas, which
+  // nothing in the page reads: it exists so this assertion can (TerrainHero.astro says so).
   it('marks the intro on the homepage', () => {
     expect(builtPage('/').html).toMatch(/<canvas[^>]*\bdata-intro\b/);
   });
@@ -303,16 +273,9 @@ describe('the homepage intro ships on / and ONLY on /', () => {
   });
 
   it('ships the decision INLINE, before the hero, with the constants from lib/', () => {
-    // THIS TEST EXISTS BECAUSE THE WELL-TESTED VERSION OF THIS POLICY WAS THE WRONG ONE.
-    //
-    // `introStillRunning`, `introDurationFrom` and `shouldPlayIntro` lived in lib/introTimeline.ts with
-    // 97 lines of specs. Then the decision moved into an `is:inline` script, because only an inline
-    // script parses before first paint — and an inline script cannot `import`, so it re-implements the
-    // parse and the clamp in raw JS. The three exports lost every production caller while their tests
-    // went on passing: a green suite over code nothing ran. They are deleted, and this is the check that
-    // replaces them, because it reads the code that actually ships.
-    //
-    // Two properties, and both have already broken once:
+    // THE POLICY IS ASSERTED WHERE IT SHIPS: the decision is an `is:inline` script, which cannot `import`,
+    // so it re-implements the parse and the clamp in raw JS, and this reads that code (module copies of it
+    // for a spec to call had no production caller and are deleted). Two properties:
     //   1. INLINE AND BEFORE THE HERO. A bundled `<script>` is deferred and runs after parse, which is
     //      what made the sky flash warm → flat → warm for ~300ms.
     //   2. THE CONSTANTS AGREE WITH lib/. They are passed through `define:vars` precisely so there is one

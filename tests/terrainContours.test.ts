@@ -109,45 +109,15 @@ describe('introContours', () => {
   });
 
   it('does the real work, within a deterministic bound', () => {
-    // MEASURED THROUGH THE UNCACHED KERNEL, which is the only way to time this honestly — and getting
-    // that wrong twice is why the reasoning is written down.
-    //
-    // The first version called `terrainContoursFor(l + 1e-7, res)` with the comment "offset the levels so
-    // nothing above has warmed the memo for these exact keys". The key was `level.toFixed(4)`, and 1e-7
-    // does not survive four decimals: 9 of 9 offset keys hashed identically to the warm ones, so it timed
-    // nine Map hits and passed at ~0ms. The ceiling guarding the intro's first frame guarded nothing.
-    //
-    // The obvious fix — `vi.resetModules()` plus a dynamic import, for genuinely empty caches — measured
-    // **44.9ms** and went red. That number is real but it is not production's: re-importing re-evaluates
-    // `terrain.ts` too, so `field` is a brand-new function with no JIT feedback. On a real first open the
-    // hero has already painted its static frame, which runs `field` tens of thousands of times, so the
-    // contour build happens on an optimised `field`. The browser figure is 10.6ms, measured on the
-    // intro's actual first frame. Cold CACHE, warm JIT — model both, or the budget describes nothing
-    // that ships.
-    //
-    // THEN THE WALL-CLOCK VERSION WENT RED ON CI AT 57.1ms, against a ceiling of 40 whose own comment
-    // claimed it was "deliberately loose enough not to flake on a loaded CI box". It was never tested
-    // against a real measurement — the ceiling was set while the measurement was fake, so its looseness
-    // was guesswork. A GitHub runner is 2 shared vCPUs; the same loop is ~11ms here and 57ms there.
-    //
-    // SO THE TIME BUDGET IS GONE, AND THAT IS THE RIGHT ANSWER RATHER THAN A BIGGER NUMBER. Raising the
-    // ceiling to fit the slowest runner makes it stop discriminating; lowering it makes it flake; and
-    // either way wall-clock on a shared runner is not a measurable quantity. This repo already has that
-    // lesson one layer up — CLAUDE.md records that a frame-cadence regression was invisible to headless
-    // Chrome and could only be seen on real hardware. A per-run timing assertion is the same category
-    // error: it reports the runner, not the code.
-    //
-    // WHAT ACTUALLY GUARDS THE INTRO'S FIRST FRAME IS DETERMINISTIC, and it is the two constants. The
-    // cost here is (levels x (res+1)^2) field evaluations plus the stitch, so the only way to make the
-    // build expensive is to raise one of them — and `INTRO_CONTOUR_LEVELS === 9` / `INTRO_CONTOUR_RES
-    // === 74` are pinned by the test below. Raising res to descentPath's 150 fails that pin immediately,
-    // on any machine, in any load, which is strictly better than failing a stopwatch sometimes. The
-    // measured figures live in terrainContours.ts's header where a tuner will read them: 4.9ms at res
-    // 60, 10.0ms at 74, 21.0ms at 110, 47.1ms at 150, and 10.6ms in a real browser on the intro's first
-    // frame.
-    //
-    // What remains here is the half that CAN be asserted: that the kernel does the work at all. A
-    // regression that made `isoRuns` return nothing would have passed the old stopwatch at ~0ms.
+    // NO STOPWATCH, after three that measured nothing that ships:
+    //   1. offset memo keys (`l + 1e-7`) that `toFixed(4)` hashed back onto the warm ones: it timed Map hits;
+    //   2. `vi.resetModules()` for empty caches: 44.9ms, but on a fresh `field` with no JIT feedback, where a
+    //      real first open has a warm one (10.6ms in the browser): cold cache, warm JIT, model both;
+    //   3. the wall clock: ~11ms here, 57.1ms on a 2-vCPU CI runner, against a ceiling of 40.
+    // A per-run timing reports the runner, not the code. What guards the first frame is deterministic: the
+    // cost is levels x (res+1)^2 field evaluations, so the two constants are pinned (below) and the product
+    // is bounded here. The measured times are in terrainContours.ts's header. This test also asserts the
+    // kernel does the work at all, which an empty `isoRuns` would fail.
     const bounds = { x0: -RANGE, y0: -RANGE, x1: RANGE, y1: RANGE };
     let points = 0;
     let runs = 0;
