@@ -10,6 +10,7 @@ import { rlBhrpWealth } from '../src/data/vendor/rlBhrpWealth';
 import { metricsTable } from '../src/lib/paperFigures/metricsTable';
 import { pipelineFigure } from '../src/lib/paperFigures/pipelineFigure';
 import { wealthFigure, type WealthSeries } from '../src/lib/paperFigures/wealthFigure';
+import { readoutWhen } from '../src/lib/paperPage';
 import { band, cumulative, pointwiseMedian } from '../src/lib/wealth';
 
 const full = wealthFigure(REPRO, 'full'), mini = wealthFigure(REPRO, 'mini'), pipe = pipelineFigure();
@@ -159,9 +160,8 @@ describe('Figure 2, the growth of $1', () => {
     }
   });
 
-  it('carries the readout\'s three series on data-*, to 4 dp, one point more than there are months', () => {
+  it('carries the three series the readout places its dots by on data-*, to 4 dp', () => {
     const plot = full.match(/<div class="f-plot"[^>]*>/)![0];
-    expect(attr(plot, 'data-dates')).toBe(REPRO.dates.join(' '));
     for (const k of ['rl', 'bhrp', 'bench'] as const) {
       const got = attr(plot, `data-${k}`)!.split(' ').map(Number);
       expect(got).toEqual(REPRO[k].map((v) => Number(v.toFixed(4))));
@@ -169,17 +169,34 @@ describe('Figure 2, the growth of $1', () => {
     expect(full).not.toContain('<script');
   });
 
-  // The band is exempt from 3:1 (WCAG 1.4.11) on the condition that its values are available as text: the readout
-  // reads each month's range across the runs from these.
-  it("carries the band's two edges too, the readout's text for it, and where the data end", () => {
-    const plot = full.match(/<div class="f-plot"[^>]*>/)![0];
-    for (const k of ['lo', 'hi'] as const) {
-      expect(attr(plot, `data-${k}`)!.split(' ').map(Number), k).toEqual(REPRO[k].map((v) => Number(v.toFixed(4))));
-    }
-    expect(attr(plot, 'data-end')).toBe(REPRO.dataEnd);
+  // The readout is a pointer's, a tap's and a keyboard's. A screen reader in browse mode keeps the arrow keys for
+  // itself, so the values are also a table, which browse mode reads as it reads any table, and which the readout
+  // prints from, so the tip and the table cannot disagree. The band is exempt from 3:1 (WCAG 1.4.11) on the condition
+  // that its values are text, and they are here: each point's lowest and highest run.
+  it('gives every point as a row of a table: when it is, then each value as the readout prints it', () => {
+    const tbl = full.match(/<table class="f-values sr-only">[\s\S]*?<\/table>/)?.[0] ?? '';
+    expect(tbl, 'no table of values').not.toBe('');
+    expect(tbl).toMatch(/<caption>[^<]*reproduction[^<]*<\/caption>/);
+    expect([...tbl.matchAll(/<th scope="col">([^<]*)<\/th>/g)].map((m) => m[1]))
+      .toEqual(['Date', `RL-BHRP, median of ${REPRO.runs} runs`, 'Lowest of the runs', 'Highest of the runs', 'BHRP', 'Benchmark']);
+    const rows = [...tbl.matchAll(/<tr><th scope="row">([^<]*)<\/th>([\s\S]*?)<\/tr>/g)];
+    expect(rows).toHaveLength(REPRO.rl.length);
+    rows.forEach(([, when, cells], i) => {
+      expect(when).toBe(readoutWhen(i, REPRO.dates, REPRO.dataEnd));
+      const got = [...cells.matchAll(/<td data-k="(\w+)">([^<]*)<\/td>/g)].map((m) => [m[1], m[2]]);
+      expect(got).toEqual((['rl', 'lo', 'hi', 'bhrp', 'bench'] as const).map((k) => [k, `$${REPRO[k][i].toFixed(2)}`]));
+    });
+    expect(rows.at(-1)![1]).toContain('where the data end');
     expect(full).toContain(`median of ${REPRO.runs} runs`);   // the readout's legend
     expect(full).toMatch(/<dd data-k="band"><\/dd>/);
     expect(REPRO.runs).toBe(10);
+  });
+
+  // Without a script the plot reads nothing, so it is no control and promises nothing: the script that makes it work
+  // makes it focusable and says how it works.
+  it('is a plain block in the markup: no tab stop, role or instructions until the readout starts', () => {
+    const plot = full.match(/<div class="f-plot"[^>]*>/)![0];
+    for (const a of ['tabindex', 'role', 'aria-label']) expect(attr(plot, a), a).toBeUndefined();
   });
 
   // The caption is prose, so the explainer writes it (a :::figure container); the plugin makes the <figure>.

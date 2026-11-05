@@ -184,17 +184,16 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
      nothing there (CLAUDE.md, Astro trap 1). Ported from the approved prototype (research-b4) onto the paper
      register's tokens: the ground is --sheet-ground, never --paper, which is the dark theme's TEXT colour. */}
 <style is:global>
-  /* ── the measure (styles/paper.css): a reading column and a notes column, centred right of the rail, the type 1px
-     larger from 1101px (18 → 19px) as the measure grows. At 1100px and below there is one column and the notes fall
-     into it. ── */
+  /* ── the measure (styles/paper.css): a reading column and a notes column, centred right of the rail, the type up to
+     1px larger as the measure grows past 1100px (18 → 19px; --tk is 0 at 1100px and below). At 1100px and below there
+     is one column and the notes fall into it. ── */
   .paper {
     width: var(--M); margin-left: var(--L); padding-bottom: 96px;
-    font-family: var(--font-display); font-size: 18px; line-height: 1.66; color: var(--ink-2);
+    font-family: var(--font-display); font-size: calc(18px + var(--tk)); line-height: 1.66; color: var(--ink-2);
     font-kerning: normal; text-rendering: optimizeLegibility;
   }
-  @media (min-width: 1101px) { .paper { font-size: calc(18px + var(--tk)); } }
 
-  .paper a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: rgba(var(--hairline-rgb), 0.5); text-underline-offset: 3px; }
+  .paper a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: var(--sheet-link); text-underline-offset: 3px; }
   @media (hover: hover) { .paper a:hover { color: var(--seal); text-decoration-color: currentColor; } }
   .paper :focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; border-radius: 2px; }
   .paper p { margin: 0 0 1.05em; text-wrap: pretty; }
@@ -272,8 +271,10 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
      it would then jump to its anchor in view, a layout shift. Hidden keeps its box, so nothing moves when it shows.
      The animation is the backstop, shown after MOTION_LIMIT_MS (lib/motion.ts) if the script never runs; without
      a script the query does not match and every note falls into the column. A printout holds nothing (screen). */
-  @media screen and (min-width: 1101px) and (scripting: enabled) {
-    .paper .mn:not(.is-placed) { visibility: hidden; animation: mn-unheld 0s 5000ms forwards; }
+  @media not all and (max-width: 1100px) {
+    @media screen and (scripting: enabled) {
+      .paper .mn:not(.is-placed) { visibility: hidden; animation: mn-unheld 0s 5000ms forwards; }
+    }
   }
   @keyframes mn-unheld { to { visibility: visible; } }
 
@@ -426,9 +427,11 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
   }
   /* the linked note shifts toward the text, beside it only; ::after keeps the box it left under the pointer, or a
      note shifted from under a pointer at its right edge would unlink, slide back and relink */
-  @media (min-width: 1101px) and (prefers-reduced-motion: no-preference) {
-    .paper .mn.lk { transform: translateX(-4px); }
-    .paper .mn.lk::after { content: ''; position: absolute; top: 0; bottom: 0; left: 100%; width: 4px; }
+  @media not all and (max-width: 1100px) {
+    @media (prefers-reduced-motion: no-preference) {
+      .paper .mn.lk { transform: translateX(-4px); }
+      .paper .mn.lk::after { content: ''; position: absolute; top: 0; bottom: 0; left: 100%; width: 4px; }
+    }
   }
 
   /* ── one column at 1100px and below (the rail hides at the same width): the Contents list replaces the rail,
@@ -490,7 +493,8 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
   // (scripts/motion.ts). Started through onPageView, so it runs at parse on a full load and once per arrival.
   import { DRAW } from '../../lib/motionTiming';
   import { onPageView } from '../../scripts/pageView';
-  import { readoutIndex, readoutSays, readoutStep, readoutWhen, stackNotes, tipLeft } from '../../lib/paperPage';
+  import { READOUT_LABEL, readoutIndex, readoutSays, readoutStep, stackNotes, tipLeft } from '../../lib/paperPage';
+  import { WIDE_QUERY } from '../../lib/viewport';
   import { batch, onceSeen, play, riseOnceSeen, sweepLines } from '../../scripts/motion';
 
   onPageView('main.paper', (page) => {
@@ -498,15 +502,18 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
     const { signal } = ac;
     const live = new Set<Animation>();
     const timers = new Set<number>();
+    // Every timer the page sets goes through here, so the teardown ends them all: it clears what is set, and once the
+    // signal has aborted nothing more is (an animation the teardown finishes may still ask for its next step).
     const later = (fn: () => void, ms: number): void => {
+      if (signal.aborted) return;
       const t = window.setTimeout(() => { timers.delete(t); fn(); }, ms);
       timers.add(t);
     };
     const shown = (el: Element): boolean => el.getClientRects().length > 0;
-    const wide = matchMedia('(min-width: 1101px)');
+    const wide = matchMedia(WIDE_QUERY);
 
     // ── margin notes, each beside its anchor (its term's line, or the top of its block), none overlapping
-    // (stackNotes, 16px apart). Only a script knows where a term's line falls, so from 1101px a note is held
+    // (stackNotes, 16px apart). Only a script knows where a term's line falls, so in the wide layout a note is held
     // `visibility: hidden` until place() marks it .is-placed: hidden keeps its box, so its first paint is where it
     // rests and nothing shifts (CLS 0 at 1440x900, 1280x720, 1101x700 and 1101x600, cold, throttled, from a
     // #results deep link and on a restored-scroll reload). The hold is CSS alone, `@media (scripting: enabled)`, and
@@ -528,7 +535,7 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
         items[k].n.classList.add('is-placed'); // shown now (the CSS above holds a note until this)
       });
     }
-    // Again whenever the page's box changes — a webfont landing, a resize, the 1101px line crossed — from a
+    // Again whenever the page's box changes — a webfont landing, a resize, the 1100px line crossed — from a
     // ResizeObserver, whose callback runs after layout and before paint, so a note is never drawn where it was.
     // Placing moves only absolutely placed notes, which change no box it watches.
     place();
@@ -536,8 +543,11 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
     ro.observe(page);
 
     // ── reveals: a section's heading and first block rise in, and a margin note after its block, beside the text
-    // from the right (riseOnceSeen) ──
-    const risers = [...page.querySelectorAll('.sec > h2')].flatMap((h) => [h, h.nextElementSibling].filter((x): x is Element => !!x));
+    // from the right (riseOnceSeen). A figure that opens a section does not rise: one reveal owns an element, and a
+    // drawn figure has its own (two would both set data-pending and the first done would end the other's hold), and
+    // the CSS never holds a figure at opacity 0, so a rise would show it and then start it from 0. ──
+    const risers = [...page.querySelectorAll('.sec > h2')]
+      .flatMap((h) => [h, h.nextElementSibling].filter((x): x is Element => !!x && !x.matches('figure')));
     const rising = riseOnceSeen([...risers, ...notes.filter(shown)], {
       signal, live, note: (el) => (el.classList.contains('mn') ? (wide.matches ? 'beside' : 'below') : null),
     });
@@ -639,17 +649,23 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
     page.addEventListener('focusout', (e) => link(e.relatedTarget), { signal });
 
     // ── Figure 2's readout: the month nearest the pointer, a tap or ←/→ (Shift: a year; Home/End): a hairline
-    // there, a dot on each series, and the values, the runs' range among them. A keyboard reading is spoken. ──
+    // there, a dot on each series, and the values, the runs' range among them. A keyboard reading is spoken. What it
+    // prints is a row of the figure's table of values (lib/paperFigures/wealthFigure), so the two say the same. ──
     let dismissed = false; // Escape put the readout's tip away, until the reader asks for another reading
     if (plot) {
       const series = (k: string) => (plot.dataset[k] ?? '').split(' ').map(Number);
-      const dates = (plot.dataset.dates ?? '').split(' '), end = plot.dataset.end ?? '';
-      const S = { rl: series('rl'), lo: series('lo'), hi: series('hi'), bhrp: series('bhrp'), bench: series('bench') };
-      const points = S.rl.length;
+      const S = { rl: series('rl'), bhrp: series('bhrp'), bench: series('bench') };
+      const rows = [...plot.querySelectorAll<HTMLTableRowElement>('.f-values tbody tr')];
+      const points = rows.length;
       const tipEl = plot.querySelector<HTMLElement>('.f-tip'), say = plot.querySelector('[aria-live]');
       const runs = plot.querySelector('dt.rl i')?.textContent ?? '';
-      const usd = (v: number) => `$${v.toFixed(2)}`;
+      // a control now that it reads: without this script it reads nothing and promises nothing
+      plot.tabIndex = 0;
+      plot.setAttribute('role', 'group');
+      plot.setAttribute('aria-label', READOUT_LABEL);
       let at = -1, hovering = false;
+      // the plot was focused by a tap, whose reading stays until the focus goes; a mouse's leaves with the pointer
+      let tapped = false;
       const svgShown = () => [...plot.querySelectorAll<SVGSVGElement>('svg')].find(shown);
       function read(i: number, speak: boolean): void {
         // a reader who reaches for the values wants the finished figure, not dots ahead of a line still drawing
@@ -663,14 +679,15 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
         const [W, x0, x1, y0, y1, lo, hi] = (svg.dataset.g ?? '').split(' ').map(Number);
         const X = x0 + ((x1 - x0) * at) / (points - 1), Y = (v: number) => y1 - ((y1 - y0) * (v - lo)) / (hi - lo);
         svg.querySelector('.f-hair')?.setAttribute('transform', `translate(${X} 0)`);
+        const row = rows[at], v = (k: string): string => row.querySelector(`[data-k="${k}"]`)?.textContent ?? '';
         for (const k of ['rl', 'bhrp', 'bench'] as const) {
           svg.querySelector(`.f-dot-${k}`)?.setAttribute('transform', `translate(${X} ${Y(S[k][at])})`);
           const dd = tipEl.querySelector(`dd[data-k="${k}"]`);
-          if (dd) dd.textContent = usd(S[k][at]);
+          if (dd) dd.textContent = v(k);
         }
         const band = tipEl.querySelector('dd[data-k="band"]');
-        if (band) band.textContent = `${usd(S.lo[at])}–${usd(S.hi[at])}`;
-        const when = readoutWhen(at, dates, end);
+        if (band) band.textContent = `${v('lo')}–${v('hi')}`;
+        const when = row.cells[0].textContent ?? '';
         const d = tipEl.querySelector('.f-tip-d');
         if (d) d.textContent = `${when} · reproduction`;
         // measured at the plot's left edge: laid out at the last month, a wide tip overflowed a phone's window
@@ -683,13 +700,12 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
         const top = above ? sr.top - pr.top - tipEl.offsetHeight - 14 : sr.bottom - pr.top + 14;
         tipEl.classList.toggle('below', !above);
         tipEl.style.transform = `translate(${left}px, ${Math.round(top)}px)`;
-        if (speak && say) {
-          say.textContent = readoutSays(when, runs, {
-            rl: usd(S.rl[at]), lo: usd(S.lo[at]), hi: usd(S.hi[at]), bhrp: usd(S.bhrp[at]), bench: usd(S.bench[at]),
-          });
-        }
+        if (speak && say) say.textContent = readoutSays(when, runs, { rl: v('rl'), lo: v('lo'), hi: v('hi'), bhrp: v('bhrp'), bench: v('bench') });
       }
-      const unread = (): void => { if (!hovering && document.activeElement !== plot) plot.classList.remove('reading'); };
+      // The reading ends when the pointer leaves, unless the plot holds focus that keeps it: a keyboard's (what
+      // :focus-visible matches) or a tap's. A mouse click focuses the plot too, and its reading still leaves with it.
+      const keeps = (): boolean => document.activeElement === plot && (tapped || plot.matches(':focus-visible'));
+      const unread = (): void => { if (!hovering && !keeps()) plot.classList.remove('reading'); };
       const fromPointer = (e: PointerEvent): number => {
         const svg = svgShown();
         if (!svg) return at;
@@ -710,6 +726,7 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
       plot.addEventListener('pointerup', (e) => {
         if (e.pointerType !== 'touch' || onTip(e)) return;
         const i = fromPointer(e);
+        tapped = true;
         if (document.activeElement === plot) read(i, true);
         else { at = i; plot.focus({ preventScroll: true }); }
       }, { signal });
@@ -719,7 +736,7 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
       }, { signal });
       plot.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') { hovering = false; unread(); } }, { signal });
       plot.addEventListener('focus', () => read(at < 0 ? points - 1 : at, true), { signal });
-      plot.addEventListener('blur', unread, { signal });
+      plot.addEventListener('blur', () => { tapped = false; unread(); }, { signal });
       plot.addEventListener('keydown', (e) => {
         const next = readoutStep(at < 0 ? points - 1 : at, e.key, e.shiftKey, points);
         if (next === null) return;

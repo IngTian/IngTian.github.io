@@ -7,6 +7,7 @@
 // gate is here and not in the callers: `play` lands on its last frame at once, and `onceSeen` holds nothing back.
 import { MOTION_LIMIT_MS, prefersReducedMotion } from '../lib/motion';
 import { EASE, mergeLines, stagger, sweepDurations } from '../lib/motionTiming';
+import { fragmentId } from '../lib/pageStops';
 
 /**
  * Play an animation that hands back to the element's own style. `fill: 'both'` holds the first frame through any
@@ -32,7 +33,7 @@ export function play(el: Element, frames: Keyframe[], opts: KeyframeAnimationOpt
  * on any of those screens is held back.
  */
 function landingBottom(): number {
-  const id = decodeURIComponent(window.location.hash.slice(1));
+  const id = fragmentId(window.location.hash);
   const target = id ? document.getElementById(id) : null;
   const restored = (history.state as { scrollY?: unknown } | null)?.scrollY;
   const targetTop = target ? target.getBoundingClientRect().top - (parseFloat(getComputedStyle(target).scrollMarginTop) || 0) : 0;

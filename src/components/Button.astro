@@ -69,7 +69,8 @@ const Tag = href ? 'a' : 'button';
   /* THE PAPER — the research routes' skin, on their sheet: a hairline box in the sheet's own ground, ink-1 type, the
      edge going to ink on hover. Quiet on purpose; a page for papers has no use for a button that asks to be pressed.
      The ground is --sheet-ground, never --paper (in the dark theme that is the TEXT colour). Only the anatomy's press
-     moves. */
+     moves. The resting edge is under 3:1 on the sheet (1.86:1 light, 2.73:1 dark), and that is not a 1.4.11 failure:
+     the label, ink-1, is what identifies the control, and WCAG does not require a text button's boundary to show. */
   .btn--paper {
     border-radius: 3px; color: var(--ink-1); background: var(--sheet-ground);
     border: 1px solid rgba(var(--hairline-rgb), 0.4);

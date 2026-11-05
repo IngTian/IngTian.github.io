@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isPhone, PHONE_MAX_WIDTH, PHONE_QUERY } from '../src/lib/viewport';
+import { readdirSync, readFileSync } from 'node:fs';
+import { isPhone, PHONE_MAX_WIDTH, PHONE_QUERY, WIDE_QUERY } from '../src/lib/viewport';
 
 /**
  * The phone gate decides BEHAVIOUR, not just looks: whether the slide deck attaches its listeners at all.
@@ -62,5 +63,23 @@ describe('viewport phone gate', () => {
   it('is false when matchMedia is missing rather than throwing', () => {
     vi.stubGlobal('window', {});
     expect(isPhone()).toBe(false);
+  });
+});
+
+// The one-column breakpoint: at 1100px and below the rail hides and the reading pages fall to one column. A pair of
+// bounds (max 1100 / min 1101) leaves the widths between them, which a zoomed or OS-scaled window reaches (1100.8 CSS px
+// is a 1321px window at 120%), to neither layout: there the rail shows and the paper's two columns stand, while its
+// script, asking the other bound, leaves every note unplaced at its block's top.
+describe('the wide layout', () => {
+  it('is the exact negation of the one-column query, so no width falls between the two', () => {
+    expect(WIDE_QUERY).toBe('not all and (max-width: 1100px)');
+  });
+
+  it('is never written as a second bound beside it', () => {
+    const src = new URL('../src/', import.meta.url);
+    const files = readdirSync(src, { recursive: true, encoding: 'utf8' }).filter((f) => /\.(astro|css|ts)$/.test(f));
+    expect(files.length).toBeGreaterThan(50);
+    const pairs = files.filter((f) => /min-width:\s*1101px|width\s*>=?\s*1101px/.test(readFileSync(new URL(f, src), 'utf8')));
+    expect(pairs).toEqual([]);
   });
 });

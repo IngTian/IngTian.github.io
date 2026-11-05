@@ -92,7 +92,7 @@ const bootDecider = `(function () {
   /* Clears SideRail where it shows (it hides at ≤1100px). Every label sits past the dash's gutter whatever its
      state; measured, the rail's right edge ("THE WORKSHOP") is at x=159.4 at 1101px and x=171.0 at 2000px, 2px more
      under the hover nudge, against content starting at 190 and 230. */
-  @media (min-width: 1101px) { .projects-page { padding-left: clamp(190px, 13vw, 230px); } }
+  @media not all and (max-width: 1100px) { .projects-page { padding-left: clamp(190px, 13vw, 230px); } }
   /* THE COW'S COLUMN IS THE MOCKUP'S, and the bubble is capped to it (.cowbox, below) — the owner's "the cow never
      overlaps content" (spec §3). The widest bubble is ~272px ("Look before you change anything.", 32 characters of
      12.5px mono, plus the 4px cell's padding and border), wider than this gutter from 1180 to ~1560px, where it

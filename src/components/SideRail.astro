@@ -6,7 +6,9 @@
 // data-l, --ink-2 for the quieter mark and --ink-1 for the lead — so a state change is a cross-fade of opacities,
 // never a colour transition, and every state is a solid ink at rest (the inactive one clears 4.5:1 on every rail
 // page's ground). The copies are `content: attr(data-l) / ''`, so find-in-page, a copied selection and the
-// accessible name see each label once. The dash hangs in a 20px gutter left of the label, so no label ever moves.
+// accessible name see each label once; a plain `attr(data-l)` before it is for an engine that does not parse the
+// alt text (Safari before 17.4, Firefox before 128), which would otherwise drop the declaration and show an active
+// label as nothing. The dash hangs in a 20px gutter left of the label, so no label ever moves.
 //
 // Not an island (the site has none): a vanilla <script>, started through onPageView, with a teardown. The entrance
 // is CSS, not the script's: a bundled script runs after the browser has painted, so a from-state it set could land
@@ -96,7 +98,7 @@ const gap = stagger(1, flat.length, { step: 40, total: RAIL_ENTER_MS - ROW_MS })
   .side-rail .lbl::after { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .side-rail .dim { color: var(--ink-3); }
   .side-rail .lbl::before,
-  .side-rail .lbl::after { content: attr(data-l) / ''; position: absolute; inset: 0; opacity: 0; }
+  .side-rail .lbl::after { content: attr(data-l); content: attr(data-l) / ''; position: absolute; inset: 0; opacity: 0; }
   .side-rail .lbl::before { color: var(--ink-2); }
   .side-rail .lbl::after { color: var(--ink-1); }
 
@@ -122,6 +124,14 @@ const gap = stagger(1, flat.length, { step: 40, total: RAIL_ENTER_MS - ROW_MS })
   .side-rail a.is-active.is-quiet .lbl::after { opacity: 0; }
   .side-rail a:is(.is-active, .is-ancestor) .rule { opacity: 1; }
   .side-rail a:is(.is-ancestor, .is-quiet) .rule { transform: scaleX(0.6); }
+
+  /* FORCED COLOURS (Windows High Contrast) set every ink in one system colour and paint backgrounds as Canvas, so
+     the inks the marks cross-fade between look alike and the dash is gone. The current stop keeps a mark there: the
+     dash in Highlight (and the hover preview with it, at its own opacity), the current label underlined. */
+  @media (forced-colors: active) {
+    .side-rail .rule, .side-rail a::after { forced-color-adjust: none; background: Highlight; box-shadow: none; }
+    .side-rail a.is-active .lbl::before, .side-rail a.is-active .lbl::after { text-decoration: underline; }
+  }
 
   /* HOVER IS .is-hover, NOT :hover: the script sets it for a mouse or a pen and ignores a touch, so a tap on a
      touch laptop (whose primary pointer can hover) never leaves a row nudged and previewed. */
@@ -170,6 +180,7 @@ const gap = stagger(1, flat.length, { step: 40, total: RAIL_ENTER_MS - ROW_MS })
   // The first marks appear at once, inside the rows' CSS entrance. Reduced motion: the same marks, at once.
   import { prefersReducedMotion } from '../lib/motion';
   import { EASE } from '../lib/motionTiming';
+  import { fragmentId } from '../lib/pageStops';
   import { type Marks, markStops } from '../lib/scrollspy';
   import { play } from '../scripts/motion';
   import { onPageView } from '../scripts/pageView';
@@ -178,7 +189,7 @@ const gap = stagger(1, flat.length, { step: 40, total: RAIL_ENTER_MS - ROW_MS })
 
   onPageView('.side-rail', (rail) => {
     const stops = [...rail.querySelectorAll<HTMLAnchorElement>('a')].flatMap((a) => {
-      const el = document.getElementById(decodeURIComponent(a.hash.slice(1)));
+      const el = document.getElementById(fragmentId(a.hash));
       const rule = a.querySelector<HTMLElement>('.rule');
       const li = a.closest('li');
       return el && rule && li ? [{ a, el, rule, li }] : [];
@@ -198,6 +209,7 @@ const gap = stagger(1, flat.length, { step: 40, total: RAIL_ENTER_MS - ROW_MS })
     const live = new Set<Animation>();
     const fly = new Map<number, Animation>(); // at most one animation per dash
     let on = new Set<number>();
+    let ancestors = new Set<number>();
     let lead: number | null = null;
     let was = false; // the rail was showing on the last frame: only then do marks move rather than appear
     let raf = 0;
@@ -230,8 +242,9 @@ const gap = stagger(1, flat.length, { step: 40, total: RAIL_ENTER_MS - ROW_MS })
     };
 
     function apply(m: Marks, animate: boolean): void {
-      const prev = on, from = lead, next = new Set(m.current), anc = new Set(m.ancestors);
+      const prev = on, wasAnc = ancestors, from = lead, next = new Set(m.current), anc = new Set(m.ancestors);
       on = next;
+      ancestors = anc;
       lead = m.lead;
       // Read before any class or animation changes: where the old lead's dash is now (nowhere if its row is
       // hidden), and how each quiet mark looks, so one that stops being current fades from where it is.
@@ -273,7 +286,8 @@ const gap = stagger(1, flat.length, { step: 40, total: RAIL_ENTER_MS - ROW_MS })
         // The stop it left, if still current, takes the quiet mark where it stands; the dash leaving covers it.
         if (from !== null && next.has(from)) fadeIn(from);
       }
-      for (const i of next) if (i !== lead && i !== from && !prev.has(i)) fadeIn(i);
+      // A stop newly current fades its quiet mark in, unless it was an ancestor: an ancestor's mark is the quiet mark.
+      for (const i of next) if (i !== lead && i !== from && !prev.has(i) && !wasAnc.has(i)) fadeIn(i);
       for (const q of quiet) {
         if (next.has(q.i)) continue;
         halt(q.i);

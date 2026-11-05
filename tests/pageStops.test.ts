@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  projectStops, projectSectionId, experienceStops, railLabel, homeStops, flattenStops, paperPageOwns, paperSections, paperStops,
-  researchIndexStops, PAPER_END, type Stop,
+  projectStops, projectSectionId, experienceStops, railLabel, homeStops, flattenStops, fragmentId, paperPageOwns, paperSections,
+  paperStops, researchIndexStops, PAPER_END, type Stop,
 } from '../src/lib/pageStops';
 import { refId } from '../src/lib/paperMarkdown';
 import type { TimelineEntry } from '../src/data/profile';
@@ -188,6 +188,25 @@ describe('paperPageOwns', () => {
     for (const id of ['brief', 'brief-title', 'results', 'eq-4', 'figure-2', 'fm-wide', 'cited', 'references-title']) {
       expect(paperPageOwns(id), id).toBe(false);
     }
+  });
+});
+
+// Every script that reads a URL fragment (the rail's links, the reveals' landing screen) reads it through this, so a
+// fragment a browser hands over undecodable cannot throw inside a page's setup.
+describe('fragmentId', () => {
+  it('is the id a fragment names, decoded', () => {
+    expect(fragmentId('#results')).toBe('results');
+    expect(fragmentId('#caf%C3%A9')).toBe('café');
+  });
+
+  it('is empty for no fragment', () => {
+    expect(fragmentId('')).toBe('');
+    expect(fragmentId('#')).toBe('');
+  });
+
+  it('is empty for a fragment that cannot be decoded, which names nothing', () => {
+    expect(fragmentId('#%')).toBe('');
+    expect(fragmentId('#100%')).toBe('');
   });
 });
 

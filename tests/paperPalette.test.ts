@@ -21,7 +21,8 @@ const THEMES = [
 
 const ROLE = ['--paper', '--ink-1', '--ink-2', '--ink-3', '--ink-4', '--ink-5', '--ochre', '--on-accent',
   '--hairline-rgb', '--bg'];
-const SHEET = ['--sheet-ground', '--sheet-ul', '--sheet-band', '--sheet-axis', '--sheet-one', '--sheet-grid', '--sheet-mark'];
+const SHEET = ['--sheet-ground', '--sheet-ul', '--sheet-band', '--sheet-axis', '--sheet-one', '--sheet-grid', '--sheet-mark',
+  '--sheet-link'];
 
 // The two research pages' own stylesheets and the sheet they share (styles/paper.css, where Figure 2's series are
 // coloured), comments stripped: the alphas their marks are drawn at are read from them, so the number measured is the
@@ -99,6 +100,15 @@ describe('the paper palette (tokens.css)', () => {
         // Pins tokens.css's "bare sheet only" for --sheet-mark: seal over the seal band is under 3:1, which is why
         // the explainer format refuses a linked term inside a highlight.
         expect(onGround(tk['--sheet-mark'], band), '--sheet-mark over the underline').toBeLessThan(NON_TEXT);
+      });
+
+      // A link in the text is the body's ink, so its underline is the only thing that tells it from the words round it.
+      it("a link's underline clears 3:1 on the sheet, and the link stays ink", () => {
+        expect(decl('.paper a', 'color')).toBe('inherit');
+        expect(decl('.paper a', 'text-decoration-color')).toBe('var(--sheet-link)');
+        const [hairline, a] = rgbaOf(tk['--sheet-link']);
+        expect(hairline).toEqual(rgbToken(tk['--hairline-rgb']));
+        expect(between(over(hairline, a, ground), ground)).toBeGreaterThanOrEqual(NON_TEXT);
       });
 
       it('--on-accent clears AA on the accent (the nav pill on hover)', () => {

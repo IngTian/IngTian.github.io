@@ -216,3 +216,13 @@ export function flattenStops(stops: readonly Stop[]): Stop[] {
   return out;
 }
 
+/** The id a URL fragment names (`location.hash`, or a link's `hash`): '#results' → 'results', '' for none. A
+ *  fragment that cannot be decoded (a stray '%', as in '#100%') names nothing, rather than throwing inside the setup
+ *  of whatever page reads it. Every fragment a script reads goes through this. */
+export function fragmentId(hash: string): string {
+  try {
+    return decodeURIComponent(hash.replace(/^#/, ''));
+  } catch {
+    return '';
+  }
+}

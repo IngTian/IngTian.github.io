@@ -45,6 +45,13 @@ const STATUS: Record<PublicationStatus, string> = { preprint: 'Preprint', confer
           const title = hyphenatedParts(p.title).map((s, i) => (i % 2 ? <span class="nw">{s}</span> : s));
           return (
             <article class="pc">
+              <h3 class="p-title">{here
+                ? <a href={`/research/${p.slug}`}>{title}</a>
+                : <a href={p.href} target="_blank" rel="noopener noreferrer" aria-describedby={`out-${p.slug}`}>{title}<span class="ext" aria-hidden="true"> ↗</span></a>}</h3>
+              <p class="p-auth">{p.authors.map((a) => a.name).join(', ')}</p>
+              <p class="p-meta">{[STATUS[p.status], p.venue, p.year].map((t, i) => <>{i > 0 && ' '}<span class="nw">{i > 0 && '· '}{t}</span></>)}{!here && <span class="out" id={`out-${p.slug}`}>opens the publisher’s page<span aria-hidden="true"> ↗</span></span>}</p>
+              <p class="p-find">{p.finding}</p>
+              <p class="p-tags">{p.tags.map((t, i) => <>{i > 0 && ' '}<span class="nw">{i > 0 && '· '}{t}</span></>)}</p>
               {thumb && (
                 <div class="p-fig">
                   <Fragment set:html={thumb.svg} />
@@ -52,13 +59,6 @@ const STATUS: Record<PublicationStatus, string> = { preprint: 'Preprint', confer
                   <p class="p-figtag">{thumb.tag}</p>
                 </div>
               )}
-              <h3 class="p-title">{here
-                ? <a href={`/research/${p.slug}`}>{title}</a>
-                : <a href={p.href} target="_blank" rel="noopener noreferrer" aria-describedby={`out-${p.slug}`}>{title}<span class="ext" aria-hidden="true"> ↗</span></a>}</h3>
-              <p class="p-auth">{p.authors.map((a) => a.name).join(', ')}</p>
-              <p class="p-meta">{[STATUS[p.status], p.venue, p.year].map((t, i) => <>{i > 0 && ' '}<span class="nw">{i > 0 && '· '}{t}</span></>)}{!here && <span class="out" id={`out-${p.slug}`}>opens the publisher’s page ↗</span>}</p>
-              <p class="p-find">{p.finding}</p>
-              <p class="p-tags">{p.tags.map((t, i) => <>{i > 0 && ' '}<span class="nw">{i > 0 && '· '}{t}</span></>)}</p>
             </article>
           );
         })}
@@ -107,12 +107,12 @@ const STATUS: Record<PublicationStatus, string> = { preprint: 'Preprint', confer
   .research .p-meta { grid-area: meta; font-size: 15px; line-height: 1.45; color: var(--ink-3); }
   .research .p-meta .out { display: block; }
   .research .nw { white-space: nowrap; }
-  .research .p-find { grid-area: find; margin-top: 6px; font-size: 16.5px; line-height: 1.58; color: var(--ink-2); }
-  @media (min-width: 1101px) { .research .p-find { font-size: calc(16.5px + var(--tk)); } }
+  .research .p-find { grid-area: find; margin-top: 6px; font-size: calc(16.5px + var(--tk)); line-height: 1.58; color: var(--ink-2); }
   .research .p-tags { grid-area: tags; margin-top: 4px; font: 12px/1.5 var(--font-mono); letter-spacing: 0.02em; color: var(--ink-3); }
 
   /* the picture: Figure 2's series in miniature, coloured as Figure 2 is (styles/paper.css); its strokes keep their
-     width however far the drawing is scaled */
+     width however far the drawing is scaled. It is the card's last child, so the title leads in reading order, and
+     its grid area sets it beside the words. */
   .research .p-fig { grid-area: fig; align-self: start; margin-top: 4px; }
   .research .mini { display: block; width: 100%; height: auto; border: 1px solid rgba(var(--hairline-rgb), 0.3); }
   .research .mini polyline, .research .mini line { vector-effect: non-scaling-stroke; }

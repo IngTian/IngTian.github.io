@@ -12,11 +12,15 @@
 //   slides g.f-mask right by its data-d, and hides it again. It is clipped to where it lies at rest, so the slide
 //   never paints outside the drawing, whatever the svg's overflow.
 // - g.f-labels, the end labels; g.f-read, the readout's hairline and dots at the origin, unshown (opacity 0).
-// - .f-plot, the readout's target and the string's root: the series it reads on data-rl, data-bhrp, data-bench and
-//   the band's edges on data-lo and data-hi (4 dp; point 0 is the start, point i the month-end data-dates[i - 1]),
-//   the day the data end on data-end (the last month is partial), its legend .f-tip and a live region.
+// - .f-plot, the readout's target and the string's root: the three series its dots are placed by on data-rl,
+//   data-bhrp and data-bench (4 dp; point 0 is the start, point i the month-end dates[i - 1]); table.f-values,
+//   every point's values as text, visually hidden (a screen reader's browse mode keeps the arrow keys for itself and
+//   reads a table as it reads any table), which the readout prints from, so the tip and the table say the same; its
+//   legend .f-tip; and a live region. It is a plain block here: the readout's script, which makes it work, makes it a
+//   control (a tab stop, a role, its instructions).
 // The <figure> and its caption are the explainer's (a :::figure container), so this is the drawing alone.
 import { monthYear } from '../dates';
+import { readoutWhen } from '../paperPage';
 import { linearScale, niceDomain, nudgeLabels } from '../wealth';
 
 export interface WealthSeries {
@@ -119,12 +123,15 @@ export function wealthFigure(d: WealthSeries, size: 'full' | 'mini'): string {
     + `${d.runs} runs, ends at $${final(d.rl).toFixed(2)}, BHRP at $${final(d.bhrp).toFixed(2)} and the benchmark at `
     + `$${final(d.bench).toFixed(2)}; the runs end between $${final(d.lo).toFixed(2)} and $${final(d.hi).toFixed(2)}.`;
   const data = (s: readonly number[]) => s.map((v) => Number(v.toFixed(4))).join(' ');
-  return '<div class="f-plot" tabindex="0" role="group" aria-label="Plot of Figure 2. Hover, tap, or use the left and right arrow keys, to read the values month by month."'
-    + ` data-dates="${d.dates.join(' ')}" data-end="${d.dataEnd}" data-rl="${data(d.rl)}" data-lo="${data(d.lo)}" data-hi="${data(d.hi)}"`
-    + ` data-bhrp="${data(d.bhrp)}" data-bench="${data(d.bench)}">`
+  const cols = ['Date', `RL-BHRP, median of ${d.runs} runs`, 'Lowest of the runs', 'Highest of the runs', 'BHRP', 'Benchmark'];
+  const rows = d.rl.map((_, i) => `<tr><th scope="row">${readoutWhen(i, d.dates, d.dataEnd)}</th>`
+    + (['rl', 'lo', 'hi', 'bhrp', 'bench'] as const).map((k) => `<td data-k="${k}">$${d[k][i].toFixed(2)}</td>`).join('') + '</tr>');
+  return `<div class="f-plot" data-rl="${data(d.rl)}" data-bhrp="${data(d.bhrp)}" data-bench="${data(d.bench)}">`
     + drawing(d, WIDE, 'wide', dom, label) + drawing(d, NARROW, 'narrow', dom, label)
     + `<div class="f-tip" aria-hidden="true"><p class="f-tip-d"></p><dl><dt class="rl">RL-BHRP <i>median of ${d.runs} runs</i></dt>`
     + '<dd data-k="rl"></dd><dt class="band"><i>the runs</i></dt><dd data-k="band"></dd><dt>BHRP</dt><dd data-k="bhrp"></dd>'
     + '<dt>Benchmark</dt><dd data-k="bench"></dd></dl></div>'
+    + '<table class="f-values sr-only"><caption>Figure 2’s values, month by month, in the second author’s reproduction</caption>'
+    + `<thead><tr>${cols.map((c) => `<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`
     + '<span class="sr-only" aria-live="polite"></span></div>';
 }

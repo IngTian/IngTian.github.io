@@ -1,6 +1,6 @@
 // src/lib/paperPage.ts
 // The pure half of the paper page's script (pages/research/[slug].astro): where the margin notes go, and what
-// Figure 2's readout reads and says. The script measures and paints; this decides. Pure.
+// Figure 2's readout reads, says and tells a reader it does. The script measures and paints; this decides. Pure.
 import { longDate, monthYear } from './dates';
 
 /**
@@ -24,6 +24,11 @@ export function readoutIndex(x: number, x0: number, x1: number, points: number):
   return Math.max(0, Math.min(points - 1, Math.round(((x - x0) / (x1 - x0)) * (points - 1))));
 }
 
+/** What the plot tells a reader who reaches it, set by the script that makes the readout work: every way it reads,
+ *  each key as readoutStep handles it. */
+export const READOUT_LABEL = 'Plot of Figure 2. Hover or tap it to read the values at a month; with the keyboard, the left '
+  + 'and right arrow keys step a month, a year with Shift, and Home and End go to the first and the last.';
+
 /** Where a key moves the readout from `at`: a month an arrow, a year with Shift, an end Home or End; null for any
  *  other key, which the readout leaves to the page. */
 export function readoutStep(at: number, key: string, shift: boolean, points: number): number | null {
@@ -33,7 +38,8 @@ export function readoutStep(at: number, key: string, shift: boolean, points: num
 }
 
 /** What point `i` is: the start of the first month, a month's end, or (the last, a partial month) the day the data
- *  end. `dates` are the month-ends; point i > 0 is dates[i - 1]. */
+ *  end. `dates` are the month-ends; point i > 0 is dates[i - 1]. Figure 2's table of values heads each row with it
+ *  (lib/paperFigures/wealthFigure), and the readout prints the row. */
 export function readoutWhen(i: number, dates: readonly string[], dataEnd: string): string {
   if (i === 0) return `Start of ${monthYear(dates[0])}`;
   if (i === dates.length) return `${longDate(dataEnd)}, where the data end`;

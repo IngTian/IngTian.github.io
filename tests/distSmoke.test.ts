@@ -774,6 +774,28 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
     expect(railRules().map(([, sel]) => sel.trim()).filter((sel) => /:hover\b/.test(sel))).toEqual([]);
     expect(railRules().some(([, sel]) => /\.is-hover/.test(sel)), 'no rule reads .is-hover').toBe(true);
   });
+
+  // The label's two generated layers are `attr(data-l) / ''`, an alt text that keeps them out of find-in-page and the
+  // accessible name. An engine that does not parse the alt form drops the whole declaration, and with the served
+  // layer at opacity 0 an active label would show nothing: the plain form before it is that engine's.
+  it("keeps a plain content fallback before the labels' alt-text form, as shipped", () => {
+    const content = railRules().filter(([, sel]) => /\.lbl:{1,2}before/.test(sel) && /\.lbl:{1,2}after/.test(sel))
+      .flatMap(([, , body]) => [...body.matchAll(/(?:^|;)content:([^;]*)/g)].map((m) => m[1].replace(/\s+/g, '')));
+    expect(content).toEqual(['attr(data-l)', 'attr(data-l)/""']);
+  });
+
+  // Forced colours (Windows High Contrast) map every ink to one system colour and paint backgrounds as Canvas, so the
+  // marks the rail tells its stops apart by, an ink's strength and a dash, are gone. The current stop keeps a mark
+  // there: the dash painted in Highlight, the current label underlined.
+  it('keeps the current stop marked under forced colours', () => {
+    const forced = [...railCss().matchAll(/@media ?\(forced-colors: ?active\) ?\{((?:[^{}]*\{[^{}]*\})*)\}/g)].map((m) => m[1]).join('');
+    const rules = [...forced.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, sel, body]) => ({ sel, body }));
+    const dash = rules.find((r) => /\.side-rail \.rule\b/.test(r.sel));
+    expect(dash?.body, 'no forced-colours rule for the dash').toMatch(/forced-color-adjust:none/);
+    expect(dash?.body).toMatch(/background(?:-color)?:highlight\b/i);
+    const current = rules.find((r) => /\.is-active\b/.test(r.sel) && /\.lbl:{1,2}after/.test(r.sel));
+    expect(current?.body, 'no forced-colours underline for the current label').toMatch(/text-decoration(?:-line)?:underline\b/);
+  });
 });
 
 describe('/projects — the page shell on the drafting field', () => {
@@ -1152,7 +1174,8 @@ describe('/research — the papers as cards, newest first, then the interests', 
         expect(text(c.html), p.slug).toContain('opens the publisher’s page ↗');
         // and says so to a reader who reaches the link from a list of links, too
         const said = /\saria-describedby="([^"]*)"/.exec(c.attrs)?.[1] ?? '';
-        expect(new RegExp(`<span class="out" id="${said}">opens the publisher’s page`).test(c.html), p.slug).toBe(true);
+        // the arrow is a picture of "opens elsewhere", which the words already say, so it is not read out
+        expect(new RegExp(`<span class="out" id="${said}">opens the publisher’s page<span aria-hidden="true"> ↗</span></span>`).test(c.html), p.slug).toBe(true);
       }
     }
     // both kinds are on the page today, so neither branch above is vacuous
@@ -1185,6 +1208,15 @@ describe('/research — the papers as cards, newest first, then the interests', 
       expect(text(c.html)).toContain(thumb.caption);
     }
     expect(PAPER_DATA['rl-bhrp'].thumb, "RL-BHRP's card has no miniature").toBeDefined();
+  });
+
+  // A reader who moves by headings lands on the title, and what follows it is the card: the picture is the card's
+  // last word in the markup, wherever the grid shows it.
+  it("puts a card's title first and its picture last in the markup", () => {
+    const pictured = cards().filter((c) => c.html.includes('class="p-fig"'));
+    expect(pictured.length).toBeGreaterThan(0);
+    for (const c of cards()) expect(c.html.trimStart().startsWith('<h3 class="p-title">'), c.href).toBe(true);
+    for (const c of pictured) expect(c.html.trimEnd()).toMatch(/<div class="p-fig">[\s\S]*<\/div>$/);
   });
 
   // A browser may break a line after any hyphen, and a title would then split a paper's own name ("(RL-BHRP)").

@@ -1,7 +1,7 @@
 // tests/paperPage.test.ts — the pure half of the paper page's script (lib/paperPage.ts): where the margin notes
 // go, and what Figure 2's readout reads and says.
 import { describe, expect, it } from 'vitest';
-import { readoutIndex, readoutSays, readoutStep, readoutWhen, stackNotes, tipLeft } from '../src/lib/paperPage';
+import { READOUT_LABEL, readoutIndex, readoutSays, readoutStep, readoutWhen, stackNotes, tipLeft } from '../src/lib/paperPage';
 
 describe('stackNotes', () => {
   it('puts each note at its anchor while the one above has ended', () => {
@@ -34,6 +34,14 @@ describe('the readout', () => {
     expect(readoutStep(30, 'Home', false, 68)).toBe(0);
     expect(readoutStep(30, 'End', true, 68)).toBe(67);
     expect(readoutStep(30, 'Enter', false, 68)).toBeNull();
+  });
+
+  // What the plot tells a reader who reaches it says each way it reads, and no key it does not handle.
+  it('names in its instructions every way to read it, and only those', () => {
+    for (const way of ['Hover', 'tap', 'left and right arrow keys', 'Shift', 'Home', 'End']) expect(READOUT_LABEL).toContain(way);
+    for (const key of ['ArrowLeft', 'ArrowRight', 'Home', 'End']) expect(readoutStep(30, key, false, 68), key).not.toBeNull();
+    for (const key of ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown']) expect(readoutStep(30, key, false, 68), key).toBeNull();
+    expect(READOUT_LABEL).not.toMatch(/\bup\b|\bdown\b|page/i);
   });
 
   it('names a point: the start, a month-end, and the day the data end', () => {

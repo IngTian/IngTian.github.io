@@ -2,11 +2,12 @@
    once, and imported by both pages.
 
    The measure: a reading column (--M) and a notes column (--N), a gap (--G) apart, the composition centred in the
-   space right of the rail (the 90px is half its 180) and never nearer the window's left than 232px. From 1101px the
+   space right of the rail (the 90px is half its 180) and never nearer the window's left than 232px. Past 1100px the
    measure grows by about a tenth (604 → 664px at 1780px), the gap and the notes with it, and --tk, the body type's
-   extra pixel (18 → 19px), so a paper's line stays near 77 characters; from 1101 to 1139px the gap and the notes step
+   extra pixel (18 → 19px), so a paper's line stays near 77 characters; below 1140px the gap and the notes step
    down, or at the 232px floor the notes would run to 10px from the window's edge. A paper page sets its two columns
-   by these, and an index card spans both.
+   by these, and an index card spans both. At 1100px and below both pages are one column and read none of these, so
+   the step-down needs no lower bound.
 
    The marks of wealthFigure's drawings (lib/paperFigures/wealthFigure.ts): Figure 2 on a paper page, and its
    miniature on the index card, one figure at two sizes. tests/paperPalette.test.ts measures them on the sheet. */
@@ -17,7 +18,7 @@ html[data-page='paper'] {
   --L: max(232px, calc(90px + (100vw - var(--M) - var(--G) - var(--N)) / 2));
   --tk: clamp(0px, calc((100vw - 1100px) / 680), 1px);
 }
-@media (min-width: 1101px) and (max-width: 1139.98px) { html[data-page='paper'] { --G: 32px; --N: 186px; } }
+@media (max-width: 1139.98px) { html[data-page='paper'] { --G: 32px; --N: 186px; } }
 
 html[data-page='paper'] .f-grid { stroke: var(--sheet-grid); stroke-width: 1; }
 html[data-page='paper'] .f-one { stroke: var(--sheet-one); }

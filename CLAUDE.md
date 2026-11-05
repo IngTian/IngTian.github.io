@@ -242,7 +242,7 @@ src/
   pages/research/[slug].astro       # the one paper page: the record's head, the file's body, references, BibTeX; its script places the notes and runs the motion
   lib/paperMarkdown/{index,remarkPaper,rehypePaper}.ts # the markdown chain (spelled once) + the paper format's compiler and checks — see Papers are files
   lib/paperFigures/{wealthFigure,pipelineFigure,metricsTable}.ts # a paper's drawings and Table 1, as HTML strings from its data; a :::figure places each
-  lib/paperPage.ts                  # the paper page script's pure half: note stacking, the readout's month, step and label
+  lib/paperPage.ts                  # the paper page script's pure half: note stacking, the readout's month, step, point names, spoken line and instructions
   lib/wealth.ts                     # the one wealth module: growth of $1, CAGR, drawdown, the band of runs, scales and ticks — the paper page's figures and /projects' rl-bhrp picture
   lib/words.ts                      # the one word counter (countWords, readingMinutes) + hyphenatedParts, so a title keeps "RL-BHRP" whole
   lib/dates.ts                      # the one date helper: longDate, monthYear (UTC)
@@ -258,8 +258,8 @@ src/
   data/{define,desk,making,story}.ts                       # the homepage explainer's copy + numbers, per slide
   data/{cowGlyph,ruleGlyphs,tickerGlyphs,signalWeights}.ts # pixel-art matrices and weights the slides draw from
   lib/deck.ts                       # pure deck stops: WHERE the homepage scroll may rest, and what's next — unit-tested
-  lib/pageStops.ts                  # pure Stop trees: one tree per page drives BOTH its rail and its section ids — unit-tested
-  lib/viewport.ts                   # PHONE_MAX_WIDTH = 640, its PHONE_QUERY + isPhone() — the one phone gate
+  lib/pageStops.ts                  # pure Stop trees: one tree per page drives BOTH its rail and its section ids — unit-tested; + fragmentId, the one decode of a URL fragment
+  lib/viewport.ts                   # PHONE_MAX_WIDTH = 640, its PHONE_QUERY + isPhone() — the one phone gate; WIDE_QUERY, the wide layout past 1100px
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate; MOTION_LIMIT_MS, WCAG 2.2.2's five seconds
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
   lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter AND the memoised grid cache
@@ -674,6 +674,16 @@ phone treatment is *bug fixes only*, and the whole of it is:
   and /projects (the homepage's `Toc` and the /art rail are separate, each coupled to
   behaviour of its own page). It hides at 1100px and below, where a paper page shows its
   Contents list instead.
+  - **That breakpoint is one query, `(max-width: 1100px)`, and the wide side is always its exact
+    negation**, `not all and (max-width: 1100px)` (`WIDE_QUERY` in `lib/viewport.ts`, for the one
+    script that asks: the paper page's note placement), never a second bound at 1101px. A zoomed
+    or OS-scaled window can be 1100.83 CSS px wide (1321px at 120%), which a pair of bounds leaves
+    to neither: measured there, the rail showed while the paper's 24 notes went unplaced, 8 of them
+    overlapping, /projects' content sat under the rail, and the homepage's Choice slide stacked.
+    `tests/viewport.test.ts` fails on a `min-width: 1101px` anywhere in `src`.
+  - **Under forced colours** (Windows High Contrast) every ink becomes one system colour and the
+    dash, a background, is painted as Canvas, so nothing would tell the current stop apart; there
+    the dash is `Highlight` and the current label is underlined.
   - **Its marking rule is `markStops()` in `lib/scrollspy.ts`**, pure and specified (its doc
     comment is the rule). Two stops are lit at a section boundary **on purpose** — the reader
     is looking at both — and one of them leads; links carry `aria-current="true"`, which is
@@ -851,15 +861,15 @@ file holds is the prose; everything else has one home of its own:
   by that rule, and the body to the word.
 - **A line never breaks inside a hyphenated name in capitals (RL-BHRP), a span of years or an ISO
   date**: the last pass wraps each in `<span class="nw">`, after the words are counted.
-- **The margin notes are placed by the page's script, and held until placed.** From 1101px a note
+- **The margin notes are placed by the page's script, and held until placed.** Wider than 1100px a note
   sits in the notes column beside its anchor — its term's line, or its block's top — stacked 16px
   apart so none overlap (`stackNotes` in `lib/paperPage.ts`), re-placed by a ResizeObserver
   (after layout, before paint) when a webfont lands or the window changes. Only a script knows where
   a term's line falls, so a note is `visibility: hidden` until `place()` marks it `.is-placed`:
   hidden keeps its box, so it first paints where it rests and nothing shifts — **CLS 0** at
   1440×900, 1280×720, 1101×700 and 1101×600, cold, throttled, from a `#results` deep link and on a
-  restored-scroll reload. The hold is CSS alone, `@media (min-width: 1101px) and (scripting:
-  enabled)`, with no pre-paint script; its backstop is a CSS animation that shows every note after
+  restored-scroll reload. The hold is CSS alone, `@media (scripting: enabled)` nested in the wide
+  layout's `@media not all and (max-width: 1100px)`, with no pre-paint script; its backstop is a CSS animation that shows every note after
   `MOTION_LIMIT_MS` if the script never runs (then at its block's top, perhaps overlapping —
   accepted, as it shifts nothing). Without a script the query does not match and every note falls
   into the column, as at 1100px and below. `tests/motionLimit.test.ts` reads the hold, its delay
@@ -1162,7 +1172,7 @@ galaxy). The whole system is **token override**, not per-component branching:
     the page never styles the rail), `--rail-dash-halo` (the rail dash's 2px ring)
     and eight `--draft-*` tokens. `tests/draftingPalette.test.ts` checks that the two sets
     match and the inks clear AA.
-  - **paper** adds seven `--sheet-*` tokens, each glossed in `tokens.css`'s paper header. The
+  - **paper** adds eight `--sheet-*` tokens, each glossed in `tokens.css`'s paper header. The
     ground is `--sheet-ground`, never `--paper`, which in the dark convention is the light text
     colour; the band of runs and the grid are **exempt from 3:1 by name**, every value they help
     read being text. It needs no knockout: nothing strokes under its text, so the rail reads its
@@ -1410,7 +1420,7 @@ titles came to rest hard against the browser chrome — the lead is a number in
 - **Palette discipline:** ONLY the tokens in `tokens.css` (paper, ink-1..5,
   ochre, indigo, seal, plus the derived `--hairline-rgb` and `--rule` — and, under a page
   register only, its own tokens and its overrides of the role tokens: /projects' eight
-  `--draft-*` and two knockouts, the research routes' seven `--sheet-*`; see *Themes*).
+  `--draft-*` and two knockouts, the research routes' eight `--sheet-*`; see *Themes*).
   - **`--rule` exists because `/experience` was already using it.** Two rules there declared
     `border-bottom: 1px solid var(--rule)` against a property defined nowhere, which by spec makes the whole
     shorthand invalid at computed-value time — every longhand falls back to its initial, and
