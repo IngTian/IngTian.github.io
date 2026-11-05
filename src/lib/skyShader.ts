@@ -5,7 +5,7 @@
 // subtractive broken-color tint (ink-side only, never lightens). Dark theme
 // becomes a phosphor nebula with stars behind the line.
 
-import { READING_TINT_WARM } from './skyLegibility';
+import { READING_TINT } from './skyLegibility';
 
 export const VERTEX_SHADER = `
   attribute vec2 aPos;
@@ -200,8 +200,8 @@ export function fragmentShader(): string {
         // The 0.30/0.16 coefficients are the tint's character (ink vs veins response
         // shape); uTintCap and uViscousFloor are the safety bounds that vary by page.
         float amt = min(uTintCap, (ink * 0.30 + veins * 0.16) * uAmp);
-        vec3 warmTint = vec3(${READING_TINT_WARM}, 0.042, 0.024);
-        vec3 coolTint = vec3(0.030, 0.033, 0.039);
+        vec3 warmTint = vec3(${READING_TINT.warm.join(', ')});
+        vec3 coolTint = vec3(${READING_TINT.cool.join(', ')});
         float pick = smoothstep(0.30, 0.70, r.x);
         col -= mix(warmTint, coolTint, pick) * amt;
       }

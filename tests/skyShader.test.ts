@@ -51,6 +51,12 @@ describe('Archetype guard — reading vs descent inversion', () => {
     // Deleting or flattening it would break the archetype-dependent legibility guarantee.
     expect(source).toMatch(/mix\(\s*max\(\s*y\s*,\s*depth\s*\)\s*,\s*min\(\s*y\s*,\s*depth\s*\)\s*,\s*uReading\s*\)/);
   });
+
+  it('gates over the zone only: outside it, at zone 0, each multiplier is 1', () => {
+    const source = fragmentShader();
+    expect(source).toMatch(/mix\(\s*1\.0\s*,\s*uGateDark\s*,\s*zone\s*\)/);
+    expect(source).toMatch(/mix\(\s*1\.0\s*,\s*uGateLight\s*,\s*zone\s*\)/);
+  });
 });
 
 describe('Reading tint is SUBTRACTIVE', () => {

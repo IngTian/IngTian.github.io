@@ -126,8 +126,9 @@ const { variant = 'descent' } = Astro.props;
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, ramp);
       gl.uniform1i(U.uRamp, 0);
     }
-    // Every uniform but the scroll, the page depth, the clock, the intro's flatten and the measured gate
-    // top is fixed for this canvas's life, so it is uploaded once; a program keeps its uniforms.
+    // Every uniform but the scroll and the viewport's aspect (uYOffset, uYSpan), the page depth, the clock,
+    // the intro's flatten and the measured gate top is fixed for this canvas's life, so it is uploaded once;
+    // a program keeps its uniforms.
     gl.uniform1f(U.uAmp, AMP[variant]);
     gl.uniform1f(U.uDark, theme === 'dark' ? 1 : 0);
     gl.uniform3f(U.uNebula, NEBULA[0], NEBULA[1], NEBULA[2]);

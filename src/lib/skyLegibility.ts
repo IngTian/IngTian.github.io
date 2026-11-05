@@ -1,9 +1,9 @@
 // The contrast policy for the fluid sky, in one place.
 //
 // The sky is generated, so no CSS tool can audit it — Lighthouse's contrast check
-// reads background-color and sees nothing. These functions are therefore the only
-// guarantee that generated colour cannot make text unreadable, which is why they
-// live here as pure functions with tests rather than as inline constants.
+// reads background-color and sees nothing. These values and checks are therefore the
+// only guarantee that generated colour cannot make text unreadable, which is why they
+// live here, named and tested, rather than as literals in the shader or the component.
 //
 // The governing asymmetry: what threatens text depends on the text's own colour.
 //   descent pages carry PAPER-coloured text -> a LIGHTER sky erases it
@@ -63,9 +63,12 @@ export const TINT_BUDGET: Record<SkyVariant, { cap: number; viscousFloor: number
   descent: { cap: 1.0, viscousFloor: 0.86 },
 };
 
-/** The reading tint's strongest channel, the red of the shader's warmTint. skyShader.ts
- *  interpolates it there, so the AA test holds the tint that ships. */
-export const READING_TINT_WARM = 0.055;
+/** The reading tint, the shader's warmTint and coolTint, mixed per pixel and subtracted from
+ *  the colour. skyShader.ts interpolates both, so the AA test holds the tint that ships. */
+export const READING_TINT: Record<'warm' | 'cool', readonly [number, number, number]> = {
+  warm: [0.055, 0.042, 0.024],
+  cool: [0.030, 0.033, 0.039],
+};
 
 /** The cool tint the dark theme's nebula lifts a descent sky with, uploaded as uNebula. */
 export const NEBULA: readonly [number, number, number] = [0.055, 0.105, 0.115];

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  wcagLuminance, contrastRatio, AA_BODY, GATES, TINT_BUDGET, READING_TINT_WARM, NEBULA, NEBULA_CEILING,
+  wcagLuminance, contrastRatio, AA_BODY, GATES, TINT_BUDGET, READING_TINT, NEBULA, NEBULA_CEILING,
 } from '../src/lib/skyLegibility';
 
 // --ink-3 #5a544a is the smallest ink actually used on the reading pages (12-14px).
@@ -51,11 +51,11 @@ describe('TINT_BUDGET — bounds the darkening at its SOURCE', () => {
     // Worst case: start at the reading ramp's own darkest stop, apply the viscous
     // multiply and capped tint IN RGB SPACE, then take luminance. The tint is
     // applied in RGB before luminance is taken, so composing in luminance space
-    // understates the darkening (WCAG luminance is nonlinear). The tint's strongest
-    // channel is taken off every channel, and it is the value the shader is built with.
+    // understates the darkening (WCAG luminance is nonlinear). The strongest of the
+    // tint's six channels is taken off every channel, read from the values the shader is built with.
     const start: [number, number, number] = [0xdc, 0xd5, 0xcf];
     const afterViscous = start.map(ch => ch * viscousFloor);
-    const tintAmount = 255 * READING_TINT_WARM * cap;
+    const tintAmount = 255 * Math.max(...READING_TINT.warm, ...READING_TINT.cool) * cap;
     const afterTint = afterViscous.map(ch => Math.max(0, ch - tintAmount)) as [number, number, number];
     const worstLuminance = wcagLuminance(afterTint);
     expect(contrastRatio(worstLuminance, INK_3)).toBeGreaterThanOrEqual(4.5);
