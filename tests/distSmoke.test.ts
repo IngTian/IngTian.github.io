@@ -1202,11 +1202,11 @@ describe('/research/rl-bhrp — a paper explained, from its file', async () => {
   // A month-by-month median is no single run and has no turnover: the one run's turnover is named as that run's.
   it("captions Figure 2 as the second author's reproduction, with the paper's own figure beside it", () => {
     const cap = /<figure class="fig" id="figure-2">[\s\S]*?<figcaption>([\s\S]*?)<\/figcaption>/.exec(page().markup)?.[1] ?? '';
-    // the framing, whatever the values (paperNumbers.test.ts holds those)
+    const v = PAPER_DATA['rl-bhrp'].values;
     expect(text(cap)).toContain('Figure 2. A reproduction, not the paper’s run:');
-    expect(text(cap)).toMatch(/median of the reproduction’s \S+ training runs/);
-    expect(text(cap)).toMatch(/where the paper reports \S+ from its original run/);
-    expect(text(cap)).toMatch(/the run with the median growth turns over \S+/);
+    expect(text(cap)).toContain(`median of the reproduction’s ${v.reproRuns} training runs`);
+    expect(text(cap)).toContain(`where the paper reports ${v['usd.rl']} from its original run`);
+    expect(text(cap)).toContain(`the run with the median growth turns over ${v.reproTurnover}`);
     expect(text(cap)).not.toMatch(/median run|its median,/);
     expect(text(cap)).toContain('not fresh evidence');
   });
