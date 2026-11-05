@@ -185,8 +185,8 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
   });
 
   // ── 2. CV AND EMAIL ARE IN EVERY CORNER NAV, AT EVERY WIDTH ──────────────────────────────────────
-  // The corner nav is the only place on the site they are linked. The phone's list is the same <ul>, and below
-  // 1200px only an item marked `profile` (GitHub, LinkedIn) is hidden, so neither of these may carry it.
+  // The corner nav is the only place on the site they are linked. The phone's list is the same <ul>, and from 641
+  // to 1199px only an item marked `profile` (GitHub, LinkedIn) is hidden, so neither of these may carry it.
   it('links the CV and Email from every corner nav, in the list the phone opens too', () => {
     const wrong: string[] = [];
     for (const p of pages()) {
@@ -203,10 +203,15 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
       for (const [a] of list.matchAll(/<a\b[^>]*>/g)) if (!/\shref="[^"]+"/.test(a)) wrong.push(`${p.route}: ${a}`);
     }
     expect(wrong).toEqual([]);
-    // and no rule hides the marks wholesale: below 1200px only `.profile` goes. Read from every byte of CSS the pages
-    // ship, and known to be reading the corner nav's: the `.profile` rule is found first.
+    // and no rule hides the marks wholesale: only `.profile` goes, from 641 to 1199px, never in the phone's list (the
+    // one link to GitHub and LinkedIn there). Read from every byte of CSS the pages ship, and known to be reading the
+    // corner nav's: the `.profile` rule is found first, and every copy of it sits in the wide side's negation block.
     const css = shippedCss(pages());
-    expect(css, 'the corner nav hides `.profile` below 1200px').toMatch(/\.cnav\[[^\]]+\] \.profile\[[^\]]+\][^{}]*\{[^}]*display:none/);
+    const profileHide = /\.cnav\[[^\]]+\] \.profile\[[^\]]+\][^{}]*\{[^}]*display:none/g;
+    const all = css.match(profileHide) ?? [];
+    expect(all.length, 'the corner nav hides `.profile` from 641 to 1199px').toBeGreaterThan(0);
+    const wide = [...css.matchAll(/@media not all and \(max-width:640px\)\{([^@]*?)\}\}/g)].flatMap((m) => m[1].match(profileHide) ?? []);
+    expect(wide.length, 'a `.profile` rule outside the wide side would hide GitHub and LinkedIn on a phone').toBe(all.length);
     const hides = /\.cnav\[[^\]]+\] \.mark(?:-li)?\[[^\]]+\][^{}]*\{[^}]*display:none/.exec(css);
     expect(hides?.[0], 'a corner-nav rule hides every contact mark').toBeUndefined();
   });

@@ -390,9 +390,9 @@ route is not part of the phone treatment and need not use this breakpoint.
 and reverted every time** — do not rebuild it. The phone treatment is *bug fixes only*, and the whole of it is:
 
 - the corner nav collapses to a **menu mark** that swaps for the list when opened (mutually exclusive, so the
-  capsule never grows a second row). The list is the pages, then Email and CV as icon-and-word rows, then the
-  theme toggle, each group past a hairline, every row at least 44px tall; it scrolls inside itself on a
-  screen shorter than its 415px;
+  capsule never grows a second row). The list is the pages, then GitHub, Email, CV and LinkedIn as
+  icon-and-word rows, then the theme toggle, each group past a hairline, every row at least 44px tall; it
+  scrolls inside itself on a screen shorter than it (~510px, computed: 415px measured with two contact rows);
 - the **deck disengages** — measured in real WebKit, 5 of the 7 slides are taller than the viewport (rules
   1.84 screens, story 3.07 on an iPhone 14; 2.5 and 4.2 on an SE), so "every slide owns the screen" is false
   there. All four reported symptoms — text resting under the fixed nav at 7 of 15 stops, one swipe scrolling
@@ -461,9 +461,10 @@ and reverted every time** — do not rebuild it. The phone treatment is *bug fix
   - **The corner nav is the only place CV and Email are linked**, so it links them at every width: from 1200px
     all four marks, as icons (with their words from 2200px); from 641 to 1199px Email and CV only, in a
     capsule whose paddings tighten to fit one row at 641px (`CornerNav.astro` has the arithmetic, classic
-    scrollbar included); on a phone, rows in the opened list (*Phones*). Below 1200px no page links GitHub or
-    LinkedIn as profiles. `tests/distSmoke.test.ts` checks every built page's nav for the CV and Email links
-    and that no rule hides them.
+    scrollbar included); on a phone, all four as rows in the opened list (*Phones*), the one place a phone
+    reaches GitHub and LinkedIn. From 641 to 1199px no page links those two. `tests/distSmoke.test.ts` checks
+    every built page's nav for the CV and Email links, that no rule hides them, and that the profiles' hide
+    sits inside the wide side's negation, never on a phone.
 - **`src/lib/pageStops.ts` is one tree per page, and it drives BOTH the rail and the page's section ids**, so
   **a stop cannot point at an id the page didn't emit**: the function that names a stop's anchor hands the
   page the id to render. (An old /research built its rail from one paper's anchors while rendering the ids once

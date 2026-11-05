@@ -35,7 +35,8 @@ const { navZone = 'scroll' } = Astro.props;
 // The current route, normalised without a trailing slash, so aria-current marks the page you are on.
 const current = Astro.url.pathname.replace(/\/+$/, '') || '/';
 
-// `profile`: GitHub and LinkedIn, the items that go first when the capsule runs out of room (below 1200px).
+// `profile`: GitHub and LinkedIn, the items that go first when the capsule runs out of room (641-1199px; a phone's
+// list shows all four).
 type Item = { key: string; label: string; href: string; external: boolean; icon: string; profile?: boolean };
 const items: Item[] = [
   {
@@ -339,8 +340,9 @@ const items: Item[] = [
      without. Every current-page state is that width: the dot sits in reserved padding, and 600 keeps the
      advances. */
   @media (max-width: 1199px) {
-    .cnav .profile { display: none; }
+    /* A phone's list keeps all four: it is a column with room for them, and the only link to the profiles there. */
     @media not all and (max-width: 640px) {
+      .cnav .profile { display: none; }
       .cnav .page { padding-right: 8px; }
       .cnav .mark { padding: 9px 8px; }
     }
@@ -371,8 +373,9 @@ const items: Item[] = [
       padding: 4px;
       border-radius: 14px;
       min-width: 148px;
-      /* The open list is 415px tall, past a landscape phone's screen (640x360), so it scrolls inside itself
-         rather than leave its last rows off the bottom. */
+      /* The open list is ~510px tall (415px measured with two contact rows, plus two more 48px rows), past a
+         landscape phone's screen (640x360), so it scrolls inside itself rather than leave its last rows off the
+         bottom. */
       max-height: calc(100dvh - 24px);
       overflow-y: auto;
     }
@@ -387,8 +390,8 @@ const items: Item[] = [
        named because it outranks `.cnav a`.) */
     .cnav .page, .cnav .mark { font-size: 13px; }
     .cnav a, .cnav .mark, .cnav .toggle { padding: 16px 13px; }
-    /* Email and CV are rows under the pages, icon and word (the marks' 2200px form), and a hairline sets each
-       group apart: pages, then contact, then the toggle. */
+    /* GitHub, Email, CV and LinkedIn are rows under the pages, icon and word (the marks' 2200px form), and a
+       hairline sets each group apart: pages, then contact, then the toggle. */
     .cnav .mark .label { position: unset; width: unset; height: unset; overflow: unset; clip-path: unset; }
     .cnav .mark .content { gap: 7px; }
     .cnav .sep { width: auto; height: 1px; margin: 4px 13px; }
