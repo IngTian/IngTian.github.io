@@ -317,7 +317,7 @@ html[data-theme='dark'] .descent::after {
    reading pages keep --reading-grad, because each page's own rule already sets
    the right one and we only need to know whether to hide it.
 
-   ── CRITICAL: every suppression rule below is inside @media (min-width: 641px) ──
+   ── CRITICAL: every suppression rule below is inside the exact negation of the 640px query ──
    An audit caught a reproducible way to render the hero INVISIBLE. .fluid-live is
    added once after the first successful draw and removed only in the
    astro:page-load teardown, so ANY state change that hides the canvas without a
@@ -339,8 +339,9 @@ html[data-theme='dark'] .descent::after {
    Gating the CSS on the SAME breakpoint that hides the canvas makes the two
    physically unable to desync — the suppression cannot apply anywhere the canvas
    is display:none, regardless of what the class says. That is a structural
-   guarantee rather than another JS listener that could be forgotten. */
-@media (min-width: 641px) {
+   guarantee rather than another JS listener that could be forgotten. The negation, not a second bound at 641px,
+   is what makes it the same breakpoint: a zoomed window 640.5 CSS px wide is on one side of it. */
+@media not all and (max-width: 640px) {
   .descent.is-fluid.fluid-live { background: var(--bg); }
 
   /* Explicitly restore each archetype's own gradient when the canvas is off, rather

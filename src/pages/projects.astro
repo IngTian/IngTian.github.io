@@ -99,7 +99,7 @@ const bootDecider = `(function () {
      painted up to ~52px over the column. The column keeps the mockup's width rather than widening to hold it: a
      long half wraps inside the bubble.
      tests/cowTalk.test.ts holds this padding and the cap to the same terms. */
-  @media (min-width: 1180px) {
+  @media not all and (max-width: 1179px) {
     .projects-page { padding-right: calc(4vw + 210px); }
   }
 
@@ -112,7 +112,10 @@ const bootDecider = `(function () {
   .back:hover { color: var(--ochre); }
 
   /* THE COW'S COLUMN. From 1180px it is fixed in the gutter the padding above reserves, mirroring the rail. Below
-     that it follows no scroll — fixed, it and its bubble would cover text and tap targets.
+     that it follows no scroll — fixed, it and its bubble would cover text and tap targets. ONE BREAKPOINT: the
+     in-flow rules ask (max-width: 1179px) and every gutter rule, here and in PlushCow, its exact negation, so a
+     zoomed window between the two whole pixels (1179.2 CSS px is 1415px at 120%) is one or the other; a second
+     bound at 1180px would leave it neither: the cow a 156px row in the flow, the gallery pushed down.
      BELOW 1180px, PHONES INCLUDED, it sits in the flow BESIDE THE LISTING'S LAST LINE, the idle prompt, whose 14
      characters leave the rest of that row empty. The box takes no height of its own there: the cow's top meets
      the prompt line's top (TerminalHeader's .idle is a 12px margin plus one 13.5px/1.55 line, synced by hand) and
@@ -169,7 +172,7 @@ const bootDecider = `(function () {
      bubble grows a row taller — upward, because the box hangs from where the two-row pair's bottom sat under the
      mockup's `top: 47vh`: two rows, the bubble's 54px of border, padding and MOO type, its 24px gap and the 156px
      cow, so 47vh + 270.25px. The cow itself never moves. */
-  @media (min-width: 1180px) {
+  @media not all and (max-width: 1179px) {
     .cowbox { position: fixed; right: max(26px, 3.2vw); bottom: calc(53vh - 2 * 1.45 * 12.5px - 234px); z-index: 15;
       max-width: calc(100% - min(100%, 1500px) + 4vw + 210px - max(26px, 3.2vw)); }
   }

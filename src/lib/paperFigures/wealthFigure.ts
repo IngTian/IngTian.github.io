@@ -16,8 +16,10 @@
 //   data-bhrp and data-bench (4 dp; point 0 is the start, point i the month-end dates[i - 1]); table.f-values,
 //   every point's values as text, visually hidden (a screen reader's browse mode keeps the arrow keys for itself and
 //   reads a table as it reads any table), which the readout prints from, so the tip and the table say the same; its
-//   legend .f-tip; and a live region. It is a plain block here: the readout's script, which makes it work, makes it a
-//   control (a tab stop, a role, its instructions).
+//   legend .f-tip; and a live region. The table is hidden by a div around it, never by .sr-only on itself: a table's
+//   width and height are only minimums, so a 1px table still lays out every column and row (about 1,100 x 2,100px)
+//   in the page's scrollable overflow, where a scroll to a hidden cell moves the page sideways. .f-plot is a plain
+//   block here: the readout's script, which makes it work, makes it a control (a tab stop, a role, its instructions).
 // The <figure> and its caption are the explainer's (a :::figure container), so this is the drawing alone.
 import { monthYear } from '../dates';
 import { readoutWhen } from '../paperPage';
@@ -131,7 +133,7 @@ export function wealthFigure(d: WealthSeries, size: 'full' | 'mini'): string {
     + `<div class="f-tip" aria-hidden="true"><p class="f-tip-d"></p><dl><dt class="rl">RL-BHRP <i>median of ${d.runs} runs</i></dt>`
     + '<dd data-k="rl"></dd><dt class="band"><i>the runs</i></dt><dd data-k="band"></dd><dt>BHRP</dt><dd data-k="bhrp"></dd>'
     + '<dt>Benchmark</dt><dd data-k="bench"></dd></dl></div>'
-    + '<table class="f-values sr-only"><caption>Figure 2’s values, month by month, in the second author’s reproduction</caption>'
-    + `<thead><tr>${cols.map((c) => `<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`
+    + '<div class="sr-only"><table class="f-values"><caption>Figure 2’s values, month by month, in the second author’s reproduction</caption>'
+    + `<thead><tr>${cols.map((c) => `<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`
     + '<span class="sr-only" aria-live="polite"></span></div>';
 }

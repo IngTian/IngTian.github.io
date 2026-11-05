@@ -417,6 +417,14 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
     expect(bare, `<img> without alt:\n  ${bare.join('\n  ')}`).toEqual([]);
   });
 
+  // .sr-only's 1px box hides nothing on a table: a table's width and height are only minimums, so it lays out every
+  // column and row at full size, inside the page's scrollable overflow, where a scroll to a hidden cell (find-in-page,
+  // a screen reader's cursor) moves the page sideways. A hidden table goes inside a hidden div.
+  it('never puts .sr-only on a table', () => {
+    const bad = pages().flatMap((p) => [...p.markup.matchAll(/<table\b[^>]*\bclass="[^"]*\bsr-only\b[^>]*>/gi)].map(([t]) => `${p.file}: ${t}`));
+    expect(bad).toEqual([]);
+  });
+
   /* (There is no separate 'resolves fragments on the proto routes too' test any more. It existed only to
      make the `isProto` exclusion in check 1 a visible gap rather than a silent filter; the exclusion is
      gone, so check 1 covers the proto routes directly and this was a strict subset of it — with a worse

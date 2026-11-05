@@ -365,7 +365,7 @@ const measure = widestHalf(lines.slice(0, 1)) + 1;
      .cowbox). Below that, phones included, the cow sits in the page's flow beside the listing's last line, and there
      it keeps the bubble BESIDE it — the row geometry above, tail at the bubble's lower right — so it costs the cow's
      104px of height rather than bubble plus cow. Where on that row the bubble opens is the page's to say. */
-  @media (min-width: 1180px) {
+  @media not all and (max-width: 1179px) {
     .cow-wrap--rail { flex-direction: column; align-items: flex-end; gap: 0; }
     .cow-wrap--rail .cow-bubble { margin-bottom: calc(var(--moo-cell) * 6); }
     /* Over the cow's head, which is below the bubble here rather than beside it. */

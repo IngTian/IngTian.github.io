@@ -174,7 +174,8 @@ describe('Figure 2, the growth of $1', () => {
   // prints from, so the tip and the table cannot disagree. The band is exempt from 3:1 (WCAG 1.4.11) on the condition
   // that its values are text, and they are here: each point's lowest and highest run.
   it('gives every point as a row of a table: when it is, then each value as the readout prints it', () => {
-    const tbl = full.match(/<table class="f-values sr-only">[\s\S]*?<\/table>/)?.[0] ?? '';
+    // hidden by its wrapper: on a table, .sr-only's 1px is only a minimum (distSmoke holds every page to that)
+    const tbl = full.match(/<div class="sr-only"><table class="f-values">[\s\S]*?<\/table><\/div>/)?.[0] ?? '';
     expect(tbl, 'no table of values').not.toBe('');
     expect(tbl).toMatch(/<caption>[^<]*reproduction[^<]*<\/caption>/);
     expect([...tbl.matchAll(/<th scope="col">([^<]*)<\/th>/g)].map((m) => m[1]))

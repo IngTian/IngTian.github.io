@@ -508,20 +508,21 @@ string itself is built once, as `PHONE_QUERY`: `isPhone()`, the deck's change li
 **The number lives in two places and they are synced BY HAND.** `@media
 (max-width: var(--x))` is not valid CSS, so there is no way to feed one value to
 both. **If you change `PHONE_MAX_WIDTH`, change every `@media (max-width: 640px)`
-block with it.** `grep -rn 'max-width: *640px' src` returns **21 hits in 15 files**,
-and **four of the 21 are prose, not rules** — `viewport.ts` ×2 (its own doc
+block with it.** `grep -rn 'max-width: *640px' src` returns **22 hits in 15 files**,
+and **four of the 22 are prose, not rules** — `viewport.ts` ×2 (its own doc
 comments) plus `global.css:178` and `global.css:327`, which describe the
 breakpoint in comments rather than declaring it — and **one is a `sizes` hint**:
 `projects/Gallery`'s `sizes="(max-width: 640px) 240px, 330px"`, the phone strip's
-card width, which must move with the strip's block. So there are **16 real CSS
-blocks across 14 files**: `experience` ×2, `projects/Gallery` ×2 (one of them
-`@media not all and (max-width: 640px)` — the desktop-only card lift, written
-negated so this grep still finds it), and one each in `global.css`, `CornerNav`,
+card width, which must move with the strip's block. So there are **17 real CSS
+blocks across 14 files**: `experience` ×2, `projects/Gallery` ×2 and `global.css` ×2
+(one of each pair is `@media not all and (max-width: 640px)` — Gallery's desktop-only
+card lift and global.css's sky suppression), and one each in `CornerNav`,
 `Toc`, `DescentPath`, `FluidSky`, `Heights`, `projects.astro` (the phone's strip
 for the cow's bubble), `projects/TerminalHeader`, `404`, `research/index`,
-`research/[slug]` and `writing/[...slug]`. **One block
-spells the same breakpoint so this grep misses it** — `global.css:343`,
-`min-width: 641px` — check it by hand.
+`research/[slug]` and `writing/[...slug]`. **The wide side is always written as that
+negation, never as `min-width: 641px`**: a second bound leaves a zoomed window 640.5 CSS
+px wide to neither side, and it is also what this grep would miss.
+`tests/viewport.test.ts` fails on any such pair, at any breakpoint in `src`.
   Two notes on how this count has gone wrong before, because it keeps doing so.
 It read "15 hits … 13 real blocks … `global.css` ×2" — overcounting `global.css`
 because one of its two prose mentions is `max-width:640px` with **no space**,
@@ -680,7 +681,9 @@ phone treatment is *bug fixes only*, and the whole of it is:
     or OS-scaled window can be 1100.83 CSS px wide (1321px at 120%), which a pair of bounds leaves
     to neither: measured there, the rail showed while the paper's 24 notes went unplaced, 8 of them
     overlapping, /projects' content sat under the rail, and the homepage's Choice slide stacked.
-    `tests/viewport.test.ts` fails on a `min-width: 1101px` anywhere in `src`.
+    `tests/viewport.test.ts` fails on a `min-width: 1101px` anywhere in `src`, and on any other
+    breakpoint written as two bounds a pixel apart (/projects' cow column is `(max-width: 1179px)`
+    and its negation for the same reason).
   - **Under forced colours** (Windows High Contrast) every ink becomes one system colour and the
     dash, a background, is painted as Canvas, so nothing would tell the current stop apart; there
     the dash is `Highlight` and the current label is underlined.

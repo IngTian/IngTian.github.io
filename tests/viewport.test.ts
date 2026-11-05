@@ -75,11 +75,18 @@ describe('the wide layout', () => {
     expect(WIDE_QUERY).toBe('not all and (max-width: 1100px)');
   });
 
-  it('is never written as a second bound beside it', () => {
+  // Not only this breakpoint: any (min-width: N) beside a (max-width: M) with N - 1 <= M < N leaves the widths between
+  // them to neither side (/projects' cow at 1179/1180 fell into the flow as a 156px row at 1179.2 CSS px).
+  it('is never written as a second bound beside it, nor is any breakpoint in src', () => {
     const src = new URL('../src/', import.meta.url);
     const files = readdirSync(src, { recursive: true, encoding: 'utf8' }).filter((f) => /\.(astro|css|ts)$/.test(f));
     expect(files.length).toBeGreaterThan(50);
-    const pairs = files.filter((f) => /min-width:\s*1101px|width\s*>=?\s*1101px/.test(readFileSync(new URL(f, src), 'utf8')));
-    expect(pairs).toEqual([]);
+    const bounds = (re: RegExp) => files.flatMap((f) =>
+      [...readFileSync(new URL(f, src), 'utf8').matchAll(re)].map((m) => ({ f, px: Number(m[1]) })));
+    const lows = bounds(/\((?:min-width:|width\s*>=?)\s*([\d.]+)px\)/g), highs = bounds(/\(max-width:\s*([\d.]+)px\)/g);
+    expect(lows.length).toBeGreaterThan(0);
+    const pairs = lows.flatMap((lo) => highs.filter((hi) => hi.px < lo.px && hi.px >= lo.px - 1)
+      .map((hi) => `${lo.f}: (min-width: ${lo.px}px) beside (max-width: ${hi.px}px)`));
+    expect([...new Set(pairs)]).toEqual([]);
   });
 });
