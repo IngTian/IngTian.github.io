@@ -167,34 +167,18 @@ html.intro-flat .descent {
 }
 
 /* ============================================================
-   THE FIVE SLIDE PANELS, ENUMERATED EXACTLY ONCE.
-   .story-paper (Story) · .ch-paper (Choice) · .ru-paper (Rules) · .so-paper (Solve) ·
-   .wk-paper (Work) — the opaque full-bleed panel each slide hangs its content on.
+   THE SLIDE PANELS: .slide-paper, the opaque full-bleed panel each of the five paper
+   slides (Choice, Rules, Solve, Story, Work) hangs its content on. styles/slides.css
+   paints it; this gives it its fill and nav clearance. One class rather than a list of
+   the five, so a panel cannot be half-added: hand-kept lists here missed one before (on
+   a phone, the Appendix kept 78px of blank tan above its kicker).
 
-   THIS USED TO BE THREE HAND-WRITTEN COPIES of the same five-class list (flex fill,
-   nav clearance, phone correction) and the third copy had only FOUR entries: .wk-paper
-   was missing from the phone correction. The consequence was live and measurable — the
-   78px nav clearance below applies at max-width:1100px, the 22px correction only at
-   max-width:640px, so on a phone #appendix (class="wk-paper", confirmed in
-   dist/index.html) kept 78px of blank tan above its kicker while its four siblings got
-   22px. A band of empty paper that reads as something that failed to render, in the one
-   place nobody was looking, because the bug was a missing line rather than a wrong one.
-
-   Three parallel lists cannot be kept in sync by care, so there is now one. The nested
-   @media rules below inherit this selector list, which means a SIXTH panel is added in
-   exactly one place and cannot be half-added. Nesting rather than :is() so the emitted
-   selectors — and therefore the specificity — are byte-for-byte what they were:
-   `.is-slides > section > .wk-paper` is (0,2,1), which is what beats Astro's scoped
+   `.is-slides > section > .slide-paper` is (0,2,1), which is what beats Astro's scoped
    `.wk-paper[data-astro-cid-…]` at (0,2,0) and lets a longhand `padding-top` here
-   override each panel's own `padding` shorthand. An earlier attempt at the clearance
-   used a plain `.is-slides > section` rule, lost that specificity race, and silently
-   changed nothing.
+   override each panel's own `padding` shorthand. A plain `.is-slides > section` rule
+   loses that race and silently changes nothing.
    ============================================================ */
-.is-slides > section > .story-paper,
-.is-slides > section > .ch-paper,
-.is-slides > section > .ru-paper,
-.is-slides > section > .so-paper,
-.is-slides > section > .wk-paper {
+.is-slides > section > .slide-paper {
   /* The panel inside a slide must be able to fill it, or the centring above just moves a
      short panel down the screen and leaves sky above and below it. */
   flex: 1 0 auto;

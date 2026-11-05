@@ -28,7 +28,7 @@ const THEMES = [
   { theme: 'dark', sel: "html[data-page='deck'][data-theme='dark']", base: "html[data-theme='dark']" },
 ] as const;
 
-/** The panels' grounds, as the five slides declare them (`--<slide>-bg`), light then dark. */
+/** The five panels' ground, as styles/slides.css declares it (`--panel-bg`), light then dark. */
 const PANEL = { light: '#c4b7a1', dark: '#14161a' } as const;
 
 /**
@@ -66,12 +66,13 @@ describe("the homepage's rail ink (tokens.css)", () => {
     expect(rail).toContain('.side-rail .ink1 { color: var(--ink-1); }');
   });
 
-  it("matches the five panels' grounds", () => {
+  it("matches the panels' ground, light then dark, and no slide declares another", () => {
+    const grounds = (css: string) => [...css.matchAll(/--[\w-]+-bg:\s*(#[0-9a-f]{6})/gi)].map((m) => m[1].toLowerCase());
+    expect(grounds(readFileSync(new URL('../src/styles/slides.css', import.meta.url), 'utf8'))).toEqual([PANEL.light, PANEL.dark]);
     const dir = new URL('../src/sections/', import.meta.url);
-    const grounds = readdirSync(dir).filter((f) => f.endsWith('.astro'))
-      .flatMap((f) => [...readFileSync(new URL(f, dir), 'utf8').matchAll(/--[\w-]+-bg:\s*(#[0-9a-f]{6})/gi)].map((m) => m[1].toLowerCase()));
-    expect(grounds.length, 'no panel declares a ground').toBe(10);
-    expect(new Set(grounds)).toEqual(new Set(Object.values(PANEL)));
+    for (const f of readdirSync(dir).filter((n) => n.endsWith('.astro'))) {
+      for (const g of grounds(readFileSync(new URL(f, dir), 'utf8'))) expect(Object.values(PANEL), f).toContain(g);
+    }
   });
 
   for (const t of THEMES) {

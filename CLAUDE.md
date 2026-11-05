@@ -239,6 +239,7 @@ else.
 src/
   styles/{tokens.css, global.css}   # palette + type roles; the .descent gradient, atmosphere washes and the .is-slides slide metrics live in global.css
   styles/paper.css                  # what the two research routes share: the measure (--M --G --N --L --tk) and the wealth figure's series marks
+  styles/slides.css                 # the homepage's paper panel, imported by pages/index.astro alone: .slide-paper (the five slides' ground and inks, --panel-*, per theme) and .slide-gutter (the rail's gutter, given back at 1100px)
   layouts/BaseLayout.astro          # head, astro:fonts, meta/OG/JSON-LD, favicons, the page-load veil, CornerNav, ClientRouter
   content.config.ts                 # the two content collections, `writing` and `papers`, their frontmatter schemas and the one isoDate helper
   content/writing/*.md              # the pieces themselves — a new one is a FILE, not a code change
@@ -522,10 +523,10 @@ string itself is built once, as `PHONE_QUERY`: `isPhone()`, the deck's change li
 **The number lives in two places and they are synced BY HAND.** `@media
 (max-width: var(--x))` is not valid CSS, so there is no way to feed one value to
 both. **If you change `PHONE_MAX_WIDTH`, change every `@media (max-width: 640px)`
-block with it.** `grep -rn 'max-width: *640px' src` returns **21 hits in 14 files**,
-and **four of the 21 are prose, not rules** — `viewport.ts` ×2 (its own doc
-comments) plus `global.css:178` and `global.css:327`, which describe the
-breakpoint in comments rather than declaring it — and **one is a `sizes` hint**:
+block with it.** `grep -rn 'max-width: *640px' src` returns **20 hits in 14 files**,
+and **three of the 20 are prose, not rules** — `viewport.ts` ×2 (its own doc
+comments) plus `global.css:311`, which describes the breakpoint in a comment
+rather than declaring it — and **one is a `sizes` hint**:
 `projects/Gallery`'s `sizes="(max-width: 640px) 240px, 330px"`, the phone strip's
 card width, which must move with the strip's block. So there are **16 real CSS
 blocks across 13 files**: `experience` ×2, `projects/Gallery` ×2 and `global.css` ×2
@@ -539,9 +540,9 @@ px wide to neither side, and it is also what this grep would miss.
 `tests/viewport.test.ts` fails on any such pair, at any breakpoint in `src`.
   Two notes on how this count has gone wrong before, because it keeps doing so.
 It read "15 hits … 13 real blocks … `global.css` ×2" — overcounting `global.css`
-because one of its two prose mentions is `max-width:640px` with **no space**,
-which the documented `grep -rn 'max-width: 640px' src` silently misses while a
-careless re-count catches it as a rule. Use the pattern above, with the `*`, and
+because a prose mention there (since deleted) was `max-width:640px` with **no space**,
+which the documented `grep -rn 'max-width: 640px' src` silently missed while a
+careless re-count caught it as a rule. Use the pattern above, with the `*`, and
 classify each hit rather than subtracting a remembered number of prose lines.
 Earlier still it listed "the two proto sections": there are no proto *sections* —
 `src/sections/` holds only the seven homepage slides plus Signature. A prototype
@@ -704,9 +705,8 @@ phone treatment is *bug fixes only*, and the whole of it is:
     `tests/viewport.test.ts` reads SideRail's hide query and the paper page's one-column query and
     holds `WIDE_QUERY` to their exact negation, so a breakpoint retuned in the CSS alone fails; it
     also fails on any breakpoint in `src` written as two bounds a pixel apart (/projects' cow column
-    is `(max-width: 1179px)` and its negation for the same reason). The homepage slides are not this
-    breakpoint: Choice and Rules reclaim the rail's gutter at 1100px and below, Story, Solve and Work
-    at 1099px and below.
+    is `(max-width: 1179px)` and its negation for the same reason). The homepage's five paper slides
+    give the rail's gutter back on this same query, once (`.slide-gutter` in `styles/slides.css`).
   - **Under forced colours** (Windows High Contrast) every ink becomes one system colour and the
     dash, a background, is painted as Canvas, so nothing would tell the current stop apart; there
     the dash is `Highlight` and the current label is underlined.
@@ -1247,7 +1247,7 @@ galaxy). The whole system is **token override**, not per-component branching:
   (`skyPalette`/`skyShader` switch to a phosphor nebula with stars behind the
   line), the **SkyWash** + `.descent::before/::after` washes (raw rgba — dark
   nearly kills the warm Monet strokes), the **hero legibility halo** (paper→dark
-  veil), the **Story panel's paper ground** (chosen per theme, not shared), and the
+  veil), the **homepage panels' paper ground** (`styles/slides.css`, chosen per theme), and the
   **corner-nav glass** (forced dark-frost in dark theme). The research routes' figures are
   not among them: their SVG is drawn from CSS classes that read the paper tokens, so they
   re-theme with no listener.
@@ -1267,8 +1267,8 @@ galaxy). The whole system is **token override**, not per-component branching:
   touching themes, verify BOTH — build breaks and contrast regressions hide in
   the theme you didn't look at.
 - One panel used to be dark in both themes for emphasis. It was removed: a
-  light-theme reader read it as a **bug**, not as emphasis. All four paper slides
-  now share one palette and follow the theme.
+  light-theme reader read it as a **bug**, not as emphasis. All five paper slides
+  share one palette, `.slide-paper` in `styles/slides.css`, and follow the theme.
 
 ## Three Astro traps that have each shipped a bug here
 

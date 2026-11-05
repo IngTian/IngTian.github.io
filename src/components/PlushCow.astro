@@ -199,8 +199,9 @@ const measure = widestHalf(lines.slice(0, 1)) + 1;
     display: flex; align-items: flex-end; gap: clamp(4px, 0.6vw, 10px);
     flex: 0 0 auto; width: max-content; max-width: 100%;
   }
-  /* #14161a is the paper slides' dark surface, byte-identical to Choice/Rules/Work/Solve, so the bubble is the
-     same material as every other panel in dark theme. */
+  /* #14161a is the homepage panels' dark ground (styles/slides.css --panel-bg), so the bubble is the same
+     material as a panel in dark theme. A literal, not var(--panel-bg): that is declared on a panel, and the cows
+     on /404 and /writing sit on none. */
   :global(html[data-theme='dark']) .cow-wrap { --moo-paper: #14161a; }
   /* NO margin-left: auto ANY MORE. It used to pin the cow to the right of whatever row it landed in; the footer
      now centres it explicitly, and an auto left margin absorbs all the free space on that side, so leaving it

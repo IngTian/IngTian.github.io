@@ -115,8 +115,8 @@ const ATOMS_EXP = 80;
 const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
 ---
 <section id="rules" class="ru" aria-labelledby="ru-heading">
-  <div class="ru-paper">
-    <div class="ru-inner">
+  <div class="ru-paper slide-paper">
+    <div class="slide-gutter">
       <p class="ru-kicker">2 / 3 · the difficulty</p>
 
       {/* ══ TURNED AXIS. The owner: "now this slide is essentially the same format as the previous one, which
@@ -390,28 +390,11 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
 
 <style>
   .ru { position: relative; z-index: 1; width: 100vw; margin-left: calc(50% - 50vw); }
-  .ru-paper {
-    --r-bg: #c4b7a1; --r-edge: rgba(74,66,54,0.26); --r-ink: #1f1b14;
-    --r-soft: #423b30; --r-faint: #6a6153; --r-accent: #7c5522;
-    background: var(--r-bg);
-    border-top: 1px solid var(--r-edge); border-bottom: 1px solid var(--r-edge);
-    padding: clamp(30px, 4vh, 62px) 0;
-  }
-  :global(html[data-theme='dark']) .ru-paper {
-    --r-bg: #14161a; --r-edge: rgba(184,177,161,0.14); --r-ink: #dce1dc;
-    --r-soft: #a8b0a9; --r-faint: #6d746e; --r-accent: #7fc9a0;
-  }
-  .ru-inner {
-    /* Clears the fixed rail (SideRail), whose widest label ends at x=145 at most (lib/pageStops' homeStops has
-       the arithmetic). The rail hides at 1100px and below, and this gutter goes with it. Shared across the five
-       paper slides. */
-    padding-left: clamp(168px, 10.4vw, 200px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
-  }
-  @media (max-width: 1100px) { .ru-inner { padding-left: clamp(28px, 6vw, 80px); } }
+  .ru-paper { padding: clamp(30px, 4vh, 62px) 0; }
 
   .ru-kicker {
     font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
-    text-transform: uppercase; color: var(--r-accent); margin: 0 0 12px;
+    text-transform: uppercase; color: var(--panel-accent); margin: 0 0 12px;
   }
 
   /* ── THE TURNED AXIS. A vertical flow instead of two columns: headline, then the drawing across the whole
@@ -432,7 +415,7 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
   .ru-head {
     font-family: var(--font-display); font-weight: 300;
     font-size: clamp(24px, 2.4vw, 38px); line-height: 1.16;
-    color: var(--r-ink); margin: 0; max-width: 26ch; letter-spacing: -0.012em;
+    color: var(--panel-ink); margin: 0; max-width: 26ch; letter-spacing: -0.012em;
   }
 
   /* ── THE FOUR BEATS. Buttons, like the defining slide's, so a reader can go back to a number. */
@@ -443,7 +426,7 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     list-style: none; margin: 0; padding: 0;
     display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0 clamp(14px, 1.8vw, 30px);
-    border-top: 1px solid var(--r-edge);
+    border-top: 1px solid var(--panel-edge);
   }
   .ru-beats > li { display: flex; min-width: 0; }
   .ru-beat {
@@ -460,11 +443,11 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
   /* html.complex-js is added by the script before it starts stepping, so the dimming and the pointer affordance
      only appear where the sequence can actually run. Default = every beat legible, which is the no-JS state. */
   :global(html.complex-js) .ru-beat { cursor: pointer; opacity: 0.4; }
-  :global(html.complex-js) .ru-beat.is-on { opacity: 1; border-top-color: var(--r-accent); }
+  :global(html.complex-js) .ru-beat.is-on { opacity: 1; border-top-color: var(--panel-accent); }
   @media (hover: hover) {
     :global(html.complex-js) .ru-beat:not(.is-on):hover { opacity: 0.7; }
   }
-  .ru-beat:focus-visible { outline: 2px solid var(--r-accent); outline-offset: 2px; opacity: 1; }
+  .ru-beat:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 2px; opacity: 1; }
   @media (prefers-reduced-motion: no-preference) {
     .ru-beat { transition: opacity .45s ease, border-color .4s ease; }
   }
@@ -474,25 +457,25 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
 
   .ru-beat-n {
     flex: none;
-    font-family: var(--font-mono); font-size: 9.5px; color: var(--r-accent);
+    font-family: var(--font-mono); font-size: 9.5px; color: var(--panel-accent);
     border: 1px solid currentColor; border-radius: 50%;
     width: 18px; height: 18px; display: grid; place-items: center;
   }
   .ru-beat-head {
     /* Floor 16px: measured at 1366x768 this rendered 13.4px, barely above its own body copy. */
-    display: block; font-size: clamp(16px, 1.18vw, 19px); line-height: 1.3; color: var(--r-ink);
+    display: block; font-size: clamp(16px, 1.18vw, 19px); line-height: 1.3; color: var(--panel-ink);
   }
   /* THE BULLET POINTS, and the owner's actual complaint: "the text is a little bit small, especially the
      bullet points." Measured before this pass: 13px at 1700x1050 and 11.2px at 1366x768 — below caption size
      for the slide's main reading text, because the vw term was collapsing it. The FLOOR is what rose.
-     --r-soft rather than --r-faint too: this is body copy, not an aside. No max-width — each band column is
+     --panel-soft rather than --panel-faint too: this is body copy, not an aside. No max-width — each band column is
      its own measure now. */
   .ru-beat-body {
-    display: block; font-size: clamp(14px, 1.02vw, 16px); line-height: 1.55; color: var(--r-soft);
+    display: block; font-size: clamp(14px, 1.02vw, 16px); line-height: 1.55; color: var(--panel-soft);
     margin-top: 0; max-width: none;
   }
   .ru-beat-body strong {
-    font-family: var(--font-mono); font-weight: 400; color: var(--r-accent); font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono); font-weight: 400; color: var(--panel-accent); font-variant-numeric: tabular-nums;
   }
   .ru-beat-body sup { font-size: 0.7em; }
 
@@ -500,14 +483,14 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
      a left-aligned rule it sat beneath beat one and read as that beat's footnote instead of as the slide's
      closing sentence. Centred and wider, with no rule of its own — the band above already has one. */
   .ru-scale {
-    font-size: clamp(15px, 1.12vw, 17.5px); line-height: 1.62; color: var(--r-soft);
+    font-size: clamp(15px, 1.12vw, 17.5px); line-height: 1.62; color: var(--panel-soft);
     margin: 0 auto; max-width: 78ch; text-align: center;
     padding-top: clamp(8px, 1.2vh, 14px); border-top: 0;
   }
 
   .ru-fig-head {
     font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase;
-    color: var(--r-faint); margin: 0 0 10px; display: grid;
+    color: var(--panel-faint); margin: 0 0 10px; display: grid;
   }
   .ru-fig-head > .ru-panel { grid-area: 1 / 1; }
 
@@ -547,18 +530,18 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
   .ru-rung-track { grid-column: 1 / -1; }
   .ru-rung-cost { grid-column: 3 / 4; grid-row: 1; }
   .ru-rung-aum { grid-column: 2 / 3; grid-row: 1; }
-  .ru-rung-label { font-size: clamp(14px, 1.02vw, 16px); color: var(--r-ink); }
+  .ru-rung-label { font-size: clamp(14px, 1.02vw, 16px); color: var(--panel-ink); }
   .ru-rung-aum {
-    font-family: var(--font-mono); font-size: 12px; color: var(--r-faint); text-align: right;
+    font-family: var(--font-mono); font-size: 12px; color: var(--panel-faint); text-align: right;
     font-variant-numeric: tabular-nums;
   }
   .ru-rung-track {
-    height: 9px; background: color-mix(in srgb, var(--r-ink) 8%, transparent);
+    height: 9px; background: color-mix(in srgb, var(--panel-ink) 8%, transparent);
     border-radius: 1px; overflow: hidden;
   }
-  .ru-rung-bar { display: block; height: 100%; background: var(--r-accent); opacity: 0.75; }
+  .ru-rung-bar { display: block; height: 100%; background: var(--panel-accent); opacity: 0.75; }
   .ru-rung-cost {
-    font-family: var(--font-mono); font-size: 12.5px; color: var(--r-accent);
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--panel-accent);
     text-align: right; font-variant-numeric: tabular-nums;
   }
 
@@ -581,18 +564,18 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
   }
   .ru-cat-mark { display: grid; justify-items: center; gap: 4px; }
   .ru-glyph { display: block; }
-  .ru-glyph rect { fill: var(--r-accent); opacity: 0.85; }
+  .ru-glyph rect { fill: var(--panel-accent); opacity: 0.85; }
   .ru-cat-tag {
     font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.12em;
-    color: var(--r-faint);
+    color: var(--panel-faint);
   }
   .ru-cat-text { display: grid; gap: 2px; min-width: 0; }
   .ru-cat {
     font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase;
-    color: var(--r-accent);
+    color: var(--panel-accent);
   }
-  .ru-cat-rule { font-size: clamp(14px, 1.02vw, 16px); line-height: 1.38; color: var(--r-ink); }
-  .ru-cat-why { font-size: clamp(12.5px, 0.9vw, 14px); line-height: 1.5; color: var(--r-faint); max-width: 60ch; }
+  .ru-cat-rule { font-size: clamp(14px, 1.02vw, 16px); line-height: 1.38; color: var(--panel-ink); }
+  .ru-cat-why { font-size: clamp(12.5px, 0.9vw, 14px); line-height: 1.5; color: var(--panel-faint); max-width: 60ch; }
 
   /* ── BEATS 3 AND 4: the fan of futures. */
   .ru-fan { display: flex; flex-direction: column; justify-content: center; }
@@ -613,7 +596,7 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     height: clamp(210px, 34vh, 460px);
   }
   .ru-traj {
-    fill: none; stroke: var(--r-faint); stroke-width: 1; vector-effect: non-scaling-stroke;
+    fill: none; stroke: var(--panel-faint); stroke-width: 1; vector-effect: non-scaling-stroke;
     opacity: 0.22; stroke-linejoin: round;
   }
 
@@ -639,9 +622,9 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
   /* Reduced motion, and the state before the beat is live: the finished line. Never a blank chart. */
   .ru-traj { stroke-dashoffset: 0; }
   /* Three threads in ink, so a reader sees that each line is one name's possible future. */
-  .ru-traj--lit { stroke: var(--r-accent); opacity: 0.9; stroke-width: 1.8; }
+  .ru-traj--lit { stroke: var(--panel-accent); opacity: 0.9; stroke-width: 1.8; }
   .ru-base {
-    stroke: var(--r-faint); stroke-width: 1; stroke-dasharray: 3 5;
+    stroke: var(--panel-faint); stroke-width: 1; stroke-dasharray: 3 5;
     vector-effect: non-scaling-stroke; opacity: 0.5;
   }
   /* ── BEAT 4: the conflict web beside the mathematics, in two columns. An earlier version floated a tally of
@@ -661,10 +644,10 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
      already correct, which is the whole reason for going through KaTeX rather than hand-setting spans. */
   .ru-math { display: grid; gap: clamp(5px, 0.9vh, 12px); min-width: 0; }
   .ru-math-lead, .ru-math-mid {
-    font-size: clamp(13.5px, 1.05vw, 16px); line-height: 1.5; color: var(--r-faint); margin: 0;
+    font-size: clamp(13.5px, 1.05vw, 16px); line-height: 1.5; color: var(--panel-faint); margin: 0;
   }
   .ru-eq {
-    color: var(--r-ink);
+    color: var(--panel-ink);
     /* MathML inherits font-size, and KaTeX's display mode already sizes the operators — so one declaration
        controls the whole expression. Slightly larger than body copy: this is the subject, not an aside. */
     /* The equation is the subject of this panel, so it is set well above body copy — measured at 16.5px it read
@@ -674,31 +657,31 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
   }
   .ru-eq :global(math) { display: block; margin: 0 auto; }
   .ru-math-punch {
-    font-size: clamp(14px, 1.12vw, 17.5px); line-height: 1.55; color: var(--r-soft); margin: 0;
+    font-size: clamp(14px, 1.12vw, 17.5px); line-height: 1.55; color: var(--panel-soft); margin: 0;
   }
   .ru-math-punch strong {
-    font-family: var(--font-mono); font-weight: 400; color: var(--r-accent); font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono); font-weight: 400; color: var(--panel-accent); font-variant-numeric: tabular-nums;
   }
   .ru-math-punch sup { font-size: 0.72em; }
   .ru-math-foot {
-    font-size: clamp(13px, 1vw, 15.5px); line-height: 1.5; color: var(--r-faint); margin: 0;
-    padding-top: clamp(3px, 0.6vh, 7px); border-top: 1px solid var(--r-edge);
+    font-size: clamp(13px, 1vw, 15.5px); line-height: 1.5; color: var(--panel-faint); margin: 0;
+    padding-top: clamp(3px, 0.6vh, 7px); border-top: 1px solid var(--panel-edge);
   }
   /* The chords carry the meaning, so they are the only confident marks. Curved through the centre: straight
      chords read as a star burst, curves read as a tangle, and a tangle is the honest impression. */
   .ru-chord {
-    fill: none; stroke: var(--r-accent); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.42;
+    fill: none; stroke: var(--panel-accent); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.42;
   }
-  .ru-webnode { fill: var(--r-faint); opacity: 0.8; }
+  .ru-webnode { fill: var(--panel-faint); opacity: 0.8; }
 
   .ru-note {
     /* 9px is not a readable size for a sentence that qualifies the drawing above it. */
     font-family: var(--font-mono); font-size: 10.5px; line-height: 1.55; letter-spacing: 0.04em;
-    color: var(--r-faint); margin: clamp(8px, 1.2vh, 14px) 0 0; max-width: 60ch;
+    color: var(--panel-faint); margin: clamp(8px, 1.2vh, 14px) 0 0; max-width: 60ch;
   }
 
   .ru-cap {
-    font-size: 12px; line-height: 1.55; color: var(--r-faint);
+    font-size: 12px; line-height: 1.55; color: var(--panel-faint);
     margin: clamp(6px, 1vh, 12px) 0 0; max-width: 82ch; display: grid;
   }
   .ru-cap > .ru-panel { grid-area: 1 / 1; }
@@ -756,7 +739,7 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
        the beat's copy and in the caption, so nothing measured is lost. */
     .ru-webwrap { grid-template-columns: minmax(0, 1fr); gap: 0; }
     .ru-web { display: none; }
-    .ru-fig { padding-top: 3vh; border-top: 1px solid var(--r-edge); }
+    .ru-fig { padding-top: 3vh; border-top: 1px solid var(--panel-edge); }
     .ru-paper { padding-top: clamp(14px, 2vh, 24px); padding-bottom: clamp(14px, 2vh, 24px); }
     .ru-head { font-size: clamp(22px, 3.4vw, 30px); }
     .ru-beats { gap: 1px; }

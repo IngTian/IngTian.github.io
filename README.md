@@ -78,6 +78,7 @@ src/
   lib/              pure, unit-tested logic: deck stops, terrain math, the sky's
                     GLSL and contrast policy, the slides' real math, the gates
   styles/           tokens.css (palette) · global.css (the sky + slide metrics)
+                    · slides.css (the homepage's paper panel)
 tests/              Vitest — every pure lib module, plus the invariants between files
 public/             static passthrough — cv.pdf, favicons, robots.txt
 ```

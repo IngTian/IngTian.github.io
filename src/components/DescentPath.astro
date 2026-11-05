@@ -91,19 +91,20 @@ import { STORY_CODA } from '../data/story';
 </section>
 
 <style>
-  /* ── THE INK IS STORY'S PAPER PANEL'S, the one ground this renders on (Story.astro's .story-paper sets
-     the --story-* values, per theme). Both the CSS and the CANVAS read these --dp-* tokens, never the
+  /* ── THE INK IS STORY'S PAPER PANEL'S, the one ground this renders on (styles/slides.css sets the
+     --panel-* inks, Story.astro's .story-paper the two --story-line tones, per theme). Both the CSS and
+     the CANVAS read these --dp-* tokens, never the
      global ink ramp: that ramp is light ink for the sky, and on paper it drew near-invisible.
      `position: relative` makes this the containing block for the overlaid header. No vertical padding:
      the panel opens with its own, and the stage is sized to the viewport. */
   .dp {
     position: relative; display: grid;
-    --dp-strong: var(--story-ink);
-    --dp-body: var(--story-ink-soft);
-    --dp-quiet: var(--story-ink-faint);
+    --dp-strong: var(--panel-ink);
+    --dp-body: var(--panel-soft);
+    --dp-quiet: var(--panel-faint);
     --dp-line: var(--story-line);
     --dp-line-soft: var(--story-line-soft);
-    --dp-accent: var(--story-accent);
+    --dp-accent: var(--panel-accent);
     /* The seal red is the brand mark in both themes and reads correctly on paper, so the climb keeps
        it rather than being recoloured. */
     --dp-alert: var(--seal);

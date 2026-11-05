@@ -58,8 +58,8 @@ const path = (pt: [number, number][]) => pt.map(([x, y]) => `${Math.round(x)},${
 const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0).map(({ i }) => i);
 ---
 <section id="solve" class="so" aria-labelledby="so-heading">
-  <div class="so-paper">
-    <div class="so-inner">
+  <div class="so-paper slide-paper">
+    <div class="so-inner slide-gutter">
       <p class="so-kicker">3 / 3 · where to start</p>
 
       <div class="so-split">
@@ -157,36 +157,15 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
 
 <style>
   .so { position: relative; z-index: 1; width: 100vw; margin-left: calc(50% - 50vw); }
-  /* FOLLOWS THE THEME, like every other slide. This was built as "the one dark slide" — a deliberate register
-     break marking the arrival of the explainer — and the owner rejected it outright: "in light theme, the Still
-     an open problem slide, the background is dark." He is right, and the reason is worth keeping: a light-theme
-     reader has no way to read one dark slab as a *register* choice, only as a bug or a half-loaded panel. A
-     theme is a promise about the whole page, and one surface opting out breaks it.
-     The values below are byte-identical to Choice, Rules and Work, so the four paper slides cannot drift apart.
-     Every colour on this slide routes through these six variables, including the lattice, so the drawing
-     re-themes with the panel and nothing needed to be re-drawn. */
-  .so-paper {
-    --s-bg: #c4b7a1; --s-edge: rgba(74,66,54,0.26); --s-ink: #1f1b14;
-    --s-soft: #423b30; --s-faint: #6a6153; --s-accent: #7c5522;
-    background: var(--s-bg);
-    border-top: 1px solid var(--s-edge); border-bottom: 1px solid var(--s-edge);
-    padding: clamp(30px, 4vh, 62px) 0;
-  }
-  :global(html[data-theme='dark']) .so-paper {
-    --s-bg: #14161a; --s-edge: rgba(184,177,161,0.14); --s-ink: #dce1dc;
-    --s-soft: #a8b0a9; --s-faint: #6d746e; --s-accent: #7fc9a0;
-  }
+  /* Every colour on this slide, the lattice's included, is the panel's (styles/slides.css), so the drawing
+     re-themes with the panel. */
+  .so-paper { padding: clamp(30px, 4vh, 62px) 0; }
   .so-inner {
-    /* Clears the fixed rail (SideRail), whose widest label ends at x=145 at most (lib/pageStops' homeStops has
-       the arithmetic). The rail hides at 1100px and below; this gutter goes at 1099px, a pixel later, as in Story
-       and Work (Choice and Rules drop it at 1100px). Shared across the five paper slides. */
-    padding-left: clamp(168px, 10.4vw, 200px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
     /* Measured: content ended at y=902 in a 1050px slide, so 148px sat dead at the foot. Centring the block
        spends that slack on the drawing and the type. (Tested as the cause of the Lighthouse point and cleared —
        removing it left LCP at 2709ms, unchanged.) */
     display: grid; align-content: center;
   }
-  @media (max-width: 1099px) { .so-inner { padding-left: clamp(28px, 6vw, 80px); } }
 
   /* ── THE EQUATION WALK. One equation, four annotations, one visible at a time — the same overlay pattern the
      other two slides use for their panels, so the height is set by the tallest and nothing jumps. */
@@ -213,22 +192,22 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
      the moves' body copy and stays put while they cycle. */
   .so-open {
     margin: clamp(10px, 1.5vh, 18px) 0 clamp(14px, 2vh, 24px);
-    font-size: clamp(13px, 1.02vw, 16px); line-height: 1.6; color: var(--s-soft);
-    padding-bottom: clamp(10px, 1.5vh, 18px); border-bottom: 1px solid var(--s-edge);
+    font-size: clamp(13px, 1.02vw, 16px); line-height: 1.6; color: var(--panel-soft);
+    padding-bottom: clamp(10px, 1.5vh, 18px); border-bottom: 1px solid var(--panel-edge);
   }
 
   .so-move-lede {
-    margin: 0 0 6px; font-size: clamp(15px, 1.16vw, 19px); line-height: 1.42; color: var(--s-ink);
+    margin: 0 0 6px; font-size: clamp(15px, 1.16vw, 19px); line-height: 1.42; color: var(--panel-ink);
   }
   .so-move-detail {
-    margin: 0; font-size: clamp(13px, 1vw, 15.5px); line-height: 1.62; color: var(--s-soft);
+    margin: 0; font-size: clamp(13px, 1vw, 15.5px); line-height: 1.62; color: var(--panel-soft);
   }
 
 
   /* The closing line, under the selector: names what the slide is and is not. */
   .so-close {
     margin: clamp(12px, 1.8vh, 20px) 0 0;
-    font-size: clamp(12px, 0.95vw, 14.5px); line-height: 1.55; color: var(--s-faint);
+    font-size: clamp(12px, 0.95vw, 14.5px); line-height: 1.55; color: var(--panel-faint);
     max-width: 96ch;
   }
 
@@ -237,7 +216,7 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
   .so-terms {
     list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0; margin: clamp(18px, 2.6vh, 34px) 0 0; padding: 0;
-    border-top: 1px solid var(--s-edge);
+    border-top: 1px solid var(--panel-edge);
   }
   .so-term {
     -webkit-appearance: none; appearance: none; background: none; border: 0;
@@ -248,21 +227,21 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     opacity: 0.42;
   }
   .so-term:hover { opacity: 0.72; }
-  .so-term[aria-pressed='true'] { opacity: 1; border-top-color: var(--s-accent); }
-  .so-term:focus-visible { outline: 2px solid var(--s-accent); outline-offset: 3px; }
+  .so-term[aria-pressed='true'] { opacity: 1; border-top-color: var(--panel-accent); }
+  .so-term:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 3px; }
   @media (prefers-reduced-motion: no-preference) {
     .so-term { transition: opacity 200ms ease, border-color 200ms ease; }
   }
   /* The discipline, in the owner's own words. Was a MathML term chip; the equation it belonged to is gone. */
   .so-term-tag {
     font-family: var(--font-mono); font-size: clamp(9.5px, 0.72vw, 11px); letter-spacing: 0.04em;
-    color: var(--s-accent); line-height: 1.3;
+    color: var(--panel-accent); line-height: 1.3;
   }
   .so-term-name {
     font-family: var(--font-mono); font-size: clamp(10px, 0.76vw, 11.5px);
-    letter-spacing: 0.1em; text-transform: uppercase; color: var(--s-faint);
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--panel-faint);
   }
-  .so-term[aria-pressed='true'] .so-term-name { color: var(--s-soft); }
+  .so-term[aria-pressed='true'] .so-term-name { color: var(--panel-soft); }
 
   /* ── THE LATTICE, EMPHASISED PER MOVE. The drawing is reused rather than rebuilt (the owner: "i think we can
      reuse the same graph we have right now") — each move just changes which layer carries the ink. */
@@ -287,7 +266,7 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
 
   .so-kicker {
     font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
-    text-transform: uppercase; color: var(--s-accent); margin: 0 0 14px;
+    text-transform: uppercase; color: var(--panel-accent); margin: 0 0 14px;
   }
   /* The lattice is the payoff of the whole sequence, so it is the most dominant figure of the three — and it
      loses the divider rule for the same reason the others do. */
@@ -297,13 +276,13 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
   .so-fig { margin: 0; }
   @media (max-width: 1080px) {
     .so-split { grid-template-columns: 1fr; gap: 4vh 0; }
-    .so-fig { padding-top: 4vh; border-top: 1px solid var(--s-edge); }
+    .so-fig { padding-top: 4vh; border-top: 1px solid var(--panel-edge); }
   }
 
   .so-head {
     font-family: var(--font-display); font-weight: 300;
     font-size: clamp(20px, 1.8vw, 30px); line-height: 1.24;
-    color: var(--s-ink); margin: 0 0 clamp(14px, 2vh, 22px); max-width: 32ch; letter-spacing: -0.008em;
+    color: var(--panel-ink); margin: 0 0 clamp(14px, 2vh, 22px); max-width: 32ch; letter-spacing: -0.008em;
   }
   /* (.so-body and the .so-tools list are gone with their markup. The slide used to carry a paragraph of prose
      and a named list of "the tools this uses" beside the lattice; both went when the copy moved into the
@@ -316,7 +295,7 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
 
   /* The wireframe surface: hairlines, so it reads as structure rather than as a filled object. */
   .so-rib, .so-spine {
-    fill: none; stroke: var(--s-faint); stroke-width: 1;
+    fill: none; stroke: var(--panel-faint); stroke-width: 1;
     vector-effect: non-scaling-stroke; opacity: 0;
   }
   .so-rib.is-in, .so-spine.is-in { opacity: 0.42; }
@@ -324,17 +303,17 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
      invisible in the shot, which loses the whole "one route out of many" contrast the slide is built on. 0.55
      on a slightly thicker stroke reads as a crowd without competing with the optimum. */
   .so-cand {
-    fill: none; stroke: var(--s-soft); stroke-width: 1.2;
+    fill: none; stroke: var(--panel-soft); stroke-width: 1.2;
     vector-effect: non-scaling-stroke; stroke-linejoin: round; opacity: 0;
   }
   .so-cands.is-in .so-cand { opacity: 0.55; }
   .so-opt {
-    fill: none; stroke: var(--s-accent); stroke-width: 2.6;
+    fill: none; stroke: var(--panel-accent); stroke-width: 2.6;
     vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round;
     opacity: 0;
   }
   .so-opt.is-in { opacity: 1; }
-  .so-opt-node { fill: var(--s-accent); opacity: 0; }
+  .so-opt-node { fill: var(--panel-accent); opacity: 0; }
   .so-opt-node.is-in { opacity: 1; }
   @media (prefers-reduced-motion: no-preference) {
     .so-rib, .so-spine, .so-cand, .so-opt, .so-opt-node { transition: opacity .5s ease; }
@@ -349,21 +328,21 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
   .so-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 0; }
   .so-key {
     font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--s-faint); display: inline-flex; align-items: center; gap: 6px;
+    color: var(--panel-faint); display: inline-flex; align-items: center; gap: 6px;
   }
   .so-key::before {
     content: ""; width: 14px; height: 0; border-top: 1px solid currentColor;
   }
-  .so-key--opt { color: var(--s-accent); }
+  .so-key--opt { color: var(--panel-accent); }
   .so-key--opt::before { border-top-width: 2.5px; }
-  .so-key--cand { color: var(--s-soft); }
+  .so-key--cand { color: var(--panel-soft); }
 
   .so-read {
-    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--s-soft);
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--panel-soft);
     margin: 10px 0 0; min-height: 2.6em;
   }
   .so-cap {
-    font-size: 10.5px; line-height: 1.5; color: var(--s-faint);
+    font-size: 10.5px; line-height: 1.5; color: var(--panel-faint);
     margin: 8px 0 0; max-width: 62ch;
   }
 
