@@ -22,6 +22,17 @@ describe('the corner nav page set', () => {
     }
   });
 
+  // The converse. The corner nav is the only link to /experience anywhere on the site, and the only one on
+  // every page to the rest, so a page left out of PAGES can be orphaned with every other check green. The
+  // homepage, the 404 and a /proto- route are not nav doors.
+  it('names every page the site has', () => {
+    const hrefs = new Set(PAGES.map((p) => p.href));
+    for (const r of routes) {
+      if (r === '/' || r === '/404' || r.startsWith('/proto-')) continue;
+      expect(hrefs.has(r), `${r} is in src/pages but not in PAGES`).toBe(true);
+    }
+  });
+
   it('has no duplicate destinations or labels', () => {
     expect(new Set(PAGES.map((p) => p.href)).size).toBe(PAGES.length);
     expect(new Set(PAGES.map((p) => p.label)).size).toBe(PAGES.length);

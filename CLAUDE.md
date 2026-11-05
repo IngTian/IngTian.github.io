@@ -622,7 +622,9 @@ phone treatment is *bug fixes only*, and the whole of it is:
   after /research because it's the same subject at a different formality). It lives
   in `data/` because the page set is a *fact* about the site: the site once shipped
   a link to `/experience` before that page existed, and `tests/nav.test.ts` now
-  asserts every href resolves to a real route, with no duplicate hrefs or labels.
+  asserts every href resolves to a real route, with no duplicate hrefs or labels, and
+  the converse: every page in `src/pages` but `/`, the 404 and a `/proto-` route is in
+  `PAGES`, since the corner nav is the only link to `/experience` anywhere on the site.
   `CornerNav` renders it.
 - **The page you are on is marked by a lit DOT before its label**, on every page:
   `aria-current="page"` on the link, a 6px dot plus a glow, and the label at weight 600. A page
@@ -1402,8 +1404,8 @@ titles came to rest hard against the browser chrome — the lead is a number in
     spans its gap; `tests/distSmoke.test.ts` reads both in the built CSS).
 - **Pure logic is tested.** Anything non-trivial in `lib/` gets a vitest spec, and
   so does every *invariant between two files* (`nav.test.ts`: every nav href is a
-  real route; `writingContent.test.ts`: the schema enum matches `KINDS`;
-  `pageStops.test.ts`: no stop points at an id the page won't emit;
+  real route, and every page a nav href; `writingContent.test.ts`: the schema enum
+  matches `KINDS`; `pageStops.test.ts`: no stop points at an id the page won't emit;
   `viewport.test.ts`: the breakpoint still says 640; `artSizes.test.ts`: both
   `sizes` hints still describe the layout that decides them). They're the only
   automated safety net, and they're where "two places must agree" is actually
