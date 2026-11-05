@@ -179,52 +179,26 @@ When in doubt, remove rather than add.
     a letter is never drawn plain in silence. A markdown plugin's throw does not fail the build
     by itself (Astro logs it and stores the entry unrendered), so `/writing/<slug>` throws on an
     unrendered entry rather than ship an empty piece.
-- `astro:assets` optimizes gallery images (responsive `widths`, **webp — not avif**). This line said
-  "webp/avif" for a long time; `ls dist/_astro/*.avif` is empty and nothing in `astro.config.mjs` asks
-  for avif, so no page has ever shipped one. Either add the format deliberately or leave it — but do
-  not read this line as evidence it is already happening.
-  - **NEVER put a native image width in a `widths` array.** `/art`'s calligraphy asked for
-    `widths={[480, 900, w.src.width]}` — 1727 for `spring-couplet-stele`, a **1342 KB** webp — on the element
-    that is also `fetchpriority="high"`. At `40vw`, a 1440px viewport at DPR 2 needs 1152 device px, so that
-    file became the page's high-priority LCP resource; the 900w variant is 139 KB. Capped at
-    `[480, 900, 1200]`, the chosen candidate is **387 KB**. The photo grid never had the bug — it caps at 900
-    via `photoSizes()`, pinned by `tests/artSizes.test.ts`.
-  - **The lightbox's source is a processed webp at NATIVE pixels, via `getImage()` — not `ImageMetadata.src`.**
-    It was the untouched original: 38.6 MB of JPEG across 44 works, 0.6–2.2 MB per open. The pixels are
-    deliberate and must stay — `scripts/artGallery.ts` zooms to **6×**, so capping the long edge would quietly
-    degrade the feature while the byte count improved. Only the container changed.
-    It also turned waste into the fix: `<Image>` already emitted a native-dimension variant for the `src`
-    attribute independent of `widths`, which a browser with `srcset` never requests — 18.6 MB of pure build
-    output, now the thing actually being used. `tests/distSmoke.test.ts` weighs the file a browser would
-    *choose* rather than checking the array, because the array is a means and bytes on the critical path
-    are what hurt — and it derives the device-px figure from the shipped `sizes` instead of hard-coding it,
-    after a first version hard-coded the wrong one (see the next bullet).
-  - **`sizes` MATTERS AS MUCH AS `widths`, and fixing only one left two thirds of the over-fetch.** The
-    calligraphy hint was `40vw` — a fluid bound for an element whose width is a CONSTANT. `.cal :global(img)`
-    is `width: auto; max-width: 100%; max-height: min(82vh, 820px)`, so for a tall work the HEIGHT cap binds
-    and the width is `cap * ar`, bounded by `820 * ar` at any window height: **414 CSS px** for the stele,
-    against the 512–1536 that `40vw` declares. So DPR 2 still chose the 1200w variant (396,030 B) where
-    900w (142,128 B) covers the 828 device px actually needed. The arithmetic that justified it ("needs 1152
-    device px", "rendered at 576 CSS px") reasoned from the viewport rather than from the cap, and had been
-    written down five times — including into a test — which is the strongest form of "this will stop the next
-    reader from looking". `calSizes()` now derives it from the cap, and `tests/artSizes.test.ts` pins
-    `CAL_MAX_H` against the `820px` in the stylesheet so the pair cannot drift.
-  - **Nothing below the fold is eager.** The photo grid used `i < 9 ? 'eager' : 'lazy'`, and the grid starts
-    ~2,100px down — past two calligraphy blocks, each as tall as `min(82vh, 820px)` allows. Those nine were
-    **754,378 B of the 896,506 B** `/art` fetched on first load, 84% of its image payload, for content nobody
-    had scrolled to. First-load image bytes are now 142,128. Deferring was safe because the layout never used
-    them: `buildRows()` solves each row from the build-time `data-ar`, not from a decoded image.
-  - **Still true and not fixed:** **44** original JPEGs (**38.65 MiB**, 55% of a 73 MB artifact) are emitted
-    into `dist` that nothing references — `grep` across every .html/.css/.js/.xml in `dist` finds zero hits
-    for any of them. 42 are photos: `data/artworks.ts` globs them with `{ eager: true }`, and an eagerly
-    imported `ImageMetadata` bakes a URL to the original, so Vite cannot prove it unused. The other 2 are the
-    calligraphy masters, which arrive by static import. (This bullet said "42 / 36.3 MB" — correct for the
-    photos it named, but it omitted the calligraphy pair, and a comment in `art.astro` separately claimed the
-    originals "drop out of `dist` entirely", which was simply false.) Costs deploy artifact size and zero
-    visitor bytes; see issue #60.
-    **/projects' vendored PNGs do not join them**, though they too arrive by static import: they are read
-    only through `<Image>`, nothing reads their `.src` URL, and Astro drops an original nobody reads —
-    measured, 0 bytes of PNG in `dist/_astro`; `tests/distSmoke.test.ts` holds it at zero.
+- `astro:assets` optimizes gallery images (responsive `widths`, **webp, not avif**: nothing in
+  `astro.config.mjs` asks for avif, and `dist` holds none). /art's rules follow, each measured; the arithmetic
+  is beside the code it sets in `pages/art.astro`: above `photoSizes()`, `calSizes()` and `zoomOf()`, and at
+  each gallery's `<Image>`.
+  - **Never a native width in `widths`.** The stele's 1727w was a 1342 KB webp on the `fetchpriority="high"`
+    LCP image. Calligraphy is `[480, 900, 1200]`, photos `[300, 600, 900]`.
+  - **`sizes` matters as much as `widths`, and it comes from the CSS that sizes the element, not from the
+    viewport.** A height-capped work renders at most `820 * ar` CSS px (414 for the stele), so DPR 2 takes the
+    900w variant (142,128 B), where a `40vw` hint took 1200w (396,030 B). `tests/artSizes.test.ts` holds
+    `CAL_MAX_H` to the stylesheet's cap and the photo constants to `artGallery.ts`'s `justifyRows` call and
+    `justify.ts`'s final-row slack; `tests/distSmoke.test.ts` weighs the file a browser would choose, reading
+    the device px from the shipped `sizes`.
+  - **Nothing below the fold is eager.** The photo grid starts ~2,100px down, and its nine eager tiles were
+    754,378 of the 896,506 B /art loaded first.
+  - **Read an image's size from `getImage()`, never off its `ImageMetadata`.** The import is a Proxy, and
+    reading any property of it but `clone` or `fsPath` keeps the original in `dist`. /art's `.width` and
+    `.height` reads kept all 44 JPEGs there (40,525,788 B, 55% of a 74.3 MB artifact, referenced by nothing;
+    issue #60). Nothing reads one now, so Astro drops every original and `dist` is 33.8 MB;
+    `tests/distSmoke.test.ts` fails if any image under `src/assets` ships anything but webp variants. The
+    lightbox's source is that same `getImage()` call, a native-pixel webp: it zooms 6×, so the pixels stay.
 - `site: 'https://ingtian.github.io'`, no `base` (user site at root).
 
 ## Layout

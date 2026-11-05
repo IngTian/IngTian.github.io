@@ -36,12 +36,9 @@ function buildRows() {
   if (!tiles.length) return;
   const ars = tiles.map((t) => parseFloat(t.dataset.ar || '1'));
   const W = rowsEl.clientWidth;
-  // 340 IS ALSO WRITTEN IN art.astro, and the pair is synced by hand. The target row height is what bounds a
-  // tile's rendered width (width = aspectRatio * rowHeight, and this call's targetHeight is what caps
-  // rowHeight), so art.astro's per-photo `sizes` hint is computed from the same number — see the long note
-  // above photoSizes() there. Retune it here and the hint silently starts describing a layout that no longer
-  // exists, which is how the previous `30vw` hint came to over-fetch 2.9MB. tests/artSizes.test.ts asserts
-  // the two literals still agree, so a drift fails the suite instead of shipping.
+  // 340 IS ALSO art.astro's PHOTO_ROW_TARGET_H, synced by hand: it caps a tile's width, so the per-photo
+  // `sizes` hint is computed from it (see the note above photoSizes() there). tests/artSizes.test.ts fails if
+  // the two drift.
   const rows = justifyRows(ars, W, 340, 14);
   // clear flex fallback; lay out by absolute row grouping using wrappers
   rowsEl.style.display = 'flex';

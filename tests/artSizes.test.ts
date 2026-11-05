@@ -3,23 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { justifyRows } from '../src/lib/justify';
 
 /**
- * /art's `sizes` hint has to describe /art's actual layout, and the layout is decided in a different file
- * from the hint.
- *
- * The photo grid is not a fluid grid: `scripts/artGallery.ts` calls justifyRows() with a CONSTANT target row
- * height, and justifyRows solves each row's height so the row fills the container, closing a row as soon as
- * that height would fall to or below the target. So a tile's width is `aspectRatio * rowHeight` with
- * rowHeight capped by the target (and by target * slack on the final, unfilled row) — a bound that does not
- * move with the viewport. `art.astro` computes its per-photo `sizes` from those same two numbers.
- *
- * That makes them a hand-synced pair across two files, which the project only tolerates when a test fails on
- * the drift (the other one is PHONE_MAX_WIDTH's 640 — see viewport.test.ts). The hint being wrong is not
- * cosmetic: it previously said `30vw`, which at 1440/DPR2 selected the 900w variant for all 42 photographs
- * and fetched 6,007,600 bytes where 3,128,936 was enough.
- *
- * Both files are read as TEXT on purpose. artGallery.ts touches `document` at module scope and art.astro is
- * an Astro component, so neither can be imported here; the literals are what has to agree, so the literals
- * are what is asserted.
+ * /art's `sizes` hints have to describe a layout decided in other files: the photo grid's by the
+ * `justifyRows(ars, W, 340, 14)` call in scripts/artGallery.ts, the calligraphy's by a CSS height cap. A
+ * viewport-fraction hint over-fetched in both (the arithmetic is in art.astro, above photoSizes() and
+ * calSizes()), so each hand-synced constant is held to what it mirrors. Read as TEXT: artGallery.ts touches
+ * `document` at module scope and art.astro is a component, so neither can be imported.
  */
 
 const gallery = readFileSync(new URL('../src/scripts/artGallery.ts', import.meta.url), 'utf8');
@@ -91,22 +79,15 @@ describe('/art photo `sizes` hint', () => {
 });
 
 /**
- * THE CALLIGRAPHY HINT IS THE SAME KIND OF PAIR, and it got the same kind of wrong.
- *
- * The first pass at /art's LCP capped `widths` at 1200 — which removed the 1342 KB native candidate and was
- * real — but left `sizes` at `40vw`, a fluid hint for an element whose width is a constant. `.cal :global(img)`
- * is `width: auto; max-width: 100%; max-height: min(82vh, 820px)`, so for a tall work the HEIGHT cap binds and
- * the width is `cap * aspectRatio`, bounded by `820 * ar` at any window height — 414 CSS px for the
- * 1727x3422 stele against the 512–1536 that `40vw` declares. At DPR 2 that still selected the 1200w variant
- * (396,030 B) where 900w (142,128 B) covers it: 253,902 B of a `fetchpriority="high"` resource.
- *
- * So CAL_MAX_H in art.astro's frontmatter and the `820px` in its own <style> block are a hand-synced pair,
- * and this is the test that makes the drift fail rather than quietly re-inflate the LCP.
+ * The calligraphy hint is `ceil(ar * CAL_MAX_H)` px, and CAL_MAX_H is the px arm of `.cal :global(img)`'s
+ * max-height in art.astro's own <style> block: a hand-synced pair, so a drift fails here rather than quietly
+ * re-inflating /art's LCP (a `40vw` hint once fetched 396,030 B where 142,128 B covers it; see calSizes()).
  */
 describe('/art calligraphy `sizes` hint', () => {
   const calMaxH = /CAL_MAX_H\s*=\s*(\d+(?:\.\d+)?)/.exec(artPage);
-  /** The CSS cap the constant mirrors: `max-height: min(82vh, 820px)`. */
-  const cssCap = /max-height:\s*min\(\s*\d+(?:\.\d+)?vh\s*,\s*(\d+(?:\.\d+)?)px\s*\)/.exec(artPage);
+  /** The CSS cap the constant mirrors, `max-height: min(82vh, 820px)`, read from the stylesheet alone so that a
+   *  comment above it cannot stand in for the rule. */
+  const cssCap = /max-height:\s*min\(\s*\d+(?:\.\d+)?vh\s*,\s*(\d+(?:\.\d+)?)px\s*\)/.exec(artPage.slice(artPage.indexOf('<style')));
 
   it('finds both halves of the pair at all', () => {
     // Same guard as above: if either regex stops matching, every assertion below would pass vacuously.
@@ -123,7 +104,7 @@ describe('/art calligraphy `sizes` hint', () => {
     // The specific regression this file now blocks. `40vw` must never come back: it describes a fluid width
     // this element does not have, and it is the reason the LCP stayed 2.8x heavier than it needed to be
     // through the release that "fixed" it.
-    expect(artPage).toContain('calSizes(w.src.width / w.src.height)');
+    expect(artPage).toContain('calSizes(calZoom[i].w / calZoom[i].h)');
     expect(artPage).not.toContain('(max-width:1024px) 80vw, 40vw');
   });
 

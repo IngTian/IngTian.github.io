@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join, sep } from 'node:path';
+import { basename, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
@@ -425,22 +425,11 @@ describe('the homepage intro ships on / and ONLY on /', () => {
 });
 
 describe("/art's image payload, measured on the built output", () => {
-  // WHY A BYTE CEILING AND NOT A WIDTHS CHECK. The defect this pins was a `widths` array containing
-  // `w.src.width` — the image's NATIVE width — on an element that is also `fetchpriority="high"`. For
-  // `spring-couplet-stele` that is 1727w, a 1342 KB webp, so the browser picked it as the page's
-  // high-priority LCP resource where the 900w variant (139 KB) covers the element.
-  //
-  // Asserting the array would have been the weaker test: the array is a means, and what hurts a visitor is
-  // bytes on the critical path. So this reads the shipped srcset, resolves the file a browser would actually
-  // choose, and weighs it.
-  //
-  // AND THE DEVICE-PX FIGURE IS DERIVED FROM THE SHIPPED `sizes`, NOT HARD-CODED. This test first wrote
-  // `const NEEDED = 1152` with the comment "1440 CSS px at DPR 2, in the `40vw` branch" — which was the very
-  // arithmetic that was wrong: the element is height-capped by `max-height: min(82vh, 820px)` and renders at
-  // 298–414 CSS px, never the 576 that `40vw` implies. Hard-coding it meant the test agreed with the bug and
-  // would have gone on agreeing after the hint was corrected. Parsing the real hint makes this test follow
-  // the page instead of a number somebody typed. (Whether the hint itself is *right* is artSizes.test.ts's
-  // job — it pins CAL_MAX_H against the CSS cap. These two together are what close the hole.)
+  // A BYTE CEILING, NOT A WIDTHS CHECK: the regression was the stele's native 1727w (a 1342 KB webp) in the
+  // `widths` of the fetchpriority="high" LCP image, and the array is only a means. This weighs the file a
+  // DPR-2 browser would choose, with the device px read from the shipped `sizes`: a hard-coded figure once
+  // agreed with a wrong hint. Whether the hint is right is artSizes.test.ts's job; the arithmetic is in
+  // art.astro, above calSizes().
   const artHtml = (): string => {
     const p = join(DIST, 'art', 'index.html');
     if (!existsSync(p)) throw new Error('dist/art/index.html missing — run `npm run build`');
@@ -492,13 +481,27 @@ describe("/art's image payload, measured on the built output", () => {
   });
 
   it('serves every lightbox source as a processed webp, not the untouched original', () => {
-    // `data-zoom` was `ImageMetadata.src`, the unprocessed file, which cost 0.6-2.2 MB of JPEG per open.
-    // The PIXELS are deliberate — artGallery.ts zooms to 6x, so capping the long edge would have quietly
-    // degraded the feature while the byte count looked better. The fix was the container, not the size.
+    // Native pixels, for the 6x zoom, in a webp: the JPEG original cost 0.6-2.2 MB per open (see zoomOf()).
     const zooms = [...artHtml().matchAll(/data-zoom="([^"]+)"/g)].map((m) => m[1]);
     expect(zooms.length, 'no data-zoom attributes on /art').toBeGreaterThan(10);
     const notWebp = zooms.filter((z) => !z.endsWith('.webp'));
     expect(notWebp, `lightbox sources that are not webp: ${notWebp.slice(0, 3).join(', ')}`).toEqual([]);
+  });
+});
+
+describe('the images under src/assets', () => {
+  // Astro drops an imported image's original unless something reads a property of its ImageMetadata outside
+  // <Image>/getImage() (the import is a Proxy; see zoomOf() in art.astro). /art reading `.width` once kept all 44
+  // of its JPEGs, 40.5 MB that nothing referenced. So every image here ships as its webp variants and nothing
+  // else; an og:image or a plain <img> reading `.src` turns this red.
+  it('ships no original of any of them, only its webp variants', () => {
+    const sources = readdirSync(new URL('../src/assets/', import.meta.url), { recursive: true, encoding: 'utf8' })
+      .filter((f) => /\.(png|jpe?g|gif|webp|avif|tiff?)$/i.test(f))
+      .map((f) => basename(f).replace(/\.[^.]+$/, ''));
+    expect(sources.length, 'no images found under src/assets').toBeGreaterThan(0);
+    const emitted = readdirSync(join(DIST, '_astro')).filter((f) => sources.some((s) => f.startsWith(`${s}.`)));
+    expect(emitted.filter((f) => !f.endsWith('.webp')), 'originals in dist/_astro').toEqual([]);
+    expect(sources.filter((s) => !emitted.some((f) => f.startsWith(`${s}.`))), 'images with no variant at all').toEqual([]);
   });
 });
 
@@ -740,19 +743,6 @@ describe('/projects — the page shell on the drafting field', () => {
       ...projects.map((p) => projectSectionId(p.slug)),
     ];
     expect(want.filter((id) => !ids.has(id))).toEqual([]);
-  });
-
-  // NOT /art's issue #60. The vendored captures are static ImageMetadata imports read only through <Image>, and Astro
-  // drops an original whose `.src` nothing reads — so their PNGs never reach dist; only the webp variants do. This was
-  // predicted otherwise (~593 KB of originals) and planned around (storing them pre-shrunk); measured, it was 0
-  // bytes, and this holds it there. The day something reads `.src` (an og:image, a plain <img>), it goes red.
-  it('ships no original of a vendored capture, only its webp variants', () => {
-    const vendored = readdirSync(new URL('../src/assets/projects/', import.meta.url))
-      .filter((f) => f.endsWith('.png')).map((f) => f.slice(0, -'.png'.length));
-    expect(vendored.length, 'no PNG captures in src/assets/projects').toBeGreaterThan(0);
-    const emitted = readdirSync(join(DIST, '_astro')).filter((f) => vendored.some((v) => f.startsWith(`${v}.`)));
-    expect(emitted.filter((f) => !f.endsWith('.webp'))).toEqual([]);
-    expect(vendored.filter((v) => !emitted.some((f) => f.startsWith(`${v}.`))), 'captures with no variant at all').toEqual([]);
   });
 
   it('has exactly one <h1>, and it reads "Projects"', () => {
