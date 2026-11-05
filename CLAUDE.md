@@ -130,11 +130,11 @@ When in doubt, remove rather than add.
     `normal` and `computeEDL` (eye-dome lighting) are the shading — and painted to an
     ordinary 2D canvas by `lib/terrainRender.ts`; the Solve slide's lattice is
     `lib/bellman.ts`. Both are pure, unit-tested, and cost the bundle nothing a
-    library would have cost. And the gate is written down in `lib/sketches/kit.ts`:
-    *a still frame first, in SVG, judged in one look — three.js only after a frame
-    survives being looked at.* Four of the five rejected showpieces were only
-    judgeable once finished, which is what the cheap gate exists to prevent. So: no
-    island, and no 3D library either, until a still frame has earned one.
+    library would have cost. And the gate is a rule of its own: *a still frame
+    first, in SVG, judged in one look — three.js only after a frame survives being
+    looked at.* Four of the five rejected showpieces were only judgeable once
+    finished, which is what the cheap gate exists to prevent. So: no island, and no
+    3D library either, until a still frame has earned one.
 - **Type: four roles, TWO downloaded faces.** `--font-display` is **Georgia** and
   `--font-body` is the **system UI stack** — neither downloads anything.
   `--font-mono` is **JetBrains Mono** and `--font-accent` is **Fraunces**, used
@@ -262,7 +262,7 @@ src/
   data/writing.ts                   # the writing TAXONOMY (KINDS) + buildKinds(), the one seam to the markdown
   data/artworks.ts                  # gallery: calligraphy entries + globbed photos (+ photoNotes.ts for per-photo copy)
   data/{define,desk,making,story}.ts                       # the homepage explainer's copy + numbers, per slide
-  data/{cowGlyph,ruleGlyphs,tickerGlyphs,signalWeights}.ts # pixel-art matrices and weights the slides draw from
+  data/{cowGlyph,ruleGlyphs,tickerGlyphs}.ts # pixel-art matrices: the cow's and the slides'
   lib/deck.ts                       # pure deck stops: WHERE the homepage scroll may rest, and what's next — unit-tested
   lib/pageStops.ts                  # pure Stop trees: one tree per page drives BOTH its rail and its section ids — unit-tested; + fragmentId, the one decode of a URL fragment
   lib/viewport.ts                   # PHONE_MAX_WIDTH = 640, its PHONE_QUERY + isPhone() — the one phone gate; WIDE_QUERY, the wide layout past 1100px
@@ -273,14 +273,13 @@ src/
   lib/terrainContours.ts            # the hero field's isolines + levels, memoised — the intro's survey pass
   lib/introTimeline.ts              # the homepage intro's SCHEDULE only — pure. The decision and the ?dur= clamp live in pages/index.astro's is:inline script (it must run before first paint, so it cannot import); lib/introSession.ts reads what that publishes
   lib/descentPath.ts, trajectory.ts # the career descent graph's field and route
-  lib/{bellman,factorModel,problemSize,complexity,policyPnl,scenario,split}.ts   # the explainer slides' real math
+  lib/{bellman,problemSize,complexity,policyPnl,scenario,split}.ts   # the explainer slides' real math
   lib/scrollspy.ts                  # activeStopIndex (the homepage Toc, the /art rail) + railMarks, SideRail's marking rule — see Navigation
-  lib/{justify,pixels,cowSpeech,knowledge,capability,equations,signalRubric}.ts
-  lib/sketches/{kit,batch1}.ts      # the showpiece prototype harness — a sketch is (ctx) -> SVG string; /proto-sketches is its gallery
+  lib/{justify,pixels,cowSpeech,knowledge,equations}.ts
   sections/{Heights,Interlude,Choice,Rules,Solve,Story,Work}.astro   # the homepage, in scroll order — ALL of sections/, there is nothing else in it
   sections/Signature.astro          # links + seal — rendered INSIDE Work.astro, not as its own slide
   components/Deck.astro             # the deck's event plumbing (homepage only)
-  components/proto/FluidSky.astro   # the WebGL sky canvas — on 6 routes despite the proto/ path (/projects, the two research routes and /proto-sketches omit it)
+  components/FluidSky.astro         # the WebGL sky canvas — on 6 routes (/projects and the two research routes omit it)
   components/SkyWash.astro          # woven warm/cold broken-color wash over the sky — CSS + a small script (it is in the Interactivity list below; this line used to say "pure CSS")
   components/TerrainHero.astro      # the hero's terrain canvas (Heights only)
   components/DescentPath.astro      # the career descent graph (inside Story)
@@ -306,10 +305,9 @@ tools/vendor-projects.mjs           # the ONLY thing that touches the network, r
 
 ### Routes
 
-**Ten pages, not two**, and that is the number `npm run build` prints (`10 page(s)
+**Nine pages, not two**, and that is the number `npm run build` prints (`9 page(s)
 built`) — check it against the build rather than against this table, and `ls
-src/pages` beats both. This line read "twelve" for a while, left over from when three
-more prototype routes existed and the table below still named all four.
+src/pages` beats both.
 
 | Route | What it is |
 | --- | --- |
@@ -322,23 +320,20 @@ more prototype routes existed and the table below still named all four.
 | `/experience` | the timeline — education and roles |
 | `/art` | calligraphy + photography |
 | `/404` | the not-found page (noindex, no canonical) |
-| `/proto-sketches` | the one surviving **prototype** — the showpiece sketch gallery |
 
-**The prototype routes are internal, and there is one of them left.**
-`/proto-sketches` survives; `/proto-showpiece`, `/proto-ladder` and `/proto-paper`
-were retired once they had answered their question (the reasons are in
-`tests/protoNoindex.test.ts`, which is where the count lives now). Git holds them.
+**Prototype routes are internal, and today there are none.** `/proto-showpiece`,
+`/proto-ladder`, `/proto-paper` and `/proto-sketches` were each retired once they had
+answered their question. Git holds them.
 
-They exist so a visual choice can be made by looking at the real thing in the real
-page rather than at a screenshot (see the project's own habit: put the options in
-the page as a switcher). Every one must carry `noindex={true}` on `BaseLayout`
-**and** stay out of the sitemap — `astro.config.mjs` filters `/proto-` from the
-sitemap already, and `tests/protoNoindex.test.ts` globs `src/pages/proto-*.astro`
-and asserts the prop, so a *new* one is caught the moment it is written. That suite's
-floor is **1, not 0**, deliberately — renaming the `proto-` prefix must turn it red
-rather than leave it iterating over an empty glob, the same hole as `passWithNoTests`.
-Don't "tidy" the floor down. Their rendered bodies quote internal review notes, so an
-indexed one is a real leak, not an untidiness.
+The convention stays: a `src/pages/proto-<name>.astro` page exists so a visual choice
+can be made by looking at the real thing in the real page rather than at a screenshot
+(the project's own habit: put the options in the page as a switcher). It is kept out of
+the index **by construction, with no test to remember**: `BaseLayout` gives every path
+starting with `/proto-` `noindex` itself, whatever the page passes, and `astro.config.mjs`
+filters `/proto-` from the sitemap. That matters because the head is one either/or — no
+noindex means a self-referential `<link rel="canonical">`, an explicit request to index
+the page — and two proto routes once shipped exactly that by forgetting the prop. So a
+new prototype needs no prop and no edit elsewhere, and retiring one is deleting its page.
 
 ### Interactivity — vanilla scripts, and the contract they keep
 
@@ -485,7 +480,7 @@ every block has its own route, and the corner nav plus the footer carry the door
 /proto-paper, the last route that rendered it. This file used to say it was "kept on
 purpose … so the markup is recoverable without git archaeology"; it isn't kept, and
 git is the archive. What *does* still reference it is a handful of comments that
-were written while it existed: `lib/skyShader.ts` and `components/proto/FluidSky.astro`
+were written while it existed: `lib/skyShader.ts` and `components/FluidSky.astro`
 each explain an amplitude decision in terms of where Mountains used to sit, which is
 a historical note on a live decision and is fine to leave.
 
@@ -547,9 +542,8 @@ which the documented `grep -rn 'max-width: 640px' src` silently misses while a
 careless re-count catches it as a rule. Use the pattern above, with the `*`, and
 classify each hit rather than subtracting a remembered number of prose lines.
 Earlier still it listed "the two proto sections": there are no proto *sections* —
-`src/sections/` holds only the seven homepage slides plus Signature — and the one
-surviving proto route, `/proto-sketches`, breaks at 820px, not 640, because it is
-an internal gallery and not part of the phone treatment.
+`src/sections/` holds only the seven homepage slides plus Signature. A prototype
+route is not part of the phone treatment and need not use this breakpoint.
 `tests/viewport.test.ts` pins the value so a silent drift shows up as a failure
 rather than as a phone with half a treatment.
 
@@ -1136,20 +1130,16 @@ the `SkyWash` layer.
     once the beats were separated each one needed room. Keep the habit (`?dur=` on the real page, not a
     mockup) and distrust the prediction.
 - `tests/distSmoke.test.ts` pins `data-intro` to `/` and nowhere else. Moving this component, or
-  BaseLayout growing its own copy, is the single edit that would hand the animation to all ten routes.
+  BaseLayout growing its own copy, is the single edit that would hand the animation to all nine routes.
 
 ## The fluid sky
 
-`components/proto/FluidSky.astro` is the sky on **every page a visitor reaches except the two
-registers'** — six routes: `/`, `/writing`, `/writing/<slug>`, `/experience`, `/art` and the
+`components/FluidSky.astro` is the sky on **every page except the two registers'** — six
+routes: `/`, `/writing`, `/writing/<slug>`, `/experience`, `/art` and the
 404. `/projects` and both research routes render neither it nor `SkyWash`: each register's ink
 is sized for its own ground, not the reading sky (light drafting `--ink-3` over
-`--reading-grad` measured 3.89:1), and the paper register is a still sheet by design. The
-other page without it is
-`/proto-sketches`, which also has no `.descent` element at all (`<main class="sk">`):
-it is an internal gallery, deliberately outside the sky's system so a candidate frame
-is judged against a plain ground. (The `proto/` path is where the component was born,
-not where it belongs.) A WebGL canvas: a two-level domain
+`--reading-grad` measured 3.89:1), and the paper register is a still sheet by design.
+A WebGL canvas: a two-level domain
 warp over the descent/reading ramps, sampled from scroll position, with viscous
 luminance banding and a warm bloom. `lib/skyShader.ts` holds the GLSL,
 `lib/skyPalette.ts` the ramps, `lib/skyLegibility.ts` the **contrast policy** that
@@ -1367,8 +1357,7 @@ titles came to rest hard against the browser chrome — the lead is a number in
   required check green with the safety net switched off and nothing red to say so.
 - **Verify visually, not just by build.** Art/layout/animation must be SEEN, and
   small-detail screenshots are unjudgeable — put the options *in the live page* as a
-  switcher and look (that is what a `/proto-*` route is for — `/proto-sketches` is the
-  one that exists, and its harness makes a new candidate cost one function). When a browser is
+  switcher and look (that is what a `/proto-*` route is for; see *Routes*). When a browser is
   needed: `npm run build` → `npm run preview` → drive **one** headless Chrome over
   CDP → screenshot at scroll positions → look → refine. For faint issues,
   contrast-stretch the screenshot or toggle layers off and diff — single-column pixel
@@ -1426,12 +1415,16 @@ titles came to rest hard against the browser chrome — the lead is a number in
   - **That grep has a blind spot, and a second sweep found ~600 more lines in it:**
     an export whose only caller is *another export in the same file*. Counting
     `src` hits outside the module misses it, and counting inside the module sees a
-    caller. `lib/factorModel.ts` was a live file with a dead half — the whole fan
+    caller. `lib/factorModel.ts` had a dead half — the whole fan
     (`fanBeams`, `beamQuad`, `expressionTerms`, `FAN`), orphaned when
     `FactorFan.astro` went — and `lib/knowledge.ts` held a complete superseded
     model (`knownAfter`, `isKnown`, `knownness`, `discoveredAt`, `knownMean`)
     beside the one the page runs. **Trace the call graph from what `src` imports**,
-    not from each export's name.
+    not from each export's name. And an import is not a read: the rest of
+    `factorModel`, with `signalRubric` and `signalWeights`, was reached only through
+    `/proto-sketches`' `SketchData` fields that no sketch read (and `capability` by
+    nothing but its spec). All four, ~1,200 lines with their specs, were deleted with
+    that route.
   - **When the dead half has the spec, re-point the spec before deleting it.**
     `knowledge.test.ts` was the ONLY guard on the sentence the Story slide prints —
     *"a deeper basin is now visible — it was there the whole time"* — and it was
@@ -1583,6 +1576,17 @@ looked at, and turned down:
 - **The scripted terminal** — the site's only React island, deleted on the owner's
   instruction ("you can delete the terminal at the bottom, it's already useless").
   Its data, engine and spec went with it; git holds them.
+- **A factor model of the person** — `r_TIAN = α + Σ β_k f_k + ε`, its betas from
+  LLM-scored evidence for every `profile.ts` item, then breadth statistics (HHI,
+  effective dimensions) over the same scores. The framing was rejected (a return
+  implies a P&L a person does not have), no page showed a number once the fan went,
+  and every `profile.ts` title edit still forced a re-scoring. Deleted on the owner's
+  instruction ("delete them"): `lib/factorModel.ts`, `lib/capability.ts`,
+  `lib/signalRubric.ts`, `data/signalWeights.ts` and their specs; git holds them.
+- **The /proto-sketches gallery** — five still SVG candidates for the bottom of the
+  homepage, a slot the explainer slides and Story filled. DescentPath and Story's type
+  came out of it; the route and its harness were retired ("Retire it"). Its still-frame
+  gate stays, in *Stack*.
 
 **From the /projects redesign.** These were built in its design mockups rather than in
 the repo, looked at there, and turned down — so git does not hold them, and the design

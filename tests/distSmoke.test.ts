@@ -36,7 +36,8 @@ import { PHONE_QUERY } from '../src/lib/viewport';
 
      - a "back to the section" link pointing at /writing#misc while the section renders id="w-misc";
      - the footer's page list drifting from data/nav.ts's, silently dropping a whole route;
-     - two prototype routes shipping a self-referential <link rel="canonical"> instead of noindex.
+     - two prototype routes shipping a self-referential <link rel="canonical"> instead of noindex (BaseLayout
+       now gives every /proto- path noindex itself, so no page can forget it).
 
    HOW IT READS THE HTML. Regex over the built files, no parser. That is a deliberate choice, not a
    shortcut: adding jsdom/cheerio to devDependencies to grep for `id="x"` would put a dependency in
@@ -191,23 +192,6 @@ const internalHrefs = (p: Page): string[] =>
 const namesAFile = (path: string): boolean => /\/[^/]*\.[a-z0-9]+$/i.test(path);
 
 /**
- * Which built routes are prototypes. Used by the noindex check below — and by NOTHING ELSE any more,
- * which is the point of this note.
- *
- * It used to also exclude the proto routes from the fragment-link check, because /proto-paper rendered
- * the shared homepage `<Toc />` whose stop list is the HOMEPAGE's slides, so five of its seven rail
- * entries pointed at ids that page did not contain. That was fixed at the source (proto-paper stopped
- * rendering the Toc) and /proto-paper has since been retired altogether, so the exclusion protected
- * nothing. It is gone, and with it the separate proto-only copy of the fragment check that existed to
- * make the gap visible: the fragment check below now runs over EVERY built page, prototypes included,
- * which is strictly more coverage than the two tests it replaces.
- *
- * Keep it that way. A prototype that borrows the homepage rail again will now fail the main check
- * rather than a parked one, and re-adding an exclusion here would hide it.
- */
-const isProto = (p: Page): boolean => p.route.startsWith('/proto-');
-
-/**
  * A paper's file rendered, and what the markdown plugins report for it (its sections, its words), through the chain
  * the build runs (tests/helpers/paperChain.ts) — a second reading of the file, so a page that renders its rail from
  * anything else is caught. The frontmatter is read for what the report needs: which record it explains. Without its
@@ -226,14 +210,14 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
     expect(pages().length, NEEDS_BUILD).toBeGreaterThan(5);
   });
 
-  // The eight page files' routes, then one per published writing piece and one per paper file: ten today, the
-  // "10 page(s) built" CLAUDE.md quotes. The content routes are counted from src/content/ rather than typed, because
+  // The seven page files' routes, then one per published writing piece and one per paper file: nine today, the
+  // "9 page(s) built" CLAUDE.md quotes. The content routes are counted from src/content/ rather than typed, because
   // a new piece or paper is a file and nothing else may need an edit. A deleted page that still builds, or a page
   // that stopped building, fails by name. (dist/ also holds public/'s one .html, which no page builds.)
-  it('builds exactly its routes: eight pages, one per writing piece and one per paper (ten today)', () => {
+  it('builds exactly its routes: seven pages, one per writing piece and one per paper (nine today)', () => {
     const built = pages().filter((p) => !existsSync(join(PUBLIC, p.file))).map((p) => p.route).sort();
     const want = [
-      '/', '/404.html', '/art', '/experience', '/projects', '/proto-sketches', '/research', '/writing',
+      '/', '/404.html', '/art', '/experience', '/projects', '/research', '/writing',
       ...contentFiles('writing').filter((f) => !/^draft:\s*true\b/m.test(f.front)).map((f) => `/writing/${f.name}`),
       ...[...explained()].map((slug) => `/research/${slug}`),
     ].sort();
@@ -241,7 +225,7 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
   });
 
   // ── 1. EVERY INTERNAL LINK RESOLVES ──────────────────────────────────────────────────────────
-  // EVERY page, prototypes included — see the note on isProto for why there is no exclusion here.
+  // EVERY page, with no exclusion.
   //
   // IT USED TO CHECK ONLY THE HREFS CONTAINING A '#'. The loop opened with `if (hash === -1)
   // continue;`, which is a much narrower promise than the test's name implied, and the gap was not
@@ -364,35 +348,7 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
     }
   });
 
-  // ── 3. PROTOTYPE ROUTES ARE NOT INDEXABLE ────────────────────────────────────────────────────
-  it('emits robots=noindex and NO canonical on every proto route', () => {
-    const protos = pages().filter(isProto);
-    // Asserted, not assumed: if the routes are renamed away from the prefix this must go red rather
-    // than iterate an empty list and congratulate itself. A lower bound, not an exact count — the
-    // proto routes are a workflow, so gaining one is the expected case, not a regression.
-    //
-    // The floor is 1, and it was 4 until three of the four routes were retired (/proto-showpiece,
-    // /proto-paper, /proto-ladder — all answered questions; see tests/protoNoindex.test.ts for the
-    // full reason each went). Only /proto-sketches ships now. The number is a non-empty guard, not a
-    // census, so it does not need to track the count — but it must never become 0.
-    expect(protos.length, 'no proto-* routes found in dist/').toBeGreaterThanOrEqual(1);
-
-    for (const p of protos) {
-      const robots = /<meta\s[^>]*name="robots"[^>]*>/i.exec(p.html)?.[0] ?? '';
-      expect(
-        /noindex/i.test(robots),
-        `${p.file} has no robots=noindex. Pass noindex={true} to BaseLayout in the matching ` +
-          `src/pages/*.astro (see tests/protoNoindex.test.ts).`,
-      ).toBe(true);
-
-      // BaseLayout emits one OR the other, so a canonical here means the noindex is not in force —
-      // and a self-referential canonical on an internal prototype is a request to index it.
-      const canonical = /<link\s[^>]*rel="canonical"[^>]*>/i.exec(p.html)?.[0] ?? '';
-      expect(canonical, `${p.file} advertises a canonical URL: ${canonical}`).toBe('');
-    }
-  });
-
-  // ── 4. ONE H1, AND NO IMAGE WITHOUT ALT ──────────────────────────────────────────────────────
+  // ── 3. ONE H1, AND NO IMAGE WITHOUT ALT ──────────────────────────────────────────────────────
   it('gives every document exactly one <h1>', () => {
     for (const p of pages()) {
       // dist also holds the Google Search Console verification file: a one-line text file that
@@ -424,16 +380,11 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
     const bad = pages().flatMap((p) => [...p.markup.matchAll(/<table\b[^>]*\bclass="[^"]*\bsr-only\b[^>]*>/gi)].map(([t]) => `${p.file}: ${t}`));
     expect(bad).toEqual([]);
   });
-
-  /* (There is no separate 'resolves fragments on the proto routes too' test any more. It existed only to
-     make the `isProto` exclusion in check 1 a visible gap rather than a silent filter; the exclusion is
-     gone, so check 1 covers the proto routes directly and this was a strict subset of it — with a worse
-     failure message, since it reported one dead anchor per run instead of the whole family at once.) */
 });
 
 describe('the homepage intro ships on / and ONLY on /', () => {
   // MOVING THE INTRO UP INTO BaseLayout IS THE ONE EDIT that would hand a 5.2-second construction
-  // animation to every route — including /404 and the proto gallery. The retired first-visit gate
+  // animation to every route — including /404. The retired first-visit gate
   // verified the equivalent property by reading built HTML ("5 data-gate references on /, zero on the
   // other eight"), and this is that check for its replacement.
   //

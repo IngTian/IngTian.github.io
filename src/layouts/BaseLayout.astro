@@ -28,7 +28,7 @@ interface Props {
    * for the light theme.
    */
   navZone?: 'scroll' | 'light';
-  /** Set on non-content routes (404): emit robots=noindex and skip canonical. */
+  /** Set on non-content routes (404): emit robots=noindex and skip canonical. A /proto- route gets it without asking. */
   noindex?: boolean;
   /**
    * The style of the accent face (Fraunces) THIS page sets text in, to preload: `'normal'` or `'italic'`;
@@ -56,7 +56,7 @@ const {
   veil = true,
   page,
   navZone = 'scroll',
-  noindex = false,
+  noindex: noindexProp = false,
   preloadAccent,
   preloadMono = false,
 } = Astro.props;
@@ -67,6 +67,9 @@ const {
 // /projects social shares + canonicalization). new URL(...).href normalizes
 // the trailing slash for us. The 404 route skips canonical (it's noindex).
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
+// A /proto- route is an internal prototype, noindex by construction: no page can forget the prop and take the
+// canonical branch below, a request to index it. (astro.config.mjs keeps the same routes out of the sitemap.)
+const noindex = noindexProp || Astro.url.pathname.startsWith('/proto-');
 
 // JSON-LD Person — the one structured-data type a personal portfolio benefits
 // from, built from the résumé data so it never drifts from the visible content.
@@ -174,8 +177,8 @@ const personLd = {
         double-dash form restores byte-identical output. So when a comment here needs to name a utility class,
         write the CSS variable with its dashes or describe it — never the bare class name.
 
-        Preloaded everywhere, the other eight routes — /research, /research/<slug>, /writing, /projects,
-        /experience, /art, /404 and /proto-sketches — would fetch 82,184 bytes (36,560 + 45,624: the roman and the italic) at the
+        Preloaded everywhere, the other seven routes — /research, /research/<slug>, /writing, /projects,
+        /experience, /art and /404 — would fetch 82,184 bytes (36,560 + 45,624: the roman and the italic) at the
         HIGHEST priority, ahead of their own content, for a face no rule on them ever asks for. A preload for
         an unused resource is worse than no preload: it is bandwidth spent competing with the bytes that do
         get painted.
@@ -183,8 +186,8 @@ const personLd = {
         The @font-face rules themselves are NOT gated — <Font> always emits data.css, so --ff-fraunces stays
         resolvable everywhere and any page that later grows an accent rule still renders it (just discovered
         normally). Only the <link rel=preload> tags are conditional. Verified from dist: the two opted-in routes
-        carry one preload link each, `/` the roman and /writing/<slug> the italic; the other eight carry zero,
-        and all ten still carry the Fraunces @font-face block. */}
+        carry one preload link each, `/` the roman and /writing/<slug> the italic; the other seven carry zero,
+        and all nine still carry the Fraunces @font-face block. */}
     {/* The style narrows the preload to the one file the page uses. Astro's filter takes a list of variant
         predicates (see filterPreloads in astro/dist/assets/fonts/core/), so this emits one <link> and still
         leaves the full @font-face block in place — a page that shows the other style renders it, just

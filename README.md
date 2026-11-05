@@ -65,13 +65,13 @@ gets looked at in a browser — see CLAUDE.md for how.
 
 ```
 src/
-  pages/            9 routes: / · /research · /writing · /writing/<slug>
-                    /projects · /experience · /art · /404 · /proto-sketches
+  pages/            9 routes: / · /research · /research/<slug> · /writing
+                    /writing/<slug> · /projects · /experience · /art · /404
   layouts/          BaseLayout.astro — <head>, fonts, meta/OG/JSON-LD, the veil, nav
   sections/         Heights · Interlude · Choice · Rules · Solve · Story · Work
                     — the homepage in scroll order (Signature renders inside Work)
   components/       Deck · Toc · SideRail · CornerNav · TerrainHero · DescentPath
-                    proto/FluidSky.astro (the WebGL sky, on every page)
+                    FluidSky (the WebGL sky; not on /projects or /research)
   content/writing/  the writing pieces, as markdown (a new one is a FILE)
   content.config.ts the `writing` collection + its frontmatter schema
   data/             typed content: profile, nav, artworks, the slides' copy/numbers

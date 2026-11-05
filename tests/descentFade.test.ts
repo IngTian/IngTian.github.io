@@ -24,8 +24,7 @@ import { WAYPOINTS } from '../src/lib/trajectory';
  * graph no longer draws. The comment asserted the guarantee instead of providing it.
  *
  * Read as TEXT because DescentPath.astro is an Astro component whose `<script>` touches `document` at module
- * scope, so it cannot be imported here — the same arrangement, for the same reason, as artSizes.test.ts and
- * protoNoindex.test.ts. The regex not matching is itself a failure (asserted first, below), since otherwise
+ * scope, so it cannot be imported here — the same arrangement, for the same reason, as artSizes.test.ts. The regex not matching is itself a failure (asserted first, below), since otherwise
  * every spec in this file would pass vacuously.
  */
 const component = readFileSync(new URL('../src/components/DescentPath.astro', import.meta.url), 'utf8');

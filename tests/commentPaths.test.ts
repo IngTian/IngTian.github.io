@@ -25,8 +25,7 @@
 // THE HARD PART IS THAT A CORRECT COMMENT ALSO NAMES MISSING FILES, and the first version of this test got
 // that wrong. CLAUDE.md's rule is "say what is true rather than only deleting the false part", so deletions
 // here are documented ON PURPOSE: pages/index.astro explains that the terminal's `data/script.ts` went with
-// it, lib/capability.ts names the printer that used to sit beside it. Those sentences are the opposite of rot
-// and must not be flagged. So this does not ask "does every path exist" — it asks "does any path appear in a
+// it. Such sentences are the opposite of rot and must not be flagged. So this does not ask "does every path exist" — it asks "does any path appear in a
 // sentence claiming it is HERE". A deletion marker nearby means the prose already knows, and it passes.
 //
 // WHAT IT DELIBERATELY DOES NOT DO: it cannot judge a false claim about live code. The same audit found

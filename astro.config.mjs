@@ -108,8 +108,8 @@ export default defineConfig({
   // uninstalled. If an island is ever needed again, `npm i -D @astrojs/react react react-dom` and add
   // the integration back here — devDeps is the right home for a static build's tooling.
   integrations: [sitemap({
-    // Prototype routes carry noindex, but an unfiltered sitemap still advertises
-    // them to crawlers — and their rendered bodies quote internal review notes.
+    // A /proto- route is an internal prototype: BaseLayout gives it noindex, and this keeps the
+    // sitemap from advertising it to crawlers anyway.
     filter: (page) => !page.includes('/proto-'),
   }),
   // ── COMMENTS STAY IN SOURCE AND DO NOT SHIP, and it costs nothing to arrange: no integration, no build

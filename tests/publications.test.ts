@@ -1,6 +1,6 @@
 // tests/publications.test.ts
 // The publication records: what every surface that lists a paper reads (the /research cards, the homepage
-// appendix, the factor model's signal ids), so their shape and their honesty are pinned here once.
+// appendix, a paper's own page), so their shape and their honesty are pinned here once.
 import { describe, it, expect } from 'vitest';
 import { authorName, publications } from '../src/data/profile';
 

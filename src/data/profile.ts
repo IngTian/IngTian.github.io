@@ -15,7 +15,7 @@ export type PublicationStatus = 'preprint' | 'conference' | 'journal';
 export const STATUS_LABEL: Record<PublicationStatus, string> = { preprint: 'Preprint', conference: 'Conference paper', journal: 'Journal article' };
 
 export interface Publication {
-  slug: string;              // URL segment and stable id (signal ids: `publications:${slug}`)
+  slug: string;              // URL segment and stable id
   title: string;             // exactly as the paper prints it
   authors: Author[];
   status: PublicationStatus;
@@ -50,7 +50,7 @@ export type ProjectKind = 'research' | 'data' | 'tool' | 'engine' | 'art' | 'gui
 // Images are deliberately NOT on the record: vitest runs without Astro's vite, so a test importing this
 // file could not import an image. They are keyed by slug in their own module.
 export interface Project {
-  slug: string;            // the GitHub repo name; also the section id and the signal id
+  slug: string;            // the GitHub repo name; also the section id
   name: string;
   tier: ProjectTier;
   kind: ProjectKind;
@@ -105,7 +105,7 @@ export const timeline: TimelineEntry[] = [
 ];
 
 // Newest first. Each record is what every surface listing a paper reads: the /research cards, the homepage
-// appendix, and the factor model's signal ids.
+// appendix and a paper's own page.
 export const publications: Publication[] = [
   {
     slug: 'rl-bhrp',
