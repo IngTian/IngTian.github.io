@@ -20,16 +20,10 @@ import PlushCow from '../components/PlushCow.astro';
 
 const shownProjects = appendixProjects(projects);
 
-// ── THE WRITING COLUMN IS DERIVED, NOT PROMISED. This column said "coming" and carried
-// WRITINGS_PROMISE while /writing/favourite-quotes/ was published, in the nav and live — the homepage was
-// telling visitors the writing did not exist yet. The cause was that its state came from a hand-written
-// constant, so publishing a piece could not possibly update it: nothing linked the two.
-//
-// Reading the collection is what makes that class of lie impossible. `getCollection('writing')` filtered on
-// `!draft` is EXACTLY how src/pages/writing.astro decides what exists, so the homepage and /writing cannot
-// disagree about whether there is any writing — and the next piece is still just a file, with no code change
-// here. The `coming` state below is kept and is correct when the folder is genuinely empty; it is now a
-// consequence of the content rather than a claim about it.
+// ── THE WRITING COLUMN IS DERIVED, NOT PROMISED: a hand-written "coming" state once told visitors there was
+// no writing while a piece was live in the nav. `getCollection('writing')` filtered on `!draft` is EXACTLY how
+// src/pages/writing.astro decides what exists, so the two pages cannot disagree, and the next piece is still
+// just a file. The `coming` state below is correct when the folder is genuinely empty.
 const writings = (await getCollection('writing'))
   .filter((e) => !e.data.draft)
   // Newest first. Deliberately the same rule as sorted() in data/writing.ts — a plain compare on the

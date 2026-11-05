@@ -2,12 +2,9 @@
 //
 // ISOLINES OF THE HERO'S TERRAIN, for the homepage intro's survey pass.
 //
-// The intro's first act strokes a contour map onto a flat plane; the surface then rises out of it,
-// carrying these lines up with it. That only reads as ONE surface drawn twice if the lines are the real
-// isolines of the same `field()` the dots are painted from — which is what this module is for. The whole
-// design rests on it: a decorative line field is what got the previous entrance rejected as "boring", and
-// what got five showpieces before it rejected as looking like they meant something without meaning
-// anything.
+// The intro strokes a contour map onto a flat plane, and the surface then rises out of it carrying these
+// lines. That only reads as ONE surface drawn twice if they are the real isolines of the same `field()` the
+// dots are painted from: a decorative line field is what the site's rejected entrances and showpieces were.
 //
 // Separate from lib/descentPath.ts's `storyContours()`, which samples the same field over `storyBounds()`
 // for the career graph. Both call the shared kernel and level placement in lib/marchingSquares.ts.
@@ -61,20 +58,13 @@ let runsCache: [number, number][][][] | null = null;
 /**
  * Every level's runs, in level order — what the intro's survey pass strokes.
  *
- * MEMOISED, AND THE MEMO IS THE PERF STORY: the intro builds this once at ~10ms and then strokes from it
- * every frame for 5.2 seconds. Without it that is 10ms per frame, which is the single easiest way to make
- * the intro's opening janky. `tests/terrainContours.test.ts` asserts the identity (`toBe`, not `toEqual`)
- * and separately bounds what a build costs, by its pinned parameters rather than by a stopwatch.
+ * MEMOISED: the intro builds this once at ~10ms and strokes from it every frame for 5.2 seconds.
+ * `tests/terrainContours.test.ts` asserts the identity (`toBe`, not `toEqual`) and bounds what a build
+ * costs by its pinned parameters, not by a stopwatch.
  *
  * **THE RETURNED ARRAYS ARE SHARED AND READ-ONLY BY CONTRACT.** Nothing may mutate them.
  *
- * ONE CACHE, NO KEY — AND THAT IS A DELIBERATE SIMPLIFICATION. `terrainLevels(n)` and
- * `terrainContoursFor(level, res)` used to be parameterised, with a `${level}|${res}` cache key and four
- * tests exercising it. Production never passed either argument: there was one call site, right here,
- * using the constants declared above it. The parameters' only callers were the tests that tested the
- * parameters — this project's documented "a test is not a consumer" trap — and the key arithmetic came
- * with a real defect (see that test file's note on the `toFixed(4)` collision). If a second call site
- * with different parameters ever appears, re-introduce the key with it.
+ * ONE CACHE, NO KEY: there is one call site, with the constants above. Add a key with a second one.
  */
 export function introContours(): [number, number][][][] {
   if (!runsCache) {

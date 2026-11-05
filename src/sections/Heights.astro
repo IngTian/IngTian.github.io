@@ -174,10 +174,9 @@ for (const phrase of bio.strong) {
 
   /* THE HALOS FADE IN WITH THE SKY'S COLOUR, through the intro's first beat — and the rule is GATED ON
      THE CLASS, not on the custom property alone, which is a correctness requirement rather than a style.
-     These halos are near-white paper radial fades: they disappear into the warm sky and stand out badly
-     against a flat one. The owner's report was "the two big light backgrounds behind the text, that's
-     super weird" — a box drawn round the name. They are also unnecessary while the sky is flat, since a
-     halo protects text from a VARIED backdrop and one tone is not varied.
+     These halos are near-white paper radial fades: they disappear into the warm sky and stand out against
+     a flat one (the owner: "super weird"), where a halo, which protects text from a VARIED backdrop, has
+     nothing to do.
        `--intro-flatten` runs 1 -> 0 across beat 1. index.astro's pre-paint script sets it to 1 and
      FluidSky updates it per frame, as a root custom property, which costs no layout.
        WHY THE CLASS MATTERS: the property has a writer that can fail to run. FluidSky bails before its
@@ -265,22 +264,13 @@ for (const phrase of bio.strong) {
        `.terrain-canvas` is declared in TerrainHero.astro, so the element carries TerrainHero's scope hash
        (fgzhofvv) and not Heights' (b4o3h2vg) — Astro compiled this to
        `#heights[data-astro-cid-b4o3h2vg] .terrain-canvas[data-astro-cid-b4o3h2vg]`, which matched zero
-       elements on every route. The phone dim had never applied: the dotted terrain has been painting at full
-       opacity behind the name, the bio and the 11px incoming-PhD line on the first screen every phone
-       visitor sees, 2.5x more present than designed.
-       Not a contrast bug, as it happens — the paper legibility band below was measured at >= 4.5:1 with the
-       canvas already undimmed, because the dim was never in effect when it was tuned. It is a density bug.
-       The sibling `.hero-legibility` rule in this same block DOES match, which is why the breakage was not
-       obvious: half the phone treatment worked. */
+       elements on every route, so the phone dim never applied. (The legibility band was tuned with the canvas
+       undimmed, so this is density, not contrast.) */
     #heights :global(.terrain-canvas) { opacity: 0.4; }
   }
 
-  /* A `?seq=1` SPIKE USED TO LIVE HERE, holding every hero text animation (paused + opacity 0) until
-     TerrainHero removed the class at the intro's landing. Built on the owner's note that otherwise
-     "everything is competing for the same attention", and deleted rather than shipped: the H1 in this
-     block is `/`'s measured LCP element, so pausing it for the intro's 5.2s makes the animation's
-     duration the headline's LCP. The intro is affordable precisely because the text is independent of
-     it. If the sequencing is wanted later, shorten the intro — do not pause the LCP. */
+  /* The hero text is not held for the intro: the H1 is `/`'s LCP (CLAUDE.md, the `?seq=1` spike).
+     Want the sequencing? Shorten the intro; do not pause the LCP. */
 
   @media (prefers-reduced-motion: no-preference) {
     .hero-rise { animation: hero-rise 1.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
@@ -290,11 +280,9 @@ for (const phrase of bio.strong) {
       to   { opacity: 1; transform: translate3d(0, 0, 0); }
     }
 
-    /* THE TAGLINE ARRIVES LAST, on its own beat. On the tagline slide it rose in on a staggered scroll
-       range; folded into the name block it inherited that block's single fade and stopped reading as a
-       separate thought — the owner noticed it as a dropped animation, and it was. This restores the beat:
-       the name and role line land, then the tagline follows a third of a second later, which is also when
-       the marker-wash hint begins (1.1s) so the arrival and the invitation are one gesture.
+    /* THE TAGLINE ARRIVES LAST, on its own beat (the owner noticed it missing when it shared the name
+       block's fade): the name and role line land, then the tagline a third of a second later, as the
+       marker-wash hint begins (1.1s), so the arrival and the invitation are one gesture.
        It animates its OWN opacity, so it must not fight the parent's: .hero-rise finishes at opacity 1, and
        this starts after it. */
     .hero-doors-line { animation: hero-rise 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.62s both; }

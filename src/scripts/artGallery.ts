@@ -176,7 +176,7 @@ function updateToc() {
 // handler rather than adding a second scroll listener, which is how the same fix stays one mechanism.
 const tocEl = document.getElementById('art-toc');
 const descentEl = document.querySelector<HTMLElement>('.descent');
-// Matches CornerNav's threshold, so the two marks change register together rather than a screen apart.
+// Not CornerNav's 0.57: that probes at the top of the viewport, and this rail sits at the middle (above).
 const DARK_FROM = 0.42;
 function updateTocZone() {
   if (!tocEl || !descentEl) return;

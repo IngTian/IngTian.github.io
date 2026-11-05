@@ -31,6 +31,8 @@ export const STORY: StoryColumn[] = [
       'Nine roles, four companies, systems that held at fifty thousand requests a second. ' +
       'By every visible measure that is a good place to stand, and the field around it is flat: ' +
       'every direction out looks like more of the same, slightly worse.',
+      // FLAGGED FOR THE OWNER: "a thousandth" is a typed measurement of the invented field, the kind of
+      // figure STORY_FIGURES (below) was deleted for. Nothing computes or tests it.
       'That flatness is the trap, and it is measurable rather than poetic. In the engineering ' +
       'basin the surface bends almost equally in every direction, so no step tells you much — ' +
       'the gradient there is a thousandth of what it is on the research side. Years can pass ' +
@@ -64,17 +66,8 @@ export const STORY_CODA =
   'The deepest point on that surface is not marked, because I do not know where it is. ' +
   'What I know is the direction, and that the descent is still running.';
 
-// STORY_TAIL is deleted. It was a replacement closing line for this column, and it inherited the exact bug
-// it was meant to work around: the column is taller than one screen, so its last line sits below the deck's
-// resting fold and the next gesture jumps the whole slide. Anything at the foot of that column is
-// unreachable by normal scrolling — so the column now simply ends with its last body paragraph, and the
-// coda above is the closing line, over in the drawing where it can actually be read.
+// NOTHING GOES AT THE FOOT OF A COLUMN: it is taller than one screen, so its last line sits below the deck's
+// resting fold and the next gesture jumps the slide (a closing line there, STORY_TAIL, was deleted for that).
 
-// STORY_FIGURES is deleted. It held three "measured facts" — feedback ratio, climb to leave, blind stops
-// — computed at build time from the hero's field. The computation was real; the field is invented. So the
-// page printed exact numbers about a fiction in a place where a reader would take them for facts about a
-// career, which is a worse failure than having no numbers at all: it borrows the authority of measurement
-// for something unmeasured. The owner's call, and the right one.
-//
-// The graph still draws from those same modules — the difference is that a drawing of an invented surface
-// reads as an illustration, while "260x" reads as a claim.
+// STORY_FIGURES was deleted on the owner's call: three exact "measured facts" computed from the hero's field,
+// which is invented. A drawing of an invented surface reads as an illustration; "260x" reads as a claim.

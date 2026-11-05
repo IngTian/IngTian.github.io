@@ -4,11 +4,11 @@
 // The owner's brief: "like a PPT, one scroll guides you to the next slide. It's not a free scroll."
 //
 // WHY THIS IS NOT CSS SCROLL-SNAP. That was tried first and MEASURED, because it is the cheap answer
-// and it looked like it should work. It cannot, at this page's proportions:
+// and it looked like it should work. It cannot, at this page's proportions (measured at 1700x1050 on an
+// earlier slide order; the arithmetic, not the order, is the point):
 //
-//   slide gaps (1700x1050):  heights→interlude 1134px   interlude→story 819px
-//                            story→mountains  2279px   mountains→ground 2346px
-//   one wheel gesture:       ~320px  — i.e. every gap is 1.8x to 7.3x a single scroll
+//   slide gaps:          819px to 2346px
+//   one wheel gesture:   ~320px  — i.e. every gap is 1.8x to 7.3x a single scroll
 //
 // With `scroll-snap-type: y mandatory`, one gesture proposes a destination ~320px away, and the
 // nearest snap position to that destination is the slide it just left — so the browser snaps back and

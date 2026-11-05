@@ -146,7 +146,9 @@ export function barrier(a: Basin, b: Basin, samples = 200): { height: number; t:
   return { height, t };
 }
 
-/** The story's measured facts, for the page to state rather than assert. */
+/** The measured facts the live story's claims (two basins, one climb) rest on. DescentPath reads the two
+ *  basins; `gap`, `barrierHeight`, `climbRequired` and `staysStuck` are stated by no page and asserted by
+ *  tests/trajectory.test.ts against the live field — a check on the copy, not dead fields. */
 export interface TrajectoryFacts {
   globalBasin: Basin;
   localBasin: Basin;

@@ -1,33 +1,19 @@
 // src/lib/descentPath.ts
 // THE CAREER AS A DESCENT — geometry for the part-1 graph, in 2D plan and 3D oblique.
 //
-// Pure: no canvas, no DOM. Two projections over one path, so the same waypoints can be compared
-// flat (a survey map, where the barrier's contours are legible) and in relief (where the climb is
-// physically obvious). The owner asked for both so he can judge which reads better.
+// Pure: no canvas, no DOM. `project()` has two projections over one path, flat (a survey map, where the
+// barrier's contours are legible) and in relief; the page renders plan only, the owner's choice
+// (DescentPath.astro).
 //
-// WHAT CHANGED AND WHY, because two of these are honesty fixes rather than polish:
+// THE GLOBAL MINIMUM IS NOT LABELLED AND THE PATH STOPS SHORT OF IT: placing the PhD at the deepest point
+// would assert arrival at the optimum. The owner: "I have no idea where the global min is. Maybe a future
+// quant researcher." So it is a soft, unlabelled attractor the trail heads toward. The bounds come from the
+// waypoints plus the two basins, so the path fills the frame by construction.
 //
-// 1. THE GLOBAL MINIMUM IS NOT LABELLED AND THE PATH STOPS SHORT OF IT. An earlier draft put the
-//    PhD exactly at the field's deepest point, which asserts arrival at the optimum. His own
-//    correction: "I have no idea where the global min is. Maybe a future quant researcher." So the
-//    deepest point is drawn as an unknown — a soft, unlabelled attractor the trail is heading
-//    toward and has not reached.
-// 2. FIT THE PATH TO THE FRAME. The first render crammed everything into the top-right corner
-//    because the projection was centred on the field, not on the path. The bounds now come from
-//    the waypoints themselves plus the two basins, so the composition is filled by construction.
+// Same field() as the hero, different subject: the hero shows an anonymous field with anonymous walkers,
+// this shows ONE named trajectory with its barrier called out — a career, not a surface.
 //
-// A reviewer also caught that contours of terrain.ts's own field() are the hero's object with
-// different hatching. That criticism is right for a REPLACEMENT of the hero. It is not right for
-// this: the hero shows an anonymous field with anonymous walkers, and this shows ONE named
-// trajectory with its barrier called out. Same field, different subject — a career, not a surface.
-// The section header should say so plainly rather than pretend the field is new.
-
-// `grad` was imported here too and never called. It is genuinely not needed: this module reads the
-// field's HEIGHT (to lift the oblique projection, to place contour levels, to decide where the trail
-// climbs) and never its slope — the descending is done in trajectory.ts, whose settle() owns the
-// gradient steps. The import was harmless at runtime but not free to a reader: it advertised that the
-// career graph does its own optimisation, which is the one thing about this file that would be worth
-// knowing and is false. Dropped when noUnusedLocals went on.
+// This module reads the field's HEIGHT and never its slope: the descending is trajectory.ts's settle().
 import { field, RANGE } from './terrain';
 import { isoRuns, isoLevels } from './marchingSquares';
 import { WAYPOINTS, trajectoryFacts, type Waypoint } from './trajectory';

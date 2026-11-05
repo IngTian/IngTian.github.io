@@ -9,7 +9,7 @@
 // the page's real proportions. Slide gaps are 819-2346px while one wheel gesture is ~320px, so
 // `scroll-snap-type: y mandatory` re-snapped to the slide it started from and the page froze at y=84
 // through eight consecutive gestures. `proximity`, `scroll-snap-stop: always`, and a hero shrunk to
-// exactly 100vh all measured identically stuck. The full numbers are in global.css and lib/deck.ts.
+// exactly 100vh all measured identically stuck. The full numbers are in lib/deck.ts.
 //
 // WHAT THIS DELIBERATELY DOES NOT BREAK, because hijacking the wheel is the easiest way to ruin a page:
 //   · keyboard — Home/End/PageUp/PageDown/space/arrows keep working, and Tab focus is never fought
@@ -20,8 +20,8 @@
 //     a finished state, not a degraded one
 //   · trackpad momentum — a gesture is coalesced, so one flick is one slide rather than five
 //
-// No island — the site has none since the terminal was deleted (CLAUDE.md, Stack). Vanilla script, re-inits on astro:page-load with a
-// teardown, matching TerrainHero / DescentPath.
+// A vanilla script, no island (CLAUDE.md, Stack): it re-inits on astro:page-load with a teardown, like
+// TerrainHero and DescentPath.
 ---
 <script>
   import { deckStops, nextStop, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide } from '../lib/deck';
@@ -35,36 +35,21 @@
     // reader who asked for less motion gets the plain scroll.
     if (prefersReducedMotion()) return null;
 
-    // ── THE DECK DOES NOT ENGAGE ON A PHONE. Its contract is "one gesture, one slide, and every slide owns
-    // the screen", and on a phone that contract is simply false: measured in real WebKit, 5 of the 7 slides
-    // are TALLER than the viewport — rules 1.84 screens, story 3.07 on an iPhone 14; 2.5 and 4.2 on an SE.
-    // A deck whose slides do not fit cannot rest at slide boundaries, so it rests INSIDE them, and every
-    // symptom the owner reported follows from that:
-    //   · body text resting under the fixed nav at 7 of 15 stops (11 of 19 on an SE). The panels' 78px of
-    //     padding only clears the nav when a slide's TOP is at the viewport top — true at the 8 slide-opening
-    //     stops, false at every interior one, which is exactly the split the measurements show.
-    //   · one swipe scrolled twice. The touch listeners below are { passive: true } and therefore CANNOT
-    //     preventDefault — confirmed in WebKit, where a passive preventDefault() left defaultPrevented false
-    //     and touch-action computed to `auto` on html, body and main. So iOS runs its own momentum scroll
-    //     while go() runs a smooth scrollTo to a stop, and the two fight.
-    //   · a light flick going nowhere. Under the 44px SWIPE threshold go() is never called, so the native
-    //     scroll simply stands and nothing re-snaps: a 30px flick rested 30px off-stop on an iPhone 14 and
-    //     95px off on an SE, still there 4 seconds later.
-    //   · one swipe advancing two stops, skipping a screen of an explainer.
-    // Turning the deck off removes all four at once, and it removes them by deleting behaviour rather than
-    // adding compensation. The phone then gets the ordinary free scroll — which is not a degraded state but
-    // the same finished one that reduced-motion readers already get, and the same one this file has always
-    // documented as such.
+    // ── THE DECK DOES NOT ENGAGE ON A PHONE. Its contract, "every slide owns the screen", is false there:
+    // measured in real WebKit, 5 of the 7 slides are TALLER than the viewport (rules 1.84 screens, story 3.07
+    // on an iPhone 14; 2.5 and 4.2 on an SE). So it rests INSIDE slides, and each reported symptom follows:
+    //   · text under the fixed nav at 7 of 15 stops (the panels' 78px clears it only at a slide's top);
+    //   · one swipe scrolling twice: the touch listeners are { passive: true }, so they cannot preventDefault,
+    //     and iOS's momentum scroll fights go()'s scrollTo;
+    //   · a flick under the 44px SWIPE threshold resting off-stop (30px on an iPhone 14, 95px on an SE);
+    //   · one swipe advancing two stops.
+    // Turning the deck off removes all four by deleting behaviour, not adding compensation: the phone gets the
+    // ordinary free scroll, the same finished state reduced-motion readers get.
     if (isPhone()) return null;
 
-    // Slide elements: the top-level sections, full stop.
-    //
-    // This used to split the story panel into its two beats (graph, then editorial), because they were
-    // stacked and the panel was 2.17 viewports of two distinct things. They are now ONE section — the
-    // graph sticky in a column beside the writing — so splitting it would be wrong twice over: the two
-    // beats overlap vertically, and a stop on the sticky column measures the STUCK position rather than
-    // a place in the document. The section is taller than a screen, which deckStops already handles by
-    // paging through it.
+    // Slide elements: the top-level sections, full stop. Story is NOT split into graph and editorial: the
+    // two overlap (the graph is sticky beside the writing), and a stop on the sticky column would measure
+    // its STUCK position. Being taller than a screen, it is paged by deckStops.
     function slideEls(): HTMLElement[] {
       return Array.from(main!.children).filter(
         (el): el is HTMLElement => el instanceof HTMLElement && el.tagName === 'SECTION',
@@ -119,17 +104,9 @@
       target = null;
     }
 
-    // ── THE TRANSITION IS OURS NOW, not the browser's, and the reason is measured.
-    //
-    // The owner, watching his own screen recording: "you notice the sudden change of slides instead of a smooth
-    // transition?" He was right, and it was never a regression — `behavior: 'smooth'` has been here since the
-    // commit that created the deck. It is the browser's curve that is wrong for this: measured on that clip
-    // (578 frames, 55.8fps), a slide took ~500ms but reached near-peak velocity within ~35ms of standstill. A
-    // hard launch and a soft landing is exactly what "sudden" describes.
-    //
-    // Native smooth scroll also cannot be CANCELLED — there is no API to stop one in flight — which is the
-    // second defect in the recording: transitions that double-humped, because a new scroll began while the old
-    // one was still running and the page lurched. Owning the animation makes that one cancelAnimationFrame.
+    // ── THE TRANSITION IS OURS, not the browser's. Native smooth scroll reaches near-peak velocity within
+    // ~35ms of a ~500ms slide (measured on the owner's recording: "the sudden change of slides"), and it
+    // cannot be CANCELLED, so a new scroll over a running one lurched. Owning it is one cancelAnimationFrame.
     //
     // `behavior: 'instant'` on each step is load-bearing: global.css sets `html { scroll-behavior: smooth }`, so
     // a plain scrollTo would hand every one of our ~40 frames to the browser's own smoothing and the two curves
@@ -177,7 +154,7 @@
       if (Math.abs(e.deltaY) < THRESHOLD) return;
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;  // horizontal gesture
 
-      // Let anything scrollable in its own right (the terminal's log, a code block) scroll itself.
+      // Let anything scrollable in its own right (a code block, a table's own box) scroll itself.
       if (isInnerScrollable(e.target, e.deltaY)) return;
 
       // Was a gesture ALREADY in flight before this event? Captured before the flag is re-armed below,

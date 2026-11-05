@@ -6,13 +6,12 @@
 // an example. Very concrete example. Maybe we can't even state this in one slide. Maybe we can first explain
 // what is portfolio optimization?"
 //
-// THE AUDIT THAT MADE THIS NECESSARY. The previous version of this slide opened with "Every month, decide how
-// much of each to own" — which ASSUMES the concept. Grepping the built page confirmed nothing anywhere said
-// what a portfolio is, what optimising one means, or what "multi-period" adds. A reader with no finance
-// background had no way in, which is fatal for the one slide that is supposed to let them in.
+// IT DEFINES RATHER THAN ASSUMES: nothing else on the site says what a portfolio is, what optimising one
+// means, or what "multi-period" adds, and a reader with no finance background needs a way in.
 //
 // AND IT DOES FIT ON ONE SLIDE, but only because the EXAMPLE does the defining and the prose only labels what
-// is already on screen. Three beats over ONE object — a hundred dollars in a bar:
+// is already on screen. Three beats over ONE object — a hundred dollars in a bar — and a fourth that shows the
+// consequence (BEAT4: different decisions in time, as PnL curves):
 //    1. a portfolio IS this            -> the bar divides four ways
 //    2. optimising it is choosing      -> the same bar, split three other ways, with what each is worth after
 //                                         one piece of news
@@ -56,11 +55,6 @@ const quarters = QUARTER_MARKS.filter((q) => q.week > 0).map((q) => ({
 // that matters here, and it is deliberately NOT the same as the highest curve.
 const bestRatio = runs.reduce((b, r) => (r.returnPerRisk > b.returnPerRisk ? r : b));
 const levered = runs.find((r) => r.key === 'levered');
-// `topReturn` (the highest final value) and `deepest` (the worst fall) used to be computed here and went when
-// noUnusedLocals went on. They were the two ends of an earlier verdict that named its own extremes; the closing
-// sentence now makes the same point WITH the levered row instead, because a reduce over `runs` that picks the
-// biggest number is not the argument — "you paid $X to borrow and fell Y%, while this reached less on a smaller
-// fall" is. Both are one line to recompute if the prose ever wants them again.
 // Grouped by who actually holds these books, because that division is the point of the beat.
 const retail = runs.filter((r) => r.kind === 'retail');
 const institutional = runs.filter((r) => r.kind === 'institutional');
@@ -441,14 +435,9 @@ const allBeats = [...BEATS, BEAT4];
   .ch-seg--1 { background: var(--c-h1); }
   .ch-seg--2 { background: var(--c-h2); }
   .ch-seg--3 { background: var(--c-h3); }
-  /* THERE IS NO TRANSITION ON .ch-seg, AND THE COMMENT THAT USED TO BE HERE DESCRIBED ONE THAT COULD NEVER
-     FIRE. It read: "the bar re-dividing between months is the visual of choosing again, so the segments move
-     rather than cut", with `transition: left .6s, width .6s`. But every segment's `left`/`width` is a
-     BUILD-TIME inline style (see the panels at :139/:172/:182/:207) and no script ever writes either — each
-     month is a separate panel that crossfades in, so no segment's geometry ever changes and the transition
-     had nothing to interpolate. Deleted rather than made true: making it real means one persistent bar whose
-     segments are re-measured per month, which is a different slide. The panels crossfade; that is the
-     design. */
+  /* NO TRANSITION ON .ch-seg: every segment's `left`/`width` is a build-time inline style that no script
+     writes, and each month is its own panel that crossfades in, so a transition would have nothing to
+     interpolate. Segments that move would be one persistent, re-measured bar: a different slide. */
 
   .ch-legend {
     list-style: none; margin: clamp(12px, 1.8vh, 18px) 0 0; padding: 0;

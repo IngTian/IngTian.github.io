@@ -1,24 +1,8 @@
 // src/lib/complexity.ts
 // THE SIZE OF THE PROBLEM — what the Limits slide is actually about.
 //
-// The owner's redirect, and it reframes the whole slide: "a graph is not illustrative here. the constraints are
-// complex and internally connected… essentially this slide just needs to present how complex the situation is.
-// that's the whole point. the first slide let people understand what it is, the second one introduce the immense
-// complexity."
-//
-// So the slide is not a geometry lesson. Its job is SCALE, in the order the owner named:
-//   1. you run $1bn+ — your picks are constrained, and your slippage is now measurable
-//   2. name a few constraints
-//   3. draw the trajectories the names might take — thousands of them, a legible subset drawn
-//   4. so: how do you account for a stochastic future, obey every rule, and still optimise?
-//
-// WHY THE PREVIOUS DRAWINGS WENT. The triangle and the path lattice were both real and exact, and both answer
-// "what is the feasible set" — a question a reader who has never been told no does not have. They also both
-// shrink something, which reads as tidying up rather than as difficulty. The point is the opposite: the problem
-// gets BIGGER the closer you look.
-//   Both modules are DELETED, with their specs. This said "kept, unreferenced, so nothing verified is lost and
-// either can come back"; it was not true, and the same false claim sat in sections/Rules.astro — see the longer
-// note there.
+// The slide's brief, its four beats and why its earlier drawings were deleted are in sections/Rules.astro's
+// header. This is its arithmetic.
 //
 // EVERYTHING HERE IS EITHER CITED OR COMPUTED:
 //   * the 5% ownership-disclosure threshold is the real SEC 13D/G number

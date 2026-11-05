@@ -70,8 +70,9 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
        everywhere to fix one string. */
     max-width: 200px;
     padding-left: 30px;
-    /* The dash's strength: ink-1 at 55% clears 3:1 as a mark on every rail page's ground (worst measured, 3.74:1
-       over the light reading sky; tests/paperPalette.test.ts and tests/draftingPalette.test.ts hold the sheets).
+    /* The dash's strength: ink-1 at 55% clears 3:1 as a mark on every rail page's ground (worst computed, 3.28:1
+       on the homepage's light tan panel; 3.74:1 measured over the light reading sky). tests/deckPalette.test.ts,
+       tests/paperPalette.test.ts and tests/draftingPalette.test.ts hold the panels and the sheets.
        It is the alpha of the dash's colour, not its opacity, so a register can ring the dash with an opaque knockout. */
     --mk: 55%;
   }
@@ -161,7 +162,7 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
   @media (prefers-reduced-motion: no-preference) and (hover: hover) {
     .side-rail a.is-hover .lbl { transform: translateX(2px); }
   }
-  /* THE ENTRANCE, once per page view (a ClientRouter arrival renders a new rail, so it plays there too): every row in
+  /* THE ENTRANCE, once each time the rail renders (a ClientRouter arrival renders a new rail; on `/`, see below): every row in
      from 6px left, --row long and --i x --gap late (both set by the frontmatter, so the last row is in by RAIL.enter).
      CSS, so it runs from the first frame with nothing to wait for, and the backwards fill holds each row in its
      from-state through its delay. A CSS animation restarts when its element is rendered again, so a rail hidden at
@@ -186,7 +187,7 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
 
 <script>
   // The rail's script: which stops are marked (lib/scrollspy's railMarks, measured on every scroll frame) and the
-  // motion between marks, ported from the v4 prototype. Only transform and opacity move, each thing once:
+  // motion between marks, ported from the v4 prototype. Only transform and opacity move, once per change of mark:
   // - ONE dash moves, the lead's. When the lead changes, its dash slides from wherever the old one is (at rest or
   //   mid-flight) and grows to its length; with nowhere to slide from, it grows in place. Any other current stop
   //   takes the quiet mark, fading in and out where it stands. So a section boundary in the reading band is one

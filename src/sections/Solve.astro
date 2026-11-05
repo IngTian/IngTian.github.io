@@ -1,20 +1,17 @@
 ---
 // src/sections/Solve.astro
-// SLIDE 3 OF 3 — THE METHOD, as the algorithm actually running.
+// SLIDE 3 OF 3 — WHERE TO START: "Still an open problem." (OPEN_HEADING in data/desk.ts), a few general
+// directions of attack as tabs, and beside them a figure of what CAN be solved exactly: a world small enough
+// to be handed over complete.
 //
-// The owner's brief: "the last slide animate a 3D route in a Bellman propagation of many that we highlight as
-// our goal."
+// The figure is the owner's brief ("animate a 3D route in a Bellman propagation of many that we highlight as
+// our goal"): states of the book across time, values propagating BACKWARD (you cannot know today's best move
+// until you know what tomorrow is worth), then the optimal route lighting FORWARD past the candidates it beat.
+// It is evidence of how small a solvable world is, not the method running (see the figcaption's note).
 //
-// So this is the Bellman lattice: states of the book across time, values propagating BACKWARD (which is
-// literally what dynamic programming does — you cannot know today's best move until you know what tomorrow is
-// worth), then the optimal route lighting FORWARD through the candidates it beat.
-//
-// WHY THIS IS NOT THE SIXTH REJECTED SHOWPIECE. Every one of the five failures was a drawing that looked like
-// it meant something without meaning anything, and three of them were hand-drawn props. This is neither: the
-// surface is a real finite-horizon dynamic program solved by backward induction, and lib/bellman.ts's tests
-// assert the Bellman optimality condition at EVERY node, that the traced route achieves exactly the value the
-// DP promises, and that it beats all 29 enumerated candidate policies. If the maths is real, the animation
-// teaches the method rather than decorating it.
+// NOT A SIXTH REJECTED SHOWPIECE: the surface is a real finite-horizon dynamic program, and lib/bellman.ts's
+// tests assert the optimality condition at EVERY node, that the traced route achieves the value the DP
+// promises, and that it beats every enumerated candidate.
 //
 // Hand-rolled oblique projection rather than three.js — ships no bytes, and a parallel projection keeps
 // heights comparable across the lattice, which matters when the height IS the value being compared.
@@ -63,11 +60,10 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
       <p class="so-kicker">3 / 3 · where to start</p>
 
       <div class="so-split">
-        {/* ── WHAT IS OPEN, AND WHERE IT WOULD BE ATTACKED.
-             No equation here any more. An earlier version made the Bellman recursion this slide's spine, which
-             asserts a formulation and a solution on a problem that has neither — see data/desk.ts for the
-             owner's correction verbatim. The difficulty slide already owns that recursion, where it is true
-             because it is the thing that blows up. */}
+        {/* ── WHAT IS OPEN, AND WHERE IT WOULD BE ATTACKED. No equation: the Bellman recursion as this slide's
+             spine asserts a formulation and a solution on a problem that has neither (data/desk.ts has the
+             owner's correction verbatim). The difficulty slide owns that recursion, where it is true because
+             it is the thing that blows up. */}
         <div class="so-say">
           <h2 id="so-heading" class="so-head">{OPEN_HEADING}</h2>
 
@@ -135,9 +131,8 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
       </div>
 
       {/* THE SELECTOR IS THE DISCIPLINES, in the owner's own words: "from RL, with math, or, stochastic
-           process, probability, as the backbone". It used to be the terms of an equation, which died with the
-           equation. Same affordance and position as slide two's band, but what you click is a direction of
-           attack rather than a numbered beat. */}
+           process, probability, as the backbone". Same affordance and position as slide two's band, but what
+           you click is a direction of attack rather than a numbered beat. */}
       <ol class="so-terms" aria-label="A few general methodologies">
         {METHODOLOGIES.map((m, i) => (
           <li>
@@ -167,8 +162,8 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     display: grid; align-content: center;
   }
 
-  /* ── THE EQUATION WALK. One equation, four annotations, one visible at a time — the same overlay pattern the
-     other two slides use for their panels, so the height is set by the tallest and nothing jumps. */
+  /* ── THE MOVES. One methodology panel visible at a time — the same overlay pattern the other two slides use
+     for their panels, so the height is set by the tallest and nothing jumps. */
   .so-textbox { display: grid; }
   .so-textbox > * { grid-area: 1 / 1; }
   .so-panel { opacity: 0; pointer-events: none; }
@@ -178,13 +173,8 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
   :global(html.solve-js) .so-panel:first-child { opacity: 0; pointer-events: none; }
   :global(html.solve-js) .so-panel.is-on { opacity: 1; pointer-events: auto; }
   @media (prefers-reduced-motion: no-preference) {
-    /* .5s, MATCHING Choice and Rules, and that is the whole fix. The owner: "where to start doesn't have the
-       smooth inter tab animation as other slides." He was right, and the cause was not a missing transition —
-       this one was 260ms while `.ch-panel` and `.ru-panel` are both `.5s ease`. Nearly twice as fast, on a
-       crossfade between two stacked panels, reads as a pop rather than a dissolve: at 260ms the outgoing text is
-       still legible when the incoming text is already solid, so the eye sees two states rather than one moving
-       between them. The stacking was never the problem (.so-textbox is a one-cell grid, like the others).
-       Three slides that share an interaction must share its timing, or the third one feels broken. */
+    /* .5s, MATCHING `.ch-panel` and `.ru-panel`: three slides that share an interaction share its timing. At
+       260ms the crossfade read as a pop (the owner: "doesn't have the smooth inter tab animation"). */
     .so-panel { transition: opacity .5s ease; }
   }
 
@@ -284,11 +274,6 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     font-size: clamp(20px, 1.8vw, 30px); line-height: 1.24;
     color: var(--panel-ink); margin: 0 0 clamp(14px, 2vh, 22px); max-width: 32ch; letter-spacing: -0.008em;
   }
-  /* (.so-body and the .so-tools list are gone with their markup. The slide used to carry a paragraph of prose
-     and a named list of "the tools this uses" beside the lattice; both went when the copy moved into the
-     term-definition strip and the lattice took the whole figure column. Deleted rather than parked, so the
-     sheet only describes elements this section actually renders.) */
-
   /* Tall enough for the surface to read as a surface: at 340px the lattice's depth collapsed and the twelve
      time-slices crowded into a band. */
   .so-chart { width: 100%; height: clamp(300px, 50vh, 520px); display: block; }
@@ -416,15 +401,12 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
     const read = section.querySelector<HTMLElement>('[data-read]');
     if (!ribs.length || !cands || !opt || !read) return null;
     document.documentElement.classList.remove('no-lattice-js');
-    // Announces that the equation walk has a driver, which is what lets the CSS stop showing move one outright.
+    // Announces that the moves have a driver, which is what lets the CSS stop showing move one outright.
     document.documentElement.classList.add('solve-js');
 
 
-    // ── FOUR MOVES ON ONE EQUATION, and the lattice follows them.
-    //
-    // The owner asked to reuse this drawing, and it turns out the old one-shot timeline already ran in exactly
-    // four phases (mesh backward, candidates, route forward, settled) — so the moves map onto it 1:1 rather than
-    // needing a new animation. What changes is that a reader can now DRIVE it: the phases became states.
+    // ── THE MOVES, and the lattice follows them: its four phases (mesh backward, candidates, route forward,
+    // settled) map 1:1 onto the four tabs, so a reader can DRIVE it.
     //
     // One walk drives all three explainer slides (scripts/beats.ts), so they feel like one instrument:
     // auto-advance, click to freeze, and frozen stays frozen. The dwells are each slide's own: here 4200ms to the

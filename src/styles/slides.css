@@ -5,9 +5,9 @@
    colour only it draws (Choice's charts, Story's graph lines).
 
    The ground follows the theme, on every panel: a slide kept dark in the light theme read as a bug, not as emphasis
-   (CLAUDE.md, Rejected). Light is a toned printing stock, not bright paper. Past the tagline the sky is already
+   (CLAUDE.md, Rejected). Light is a toned printing stock, not bright paper. Past the Interlude the sky is already
    warm-dark (measured at the seam: rgb(115,115,123), luminance 0.173), so a bright #efe7d8 panel (0.805) snapped
-   back to full light there, a 4.5x jump; #c4b7a1 (0.482) is 2.4x, with the ink at 8.7:1. Dark is a slate a shade
+   back to full light there, 3.8:1 against the sky; #c4b7a1 (0.482) is 2.4:1, with the ink at 8.7:1. Dark is a slate a shade
    above --bg, so the panel is felt rather than seen.
 
    The ground and inks are the panel's own, never the global ramp (--paper, --ink-*): --paper is the sky's text

@@ -10,11 +10,8 @@ const bubbles = JSON.stringify([
 ]);
 ---
 {/* `data-intro` marks the surface that carries the first-open animation. Nothing in the page reads it:
-    it exists so tests/distSmoke.test.ts can assert the intro ships on `/` and ONLY on `/`. Moving this
-    component — or BaseLayout growing its own copy — is the single edit that would hand a 5.2-second
-    construction animation to every route, /404 included, and that assertion
-    is the thing that would notice. An attribute rather than a class, because a class would read as a
-    styling hook that nothing styles. */}
+    tests/distSmoke.test.ts asserts it ships on `/` and only there, which is what would notice this component
+    (or a copy in BaseLayout) handing the 5.2s intro to every route. An attribute, as nothing styles it. */}
 <canvas id="terrain" class="terrain-canvas" aria-hidden="true" data-intro data-bubbles={bubbles}></canvas>
 <div class="terrain-bubble" id="terrain-bubble" aria-hidden="true"></div>
 
@@ -35,16 +32,9 @@ const bubbles = JSON.stringify([
   }
   .terrain-bubble.show { opacity: 1; transform: none; }
   .terrain-bubble.word { font-family: var(--font-display); font-style: italic; font-size: 16px; }
-  /* :global() ON THE DESCENDANTS, because the script creates them and scoped rules cannot reach them.
-     Both `.m` and `math` come from `bubbleEl.innerHTML = b.word || b.mathml` below, out of the data-bubbles
-     JSON built in the frontmatter — so neither node is in this component's template and neither can carry
-     its scope hash. Astro compiled these to `.terrain-bubble[cid] .m[cid]` and `.terrain-bubble[cid]
-     math[cid]`, which match nothing in dist on any route: the Moo glyph has been unstyled (wrong colour,
-     still italic from `.terrain-bubble.word`) and the three MathML bubbles have had neither their colour nor
-     their 1.05em.
-     DescentPath.astro's ":global ON THE CHILD" note documents this exact failure for its own
-     script-created emphasis nodes and fixes it the same way; this is the instance that was missed. The parent stays scoped because the bubble
-     div IS in the template — going global on the whole selector would leak. */
+  /* :global() ON THE DESCENDANTS: `.m` and `math` come from `bubbleEl.innerHTML` below, so they carry no
+     scope hash and a scoped rule would match nothing (DescentPath.astro's ":global ON THE CHILD" note).
+     The parent stays scoped, as the bubble div is in the template; going global on it would leak. */
   .terrain-bubble :global(.m) { color: color-mix(in oklab, var(--on-accent) 70%, var(--indigo)); font-style: normal; }
   .terrain-bubble :global(math) { color: var(--on-accent); font-size: 1.05em; }
 </style>
@@ -80,25 +70,14 @@ const bubbles = JSON.stringify([
     //   light = Classic — the shipped paper glow, ochre settle, indigo trail
     if (document.documentElement.dataset.theme === 'dark')
       return { ramp: TERRAIN_TERMINAL, walker: { glow: [227,242,247], settled: [134,188,204], trail: [73,127,146] }, darkness: 1, dotScale: 1.18, survey: [139, 147, 140] };
-    // LIGHT dotScale trimmed 1.15 → 1.08. Light theme now spends its EDL shade on
-    // VALUE rather than opacity (see edlSpend in lib/terrain.ts), which by itself
-    // adds ink — and "heavier" is not the goal, "clearer" is. The radius trim
-    // offsets that ink increase while keeping visible presence on the ridge.
+    // Light's dotScale is 1.08: it spends its EDL shade on value, not opacity (edlSpend in lib/terrain.ts),
+    // which adds ink by itself, and the smaller radius offsets it. The aim is clearer, not heavier.
     return { ramp: TERRAIN_LIGHT, walker: { glow: [244,239,228], settled: [200,163,106], trail: [92,108,140] }, darkness: 0, dotScale: 1.08, survey: [90, 84, 74] };
   }
 
-  // Teardown handle for the previous init — re-init runs on every page load AND
-  // after each View Transition swap (astro:page-load), so we must dispose the
-  // prior instance's listeners / rAF loop / observer or they leak across
-  // navigations and reference a stale (swapped-out) canvas. Without this, the
-  // bowl field renders blank when you navigate back to home.
+  // The previous init's teardown: init runs on every astro:page-load, and a listener, rAF loop or observer
+  // left behind would point at the swapped-out canvas (the hero then renders blank on a return to `/`).
   let teardown: (() => void) | null = null;
-
-  // The intro's clock lives in lib/introSession.ts, not here. It has to be SHARED: FluidSky and
-  // SkyWash settle in on the same timeline, and FluidSky draws synchronously during its own init,
-  // so anything this component published on its first ANIMATION frame arrived a frame too late and
-  // the sky showed its finished state before snapping flat. A module singleton is decided before
-  // any init body runs, which also makes resuming across a theme flip free.
 
   function initTerrain() {
     teardown?.();
@@ -142,8 +121,7 @@ const bubbles = JSON.stringify([
     // same factor applied to the contour points below. That is what makes the lines and the dots read as
     // ONE surface drawn twice instead of two animations stapled together.
     //
-    // ON THE PRECOMPUTED EDL SHADE, because an earlier version of this comment got it wrong: it is NOT
-    // camera-only. `computeEDL` projects each dot at FULL elevation and derives its shade from
+    // THE PRECOMPUTED EDL SHADE IS NOT camera-only. `computeEDL` projects each dot at FULL elevation and derives its shade from
     // screen-space depth differences between neighbours, so it is a function of the fixed camera AND of
     // the finished geometry. It is therefore exact only at `lift === 1`. During the rise the flat plane
     // carries the finished relief's shade — a density-and-size ghost of the mountain, with colour
@@ -151,20 +129,11 @@ const bubbles = JSON.stringify([
     // the survey is. The landing frame is still byte-exact, which is the property that matters.
     // (What WOULD break it is animating the camera. Do not.)
     //
-    // NEITHER THE DECISION NOR THE CLOCK LIVES HERE — both come from lib/introSession.ts, which reads
-    // what index.astro's pre-paint `is:inline` script published. Two reasons, both bugs that shipped.
-    //
-    // It must be SHARED: FluidSky needs the identical answer and the identical t=0 no matter which init
-    // runs first. The earlier version published `html[data-intro-at]` from this component's first
-    // animation frame, and FluidSky draws synchronously during ITS init, so the sky rendered its finished
-    // state for a frame and then snapped flat. One module read, one answer, no race.
-    //
-    // And it must be read BEFORE FIRST PAINT: this component's `<script>` is bundled, so Astro defers it
-    // until after parse, by which point the real sky has already painted. That is why the flat backdrop
-    // is a class set by the inline decider and all this file does is drop it at the landing.
-    //
-    // Resuming across a re-init (a theme flip mid-intro) is free: the attributes persist, so the clock is
-    // the same one and `introProgress` simply reports where the animation already is.
+    // NEITHER THE DECISION NOR THE CLOCK LIVES HERE: both come from lib/introSession.ts, which reads what
+    // index.astro's pre-paint `is:inline` script published (why it must be pre-paint is there). One shared
+    // answer, because FluidSky draws during its own init and needs the same t=0 whichever init runs first.
+    // This file only drops the `intro-flat` class at the landing. A re-init mid-intro (a theme flip) resumes
+    // for free: the attributes persist, so the clock is the same one.
     const session = introSession();
     const playIntro = session !== null;
 
@@ -183,14 +152,12 @@ const bubbles = JSON.stringify([
       const [ir, ig, ib] = pal.survey;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      // 1.6, up from 1.15, on the owner's note that the lines want to be "a little bit thicker".
+      // 1.6: the owner asked for the lines "a little bit thicker".
       ctx.lineWidth = 1.6 * DPR;
       const levels = introContours();
       const lv = terrainLevels();
       for (let li = 0; li < levels.length; li++) {
-        // The per-level schedule lives in lib/introTimeline.ts. It was three inline literals here, which
-        // put phase boundaries in a draw call where no test could reach them — and the schedule was
-        // wrong, finishing the whole map in the first fifth of its phase and leaving a frozen frame.
+        // The per-level schedule is lib/introTimeline.ts's, where its spec can reach it.
         const prog = surveyProgress(surveyT, li, levels.length);
         if (prog <= 0) continue;
         ctx.strokeStyle = `rgba(${ir},${ig},${ib},${(0.46 * alpha * Math.min(1, prog * 1.6)).toFixed(3)})`;
@@ -203,15 +170,10 @@ const bubbles = JSON.stringify([
         const z = lv[li] * lift;
         for (const run of levels[li]) {
           const n = Math.max(2, Math.ceil(run.length * prog));
-          // SMOOTHED, on the owner's note that the lines want to be "a little bit smoother".
-          //
-          // Marching squares returns a polyline whose vertices sit on cell edges, so at res 74 the
-          // faceting is visible as a chain of short straight segments — particularly on the gentle
-          // curves of the outer contours. Drawing quadratic curves THROUGH THE MIDPOINTS, with each
-          // original vertex as the control point, rounds that off at zero geometric cost: no extra
-          // field evaluations, no higher res (which would cost 21ms at 110 and 47ms at 150), just a
-          // different pen. The curve stays within half a cell of the true polyline, so the lines still
-          // sit on their isolines.
+          // SMOOTHED (the owner: "a little bit smoother"). At res 74 the cell-edge vertices show as facets;
+          // quadratic curves through the midpoints, each vertex the control point, round them off with no
+          // extra field evaluations and no higher res (21ms at 110, 47ms at 150). The curve stays within
+          // half a cell of the polyline, so the lines still sit on their isolines.
           ctx.beginPath();
           const pt = (k: number) => project(run[k][0], run[k][1], z, W, Hh, ZOOM);
           if (n < 3) {
@@ -258,24 +220,11 @@ const bubbles = JSON.stringify([
     }
 
     /**
-     * `breathIn` is the fix for a reported discontinuity: *"the hero's dots got shifted by a tiny bit into
-     * its correct location."*
-     *
-     * The static frame and the animated frame disagreed about exactly one parameter. `frame(0, false)`
-     * paints with `breathAmp = 0`; the loop paints with `0.04`. So the instant the loop starts, every dot's
-     * elevation gains `0.04 * sin(tsec * 0.4 + x*0.7 + y*0.6)` in one frame — and because `project` scales
-     * by `min(W, Hh) * 0.34 * zoom`, that is up to **±8.8 CSS px** of vertical displacement per dot at the
-     * hero's measured box. Not a fade, not a slide: a jump. It happened on every ordinary page load, since
-     * the static frame is painted first for instant LCP and the loop starts a moment later.
-     *
-     * Ramping the AMPLITUDE rather than the clock is what makes this exact. At `breathAmp = 0` the elevation
-     * is `field(x, y)` regardless of `tsec`, so the ramp's first frame reproduces the static frame byte for
-     * byte whatever time the loop happens to start at — there is nothing to synchronise. Easing the clock
-     * instead would have required knowing the phase the still frame was painted at.
-     *
-     * Measured with a centroid probe over the first 1.6s: largest frame-to-frame step 2.077px before,
-     * 0.924px after — and the centroid understates it, because the breath is a travelling wave whose
-     * displacements partly cancel in the mean.
+     * `breathIn` ramps the breath's AMPLITUDE up from the still frame. `frame(0, false)` paints with
+     * `breathAmp = 0` and the loop with 0.04, so without a ramp every dot jumps by up to ±8.8 CSS px the
+     * instant the loop starts. At amplitude 0 the elevation is `field(x, y)` whatever `tsec` is, so the
+     * ramp's first frame is the still frame byte for byte, with no phase to synchronise (easing the clock
+     * would need one). Measured over the first 1.6s: largest frame-to-frame step 2.077px without, 0.924px with.
      */
     function frame(ts: number, animate: boolean, breathIn = 1, intro: IntroFrame | null = null) {
       const [gr, gg, gb] = pal.walker.glow;      // walker head-glow
@@ -287,13 +236,9 @@ const bubbles = JSON.stringify([
       const breathHz = 0.4;
       const lift = intro ? intro.lift : 1;
 
-      // The intro's survey, behind everything.
-      //
-      // THE `intro.survey > 0` GUARD IS NOT COSMETIC. Without it, the very first frame — which has
-      // contourAlpha 1 and survey 0 — called `introContours()`, paid the full 10.6ms marching-squares
-      // build, and then stroked exactly ZERO paths. The spec said in so many words to compute that
-      // geometry on the first animation tick rather than synchronously before first paint; this guard
-      // is what makes that true. Measured: it was the whole of the +12ms this feature cost the LCP.
+      // The intro's survey, behind everything. THE `intro.survey > 0` GUARD IS NOT COSMETIC: the first frame
+      // has contourAlpha 1 and survey 0, and without it pays the 10.6ms contour build to stroke nothing,
+      // which measured as +12ms on the LCP.
       if (intro && intro.contourAlpha > 0.002 && intro.survey > 0) {
         strokeSurvey(intro.survey, intro.contourAlpha, lift);
       }
@@ -303,12 +248,9 @@ const bubbles = JSON.stringify([
       // The bottom fade dissolves the bowl softly into the gradient instead of
       // ending in an abrupt dot-band at the hero's lower edge.
       //
-      // The intro's dot fade-in rides on `globalAlpha` rather than on a tenth parameter to
-      // `paintTerrain`. The painter composes its own per-dot alpha from elevation and EDL, and
-      // globalAlpha multiplies the lot — which is exactly the semantics wanted, for free. Always reset:
-      // the walker and bubble passes below must not inherit it.
-      // Skipped entirely while the dots are still invisible: at globalAlpha 0 this issued 987
-      // arc+fill pairs that painted nothing, every frame, for the first 1008ms of an UNTHROTTLED loop.
+      // The intro's dot fade-in rides on `globalAlpha`, which multiplies the painter's own per-dot alpha;
+      // it is reset so the walker and bubble passes below do not inherit it. Skipped while the dots are
+      // invisible: at globalAlpha 0 it is 987 arc+fill pairs a frame that paint nothing.
       if (!intro || intro.dots > 0.004) {
         if (intro) ctx.globalAlpha = intro.dots;
         paintTerrain(ctx, grid, pal, W, Hh, DPR, tsec, breathAmp, lift);
@@ -365,28 +307,16 @@ const bubbles = JSON.stringify([
       } else { bubbleEl!.classList.remove('show'); bubbleEl!.dataset.key = ''; }
     }
 
-    // FIRST PAINT, and there is exactly one of them on either path.
-    //
-    // Without the intro: one finished frame immediately — instant LCP, and the guaranteed baseline for
-    // reduced motion and for the moment before the loop spins up. Unchanged.
-    //
-    // With the intro: the first paint IS the intro's own t=0, the flat plane. `frame(0, false)` must NOT
-    // run on that path. An earlier draft of the design had it paint the finished terrain first and then
-    // start the intro, which means the visitor watches the landscape COLLAPSE to a plane — a backwards
-    // jump, and exactly the discontinuity this whole feature is supposed to avoid.
-    //
-    // When RESUMING across a re-init (a theme flip mid-intro), paint the frame the animation is
-    // actually at, not t=0 — otherwise the fix for the snap would itself be a backwards jump.
+    // FIRST PAINT, exactly one on either path. Without the intro: the finished frame at once (instant LCP,
+    // and the reduced-motion state). With it: the intro's own frame, never `frame(0, false)` first, or the
+    // reader watches the landscape collapse to a plane. A re-init mid-intro paints where the intro is, not t=0.
     if (playIntro && session) {
       frame(0, false, 1, introFrame(Math.min(1, (performance.now() - session.at) / session.ms)));
     } else frame(0, false);
 
-    // Resize handler: canvas resize clears the backing store, so repaint the
-    // static frame under reduced-motion (otherwise the animation loop repaints).
-    // DEBOUNCED, at the same 160ms the Deck, FluidSky and DescentPath already use. `resize()` reassigns
-    // `cvs.width`/`cvs.height`, and reassigning either REALLOCATES the backing store of a full-bleed canvas
-    // at DPR up to 2 — that is the expensive part, not the getBoundingClientRect. Undebounced it ran once
-    // per resize event for the whole duration of a window drag.
+    // Resizing clears the backing store, so reduced motion repaints the static frame (otherwise the loop
+    // does). DEBOUNCED at 160ms, as in the Deck, FluidSky and DescentPath: reassigning `cvs.width`/`height`
+    // reallocates a full-bleed backing store at DPR up to 2, once per event of a window drag.
     let resizeTimer = 0;
     const onResize = () => {
       window.clearTimeout(resizeTimer);
@@ -465,29 +395,18 @@ const bubbles = JSON.stringify([
       io.observe(cvs);
     }
 
-    // Dispose everything this instance attached, so a later re-init (View
-    // Transition swap) doesn't leave a stale rAF loop / observer / listener
-    // pointing at the old canvas.
     teardown = () => {
       window.removeEventListener('resize', onResize);
-      // The debounce timer has to go too: a pending one would fire after the swap and call resize() against
-      // the canvas this instance captured, which ClientRouter has already replaced.
+      // A pending debounce would fire after the swap, against the canvas ClientRouter replaced.
       window.clearTimeout(resizeTimer);
       if (rafId) cancelAnimationFrame(rafId);
       io?.disconnect();
     };
   }
 
-  // Run on first load and after every View Transition swap. astro:page-load
-  // fires in both cases; if ClientRouter isn't present it still fires once.
   document.addEventListener('astro:page-load', initTerrain);
-  // A THEME FLIP REPAINTS THIS CANVAS, but must not re-init the whole page. The toggle used to dispatch
-  // astro:page-load, which re-ran every vanilla script — the deck's 7-slide re-measure, the rail, three beat
-  // steppers, the cow — for a palette change none of them care about. Measured at 6x throttle: a 357ms long task
-  // on the homepage against 55ms on /404, and identical with the View Transition disabled, so the transition was
-  // never the cost. This canvas is one of five scripts that read the palette from JS and so listen for
-  // theme:change — with DescentPath and FluidSky here, and DraftingField and Gallery on /projects. Added once per
-  // document and never removed, like DescentPath's and FluidSky's: on a page without the canvas, initTerrain finds
-  // none and returns.
+  // A THEME FLIP REPAINTS THIS CANVAS through `theme:change`, never by re-firing astro:page-load, which re-runs
+  // every page script (a 357ms long task on `/` at 6x throttle). Added once per document, like DescentPath's
+  // and FluidSky's: on a page without the canvas, initTerrain finds none and returns.
   document.addEventListener('theme:change', initTerrain);
 </script>

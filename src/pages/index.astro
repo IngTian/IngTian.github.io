@@ -62,28 +62,14 @@ const introVars = {
      in BaseLayout. */}
 <BaseLayout veilLine="a researcher by day" veilOnLoad={false} preloadAccent="normal" page="deck">
   {/* THE INTRO IS DECIDED HERE, BEFORE FIRST PAINT, and that timing is the whole point.
-
-      The reported symptom was the sky flashing warm → flat → warm: `--descent-grad` is the base layer
-      and the no-WebGL state and it holds the FINISHED colours, so the real sky was on screen for ~300ms
-      before the canvas's first draw replaced it with the intro's flat tone. A state shown, then
-      un-shown — the owner's words were "renders to our normal stuff and suddenly goes blank".
-
-      A bundled `<script>` cannot fix that: Astro defers it, so it runs after parse, by which point the
-      first paint has already happened. `is:inline` parses in document order and therefore before
-      anything below it paints — the same mechanism, and the same reason, as the two inline scripts
-      already in BaseLayout (the no-FOUC theme resolver and the veil). This is not an Astro limitation;
-      it is Astro's answer to exactly this problem.
-
-      `define:vars` keeps every constant single-sourced from lib/, so what is duplicated here is only
-      the decision expression, not the policy. This script is the ONE decider: `introSession()` reads
-      what it publishes rather than deciding again, so the two cannot disagree.
-
-      THE HERO TEXT IS DELIBERATELY NOT HELD. A `?seq=1` spike did hold it — the owner's note was that
-      otherwise "everything is competing for the same attention" — and it is deleted rather than
-      shipped, because the H1 is this page's measured LCP element and pausing it for the intro's
-      duration makes the animation's cost the headline's cost. The text keeps its own tuned arrival
-      (see Heights.astro), which is also why a 5.2s animation is affordable at all. If the sequencing
-      is wanted, the honest version is a shorter intro, not a paused LCP. */}
+      `--descent-grad` is the sky's base layer and its no-WebGL state, and it holds the FINISHED colours,
+      so left to the canvas the real sky showed for ~300ms and then snapped flat: warm → flat → warm (the
+      owner: "renders to our normal stuff and suddenly goes blank"). A bundled `<script>` runs after parse,
+      after first paint; `is:inline` runs before anything below it paints, as BaseLayout's theme resolver
+      and veil do. `define:vars` single-sources the constants from lib/, so only the decision expression
+      is written here, and `introSession()` reads what it publishes: one decider.
+      THE HERO TEXT IS DELIBERATELY NOT HELD: the H1 is this page's measured LCP element (CLAUDE.md,
+      the `?seq=1` spike). Want sequencing? Shorten the intro; do not pause the LCP. */}
   <script is:inline define:vars={introVars}>
     (function () {
       try {
@@ -102,10 +88,7 @@ const introVars = {
         root.dataset.introAt = String(performance.now());
         root.dataset.introMs = String(ms);
 
-        // BEAT 1's backdrop, set here rather than by the canvas, because `--descent-grad` is the base
-        // layer AND the no-WebGL state and it holds the FINISHED colours. Left to the canvas's first
-        // draw, the real sky was on screen for ~300ms and then snapped flat: warm → flat → warm, which
-        // is what the owner saw as "renders to our normal stuff and suddenly goes blank".
+        // BEAT 1's backdrop, set here rather than by the canvas (see the comment above this script).
         root.classList.add('intro-flat');
         root.style.setProperty('--intro-flatten', '1');
         root.style.setProperty(
@@ -116,24 +99,12 @@ const introVars = {
     })();
   </script>
   {/* is-slides turns the homepage into the deck: the scroll rests at slide edges instead of anywhere.
-       THE MECHANISM IS EXPLICIT JS, NOT CSS SCROLL-SNAP, and this comment used to claim the opposite —
-       which is worth correcting loudly, because this is the first thing anyone reads before adding a
-       section here. Snap was built first and MEASURED: slide gaps here are 819-2346px while one wheel
-       gesture is ~320px, so `scroll-snap-type: y mandatory` kept re-snapping to the slide the gesture
-       started from — the scroll sat at y=84 through eight consecutive gestures. `proximity`,
-       `scroll-snap-stop: always` and a hero shrunk to exactly 100vh all measured identically stuck, so
-       no snap flag can fix it (see the numbers in global.css and lib/deck.ts). The deck is therefore
-       driven by <Deck /> below: it owns a rAF tween to the next stop from lib/deck.ts.
-         What .is-slides itself contributes is only the SLIDE METRICS (global.css): each top-level
-       <section> gets min-height 100vh and centres its content, and the five paper panels get the
-       top clearance that keeps the fixed corner nav off their headlines.
-         The half of the old comment that WAS true, and stays true — keyboard (Home/End/PageUp/PageDown/
-       space/arrows), find-in-page and #anchor jumps, and trackpad momentum all keep working. That is
-       deliberate work in Deck.astro (programmatic scrolls are ignored; one flick is coalesced into one
-       slide), not something a CSS mechanism was giving us for free.
-         Only the homepage's main carries .is-slides; every other page scrolls freely, the ones that share
-       .descent (/writing, /writing/<slug>, /experience, /art, the 404) included. The deck also disengages entirely under
-       reduced motion and on phones. */}
+       THE MECHANISM IS EXPLICIT JS, NOT CSS SCROLL-SNAP, which was measured stuck at these proportions
+       (the numbers are in lib/deck.ts). <Deck /> below tweens to the next stop; keyboard, find-in-page,
+       #anchor jumps and trackpad momentum keep working by its design. .is-slides itself contributes only
+       the SLIDE METRICS (global.css): each top-level <section> owns a screen, and the five paper panels get
+       the clearance that keeps the fixed corner nav off their headlines. Only the homepage's main carries
+       it, and the deck disengages under reduced motion and on phones. */}
   <main class="descent is-fluid is-slides">
     <FluidSky variant="descent" />
     <SkyWash />
@@ -141,26 +112,15 @@ const introVars = {
     <Interlude />
     {/* WHAT I DO COMES BEFORE HOW I GOT HERE, on the owner's observation: "the descent answered my
          trajectory, but didn't answer what I do. Normally people think about what do I do first, then my
-         trajectory." Correct, and it was backwards — a reader met a career-shaped gradient descent before
-         knowing what field it descended into.
+         trajectory."
            1. Choice — what the decision IS, defined rather than assumed: ONE object, a hundred dollars in a
-              bar, divided three ways, re-priced after one piece of news, then re-divided month after month.
-              (It is not the earlier "six names you recognise" + a forty-eight-forecaster fan; that draft
-              opened by assuming the concept, and grepping the built page confirmed nothing on the site said
-              what a portfolio was.)
-           2. Rules — how hard it actually is, in four beats: you run a billion dollars and your own slippage
-              is now measurable; you are not allowed to do most of it; nobody knows what any of it will do;
-              now do all of it at once, every month. (It is NOT the convex feasible polygon this comment used
-              to describe — that drawing, and the decision lattice beside it, were exact and unit-tested and
-              still pulled: both answer "what is the feasible set", a question a reader who has never been
-              told no does not have yet, and both SHRINK something on the one slide whose whole claim is that
-              the problem grows the closer you look. See the note at the top of Rules.astro before rebuilding
-              either.)
-           3. Solve — the method, as the algorithm running: a real Bellman lattice filling in backward from the
-              horizon, then the optimal route traced forward past the 29 candidate policies it beat.
-
-         Solve used to break the register as the one dark panel. It no longer does — a light-theme reader read
-         that as a bug, not as emphasis, so all four paper slides now share one palette and follow the theme. */}
+              bar, divided, re-priced after one piece of news, then re-divided month after month.
+           2. Rules — how hard it actually is, in four beats: scale, the rule book, the futures it must hold
+              in, all of it at once. (Two exact drawings that SHRINK something were pulled from it; see the
+              note at the top of Rules.astro before rebuilding either.)
+           3. Solve — still an open problem: a few general directions of attack, beside a world small enough
+              to solve exactly (a real Bellman lattice, past the candidate policies it beat).
+         All five paper slides share one palette (`.slide-paper`, styles/slides.css) and follow the theme. */}
     <Choice />
     <Rules />
     <Solve />
@@ -171,16 +131,9 @@ const introVars = {
       <DescentPath />
     </Story>
     <Appendix />
-    {/* MOUNTAINS IS GONE from the homepage, on the owner's instruction: "you may delete everything
-         from below. The record, the experience, everything." It was the résumé — research interests,
-         selected writing, selected experience, projects, recognition — and it is the thing the graph
-         and the editorial exist to replace. Nothing was lost: every block already has its own route
-         (/research, /experience, /projects), and the corner nav carries the doorways. The section
-         file is deleted; git holds it. */}
-    {/* THE TERMINAL IS GONE, on the owner's instruction: "you can delete the terminal at the bottom,
-         it's already useless." It was the site's only React island; with it removed the homepage ships
-         no client framework at all. Its data (data/script.ts), engine (useTypewriter) and spec are
-         deleted with it rather than left as dead weight — git holds them if it ever comes back. */}
+    {/* Mountains (the résumé) was deleted on the owner's instruction; each block has its own route. */}
+    {/* The terminal, the site's only React island, was deleted on the owner's instruction, with its data
+         (data/script.ts) and spec; git holds them (CLAUDE.md, Rejected). */}
   </main>
   <SideRail stops={homeStops()} hideOver="heights" />
   <Grain />

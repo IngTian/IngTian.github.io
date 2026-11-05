@@ -501,7 +501,7 @@ string itself is built once, as `PHONE_QUERY`: `isPhone()`, the deck's change li
 both. **If you change `PHONE_MAX_WIDTH`, change every `@media (max-width: 640px)`
 block with it.** `grep -rn 'max-width: *640px' src` returns **21 hits in 14 files**,
 and **three of the 21 are prose, not rules** — `viewport.ts` ×2 (its own doc
-comments) plus `global.css:287`, which describes the breakpoint in a comment
+comments) plus `global.css:171`, which describes the breakpoint in a comment
 rather than declaring it — and **one is a `sizes` hint**:
 `projects/Gallery`'s `sizes="(max-width: 640px) 240px, 330px"`, the phone strip's
 card width, which must move with the strip's block. So there are **17 real CSS

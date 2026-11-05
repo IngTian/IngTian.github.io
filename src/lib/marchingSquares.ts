@@ -46,8 +46,7 @@ export function isoLevels(
  * Contour polylines of `fn` at `level`, as world-space point runs.
  *
  * Marching squares proper — segments are collected per cell and then STITCHED into continuous runs. The
- * stitch is what makes the result strokeable: an earlier version of this code emitted the per-cell
- * segments directly and its contours rendered as invisible 1px stubs.
+ * stitch is what makes the result strokeable at a hero's line weight: bare per-cell segments render as 1px stubs.
  *
  * `res` is the cell count per axis, so cost is O(res²) in field evaluations. Runs shorter than four points
  * are dropped as noise.
@@ -105,24 +104,13 @@ export function isoRuns(
 
   // ── Stitch: extend a run by its NEAREST unused neighbour, from either end ──────────────────────
   //
-  // TAKING THE *NEAREST* CANDIDATE RATHER THAN THE FIRST ONE WITHIN THE THRESHOLD IS A BUG FIX, and it
-  // is worth knowing why, because the broken version looked completely reasonable.
-  //
-  // Adjacent cells compute the crossing on their shared edge from the same two corner values, so true
-  // neighbours are coincident to floating-point noise — a measured nearest-neighbour gap of 0.000000
-  // across every endpoint of a test circle. The tolerance, meanwhile, is `dx * 1.2`. So at a given tip
-  // there can be many segments "near" it, and the old code attached the FIRST one the scan happened to
-  // reach, which at a 0.0667 cell size could be a segment further along the curve. The genuine neighbour
-  // was then orphaned, and since runs shorter than four points are discarded as noise, those orphans
-  // were DROPPED — not merely mis-ordered.
-  //
-  // Measured on a plain circle at res 60: the old stitch returned runs of [50, 7, 63, 3, 2, 2, 2, 3],
-  // i.e. three kept pieces of one closed loop and four fragments thrown away — visible gaps in a line
-  // that should be continuous. Nearest-first returns a single run of 124 points, as it should.
-  //
-  // The tolerance stays at `dx * 1.2` so a field with genuinely gappy crossings still stitches; what
-  // changed is only WHICH candidate inside it wins. And the naive O(n²) scan stays — see the note on
-  // this function: the hashed alternative measured slower and fragmented worse.
+  // THE NEAREST CANDIDATE, NOT THE FIRST ONE WITHIN THE TOLERANCE. Adjacent cells compute their shared
+  // crossing from the same two corners, so true neighbours coincide to floating-point noise, while the
+  // tolerance is `dx * 1.2`: the first candidate in scan order can be a segment further along the curve,
+  // which orphans the real neighbour, and runs under four points are then dropped. On a circle at res 60
+  // first-within-tolerance returns runs of [50, 7, 63, 3, 2, 2, 2, 3] (three kept pieces, five dropped);
+  // nearest-first returns one run of 124 points. The tolerance stays at `dx * 1.2` so genuinely gappy
+  // crossings still stitch, and the naive O(n²) scan stays (see the note on this function).
   const used = new Array(segs.length).fill(false);
   const TOL = dx * 1.2;
   const d2 = (a: [number, number], c: [number, number]) => (a[0] - c[0]) ** 2 + (a[1] - c[1]) ** 2;

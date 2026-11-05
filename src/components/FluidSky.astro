@@ -173,52 +173,30 @@ const { variant = 'descent' } = Astro.props;
       mVh = Math.max(1, window.innerHeight);
       mDocH = Math.max(1, document.documentElement.scrollHeight);
     }
-    // AN ACCUMULATED CLOCK, NOT WALL TIME SINCE INIT — because the loop stops and wall time does not.
-    //
-    // `uTime` was `(nowMs - t0) / 1000`, measured from init, while the loop is stopped on
-    // `visibilitychange`. So a tab left for two minutes came back with uTime two minutes further on while
-    // the last painted frame was from before: the entire domain warp teleported to an unrelated phase in
-    // one frame. The longer the tab was away, the bigger the jump.
-    //
-    // Accumulating only while the loop actually runs makes the sky's time its OWN time. The per-frame delta
-    // is clamped to 50ms so a long stall advances the warp by one frame's worth rather than by the stall.
+    // AN ACCUMULATED CLOCK, NOT WALL TIME SINCE INIT, because the loop stops on `visibilitychange` and wall
+    // time does not: a tab left for two minutes would come back with the warp teleported to another phase.
+    // The per-frame delta is clamped to 50ms so a long stall advances the warp by one frame, not the stall.
     let uTimeSec = 0;
     let lastNow = 0;
 
-    // THE SKY SETTLES IN WITH THE HERO'S INTRO — one tone resolving into the full gradient, as the
-    // ground's own opening beat. `uFlatten` is the lever: it already scales nothing else, and at 1 the
-    // shader resolves to a single colour sampled from the ramp itself.
-    //
-    // THREE OTHER CANDIDATES WERE BUILT AND REJECTED, and are deleted rather than left behind a flag:
-    // ramping the warp AMPLITUDE (measured imperceptible — `uAmp` moves the warp's displacement, which
-    // is textural, while the sky's visible presence is its colours), DRIFTING the pattern into place,
-    // and fading the SkyWash layer. All three were compared live on the real page; the owner chose this
-    // one. A rejected option left in the tree reads as a supported one to the next reader.
-    //
-    // WHAT THIS DELIBERATELY DOES NOT TOUCH: the frame cadence. CLAUDE.md records that capping the
-    // scroll budget at 16ms made the homepage "stucky as hell" and was reverted, with a standing rule
-    // that the budget is 0 and stays 0. Scaling a uniform is not a cadence change.
-    //
-    // AND THE EASING LIVES IN lib/introTimeline.ts, not here. The rejected levers each carried their own
-    // local smootherstep, which is how three surfaces came to be easing the same intro three ways.
+    // THE SKY SETTLES IN WITH THE HERO'S INTRO, one tone resolving into the full gradient: `uFlatten` at 1
+    // resolves the shader to one colour from its own ramp. (The other levers, uAmp, a drift and a SkyWash
+    // fade, were compared live and rejected; CLAUDE.md lists them.) It scales a uniform and leaves the
+    // cadence alone (the scroll budget is 0; see CLAUDE.md), and its easing is lib/introTimeline.ts's.
     function introFlatten(nowMs: number): number {
       const t = introProgress(nowMs);
       const root = document.documentElement;
       if (t === null) {
-        // CLEAR IT rather than just returning 0: the pre-paint decider in index.astro sets this to 1, so
-        // an early return would leave a stale 1 on <html>. Not load-bearing for correctness — Heights
-        // gates the halos on `html.intro-flat`, which TerrainHero always removes, precisely because this
-        // function does not run at all when `getContext('webgl')` comes back null.
+        // CLEAR IT rather than just returning 0: the pre-paint decider in index.astro sets it to 1. (Heights
+        // gates the halos on `html.intro-flat` instead, as this does not run when there is no WebGL.)
         root.style.removeProperty('--intro-flatten');
         return 0;
       }
       // BEAT 1 drives this, not the whole intro: `introFrame(t).sky` is 1 at t=0 and 0 once the ground
       // has resolved, so the background finishes its own phase before the survey is really underway.
       const v = introFrame(t).sky;
-      // PUBLISHED so the hero's legibility halo can hide behind it. Those halos are near-white paper
-      // fades, invisible against the warm sky and glaring against a flat one — and they have nothing to
-      // do while the sky is flat, since a halo protects text from a VARIED backdrop. A custom property
-      // on the root, which does not invalidate layout.
+      // PUBLISHED so the hero's legibility halos (near-white fades, glaring on a flat sky and with nothing
+      // to protect against there) can hide while it is flat. A root custom property: no layout invalidation.
       root.style.setProperty('--intro-flatten', v.toFixed(3));
       return v;
     }

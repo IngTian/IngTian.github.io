@@ -12,8 +12,10 @@
 // theme from styles/slides.css: an editorial paper surface, full-bleed, with the sky visible above and
 // below it. That is also the elegant thing the owner picked out about the light theme.
 //
-// Every number here is COMPUTED at build time from the same field the graph draws, so the prose and
-// the picture cannot drift apart. Nothing is hand-typed.
+// THE PROSE'S NUMBERS ARE TYPED BY HAND, in data/story.ts ("nine roles, four companies", "fifty thousand
+// requests a second", "eight times across eight years"), and no test reads them. One is a figure about the
+// invented field rather than the career ("a thousandth"), the kind STORY_FIGURES was deleted for; it is
+// flagged there for the owner.
 //
 // THE PANEL NOW WRAPS THE GRAPH TOO. The owner: "in the descent one climb section, you might want to
 // completely turn off the fluid background and use the paper editorial background." That is one
@@ -21,11 +23,7 @@
 // a <slot> inside this panel rather than as a sibling floating on the sky. Turning the fluid off
 // behind it is done by the panel being opaque, not by touching the fluid layer: the sky keeps
 // running above and below, and this slide simply sits on paper.
-// The figure row is deleted (see below), so the measurement imports go with it — curvature(),
-// discoveryOf() and trajectoryFacts() were only ever called here to fill those three numbers.
-// What the GRAPH is drawn from is lib/descentPath.ts and lib/knowledge.ts, both of which keep their own
-// specs. This line used to name a `lib/sensitivity` as the source; no module of that name exists, or did
-// under that name — the curvature work it refers to lives in descentPath.
+// The GRAPH is drawn from lib/descentPath.ts and lib/knowledge.ts, each with its own spec.
 import { STORY } from '../data/story';
 ---
 <section id="story" class="story" aria-labelledby="story-heading">
@@ -200,11 +198,6 @@ import { STORY } from '../data/story';
   }
   .story-body:last-child { margin-bottom: 0; }
 
-  /* (.story-tail and the .story-figures dl are both gone with their elements. The tail: anything placed at
-     the foot of this column is unreachable in the deck — see the markup comment. The figures were three mono
-     "instrument readings" under the prose, dropped when the section became one narrow column beside the
-     graph. Both rule sets are deleted rather than left for someone to reuse, because a rule with no markup
-     is a claim about a layout that no longer exists. Note that .story-figure-slot, just above, is LIVE and
-     unrelated: `.story-figure` never matched it — a class selector matches the whole class name, not a
-     prefix — which is exactly why the dead rules were invisible for so long. */
+  /* (No tail and no figure row: nothing placed at the foot of this column is reachable in the deck, and the
+     figures went with STORY_FIGURES; data/story.ts says why for both.) */
 </style>

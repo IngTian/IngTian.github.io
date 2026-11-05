@@ -106,22 +106,8 @@ export function buildGrid(): GridPoint[] {
   return gridCache;
 }
 
-// `paletteDarkness(topSky)` was here: 1 - luminance01(topSky), clamped, meant to DERIVE the lighting
-// value/gain blend from a palette's top sky colour so the blend adapted to the theme automatically.
-//
-// Nothing ever called it, and the reason is the interesting part. The painter's `darkness` is not derived
-// at all — TerrainHero.astro sets it per theme off `data-theme` (0 for light, 1 for the terminal galaxy),
-// alongside the ramp and the walker palette it picks the same way. That is deliberate: dark mode is a chosen
-// look, not a luminance calculation, and the emerald "stars" are a palette decision no formula would produce.
-// An automatic derivation sitting next to the hand-set value invites someone to switch to it and quietly lose
-// the choice.
-//
-// `luminance01` stays in lib/terrain.ts, where it is TESTED — and that is the whole of its justification.
-// This line used to add "and has real callers", which is not true: it has no production caller either, and
-// claiming one made it look load-bearing to anyone deciding whether to keep it. It is kept because
-// tests/terrain.test.ts asserts the ramp's perceptual ordering through it, which is a real invariant on live
-// palette data, in the same category as `sumsToWhole` in lib/split.ts and `bellmanResidual` in lib/bellman.ts.
-// If that spec ever goes, so does this.
+// The painter's `darkness` is SET per theme in TerrainHero.astro, never derived from a sky colour: dark mode
+// is a chosen look, not a luminance calculation (a derivation from the top sky colour was deleted unused).
 
 const ZR = 1.55; // elevation → [0,1] normalization half-range (matches the hero)
 
@@ -146,17 +132,10 @@ export function paintTerrain(
   interface Dot { sx: number; sy: number; depth: number; z: number; ndl: number; edl: number; gx: number; gy: number }
   const rd: Dot[] = [];
   for (const g of grid) {
-    // `lift` SCALES ELEVATION, and it is the homepage intro's one animated quantity: 0 is a flat plane,
-    // 1 is the hero. It defaults to 1 so every pre-existing caller is unchanged by construction.
-    //
-    // It has to be applied HERE rather than passed in through the grid, because this function computes
-    // `field(g.x, g.y)` itself — the grid carries positions and precomputed shading, not elevation. The
-    // alternative, writing lifted values back into the grid points, would corrupt the memoised array
-    // that `buildGrid` shares with every other consumer; there is a test asserting we do not.
-    //
-    // Breath is deliberately NOT scaled by lift. It is a separate amplitude, already ramped from zero by
-    // the component's own `breathIn`, and at the intro's final frame `breathAmp` is 0 anyway — which is
-    // exactly why the handoff from the intro to the live loop needs no blending.
+    // `lift` SCALES ELEVATION, the homepage intro's one animated quantity: 0 is a flat plane, 1 the hero.
+    // Applied here, not written into the grid, which is the memoised array `buildGrid` shares (a test
+    // asserts it is not mutated). Breath is NOT scaled by lift: it is ramped from zero by the hero's own
+    // `breathIn`, and is 0 at the intro's last frame, so the handoff needs no blending.
     let z = field(g.x, g.y) * lift;
     z += breathAmp * Math.sin(tsec * breathHz + g.x * 0.7 + g.y * 0.6);
     const [sx, sy, depth] = project(g.x, g.y, z, W, Hh, zoom);
@@ -170,16 +149,9 @@ export function paintTerrain(
     if (p.sx < -20 || p.sx > W + 20 || p.sy < -20 || p.sy > Hh + 20) continue;
     const hn = Math.max(0, Math.min(1, (p.z + ZR) / (2 * ZR)));
     let r = (2.9 - hn * 1.6) * DPR * zoom * theme.dotScale;
-    // Base opacity by elevation. The shipped ramp fades the RIDGE OUT
-    // (0.30+(1-hn)*0.45 → alpha 0.27 at the peak vs 0.75 in the valley), which on
-    // pale paper is fatal: the peak dots composite with barely any separation from
-    // the paper backdrop, so the ridge dissolves. That is the "still blends in"
-    // report, and it is why fixing hue and value alone never worked: the ridge was
-    // being made transparent.
-    //
-    // In LIGHT theme the ramp is flattened and lifted so high ground stays present.
-    // Dark theme keeps the shipped falloff, where a fading dot correctly recedes
-    // into a near-black sky.
+    // Base opacity by elevation. Dark keeps a falloff that fades the ridge (alpha 0.27 at the peak against
+    // 0.75 in the valley), where a fading dot recedes into a near-black sky. On pale paper that dissolves
+    // the ridge into the backdrop, so LIGHT flattens and lifts the ramp to keep high ground present.
     const aBase = theme.darkness > 0.5 ? 0.30 + (1 - hn) * 0.45
                                        : 0.62 + (1 - hn) * 0.16;
     let alpha = aBase;
@@ -192,12 +164,7 @@ export function paintTerrain(
     // near/high ridge dot (edl→1) stays present and grows. Size coupling is
     // centered on 1× (sh=0.5 ⇒ unchanged) so mean size is kept.
     //
-    // HOW the shade is spent is theme-dependent — see edlSpend() in terrain.ts.
-    // Dark theme spends it on ALPHA (fading toward a near-black sky darkens the
-    // dot, which is what an eye-dome shadow is). Light theme spends it mostly on
-    // VALUE, because on the pale sky fading a dot LIGHTENS it — the shipped
-    // alpha-only version ran the shape cue backwards and bleached the ridge into
-    // the sky, which is what made the mountain read as mush over the fluid.
+    // HOW the shade is spent (alpha in dark, value in light) is edlSpend()'s, in terrain.ts.
     const sh = p.edl;
     const spend = edlSpend(sh, theme.darkness, EDL_FLOOR);
     color = [color[0] * spend.value, color[1] * spend.value, color[2] * spend.value];
