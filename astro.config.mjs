@@ -3,8 +3,9 @@ import { defineConfig, fontProviders } from 'astro/config';
 
 import tailwindcss from '@tailwindcss/vite';
 import sitemap from '@astrojs/sitemap';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
+import { markdownPlugins } from './src/lib/paperMarkdown/index.ts';
+import { PAPER_DATA } from './src/data/papers/index.ts';
+import { publications } from './src/data/profile.ts';
 
 // https://astro.build/config
 export default defineConfig({
@@ -84,17 +85,19 @@ export default defineConfig({
   // served locally, no third party at build or at runtime). MathML is the browser's own math renderer:
   // the page ships static <math> markup, zero client JS, zero CSS, zero fonts. Safari, Firefox and
   // Chromium have all shipped MathML Core. This is the same guarantee src/lib/equations.ts already
-  // holds for the terrain pill and the /research panels, and tests/equations.test.ts asserts it there
+  // holds for the terrain pill and the Rules slide's Bellman recursion, and tests/equations.test.ts asserts it there
   // ("ships MathML, not a KaTeX runtime") — the markdown path must not be the one that breaks it.
   //
-  // throwOnError: false matches equations.ts: one malformed formula renders as KaTeX's error markup in
-  // that one spot instead of failing the whole build (and the deploy) over a typo in a note.
+  // A TeX error does not fail the build by itself: rehype-katex always catches it and draws the source in
+  // KaTeX's error markup. In a paper that is reported, and the paper page fails the build on it.
   //
   // katex is a devDependency, and stays one — nothing about it is shipped, only its output.
-  markdown: {
-    remarkPlugins: [remarkMath],
-    rehypePlugins: [[rehypeKatex, { output: 'mathml', throwOnError: false }]],
-  },
+  //
+  // The chain lives in src/lib/paperMarkdown/index.ts, so its spec runs exactly this. It adds the paper format
+  // (remark-directive's syntax, parsed only in a paper, and the two paper plugins, inert on any other file) and the MathML
+  // letter fix for every file. PAPER_DATA and the records go in as options so they are part of the config digest:
+  // when a paper's number or its record changes, its cached render is thrown away rather than served stale.
+  markdown: markdownPlugins(PAPER_DATA, publications),
 
   // NO REACT, AND NOT INSTALLED ANY MORE. The terminal was the site's only island and it is deleted, so
   // nothing renders a component: no .tsx files, no client:* directives, no react imports remain.

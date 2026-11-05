@@ -1,0 +1,28 @@
+/* THE RESEARCH ROUTES' SHEET: what /research and /research/<slug> (BaseLayout `page="paper"`) must agree on, set
+   once, and imported by both pages.
+
+   The measure: a reading column (--M) and a notes column (--N), a gap (--G) apart, the composition centred in the
+   space right of the rail (the 90px is half its 180) and never nearer the window's left than 232px. Past 1100px the
+   measure grows by about a tenth (604 → 664px at 1780px), the gap and the notes with it, and --tk, the body type's
+   extra pixel (18 → 19px), so a paper's line stays near 77 characters; below 1140px the gap and the notes step
+   down, or at the 232px floor the notes would run to 10px from the window's edge. A paper page sets its two columns
+   by these, and an index card spans both. At 1100px and below both pages are one column and read none of these, so
+   the step-down needs no lower bound.
+
+   The marks of wealthFigure's drawings (lib/paperFigures/wealthFigure.ts): Figure 2 on a paper page, and its
+   miniature on the index card, one figure at two sizes. tests/paperPalette.test.ts measures them on the sheet. */
+html[data-page='paper'] {
+  --M: clamp(604px, calc(604px + (100vw - 1100px) * 0.088235), 664px);
+  --G: clamp(40px, calc(40px + (100vw - 1140px) * 0.00625), 44px);
+  --N: clamp(214px, calc(214px + (100vw - 1140px) * 0.04375), 242px);
+  --L: max(232px, calc(90px + (100vw - var(--M) - var(--G) - var(--N)) / 2));
+  --tk: clamp(0px, calc((100vw - 1100px) / 680), 1px);
+}
+@media (max-width: 1139.98px) { html[data-page='paper'] { --G: 32px; --N: 186px; } }
+
+html[data-page='paper'] .f-grid { stroke: var(--sheet-grid); stroke-width: 1; }
+html[data-page='paper'] .f-one { stroke: var(--sheet-one); }
+html[data-page='paper'] .f-band { fill: var(--sheet-band); stroke: none; }
+html[data-page='paper'] .f-rl { fill: none; stroke: var(--seal); stroke-width: 1.7; stroke-linejoin: round; }
+html[data-page='paper'] .f-bhrp { fill: none; stroke: var(--ink-1); stroke-width: 1.15; stroke-linejoin: round; }
+html[data-page='paper'] .f-bench { fill: none; stroke: var(--ink-3); stroke-width: 1.15; stroke-dasharray: 4 3; stroke-linejoin: round; }

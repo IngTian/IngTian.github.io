@@ -1,8 +1,9 @@
 // tests/pageView.test.ts
 // onPageView: a /projects script starts at parse on a full load, not at window `load`, and the page-load that ends
-// that load does not start it a second time — while a ClientRouter arrival (a new DOM) and a departure still do.
+// that load does not start it a second time — while a ClientRouter arrival (a new DOM) still does, and a departure
+// runs the last teardown.
 import { afterEach, describe, expect, it } from 'vitest';
-import { onPageView } from '../src/lib/pageView';
+import { onPageView } from '../src/scripts/pageView';
 
 const g = globalThis as { document?: unknown };
 
@@ -42,16 +43,19 @@ describe('onPageView', () => {
     expect(runs).toBe(1);
   });
 
-  it('runs again for each new DOM, and for a page without the element, so its teardown happens', () => {
+  it('runs again for each new DOM, on its element, and not for a page without the element', () => {
     const doc = fakeDocument('interactive');
-    let runs = 0;
-    onPageView('[data-term]', () => { runs++; });
+    const seen: unknown[] = [];
+    onPageView('[data-term]', (el) => { seen.push(el); return undefined; });
+    expect(seen).toEqual([doc.el]);
     doc.el = null;        // left for another page
     doc.pageLoad();
-    expect(runs).toBe(2);
-    doc.el = {};          // back again: a new DOM
+    expect(seen).toHaveLength(1);
+    const next = {};
+    doc.el = next;        // back again: a new DOM
     doc.pageLoad();
-    expect(runs).toBe(3);
+    expect(seen).toHaveLength(2);
+    expect(seen[1]).toBe(next);
   });
 
   it('keeps the teardown init returns and runs it before the next init — only for a new DOM, and also when leaving', () => {
@@ -59,7 +63,6 @@ describe('onPageView', () => {
     const log: string[] = [];
     let n = 0;
     onPageView('[data-term]', () => {
-      if (!doc.el) { log.push('init, nothing found'); return undefined; }
       const k = ++n;
       log.push(`init ${k}`);
       return () => { log.push(`teardown ${k}`); };
@@ -67,11 +70,12 @@ describe('onPageView', () => {
     doc.readyState = 'complete';
     doc.pageLoad();       // the page-load that ends the full load: same DOM, nothing torn down
     expect(log).toEqual(['init 1']);
-    doc.el = null;        // left for another page
+    doc.el = null;        // left for another page: its teardown runs now, and no init
     doc.pageLoad();
+    expect(log).toEqual(['init 1', 'teardown 1']);
     doc.el = {};          // back again: a new DOM, and the page without it left nothing to tear down
     doc.pageLoad();
-    expect(log).toEqual(['init 1', 'teardown 1', 'init, nothing found', 'init 2']);
+    expect(log).toEqual(['init 1', 'teardown 1', 'init 2']);
   });
 
   it('never runs a teardown twice, even when the init after it throws', () => {

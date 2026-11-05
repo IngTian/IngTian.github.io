@@ -1,3 +1,5 @@
+import { paperValue } from './papers/rl-bhrp';
+
 export interface TimelineEntry {
   period: string;
   title: string;
@@ -6,43 +8,30 @@ export interface TimelineEntry {
   kind: 'work' | 'education';
 }
 
-export interface PublicationResult {
-  value: string; // e.g. "~120%"
-  label: string; // e.g. "adaptive (out-of-sample 2020–25)"
-}
-
-// A full results table: one row per metric, compared across columns (models).
-export interface MetricsTable {
-  caption: string;
-  columns: string[];          // e.g. ['RL-BHRP', 'BHRP', 'Benchmark']
-  rows: { metric: string; values: string[]; highlight?: boolean }[];
-}
+export interface Author { name: string; affiliation?: string }
+export type PublicationStatus = 'preprint' | 'conference' | 'journal';
+/** What a status is called wherever one is printed: as written on a /research card, in lower case in the homepage
+ *  line and in a paper page's head (which adds ", not peer reviewed" to a preprint). */
+export const STATUS_LABEL: Record<PublicationStatus, string> = { preprint: 'Preprint', conference: 'Conference paper', journal: 'Journal article' };
 
 export interface Publication {
-  authors: string;
-  title: string;
-  venue: string;
+  slug: string;              // URL segment and stable id (signal ids: `publications:${slug}`)
+  title: string;             // exactly as the paper prints it
+  authors: Author[];
+  status: PublicationStatus;
+  venue: string;             // e.g. 'arXiv', 'SPIE (CNSSE)': never the year, which every surface prints after it, nor a volume, which the DOI carries
   year: string;
-  href?: string;          // primary link (arXiv abstract page, etc.)
-  // ── richer fields, surfaced on the /research page (all optional) ──
-  arxivId?: string;       // e.g. "2508.11856"
-  pdfHref?: string;       // direct PDF link
-  subject?: string;       // e.g. "q-fin.PM (Portfolio Management)"
-  idea?: string;          // plain-language "what it is"
-  takeaway?: string;      // one-line "why it matters"
-  results?: PublicationResult[]; // headline numbers, shown as a stat strip
-  metrics?: MetricsTable; // full results table (verbatim from the paper)
-  abstract?: string;      // verbatim abstract
-  featured?: boolean;     // gets the full treatment on /research
-  // Short label for the /research rail. Real titles run 100+ chars, which is
-  // unusable at 11px mono in a narrow margin. Falls back to `title`.
-  shortTitle?: string;
-  // Which set of typeset equations this paper OWNS, keyed into research.astro's
-  // showcase table. Load-bearing for honesty: the showcase used to be a
-  // page-level constant rendered inside the per-paper loop, so a second featured
-  // paper would have displayed RL-BHRP's equations under its own title. A paper
-  // without a mathKey renders no Method block and gets no Method stop.
-  mathKey?: string;
+  submitted?: string;        // YYYY-MM-DD
+  version?: string;          // e.g. 'v1'
+  versions?: number;         // how many versions arXiv lists (its abstract page's submission history)
+  arxivId?: string; doi?: string; subject?: string;
+  href: string;              // where a card links when there is no explainer page
+  pdfHref?: string;
+  reproduction?: string;     // the owner's own reproduction's repo, where one exists — never the paper's code
+  finding: string;           // ONE plain sentence, honest and scoped — the card line
+  tags: string[];
+  abstract?: string;         // verbatim
+  bibtex?: string;
 }
 
 export interface Award {
@@ -79,6 +68,8 @@ export interface Project {
 export interface InProgressItem { name: string; idea: string; repo?: string }   // repo: set only once the repo exists
 
 export const name = { first: 'Ing', last: 'Tian' } as const;
+/** The name his papers carry, as their author lists spell it. */
+export const authorName = 'Zeying Tian';
 
 export const roles = 'Quant Researcher · Portfolio Optimization';
 export const rolesSub = 'Full-stack SDE / MLE';
@@ -92,9 +83,8 @@ export const bio: { text: string; strong: string[] } = {
   strong: ['University of Toronto', 'multi-period portfolio optimization'],
 };
 
-// Research interests — shown as themed entries atop /research, with a one-line
-// teaser linking in from the homepage. Grounded in the RL-BHRP paper + the
-// incoming OR PhD focus; kept to areas actually worked in.
+// Research interests — a quiet list after the papers on /research, each its label and a one-line gloss.
+// Grounded in the RL-BHRP paper + the incoming OR PhD focus; kept to areas actually worked in.
 export const researchInterests: ResearchInterest[] = [
   { label: 'Multi-period portfolio optimization', gloss: 'Allocation across horizons, rebalancing as conditions change — not single-shot mean–variance.' },
   { label: 'Risk parity & hierarchical methods', gloss: 'Distributing risk across structure — sectors, then assets — rather than chasing returns.' },
@@ -114,52 +104,56 @@ export const timeline: TimelineEntry[] = [
   { period: '2019 — 23', title: 'B.Eng, Computer Engineering · McGill', detail: "CGPA 3.99 · Dean's Honour List · Full Scholarship.", kind: 'education' },
 ];
 
+// Newest first. Each record is what every surface listing a paper reads: the /research cards, the homepage
+// appendix, and the factor model's signal ids.
 export const publications: Publication[] = [
   {
-    authors: 'S. Kang, Z. Tian',
-    title: 'Optimal Portfolio Construction — A Reinforcement-Learning-Embedded Bayesian Hierarchical Risk Parity (RL-BHRP) Approach',
-    venue: 'arXiv preprint',
-    year: '2025',
-    href: 'https://arxiv.org/abs/2508.11856',
-    arxivId: '2508.11856',
-    pdfHref: 'https://arxiv.org/pdf/2508.11856',
-    subject: 'q-fin.PM · Portfolio Management',
-    featured: true,
-    shortTitle: 'RL-BHRP',
-    mathKey: 'rlbhrp',
-    idea: 'Most portfolios either assume a fixed model of risk or chase returns directly. RL-BHRP does neither: it spreads risk hierarchically across sectors and the stocks within them, then uses reinforcement learning to adapt those exposures as market conditions shift — learning how to allocate, rather than assuming.',
-    takeaway: 'Allocation that learns instead of assuming — diversified and investable, not a backtest curiosity.',
-    results: [
-      { value: '~120%', label: 'wealth compounded, out-of-sample 2020–25 (vs 101% static, 91% sector ETF)' },
-      { value: '~15% / yr', label: 'average annual growth (vs 13% and 12%)' },
-      { value: 'comparable', label: 'drawdowns — value added while staying diversified' },
+    slug: 'rl-bhrp',
+    title: 'Optimal Portfolio Construction — A Reinforcement Learning Embedded Bayesian Hierarchical Risk Parity (RL-BHRP) Approach',
+    authors: [
+      { name: 'Shaofeng Kang', affiliation: 'University of Toronto' },
+      { name: 'Zeying Tian', affiliation: 'McGill University' },
     ],
-    // Verbatim from Table 2 (67 periods, 2020-02-29 → 2025-08-31). Values
-    // rounded for display from the paper's reported figures.
-    metrics: {
-      caption: 'Full period · 2020-02 to 2025-08 · RL-BHRP vs static BHRP vs sector benchmark',
-      columns: ['RL-BHRP', 'BHRP', 'Benchmark'],
-      rows: [
-        { metric: 'Cumulative return', values: ['1.20', '1.01', '0.91'], highlight: true },
-        { metric: 'CAGR', values: ['15.2%', '13.4%', '12.3%'], highlight: true },
-        { metric: 'Annual volatility', values: ['17.4%', '16.5%', '17.3%'] },
-        { metric: 'Sharpe', values: ['0.90', '0.85', '0.76'], highlight: true },
-        { metric: 'Sortino', values: ['1.65', '1.53', '1.37'] },
-        { metric: 'Max drawdown', values: ['−20.3%', '−19.1%', '−18.3%'] },
-        { metric: 'Calmar', values: ['0.75', '0.70', '0.67'] },
-        { metric: 'Information ratio', values: ['0.69', '0.22', '—'] },
-        { metric: 'CVaR 5%', values: ['−10.2%', '−9.7%', '−10.3%'] },
-        { metric: 'Hit rate (>0)', values: ['64.2%', '64.2%', '62.7%'] },
-      ],
-    },
+    status: 'preprint',
+    venue: 'arXiv',
+    year: '2025',
+    submitted: '2025-08-16',
+    version: 'v1',
+    versions: 1,               // arXiv's submission history lists [v1] alone, read 3 November 2026
+    arxivId: '2508.11856',
+    doi: '10.48550/arXiv.2508.11856',
+    subject: 'q-fin.PM · Portfolio Management',
+    // Version 1, the version every figure quoted from it describes.
+    href: 'https://arxiv.org/abs/2508.11856v1',
+    pdfHref: 'https://arxiv.org/pdf/2508.11856v1',
+    reproduction: 'https://github.com/IngTian/rl-bhrp',
+    // The paper's own figures (data/papers/rl-bhrp.ts VALUES).
+    finding: `On one ${paperValue('startYear')}–${paperValue('endYear')} test of ${paperValue('universe')} large US stocks, a policy that learns sector and stock weights under a risk-parity penalty turned $1 into ${paperValue('usd.rl')}, against ${paperValue('usd.bhrp')} for plain two-level risk parity — with somewhat more risk, and no test of whether the gap is more than chance.`,
+    tags: ['reinforcement learning', 'Bayesian hierarchical risk parity', 'portfolio optimization', 'asset allocation'],
     abstract:
       'We propose a two-level, learning-based portfolio method (RL-BHRP) that spreads risk across sectors and stocks, and adjusts exposures as market conditions change. Using U.S. Equities from 2012 to mid-2025, we design the model using 2012 to 2019 data, and evaluate it out-of-sample from 2020 to 2025 against a sector index built from exchange-traded funds and a static risk-balanced portfolio. Over the test window, the adaptive portfolio compounds wealth by approximately 120 percent, compared with 101 percent for the static comparator and 91 percent for the sector benchmark. The average annual growth is roughly 15 percent, compared to 13 percent and 12 percent, respectively. Gains are achieved without significant deviations from the benchmark and with peak-to-trough losses comparable to those of the alternatives, indicating that the method adds value while remaining diversified and investable. Weight charts show gradual shifts rather than abrupt swings, reflecting disciplined rebalancing and the cost-aware design. Overall, the results support risk-balanced, adaptive allocation as a practical approach to achieving stronger and more stable long-term performance.',
+    bibtex: `@misc{kang2025rlbhrp,
+  title = {Optimal Portfolio Construction -- A Reinforcement Learning Embedded Bayesian Hierarchical Risk Parity (RL-BHRP) Approach},
+  author = {Kang, Shaofeng and Tian, Zeying},
+  year = {2025},
+  eprint = {2508.11856},
+  archivePrefix = {arXiv},
+  primaryClass = {q-fin.PM},
+  url = {https://arxiv.org/abs/2508.11856}
+}`,
   },
   {
-    authors: 'D. Li, Z. Tian, Y. Duan',
+    slug: 'self-attention-rnn-text',
     title: 'Self-Attention on RNN-based Text Classification',
-    venue: 'CNSSE / SPIE, vol. 12290',
+    authors: [{ name: 'Dailun Li' }, { name: 'Zeying Tian' }, { name: 'Yining Duan' }],
+    status: 'conference',
+    venue: 'SPIE (CNSSE)',     // Proc. SPIE vol. 12290, which the DOI carries
     year: '2022',
+    doi: '10.1117/12.2641031',
+    href: 'https://doi.org/10.1117/12.2641031',
+    // Scoped to its abstract (OpenAlex's record for the DOI; Crossref carries none).
+    finding: 'Testing the claim that self-attention always helps, it found that the gain grows with the size of the dataset, that attention can hurt on small datasets, and that the same dataset can show opposite effects in different models.',
+    tags: ['self-attention', 'recurrent neural networks', 'text classification'],
   },
 ];
 
@@ -179,7 +173,7 @@ export const WITNESS_RELEASES = 29;
 export const projects: Project[] = [
   {
     slug: 'rl-bhrp', name: 'rl-bhrp', tier: 'selected', kind: 'research',
-    // "From my arXiv paper", not "my published": the paper is a preprint — its venue in `publications` above, and
+    // "From my arXiv paper", not "my published": the paper is a preprint — its status in `publications` above, and
     // how /research shows it.
     idea: "The portfolio allocator from my arXiv paper, rebuilt from the paper alone — with a plain report of which numbers reproduce and which don't.",
     short: 'my paper, rebuilt from the paper alone',

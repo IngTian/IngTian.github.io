@@ -36,7 +36,7 @@ const roles = indexed.filter(({ entry }) => entry.kind === 'work');
     <FluidSky strength={3} variant="reading" />
     <SkyWash />
 
-    <SideRail stops={stops} id="experience-toc" />
+    <SideRail stops={stops} />
 
     <div class="xp-block">
       <header class="xp-head">
@@ -108,11 +108,11 @@ const roles = indexed.filter(({ entry }) => entry.kind === 'work');
 
   /* A READING page, so it uses the shared --reading-grad token (tokens.css) rather than the
      descent's sky: dark ink on a luminous ground in light theme, an even charcoal in dark.
-     Shared with /research and /projects so the reading pages stay one system. */
+     Shared with /writing and /writing/<slug> so the reading pages stay one system. */
   .experience.descent { background: var(--reading-grad); }
 
-  /* Same composition as /projects — identical left margin and measure, so the reading pages
-     read as a system instead of three guesses. */
+  /* Same composition as /writing — the same 34% left margin and the same 860px cap on the
+     measure, so the reading pages read as a system instead of three guesses. */
   .xp-block {
     position: relative; z-index: 1;
     margin-left: 34%;

@@ -1,0 +1,15 @@
+---
+// One line of the prose a paper page writes round its file (lib/paperPage Line): its text, with what reads as one
+// word kept on one line (lib/words wholeParts, the rule the file's body is set by) and each date marked up as a
+// <time>. The page builds each line once, prints it here and counts its words with lineText, so the reading time
+// counts what this prints. The span.nw is styled by the page's is:global sheet.
+import { longDate } from '../../lib/dates';
+import type { Line } from '../../lib/paperPage';
+import { wholeParts } from '../../lib/words';
+
+interface Props { line: Line }
+const { line } = Astro.props;
+---
+{line.map((x) => (typeof x === 'string'
+  ? wholeParts(x).map((s, i) => (i % 2 ? <span class="nw">{s}</span> : s))
+  : <time datetime={x.date}>{longDate(x.date)}</time>))}

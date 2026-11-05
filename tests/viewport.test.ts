@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isPhone, PHONE_MAX_WIDTH, PHONE_QUERY } from '../src/lib/viewport';
+import { readdirSync, readFileSync } from 'node:fs';
+import { isPhone, PHONE_MAX_WIDTH, PHONE_QUERY, WIDE_QUERY } from '../src/lib/viewport';
 
 /**
  * The phone gate decides BEHAVIOUR, not just looks: whether the slide deck attaches its listeners at all.
@@ -62,5 +63,49 @@ describe('viewport phone gate', () => {
   it('is false when matchMedia is missing rather than throwing', () => {
     vi.stubGlobal('window', {});
     expect(isPhone()).toBe(false);
+  });
+});
+
+// The one-column breakpoint: at 1100px and below the rail hides and the reading pages fall to one column. A pair of
+// bounds (max 1100 / min 1101) leaves the widths between them, which a zoomed or OS-scaled window reaches (1100.8 CSS px
+// is a 1321px window at 120%), to neither layout: there the rail shows and the paper's two columns stand, while its
+// script, asking the other bound, leaves every note unplaced at its block's top.
+describe('the wide layout', () => {
+  // WIDE_QUERY is the paper page's script's question; the answer the page shows is two stylesheets' (lib/viewport
+  // says which). Read from them, so a breakpoint retuned in the CSS alone fails here.
+  it("is the exact negation of the query SideRail hides at and the paper page's one column is set at", () => {
+    const read = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8');
+    const hides = /@media ([^{]+?) ?\{ ?\.side-rail \{ display: none; \} ?\}/.exec(read('components/SideRail.astro'));
+    const page = read('pages/research/[slug].astro');
+    const column = /@media ([^{]+?) ?\{\s*\.paper \{ width: auto;/.exec(page);
+    expect(hides, "SideRail's hide rule").not.toBeNull();
+    expect(column, "the paper page's one-column block").not.toBeNull();
+    expect(`not all and ${hides![1]}`).toBe(WIDE_QUERY);
+    expect(`not all and ${column![1]}`).toBe(WIDE_QUERY);
+    // and the page's own wide blocks ask the same
+    const negations = [...page.matchAll(/@media (not all and \([^)]*\))/g)].map((m) => m[1]);
+    expect(negations.length).toBeGreaterThan(0);
+    expect(new Set(negations)).toEqual(new Set([WIDE_QUERY]));
+    // and every one-column bound the page writes (the notes' drop into the column among them) is that same width;
+    // only the phone's own breakpoint differs.
+    const hideWidth = /\(max-width: (\d+)px\)/.exec(hides![1])![1];
+    const bounds = [...page.matchAll(/\(max-width: (\d+)px\)/g)].map((m) => m[1]).filter((w) => w !== String(PHONE_MAX_WIDTH));
+    expect(bounds.length).toBeGreaterThan(1);
+    expect(new Set(bounds)).toEqual(new Set([hideWidth]));
+  });
+
+  // Not only this breakpoint: any (min-width: N) beside a (max-width: M) with N - 1 <= M < N leaves the widths between
+  // them to neither side (/projects' cow at 1179/1180 fell into the flow as a 156px row at 1179.2 CSS px).
+  it('is never written as a second bound beside it, nor is any breakpoint in src', () => {
+    const src = new URL('../src/', import.meta.url);
+    const files = readdirSync(src, { recursive: true, encoding: 'utf8' }).filter((f) => /\.(astro|css|ts)$/.test(f));
+    expect(files.length).toBeGreaterThan(50);
+    const bounds = (re: RegExp) => files.flatMap((f) =>
+      [...readFileSync(new URL(f, src), 'utf8').matchAll(re)].map((m) => ({ f, px: Number(m[1]) })));
+    const lows = bounds(/\((?:min-width:|width\s*>=?)\s*([\d.]+)px\)/g), highs = bounds(/\(max-width:\s*([\d.]+)px\)/g);
+    expect(lows.length).toBeGreaterThan(0);
+    const pairs = lows.flatMap((lo) => highs.filter((hi) => hi.px < lo.px && hi.px >= lo.px - 1)
+      .map((hi) => `${lo.f}: (min-width: ${lo.px}px) beside (max-width: ${hi.px}px)`));
+    expect([...new Set(pairs)]).toEqual([]);
   });
 });

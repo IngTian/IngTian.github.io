@@ -1,0 +1,87 @@
+::::section[In brief]{#brief}
+A paper about :t[risk parity]{#rp}, in brief.
+
+:::def{for=rp}
+**Risk parity.** Every holding carries the same share of the risk (:cite[maillard2008]).
+:::
+
+:hl[One dollar grew to :v[usd.rl].] The rest is detail.
+
+Yearly, that is $:v[wealth.rl]^{12/67}-1$, or $:v[usd.rl]$ at the end.
+::::
+
+:::section[Abstract]{#abstract aside="in the paper’s own words"}
+::abstract
+
+What the abstract leaves out.
+:::
+
+::::section[Notation]{#notation}
+:::notation
+| Symbol | Meaning |
+| --- | --- |
+| $W_{g}$ | The weight of sector $g$. |
+| $\mathrm{RC}_{g}(w),\ G$ | Sector $g$'s risk, one of $G$. |
+| $\theta$ {text-only} | The policy's parameters. |
+:::
+::::
+
+:::::section[The method]{#method n=1 rail="Method"}
+Each sector gets a weight:
+
+::::eq{#eq-1 n=1}
+$$ wide
+W_{g} = \sum_{i \in g} w_{i} + W + \mathrm{RC}_{g}(w)
+$$
+
+$$ narrow
+W_{g} = \sum_{i} w_{i} + W + \mathrm{RC}_{g}(w)
+$$
+
+:::where
+where $W_{g}$ is the :t[sector weight]{#sw}.
+:::
+
+:::def{for=sw}
+**Sector weight.** The share of the money in a sector.
+:::
+
+:::why
+It keeps the weights adding up to one.
+:::
+::::
+
+::::thm{#thm-1}
+**Theorem 1** *(weights).* In words first:
+
+The weights add up.
+
+In symbols,
+
+:::eq{#eq-2 n=2}
+$$
+W^{\top}W
+$$
+:::
+::::
+
+:::figure{name=pipe n=1}
+**How it runs.** The pieces, :v[usd.rl] in all.
+:::
+
+::::figure{name=table n=1}
+The table, every row.
+
+Source: the paper.
+
+:sup[a] A note on one cell.
+
+:::def
+**Reading the table.** One row a measure.
+:::
+::::
+
+:::inpaper
+**In the paper:** Alg. 1.
+:::
+:::::

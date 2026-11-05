@@ -141,20 +141,17 @@ const n = summaryCounts(projects);
 </style>
 
 <script>
-  import { onPageView } from '../../lib/pageView';
+  import { onPageView } from '../../scripts/pageView';
   import { BOOT_KEY_MS, bootState, bootSteps } from '../../lib/projectsBoot';
 
   // The deal's stagger, and how long it stays set: the last riser's delay (870ms for today's eight rows and cards)
   // plus its .5s rise, with room.
   const FAN_STAGGER_MS = 75, RISE_AT_MS = 380, RISE_STAGGER_MS = 70, DEAL_MS = 1600;
 
-  function init(): (() => void) | undefined {
+  function init(term: HTMLElement): (() => void) | undefined {
     const root = document.documentElement;
-    const maybeTerm = document.querySelector<HTMLElement>('[data-term]');
     // No class: this page view is not booting, and the HTML as served is already the finished state.
-    if (!maybeTerm || !root.classList.contains('projects-boot')) return;
-    // Non-null alias: TypeScript does not carry the guard's narrowing into the hoisted functions below.
-    const term = maybeTerm;
+    if (!root.classList.contains('projects-boot')) return;
     const rows = [...term.querySelectorAll('.banner .row')];
     const keys = [...term.querySelectorAll('.cmd > span')];
     const lines = [...term.querySelectorAll('.tc, .ls li')];
@@ -226,6 +223,6 @@ const n = summaryCounts(projects);
   }
 
   // Started at parse on a full load, not at astro:page-load (window `load`, which waits for the fonts): see
-  // lib/pageView.ts. A ClientRouter arrival still starts on its page-load.
+  // scripts/pageView.ts. A ClientRouter arrival still starts on its page-load.
   onPageView('[data-term]', init);
 </script>

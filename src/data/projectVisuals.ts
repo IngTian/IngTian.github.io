@@ -1,6 +1,6 @@
 // src/data/projectVisuals.ts
 // Each project's picture on /projects. Four are COMPUTED from the project's own output (lib/projectVisuals.ts,
-// over src/data/vendor); three are real captures, vendored into src/assets/projects by tools/vendor-projects.mjs
+// over src/data/vendor; rl-bhrp's through REPRO, the series the paper page draws); three are real captures, vendored into src/assets/projects by tools/vendor-projects.mjs
 // with their provenance in src/assets/projects/SOURCES.txt.
 //
 // trading-desk and daylogs have only a dark capture, shown in BOTH themes — never CSS-inverted, the "derived"
@@ -15,9 +15,9 @@ import manifoldDark from '../assets/projects/manifold-saver-dark.png';
 import manifoldLight from '../assets/projects/manifold-saver-light.png';
 import tradingDeskDashboard from '../assets/projects/trading-desk-dashboard.png';
 import { facetsSvg, positioningSvg, sectionsSvg, wealthSvg } from '../lib/projectVisuals';
+import { REPRO } from './papers/rl-bhrp';
 import { macbootSections } from './vendor/macbootSections';
 import { offchartPositioning } from './vendor/offchartPositioning';
-import { rlBhrpWealth } from './vendor/rlBhrpWealth';
 import { witnessFacets } from './vendor/witnessFacets';
 
 /** A capture's `alt` is hand-written; a computed svg labels itself (lib/projectVisuals.ts). */
@@ -26,7 +26,7 @@ export type ProjectVisual =
   | { kind: 'svg'; svg: string };
 
 const VISUALS: Record<string, ProjectVisual> = {
-  'rl-bhrp': { kind: 'svg', svg: wealthSvg(rlBhrpWealth) },
+  'rl-bhrp': { kind: 'svg', svg: wealthSvg(REPRO) },
   offchart: { kind: 'svg', svg: positioningSvg(offchartPositioning) },
   'trading-desk': {
     kind: 'image', dark: tradingDeskDashboard,

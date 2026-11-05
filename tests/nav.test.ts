@@ -7,10 +7,12 @@ import { PAGES } from '../src/data/nav';
 // there is not a cosmetic slip — it is a dead end on every page at once. The site has already shipped one: a
 // pod panel linked to /experience before that page existed. A list plus this check is what stops the next one.
 const pagesDir = resolve(import.meta.dirname, '../src/pages');
+// A page file's route: `writing.astro` is /writing, and a folder's `index.astro` is the folder (`research/index.astro`
+// is /research). A dynamic route (`[slug]`) is no page a nav link could name.
 const routes = new Set(
-  readdirSync(pagesDir)
-    .filter((f) => f.endsWith('.astro'))
-    .map((f) => '/' + f.replace(/\.astro$/, '')),
+  readdirSync(pagesDir, { recursive: true }).map(String)
+    .filter((f) => f.endsWith('.astro') && !f.includes('['))
+    .map((f) => '/' + f.replace(/\/?index\.astro$|\.astro$/, '')),
 );
 
 describe('the corner nav page set', () => {

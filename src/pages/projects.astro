@@ -56,8 +56,10 @@ const bootDecider = `(function () {
 ---
 <BaseLayout title="Projects — Ing Tian" description={description} page="drafting" veil={false} navZone="light" preloadMono>
   <script is:inline set:html={bootDecider} />
+  {/* The rail before the field, so the rail's script runs first and its first marks land inside its entrance: the
+      field's init (a whole frame of isolines) is the longest on the page. */}
+  <SideRail stops={stops} />
   <DraftingField />
-  <SideRail stops={stops} id="projects-toc" />
 
   <main class="projects-page">
     <a class="back" href="/">← back</a>
@@ -83,28 +85,20 @@ const bootDecider = `(function () {
 
 <style>
   /* Above the field (z 0). The right gutter from 1180px is the cow's column, mirroring the rail on the left.
-     THE LABEL KNOCKOUT: every glyph on the page wears a 1px ring of the bare ground, the way a drafting sheet clears
-     the contours around a label. main has no background, so its text sits straight on the field's strokes, and a
-     stroke under a glyph takes light --ink-3 from 5.00:1 to 4.10 (minor line), 3.03 (major) and 1.34 (a fresh lit
-     ping) — the 4.5:1 rule held only between strokes. With the ring, the pixels touching a glyph are the ground the
-     palette was measured on (tests/draftingPalette.test.ts). Offsets with no blur, so the ring is opaque; eight of
-     them so the diagonals are closed too. A component with its own opaque ground should set `text-shadow: none`. */
-  .projects-page {
-    position: relative; z-index: 1; max-width: 1500px; padding: 0 6vw 180px;
-    --knock: var(--draft-ground);
-    text-shadow: -1px -1px 0 var(--knock), 0 -1px 0 var(--knock), 1px -1px 0 var(--knock), -1px 0 0 var(--knock),
-      1px 0 0 var(--knock), -1px 1px 0 var(--knock), 0 1px 0 var(--knock), 1px 1px 0 var(--knock);
-  }
-  /* Clears SideRail where it shows (it hides at ≤1100px). Measured with every row active, so every rule drawn:
-     its right edge is at x=139 at 1101px and x=151 at 2000px, against content starting at 190 and 230. */
-  @media (min-width: 1101px) { .projects-page { padding-left: clamp(190px, 13vw, 230px); } }
+     THE LABEL KNOCKOUT: main has no background, so every glyph in it wears a 1px ring of the bare ground, the one
+     tokens.css declares for this register (and says why). The rail's labels wear the same token. */
+  .projects-page { position: relative; z-index: 1; max-width: 1500px; padding: 0 6vw 180px; text-shadow: var(--knockout); }
+  /* Clears SideRail where it shows (it hides at ≤1100px). Every label sits past the dash's gutter whatever its
+     state; measured, the rail's right edge ("THE WORKSHOP") is at x=159.4 at 1101px and x=171.0 at 2000px, 2px more
+     under the hover nudge, against content starting at 190 and 230. */
+  @media not all and (max-width: 1100px) { .projects-page { padding-left: clamp(190px, 13vw, 230px); } }
   /* THE COW'S COLUMN IS THE MOCKUP'S, and the bubble is capped to it (.cowbox, below) — the owner's "the cow never
      overlaps content" (spec §3). The widest bubble is ~272px ("Look before you change anything.", 32 characters of
      12.5px mono, plus the 4px cell's padding and border), wider than this gutter from 1180 to ~1560px, where it
      painted up to ~52px over the column. The column keeps the mockup's width rather than widening to hold it: a
      long half wraps inside the bubble.
      tests/cowTalk.test.ts holds this padding and the cap to the same terms. */
-  @media (min-width: 1180px) {
+  @media not all and (max-width: 1179px) {
     .projects-page { padding-right: calc(4vw + 210px); }
   }
 
@@ -117,7 +111,10 @@ const bootDecider = `(function () {
   .back:hover { color: var(--ochre); }
 
   /* THE COW'S COLUMN. From 1180px it is fixed in the gutter the padding above reserves, mirroring the rail. Below
-     that it follows no scroll — fixed, it and its bubble would cover text and tap targets.
+     that it follows no scroll — fixed, it and its bubble would cover text and tap targets. ONE BREAKPOINT: the
+     in-flow rules ask (max-width: 1179px) and every gutter rule, here and in PlushCow, its exact negation, so a
+     zoomed window between the two whole pixels (1179.2 CSS px is 1415px at 120%) is one or the other; a second
+     bound at 1180px would leave it neither: the cow a 156px row in the flow, the gallery pushed down.
      BELOW 1180px, PHONES INCLUDED, it sits in the flow BESIDE THE LISTING'S LAST LINE, the idle prompt, whose 14
      characters leave the rest of that row empty. The box takes no height of its own there: the cow's top meets
      the prompt line's top (TerminalHeader's .idle is a 12px margin plus one 13.5px/1.55 line, synced by hand) and
@@ -174,7 +171,7 @@ const bootDecider = `(function () {
      bubble grows a row taller — upward, because the box hangs from where the two-row pair's bottom sat under the
      mockup's `top: 47vh`: two rows, the bubble's 54px of border, padding and MOO type, its 24px gap and the 156px
      cow, so 47vh + 270.25px. The cow itself never moves. */
-  @media (min-width: 1180px) {
+  @media not all and (max-width: 1179px) {
     .cowbox { position: fixed; right: max(26px, 3.2vw); bottom: calc(53vh - 2 * 1.45 * 12.5px - 234px); z-index: 15;
       max-width: calc(100% - min(100%, 1500px) + 4vw + 210px - max(26px, 3.2vw)); }
   }
@@ -205,15 +202,13 @@ const bootDecider = `(function () {
   import { BUBBLE_MS, HELLO_DELAY_MS, IDLE_EVERY_MS, TYPE_MS, idleLines, mayIdle, nextLine } from '../lib/cowTalk';
   import { askPoint } from '../lib/galleryLayout';
   import { prefersReducedMotion } from '../lib/motion';
-  import { onPageView } from '../lib/pageView';
+  import { onPageView } from '../scripts/pageView';
   import { isPhone } from '../lib/viewport';
 
-  // Started with the boot (lib/pageView.ts), not at window `load`: the boot can be skipped once the header's script
+  // Started with the boot (scripts/pageView.ts), not at window `load`: the boot can be skipped once the header's script
   // runs, right after parse, and the press that skips it must already find this listening — and ProjectAsk, which
   // starts the same way, there to answer the clicks this turns into asks.
-  onPageView('main.projects-page', () => {
-    const page = document.querySelector<HTMLElement>('main.projects-page');
-    if (!page) return;
+  onPageView('main.projects-page', (page) => {
     // A PRESS THAT SKIPS THE BOOT DOES NOTHING ELSE: the click ending it neither asks nor falls through to the repo.
     // During the boot the gallery is still the pile and the rows are invisible, so what is under the pointer is not
     // what the reader aimed at. Read at pointerdown, in the capture phase on window, because the boot's skip removes
@@ -256,13 +251,12 @@ const bootDecider = `(function () {
   // phone's one column a bubble the reader did not ask for is a box over what they are reading.
   // STARTED AT PARSE, like the dispatcher above that sends it `cow:say`: started at window `load` it missed every ask
   // made before then, and then greeted ("Click one. I'll explain.") a reader whose pop-up was already open.
-  onPageView('.cow-wrap--talk', () => {
-    const wrap = document.querySelector<HTMLElement>('.cow-wrap--talk');
-    const maybeBtn = wrap?.querySelector<HTMLButtonElement>('[data-cow]');
-    const maybeBubble = wrap?.querySelector<HTMLElement>('.cow-bubble');
-    const maybeA = wrap?.querySelector<HTMLElement>('[data-said-a]');
-    const maybeB = wrap?.querySelector<HTMLElement>('[data-said-b]');
-    const maybeLive = wrap?.querySelector<HTMLElement>('[data-cow-live]');
+  onPageView('.cow-wrap--talk', (wrap) => {
+    const maybeBtn = wrap.querySelector<HTMLButtonElement>('[data-cow]');
+    const maybeBubble = wrap.querySelector<HTMLElement>('.cow-bubble');
+    const maybeA = wrap.querySelector<HTMLElement>('[data-said-a]');
+    const maybeB = wrap.querySelector<HTMLElement>('[data-said-b]');
+    const maybeLive = wrap.querySelector<HTMLElement>('[data-cow-live]');
     if (!maybeBtn || !maybeBubble || !maybeA || !maybeB || !maybeLive) return;
     const btn = maybeBtn, bubble = maybeBubble, lineA = maybeA, lineB = maybeB, live = maybeLive;
     const root = document.documentElement;

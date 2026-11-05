@@ -1,79 +1,75 @@
 ---
-// A thin marginal table-of-contents rail, driven by a Stop tree from lib/pageStops.
+// The marginal table-of-contents rail, one component for every page that has one, driven by a Stop tree from
+// lib/pageStops. The template recurses, so the rail is as deep as the tree.
 //
-// Renders one level per level of the Stop tree (up to three), so the rail's depth
-// follows the data rather than being hardcoded per page.
+// Each label is three layers of the same text — the dim one (--ink-3), which is the link's name, and two copies over
+// it, .ink2 for the quieter mark and .ink1 for the lead — so a state change is a cross-fade of opacities, never a
+// colour transition, and every state is a solid ink at rest (the inactive one clears 4.5:1 on every rail page's
+// ground). The copies are empty aria-hidden elements whose text is generated (::before, from data-l): aria-hidden
+// keeps them out of the link's name in every engine (generated text alone is named by some and not by others), and
+// generated text is in no selection, no find-in-page and no unstyled page, so each of those holds a label once. The
+// dash hangs in a 20px gutter left of the label, so no label ever moves.
 //
-// Not an island (the site has none). Vanilla <script>, re-inits on
-// astro:page-load with teardown so it survives View Transitions.
+// Not an island (the site has none): a vanilla <script>, started through onPageView, with a teardown. The entrance
+// is CSS, not the script's: a bundled script runs after the browser has painted, so a from-state it set could land
+// on a rail already painted at rest. Each row carries its index (--i) and the rail the gap between rows (--gap).
 //
-// Scope note: the site has two OTHER rails — Toc.astro (post-hero fade-in) and the
-// /art rail (coupled to gallery formation). Both carry behavior this component
-// deliberately does not model, so they are left alone rather than half-migrated.
-import { type Stop } from '../lib/pageStops';
+// A page reskins it only through role tokens (CLAUDE.md, The concept): --knockout and --rail-dash-halo, declared
+// by the registers whose ground needs them (today /projects' drafting sheet), `none` everywhere else.
+//
+// Scope note: the site has two OTHER rails — Toc.astro (post-hero fade-in) and the /art rail (coupled to gallery
+// formation). Both carry behaviour this component deliberately does not model, so they are left alone rather than
+// half-migrated.
+import { type Stop, flattenStops } from '../lib/pageStops';
+import { RAIL, stagger } from '../lib/motionTiming';
 
 interface Props {
   stops: Stop[];
-  /** DOM id on the <nav> — a stable handle for tests and for #-linking to the rail.
-   *  (The script finds rails by the .side-rail CLASS, so it can drive several.) */
-  id: string;
-  label?: string;
+  /** Set only by the template's own recursion: the depth of the list being rendered. */
+  depth?: number;
+  /** Set only by the template's own recursion: the whole rail in document order, which numbers its rows. */
+  flat?: Stop[];
 }
-const { stops, id, label = 'On this page' } = Astro.props;
+const { stops, depth, flat = flattenStops(stops) } = Astro.props;
+// The entrance (lib/motionTiming RAIL): each row RAIL.row long, RAIL.rowStep after the one before, closer on a long
+// rail so the last is in by RAIL.enter. The CSS reads both from the nav's style, --row and --gap, so it plays the
+// duration this arithmetic used. With no `max`, stagger(i) is i x stagger(1), so the CSS multiplies.
+const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RAIL.row });
 ---
-{stops.length > 0 && (
-  <nav class="side-rail" id={id} aria-label={label}>
-    <ul>
-      {stops.map((s) => (
-        <li>
-          <a href={`#${s.target}`} data-target={s.target}>
-            <span class="rule" aria-hidden="true"></span><span class="label">{s.label}</span>
-          </a>
-          {s.children && s.children.length > 0 && (
-            <ul class="sub">
-              {s.children.map((c) => (
-                <li>
-                  <a href={`#${c.target}`} data-target={c.target}>
-                    <span class="rule" aria-hidden="true"></span><span class="label">{c.label}</span>
-                  </a>
-                  {c.children && c.children.length > 0 && (
-                    <ul class="sub">
-                      {c.children.map((g) => (
-                        <li>
-                          <a href={`#${g.target}`} data-target={g.target}>
-                            <span class="rule" aria-hidden="true"></span><span class="label">{g.label}</span>
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </li>
-      ))}
-    </ul>
-  </nav>
+{depth === undefined ? (
+  stops.length > 0 && (
+    <nav class="side-rail" aria-label="On this page" style={`--gap:${gap}ms;--row:${RAIL.row}ms`}><Astro.self stops={stops} depth={0} flat={flat} /></nav>
+  )
+) : (
+  <ul class={depth > 0 ? 'sub' : undefined}>
+    {stops.map((s) => (
+      <li>
+        <a href={`#${s.target}`} style={`--i:${flat.indexOf(s)}`}><span class="rule" aria-hidden="true"></span><span class="lbl"><span class="dim">{s.label}</span><span class="ink2" aria-hidden="true" data-l={s.label}></span><span class="ink1" aria-hidden="true" data-l={s.label}></span></span></a>
+        {s.children && s.children.length > 0 && <Astro.self stops={s.children} depth={depth + 1} flat={flat} />}
+      </li>
+    ))}
+  </ul>
 )}
 
 <style>
-  /* Vertically centred in the left margin — same position as the /research rail
-     it replaces, so the page's composition is unchanged. */
+  /* Vertically centred in the left margin. The 30px of padding is the dash's gutter (20px dash, 10px air), so every
+     label sits where it would with its dash drawn; the pages' clearances were measured against that edge. */
   .side-rail {
     position: fixed;
     left: clamp(18px, 2.4vw, 38px);
     top: 50%;
     transform: translateY(-50%);
     z-index: 30;
-    /* 200px, not 190px, and the 10px is load-bearing: at 190px the longest label in the data — "University of
-       Toronto", the PhD institution — needed 151px against a 148px box and rendered as "UNIVERSITY OF TORON…".
-       Only the ACTIVE row truncated, because .rule animates from 0 to 20px on activation and takes that width
-       out of the label beside it, so the defect appeared only once a reader had scrolled to that stop.
-       There is room: measured at 1180px, the narrowest width where the rail is shown at all, its right edge sits
-       at x=218 and the nearest content starts at x=401 — 183px of clearance. Widening is preferable to tightening
-       the label's tracking, which would have changed the rail's type everywhere to fix one string. */
+    /* 200px, and the last 10px are load-bearing: the longest label in the data, "University of Toronto" (the PhD
+       institution), needs 151px, and a nested label gets 200 - 30 - 12 = 158. At 190 it rendered as
+       "UNIVERSITY OF TORON…". Widening beats tightening the tracking, which would change the rail's type
+       everywhere to fix one string. */
     max-width: 200px;
+    padding-left: 30px;
+    /* The dash's strength: ink-1 at 55% clears 3:1 as a mark on every rail page's ground (worst measured, 3.74:1
+       over the light reading sky; tests/paperPalette.test.ts and tests/draftingPalette.test.ts hold the sheets).
+       It is the alpha of the dash's colour, not its opacity, so a register can ring the dash with an opaque knockout. */
+    --mk: 55%;
   }
   .side-rail ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
   /* Nested lists breathe less than top-level ones, so a group reads as a group — but not below 12px, at any depth.
@@ -83,193 +79,251 @@ const { stops, id, label = 'On this page' } = Astro.props;
   .side-rail .sub { gap: 12px; margin-top: 12px; padding-left: 12px; }
 
   .side-rail a {
-    display: flex; align-items: center; gap: 10px; text-decoration: none;
+    position: relative; display: flex; text-decoration: none;
     font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em;
-    text-transform: uppercase; line-height: 1.25; color: var(--ink-3); opacity: 0.45;
-    transition: opacity 0.3s, color 0.3s;
+    text-transform: uppercase; line-height: 1.25;
   }
-  /* Child stops are quieter and less tracked-out than their parent — hierarchy by
-     weight, not by adding indent depth (which a narrow margin can't afford).
-     Opacity 0.45 (matching the top tier) not 0.34: at 0.34 the child text measured
-     ~1.6:1 against the reading-page sky, the least legible text on either reading
-     page. Size and tracking already carry the tier difference, so the extra fade
-     bought hierarchy that was already there at the cost of readability. */
-  .side-rail .sub a { font-size: 10px; letter-spacing: 0.12em; opacity: 0.45; }
-  .side-rail .rule { width: 0; height: 1px; background: currentColor; opacity: 0.55; transition: width 0.4s ease; flex: none; }
-  /* ONE LINE PER ROW. Measured with a real long title in the data: a truncated 22-char label still wrapped to
-     two lines in a 190px rail, which broke the even vertical rhythm and pushed the neighbouring rows
-     off-centre. The ellipsis is the rail's own, so a label that still cannot fit degrades to a clean cut
-     rather than to a second line. */
-  .side-rail .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Child stops are smaller and less tracked-out than their parent: hierarchy by type, not by indent depth, which
+     a narrow margin cannot afford. */
+  .side-rail .sub a { font-size: 10px; letter-spacing: 0.12em; }
 
-  /* ── STATE beats TIER, and state beats hover. ──
-     These are written with :where() on the tier part so the STATE selectors win
-     regardless of nesting depth. Plainly-written `.side-rail a.is-active`
-     (specificity 0,4,1) LOSES to `.side-rail .sub a` (0,5,1), which meant a
-     nested active stop stayed at the child tier's opacity 0.34 — the active
-     indicator never appeared on any child row, which is every section stop on
-     /research. Verified in the browser: the active leaf computed to 0.34.
-     :where() contributes ZERO specificity, so `.side-rail :where(.sub) a`
-     still targets the nested tiers but cannot outrank a state class. */
-  .side-rail a.is-active,
-  .side-rail :where(.sub) a.is-active { opacity: 1; color: var(--ink-1); }
-  .side-rail a.is-active .rule,
-  .side-rail :where(.sub) a.is-active .rule { width: 20px; }
-  /* Ancestor of the active leaf: lit, but not as loud as the leaf itself, so you
-     can see WHICH paper you're inside without it competing with the section. */
-  .side-rail a.is-ancestor,
-  .side-rail :where(.sub) a.is-ancestor { opacity: 0.78; color: var(--ink-2); }
-  .side-rail a.is-ancestor .rule,
-  .side-rail :where(.sub) a.is-ancestor .rule { width: 12px; }
+  /* ONE LINE PER ROW: a label that cannot fit ends in an ellipsis rather than wrapping, which would break the even
+     rhythm and push its neighbours off-centre. All three layers clip the same way, so they stay one word.
+     --knockout is a register's ring for a ground with strokes under the text (on /projects, 1px of the bare sheet
+     around every glyph, so no field line touches one; the page's own text wears the same token); the copies inherit
+     it. */
+  .side-rail .lbl { position: relative; min-width: 0; text-shadow: var(--knockout, none); }
+  .side-rail .dim,
+  .side-rail .ink2,
+  .side-rail .ink1 { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .side-rail .dim { color: var(--ink-3); }
+  .side-rail .ink2,
+  .side-rail .ink1 { position: absolute; inset: 0; opacity: 0; }
+  .side-rail .ink2::before,
+  .side-rail .ink1::before { content: attr(data-l); }
+  .side-rail .ink2 { color: var(--ink-2); }
+  .side-rail .ink1 { color: var(--ink-1); }
 
-  /* Hover must not DIM the active row. The hover rules come later in the sheet at
-     equal-or-higher specificity than the state rules, so without the :not() guard
-     pointing at the active stop dropped it from 1.0 to 0.85 — dimming exactly the
-     row the pointer is most likely resting on. */
+  /* The dash, and its faint preview at a hovered or focused row (a::after): the same 20px hairline in the gutter,
+     shown by opacity and scaled from its left end. A text-shadow does not reach the dash (a painted span), so it
+     wears its register's knockout as a box-shadow, --rail-dash-halo. */
+  .side-rail .rule,
+  .side-rail a::after {
+    position: absolute; left: -30px; top: 50%; width: 20px; height: 1px; margin-top: -0.5px;
+    background: var(--ink-1); opacity: 0; transform-origin: 0 50%; pointer-events: none;
+  }
+  .side-rail .rule { background: color-mix(in srgb, var(--ink-1) var(--mk), transparent); box-shadow: var(--rail-dash-halo, none); }
+  .side-rail a::after { content: ''; }
+
+  /* THE MARKS, set by the script (lib/scrollspy's railMarks). The lead, the one current stop the moving dash is at,
+     is full ink with the whole dash. Any other current stop (.is-quiet: a second section in the reading band) and
+     an ancestor of a current stop wear the quieter mark — --ink-2 and a 12px dash — so the rail shows one "here" at
+     a time. The quiet dash keeps the full strength: at the prototype's 0.69 of it, it computes to 2.30-2.40:1 in
+     light, under 3:1. */
+  .side-rail a:is(.is-active, .is-ancestor) .dim { opacity: 0; }
+  .side-rail a.is-active .ink1 { opacity: 1; }
+  .side-rail a:is(.is-ancestor, .is-quiet) .ink2 { opacity: 1; }
+  .side-rail a.is-active.is-quiet .ink1 { opacity: 0; }
+  .side-rail a:is(.is-active, .is-ancestor) .rule { opacity: 1; }
+  .side-rail a:is(.is-ancestor, .is-quiet) .rule { transform: scaleX(0.6); }
+
+  /* FORCED COLOURS (Windows High Contrast) set every ink in one system colour and paint backgrounds as Canvas, so
+     the inks the marks cross-fade between look alike and the dash is gone. The current stop keeps a mark there: the
+     dash in Highlight (and the hover preview with it, at its own opacity), the current label underlined. */
+  @media (forced-colors: active) {
+    .side-rail .rule, .side-rail a::after { forced-color-adjust: none; background: Highlight; box-shadow: none; }
+    .side-rail a.is-active .ink2, .side-rail a.is-active .ink1 { text-decoration: underline; }
+  }
+
+  /* HOVER IS .is-hover, NOT :hover: the script sets it for a mouse or a pen and ignores a touch, so a tap on a
+     touch laptop (whose primary pointer can hover) never leaves a row nudged and previewed. */
   @media (hover: hover) {
-    .side-rail a:not(.is-active):not(.is-ancestor):hover { opacity: 0.85; }
-    .side-rail :where(.sub) a:not(.is-active):not(.is-ancestor):hover { opacity: 0.7; }
+    .side-rail a.is-hover:not(.is-active)::after { opacity: 0.2; }
   }
+  .side-rail a:not(.is-active):focus-visible::after { opacity: 0.2; }
+  .side-rail a:focus-visible { outline: 1px solid var(--ochre); outline-offset: 3px; border-radius: 2px; }
 
-  /* Keyboard focus must be visible. The inherited element `opacity` fades a UA
-     focus ring, so the rail draws its own and lifts the row to full strength. */
-  .side-rail a:focus-visible {
-    opacity: 1;
-    outline: 1px solid var(--ochre);
-    outline-offset: 3px;
-    border-radius: 2px;
+  /* The label's cross-fade and the 2px nudge toward a hovered or focused row. The dash's slide and the quiet marks'
+     fades are the script's. The times are lib/motionTiming's RAIL, the curves its FADE and EASE
+     (tests/motionTiming.test.ts). */
+  @media (prefers-reduced-motion: no-preference) {
+    .side-rail .dim,
+    .side-rail .ink2,
+    .side-rail .ink1 { transition: opacity 200ms ease-out; }
+    .side-rail a::after { transition: opacity 160ms ease-out; }
+    .side-rail .lbl { transition: transform 160ms cubic-bezier(.2,.7,.2,1); }
+    .side-rail a:focus-visible .lbl { transform: translateX(2px); }
   }
+  @media (prefers-reduced-motion: no-preference) and (hover: hover) {
+    .side-rail a.is-hover .lbl { transform: translateX(2px); }
+  }
+  /* THE ENTRANCE, once per page view (a ClientRouter arrival renders a new rail, so it plays there too): every row in
+     from 6px left, --row long and --i x --gap late (both set by the frontmatter, so the last row is in by RAIL.enter).
+     CSS, so it runs from the first frame with nothing to wait for, and the backwards fill holds each row in its
+     from-state through its delay. A CSS animation restarts when its element is rendered again, so a rail hidden at
+     1100px and below runs it when it first shows, and a row the script hid (its target stopped rendering) replays its
+     own when it shows again; today no rail page hides a target wider than 1100px. On a page with a veil (/writing,
+     /experience) most of it plays under the veil's wipe. */
+  @media (prefers-reduced-motion: no-preference) {
+    .side-rail a {
+      animation: side-rail-enter var(--row) cubic-bezier(.2,.7,.2,1) backwards;
+      animation-delay: calc(var(--i) * var(--gap));
+    }
+  }
+  @keyframes side-rail-enter { from { opacity: 0; transform: translateX(-6px); } }
 
   /* The rail is a wide-viewport affordance; below this the page re-centers. */
   @media (max-width: 1100px) { .side-rail { display: none; } }
 </style>
 
 <script>
-  import { activeStopIndex } from '../lib/scrollspy';
+  // The rail's script: which stops are marked (lib/scrollspy's railMarks, measured on every scroll frame) and the
+  // motion between marks, ported from the v4 prototype. Only transform and opacity move, each thing once:
+  // - ONE dash moves, the lead's. When the lead changes, its dash slides from wherever the old one is (at rest or
+  //   mid-flight) and grows to its length; with nowhere to slide from, it grows in place. Any other current stop
+  //   takes the quiet mark, fading in and out where it stands. So a section boundary in the reading band is one
+  //   quiet mark appearing and then one slide, and a rail click is one dash travelling. The times are RAIL's.
+  // The first marks appear at once, inside the rows' CSS entrance. Reduced motion: the same marks, at once.
+  import { prefersReducedMotion } from '../lib/motion';
+  import { EASE, RAIL } from '../lib/motionTiming';
+  import { fragmentId } from '../lib/pageStops';
+  import { type Marks, railMarks } from '../lib/scrollspy';
+  import { play } from '../scripts/motion';
+  import { onPageView } from '../scripts/pageView';
 
-  const teardowns: Array<() => void> = [];
-
-  function initRails(): void {
-    while (teardowns.length) teardowns.pop()!();
-    document.querySelectorAll<HTMLElement>('.side-rail').forEach((rail) => {
-      const t = initRail(rail);
-      if (t) teardowns.push(t);
+  onPageView('.side-rail', (rail) => {
+    const stops = [...rail.querySelectorAll<HTMLAnchorElement>('a')].flatMap((a) => {
+      const el = document.getElementById(fragmentId(a.hash));
+      const rule = a.querySelector<HTMLElement>('.rule');
+      const li = a.closest('li');
+      return el && rule && li ? [{ a, el, rule, li }] : [];
     });
-  }
-
-  function initRail(rail: HTMLElement): (() => void) | null {
-    const links = Array.from(rail.querySelectorAll<HTMLAnchorElement>('a'));
-    const stops = links
-      .map((a) => ({ a, el: document.getElementById(a.dataset.target || '') }))
-      .filter((s): s is { a: HTMLAnchorElement; el: HTMLElement } => !!s.el);
-    if (!stops.length) return null;
-
-    // Each link's ancestor links, so activating a leaf can also light its parents.
-    const ancestorsOf = new Map<HTMLAnchorElement, HTMLAnchorElement[]>();
-    for (const { a } of stops) {
-      const chain: HTMLAnchorElement[] = [];
-      let li = a.closest('li')?.parentElement?.closest('li') ?? null;
-      while (li) {
-        const parentLink = li.querySelector<HTMLAnchorElement>(':scope > a');
-        if (parentLink) chain.push(parentLink);
-        li = li.parentElement?.closest('li') ?? null;
+    if (!stops.length) return undefined;
+    // Each stop's parent: the nearest enclosing row that is itself a stop.
+    const indexOf = new Map(stops.map((s, i) => [s.li, i]));
+    const parent = stops.map((s) => {
+      for (let li = s.li.parentElement?.closest('li'); li; li = li.parentElement?.closest('li')) {
+        const i = indexOf.get(li);
+        if (i !== undefined) return i;
       }
-      ancestorsOf.set(a, chain);
-    }
+      return null;
+    });
 
-    // WHICH STOP IS "CURRENT" — and why more than one can be.
-    //
-    // The obvious rule (last stop whose top crossed a line near the viewport top,
-    // which lib/scrollspy implements) assumes tree order equals top-to-bottom
-    // order. On /research it does not: the paper body is a two-column grid with
-    // "The idea" and "Method" stacked in the LEFT column and "Results" filling the
-    // RIGHT. Measured on the real page, Results spans document 1044-1817 while the
-    // left sections span 1044-1307 and 1367-1849 — so Results is on screen at the
-    // same time as a left section at EVERY scroll position, and no position-based
-    // rule can name a single current section. Feeding tree order to the shared rule
-    // left only 1 of 7 stops ever active; sorting by measured top left 5 of 7.
-    //
-    // So the rail marks every stop the reader is actually looking at: each stop
-    // whose box overlaps a reading band below the viewport top is CURRENT. That is
-    // honest about a two-column layout instead of picking a winner by coin flip.
-    // The band is deliberately shallow so a tall section does not stay lit forever.
-    //
-    // Ancestors of any current stop are marked separately (dimmer), so you can see
-    // which paper you are inside without it competing with its sections.
-    function update(): void {
-      const vh = window.innerHeight;
-      const bandTop = vh * 0.10;
-      const bandBottom = vh * 0.62;
+    const ac = new AbortController();
+    const live = new Set<Animation>();
+    const fly = new Map<number, Animation>(); // at most one animation per dash
+    let on = new Set<number>();
+    let ancestors = new Set<number>();
+    let lead: number | null = null;
+    let was = false; // the rail was showing on the last frame: only then do marks move rather than appear
+    let raf = 0;
 
-      // COLLAPSED CONTENT: a stop whose target is not rendered must not appear in the rail.
-      // /research collapses each paper behind a card, so "The idea / Method / Results" point at
-      // elements inside a `hidden` panel. getBoundingClientRect() on those returns an all-zero box,
-      // which is not merely inert — it sorts to the top and can win the fallback rule, lighting a
-      // section the reader cannot see. Hiding the row is also the honest UI: the rail should offer
-      // what the page is currently showing.
-      for (const s of stops) {
-        const live = s.el.getClientRects().length > 0;
-        s.a.closest('li')?.toggleAttribute('hidden', !live);
-      }
-      const visible = stops.filter((s) => s.el.getClientRects().length > 0);
-      if (!visible.length) return;
-
-      const measured = visible.map((s, treeIndex) => {
+    function measure(): Marks {
+      const boxes = stops.map((s, i) => {
         const r = s.el.getBoundingClientRect();
-        return {
-          ...s, treeIndex, top: r.top,
-          overlap: Math.max(0, Math.min(r.bottom, bandBottom) - Math.max(r.top, bandTop)),
-        };
+        return { top: r.top, bottom: r.bottom, visible: s.el.getClientRects().length > 0, parent: parent[i] };
       });
+      // A stop whose target is not rendered leaves the rail: the rail offers what the page is showing.
+      stops.forEach((s, i) => s.li.toggleAttribute('hidden', !boxes[i].visible));
+      return railMarks(boxes, window.innerHeight, window.scrollY, document.documentElement.scrollHeight);
+    }
 
-      let current = measured.filter((s) => s.overlap > 0);
+    function halt(i: number): void {
+      fly.get(i)?.cancel();
+      fly.delete(i);
+    }
+    function flyDash(i: number, frames: Keyframe[], opts: KeyframeAnimationOptions): void {
+      halt(i);
+      const f = play(stops[i].rule, frames, opts, live);
+      fly.set(i, f);
+      const end = (): void => { if (fly.get(i) === f) fly.delete(i); };
+      f.finished.then(end, end);
+    }
+    const fadeIn = (i: number): void => flyDash(i, [{ opacity: 0, offset: 0 }], { duration: RAIL.fade });
+    const centre = (el: Element): { x: number; y: number } => {
+      const r = el.getBoundingClientRect();
+      return { x: r.left, y: r.top + r.height / 2 };
+    };
 
-      if (!current.length) {
-        // Nothing in the band: above the first section, or (at the page bottom)
-        // below the last one — content past max scroll can never reach the band.
-        // Fall back to the shared "last top past the line" rule, on positionally
-        // sorted tops so its monotonic-order precondition actually holds.
-        const sorted = [...measured].sort((p, q) => (p.top - q.top) || (p.treeIndex - q.treeIndex));
-        const idx = activeStopIndex(
-          sorted.map((s) => s.top), vh, window.scrollY, document.documentElement.scrollHeight,
-        );
-        if (idx >= 0) current = [sorted[idx]];
-      }
-
-      const activeSet = new Set(current.map((s) => s.a));
-      const litAncestors = new Set<HTMLAnchorElement>();
-      for (const s of current) for (const anc of ancestorsOf.get(s.a) ?? []) litAncestors.add(anc);
-
-      for (const { a } of stops) {
-        const isActive = activeSet.has(a);
-        a.classList.toggle('is-active', isActive);
-        a.classList.toggle('is-ancestor', !isActive && litAncestors.has(a));
-        // aria-current mirrors the visual state for assistive tech, the way the
-        // sibling Toc.astro rail does. 'true' is valid on more than one link when
-        // more than one section is genuinely in view.
-        if (isActive) a.setAttribute('aria-current', 'true');
+    function apply(m: Marks, animate: boolean): void {
+      const prev = on, wasAnc = ancestors, from = lead, next = new Set(m.current), anc = new Set(m.ancestors);
+      on = next;
+      ancestors = anc;
+      lead = m.lead;
+      // Read before any class or animation changes: where the old lead's dash is now (nowhere if its row is
+      // hidden), and how each quiet mark looks, so one that stops being current fades from where it is.
+      const src = animate && from !== null && stops[from].a.getClientRects().length > 0 ? centre(stops[from].rule) : null;
+      const quiet = animate
+        ? [...prev].filter((i) => i !== from).map((i) => {
+          const cs = getComputedStyle(stops[i].rule);
+          return { i, opacity: cs.opacity, transform: cs.transform };
+        })
+        : [];
+      stops.forEach(({ a }, i) => {
+        a.classList.toggle('is-active', next.has(i));
+        a.classList.toggle('is-quiet', next.has(i) && i !== lead);
+        a.classList.toggle('is-ancestor', anc.has(i));
+        // 'true' is valid on more than one link when more than one section is genuinely in view.
+        if (next.has(i)) a.setAttribute('aria-current', 'true');
         else a.removeAttribute('aria-current');
+      });
+      if (!animate) {
+        fly.forEach((f) => f.cancel());
+        fly.clear();
+        return;
+      }
+      if (lead !== from) {
+        if (from !== null) halt(from);
+        if (lead !== null && src) {
+          // Its resting place: the row's height-centre, at the dash's own offset (offsetLeft ignores transforms).
+          const { a, rule } = stops[lead];
+          const r = a.getBoundingClientRect();
+          const dx = src.x - (r.left + rule.offsetLeft), dy = src.y - (r.top + r.height / 2);
+          flyDash(lead, [
+            { transform: `translate(${dx}px, ${dy}px) scaleX(1)`, opacity: 1, easing: EASE },
+            { transform: 'translate(0px, 0px) scaleX(0.45)', opacity: 1, offset: RAIL.slide / (RAIL.slide + RAIL.grow), easing: EASE },
+            { transform: 'translate(0px, 0px) scaleX(1)', opacity: 1 },
+          ], { duration: RAIL.slide + RAIL.grow, easing: 'linear' });
+        } else if (lead !== null) {
+          flyDash(lead, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: RAIL.growIn });
+        }
+        // The stop it left, if still current, takes the quiet mark where it stands; the dash leaving covers it.
+        if (from !== null && next.has(from)) fadeIn(from);
+      }
+      // A stop newly current fades its quiet mark in, unless it was an ancestor: an ancestor's mark is the quiet mark.
+      for (const i of next) if (i !== lead && i !== from && !prev.has(i) && !wasAnc.has(i)) fadeIn(i);
+      for (const q of quiet) {
+        if (next.has(q.i)) continue;
+        halt(q.i);
+        // No longer current, and no ancestor's mark in its place: it fades where it is.
+        if (getComputedStyle(stops[q.i].rule).opacity !== '0' || q.opacity === '0') continue;
+        flyDash(q.i, [{ opacity: q.opacity, transform: q.transform }, { opacity: 0, transform: q.transform }], { duration: RAIL.fade });
       }
     }
 
-    let ticking = false;
-    function onScroll(): void {
-      if (ticking) return;
-      // Below 1100px the rail is display:none, so measuring every stop's rect on
-      // each scroll buys nothing the user can see. Skip the work instead.
-      if (getComputedStyle(rail).display === 'none') return;
-      ticking = true;
-      requestAnimationFrame(() => { update(); ticking = false; });
+    function frame(): void {
+      raf = 0;
+      const shown = rail.getClientRects().length > 0; // display: none at 1100px and below
+      if (shown) apply(measure(), was && !prefersReducedMotion());
+      was = shown;
     }
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll, { passive: true });
-    update();
+    const spy = (): void => { if (!raf) raf = requestAnimationFrame(frame); };
+
+    frame();
+    window.addEventListener('scroll', spy, { passive: true, signal: ac.signal });
+    window.addEventListener('resize', spy, { passive: true, signal: ac.signal });
+    // Hover is a mouse's or a pen's; a tap reports 'touch' and is ignored (the CSS reads .is-hover, not :hover).
+    for (const a of rail.querySelectorAll('a')) {
+      a.addEventListener('pointerenter', (e) => a.classList.toggle('is-hover', e.pointerType !== 'touch'), { signal: ac.signal });
+      a.addEventListener('pointerleave', () => a.classList.remove('is-hover'), { signal: ac.signal });
+    }
+    // Started at parse, so the first marks were measured before the webfonts: measure again once they land.
+    void document.fonts.ready.then(() => { if (!ac.signal.aborted) spy(); });
 
     return () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
+      ac.abort();
+      cancelAnimationFrame(raf);
+      live.forEach((a) => a.finish());
     };
-  }
-
-  document.addEventListener('astro:page-load', initRails);
+  });
 </script>

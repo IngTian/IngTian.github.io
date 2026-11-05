@@ -27,12 +27,9 @@
 // problem, the constraint, stuff, you can maybe learn from research's nested ToC. this way it's clearer on the
 // top level."
 //
-// The tree lives in lib/pageStops (homeStops), the same module the /research, /projects and /experience rails
-// read — one place that knows what a rail carries, and unit-tested. Zones stay HERE on the top-level stops
-// because they are a property of the sky behind a stop, not of the page's structure.
-// flattenStops came off this import when noUnusedLocals went on: it is what SideRail needs (a rail that runs a
-// scrollspy over every stop at once), and the Toc renders the tree as a tree, so it never had a use for the
-// flattened form. It stays exported and tested in lib/pageStops for the rails that do.
+// The tree lives in lib/pageStops (homeStops), the same module every SideRail page's rail reads — one place
+// that knows what a rail carries, and unit-tested. Zones stay HERE on the top-level stops because they are a
+// property of the sky behind a stop, not of the page's structure.
 import { homeStops } from '../lib/pageStops';
 
 const stops = homeStops();
@@ -186,9 +183,10 @@ for (const s of stops) {
   :global(html[data-theme='dark']) .toc.over-paper a.is-active { color: #eef2ee; }
 
   /* THE LABELS NEED A MARGIN TO LIVE IN. The slide papers reserve a wide left gutter for this rail only in
-     their two-column layout (min-width: 1101px); below that they reclaim it and pad to just 28-80px, so the
-     labelled rail lands ON the body text. Measured at 900px: "ABOUT / CHOICE / RULES" printed across the
-     defining slide's beats. Dots carry the same progress information in a width that always fits. */
+     their two-column layout, and below it reclaim it and pad to just 28-80px, so the labelled rail would land ON the
+     body text: Choice and Rules reclaim it at 1100px and below, Story, Solve and Work at 1099px and below (at exactly
+     1100px those three keep the gutter while the rail is already dots). Measured at 900px: "ABOUT / CHOICE / RULES"
+     printed across the defining slide's beats. Dots carry the same progress information in a width that always fits. */
   @media (max-width: 1100px) {
     .toc .rule, .toc .label { display: none; }
     .toc .dot { display: block; }

@@ -8,9 +8,17 @@ import {
   INTRO_DURATION_MS, INTRO_DUR_MIN_MS, INTRO_DUR_MAX_MS,
 } from '../src/lib/introTimeline';
 import { INTRO_SEEN_KEY } from '../src/lib/introSession';
-import { inProgress, projects } from '../src/data/profile';
-import { flattenStops, projectSectionId, projectStops } from '../src/lib/pageStops';
+import { inProgress, projects, publications, researchInterests, timeline, type Publication } from '../src/data/profile';
+import { PAPER_DATA } from '../src/data/papers';
+import {
+  type Stop, experienceStops, flattenStops, paperPageOwns, paperSections, paperStops, projectSectionId, projectStops,
+  researchIndexStops,
+} from '../src/lib/pageStops';
+import { FIGURE_NAME, PAPERS_DIR, type PaperReport } from '../src/lib/paperMarkdown';
+import { countWords, readingMinutes, wholeParts } from '../src/lib/words';
+import { renderMarkdown } from './helpers/paperChain';
 import { GALLERY_ORDER } from '../src/lib/galleryLayout';
+import { EASE, RAIL, stagger } from '../src/lib/motionTiming';
 import { listingLines } from '../src/lib/projectsListing';
 import { BOOT_CMD, BOOT_DEADLINE_MS, BOOT_SEEN_KEY } from '../src/lib/projectsBoot';
 import { PHONE_QUERY } from '../src/lib/viewport';
@@ -45,6 +53,16 @@ import { PHONE_QUERY } from '../src/lib/viewport';
    ================================================================================================ */
 
 const DIST = fileURLToPath(new URL('../dist/', import.meta.url));
+const PUBLIC = fileURLToPath(new URL('../public/', import.meta.url));
+const CONTENT = fileURLToPath(new URL('../src/content/', import.meta.url));
+
+/** A collection's files, each its name (the slug its glob loader gives it) and its frontmatter block. */
+const contentFiles = (dir: string): { name: string; front: string }[] => readdirSync(join(CONTENT, dir))
+  .filter((f) => f.endsWith('.md'))
+  .map((f) => ({ name: f.slice(0, -3), front: /^---\n([\s\S]*?)\n---/.exec(readFileSync(join(CONTENT, dir, f), 'utf8'))?.[1] ?? '' }));
+/** The records with a page of their own: the one each paper file explains (its `publication`). */
+const explained = (): Set<string> =>
+  new Set(contentFiles('papers').map((f) => /^publication:\s*(\S+)/m.exec(f.front)?.[1] ?? `(${f.name} names no publication)`));
 
 const NEEDS_BUILD =
   'tests/distSmoke.test.ts found no HTML in dist/. It inspects the BUILT site, so `npm run build` ' +
@@ -189,11 +207,37 @@ const namesAFile = (path: string): boolean => /\/[^/]*\.[a-z0-9]+$/i.test(path);
  */
 const isProto = (p: Page): boolean => p.route.startsWith('/proto-');
 
+/**
+ * A paper's file rendered, and what the markdown plugins report for it (its sections, its words), through the chain
+ * the build runs (tests/helpers/paperChain.ts) — a second reading of the file, so a page that renders its rail from
+ * anything else is caught. The frontmatter is read for what the report needs: which record it explains. Without its
+ * references a citation renders as its key, so the words are this render's, not the built page's.
+ */
+const paperRender = async (slug: string): Promise<{ html: string; report: PaperReport }> => {
+  const path = fileURLToPath(new URL(`../${PAPERS_DIR}/${slug}.md`, import.meta.url));
+  const body = readFileSync(path, 'utf8').replace(/^---\n[\s\S]*?\n---\n/, '');
+  return renderMarkdown(body, path, { papers: PAPER_DATA, publications, frontmatter: { publication: slug } });
+};
+
 describe('the built site (dist/) — rendered-output smoke test', () => {
   it('has a build to inspect at all', () => {
     // First, so that a missing dist/ reads as "you did not build" once, instead of as four
     // unrelated-looking failures further down.
     expect(pages().length, NEEDS_BUILD).toBeGreaterThan(5);
+  });
+
+  // The eight page files' routes, then one per published writing piece and one per paper file: ten today, the
+  // "10 page(s) built" CLAUDE.md quotes. The content routes are counted from src/content/ rather than typed, because
+  // a new piece or paper is a file and nothing else may need an edit. A deleted page that still builds, or a page
+  // that stopped building, fails by name. (dist/ also holds public/'s one .html, which no page builds.)
+  it('builds exactly its routes: eight pages, one per writing piece and one per paper (ten today)', () => {
+    const built = pages().filter((p) => !existsSync(join(PUBLIC, p.file))).map((p) => p.route).sort();
+    const want = [
+      '/', '/404.html', '/art', '/experience', '/projects', '/proto-sketches', '/research', '/writing',
+      ...contentFiles('writing').filter((f) => !/^draft:\s*true\b/m.test(f.front)).map((f) => `/writing/${f.name}`),
+      ...[...explained()].map((slug) => `/research/${slug}`),
+    ].sort();
+    expect(built).toEqual(want);
   });
 
   // ── 1. EVERY INTERNAL LINK RESOLVES ──────────────────────────────────────────────────────────
@@ -373,6 +417,14 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
     expect(bare, `<img> without alt:\n  ${bare.join('\n  ')}`).toEqual([]);
   });
 
+  // .sr-only's 1px box hides nothing on a table: a table's width and height are only minimums, so it lays out every
+  // column and row at full size, inside the page's scrollable overflow, where a scroll to a hidden cell (find-in-page,
+  // a screen reader's cursor) moves the page sideways. A hidden table goes inside a hidden div.
+  it('never puts .sr-only on a table', () => {
+    const bad = pages().flatMap((p) => [...p.markup.matchAll(/<table\b[^>]*\bclass="[^"]*\bsr-only\b[^>]*>/gi)].map(([t]) => `${p.file}: ${t}`));
+    expect(bad).toEqual([]);
+  });
+
   /* (There is no separate 'resolves fragments on the proto routes too' test any more. It existed only to
      make the `isProto` exclusion in check 1 a visible gap rather than a silent filter; the exclusion is
      gone, so check 1 covers the proto routes directly and this was a strict subset of it — with a worse
@@ -381,7 +433,7 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
 
 describe('the homepage intro ships on / and ONLY on /', () => {
   // MOVING THE INTRO UP INTO BaseLayout IS THE ONE EDIT that would hand a 5.2-second construction
-  // animation to all nine routes — including /404 and the proto gallery. The retired first-visit gate
+  // animation to every route — including /404 and the proto gallery. The retired first-visit gate
   // verified the equivalent property by reading built HTML ("5 data-gate references on /, zero on the
   // other eight"), and this is that check for its replacement.
   //
@@ -543,43 +595,219 @@ describe("/art's image payload, measured on the built output", () => {
   });
 });
 
-describe("BaseLayout's per-page hooks ship on /projects and ONLY on /projects", () => {
-  // `page` puts `data-page` on <html>, the scope tokens.css hangs the drafting palette from; `veil={false}` drops
-  // the descent veil, because /projects' boot is its entrance and two entrances back to back would put readable
-  // text ~4.4s away. Both are props, so what this guards is a default changing under every other route.
+describe("BaseLayout's per-page hooks: /projects is the drafting page, the research routes the paper page", () => {
+  // `page` puts `data-page` on <html>, the scope tokens.css hangs a register's palette from; `veil={false}` drops
+  // the descent veil — on /projects because its boot is its entrance, on the research routes because the veil would
+  // replay on every card click and every way back, holding the text ~1.1s. Both are props, so what this guards is a
+  // default changing under every other route.
   // Read from `markup` (scripts stripped): the veil's own inline script names `[data-veil]` on every page.
   const veilEl = /<div\b[^>]*\sdata-veil\b/;
+  const pageOf = (markup: string): string | undefined => /<html\b[^>]*\sdata-page="([^"]*)"/.exec(markup)?.[1];
+  const isResearch = (route: string): boolean => route === '/research' || route.startsWith('/research/');
+  const research = (): Page[] => pages().filter((p) => isResearch(p.route));
+
+  it('marks /projects as drafting, every research route as paper, and no other route at all', () => {
+    expect(research().length, 'no research route was built').toBeGreaterThan(0);
+    const want = (route: string): string | undefined =>
+      route === '/projects' ? 'drafting' : isResearch(route) ? 'paper' : undefined;
+    const wrong = pages().filter((p) => pageOf(p.markup) !== want(p.route))
+      .map((p) => `${p.route}: data-page=${pageOf(p.markup) ?? '(none)'}`);
+    expect(wrong).toEqual([]);
+  });
 
   // `.test()` rather than `toMatch` so a failure names the defect instead of printing the whole page.
-  it('marks /projects as the drafting page, on <html>, and renders it no veil', () => {
-    const { markup } = projectsPage();
-    expect(/<html\b[^>]*\sdata-page="drafting"/.test(markup), '<html> on /projects lacks data-page="drafting"')
-      .toBe(true);
-    expect(veilEl.test(markup), '/projects renders a [data-veil] element').toBe(false);
+  it('renders /projects and the research routes no veil, and /writing its veil', () => {
+    for (const p of [projectsPage(), ...research()]) {
+      expect(veilEl.test(p.markup), `${p.route} renders a [data-veil] element`).toBe(false);
+    }
+    expect(veilEl.test(builtPage('/writing').markup), '/writing lost its [data-veil] element').toBe(true);
   });
 
-  it('leaves every other page unmarked, and /research its veil', () => {
-    expect(veilEl.test(builtPage('/research').markup), '/research lost its [data-veil] element').toBe(true);
-    const marked = pages().filter((p) => p.route !== '/projects' && /\sdata-page=/.test(p.markup)).map((p) => p.route);
-    expect(marked).toEqual([]);
+  // Each register's ink is sized for its own ground (tests/draftingPalette.test.ts, tests/paperPalette.test.ts), not
+  // for the reading sky: light drafting --ink-3 over --reading-grad's lower stops measured 4.20 and 3.89. So neither
+  // page paints a sky. /writing is the control: the sky it keeps is the markup these patterns look for.
+  it('paints /projects and the research routes no fluid sky and no sky wash, and /writing both', () => {
+    for (const p of [projectsPage(), ...research()]) {
+      expect(/class="fluid-sky"/.test(p.markup), `${p.route} renders the fluid-sky canvas`).toBe(false);
+      expect(/class="sky-wash"/.test(p.markup), `${p.route} renders the SkyWash layer`).toBe(false);
+    }
+    const { markup } = builtPage('/writing');
+    expect(/class="fluid-sky"/.test(markup), '/writing lost the fluid-sky canvas').toBe(true);
+    expect(/class="sky-wash"/.test(markup), '/writing lost the SkyWash layer').toBe(true);
   });
 
-  // The drafting ink is sized for the drafting ground (tests/draftingPalette.test.ts), not for the reading sky:
-  // light --ink-3 over --reading-grad's lower stops measured 4.20 and 3.89. So the page must not paint a sky.
-  it('paints /projects no fluid sky and no sky wash, so its ink sits on the ground it was measured on', () => {
-    const { markup } = projectsPage();
-    expect(/class="fluid-sky"/.test(markup), '/projects renders the fluid-sky canvas').toBe(false);
-    expect(/class="sky-wash"/.test(markup), '/projects renders the SkyWash layer').toBe(false);
+  // The dot is on every page under a door: its own link's ("page"), or on a page under one (/research/<slug>,
+  // /writing/<slug>) its section's ("true"). No other link is marked.
+  it('marks the page you are on in the corner nav, or the section it is under', () => {
+    const wrong: string[] = [];
+    for (const p of pages()) {
+      const nav = /<ul id="cnav-list"[^>]*>[\s\S]*?<\/ul>/.exec(p.markup)?.[0] ?? '';
+      const marked = [...nav.matchAll(/<a\b[^>]*\shref="([^"]*)"[^>]*\saria-current="([^"]*)"/g)].map((m) => `${m[1]}=${m[2]}`);
+      const door = PAGES.find((x) => p.route === x.href || p.route.startsWith(`${x.href}/`));
+      const want = door ? [`${door.href}=${p.route === door.href ? 'page' : 'true'}`] : [];
+      if (marked.join() !== want.join()) wrong.push(`${p.route}: ${marked.join() || '(none)'}, want ${want.join() || '(none)'}`);
+    }
+    expect(pages().some((p) => p.route === '/research/rl-bhrp'), 'no nested route was built').toBe(true);
+    expect(wrong).toEqual([]);
   });
 
   // A face declared below the weight a rule asks for gets a FAKE bold (the engine clamps, then emboldens), and a
   // computed style cannot show that: it reads 600 either way. So compare the request with the declared face.
   it("declares JetBrains Mono up to the nav's current-page weight, so that weight is real, not synthesised", () => {
-    const want = /aria-current=page\][^{]*\{font-weight:(\d+)/.exec(distCss());
+    const want = /aria-current\][^{]*\{font-weight:(\d+)/.exec(distCss());
     const face = /@font-face\{font-family:"JetBrains Mono-[^"]*";[^}]*font-weight:(\d+) (\d+)/.exec(builtPage('/research').html);
     expect(want, "no font-weight rule for the nav's current link in dist/_astro/*.css").not.toBeNull();
     expect(face, 'no JetBrains Mono @font-face with a weight range on /research').not.toBeNull();
     expect(Number(want![1])).toBeLessThanOrEqual(Number(face![2]));
+  });
+});
+
+describe('SideRail — one rail, shipped the same way on every page that has it', () => {
+  // Found by markup rather than listed, so a page that gains the rail is checked too; the set is pinned as well, so a
+  // page that loses its rail fails by name.
+  const railPages = (): Page[] => pages().filter((p) => /<nav\b[^>]*\sclass="side-rail"/.test(p.markup));
+  const decode = (s: string): string => s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  interface Item { target: string; label: string; depth: number; tag: string; inner: string }
+  /** The rail's links in document order, each with its nesting depth (0 = top level). */
+  const itemsOf = (p: Page): Item[] => {
+    const nav = /<nav\b[^>]*\sclass="side-rail"[\s\S]*?<\/nav>/.exec(p.markup)![0];
+    const out: Item[] = [];
+    let open = 0;
+    for (const m of nav.matchAll(/<ul\b[^>]*>|<\/ul>|(<a\b[^>]*>)([\s\S]*?)<\/a>/g)) {
+      if (m[0].startsWith('<ul')) open += 1;
+      else if (m[0] === '</ul>') open -= 1;
+      else {
+        out.push({
+          target: /\shref="#([^"]*)"/.exec(m[1])?.[1] ?? '', label: decode(/<span class="dim"[^>]*>([^<]*)</.exec(m[2])?.[1] ?? ''),
+          depth: open - 1, tag: m[1], inner: m[2],
+        });
+      }
+    }
+    return out;
+  };
+  const flat = (stops: readonly Stop[], depth = 0): { target: string; label: string; depth: number }[] =>
+    stops.flatMap((s) => [{ target: s.target, label: s.label, depth }, ...flat(s.children ?? [], depth + 1)]);
+
+  it('is on /experience, /projects, /research, /research/rl-bhrp and /writing', () => {
+    expect(railPages().map((p) => p.route).sort()).toEqual(['/experience', '/projects', '/research', '/research/rl-bhrp', '/writing']);
+  });
+
+  // The label is three layers of its text, so its states cross-fade by opacity: the dim one, the link's name and the
+  // only text in the markup, and two inks over it, each an empty aria-hidden element whose text is generated from
+  // its data-l, so every engine names the link by its label once and find-in-page sees it once. The dash is its own
+  // aria-hidden span. The marks are the script's: none is served. The one thing served on a link is its place in the
+  // entrance, --i, its index in document order.
+  it('renders every link as href + aria-hidden dash + its label and two empty aria-hidden copies, its --i, and no state', () => {
+    const bad: string[] = [];
+    for (const p of railPages()) {
+      for (const [k, it] of itemsOf(p).entries()) {
+        const parts = /^<span class="rule" aria-hidden="true"[^>]*><\/span><span class="lbl"[^>]*><span class="dim"[^>]*>([^<]*)<\/span><span class="ink2" aria-hidden="true" data-l="([^"]*)"[^>]*><\/span><span class="ink1" aria-hidden="true" data-l="([^"]*)"[^>]*><\/span><\/span>$/
+          .exec(it.inner);
+        if (!parts) bad.push(`${p.route} #${it.target}: ${it.inner}`);
+        else if (decode(parts[2]) !== decode(parts[1]) || decode(parts[3]) !== decode(parts[1])) bad.push(`${p.route} #${it.target}: a copy ≠ its label`);
+        if (!p.ids.has(it.target)) bad.push(`${p.route}: the rail links #${it.target}, which the page does not emit`);
+        if (/\s(aria-current|class)=/.test(it.tag)) bad.push(`${p.route} #${it.target}: served with ${it.tag}`);
+        if (/\sstyle="([^"]*)"/.exec(it.tag)?.[1] !== `--i:${k}`) bad.push(`${p.route} #${it.target}: not style="--i:${k}" in ${it.tag}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  // Every level of the tree, at its depth: the template recurses rather than unrolling a fixed number of levels.
+  it("nests the links as the page's Stop tree does, at every depth", async () => {
+    const strip = (xs: Item[]) => xs.map(({ target, label, depth }) => ({ target, label, depth }));
+    expect(strip(itemsOf(projectsPage()))).toEqual(flat(projectStops(projects)));
+    expect(strip(itemsOf(builtPage('/experience')))).toEqual(flat(experienceStops(timeline)));
+    expect(strip(itemsOf(builtPage('/research/rl-bhrp')))).toEqual(flat(paperStops((await paperRender('rl-bhrp')).report.sections)));
+    expect(strip(itemsOf(builtPage('/research')))).toEqual(flat(researchIndexStops()));
+    expect(new Set(itemsOf(builtPage('/writing')).map((i) => i.depth))).toEqual(new Set([0, 1]));
+  });
+
+  // CLAUDE.md, Motion: only transform and opacity animate, so the dash never grows by `width` (which would push the
+  // label sideways) and a label never fades by `color`.
+  /** Every shipped rule that styles the rail, from the pages' inline styles and the bundled sheets, scope hashes
+   *  stripped: [whole, selector, body]. */
+  const railCss = (): string => [...railPages().flatMap((p) => [...p.html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)]
+    .map((m) => m[1])), distCss()].join('\n').replace(/\[data-astro-cid-[\w-]+\]/g, '');
+  const railRules = (): RegExpMatchArray[] => [...railCss().matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(([, sel]) => /\.side-rail\b/.test(sel));
+
+  it('transitions nothing but opacity and transform', () => {
+    const rules = railRules();
+    expect(rules.length, 'no shipped rule styles the rail').toBeGreaterThan(5);
+    const moving = rules.flatMap(([, sel, body]) => [...body.matchAll(/(?:^|;)\s*transition(?:-property)?\s*:([^;]*)/g)]
+      .flatMap((t) => t[1].split(/,(?![^(]*\))/).map((x) => x.trim().split(/\s+/)[0]))
+      .filter((prop) => !['opacity', 'transform', 'none'].includes(prop))
+      .map((prop) => `${sel.trim()} transitions ${prop}`));
+    expect(moving).toEqual([]);
+    // CSS cannot import lib/motionTiming, so the curve is a literal there: hold it to EASE.
+    const curves = new Set(rules.flatMap(([, , body]) => body.match(/cubic-bezier\([^)]*\)/g) ?? []));
+    expect([...curves].map((c) => c.replace(/\s+/g, ''))).toEqual([EASE]);
+  });
+
+  // THE ENTRANCE IS CSS, so it runs from the first frame with no script to wait for (a bundled script runs after
+  // the browser has painted). Each row comes in from 6px left, --i (its index) times the rail's --gap late, with a
+  // backwards fill so it waits in its from-state; --row is RAIL.row and --gap lib/motionTiming's stagger() over the
+  // rail's rows, so every row is in by RAIL.enter however long the rail is. Read as shipped, the duration and the gaps.
+  it('enters by CSS alone, where motion is allowed: opacity and transform, each row --i x --gap late, all in by RAIL.enter', () => {
+    const css = railCss();
+    const frames = /@keyframes side-rail-enter\{((?:[^{}]*\{[^{}]*\})*)\}/.exec(css);
+    expect(frames, 'no @keyframes side-rail-enter').not.toBeNull();
+    // one frame, the from-state, and nothing in it but opacity and transform
+    expect(frames![1]).toMatch(/^(?:from|0%)\{opacity:0;transform:translate(?:X)?\(-6px\)\}$/);
+
+    const gated = [...css.matchAll(/@media ?\(prefers-reduced-motion: ?no-preference\) ?\{((?:[^{}]*\{[^{}]*\})*)\}/g)]
+      .map((m) => m[1]).join('');
+    const rule = /\.side-rail a\{(animation:side-rail-enter [^}]*)\}/.exec(gated);
+    expect(rule, 'the entrance is not on .side-rail a under prefers-reduced-motion: no-preference').not.toBeNull();
+    expect([...css.matchAll(/animation(?:-name)?:side-rail-enter\b/g)], 'the entrance is also set outside the motion gate').toHaveLength(1);
+    const m = /^animation:side-rail-enter var\(--row\) (cubic-bezier\([^)]*\)) backwards;animation-delay:calc\(var\(--i\) ?\* ?var\(--gap\)\)$/.exec(rule![1]);
+    expect(m, `the entrance's declarations: ${rule![1]}`).not.toBeNull();
+    expect(m![1]).toBe(EASE);
+
+    for (const p of railPages()) {
+      const vars = /<nav\b[^>]*\sclass="side-rail"[^>]*\sstyle="--gap:([\d.]+)ms;--row:([\d.]+)ms"/.exec(p.html);
+      expect(vars, `${p.route}: the rail carries no --gap and --row`).not.toBeNull();
+      const gap = Number(vars![1]), row = Number(vars![2]);
+      expect(row, p.route).toBe(RAIL.row);
+      const n = itemsOf(p).length; // and each row's --i is its index (the markup test above)
+      for (let i = 0; i < n; i += 1) {
+        expect(i * gap, `${p.route} row ${i}`).toBeCloseTo(stagger(i, n, { step: RAIL.rowStep, total: RAIL.enter - row }), 6);
+      }
+      expect((n - 1) * gap + row, p.route).toBeLessThanOrEqual(RAIL.enter + 1e-9);
+    }
+  });
+
+  // A touch laptop's primary pointer can hover, so a tap there leaves :hover on the tapped row until the next tap
+  // elsewhere. The script's .is-hover is set for a mouse or a pen only.
+  it("styles hover by the script's .is-hover, never by :hover", () => {
+    expect(railRules().map(([, sel]) => sel.trim()).filter((sel) => /:hover\b/.test(sel))).toEqual([]);
+    expect(railRules().some(([, sel]) => /\.is-hover/.test(sel)), 'no rule reads .is-hover').toBe(true);
+  });
+
+  // Generated text is in the accessible name in some engines and not in others (the alt text after a slash that
+  // keeps it out does not parse before Safari 17.4 and Firefox 128), so a label's text is generated only inside the
+  // copies, whose aria-hidden keeps it out of the name everywhere (the markup test above). Generated, the copies are in
+  // no selection and no find-in-page; real text in them would be in both. The rail's one other generated box is the
+  // hover preview's dash, which holds no text.
+  it('generates label text only in the aria-hidden copies, and nothing else', () => {
+    const content = railRules().flatMap(([, sel, body]) => [...body.matchAll(/(?:^|;)content:([^;]*)/g)]
+      .map((m) => `${sel.trim().replace(/::/g, ':')} ${m[1].replace(/\s+/g, '')}`));
+    expect(content.sort()).toEqual(['.side-rail .ink2:before,.side-rail .ink1:before attr(data-l)', '.side-rail a:after ""']);
+  });
+
+  // Forced colours (Windows High Contrast) map every ink to one system colour and paint backgrounds as Canvas, so the
+  // marks the rail tells its stops apart by, an ink's strength and a dash, are gone. The current stop keeps a mark
+  // there: the dash painted in Highlight, the current label underlined.
+  it('keeps the current stop marked under forced colours', () => {
+    const forced = [...railCss().matchAll(/@media ?\(forced-colors: ?active\) ?\{((?:[^{}]*\{[^{}]*\})*)\}/g)].map((m) => m[1]).join('');
+    const rules = [...forced.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, sel, body]) => ({ sel, body }));
+    const dash = rules.find((r) => /\.side-rail \.rule\b/.test(r.sel));
+    expect(dash?.body, 'no forced-colours rule for the dash').toMatch(/forced-color-adjust:none/);
+    expect(dash?.body).toMatch(/background(?:-color)?:highlight\b/i);
+    const current = rules.find((r) => /\.is-active\b/.test(r.sel) && /\.ink1\b/.test(r.sel));
+    expect(current?.body, 'no forced-colours underline for the current label').toMatch(/text-decoration(?:-line)?:underline\b/);
   });
 });
 
@@ -672,19 +900,15 @@ describe('/projects — the page shell on the drafting field', () => {
     expect(rule![1]).toMatch(/(^|;)position:fixed(;|$)/);
   });
 
-  // main has no background, so its text sits straight on the field's strokes. The knockout gives every glyph an
-  // opaque 1px ring of the ground: eight offsets, none blurred, in the ground colour.
-  it("rings every glyph in <main> with the bare ground, so no stroke touches the page's text", () => {
-    const rule = /\.projects-page\{([^}]*text-shadow:[^}]*)\}/.exec(shippedCss());
-    expect(rule, 'no text-shadow on .projects-page').not.toBeNull();
-    expect(rule![1]).toMatch(/--knock:\s*var\(--draft-ground\)/);
-    const shadows = /text-shadow:([^;}]*)/.exec(rule![1])![1].split(/,(?![^(]*\))/).map((s) => s.trim());
-    const offsets = shadows.map((s) => {
-      const p = /^(-?\d+)(?:px)? (-?\d+)(?:px)? 0(?:px)? var\(--knock\)$/.exec(s);
-      expect(p, `"${s}" is not an unblurred offset in var(--knock)`).not.toBeNull();
-      return `${Number(p![1])},${Number(p![2])}`;
-    });
-    expect(new Set(offsets)).toEqual(new Set(['-1,-1', '0,-1', '1,-1', '-1,0', '1,0', '-1,1', '0,1', '1,1']));
+  // Neither main nor the rail has a background, so their text sits straight on the field's strokes. The knockout
+  // gives every glyph an opaque 1px ring of the ground. It is ONE role token, --knockout, which the drafting blocks
+  // declare (tests/draftingPalette.test.ts holds its value and that it has no second spelling): <main>'s text and the
+  // shared rail's labels both read it, so the page does not touch the rail.
+  it("rings every glyph in <main> and in the rail with the bare ground, so no stroke touches the page's text", () => {
+    const css = shippedCss();
+    expect(css).toMatch(/\.side-rail \.lbl\{(?:[^}]*;)?text-shadow:var\(--knockout,\s*none\)/);
+    expect(css).toMatch(/\.side-rail \.rule\{(?:[^}]*;)?box-shadow:var\(--rail-dash-halo,\s*none\)/);
+    expect(css).toMatch(/\.projects-page\{(?:[^}]*;)?text-shadow:var\(--knockout\)(;|\})/);
   });
 });
 
@@ -927,5 +1151,337 @@ describe('/projects — repo links, private repos, and what assistive tech is to
     expect(live.length, `live regions: ${live.join(' ')}`).toBe(1);
     expect(live[0]).toMatch(/\saria-live="polite"/);
     expect(live[0]).toMatch(/\sdata-cow-live\b/);
+  });
+});
+
+/** What a title keeps on one line (lib/words wholeParts): its names, spans of years, dates and arXiv categories. */
+const kept = (title: string): string[] => wholeParts(title).filter((_, i) => i % 2);
+
+describe('/research — the papers as cards, newest first, then the interests', () => {
+  const page = (): Page => builtPage('/research');
+  const text = (html: string): string => html.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&nbsp;|\s+/g, ' ').trim();
+  /** Each card in order: its title link's attributes and href, and its markup. */
+  const cards = () => [...page().markup.matchAll(/<article\b[^>]*\sclass="pc"[^>]*>([\s\S]*?)<\/article>/g)].map((m) => {
+    const attrs = /<h3 class="p-title"><a\b([^>]*)>/.exec(m[1])?.[1] ?? '';
+    return { attrs, href: /\shref="([^"]*)"/.exec(attrs)?.[1] ?? '', html: m[1] };
+  });
+  // A record that a paper file explains opens that page; any other opens where the paper is published.
+  const want = (p: Publication): string => (explained().has(p.slug) ? `/research/${p.slug}` : p.href);
+
+  it('renders one card per publication, newest first', () => {
+    expect(cards().map((c) => c.href)).toEqual(publications.map(want));
+    const dates = publications.map((p) => p.submitted ?? p.year);
+    expect(dates).toEqual([...dates].sort().reverse());
+  });
+
+  it("opens a paper's own page when it has one, and otherwise the record's href, saying so", () => {
+    for (const [i, c] of cards().entries()) {
+      const p = publications[i];
+      if (c.href.startsWith('/')) {
+        expect(byRoute().has(c.href), `${p.slug}: ${c.href} is not a built route`).toBe(true);
+        expect(text(c.html), p.slug).not.toContain('opens the publisher');
+      } else {
+        expect(c.href, p.slug).toBe(p.href);
+        expect(c.attrs, p.slug).toMatch(/\starget="_blank"/);
+        expect(c.attrs, p.slug).toMatch(/\srel="noopener noreferrer"/);
+        expect(text(c.html), p.slug).toContain('opens the publisher’s page ↗');
+        // and says so to a reader who reaches the link from a list of links, too
+        const said = /\saria-describedby="([^"]*)"/.exec(c.attrs)?.[1] ?? '';
+        // the arrow is a picture of "opens elsewhere", which the words already say, so it is not read out
+        expect(new RegExp(`<span class="out" id="${said}">opens the publisher’s page<span aria-hidden="true"> ↗</span></span>`).test(c.html), p.slug).toBe(true);
+      }
+    }
+    // both kinds are on the page today, so neither branch above is vacuous
+    expect(new Set(cards().map((c) => c.href.startsWith('/')))).toEqual(new Set([false, true]));
+  });
+
+  // The venue never carries the year itself, nor a volume, which the DOI carries: a card reads, as spec §3 has it,
+  // "Conference paper · SPIE (CNSSE) · 2022".
+  it("prints each card's status, venue and year, the year once", () => {
+    expect(cards()).toHaveLength(publications.length);
+    const metas = cards().map((c) => text(/<p class="p-meta">([\s\S]*?)<\/p>/.exec(c.html)?.[1] ?? ''));
+    for (const [i, meta] of metas.entries()) {
+      const p = publications[i];
+      expect(meta, p.slug).toContain(` · ${p.venue} · ${p.year}`);
+      expect(meta.split(p.year).length - 1, meta).toBe(1);
+    }
+    expect(metas.some((m) => m.startsWith('Conference paper · SPIE (CNSSE) · 2022'))).toBe(true);
+  });
+
+  it("shows a paper's miniature on its card, captioned as the reproduction, and no picture on one without", () => {
+    expect(cards()).toHaveLength(publications.length);
+    for (const [i, c] of cards().entries()) {
+      const thumb = PAPER_DATA[publications[i].slug]?.thumb;
+      if (!thumb) {
+        expect(c.html, publications[i].slug).not.toMatch(/<svg\b/);
+        continue;
+      }
+      expect(c.html).toContain(thumb.svg);
+      expect(thumb.caption).toMatch(/reproduction/);
+      expect(text(c.html)).toContain(thumb.caption);
+    }
+    expect(PAPER_DATA['rl-bhrp'].thumb, "RL-BHRP's card has no miniature").toBeDefined();
+  });
+
+  // A reader who moves by headings lands on the title, and what follows it is the card: the picture is the card's
+  // last word in the markup, wherever the grid shows it.
+  it("puts a card's title first and its picture last in the markup", () => {
+    const pictured = cards().filter((c) => c.html.includes('class="p-fig"'));
+    expect(pictured.length).toBeGreaterThan(0);
+    for (const c of cards()) expect(c.html.trimStart().startsWith('<h3 class="p-title">'), c.href).toBe(true);
+    for (const c of pictured) expect(c.html.trimEnd()).toMatch(/<div class="p-fig">[\s\S]*<\/div>$/);
+  });
+
+  // A browser may break a line after any hyphen, and a title would then split a paper's own name ("(RL-BHRP)").
+  it("keeps each card title's names whole", () => {
+    expect(cards()).toHaveLength(publications.length);
+    for (const [i, c] of cards().entries()) {
+      for (const w of kept(publications[i].title)) expect(c.html, w).toContain(`<span class="nw">${w}</span>`);
+    }
+  });
+
+  it('emits the id of every rail stop, the papers before the interests', () => {
+    const ids = researchIndexStops().map((s) => s.target);
+    expect(ids.filter((id) => !page().ids.has(id))).toEqual([]);
+    const at = ids.map((id) => page().markup.indexOf(` id="${id}"`));
+    expect(at).toEqual([...at].sort((a, b) => a - b));
+    for (const r of researchInterests) expect(text(page().markup)).toContain(`${r.label}. ${r.gloss}`);
+  });
+
+  it('never says a paper was published or peer-reviewed', () => {
+    expect(text(page().markup)).not.toMatch(/published|peer[- ]reviewed/i);
+  });
+
+  // The generated sitemap lists every route. public/sitemap.xml is an index that points at it, so it lists none.
+  it('reaches the generated sitemap with every paper page', () => {
+    const map = readFileSync(join(DIST, 'sitemap-0.xml'), 'utf8');
+    for (const route of ['/research', ...[...explained()].map((s) => `/research/${s}`)]) {
+      expect(map, route).toContain(`<loc>https://ingtian.github.io${route}/</loc>`);
+    }
+    expect(readFileSync(join(DIST, 'sitemap.xml'), 'utf8')).toContain('<loc>https://ingtian.github.io/sitemap-0.xml</loc>');
+  });
+});
+
+describe('/research/rl-bhrp — a paper explained, from its file', async () => {
+  const page = (): Page => builtPage('/research/rl-bhrp');
+  const { html: rendered, report } = await paperRender('rl-bhrp');
+  const rl = publications.find((p) => p.slug === 'rl-bhrp')!;
+  const text = (html: string): string => html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;|\s+/g, ' ');
+
+  it('is a paper page: data-page="paper", one <main class="paper">', () => {
+    expect(/<html\b[^>]*\sdata-page="paper"/.test(page().markup)).toBe(true);
+    expect(page().markup.match(/<main\b[^>]*\sclass="paper"/g)).toHaveLength(1);
+  });
+
+  // The rail and the page's sections come from one report; a stop the page did not emit fails here by name.
+  it('emits an id for every rail stop, and each id once', () => {
+    const stops = paperStops(report.sections).map((s) => s.target);
+    expect(stops.filter((id) => !page().ids.has(id))).toEqual([]);
+    const all = [...page().markup.matchAll(/\sid="([^"]*)"/g)].map((m) => m[1]);
+    expect(all.filter((id, i) => all.indexOf(id) !== i)).toEqual([]);
+  });
+
+  // The page refuses a file id it writes itself (paperPageOwns), so the build fails. That holds only while the plugin
+  // reports every id the file writes and paperPageOwns knows every id the page and the layout write: each id here is
+  // the one or the other. An id the layout gains, or the plugin writes unreported, fails here by name.
+  it("carries no id but its file's and its own", () => {
+    const file = new Set(report.ids);
+    expect([...page().ids].filter((id) => file.has(id) === paperPageOwns(id))).toEqual([]);
+  });
+
+  // Below 1100px the Contents list replaces the rail: the rail's stops, each by its title, a section's number before it.
+  it('lists the same sections in its Contents as in its rail, each by its title', () => {
+    const links = (cls: string) => [...(new RegExp(`<nav\\b[^>]*\\sclass="${cls}"[\\s\\S]*?</nav>`).exec(page().markup)?.[0] ?? '')
+      .matchAll(/<a\b[^>]*\shref="#([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)];
+    const contents = links('toc-inline');
+    expect(contents.length).toBeGreaterThan(3);
+    expect(contents.map((m) => m[1])).toEqual(links('side-rail').map((m) => m[1]));
+    expect(contents.map((m) => text(m[2]).trim()))
+      .toEqual(paperSections(report.sections).map((s) => [s.n, s.title].filter(Boolean).join(' ')));
+  });
+
+  // text-wrap: balance happens to keep "(RL-BHRP)" whole at 390px, but only where balance applies (not past six
+  // lines, nor in Safari before 17.5), so the title's hyphenated words are kept whole by markup, as on its card.
+  it("keeps the title's names whole", () => {
+    const h1 = /<h1 class="ptitle">([\s\S]*?)<\/h1>/.exec(page().markup)?.[1] ?? '';
+    expect(kept(rl.title)).toContain('RL-BHRP');
+    for (const w of kept(rl.title)) expect(h1, w).toContain(`<span class="nw">${w}</span>`);
+  });
+
+  it("prints the paper's Table 2 whole: all 18 rows", () => {
+    const table = /<table class="bt">[\s\S]*?<\/table>/.exec(page().markup)?.[0] ?? '';
+    expect(table.match(/<tbody>[\s\S]*<\/tbody>/)?.[0].match(/<tr\b/g)).toHaveLength(18);
+  });
+
+  // Underline, on 5–7 key sentences: no more than about one a screen (spec §4).
+  it('highlights five to seven sentences', () => {
+    const n = page().markup.match(/<mark class="hl">/g)?.length ?? 0;
+    expect(n).toBeGreaterThanOrEqual(5);
+    expect(n).toBeLessThanOrEqual(7);
+  });
+
+  // A preprint, always: never "published" or "peer-reviewed" — the one place it may say "not peer reviewed".
+  it('never says the preprint was published or reviewed', () => {
+    const words = text(page().markup);
+    expect(words).not.toMatch(/published/i);
+    expect(words.replace(/not peer reviewed/g, '')).not.toMatch(/peer[- ]reviewed/i);
+    expect(words).toContain('preprint, not peer reviewed');
+  });
+
+  it('sets every numbered equation as MathML, its number outside the maths', () => {
+    const eqs = [...page().markup.matchAll(/<div class="eq an" id="([^"]+)">([\s\S]*?)<span class="eq-no">([^<]*)<\/span>/g)];
+    const numbered = eqs.filter((m) => m[3]);
+    expect(numbered.map((m) => m[3])).toEqual(['(2)', '(3)', '(4)']);
+    for (const [, id, body] of numbered) expect(body, id).toMatch(/<math\b/);
+    expect(page().markup).not.toMatch(/katex-error|\\tag/);
+  });
+
+  it('cites every reference it lists, and lists every one it cites', () => {
+    const listed = [...page().markup.matchAll(/<li id="(ref-[^"]+)"/g)].map((m) => m[1]);
+    const cited = new Set([...page().markup.matchAll(/<a class="cite" href="#(ref-[^"]+)"/g)].map((m) => m[1]));
+    expect(listed.length).toBeGreaterThan(5);
+    expect(listed.filter((id) => !cited.has(id))).toEqual([]);
+    expect([...cited].filter((id) => !listed.includes(id))).toEqual([]);
+  });
+
+  it('gives the BibTeX verbatim, with a copy control in the paper skin', () => {
+    const pre = /<pre id="bibtex">([\s\S]*?)<\/pre>/.exec(page().markup)?.[1] ?? '';
+    expect(pre.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')).toBe(rl.bibtex);
+    const button = /<button\b[^>]*\sdata-copy="bibtex"[^>]*>/.exec(page().markup)?.[0] ?? '';
+    expect(button).toMatch(/\stype="button"/);
+    expect(button).toMatch(/\sclass="btn btn--paper\b/);
+  });
+
+  // The reading time counts every word a reader reads on the page, as the approved prototype did: the head, the
+  // abstract, the body with its captions and notes, Read the full paper, the note on the references, the cite line,
+  // the corrections and the tags. Not the controls (the back link, the links, Copy), the maths, the figures'
+  // drawings, the tables, the Contents, the reference list or the BibTeX. Recounted here by that rule, from the
+  // markup: the plugin's count of the file to the word, and the built page's minutes.
+  it('computes its reading time from every word a reader reads', () => {
+    const unread = [/<(math|svg|table|pre|nav|button)\b[\s\S]*?<\/\1>/g, /<a class="back"[\s\S]*?<\/a>/g,
+      /<p class="links">[\s\S]*?<\/p>/g, /<ol class="refs">[\s\S]*?<\/ol>/g, /(?<=<figure class="fig\b[^>]*>)[\s\S]*?(?=<figcaption>)/g];
+    // a name kept whole is one word, as the plugin counted it before the span went round it
+    const words = (html: string) => countWords(unread.reduce((s, re) => s.replace(re, ' '), html)
+      .replace(/<span class="nw">([^<]*)<\/span>/g, '$1').replace(/<[^>]+>|&nbsp;/g, ' ').replace(/&[#\w]+;/g, ''));
+    expect(words(rendered)).toBe(report.bodyWords);
+    const markup = page().markup, main = markup.slice(markup.indexOf('<main'), markup.indexOf('</main>'));
+    expect(text(main)).toContain(`· ${readingMinutes(words(main))} min read · written by Zeying Tian, the second author`);
+  });
+
+  it("keeps the paper's name whole in its abstract, as in the rest of its prose", () => {
+    const abstract = /<blockquote class="abstract"[\s\S]*?<\/blockquote>/.exec(page().markup)?.[0] ?? '';
+    expect(rl.abstract).toContain('(RL-BHRP)');
+    expect(abstract).toContain('(<span class="nw">RL-BHRP</span>)');
+  });
+
+  // The page's own prose round the file (the head, the cite line, the corrections) goes through the rule the body
+  // does (lib/words wholeParts), so nowhere on the page does a line break inside a name: "RL-" / "BHRP)" on the cite
+  // line, "[q-" / "fin.PM" in the meta. Read from the page's text, the maths, drawings, tables and BibTeX aside (the
+  // drawings' text is set on one line by their own CSS: the readout's tip is nowrap).
+  it('keeps every hyphenated name, span of years, ISO date and arXiv category whole, in its own prose too', () => {
+    const markup = page().markup;
+    const prose = markup.slice(markup.indexOf('<main'), markup.indexOf('</main>'))
+      .replace(/(?<=<figure class="fig\b[^>]*>)[\s\S]*?(?=<figcaption>)/g, ' ')
+      .replace(/<(math|svg|pre|table|nav|script)\b[\s\S]*?<\/\1>/g, ' ')
+      .replace(/<span class="nw">[^<]*<\/span>/g, ' ').replace(/<[^>]+>/g, ' ');
+    expect(wholeParts(prose).filter((_, i) => i % 2)).toEqual([]);
+    expect(/<p class="ref-line">[\s\S]*?<\/p>/.exec(markup)?.[0]).toContain('(<span class="nw">RL-BHRP</span>) Approach');
+  });
+
+  // The explainer numbers the figure and the record names its reproduction's author: the drawing says both as they say.
+  it("names Figure 2 by its :::figure's number, and its reproduction by the record's author", () => {
+    const fig = /<figure class="fig" id="figure-(\d+)">\s*<div class="f-plot"[^>]*>[\s\S]*?<\/figure>/.exec(page().markup);
+    expect(fig, 'no figure holds the plot').not.toBeNull();
+    const [whole, n] = fig!;
+    expect(whole).toContain(`<div class="f-plot" data-name="Figure ${n}"`);
+    expect(whole).toContain(`<caption>Figure ${n}’s values, month by month, in the second author’s reproduction</caption>`);
+    expect(pages().filter((p) => p.html.includes(FIGURE_NAME)).map((p) => p.route)).toEqual([]);
+  });
+
+  // Corrections are against the version the page explains; the record says arXiv lists no other, so none to read.
+  it('says the corrections are against the only version arXiv lists', () => {
+    const summary = /<details class="errata">\s*<summary>([\s\S]*?)<\/summary>/.exec(page().markup)?.[1] ?? '';
+    expect(rl.versions).toBe(1);
+    expect(summary.replace(/<[^>]+>/g, '')).toBe(`Corrections to ${rl.version}, noted 3 November 2026 (arXiv lists ${rl.version} only)`);
+  });
+
+  // The caption is the explainer's, so it says here what the figure is: the owner's reproduction, not the paper's run.
+  // A month-by-month median is no single run and has no turnover: the one run's turnover is named as that run's.
+  it("captions Figure 2 as the second author's reproduction, with the paper's own figure beside it", () => {
+    const cap = /<figure class="fig" id="figure-2">[\s\S]*?<figcaption>([\s\S]*?)<\/figcaption>/.exec(page().markup)?.[1] ?? '';
+    const v = PAPER_DATA['rl-bhrp'].values;
+    expect(text(cap)).toContain('Figure 2. A reproduction, not the paper’s run:');
+    expect(text(cap)).toContain(`median of the reproduction’s ${v.reproRuns} training runs`);
+    expect(text(cap)).toContain(`where the paper reports ${v['usd.rl']} from its original run`);
+    expect(text(cap)).toContain(`the run with the median growth turns over ${v.reproTurnover}`);
+    expect(text(cap)).not.toMatch(/median run|its median,/);
+    expect(text(cap)).toContain('not fresh evidence');
+  });
+
+  // Which fell deepest depends on where the count starts (Results says why), so each such claim says whose count.
+  it("qualifies every claim of the deepest fall as the paper's count", () => {
+    const claims = text(page().markup).split(/(?<=\.)\s/).filter((s) => /\bdeepe(?:r|st)\b/.test(s));
+    expect(claims.length).toBeGreaterThanOrEqual(3);
+    for (const s of claims) expect(s).toMatch(/by the paper’s count/i);
+  });
+
+  // Hovering a Notation row lights every place its symbols stand in the displays, an index inside the symbol it
+  // indexes too, as the approved prototype did: these are its counts, over eq. (4)'s wide and narrow forms both.
+  it("tags each Notation row's symbols wherever a display uses them", () => {
+    const markup = page().markup;
+    const rows = new Map([...markup.matchAll(/<tr data-sym="(\d+)">\s*<th scope="row">[\s\S]*?<annotation encoding="application\/x-tex">([^<]*)<\/annotation>/g)]
+      .map((m) => [m[1], m[2]]));
+    const lit: Record<string, number> = {};
+    for (const [, eq] of markup.matchAll(/<div class="eq-math">([\s\S]*?)<span class="eq-no/g)) {
+      for (const [, k] of eq.matchAll(/\sdata-sym="(\d+)"/g)) lit[rows.get(k)!] = (lit[rows.get(k)!] ?? 0) + 1;
+    }
+    expect(lit).toEqual({
+      'N,\\ G': 1, 'i\\in\\mathcal{I}_{g}': 14, 'w,\\ w_{i}': 20, 'W_{g}': 5, '\\eta_{i\\mid g},\\ \\eta^{(g)}': 3,
+      'R_{t+1}': 2, '\\Sigma,\\ \\Sigma_{t}': 5, '\\widetilde{\\Sigma}(\\eta)': 2, '\\sigma_{p}^{2}(w)': 2,
+      '\\mathrm{RC}_{i}(w),\\ \\mathrm{RC}_{g}(w)': 3, c: 2, '\\mathcal{V}_{\\mathrm{within}},\\ \\mathcal{V}_{\\mathrm{across}}': 4,
+      '\\lambda,\\ \\alpha': 6, 'U_{t+1}': 2,
+    });
+  });
+
+  it('shows exactly one drawing per figure in the markup the CSS swaps: a wide and a narrow, by class', () => {
+    for (const id of ['figure-1', 'figure-2']) {
+      const fig = new RegExp(`<figure\\b[^>]*\\sid="${id}"[\\s\\S]*?</figure>`).exec(page().markup)?.[0] ?? '';
+      expect(fig.match(/\sclass="[^"]*\bwide\b/g), id).toHaveLength(1);
+      expect(fig.match(/\sclass="[^"]*\bnarrow\b/g), id).toHaveLength(1);
+    }
+  });
+});
+
+describe('the research routes — what a reader prints or hovers', () => {
+  // A printout is laid out where no IntersectionObserver sees it and no on-screen backstop runs, so a hold-back
+  // that applied there would print the page blank below its first screen, Figure 2 under its mask. Every rule that
+  // holds something back (a `[data-pending]` reveal, an unplaced margin note) is inside an `@media screen` block.
+  // Outside one such a rule may say only `transition: none`: kept in every medium, it makes the print layout's
+  // dropping of a hold a snap, where a note's opacity transition would otherwise start from 0 and print it there.
+  it('holds nothing back in print: every hold-back rule is screen-only', () => {
+    const css = distCss();
+    const screen = /@media screen\b[^{]*\{((?:[^{}]*\{[^{}]*\})*)\}/g;
+    const holds = (s: string) => [...s.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter(([, sel]) => /\[data-pending\]|:not\(\.is-placed\)/.test(sel))
+      .map(([, sel, body]) => ({ sel: sel.trim(), body }));
+    const guarded = [...css.matchAll(screen)].flatMap((m) => holds(m[1]));
+    expect(guarded.length, 'the seven hold-back rules written today').toBeGreaterThanOrEqual(7);
+    const outside = holds(css.replace(screen, ''));
+    expect(outside.length, "the two pages' transition: none").toBeGreaterThanOrEqual(2);
+    expect(outside.filter((r) => r.body !== 'transition:none').map((r) => r.sel)).toEqual([]);
+  });
+
+  // WCAG 1.4.13, which neither Lighthouse nor axe tests: content shown on hover must be hoverable. Each of the paper
+  // page's two tips takes the pointer while it shows, and bridges the gap to what it reads, so the pointer can cross.
+  it('makes each tip hoverable: a shown tip takes the pointer, and a bridge spans its gap', () => {
+    const rules = [...distCss().matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, sel, body]) => ({ sels: sel.split(',').map((s) => s.trim()), body }));
+    const body = (sel: string) => rules.filter((r) => r.sels.includes(sel)).map((r) => r.body).join(';');
+    for (const shown of ['.paper .f-plot.reading .f-tip', 'html[data-page=paper] .sym-tip.on']) {
+      expect(body(shown), shown).toMatch(/(^|;)pointer-events:auto\b/);
+    }
+    for (const bridge of ['.paper .f-tip:after', 'html[data-page=paper] .sym-tip:before']) {
+      expect(body(bridge), bridge).toMatch(/(^|;)content:""/);
+      expect(body(bridge), bridge).toMatch(/(^|;)height:\d+px/);
+    }
   });
 });

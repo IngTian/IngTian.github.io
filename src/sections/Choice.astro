@@ -662,9 +662,10 @@ const allBeats = [...BEATS, BEAT4];
     .ch-panel-foot { font-size: 11px; line-height: 1.38; }
   }
 
-  /* 1101 vs 1100: the pair must ABUT. At exactly 1100px the old bounds (max 1099 / min 1101) matched neither
-     query, so that one width got the two-column gutter with no two-column grid and the slide overflowed. */
-  @media (min-width: 1101px) {
+  /* The exact negation of the stacked layout's query, so no width falls to neither: two bounds a pixel apart (max
+     1100 / min 1101) leave a zoomed window's fractional widths between them, where the slide would get the
+     two-column gutter with no two-column grid, and overflow. */
+  @media not all and (max-width: 1100px) {
     .ch-body {
       display: grid; grid-template-columns: 33fr 67fr;
       gap: 0 clamp(26px, 3vw, 56px); align-items: center;

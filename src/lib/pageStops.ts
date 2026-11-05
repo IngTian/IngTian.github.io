@@ -1,23 +1,17 @@
 // Which stops does a page's marginal rail carry, and what does each one point at?
 //
 // This is the rail's CONTENT rule, kept pure so it can be unit-tested and so the
-// rail component stays dumb markup. It exists because /research had the bug this
-// module makes impossible: the page rendered N featured papers with
-// `featured.map(...)` but built its rail with `featured.some(...)`, so N papers
-// collapsed into ONE flat anchor set — pointing at IDs that were emitted once per
-// paper and therefore duplicated. getElementById resolves the first match, so
-// every "Method" link jumped to paper 1.
-//
-// The fix is structural, not a patch: the SAME function that names a stop's
-// anchor also hands the page the id to render (`sectionId`). A stop can no longer
-// point at an id the page didn't emit, because there is only one place that
-// spells it.
+// rail component stays dumb markup. The SAME function that names a stop's anchor
+// also hands the page the id to render (`projectSectionId`, `experienceSectionId`,
+// `paperSections`), so a stop cannot point at an id the page did not emit: there is
+// one place that spells it. A rail built apart from its page fails silently — a
+// repeated id is resolved to its first match by getElementById and by a #fragment,
+// so every link naming it lands on the first section.
 
-import type { Publication, Project, TimelineEntry } from '../data/profile';
+import type { Project, TimelineEntry } from '../data/profile';
 import {
   type WritingKind, sorted as sortedEntries, kindSectionId, entrySectionId,
 } from '../data/writing';
-import { mathFor } from './paperMath';
 
 export interface Stop {
   label: string;
@@ -28,92 +22,7 @@ export interface Stop {
   children?: Stop[];
 }
 
-/** Per-paper section ids. One speller, so rail and page cannot disagree. */
-export function paperSectionId(index: number, section: 'idea' | 'math' | 'results'): string {
-  return `r-p${index}-${section}`;
-}
-
-/** A paper's own anchor — its masthead (title + byline).
- *  Distinct from its first section's id: a paper-name stop that reused the
- *  first child's target would collide with that child in the flattened rail,
- *  and clicking the name should land on the TITLE anyway, not mid-paper. */
-export function paperAnchorId(index: number): string {
-  return `r-p${index}`;
-}
-
-/** Does this paper have the fields its "The idea" block needs? */
-function hasIdea(p: Publication): boolean {
-  return !!p.idea;
-}
-/** Does this paper own a set of typeset equations that the page can actually
- *  RENDER? Asks lib/paperMath, the same table research.astro renders from —
- *  testing `!!p.mathKey` instead would emit a Method stop for a key the table
- *  doesn't know, pointing at an id the page never emits. */
-function hasMath(p: Publication): boolean {
-  return !!mathFor(p);
-}
-/** Does this paper have headline numbers or a metrics table? */
-function hasResults(p: Publication): boolean {
-  return !!(p.results?.length || p.metrics);
-}
-
-/** The stops WITHIN one paper, in the order the page renders them. */
-function paperChildren(p: Publication, index: number): Stop[] {
-  const out: Stop[] = [];
-  if (hasIdea(p)) out.push({ label: 'The idea', target: paperSectionId(index, 'idea') });
-  if (hasMath(p)) out.push({ label: 'Method', target: paperSectionId(index, 'math') });
-  if (hasResults(p)) out.push({ label: 'Results', target: paperSectionId(index, 'results') });
-  return out;
-}
-
-/**
- * The /research rail.
- *
- * ALWAYS nests each paper under its own name, at any paper count. An earlier
- * version hoisted a lone paper's sections to the top level so the rail matched
- * the flat one that shipped — but that made the fix invisible on the real page
- * (identical to the buggy rail until a second paper exists) and, worse, meant the
- * rail's shape changed the day a paper was added. Naming the paper is also the
- * honest label: "Method" alone is ambiguous the moment the page can hold more
- * than one paper, and the page can.
- *
- * Depth is three: "Selected research" → paper name → its sections. The two nested
- * tiers are separated by WEIGHT (size, tracking, opacity) rather than by more
- * indent, because a ~38px left margin can't afford a third indent step.
- */
-export function researchStops(
-  publications: readonly Publication[],
-  interests: readonly unknown[],
-): Stop[] {
-  const featured = publications.filter((p) => p.featured);
-  const others = publications.filter((p) => !p.featured);
-
-  const stops: Stop[] = [];
-  if (interests.length) stops.push({ label: 'Interests', target: 'r-interests' });
-
-  // Only papers that actually render a section get a rail entry: a paper stop
-  // whose child list is empty would be a rail row pointing at nothing, and a
-  // "Selected research" parent with no such papers would be a heading over air.
-  const paperStops = featured
-    .map((p, i) => ({ p, i, children: paperChildren(p, i) }))
-    .filter(({ children }) => children.length > 0)
-    .map(({ p, i, children }) => ({
-      // `||` not `??`: an empty-string shortTitle must fall back to the title, or
-      // the rail renders a row with no text at all.
-      label: p.shortTitle?.trim() || p.title,
-      target: paperAnchorId(i),
-      children,
-    }));
-
-  if (paperStops.length) {
-    stops.push({ label: 'Selected research', target: 'r-selected', children: paperStops });
-  }
-
-  if (others.length) stops.push({ label: 'Earlier', target: 'r-earlier' });
-  return stops;
-}
-
-/** Project section id — one speller, same reason as paperSectionId. Keyed by slug, not index, so
+/** Project section id — one speller, so rail and page cannot disagree. Keyed by slug, not index, so
  *  `/projects#p-witness` keeps pointing at witness when a project is added above it. */
 export function projectSectionId(slug: string): string {
   return `p-${slug}`;
@@ -139,7 +48,54 @@ export function projectStops(projects: readonly Project[]): Stop[] {
   ];
 }
 
-/** Experience section id — one speller, same reason as paperSectionId. */
+/** The /research index's rail: the papers, then the research interests. The page renders each section's id from
+ *  this, so the two are spelled here and nowhere else. */
+export function researchIndexStops(): Stop[] {
+  return [
+    { label: 'Papers', target: 'r-papers' },
+    { label: 'Interests', target: 'r-interests' },
+  ];
+}
+
+/** The sections a paper page writes itself after its file's body, in order: each id, the title its heading and the
+ *  phone's Contents print, and its rail bookmark. Spelled once, so the page and the rail cannot disagree. */
+export const PAPER_END = [
+  { id: 'read', title: 'Read the full paper', rail: 'Full paper' },
+  { id: 'references', title: 'References', rail: 'References' },
+  { id: 'cite', title: 'Cite', rail: 'Cite' },
+] as const;
+
+interface PaperSection { id: string; n?: string; title: string; rail: string }
+
+/**
+ * A paper page's sections: its file's, as the markdown plugin reports them (lib/paperMarkdown, `sections`), in
+ * order, then the page's own (PAPER_END). The rail (paperStops) and the phone's Contents both list exactly this.
+ * The ids are the file's as written: a paper has a page of its own, so no other paper's ids are ever beside them,
+ * and a deep link reads `/research/rl-bhrp#results`. The plugin refuses an id used twice in the file, and the page
+ * one it writes itself (paperPageOwns).
+ */
+export function paperSections(sections: readonly PaperSection[]): PaperSection[] {
+  return [...sections, ...PAPER_END];
+}
+
+/** A paper page's rail. Flat, though a section holds equations and figures: the rail bookmarks the sections a
+ *  reader moves between. */
+export function paperStops(sections: readonly PaperSection[]): Stop[] {
+  return paperSections(sections).map((s) => ({ label: s.rail, target: s.id }));
+}
+
+// The ids a paper page writes around its file's body: PAPER_END's sections, its BibTeX and the corner nav's
+// list. Its references' are `ref-<key>` (lib/paperMarkdown refId).
+const PAPER_PAGE_IDS = new Set<string>([...PAPER_END.map((s) => s.id), 'bibtex', 'cnav-list']);
+
+/** Whether a paper page writes `id` itself. A file that writes it too makes a second element with that id, and a
+ *  #fragment or getElementById finds the first, so the page refuses the file. distSmoke holds this to the built
+ *  page: each id there is either the file's (the plugin's `ids`) or the page's, never both, never neither. */
+export function paperPageOwns(id: string): boolean {
+  return PAPER_PAGE_IDS.has(id) || id.startsWith('ref-');
+}
+
+/** Experience section id — one speller, so rail and page cannot disagree. */
 export function experienceSectionId(index: number): string {
   return `x-${index}`;
 }
@@ -184,15 +140,14 @@ export function railLabel(entry: TimelineEntry): string {
  * carry it rather than flatten it.
  *
  * An EMPTY kind still gets its stop, because the page still renders its heading and its "nothing here yet"
- * line. This is the one place the rule differs from /research, where a paper with no renderable section is
- * dropped: there, a stop with no section would point at nothing; here the section genuinely exists.
+ * line: the section genuinely exists, so the stop points at something.
  */
 export function writingStops(kinds: readonly WritingKind[]): Stop[] {
   return kinds.map((k) => {
     const children = sortedEntries(k).map((e) => ({
-      // 18, not 22: measured with a real title, a 22-character label still wrapped to two lines in the rail's
-      // 190px box. SideRail also clips with an ellipsis as a backstop, but the tree should hand it something
-      // that fits rather than relying on the fallback.
+      // 18, not 22: a nested label gets 158px of the rail's 200 (its 30px dash gutter and 12px indent out), and
+      // 22 characters of 10px mono at 0.12em tracking take 158.4px. SideRail clips with an ellipsis as a backstop,
+      // but the tree should hand it something that fits rather than relying on the fallback.
       label: e.title.length > 18 ? `${e.title.slice(0, 17)}…` : e.title,
       target: entrySectionId(k.key, e.slug),
     }));
@@ -228,9 +183,9 @@ export function homeStops(): (Stop & { zone: 'light' | 'dark' })[] {
       label: 'The field',
       target: 'interlude',
       zone: 'light',
-      // SHORT labels, like /research's "The idea / Method / Results". Measured: with "The problem" and
-      // "Constraints" the indented tier's right edge reached x=151 while the slide headline starts at 143
-      // (at 1440px) — the rail printed over the words. A rail label is a bookmark, not a sentence.
+      // SHORT labels. Measured: with "The problem" and "Constraints" the indented tier's right edge reached
+      // x=151 while the slide headline starts at 143 (at 1440px) — the rail printed over the words. A rail
+      // label is a bookmark, not a sentence.
       children: [
         { label: 'Problem', target: 'choice' },
         { label: 'Limits', target: 'rules' },
@@ -248,12 +203,10 @@ export function homeStops(): (Stop & { zone: 'light' | 'dark' })[] {
   ];
 }
 
-/** Flatten a stop tree depth-first (parent before its children).
- *  NOTE this is TREE order, which is NOT the same as top-to-bottom VISUAL order —
- *  /research puts "Results" in a right-hand grid column beside "The idea", so it
- *  sits higher on screen than its tree position implies. SideRail therefore sorts
- *  by measured position before running the scrollspy; do not assume this order is
- *  geometrically monotonic. */
+/** Flatten a stop tree depth-first (parent before its children): SideRail numbers its rows by it for their
+ *  entrance. NOTE this is TREE order, which need not be top-to-bottom VISUAL order — a page may set a section
+ *  higher on screen than its tree position implies — so lib/scrollspy's railMarks sorts by measured top where the
+ *  order matters; do not assume this order is geometrically monotonic. */
 export function flattenStops(stops: readonly Stop[]): Stop[] {
   const out: Stop[] = [];
   for (const s of stops) {
@@ -263,3 +216,13 @@ export function flattenStops(stops: readonly Stop[]): Stop[] {
   return out;
 }
 
+/** The id a URL fragment names (`location.hash`, or a link's `hash`): '#results' → 'results', '' for none. A
+ *  fragment that cannot be decoded (a stray '%', as in '#100%') names nothing, rather than throwing inside the setup
+ *  of whatever page reads it. Every fragment a script reads goes through this. */
+export function fragmentId(hash: string): string {
+  try {
+    return decodeURIComponent(hash.replace(/^#/, ''));
+  } catch {
+    return '';
+  }
+}

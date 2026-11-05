@@ -116,7 +116,7 @@ describe('PROJECT_COW_LINES', () => {
 // the bubble. This holds the cap and the gutter to the same terms: neither moves alone.
 describe("the cow's right-hand column (projects.astro)", () => {
   const page = readFileSync(new URL('../src/pages/projects.astro', import.meta.url), 'utf8');
-  const wide = [...page.matchAll(/@media \(min-width: 1180px\) \{([\s\S]*?)\n {2}\}/g)].map((m) => m[1]).join('\n');
+  const wide = [...page.matchAll(/@media not all and \(max-width: 1179px\) \{([\s\S]*?)\n {2}\}/g)].map((m) => m[1]).join('\n');
 
   it("keeps the mockup's gutter", () => {
     expect(wide).toMatch(/\.projects-page \{ padding-right: calc\(4vw \+ 210px\); \}/);

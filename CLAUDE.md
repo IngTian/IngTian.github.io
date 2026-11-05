@@ -30,36 +30,49 @@ navigate between sections — you descend through the sky. Swiss-minimal structu
 carries the weight; the sky, the math-generative terrain hero, and one editorial
 tagline carry the soul.
 
-The homepage is the descent. Around it are the **reading pages** — /research,
-/writing, /writing/&lt;slug&gt;, /experience — **/projects**, and **/art**, a quiet museum
-room for calligraphy and photography. Every route except /projects rides the same sky,
+The homepage is the descent. Around it are the **reading pages** — /writing,
+/writing/&lt;slug&gt;, /experience — the **research routes** (/research and
+/research/&lt;slug&gt;), **/projects**, and **/art**, a quiet museum room for calligraphy and
+photography. Every route except /projects and the two research routes rides the same sky,
 and the reading pages deliberately share one margin, one measure and one back-link
 treatment: pages that each guessed their own layout would read as several sites.
 Borrow composition from the neighbouring page rather than inventing it.
 
-**/projects is the first page with a register of its own, and it will not be the last.**
-The owner: *"techy… pure tech and engineering."* It left the shared sky for a drafting
-sheet — isolines of a drifting Gaussian-mixture field, ticks and probe readouts, seal red
-the only colour (`components/projects/DraftingField.astro`) — and has its own measure
-(a 1500px main, the rail's column on the left and, from 1180px, the cow's on the
-right). The rule for the others, in his words, for their own passes: **research
-serious, academic; art imaginative, romantic; writing imaginative, fun, casual,
-stylish.** Until a page gets its pass it keeps the current look.
+**A page may have a register of its own, and two do.** The rule, in the owner's words, for
+each page's own pass: **research serious, academic; art imaginative, romantic; writing
+imaginative, fun, casual, stylish** — and /projects *"techy… pure tech and engineering."*
+/projects and the research routes have had their passes; /art and /writing have not, and
+until a page gets its pass it keeps the current look.
+- **/projects, the drafting register** (`page="drafting"`). It left the shared sky for a
+  drafting sheet — isolines of a drifting Gaussian-mixture field, ticks and probe readouts,
+  seal red the only colour (`components/projects/DraftingField.astro`) — and has its own
+  measure (a 1500px main, the rail's column on the left and, from 1180px, the cow's on the
+  right).
+- **The research routes, the paper register** (`page="paper"`). A still sheet with no sky
+  and no SkyWash — warm paper in light, near-black in dark, seal red the only colour in both
+  — set like a paper: a Georgia body (18px, growing to 19px by 1780px) on a ~77-character line,
+  numbered section heads, margin notes, booktabs tables, hairline rules, ink for structure.
+  Its measure is `styles/paper.css`'s, which both routes import: a reading column (`--M`,
+  604 → 664px between 1100 and 1780px) and a notes column (`--N`) a gap (`--G`) apart,
+  centred in the space right of the rail; an index card spans both. No page-load veil on
+  either route: it would replay on every card click and every "← all research".
 
 **What keeps them one site is shared components, not a shared background.** Two kinds,
 and which kind a component is decides how a page may change it:
 - **Shared, as is: the corner nav, the rail and the back link.** `CornerNav` and
   `SideRail` are components; the back link is a treatment each page writes the same way
   (`<a class="back">`, 12px mono in `--ink-3`). A page does not restyle any of them.
-  /projects reskins them without an edit: its `html[data-page='drafting']` block in
-  `tokens.css` overrides the *role* tokens (`--paper`, the ink ramp, `--ochre` → the
-  seal), so the nav's dot, pill and focus ring turn seal red there by reading the same
-  variable they read everywhere. A change to one of these is a change to every page.
+  A register reskins them without an edit: its `html[data-page='drafting']` or
+  `html[data-page='paper']` block in `tokens.css` overrides the *role* tokens (`--paper`,
+  the ink ramp, `--ochre` → the seal), so the nav's dot, pill and focus ring turn seal red
+  there by reading the same variable they read everywhere. A change to one of these is a
+  change to every page.
 - **Page-own: buttons.** One anatomy, a skin per page. `components/Button.astro` owns
   the size, label, arrow, press, focus ring and the `<a>`/`<button>` behaviour; a page's
-  look is a `skin` value plus one `.btn--<skin>` block. Today the only skin is
+  look is a `skin` value plus one `.btn--<skin>` block. The skins today are
   /projects' **sticker** (a slight tilt, a 1.5px ink edge, a hard 4px offset plate in
-  the accent). A new page **adds a skin, not a new button.** A skin obeys the motion rule:
+  the accent) and the research routes' **paper** (a hairline box in the sheet's own ground,
+  the paper page's Copy BibTeX). A new page **adds a skin, not a new button.** A skin obeys the motion rule:
   the sticker's plate moves by `transform`, not `box-shadow` (`Button.astro` says how).
 
 **Restraint is the aesthetic.** Text is English-only — the literati feel comes
@@ -91,8 +104,19 @@ When in doubt, remove rather than add.
 - **THERE IS NO 3D LIBRARY, AND THE RUNTIME DEPENDENCY LIST IS FOUR PACKAGES.**
   `dependencies` is `astro`, `@astrojs/sitemap`, `@tailwindcss/vite` and
   `tailwindcss`; everything else — `katex`, `remark-math`, `rehype-katex`,
-  `@astrojs/check`, `typescript`, `vitest` — is a devDependency, and only output
-  ships. `grep -c three package.json` → 0.
+  `remark-directive`, `unified`, `remark-parse`, `remark-gfm`, `remark-rehype`,
+  `rehype-stringify`, `@astrojs/check`, `typescript`, `vitest` — is a devDependency, and only
+  output ships. `grep -c three package.json` → 0.
+  - **`remark-directive`** is the paper format's syntax (`:t[…]`, `:::def`, `::::eq` — see
+    *Papers are files*): the one package it added, plus 9 small ones under it. Raw HTML in the
+    `.md` would have needed nothing, but it is opaque to the build-time checks (it stays a `raw`
+    node until Astro's rehype-raw runs, after every user plugin), and MDX's `@astrojs/mdx` brings
+    an integration, a JSX parser over the prose and, at its latest, Astro 7.
+  - **`unified`, `remark-parse`, `remark-gfm`, `remark-rehype`, `rehype-stringify`** are
+    declared so `tests/paperMarkdown.test.ts` can run the site's plugins inside the chain
+    Astro runs them in, and `unified` also so `remarkPaperSyntax` can take remark-directive's
+    syntax from a processor of its own. Astro already installs all five at these versions, so
+    declaring them downloads nothing.
   - This bullet used to say the opposite, at length: that `three` was "a real
     dependency", imported once in `lib/fanScene.ts` behind a dynamic `import()` in
     `FactorFan.astro`, code-split into a 483KB chunk for `/proto-showpiece`, and it
@@ -130,8 +154,12 @@ When in doubt, remove rather than add.
   - They live under their own `--ff-*` variables. Never point `cssVariable` at
     `--font-display`/`-body`/`-mono`: those are the site's role tokens, and that
     collision is what stopped every webfont from loading. Fraunces keeps its
-    preload — removing it measured a worse FCP (1956 → 2333ms; see BaseLayout).
-- **Math in markdown is typeset at build time.** `astro.config.mjs` wires
+    preload — removing it measured a worse FCP (1956 → 2333ms, both styles preloaded against
+    none; see BaseLayout) — but only on a page that shows it, and only the style it shows
+    (`preloadAccent`: `/` the normal, `/writing/<slug>` the italic), as each file is a
+    high-priority fetch of its own. The one-style preload has not been measured on its own.
+- **Math in markdown is typeset at build time.** The markdown chain (spelled once, in
+  `lib/paperMarkdown/index.ts`, which `astro.config.mjs` calls) runs
   `remark-math` + `rehype-katex` with **`output: 'mathml'`**, which is the
   load-bearing option: KaTeX's default HTML tree needs `katex.min.css` and ~half a
   megabyte of `KaTeX_*` webfonts, and a third downloaded family is against the font
@@ -139,6 +167,17 @@ When in doubt, remove rather than add.
   zero fonts. `katex` is a **devDependency** and stays one; only its output ships.
   `lib/equations.ts` holds the same guarantee for build-time equations in `.astro`,
   and `tests/equations.test.ts` asserts it.
+  - **The MathML letter fix runs on every markdown file**, as `rehypeMathVariants` in
+    `lib/mathml.ts` right after rehype-katex: Chrome honours no `mathvariant` but
+    "normal", so KaTeX's `\mathcal`/`\mathbb` letters are rewritten as Unicode letters, the
+    same table `fixMathVariants` uses for `lib/equations.ts`. One fix, one module: the table's
+    keys (`ALPHABETS`) are the only statement of which variants are rewritten, so a bold alphabet
+    added there is drawn by both paths at once, and the spec compares the two on each alphabet
+    they rewrite. It throws on a letter Unicode has no form for and on any `mathvariant` but
+    "normal" it leaves (bold, fraktur and the others it has no alphabet for), naming the TeX, so
+    a letter is never drawn plain in silence. A markdown plugin's throw does not fail the build
+    by itself (Astro logs it and stores the entry unrendered), so `/writing/<slug>` throws on an
+    unrendered entry rather than ship an empty piece.
 - `astro:assets` optimizes gallery images (responsive `widths`, **webp — not avif**). This line said
   "webp/avif" for a long time; `ls dist/_astro/*.avif` is empty and nothing in `astro.config.mjs` asks
   for avif, so no page has ever shipped one. Either add the format deliberately or leave it — but do
@@ -198,9 +237,26 @@ else.
 ```
 src/
   styles/{tokens.css, global.css}   # palette + type roles; the .descent gradient, atmosphere washes and the .is-slides slide metrics live in global.css
+  styles/paper.css                  # what the two research routes share: the measure (--M --G --N --L --tk) and the wealth figure's series marks
   layouts/BaseLayout.astro          # head, astro:fonts, meta/OG/JSON-LD, favicons, the page-load veil, CornerNav, ClientRouter
-  content.config.ts                 # the `writing` collection + its frontmatter schema (the ONLY content collection)
+  content.config.ts                 # the two content collections, `writing` and `papers`, their frontmatter schemas and the one isoDate helper
   content/writing/*.md              # the pieces themselves — a new one is a FILE, not a code change
+  content/papers/*.md               # one paper's explainer each (rl-bhrp.md) — see Papers are files
+  pages/research/index.astro        # /research: the papers as cards, newest first (a card opens its paper's page when a file explains it), then the interests
+  pages/research/[slug].astro       # the one paper page: the record's head, the file's body, references, BibTeX; its script places the notes and runs the motion
+  lib/paperMarkdown/{index,remarkPaper,rehypePaper}.ts # the markdown chain (spelled once) + the paper format's compiler and checks — see Papers are files
+  lib/paperMarkdown/names.ts        # imports nothing: PAPERS_DIR (content.config.ts reads it from here) and FIGURE_NAME, where a drawing names its own figure
+  lib/paperFigures/{wealthFigure,pipelineFigure,metricsTable}.ts # a paper's drawings and Table 1, as HTML strings from its data; a :::figure places and numbers each
+  lib/paperPage.ts                  # the paper page's pure half: the prose its frontmatter writes (authorRole, givenFirst, listed, referenceNote, Line + lineText), note stacking, the readout's month, step, point names, spoken line and instructions (readoutLabel)
+  components/research/PaperLine.astro # one line of a paper page's own prose: names kept whole (wholeParts), dates as <time>
+  lib/wealth.ts                     # the one wealth module: growth of $1, CAGR, drawdown, the band of runs, WealthSeries (the prepared series every picture of a run reads; REPRO is RL-BHRP's), scales and ticks — the paper page's figures and /projects' rl-bhrp picture
+  lib/words.ts                      # the one word counter (countWords, readingMinutes) + wholeParts, the one rule for what never breaks across a line ("RL-BHRP")
+  lib/dates.ts                      # the one date helper: longDate, monthYear (UTC)
+  lib/motionTiming.ts               # the motion module's pure half: every curve (EASE, DRAW, SWEEP, FADE, WITHDRAW) and duration (REVEAL, RAIL, PAPER_PAGE, CARD, MOVE_MAX) the rail and the research routes move by, stagger and the paper page's batches (highlightDelay, arrowDelay), sweepDurations, mergeLines; tests/motionTiming.test.ts holds their CSS literals to it
+  scripts/motion.ts                 # THE ONE MOTION MODULE, its DOM half: play, onceSeen, riseOnceSeen, sweepLines — the rail and both research routes; the reduced-motion gate is inside it
+  scripts/pageView.ts               # onPageView(selector, init): starts nine scripts right after parse, not at window `load`, handing init its element — /projects' (all but two), SideRail's and both research routes' (see Interactivity)
+  data/papers/{index,rl-bhrp}.ts    # PAPER_DATA (values, figures, the homepage line, thumb); RL-BHRP's Table 2, window, reproduction series, and VALUES — every figure its prose prints, as the string it prints (a :v reads one; TypeScript reads one through paperValue, whose key is typed as VALUES' keys and which also throws on an unknown one)
+  lib/mathml.ts                     # the one MathML letter fix: fixMathVariants for lib/equations.ts, rehypeMathVariants for every .md
   data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline, publications, projects + inProgress, awards, links
   data/nav.ts                       # PAGES — the canonical page set (see Navigation)
   data/writing.ts                   # the writing TAXONOMY (KINDS) + buildKinds(), the one seam to the markdown
@@ -208,8 +264,8 @@ src/
   data/{define,desk,making,story}.ts                       # the homepage explainer's copy + numbers, per slide
   data/{cowGlyph,ruleGlyphs,tickerGlyphs,signalWeights}.ts # pixel-art matrices and weights the slides draw from
   lib/deck.ts                       # pure deck stops: WHERE the homepage scroll may rest, and what's next — unit-tested
-  lib/pageStops.ts                  # pure Stop trees: one tree per page drives BOTH its rail and its section ids — unit-tested
-  lib/viewport.ts                   # PHONE_MAX_WIDTH = 640, its PHONE_QUERY + isPhone() — the one phone gate
+  lib/pageStops.ts                  # pure Stop trees: one tree per page drives BOTH its rail and its section ids — unit-tested; + fragmentId, the one decode of a URL fragment
+  lib/viewport.ts                   # PHONE_MAX_WIDTH = 640, its PHONE_QUERY + isPhone() — the one phone gate; WIDE_QUERY, the wide layout past 1100px
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate; MOTION_LIMIT_MS, WCAG 2.2.2's five seconds
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
   lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter AND the memoised grid cache
@@ -218,31 +274,31 @@ src/
   lib/introTimeline.ts              # the homepage intro's SCHEDULE only — pure. The decision and the ?dur= clamp live in pages/index.astro's is:inline script (it must run before first paint, so it cannot import); lib/introSession.ts reads what that publishes
   lib/descentPath.ts, trajectory.ts # the career descent graph's field and route
   lib/{bellman,factorModel,problemSize,complexity,policyPnl,scenario,split}.ts   # the explainer slides' real math
-  lib/{justify,scrollspy,pixels,cowSpeech,knowledge,capability,paperMath,equations,signalRubric}.ts
+  lib/scrollspy.ts                  # activeStopIndex (the homepage Toc, the /art rail) + railMarks, SideRail's marking rule — see Navigation
+  lib/{justify,pixels,cowSpeech,knowledge,capability,equations,signalRubric}.ts
   lib/sketches/{kit,batch1}.ts      # the showpiece prototype harness — a sketch is (ctx) -> SVG string; /proto-sketches is its gallery
   sections/{Heights,Interlude,Choice,Rules,Solve,Story,Work}.astro   # the homepage, in scroll order — ALL of sections/, there is nothing else in it
   sections/Signature.astro          # links + seal — rendered INSIDE Work.astro, not as its own slide
   components/Deck.astro             # the deck's event plumbing (homepage only)
-  components/proto/FluidSky.astro   # the WebGL sky canvas — on 7 content pages despite the proto/ path (/projects and /proto-sketches omit it)
+  components/proto/FluidSky.astro   # the WebGL sky canvas — on 6 routes despite the proto/ path (/projects, the two research routes and /proto-sketches omit it)
   components/SkyWash.astro          # woven warm/cold broken-color wash over the sky — CSS + a small script (it is in the Interactivity list below; this line used to say "pure CSS")
   components/TerrainHero.astro      # the hero's terrain canvas (Heights only)
   components/DescentPath.astro      # the career descent graph (inside Story)
-  components/SideRail.astro         # the reading pages' and /projects' marginal rail, driven by a Stop tree
+  components/SideRail.astro         # the one marginal rail (/research, /research/<slug>, /writing, /experience, /projects), driven by a Stop tree — see Navigation
   components/Toc.astro              # the homepage's thin left-margin TOC, driven by homeStops()
   components/CornerNav.astro        # the always-visible glass nav + theme toggle
   components/PlushCow.astro         # the cow, at three scales, with a pixel speech bubble; `talk` is /projects' cow, driven by that page's script
-  components/Button.astro           # the shared button ANATOMY + a per-page skin (only 'sticker', /projects') — see The concept
+  components/Button.astro           # the shared button ANATOMY + a per-page skin ('sticker', /projects'; 'paper', the research routes') — see The concept
   components/{SealMark,Grain}.astro # (ProjectCard.astro was here; deleted with the /projects redesign)
   components/projects/*.astro       # /projects only: DraftingField (the background), TerminalHeader (banner, listing, the boot), Gallery (the fan), SelectedRows, WorkshopCards, ProjectAsk (the "open on GitHub?" pop-up), ProjectPicture (no script)
   lib/draftingField.ts              # the drafting field: drift, the ping schedule, probe readouts — pure; DraftingField.astro strokes its isolines through marchingSquares' isoSegments over the grid sampleGrid() lays out
   lib/asciiBanner.ts                # the PROJECTS banner as SVG rects from letter matrices (the mono subset has no block glyphs)
   lib/projectsListing.ts            # the header's `ls -l` lines and the summary counts, computed from the records
   lib/projectsBoot.ts               # the boot: shouldBoot (WHETHER — shipped as source by projects.astro's is:inline decider) + bootSteps/bootState (WHAT, at each ms)
-  lib/pageView.ts                   # onPageView(): starts /projects' scripts right after parse, not at window `load` (all but two — see Interactivity)
   lib/{cowTalk,galleryLayout}.ts    # when the /projects cow talks and which line; the fan's poses + the one click rule every project surface shares
   lib/{positioning,projectVisuals}.ts # offchart's percentile, ported; the four COMPUTED pictures as SVG strings, coloured only by CSS variables
   data/{cowLines,projectVisuals}.ts # the /projects cow's lines (stored as PAIRS); which picture each project shows
-  data/vendor/*.ts                  # GENERATED — the computed pictures' inputs, with provenance in each header. Do not edit; re-run the tool
+  data/vendor/*.ts                  # GENERATED — the computed pictures' inputs and the paper page's reproduction series, with provenance in each header. Do not edit; re-run the tool
   scripts/artGallery.ts             # the /art page behavior (justified rows, placard, scrollspy, lightbox)
 tests/*.test.ts                     # vitest — every pure lib module, the data/route invariants, the content seam
 tools/vendor-projects.mjs           # the ONLY thing that touches the network, run by hand: writes data/vendor/*, src/assets/projects/* and public/projects/*; name parts (`… binaries`) to re-vendor only those
@@ -250,7 +306,7 @@ tools/vendor-projects.mjs           # the ONLY thing that touches the network, r
 
 ### Routes
 
-**Nine pages, not two**, and that is the number `npm run build` prints (`9 page(s)
+**Ten pages, not two**, and that is the number `npm run build` prints (`10 page(s)
 built`) — check it against the build rather than against this table, and `ls
 src/pages` beats both. This line read "twelve" for a while, left over from when three
 more prototype routes existed and the table below still named all four.
@@ -258,7 +314,8 @@ more prototype routes existed and the table below still named all four.
 | Route | What it is |
 | --- | --- |
 | `/` | the descent — the homepage deck |
-| `/research` | papers, in full: the idea, the method's equations, results |
+| `/research` | the papers as cards, newest first, each opening its page here or its publisher's; then the research interests |
+| `/research/<slug>` | one paper explained, rendered from `src/content/papers/<file>.md` (today `/research/rl-bhrp`) |
 | `/writing` | the writing shelf — kinds, each listing its markdown pieces |
 | `/writing/<slug>` | one piece, rendered from `src/content/writing/<slug>.md` |
 | `/projects` | every notable project, on its own drafting register: the terminal header and its boot, the gallery, selected work, the workshop |
@@ -288,18 +345,21 @@ indexed one is a real leak, not an untidiness.
 `Deck`, `Toc`, `SideRail`, `CornerNav`, `TerrainHero`, `FluidSky`, `SkyWash`,
 `DescentPath`, `PlushCow`, the three explainer slides (`Choice`, `Rules`, `Solve`),
 `BaseLayout`'s no-FOUC theme resolver and veil, `pages/index.astro`'s intro decider,
-the `/art` and `/research` pages, and `/projects` — `pages/projects.astro` (the boot
+the `/art` page, both research routes (`pages/research/index.astro`, the cards' reveals,
+hover and focus; `pages/research/[slug].astro`, the margin notes, the linking, Figure 2's
+readout and the motion), and `/projects` — `pages/projects.astro` (the boot
 decider, the ask dispatcher and the cow's talk) plus six of `components/projects/*`:
 `DraftingField`, `Gallery`, `SelectedRows`, `WorkshopCards`, `ProjectAsk` and
-`TerminalHeader` (the boot) — all need JS. That is the whole list, 23 files. Every one
+`TerminalHeader` (the boot) — all need JS. That is the whole list, 24 files. Every one
 is a plain Astro component or page with a `<script>`, **not** an island (see *Stack*).
 
 **Counting it:** `grep -rln '<script' src` also hits three `lib/` files that say `<script>`
-in comments. Filtered to `src/{components,sections,pages,layouts}` it returns the 23 above
-(`ProjectPicture.astro` and `Button.astro` have none).
+in comments. Filtered to `src/{components,sections,pages,layouts}` it returns the 24 above
+(`ProjectPicture.astro` and `Button.astro` have none). `scripts/artGallery.ts`,
+`scripts/motion.ts` and `scripts/pageView.ts` are modules those scripts import, not scripts of their own.
 
-**Four files break the contract below on purpose, with `is:inline` scripts that must run
-before first paint** (`grep -rn '<script is:inline' src` → 6 in 4 files). A bundled script
+**Three files break the contract below on purpose, with `is:inline` scripts that must run
+before first paint** (`grep -rn '<script is:inline' src` → 4 in 3 files). A bundled script
 runs after parse, which is after first paint:
 - `index.astro`'s intro decider and `BaseLayout`'s theme resolver and veil: without them the
   page paints one state and then flips to another (the finished sky, the wrong theme).
@@ -308,11 +368,14 @@ runs after parse, which is after first paint:
   `BOOT_DEADLINE_MS` failsafe. Every rule that hides something under the class says
   `transition: none`, or a ClientRouter arrival animates the finished page *into* the boot
   (`tests/distSmoke.test.ts` checks the built CSS).
-- `research.astro`'s two: `html.paper-js` in the head (closed cards with JS, all open
-  without), and one after the papers that opens a deep-linked panel, syncs `aria-expanded`
-  and marks closed panels `inert`. Deferred, the panel paints closed and the closed links
-  become a keyboard trap in zero-height boxes. Its bundled script keeps the contract, so
-  `/research` is in the list too.
+
+The research routes need none: nothing on them is hidden by markup. What waits for a reveal
+carries `data-pending`, set by a bundled script and only on what is still below the screen the
+reader lands on (`onceSeen` in `scripts/motion.ts`), so nothing a reader can see flips; and a
+wide margin note is held by CSS alone, `@media (scripting: enabled)`, until the script places
+it (*Papers are files*). Every hold-back rule is inside `@media screen`: a printout is laid out
+where no observer sees it and no backstop runs, so it gets the finished page
+(`tests/distSmoke.test.ts` fails on a hold-back outside one).
 
 Everything else here:
 
@@ -323,11 +386,16 @@ Everything else here:
   - **On a FULL load `astro:page-load` is window `load`**, which waits for every
     font and eager subresource — and never comes if one never arrives. (Every
     `/projects` picture is `loading="lazy"`; in headless Chrome 156 a held lazy
-    picture did not hold `load`, held fonts did.) So six `/projects` scripts start
-    through `lib/pageView.ts`'s `onPageView()`, at module evaluation right after
-    parse and then once per new DOM on `astro:page-load`: `TerminalHeader`,
+    picture did not hold `load`, held fonts did.) So nine scripts start
+    through `scripts/pageView.ts`'s `onPageView()`, at module evaluation right after
+    parse and then once per new DOM on `astro:page-load`, with the element its selector
+    found (a page without one gets only the last teardown). Six are /projects': `TerminalHeader`,
     `ProjectAsk`, `Gallery`, `DraftingField`, and `pages/projects.astro`'s ask
-    dispatcher and cow. Each of the last four once started at `load` and paid for it:
+    dispatcher and cow. The other three are `SideRail`, whose first marks must land while
+    its rows are still entering; the paper page, whose notes must be placed and whose
+    reveals armed before the reader sees it; and the /research index, whose cards answer
+    the first pointer or Tab rather than the first after `load`. Of /projects' six, the
+    last four once started at `load` and paid for it:
     until then a slow `Gallery` card was a bare tone with no shimmer, and a picture
     landing before `load` popped in unfaded; the field stayed blank while the banner
     lit; and the cow missed every `cow:say` sent before `load`, then greeted "Click
@@ -343,6 +411,23 @@ Everything else here:
   have specs at all — the parts worth testing are not tangled in event handlers.
 - **Both gates are asked, not re-derived**: `prefersReducedMotion()` from
   `lib/motion.ts`, `isPhone()` from `lib/viewport.ts`.
+- **The rail and the research routes animate through one module**, `scripts/motion.ts`
+  (its pure half, the curves and the arithmetic, is `lib/motionTiming.ts`): `play` runs a
+  Web Animation and hands back to the element's own CSS, `onceSeen`/`riseOnceSeen` reveal
+  what is first seen, `sweepLines` draws a highlight line by line. The reduced-motion gate
+  is inside it, not in the callers: under it `play` lands on its last frame at once and
+  `onceSeen` holds nothing back. A teardown finishes every live animation.
+  - **Every curve and duration they move by is stated once, in `lib/motionTiming.ts`**, and a
+    script imports it. CSS cannot, so `tests/motionTiming.test.ts` reads each transition and
+    animation declaration, shorthand or longhand (`-duration`, `-delay`, `-timing-function`), in
+    `SideRail.astro`'s, the two research pages' `<style>` blocks and `styles/paper.css`, and holds
+    it to its constant, in order: a literal added there without one fails by name. In those scripts
+    and `scripts/motion.ts` it fails a curve written out (`cubic-bezier(`, or a keyword such as
+    `'ease-out'`; `'linear'` is no curve), and a number of ms of two digits or more after
+    `duration:`/`delay:`/`step:`/`max:`/`total:` or as a `later()`/`setTimeout()` delay. A literal in
+    a stylesheet other than those four, or a duration a script builds some other way, it does not
+    see. The rail's entrance duration is passed in instead (`--row` on the nav, beside `--gap`), as
+    the frontmatter's stagger is computed from it.
 
 ## The homepage — the deck
 
@@ -440,20 +525,21 @@ string itself is built once, as `PHONE_QUERY`: `isPhone()`, the deck's change li
 **The number lives in two places and they are synced BY HAND.** `@media
 (max-width: var(--x))` is not valid CSS, so there is no way to feed one value to
 both. **If you change `PHONE_MAX_WIDTH`, change every `@media (max-width: 640px)`
-block with it.** `grep -rn 'max-width: *640px' src` returns **20 hits in 14 files**,
-and **four of the 20 are prose, not rules** — `viewport.ts` ×2 (its own doc
+block with it.** `grep -rn 'max-width: *640px' src` returns **22 hits in 15 files**,
+and **four of the 22 are prose, not rules** — `viewport.ts` ×2 (its own doc
 comments) plus `global.css:178` and `global.css:327`, which describe the
 breakpoint in comments rather than declaring it — and **one is a `sizes` hint**:
 `projects/Gallery`'s `sizes="(max-width: 640px) 240px, 330px"`, the phone strip's
-card width, which must move with the strip's block. So there are **15 real CSS
-blocks across 13 files**: `experience` ×2, `projects/Gallery` ×2 (one of them
-`@media not all and (max-width: 640px)` — the desktop-only card lift, written
-negated so this grep still finds it), and one each in `global.css`, `CornerNav`,
+card width, which must move with the strip's block. So there are **17 real CSS
+blocks across 14 files**: `experience` ×2, `projects/Gallery` ×2 and `global.css` ×2
+(one of each pair is `@media not all and (max-width: 640px)` — Gallery's desktop-only
+card lift and global.css's sky suppression), and one each in `CornerNav`,
 `Toc`, `DescentPath`, `FluidSky`, `Heights`, `projects.astro` (the phone's strip
-for the cow's bubble), `projects/TerminalHeader`, `404`, `research` and
-`writing/[...slug]`. **One block
-spells the same breakpoint so this grep misses it** — `global.css:343`,
-`min-width: 641px` — check it by hand.
+for the cow's bubble), `projects/TerminalHeader`, `404`, `research/index`,
+`research/[slug]` and `writing/[...slug]`. **The wide side is always written as that
+negation, never as `min-width: 641px`**: a second bound leaves a zoomed window 640.5 CSS
+px wide to neither side, and it is also what this grep would miss.
+`tests/viewport.test.ts` fails on any such pair, at any breakpoint in `src`.
   Two notes on how this count has gone wrong before, because it keeps doing so.
 It read "15 hits … 13 real blocks … `global.css` ×2" — overcounting `global.css`
 because one of its two prose mentions is `max-width:640px` with **no space**,
@@ -484,6 +570,16 @@ phone treatment is *bug fixes only*, and the whole of it is:
 - the **descent graph** drops its in-frame labels and becomes a block with its own
   height, with the sentence that explains it read *after* it rather than across it;
 - the **fluid sky canvas is skipped** entirely under 640px;
+- on the **research routes**, from 1100px down (where `SideRail` hides) the page is one
+  column: a paper page opens with a **Contents** list that replaces the rail, listing
+  exactly the rail's stops (`paperSections()`), and its margin notes fall in under the
+  block they explain (so they do with no script, at any width). At 640px the type steps
+  down, an equation or figure that has a narrow drawing shows it (an equation's `$$ narrow`,
+  Figure 2's `svg.narrow`, Figure 1's `.pp-art.narrow`) — the same equation or figure, broken
+  for the width — Table 1's dates take their short form, its row heads stick as it scrolls in
+  its own box, and an index card sets its picture beside its title with a short tag for
+  a caption. Figure 2's readout works by tap; a term's link to its note and a symbol's to
+  its Notation row are a mouse's or a pen's, never a tap's, so nothing stays marked;
 - on **/projects**, the gallery's fan becomes a horizontal strip, the drafting field is
   painted once as a still frame, and the rows' floating preview and the cards' glow are
   gated on `(hover: hover)` rather than on width, so they also stay off on a tablet's
@@ -526,7 +622,10 @@ phone treatment is *bug fixes only*, and the whole of it is:
   asserts every href resolves to a real route, with no duplicate hrefs or labels.
   `CornerNav` renders it.
 - **The page you are on is marked by a lit DOT before its label**, on every page:
-  `aria-current="page"` on the link, a 6px dot plus a glow, and the label at weight 600.
+  `aria-current="page"` on the link, a 6px dot plus a glow, and the label at weight 600. A page
+  under a door (`/research/<slug>`, `/writing/<slug>`) marks its section's link the same way, with
+  `aria-current="true"` — it is in that section, not on that page; `tests/distSmoke.test.ts` checks
+  every built route.
   It replaced a 1px accent hairline under the label at weight 500, which the owner found
   unclear — that thin, it reads as an underline or as nothing. The dot is shape plus
   colour, so it does not rely on colour alone; the **bloom pill stays hover's and
@@ -534,7 +633,10 @@ phone treatment is *bug fixes only*, and the whole of it is:
   - **The dot reserves its space; it does not take any.** It is positioned in the link's
     left padding, off the label, and every page link carries the same 20px of it (6px more
     than the other items), so every `.page-label` has the same x and width on every page
-    (measured on the five pages in both themes: within 0.02px). The 6px is what keeps the
+    (measured on the five pages in both themes: within 0.02px). That holds with overlay
+    scrollbars; with classic 15px scrollbars the
+    capsule, anchored on the right of the viewport, moves by the scrollbar's width between a
+    page that scrolls and one that does not, labels and all. The 6px is what keeps the
     dot off the edge: in the shared 14px it sat flush on the link's edge, 4px from the
     capsule's border on "Research" — the owner: "almost on the edge". Its first version
     was an inline-block inside the label, which made the current item 14px wider — and
@@ -542,7 +644,8 @@ phone treatment is *bug fixes only*, and the whole of it is:
     14px from page to page, and a View Transition cross-faded two capsules. The weight
     moves nothing: a monospace face keeps its advances at 400 and 600.
   - Its colour is the accent **role token** `--ochre`, never a literal: ochre in light,
-    emerald in dark, seal red on /projects (whose drafting palette overrides `--ochre`).
+    emerald in dark, seal red on /projects and the research routes (whose registers
+    override `--ochre`).
     The pill and the focus ring read the same token.
   - The 600 is real, not synthesised: the local JetBrains Mono face declares its weight
     range up to it, and `tests/distSmoke.test.ts` compares the built rule's weight with
@@ -567,22 +670,66 @@ phone treatment is *bug fixes only*, and the whole of it is:
   the dist smoke test is what tells you that you forgot.** Anything that just needs
   "the pages" should read `PAGES`.
 - **`src/lib/pageStops.ts` is one tree per page, and it drives BOTH the rail and
-  the page's section ids.** This is structural, not stylistic: `/research` used to
-  render N papers with `featured.map(...)` while building its rail with
+  the page's section ids.** This is structural, not stylistic: an old single-page
+  /research rendered N papers with `featured.map(...)` while building its rail with
   `featured.some(...)`, so N papers collapsed into one flat anchor set pointing at
   ids emitted once per paper — `getElementById` takes the first match, so every
   "Method" link jumped to paper 1. Now the same function that names a stop's anchor
   hands the page the id to render, so **a stop cannot point at an id the page didn't
   emit.** Add a section to a page → add it to its `*Stops()` and render the id from
-  the same helper. `SideRail` (reading pages and /projects) and `Toc` (homepage, via
+  the same helper. A paper page's sections are its file's, as the plugin reports them,
+  then the page's own (`paperSections()`, `PAPER_END`); its rail and its phone Contents
+  both list exactly that. `SideRail` (every rail page) and `Toc` (homepage, via
   `homeStops()`) are both dumb markup over these trees.
   - Rail labels are **bookmarks, not sentences**: measured, "The problem" /
     "Constraints" pushed the indented tier's right edge to x=151 against a headline
     starting at 143, and the rail printed over the words.
-  - `flattenStops()` is *tree* order, which is **not** visual order (/research puts
-    Results in a right-hand column, higher on screen than its tree position).
-    `SideRail` sorts by measured position before running the scrollspy — don't
-    assume monotonicity.
+  - `flattenStops()` is *tree* order, which need not be visual order (a page may set a
+    section higher on screen than its tree position). `SideRail` numbers its rows by it
+    for their entrance and nothing else; `railMarks` sorts by measured top where order
+    matters — don't assume monotonicity.
+- **`SideRail` is the one rail**, on /research, /research/&lt;slug&gt;, /writing, /experience
+  and /projects (the homepage's `Toc` and the /art rail are separate, each coupled to
+  behaviour of its own page). It hides at 1100px and below, where a paper page shows its
+  Contents list instead.
+  - **That breakpoint is one query, `(max-width: 1100px)`, and the wide side is always its exact
+    negation**, `not all and (max-width: 1100px)` (`WIDE_QUERY` in `lib/viewport.ts`, for the one
+    script that asks: the paper page's note placement), never a second bound at 1101px. A zoomed
+    or OS-scaled window can be 1100.83 CSS px wide (1321px at 120%), which a pair of bounds leaves
+    to neither: measured there, the rail showed while the paper's 24 notes went unplaced, 8 of them
+    overlapping, /projects' content sat under the rail, and the homepage's Choice slide stacked.
+    `tests/viewport.test.ts` reads SideRail's hide query and the paper page's one-column query and
+    holds `WIDE_QUERY` to their exact negation, so a breakpoint retuned in the CSS alone fails; it
+    also fails on any breakpoint in `src` written as two bounds a pixel apart (/projects' cow column
+    is `(max-width: 1179px)` and its negation for the same reason). The homepage slides are not this
+    breakpoint: Choice and Rules reclaim the Toc's gutter at 1100px and below, Story, Solve and Work
+    at 1099px and below.
+  - **Under forced colours** (Windows High Contrast) every ink becomes one system colour and the
+    dash, a background, is painted as Canvas, so nothing would tell the current stop apart; there
+    the dash is `Highlight` and the current label is underlined.
+  - **Its marking rule is `railMarks()` in `lib/scrollspy.ts`**, pure and specified (its doc
+    comment is the rule). Two stops are lit at a section boundary **on purpose** — the reader
+    is looking at both — and one of them leads; links carry `aria-current="true"`, which is
+    valid on more than one.
+  - **Every label clears 4.5:1 at rest, on every rail page's ground**, because a label is three
+    layers of one text (`SideRail.astro`'s header says how): a mark is a cross-fade of
+    opacities, never a colour transition, so every state is a solid ink. The label is the only text
+    in the markup; the two inks over it are empty `aria-hidden` elements whose text is generated
+    (`::before { content: attr(data-l) }`). `aria-hidden` is what keeps them out of the accessible
+    name in every engine — generated text alone joins the name in some and not others — and being
+    generated is what keeps them out of a selection, find-in-page and the unstyled page, each of
+    which would otherwise hold a label three times. The sheets' numbers are
+    held by `tests/paperPalette.test.ts` and `tests/draftingPalette.test.ts`; over the reading sky
+    they were measured on screen (inactive labels 5.53 / 5.74 on /writing and 5.54 / 5.63 on
+    /experience, light / dark; the dash at least 3.74:1).
+  - **Its motion is the rule's, and every piece of it runs once** (the timings are
+    `lib/motionTiming.ts`'s `RAIL`; the entrance's duration reaches the CSS as `--row`). The entrance is CSS because a bundled script runs after first paint, and
+    a from-state it set could land on a rail already drawn at rest. Hover is `.is-hover`, not
+    `:hover`, set for a mouse or a pen and never for `pointerType === 'touch'`. Reduced motion:
+    the same marks, at once.
+  - **A register reskins it through two role tokens and nothing else**, `--knockout` and
+    `--rail-dash-halo`, each read with a `none` fallback. No page styles the rail;
+    `tests/draftingPalette.test.ts` checks.
 
 ## The content model rule
 
@@ -596,12 +743,14 @@ This is the structural conclusion of the audit, and it is policy, not preference
 - **Unbounded prose with exactly one renderer becomes a content collection.**
   Writing is that: one route renders it, there is no upper bound on how much of it
   there will be, and its author should never open an editor on a `.ts` file to add a
-  piece.
+  piece. So is a paper's explainer (*Papers are files*), beside its record, which stays data.
 
 **Do not converge them.** Turning `profile.ts` into markdown would break every
 cross-reference and every computed number; turning writing back into a TS array
-would make a new post a code change. The seam between the two is exactly one
-function (`buildKinds`), and that is the whole point.
+would make a new post a code change. Each collection meets the data at exactly one
+seam, and that is the whole point: for writing, one function (`buildKinds`); for a
+paper, its frontmatter's `publication` (the slug of its record), with the records and
+`PAPER_DATA` handed to the plugins as options by `markdownPlugins()`.
 
 ## Writing is markdown
 
@@ -647,6 +796,142 @@ kind and gets its own page at `/writing/<slug>`. Nothing else is edited.
 - **Empty kinds are shown**, with copy that names what is coming rather than
   "coming soon" — it states intent, and it's honest in a way a silently-missing
   section is not. A test enforces that the empty copy is specific.
+
+## Papers are files
+
+**A new paper page is a FILE, not a code change.** A paper's explainer is one `.md` in the
+`papers` collection (`src/content/papers/`), written in a small directive syntax that
+`remark-directive` parses and `lib/paperMarkdown/` compiles and checks at build time. What the
+file holds is the prose; everything else has one home of its own:
+
+- **The record** (title, authors, abstract, BibTeX, links, the owner's `reproduction`, tags) is
+  the paper's entry in `profile.ts` `publications`, never repeated in the file. The page is
+  `/research/<record slug>`, and it says which author wrote it from `profile.ts` `authorName`.
+  A status is called what `STATUS_LABEL` beside its type says, on every surface that prints one (a
+  card as written, the homepage line and the paper's head in lower case, a preprint's head adding
+  ", not peer reviewed"). The prose the page writes round the file from these (the owner's place
+  among the authors, the note on the references, for any count of them, none included) is
+  `lib/paperPage.ts`'s, specified.
+- **The frontmatter** (zod, `content.config.ts`): `publication` (a slug in `publications`),
+  `pageDate`, `references` (`{ key, authors, year, title, journal?, venue?, doi?, url?, addedHere? }[]`,
+  an author written `Family, Given` so a citation can read "López de Prado, 2016"; `journal` is set
+  in italics and `venue` plain after it; `addedHere` is where the paper names a work its
+  bibliography leaves out), `bibliographyOmits` (the bibliography's works the page does not draw on,
+  each described, for the note above the references), `leftOut` (what the page leaves out of the
+  paper, for "Read the full paper") and `errata` (`{ date, text }[]`, a `:v` in the text filled in).
+- **The numbers and pictures** are `PAPER_DATA[slug]` (`src/data/papers/`): `values`, strings
+  computed from the paper's data; `figures`, the drawings and tables made from it by
+  `lib/paperFigures/` (HTML strings, the maths in them build-time MathML; a figure's caption is the
+  file's); `line`, the homepage appendix's line, for a paper whose line quotes its numbers; and `thumb`,
+  the index card's picture, for a paper that has one. TypeScript that quotes a value (`profile.ts`'s
+  finding, the line) reads it through `paperValue`, whose key is typed as `VALUES`' keys, so a typo is a
+  type error; and since the build strips types unchecked, it also throws on an unknown key, as an unknown
+  `:v` fails the build. A bare `values[key]` would print "undefined" with every gate green. They reach the plugins as
+  **options** from `astro.config.mjs`, with the records (for `::abstract`), so they are in Astro's
+  config digest and a moved number re-renders the paper. Plugin *code* is not in the digest: after editing a
+  plugin, delete `node_modules/.astro/data-store.json` before building or the old render is served.
+
+**The syntax** — every construct has a case in `tests/fixtures/papers/simple.md`:
+
+| write | renders |
+| --- | --- |
+| `::::section[The question]{#question n=1 rail="Question"}` … `::::` | `<section class="sec" id="question">` with `<h2><span class="n">1</span>The question</h2>`. `n` is optional (In brief has none), `rail` defaults to the title, an `aside="…"` follows the title in the heading only (`· in the paper’s own words`). The rail and the phone Contents come from these; the ids are the file's as written (one paper to a page), and the page refuses one it writes itself (see below). A numbered section opens with its lead, set in full ink. |
+| `::abstract` | the record's abstract, verbatim, as `<blockquote class="abstract" cite="<record href>">`; the paragraph after it is the page's note on it. Built as nodes, so it is counted in `bodyWords` and its `RL-BHRP` kept whole like the file's |
+| `**The problem.** …` | a run-in head: `<strong>`, set italic in full ink at the body's weight |
+| `:t[risk parity]{#rp}` | `<i class="t" data-n="rp">` — a term at first use, the anchor of its note |
+| `:::def{for=rp}` `**Risk parity.** …` `:::` | `<aside class="mn def" data-at="rp"><dfn>Risk parity.</dfn> …` — joins the block before it in one `<div class="an">` host, which must hold the term (the page looks for it there) |
+| `:::why{for=…}` … `:::` | `<aside class="mn why"><span class="mk">Why it matters.</span> …`; `for` optional on both kinds |
+| `:hl[…]` | `<mark class="hl">` — Underline, the one highlight style |
+| `::::eq{#eq-4 n=4}` `$$` … `$$` `:::where` … `:::` notes `::::` | `<div class="eq an" id="eq-4">`: the display, its number `(4)` as HTML outside `<math>` (never `\tag`), `<p class="where">`, then its notes. One `$$`, or a `$$ wide` and a `$$ narrow` |
+| `:::::thm{#thm-3-1-11}` … `:::::` | `<div class="thm">`, a theorem's frame, its displays inside it; the paragraphs that open it and introduce a display are its heads |
+| `:::notation` with a GFM table `\| Symbol \| Meaning \|` `:::` | `<div class="tbl-scroll"><table class="notation">`, each row `<tr data-sym><th scope="row">`. Each row's symbols (every maths in its Symbol cell, `$N$, $G$` as well as `$N,\ G$`, split at commas; a membership introduces its subject and its set's index, a subscript: `i\in\mathcal{I}_{g}` is `i` and `g`, never the set nor a superscript of it, so `w\in\mathbb{R}^{N}` is `w` alone and `N` is a symbol only through a row of its own) are matched **structurally** in every display's MathML and tagged `class="sym" data-sym`: an equal subtree first, else the symbol's family — a scripted `W_{g}` also stands for `W` with any other script (`W_{g(i)}`, `W^{\top}`) and for `W` alone; the largest first, then on through what a tagged symbol holds (the `i` and `g` of `W_{g(i)}`, the `w` of `RC_i(w)`) but never its own letter (`W` is not tagged again inside `W_{g(i)}`, nor `Σ` inside `Σ̃`). The page reads a pointer on a nested symbol as the outermost. A row that is only in the prose ends its Symbol cell with `{text-only}`. A row is keyed by its position, so a paper has one `:::notation`, and a second is refused. |
+| `:cite[markowitz1952]` | `<a class="cite" href="#ref-markowitz1952">Markowitz, 1952</a>` — one author, two (`Feng and He`), more (`Maillard et al.`) |
+| `:v[usd.rl]` | the text of `PAPER_DATA[slug].values['usd.rl']`. **Every quantity the prose prints that comes from data is a `:v`** — a return, a ratio, a count of stocks, sectors, months or runs, a date or year of the window, a cost, a turnover. Typed by hand, and only these: a reference to the paper or into it (arXiv:2508.11856v1, §4.1, eq. (4), Alg. 1, Def. 3.2.3, Table 2), or to the page's own figures and table (Figure 2, Table 1); a year that names an event rather than a measurement ("the 2020 crash and the 2022 sell-off"); a constant of a method or a convention, stated by the paper or the field (the \$1 every growth figure starts from, the 15 of its top-15 share, 1.96 at the 5% level, VaR 5%, 12 months to a year, a basis point's 0.01%); and a quotation of what the paper itself prints, quoted to correct or discuss it (the errata's "Feb - 2020 to Aug - 2020" and "13.37%" are the paper's misprints: as a `:v` each would print the correction in place of the error it corrects). A word that glosses a value printed beside it ("about a quarter as much", "about half the money") is not a second quantity; where the value is computed, a spec holds the word to it (`tests/paperNumbers.test.ts`, the quarter). A `$` amount is always `:v` or `\$` — a bare `$` starts maths |
+| `$:v[wealth.rl]^{12/67}-1$` | the same value written into the TeX, with `$ % # &` escaped — the one directive that works inside maths, so an equation's numbers are computed too. A `:cite`, `:t` or `:hl` there is refused |
+| `:::figure{name=wealth n=2}` caption `:::` | `<figure class="fig" id="figure-2">`: `PAPER_DATA[slug].figures.wealth`, then the container's prose as its `<figcaption>`, "Figure 2." before it, and any notes beside it. A drawing that is a `<table>` is a table: `<figure class="tbl" id="table-1">`, its first paragraph the caption above it, "Table 1.", the table in its own scroll box, its other paragraphs `<p class="src">` under it. A drawing that names its own figure writes `FIGURE_NAME` (`lib/paperMarkdown/names.ts`) there, and the plugin puts in its place the name `n` gives it ("Figure 2"), so another paper's Figure 5 reads Figure 5. Astro's rehype-raw re-serialises the drawing's markup |
+| `:::inpaper` `**In the paper:** …` `:::` | `<p class="inpaper">`, the pointer to what the page leaves to the paper |
+| `:sup[a]` | `<sup>a</sup>`, a table note's mark |
+
+- **Nesting takes colons.** A container holding another needs more colons than the one inside it:
+  `:::` for a note or a where, `::::` for an eq or a section of notes, `:::::` for a section that
+  holds an eq (or a theorem that holds one, whose section then takes `::::::`). With as many, the
+  inner fence closes both, silently — so the build refuses exactly
+  the traces that leaves (a stray `:::`, a container never closed, content outside a section).
+- **Raw HTML is refused.** It would stay an opaque `raw` node until Astro's rehype-raw, after every
+  check here, and an HTML comment would ship.
+- **So are a code block and a markdown heading.** Shiki writes a fence's colours as inline styles
+  (`github-dark`, a `#24292e` slab), and seal red is the only colour on the research routes; a
+  heading without an id gets one slugged by Astro after every check here, which can repeat a
+  section's. A section's title is its `[label]`.
+- **Smartypants runs before the plugins** (Astro puts it ahead of every user remark plugin), so a
+  title from a `[label]` is curled. An attribute is not, so a `rail="…"` holding a straight quote,
+  `--` or `...` is refused (write the character), and a reference key is joined by single hyphens,
+  since `--` in the `:cite[…]` naming it would become a dash. Smartypants never sees maths either, so
+  it opens a quote that follows inline maths (`$g$'s` drew as g‘s); `remarkPaper` closes it (g’s).
+- **Every mistake is reported, by name, and fails the build.** A plugin cannot fail the build
+  itself — Astro logs a plugin's throw and stores the entry unrendered, an empty page with a green
+  build — so the plugins collect problems into `remarkPluginFrontmatter.paperProblems` and the
+  paper page throws on an entry with no `rendered`, then through `checkedReport` (`lib/paperMarkdown/`)
+  on any problem, on an id it writes itself (below) and on a render with no report at all: a file the
+  plugins never compiled, as they compile only what is under `PAPERS_DIR`, the one spelling of the
+  directory, which `content.config.ts` loads too. The checks are in `lib/paperMarkdown/`, the less
+  obvious ones with their reason beside them; `tests/fixtures/papers/malformed.md` holds one of each
+  mistake a file can make (a record with no abstract is the spec's own case), and
+  `tests/paperMarkdown.test.ts` names each, and checks `checkedReport`'s refusals. One is an authoring rule rather than
+  a refusal: an unknown directive is reported, so a literal colon is written `\:`, as in
+  `arXiv\:2508.11856`.
+- **A file id the page writes itself fails the build too.** The plugin reports every id the file
+  carries (`ids`) and the page refuses any that `paperPageOwns()` (`lib/pageStops.ts`) claims:
+  PAPER_END's `read`, `references` and `cite`, `bibtex`, the corner nav's `cnav-list` and every
+  `ref-…`. A second element with an id takes none of its links — a `#fragment`
+  and `getElementById` find the first — so `{#bibtex}` would have Copy BibTeX copy a section, and
+  `{#ref-markowitz1952}` would take every cite of it. `tests/distSmoke.test.ts` holds the list to the
+  built page: each id there is the file's or the page's, never both and never neither, so an id the
+  layout gains fails by name.
+- **The render also reports** `sections` (`{ id, n?, title, rail }`, for the rail and Contents),
+  `errataText` (the errata with their `:v` filled in) and `bodyWords` — `countWords` from
+  `lib/words.ts` over the body's text, the abstract in it, every element boundary a space, with
+  `math`, `table` and the figures' drawings (still raw) left out. The page's reading time counts
+  every word a reader reads, as the approved prototype did: `bodyWords` plus the prose the page writes
+  round the file (the head, Read the full paper, the note on the references, the cite line, the
+  corrections, the tags). Not the controls, the Contents, the reference list or the BibTeX. Each of
+  those strings is built once in `pages/research/[slug].astro`'s frontmatter, printed as built (a line
+  with a date through `components/research/PaperLine.astro`) and counted from the same value, so a
+  string cannot be counted one way and printed another; a new line in the template still has to be
+  added to the count. `tests/distSmoke.test.ts` recounts the built page's minutes by that rule, and
+  checks the plugin's `bodyWords` against the same rule, to the word, over the test chain's render.
+- **A line never breaks inside a hyphenated word led by an acronym (RL-BHRP, RNN-based), two
+  capitalised words joined (Black-Litterman, Self-Attention), a span of years, an ISO date or an
+  arXiv category (q-fin.PM)**: one rule, `wholeParts` in `lib/words.ts`. The body's last pass wraps
+  each in `<span class="nw">`, after the words are counted; the page's own prose (its title, meta,
+  cite line, references, corrections) goes through `PaperLine`, and the /research cards' and the
+  homepage's titles through the same function. A compound in lower case (risk-parity) may break at
+  its hyphen, as in any prose.
+- **The margin notes are placed by the page's script, and held until placed.** Wider than 1100px a note
+  sits in the notes column beside its anchor — its term's line, or its block's top — stacked 16px
+  apart so none overlap (`stackNotes` in `lib/paperPage.ts`), re-placed by a ResizeObserver
+  (after layout, before paint) when a webfont lands or the window changes. Only a script knows where
+  a term's line falls, so a note is `visibility: hidden` until `place()` marks it `.is-placed`:
+  hidden keeps its box, so it first paints where it rests and nothing shifts — **CLS 0** at
+  1440×900, 1280×720, 1101×700 and 1101×600, cold, throttled, from a `#results` deep link and on a
+  restored-scroll reload. The hold is CSS alone, `@media (scripting: enabled)` nested in the wide
+  layout's `@media not all and (max-width: 1100px)`, with no pre-paint script; its backstop is a CSS animation that shows every note after
+  `MOTION_LIMIT_MS` if the script never runs (then at its block's top, perhaps overlapping —
+  accepted, as it shifts nothing). Without a script the query does not match and every note falls
+  into the column, as at 1100px and below. `tests/motionLimit.test.ts` reads the hold, its delay
+  and `place()`'s mark from the page's source.
+- **Inert everywhere else, by construction.** Astro runs one processor for every `.md`, so the
+  directive syntax is not a plugin in the list: `remarkPaperSyntax` wraps remark-parse and adds
+  remark-directive's extensions only for the length of a paper's parse. Any other file is parsed
+  exactly as it would be without them — a `:word`, a `:::` line or a `mailto:me@…` in /writing is
+  never a directive, so nothing has to be put back. Verified: `dist` byte-identical with and
+  without the plugins, and the spec compares `favourite-quotes.md` and a file of directive-like
+  text both ways. The one plugin that is not paper-only is the MathML letter fix (*Stack*).
+- The chain is spelled once, in `lib/paperMarkdown/index.ts`; the spec runs it inside Astro's own
+  order (parse, GFM, the site's remark plugins, remark-rehype, the site's rehype plugins). Astro's
+  other passes — smartypants, shiki, heading ids, images, rehype-raw — are left out of the spec,
+  and the rules above are what keep each of them from reaching anything the plugins check; the
+  spec's header says which rule answers which pass.
 
 ## Identity & voice (a design constraint)
 
@@ -851,14 +1136,16 @@ the `SkyWash` layer.
     once the beats were separated each one needed room. Keep the habit (`?dur=` on the real page, not a
     mockup) and distrust the prediction.
 - `tests/distSmoke.test.ts` pins `data-intro` to `/` and nowhere else. Moving this component, or
-  BaseLayout growing its own copy, is the single edit that would hand the animation to all nine routes.
+  BaseLayout growing its own copy, is the single edit that would hand the animation to all ten routes.
 
 ## The fluid sky
 
-`components/proto/FluidSky.astro` is the sky on **every page a visitor reaches except `/projects`** —
-seven content routes, the 404 included. `/projects` dropped it because its drafting
-palette's ink is sized for the drafting ground, not the reading sky (light `--ink-3`
-over `--reading-grad` measured 3.89:1). The other page without it is
+`components/proto/FluidSky.astro` is the sky on **every page a visitor reaches except the two
+registers'** — six routes: `/`, `/writing`, `/writing/<slug>`, `/experience`, `/art` and the
+404. `/projects` and both research routes render neither it nor `SkyWash`: each register's ink
+is sized for its own ground, not the reading sky (light drafting `--ink-3` over
+`--reading-grad` measured 3.89:1), and the paper register is a still sheet by design. The
+other page without it is
 `/proto-sketches`, which also has no `.descent` element at all (`<main class="sk">`):
 it is an internal gallery, deliberately outside the sky's system so a candidate frame
 is judged against a plain ground. (The `proto/` path is where the component was born,
@@ -868,8 +1155,8 @@ luminance banding and a warm bloom. `lib/skyShader.ts` holds the GLSL,
 `lib/skyPalette.ts` the ramps, `lib/skyLegibility.ts` the **contrast policy** that
 keeps text readable over it. Two archetypes: `descent` (paper text; the dangerous
 direction is lighter) and `reading` (dark ink on a luminous field; dangerous is
-darker). `yStart` lets a page begin further down the pattern — the owner, on the
-reading pages: "what i liked is actually lower" — without touching the shader.
+darker). Every page starts at the top of the pattern: the shader samples it from
+`scrollY / vw` alone, and the component takes `strength` and `variant`, nothing else.
 
 Two invariants, both about the compositor and both easy to break:
 
@@ -913,19 +1200,31 @@ galaxy). The whole system is **token override**, not per-component branching:
   just uses tokens. Only redefine a surface explicitly when it hardcodes a
   color a token can't reach.
 - **Role tokens that must NOT flip with the ink ramp:** `--bg` (page base
-  behind the sky — always dark, never flashes bright, **except on the drafting page**,
-  below), `--on-accent` (dark ink for text ON the accent chip — the accent is a light
+  behind the sky — always dark, never flashes bright, **except under a page register**,
+  below, whose `--bg` is its sheet), `--on-accent` (dark ink for text ON the accent chip — the accent is a light
   color in both themes, so text on it stays dark), and `--descent-grad` (the whole sky,
   redefined wholesale per theme).
 - **A page can override the ROLE tokens, per theme, from `html[data-page]`** (BaseLayout's
-  `page` prop; only /projects, as `page="drafting"`). Its two blocks in `tokens.css`,
-  `html[data-page='drafting']` and `…[data-theme='dark']`, re-declare `--paper`, the ink
-  ramp, `--ochre` (→ the seal), `--on-accent`, `--hairline-rgb` and `--bg` (= the sheet,
-  light in the light theme, so overscroll shows paper), plus eight `--draft-*` tokens. That
-  is how the shared nav, rail and cow reskin with no edit. **Both theme blocks declare every
+  `page` prop). Two registers do: `page="drafting"` (/projects) and `page="paper"` (both
+  research routes). Each has two blocks in `tokens.css`, `html[data-page='…']` and
+  `…[data-theme='dark']`, that re-declare `--paper`, the ink ramp, `--ochre` (→ the seal),
+  `--on-accent`, `--hairline-rgb` and `--bg` (= the sheet, light in the light theme, so the
+  body and overscroll show paper), plus the register's own tokens. That is how the shared
+  nav, rail, button anatomy and cow reskin with no edit. **Both theme blocks declare every
   token**: `[data-page]` and `[data-theme='dark']` tie on specificity, so a light-only value
-  would win in dark. `tests/draftingPalette.test.ts` checks that the two sets match and the
-  inks clear AA.
+  would win in dark. The role tokens a register must declare are one list, `ROLE_TOKENS` in
+  `tests/helpers/palette.ts`, which both palette specs read.
+  - **drafting** adds `--knockout` (the label knockout, one 1px ring of the bare sheet that
+    `<main>`'s text and `SideRail`'s labels both read — the rail with a `none` fallback, so
+    the page never styles the rail), `--rail-dash-halo` (the rail dash's 2px ring)
+    and eight `--draft-*` tokens. `tests/draftingPalette.test.ts` checks that the two sets
+    match and the inks clear AA.
+  - **paper** adds eight `--sheet-*` tokens, each glossed in `tokens.css`'s paper header. The
+    ground is `--sheet-ground`, never `--paper`, which in the dark convention is the light text
+    colour; the band of runs and the grid are **exempt from 3:1 by name**, every value they help
+    read being text. It needs no knockout: nothing strokes under its text, so the rail reads its
+    `none` fallbacks. `tests/paperPalette.test.ts` holds the numbers, exemptions included, and
+    that the page's own CSS never paints a ground with `--paper`.
 - **Surfaces that can't inherit CSS tokens** (handle per-theme by hand):
   the **terrain canvas** (JS-painted — `TerrainHero.astro` picks a `TerrainRamp`
   + walker palette off `data-theme`; dark = the cyan-blue **"Glacier"** ramp,
@@ -936,7 +1235,9 @@ galaxy). The whole system is **token override**, not per-component branching:
   line), the **SkyWash** + `.descent::before/::after` washes (raw rgba — dark
   nearly kills the warm Monet strokes), the **hero legibility halo** (paper→dark
   veil), the **Story panel's paper ground** (chosen per theme, not shared), and the
-  **corner-nav glass** (forced dark-frost in dark theme).
+  **corner-nav glass** (forced dark-frost in dark theme). The research routes' figures are
+  not among them: their SVG is drawn from CSS classes that read the paper tokens, so they
+  re-theme with no listener.
 - **Default + persistence:** an inline no-FOUC head script in `BaseLayout`
   resolves theme *before first paint* — explicit `localStorage.theme` first,
   else `prefers-color-scheme` (so a first-time visitor matches their OS). The
@@ -995,7 +1296,8 @@ galaxy). The whole system is **token override**, not per-component branching:
    Getting this wrong breaks the build with a parse error that points at the
    element, not at the comment.
    - This is written down because it cost **three broken builds in one session**:
-     the same mistake was made in `research.astro`, `writing/[...slug].astro` and
+     the same mistake was made in the old single-page `research.astro` (since replaced by
+     `research/index.astro` and `research/[slug].astro`), `writing/[...slug].astro` and
      `art.astro`, and the fix for the third put the comment in the `.map()` body,
      which took the error count from 8 to 19. **If a note belongs to a specific
      attribute, put it above the element or in the frontmatter** — never among the
@@ -1034,7 +1336,7 @@ titles came to rest hard against the browser chrome — the lead is a number in
     `tests/skyShader.test.ts` while build and test were both green.
   - **`npm run typecheck` is the only place types are checked**, and it runs **two**
     checkers because neither covers the other: `astro check` is the only thing that
-    reads the ~3,200 lines of `<script>` bodies inside `.astro` files (tsc can't parse
+    reads the ~4,800 lines of `<script>` bodies inside `.astro` files (tsc can't parse
     `.astro`), and `tsc --noEmit` is the only thing that covers `tests/` and `src/lib`.
     Run it after a build so the generated content-collection types in `.astro/` exist.
   - `tsconfig.json` excludes `tmp_*` and `.tmp-*` — the ad-hoc probes the verification
@@ -1081,6 +1383,11 @@ titles came to rest hard against the browser chrome — the lead is a number in
 - **Lighthouse bar:** Perf ≥99 / A11y 100 / Best-practices 100 / SEO 100. Don't
   regress a11y: there's a `<main>` landmark; nav is real `<button>`/`<a>`; decorative
   canvases, rails and the cow bubble are `aria-hidden` or labeled.
+  - **A11y 100 does not test WCAG 1.4.13** (content on hover or focus), and neither does axe.
+    A tip that covers text must be dismissible and hoverable: the paper page's two (Figure 2's
+    readout, a symbol's Notation row) go on Escape, without the pointer or the focus moving,
+    and stay while the pointer crosses onto them (a shown tip takes the pointer, and a bridge
+    spans its gap; `tests/distSmoke.test.ts` reads both in the built CSS).
 - **Pure logic is tested.** Anything non-trivial in `lib/` gets a vitest spec, and
   so does every *invariant between two files* (`nav.test.ts`: every nav href is a
   real route; `writingContent.test.ts`: the schema enum matches `KINDS`;
@@ -1158,9 +1465,9 @@ titles came to rest hard against the browser chrome — the lead is a number in
 ## Taste rules (these define the look — hold the line)
 
 - **Palette discipline:** ONLY the tokens in `tokens.css` (paper, ink-1..5,
-  ochre, indigo, seal, plus the derived `--hairline-rgb` and `--rule` — and, on
-  /projects only, its eight `--draft-*` tokens and its overrides of the role tokens; see
-  *Themes*).
+  ochre, indigo, seal, plus the derived `--hairline-rgb` and `--rule` — and, under a page
+  register only, its own tokens and its overrides of the role tokens: /projects' eight
+  `--draft-*` and two knockouts, the research routes' eight `--sheet-*`; see *Themes*).
   - **`--rule` exists because `/experience` was already using it.** Two rules there declared
     `border-bottom: 1px solid var(--rule)` against a property defined nowhere, which by spec makes the whole
     shorthand invalid at computed-value time — every longhand falls back to its initial, and
@@ -1184,8 +1491,9 @@ titles came to rest hard against the browser chrome — the lead is a number in
   (the user chose it seeing both this and a "night descent" variant live). Do
   NOT "fix" this back to ochre. The seal red stays the brand mark in both
   themes (brightened to `#e0574a` for the dark ground).
-  **And the exception to the exception: /projects has no emerald**: its palette sets
-  `--ochre` to the seal in both themes (see *Themes*).
+  **And the exception to the exception: the registers have no emerald**: /projects' and
+  the research routes' palettes set `--ochre` to the seal in both themes (see *Themes*), so
+  seal red is the only saturated colour on them in dark too.
 - **Motion:** animate only `transform` / `opacity`; NEVER animate `filter: blur`
   (bake it). ALL motion is gated behind `@media (prefers-reduced-motion:
   no-preference)` via `lib/motion.ts`. The no-motion state must look *finished* —
@@ -1207,8 +1515,22 @@ titles came to rest hard against the browser chrome — the lead is a number in
     reduced motion) unprompted lines per page view, then stops scheduling them; the rest of
     the idle set is a press away. `tests/cowTalk.test.ts` adds up what it does unasked from
     PlushCow's transition and hop literals and `TYPE_MS`, ~3.4s, and holds it under the
-    limit. **Everything older is not held to it yet, and this is the list known, not a
-    guarantee**: the hero terrain, the fluid sky, the drafting field, SkyWash's three breathe
+    limit.
+    **The research routes and the rail are held to it, and to 2s per animation.** What moves
+    there unasked moves once, by `transform` and `opacity` (the rail's entrance in CSS, the rest
+    through `scripts/motion.ts`), and ends within 2s (`MOVE_MAX`). `tests/motionTiming.test.ts`
+    holds each single duration to it, and each staggered batch as it is computed: the rail's entrance
+    (`stagger` over `RAIL`, every row in by `RAIL.enter`), the paper page's highlights and a figure's
+    arrows (`highlightDelay`, `arrowDelay`: the last ends within `MOVE_MAX` of the first's start,
+    however many), and the reveal, whose `REVEAL.max` caps any one delay. Not held: the /research
+    cards' title underlines, `--k` lines × `CARD.underlineStep` in CSS, which stay within 2s up to a title
+    of sixteen lines (the titles have two or three), and the time a highlight waits for its block to
+    rise before its batch starts. Nothing on the screen the reader
+    lands on is held back, nor anything above it (a deep link, a restored scroll), and what waits
+    runs at the latest after `MOTION_LIMIT_MS` on screen. Under reduced motion each is its finished
+    state at once. The timings are `lib/motionTiming.ts`'s (`REVEAL`, `RAIL`, `PAPER_PAGE`, `CARD`,
+    `MOVE_MAX`), not here.
+    **Everything older is not held to it yet, and this is the list known, not a guarantee**: the hero terrain, the fluid sky, the drafting field, SkyWash's three breathe
     loops and the `.descent::before/::after` drifts run for as long as they are on screen, and
     `/`'s `.scroll-cue` bobs forever in the foreground (`Heights.astro`). That is the site's
     older pattern and a known gap against 2.2.2, not a precedent for new motion in the
@@ -1232,13 +1554,15 @@ titles came to rest hard against the browser chrome — the lead is a number in
   not delete it as junk) and **`sitemap.xml`** — plus one directory, `public/projects/`:
   manifold's two screensaver MP4s for /projects, written by `tools/vendor-projects.mjs`
   (a video is not an image, so it is served by URL rather than through `astro:assets`).
-  - **`public/sitemap.xml` is hand-maintained and is NOT the generated one.**
-    `@astrojs/sitemap` emits `sitemap-index.xml` + `sitemap-0.xml`; this third file
-    is a static alias that sits beside them with no generator and no test. It is
-    exactly the shape of thing that goes stale silently — if you add or remove a
-    route, it does not update itself. Tracked in issue #67.
+  - **`public/sitemap.xml` is a static index, NOT a list of routes.** `@astrojs/sitemap`
+    emits `sitemap-index.xml` + `sitemap-0.xml`, and `sitemap-0.xml` lists every route less
+    `/404` and the `/proto-` ones. This third file is a `<sitemapindex>` whose one `<loc>` is the
+    generated `sitemap-0.xml`, so the conventional `/sitemap.xml` name resolves too. A route
+    change never touches it: the generated child gains or loses the URL. What would break it is
+    the child's name changing, and `tests/distSmoke.test.ts` reads both — that the built
+    index points at `sitemap-0.xml`, and that `sitemap-0.xml` lists the research routes.
   - `og-card.png` is **2400×1260**, while `BaseLayout` declares `og:image:width`
-    1200 and `height` 630. Also #67.
+    1200 and `height` 630. Tracked in issue #67.
 
 ## Rejected — do not rebuild
 

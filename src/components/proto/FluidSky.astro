@@ -24,26 +24,17 @@
 // one hit. The level it was built to pick has been picked and shipped (AMP_BY_LEVEL, below), the
 // route is retired, and that grep is now 0 — so the prop, its class pair and its uniform branch
 // are gone. Deliberately NOT kept "in case": a mode with no caller is a branch nobody exercises,
-// and this component runs on every page, where an untested branch is the expensive kind.
+// and this component runs on every route with a sky, where an untested branch is the expensive kind.
 //
 // (Note the house habit: this rationale is a frontmatter comment, not an HTML one. Astro emits
-// HTML comments into the build, and FluidSky renders on every route — an explanation this long
-// would ship to every visitor on every page. Frontmatter `//` never reaches the output.)
+// HTML comments into the build, and FluidSky renders on every route with a sky — an explanation this long
+// would ship to every visitor on each of them. Frontmatter `//` never reaches the output.)
 interface Props {
-  /**
-   * Where in the pattern the page STARTS, in viewport widths.
-   *
-   * The fluid is sampled from scroll position (uYOffset = scrollY / vw), so at the top of a page you always see
-   * the very top of the pattern. The owner, on the reading pages: "what i liked is actually lower." This lets a
-   * page begin further down the field, so the region he liked is what sits behind the glass cards — without
-   * touching the shader or the legibility gates.
-   */
-  yStart?: number;
   strength?: 0 | 1 | 2 | 3 | 4;
   /** 'descent' (paper text, dawn→ground) | 'reading' (dark ink, luminous) */
   variant?: 'descent' | 'reading';
 }
-const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
+const { strength = 4, variant = 'descent' } = Astro.props;
 ---
 <canvas
   class="fluid-sky"
@@ -51,7 +42,6 @@ const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
   aria-hidden="true"
   data-strength={String(strength)}
   data-variant={variant}
-  data-ystart={String(yStart)}
 ></canvas>
 
 <style>
@@ -150,8 +140,6 @@ const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
     const variant = (cvs.dataset.variant ?? 'descent') as SkyVariant;
-    // Constant head-start into the pattern, in viewport widths. See the yStart prop.
-    const yStart = Number(cvs.dataset.ystart ?? '0') || 0;
     let rampTheme: Theme | '' = '';
     function uploadRamp(force = false): void {
       const theme: Theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
@@ -275,7 +263,7 @@ const { strength = 4, variant = 'descent', yStart = 0 } = Astro.props;
       sizeTo();
       uploadRamp();
       const vw = mVw, vh = mVh, docH = mDocH;
-      gl!.uniform1f(U.uYOffset, window.scrollY / vw + yStart);
+      gl!.uniform1f(U.uYOffset, window.scrollY / vw);
       gl!.uniform1f(U.uFlatten, introFlatten(nowMs));
       gl!.uniform1f(U.uYSpan, vh / vw);
       gl!.uniform1f(U.uDepth0, window.scrollY / docH);

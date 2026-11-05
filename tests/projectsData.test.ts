@@ -59,10 +59,11 @@ describe('the project records', () => {
     expect(readFileSync(new URL('../src/data/profile.ts', import.meta.url), 'utf8')).not.toMatch(/'\d+ releases'/);
   });
 
-  // The paper is an arXiv preprint — its own record's venue, and how /research shows it. "Published" claimed more,
+  // The paper is an arXiv preprint — its own record's status, and how /research shows it. "Published" claimed more,
   // the inflation the site's "incoming PhD, never present-tense" rule exists to refuse.
   it("calls rl-bhrp's paper what its record calls it: on arXiv, not published", () => {
-    expect(publications.find((p) => p.arxivId)!.venue).toBe('arXiv preprint');
+    const paper = publications.find((p) => p.slug === 'rl-bhrp')!;
+    expect([paper.status, paper.venue]).toEqual(['preprint', 'arXiv']);
     expect(bySlug('rl-bhrp').idea).toMatch(/arXiv/);
     // Scoped to the claim, not the word: another project may truthfully "publish" something.
     const rl = bySlug('rl-bhrp');

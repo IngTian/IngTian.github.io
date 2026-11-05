@@ -303,7 +303,7 @@ html[data-theme='dark'] .descent::after {
     radial-gradient(90% 20% at 54% 66%, rgba(95,178,201,0.10), transparent 82%);
 }
 
-/* ── The fluid sky, shared across every route ────────────────────────────────
+/* ── The fluid sky, shared by every route that renders it ────────────────────
    FluidSky is an OPAQUE canvas that replaces the page's CSS gradient. It is a
    negative-z child of .descent, so it paints above the parent's own background
    but below all content.
@@ -317,7 +317,7 @@ html[data-theme='dark'] .descent::after {
    reading pages keep --reading-grad, because each page's own rule already sets
    the right one and we only need to know whether to hide it.
 
-   ── CRITICAL: every suppression rule below is inside @media (min-width: 641px) ──
+   ── CRITICAL: every suppression rule below is inside the exact negation of the 640px query ──
    An audit caught a reproducible way to render the hero INVISIBLE. .fluid-live is
    added once after the first successful draw and removed only in the
    astro:page-load teardown, so ANY state change that hides the canvas without a
@@ -339,38 +339,26 @@ html[data-theme='dark'] .descent::after {
    Gating the CSS on the SAME breakpoint that hides the canvas makes the two
    physically unable to desync — the suppression cannot apply anywhere the canvas
    is display:none, regardless of what the class says. That is a structural
-   guarantee rather than another JS listener that could be forgotten. */
-@media (min-width: 641px) {
+   guarantee rather than another JS listener that could be forgotten. The negation, not a second bound at 641px,
+   is what makes it the same breakpoint: a zoomed window 640.5 CSS px wide is on one side of it. */
+@media not all and (max-width: 640px) {
   .descent.is-fluid.fluid-live { background: var(--bg); }
-
-  /* Reading pages must NEVER fall through to --bg (a near-black page base), not even
-     for one frame — their text is dark ink. Pin the pale reading ramp as their
-     fluid-live base instead. */
-  .research.descent.is-fluid.fluid-live { background: var(--reading-grad); }
 
   /* Explicitly restore each archetype's own gradient when the canvas is off, rather
      than relying on revert-layer (whose cascade-layer semantics don't apply here —
      these are all in the same layer, so it would resolve to nothing). */
   html[data-fluid-strength='0'] .descent.is-fluid.fluid-live,
   html[data-fluid='off'] .descent.is-fluid.fluid-live { background: var(--descent-grad); }
-  html[data-fluid-strength='0'] .research.descent.is-fluid.fluid-live,
-  html[data-fluid='off'] .research.descent.is-fluid.fluid-live { background: var(--reading-grad); }
 
   /* SkyWash's woven warm/cold strokes are the same broken-colour idea the shader
      now does natively at higher fidelity; doubling them muddies both. */
   .descent.is-fluid.fluid-live .sky-wash { opacity: 0.35; }
 }
 
-/* (The `.terminal-chrome` fill lived here — two rules, light and dark — because Terminal.tsx was a React island
-   with no <style> of its own. Both are DELETED: the scripted terminal and the whole src/components/terminal/
-   directory are gone, and `grep -rn terminal-chrome src` plus a grep over every dist/**.html now return nothing,
-   so neither rule could match an element on any route. They were shipping in the critical-path stylesheet on
-   every page to style a component that no longer exists.
-   This note used to end "CLAUDE.md still describes the terminal as the site's one React island — that is stale,
-   and correcting it is on the docs pass, not this one." Both halves are done: CLAUDE.md now opens by stating
-   there is no island, and lib/motion.ts's claim that one reads its helper is gone too. A comment that defers
-   its own correction to a later pass is only worth as much as that pass happening. The page count is dropped
-   for the same reason — it said "eleven" and the build prints nine.) */
+/* (No `.terminal-chrome` fill here: the scripted terminal and the whole src/components/terminal/ directory are
+   DELETED, and no element and no rule in src or dist carries the class — this comment is its only mention — so a
+   rule for it could match no element on any route; it would only ship in the critical-path stylesheet on every
+   page.) */
 
 /* ── THE THEME-TOGGLE CROSSFADE IS GONE, and this note is why nobody should add it back.
    It wrapped the flip in document.startViewTransition() for a ~0.5s dissolve and claimed to fade
@@ -378,7 +366,7 @@ html[data-theme='dark'] .descent::after {
    Transition shows SNAPSHOT pseudo-elements instead of the live page, and in real Chrome with GPU
    rasterisation the GPU-backed canvases are absent from those snapshots. So for half a second the
    page showed --descent-grad alone — warm paper blending to near-black, i.e. a flat grey wash — with
-   no sky and no terrain dots on it, on all eight routes that carry the sky.
+   no sky and no terrain dots on it, on every route that carries the sky.
    Confirmed from a screen recording (dots absent for the whole transition, back at ~0.63s, exactly
    when the 0.5s fade ends) against a probe showing the live canvas never blanks. It did NOT reproduce
    in headless Chrome, where software rendering does capture canvases — which is why it survived two

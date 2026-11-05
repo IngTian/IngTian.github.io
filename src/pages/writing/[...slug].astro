@@ -14,6 +14,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import FluidSky from '../../components/proto/FluidSky.astro';
 import SkyWash from '../../components/SkyWash.astro';
 import { KINDS, kindSectionId } from '../../data/writing';
+import { longDate } from '../../lib/dates';
 
 export async function getStaticPaths() {
   // Drafts get no page, matching the index. Committing an unfinished note must not publish it.
@@ -22,34 +23,28 @@ export async function getStaticPaths() {
 }
 
 const { entry } = Astro.props;
+// A markdown plugin's throw (the MathML letter fix's, on a letter Unicode has no form for) does not fail the
+// build: Astro logs it and stores the entry unrendered, which would ship an empty piece. So the page fails.
+if (!entry.rendered) throw new Error(`${entry.filePath ?? entry.id} did not render; its error is logged above`);
 const { Content } = await render(entry);
 
 // The kind's label, so the piece says which section it belongs to and links back to it. Falls back to the raw
 // key, which cannot happen while the schema's enum and KINDS agree — and a test asserts they do.
 const kind = KINDS.find((k) => k.key === entry.data.kind);
-const fmt = (iso: string) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
-    year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
-  });
-const longDate = fmt(entry.data.date);
+const written = longDate(entry.data.date);
 // Null unless the piece has actually gained something since it was published — the schema allows `updated` to
 // equal `date`, and printing the same date twice would be noise rather than information.
 const updatedLong =
-  entry.data.updated && entry.data.updated !== entry.data.date ? fmt(entry.data.updated) : null;
+  entry.data.updated && entry.data.updated !== entry.data.date ? longDate(entry.data.updated) : null;
 ---
 {/* preloadAccent: a piece renders Fraunces in exactly three places — `.prose h3`, `.prose em` and
      `.prose figcaption` — so the italic can be on screen before it is discovered. The index at /writing has
      no accent rule and does not opt in. See the note next to <Font> in BaseLayout for why the preload is per
-     page rather than global or gone.
-     NOT `.prose blockquote`, which an earlier version of this comment named as the headline case: that rule
-     is `var(--font-display)`, i.e. Georgia, which downloads nothing. The quote styling on this page is
-     entirely Georgia + mono, and getting that wrong does not change the conclusion below but would send the
-     next reader to the wrong selector.
-     AND ONLY THE ITALIC FILE IS PRELOADED. All three rules above are `font-style: italic`, while
-     `preloadAccent={true}` force-downloads BOTH faces — so 36,560 B of Fraunces normal that no selector here
-     can ever match was being fetched on the critical path. `"italic"` narrows it to one <link>; the
-     @font-face block is untouched, so a future non-italic accent rule still renders, just discovered
-     normally rather than preloaded. */}
+     page rather than global or gone. Not `.prose blockquote`: that rule is `var(--font-display)`, Georgia,
+     which downloads nothing, and the quote styling here is Georgia and mono alone.
+     ONLY THE ITALIC FILE IS PRELOADED: all three rules are `font-style: italic`, so the 36,560 B normal file
+     would be fetched on the critical path for no selector here. The @font-face block is untouched, so a
+     non-italic accent rule would still render, discovered normally rather than preloaded. */}
 <BaseLayout
   title={`${entry.data.title} — Ing Tian`}
   description={entry.data.blurb}
@@ -73,7 +68,7 @@ const updatedLong =
               speller, imported, so it cannot drift again. */}
           <a href={`/writing#${kindSectionId(entry.data.kind)}`}>{kind?.label ?? entry.data.kind}</a>
           <span aria-hidden="true">·</span>
-          <time datetime={entry.data.date}>{longDate}</time>
+          <time datetime={entry.data.date}>{written}</time>
           {/* Only when it says something new. A piece written once and never touched shows one date; a running
               collection says so, which is the whole reason the field exists. */}
           {updatedLong && (
@@ -129,16 +124,11 @@ const updatedLong =
   .piece-foot { display: flex; gap: 20px; padding: 8vh 0 12vh; }
 
   /* Narrow: the 34% left margin is a desktop composition — it leaves a 12ch measure at 390px.
-     1100px AND THE SAME COLLAPSE RULE AS /writing, because this claimed to match the other reading pages and
-     did not. It collapsed at 900px to clamped side margins while /writing, /projects and /research all collapse
-     at 1100px to a centred 760px block (1100 is SideRail's own breakpoint — the margin exists to clear the rail,
-     so it goes when the rail does). Between 901 and 1100px the two writing pages therefore disagreed twice
-     over: the index had already re-centred at 760px while a piece still sat behind a 34% margin, so clicking a
-     title threw the column ~200px sideways, and any narrower width still left the two left edges apart because
-     the collapsed compositions differed too. Identical numbers here mean the reading column simply does not
-     move when you navigate — which was the stated point of borrowing this composition in the first place.
-     The 12vh top padding that used to ride along in here is gone for the same reason: /writing keeps its 14vh
-     at every width, and shaving 2vh only here moved the headline vertically as well when you navigated. */
+     1100px AND THE SAME COLLAPSE AS /writing: at 1100px and below the margin goes (it matches /writing's, where
+     it clears SideRail, which hides at the same width) and the column re-centres as a 760px block. Identical numbers mean the
+     reading column does not move when you go from the index to a piece, at any width — a different breakpoint
+     or a different collapse throws it sideways on a title's click. The top padding is /writing's at every width
+     for the same reason, so the headline does not move vertically either. */
   @media (max-width: 1100px) {
     .piece-block { width: auto; margin: 0 auto; padding: 0 24px; max-width: 760px; }
   }
@@ -251,7 +241,7 @@ const updatedLong =
      re-wrap into an anonymous table box inside, so it still lays out as a table), so the worst case is a table
      you drag instead of a page that will not hold still.
      `width: max-content` capped at 100% lets a two-column table stay its own narrow width instead of stretching
-     across the measure — how the /research metrics table reads too.
+     across the measure.
      The cells' `min-width` is what decides between wrapping and scrolling, and it is the interesting part: with
      no floor, auto table layout squeezes columns until "Max drawdown" is one word per line, which is unreadable
      in a different way; with a floor the table wraps gently while the columns stay legible, and only starts

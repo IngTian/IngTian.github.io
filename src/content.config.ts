@@ -1,5 +1,24 @@
-import { defineCollection, z } from 'astro:content';
+import { defineCollection } from 'astro:content';
 import { glob } from 'astro/loaders';
+import { z } from 'astro/zod';
+import { publications } from './data/profile';
+import { PAPERS_DIR } from './lib/paperMarkdown/names';
+
+/**
+ * An ISO date, normalised to YYYY-MM-DD: every date in every collection is one of these.
+ *
+ * ACCEPTS BOTH A STRING AND A DATE ON PURPOSE. YAML parses an unquoted `2026-08-15` as a Date OBJECT, not a
+ * string, so a plain z.string() rejects the most natural way to write a date — which is exactly how the first
+ * file failed to build. Requiring quotes would work and would be a trap for every future file, since the error
+ * only appears at build time and names a type mismatch rather than the missing quotes. Coercing here means
+ * either spelling is correct and downstream code always gets the same string, which is what `datetime=` and
+ * the sort both want.
+ */
+const isoDate = (field: string) =>
+  z
+    .union([z.string(), z.date()])
+    .transform((d) => (typeof d === 'string' ? d : d.toISOString().slice(0, 10)))
+    .refine((d) => /^\d{4}-\d{2}-\d{2}$/.test(d), { message: `${field} must be YYYY-MM-DD` });
 
 /**
  * WRITING IS MARKDOWN NOW. The owner: "i want the writing to be flexible. so essentially writing.ts displays
@@ -18,20 +37,7 @@ const writing = defineCollection({
   loader: glob({ base: './src/content/writing', pattern: '**/*.md' }),
   schema: z.object({
     title: z.string(),
-    /**
-     * ISO date, normalised to YYYY-MM-DD.
-     *
-     * ACCEPTS BOTH A STRING AND A DATE ON PURPOSE. YAML parses an unquoted `2026-08-15` as a Date OBJECT, not a
-     * string, so a plain z.string() rejects the most natural way to write a date — which is exactly how the
-     * first file failed to build. Requiring quotes would work and would be a trap for every future piece, since
-     * the error only appears at build time and names a type mismatch rather than the missing quotes. Coercing
-     * here means either spelling is correct and downstream code always gets the same string, which is what
-     * `datetime=` and the sort both want.
-     */
-    date: z
-      .union([z.string(), z.date()])
-      .transform((d) => (typeof d === 'string' ? d : d.toISOString().slice(0, 10)))
-      .refine((d) => /^\d{4}-\d{2}-\d{2}$/.test(d), { message: 'date must be YYYY-MM-DD' }),
+    date: isoDate('date'),
     /**
      * Which section of /writing this belongs to. An ENUM rather than a free string, so a misspelled kind is a
      * build error instead of a piece that silently belongs to no section and never renders.
@@ -52,11 +58,7 @@ const writing = defineCollection({
      * Rendered only when it DIFFERS from `date`, so a piece written once shows one date rather than two
      * identical ones.
      */
-    updated: z
-      .union([z.string(), z.date()])
-      .transform((d) => (typeof d === 'string' ? d : d.toISOString().slice(0, 10)))
-      .refine((d) => /^\d{4}-\d{2}-\d{2}$/.test(d), { message: 'updated must be YYYY-MM-DD' })
-      .optional(),
+    updated: isoDate('updated').optional(),
     /** One or two sentences: what it argues, in plain language. Shown on the index, not on the piece. */
     blurb: z.string(),
     /** Rough reading time. Omit rather than guess — the index only prints it when it is real. */
@@ -77,4 +79,56 @@ const writing = defineCollection({
     }),
 });
 
-export const collections = { writing };
+/**
+ * PAPERS ARE FILES TOO. A paper's explainer page is one .md in this collection, written in the directive syntax
+ * documented in CLAUDE.md ("Papers are files") and compiled by src/lib/paperMarkdown. A mistake in the body is
+ * reported by the plugins and fails the build from the paper page; a mistake here fails it from this schema.
+ *
+ * The frontmatter holds only what the record does not. Title, authors, abstract, BibTeX, links and tags are the
+ * paper's record in profile.ts `publications` (rendered in several shapes, so it stays TypeScript), and are never
+ * repeated in the file, where the two copies could disagree.
+ */
+const papers = defineCollection({
+  // the one spelling of the directory: the plugins compile a file as a paper by its path under it
+  loader: glob({ base: `./${PAPERS_DIR}`, pattern: '**/*.md' }),
+  schema: z.object({
+    /** The record this page explains: a slug in profile.ts `publications`. */
+    publication: z.string().refine((s) => publications.some((p) => p.slug === s), {
+      message: 'publication must be the slug of a record in profile.ts publications',
+    }),
+    /** When this page was written: "This page: <date>". */
+    pageDate: isoDate('pageDate'),
+    /**
+     * What `:cite[key]` resolves against, in the page's order. An author is "Family, Given", so a citation can
+     * read "López de Prado, 2016" without guessing where a name splits. `journal` is set in italics, `venue` plain
+     * after it: a journal's volume and pages, or on its own an archive ("SSRN", "arXiv:1707.06347"). `addedHere`
+     * is where the paper names a work its own bibliography leaves out ("§1"); the page marks such a reference.
+     */
+    references: z
+      .array(
+        z.object({
+          // One hyphen at a time: smartypants turns a "--" in the :cite[…] that names the key into a dash.
+          key: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { message: 'a reference key is a-z and 0-9 joined by single hyphens, as it becomes the id #ref-<key>' }),
+          authors: z.array(z.string().regex(/^[^,]+, [^,]+$/, { message: 'an author is written "Family, Given"' })).min(1),
+          year: z.number().int(),
+          title: z.string(),
+          journal: z.string().optional(),
+          venue: z.string().optional(),
+          doi: z.string().optional(),
+          url: z.url().optional(),
+          addedHere: z.string().optional(),
+        }).refine((r) => r.journal || r.venue, { message: 'a reference names its journal, its venue, or both' }),
+      )
+      .refine((rs) => new Set(rs.map((r) => r.key)).size === rs.length, { message: 'reference keys must be unique' }),
+    /** The works in the paper's bibliography that the page does not draw on, each described ("a work by …"), so the
+     *  page can say how its reference list relates to the paper's. */
+    bibliographyOmits: z.array(z.string()).default([]),
+    /** What this page leaves out of the paper, for "Read the full paper": "the weight figures (the paper's Figs. 2–3)". */
+    leftOut: z.string().optional(),
+    /** Corrections to the paper's current version, each dated: the page's "Corrections to v1". A `:v[key]` in the
+     *  text is filled in, as in the prose. */
+    errata: z.array(z.object({ date: isoDate('an erratum date'), text: z.string() })).default([]),
+  }),
+});
+
+export const collections = { writing, papers };

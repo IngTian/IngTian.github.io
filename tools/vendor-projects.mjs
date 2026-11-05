@@ -101,14 +101,49 @@ function rlBhrp() {
     benchmark: rows.map((r) => num(r[bench])),
   };
   if (!value.dates.every((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))) fail(`${path}: a row has no YYYY-MM-DD date`);
-  return writeModule('rlBhrpWealth.ts', 'rlBhrpWealth',
+  return [rlBhrpDiagnostics(repo, sha), writeModule('rlBhrpWealth.ts', 'rlBhrpWealth',
     '{ dates: string[]; rlSeeds: number[][]; bhrp: number[]; benchmark: number[] }', value, [
       `source:  ${blobUrl(repo, sha, path)}`,
       `commit:  ${sha}`,
       '',
       'rl-bhrp\'s committed reproduction run (actor-centering "shared-global"): one simple monthly return per',
       `row, ${value.dates.length} months out of sample. rlSeeds[s][t] is seed s's return in month t, ${seedCols.length} seeds in`,
-      'the CSV\'s column order. These are the REPRODUCTION\'s numbers, not the paper\'s Table 2 (profile.ts).',
+      'the CSV\'s column order. These are the REPRODUCTION\'s numbers, not the paper\'s Table 2 (data/papers/rl-bhrp.ts).',
+    ])];
+}
+
+/** What RL-BHRP's explainer quotes from the reproduction beyond its returns: the weight diagnostics of the run the
+ *  returns are from, and the other reading of the paper's penalty (centred within each sector, as its Alg. 1 does)
+ *  as each seed's CAGR. */
+function rlBhrpDiagnostics(repo, sha) {
+  const sum = 'results/shared-global/summary.json', seeds = 'results/shared-sector/seeds.csv';
+  const s = JSON.parse(fileAt(repo, sha, sum).toString('utf8'));
+  const rl = s.diagnostics?.['RL-BHRP (median seed)'], bh = s.diagnostics?.BHRP;
+  const finite = (x) => typeof x === 'number' && Number.isFinite(x);
+  if (!rl || !bh || ![rl.turnover_mean, bh.turnover_mean, bh.top15_share_mean].every(finite)) {
+    fail(`${sum}: no turnover_mean / top15_share_mean where the page reads them`);
+  }
+  // The columns the page reads come before the first quoted header, so a split on commas finds them.
+  const [head, ...rows] = fileAt(repo, sha, seeds).toString('utf8').trim().split('\n').map((l) => l.split(','));
+  const c = head.indexOf('CAGR');
+  const cagr = rows.map((r) => Number(r[c]));
+  if (c < 0 || !rows.length || !cagr.every(Number.isFinite)) fail(`${seeds}: no numeric CAGR column`);
+  const value = {
+    turnover: { rl: rl.turnover_mean, bhrp: bh.turnover_mean },
+    top15: { bhrp: bh.top15_share_mean },
+    sectorCentred: { cagr },
+  };
+  return writeModule('rlBhrpDiagnostics.ts', 'rlBhrpDiagnostics',
+    '{ turnover: { rl: number; bhrp: number }; top15: { bhrp: number }; sectorCentred: { cagr: number[] } }',
+    value, [
+      `source:  ${blobUrl(repo, sha, sum)}`,
+      `         ${blobUrl(repo, sha, seeds)}`,
+      `commit:  ${sha}`,
+      '',
+      'The reproduction\'s weight diagnostics (actor-centering "shared-global", the run rlBhrpWealth.ts holds): the mean',
+      'monthly turnover of its median seed and of BHRP, and BHRP\'s mean share in its 15 largest weights.',
+      'sectorCentred.cagr is each seed\'s CAGR with the penalty centred within each sector ("shared-sector"), the other',
+      'reading of the paper\'s Def. 3.2.3. The REPRODUCTION\'s numbers, not the paper\'s.',
     ]);
 }
 

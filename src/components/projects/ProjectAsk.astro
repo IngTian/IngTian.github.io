@@ -87,7 +87,7 @@ const asks: Record<string, { name: string; idea: string; url: string | null }> =
 
 <script>
   import { prefersReducedMotion } from '../../lib/motion';
-  import { onPageView } from '../../lib/pageView';
+  import { onPageView } from '../../scripts/pageView';
 
   interface Ask { name: string; idea: string; url: string | null }
   interface AskDetail { slug: string; x: number; y: number; from: HTMLElement }
@@ -96,11 +96,7 @@ const asks: Record<string, { name: string; idea: string; url: string | null }> =
   // corners, and a scroll of more than 60px closes the ask.
   const GAP = 16, RK = 14, RK_OUT = 7, SCROLL_CLOSE = 60;
 
-  function init(): (() => void) | undefined {
-    const maybe = document.querySelector<HTMLElement>('[data-ask-dialog]');
-    if (!maybe) return;
-    // Non-null alias: TypeScript does not carry the guard's narrowing into the hoisted functions below.
-    const dialog = maybe;
+  function init(dialog: HTMLElement): (() => void) | undefined {
     const asks = JSON.parse(dialog.dataset.asks ?? '{}') as Record<string, Ask>;
     const part = (sel: string): HTMLElement => dialog.querySelector<HTMLElement>(sel)!;
     const kicker = part('[data-k]'), title = part('[data-t]'), idea = part('[data-d]'), path = part('[data-r]');
@@ -186,7 +182,7 @@ const asks: Record<string, { name: string; idea: string; url: string | null }> =
     return () => { ac.abort(); clearTimeout(goTimer); };
   }
 
-  // Started at parse on a full load (lib/pageView.ts), with the page's ask dispatcher: once that is turning a click
+  // Started at parse on a full load (scripts/pageView.ts), with the page's ask dispatcher: once that is turning a click
   // into `projects:ask`, nothing may leave the click unanswered until window `load`.
   onPageView('[data-ask-dialog]', init);
 </script>

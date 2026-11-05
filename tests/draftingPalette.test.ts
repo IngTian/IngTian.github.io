@@ -5,38 +5,26 @@
 // so every shared component on the page — the corner nav, the rail, the cow — reskins with no edit. That is also
 // why it needs a test: a shared component chose its ink assuming the site's grounds, and here it lands on a
 // different one. The numbers below are the ones a reader actually gets.
-//
-// tokens.css is read as TEXT (comments stripped): the values live in a stylesheet, not a module.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { AA_BODY, contrastRatio, wcagLuminance } from '../src/lib/skyLegibility';
-
-const css = readFileSync(new URL('../src/styles/tokens.css', import.meta.url), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '');
-
-/** The custom properties declared in the rule whose selector is exactly `sel`. */
-function tokens(sel: string): Record<string, string> {
-  const at = css.indexOf(`${sel} {`);
-  if (at < 0) throw new Error(`tokens.css has no "${sel} {" rule`);
-  const body = css.slice(css.indexOf('{', at) + 1, css.indexOf('}', at));
-  return Object.fromEntries([...body.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
-}
+import { AA_BODY } from '../src/lib/skyLegibility';
+import { ROLE_TOKENS, between, onGround, over, railMark, ratio, rgbaOf, rgbOf, tokens, type RGB } from './helpers/palette';
 
 const src = (f: string): string => readFileSync(new URL(`../src/components/projects/${f}`, import.meta.url), 'utf8');
 const fieldSrc = src('DraftingField.astro');
 const rowsSrc = src('SelectedRows.astro');
 const cardsSrc = src('WorkshopCards.astro');
 
-type RGB = [number, number, number];
-const rgbOf = (hex: string): RGB => {
-  expect(hex, `${hex} is not a #rrggbb literal`).toMatch(/^#[0-9a-f]{6}$/i);
-  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as RGB;
-};
-const lum = (hex: string): number => wcagLuminance(rgbOf(hex));
-const ratio = (fg: string, bg: string): number => contrastRatio(lum(fg), lum(bg));
-/** `top` at alpha `a` composited over `under`. */
-const over = (top: readonly number[], a: number, under: RGB): RGB => under.map((u, i) => top[i] * a + u * (1 - a)) as RGB;
-const onGround = (ink: string, ground: RGB): number => contrastRatio(lum(ink), wcagLuminance(ground));
+/** The field's stroke alphas, read from DraftingField.astro: minor and major per theme, and a lit ping's peak. */
+function strokeAlphas(theme: 'light' | 'dark'): { minor: number; major: number; lit: number } {
+  const m = /const \[minorA, majorA\] = light \? \[([\d.]+), ([\d.]+)\] : \[([\d.]+), ([\d.]+)\];/.exec(fieldSrc);
+  const p = /rgba\(\$\{hi\},\$\{([\d.]+) \+ ([\d.]+) \* fade\}\)/.exec(fieldSrc);
+  expect(m, "DraftingField.astro's minor/major alphas moved").not.toBeNull();
+  expect(p, "DraftingField.astro's lit-line alpha moved").not.toBeNull();
+  const [lm, lM, dm, dM] = m!.slice(1).map(Number);
+  return { ...(theme === 'light' ? { minor: lm, major: lM } : { minor: dm, major: dM }), lit: Number(p![1]) + Number(p![2]) };
+}
+
 const rgbToken = (v: string): number[] => v.split(',').map(Number);
 
 /** The ground at the darkest point of the edge vignette: a corner, the farthest point of the box from the gradient's
@@ -47,9 +35,8 @@ function vignetteCorner(tk: Record<string, string>, ground: string): RGB {
   const [rx, ry, cx, cy, stop] = g!.slice(1).map((n) => Number(n) / 100);
   const d = Math.hypot(Math.max(cx, 1 - cx) / rx, Math.max(cy, 1 - cy) / ry);
   const share = Math.min(1, Math.max(0, (d - stop) / (1 - stop)));
-  const v = /^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/.exec(tk['--draft-vig']);
-  expect(v, `--draft-vig is not an rgba(): ${tk['--draft-vig']}`).not.toBeNull();
-  return over(v!.slice(1, 4).map(Number), Number(v![4]) * share, rgbOf(ground));
+  const [vig, alpha] = rgbaOf(tk['--draft-vig']);
+  return over(vig, alpha * share, rgbOf(ground));
 }
 
 /** The two ends of the vignette's ramp: the bare ground at its transparent centre, and its darkest corner. */
@@ -69,12 +56,14 @@ const THEMES = [
   { theme: 'dark', sel: "html[data-page='drafting'][data-theme='dark']", base: "html[data-theme='dark']" },
 ] as const;
 
-const ROLE = ['--paper', '--ink-1', '--ink-2', '--ink-3', '--ink-4', '--ink-5', '--ochre', '--on-accent',
-  '--hairline-rgb', '--bg'];
 // No --draft-glass: it was the mockup's nav glass, and the real CornerNav keeps its own (spec §3), so nothing
 // rendered it; it is gone rather than left to read as if the nav were reskinned here.
 const DRAFT = ['--draft-ground', '--draft-line-rgb', '--draft-hi-rgb', '--draft-panel',
   '--draft-shadow', '--draft-ph', '--draft-tag', '--draft-vig'];
+// The knockouts: role tokens only this register declares. --knockout rings every glyph on the sheet, <main>'s text
+// (projects.astro) and the shared rail's labels (SideRail.astro, which falls back to `none`) alike; --rail-dash-halo
+// rings the rail's dash. So the rail wears the knockout here without the page restyling it.
+const KNOCKOUTS = ['--knockout', '--rail-dash-halo'];
 
 describe('the drafting palette (tokens.css)', () => {
   it('declares the same tokens in both themes', () => {
@@ -82,7 +71,7 @@ describe('the drafting palette (tokens.css)', () => {
     // theme the drafting light block beats the site's dark block by source order. A token set only in the light
     // drafting block would therefore show its LIGHT value in dark theme. Both blocks must declare every token.
     const [light, dark] = THEMES.map((t) => Object.keys(tokens(t.sel)).sort());
-    expect(light).toEqual([...ROLE, ...DRAFT].sort());
+    expect(light).toEqual([...ROLE_TOKENS, ...KNOCKOUTS, ...DRAFT].sort());
     expect(dark).toEqual(light);
   });
 
@@ -147,6 +136,43 @@ describe('the drafting palette (tokens.css)', () => {
         expect(onGround(tk['--ochre'], over(rgbToken(tk['--draft-line-rgb']), Number(m![1]), rgbOf(ground)))).toBeGreaterThanOrEqual(AA_BODY);
       });
 
+      // THE PAGE'S TEXT AND THE RAIL'S LABELS lie straight on the field, so each glyph wears the knockout: an opaque
+      // 1px ring of the bare ground, eight unblurred offsets so the diagonals are closed too. The pixels touching a
+      // glyph are then the ground, where the inks above clear AA.
+      it('--knockout rings every glyph on the sheet with the bare ground', () => {
+        const offsets = tk['--knockout'].split(/,(?![^(]*\))/).map((s) => {
+          const p = /^(-?\d+)(?:px)? (-?\d+)(?:px)? 0 var\(--draft-ground\)$/.exec(s.trim());
+          expect(p, `"${s}" is not an unblurred offset in var(--draft-ground)`).not.toBeNull();
+          return `${Number(p![1])},${Number(p![2])}`;
+        });
+        expect(offsets.sort()).toEqual(['-1,-1', '-1,0', '-1,1', '0,-1', '0,1', '1,-1', '1,0', '1,1']);
+      });
+
+      // THE RAIL'S DASH is a mark (3:1), and it lies straight on the field. Bare, a major line BESIDE it is what it
+      // is read against, and in light that is 2.39:1. So it is ringed with the bare ground (--rail-dash-halo, a
+      // box-shadow, since a text-shadow does not reach a painted span), and what lies beside it is always that
+      // ground; what lies UNDER it can be the bare ground, any of the three strokes, and either end of the
+      // vignette, and each is checked. 2px, not 1: the 1px dash sits at a fractional y and covers two pixel rows in
+      // part, so a 1px ring leaves the rows next to those partly line.
+      it("the rail's dash clears 3:1 wherever the field runs under it, ringed with the bare ground", () => {
+        expect(tk['--rail-dash-halo']).toBe('0 0 0 2px var(--draft-ground)');
+        const line = rgbToken(tk['--draft-line-rgb']), hi = rgbToken(tk['--draft-hi-rgb']);
+        const a = strokeAlphas(t.theme);
+        const ink = rgbOf(tk['--ink-1']), bare = rgbOf(ground);
+        for (const [end, field] of vignetteRamp(tk, ground).entries()) {
+          const unders: [string, RGB][] = [['the ground', field], ['a minor line', over(line, a.minor, field)],
+            ['a major line', over(line, a.major, field)], ['a lit line', over(hi, a.lit, field)]];
+          for (const [what, under] of unders) {
+            const where = `on ${what}, vignette ${end ? 'corner' : 'centre'}`;
+            expect(between(over(ink, railMark(), under), bare), where).toBeGreaterThanOrEqual(3);
+          }
+        }
+        // and the case the ring is for: unringed, a major line beside the dash in light is under 3:1
+        if (t.theme === 'light') {
+          expect(between(over(ink, railMark(), bare), over(line, a.major, bare))).toBeLessThan(3);
+        }
+      });
+
       // The computed pictures (lib/projectVisuals.ts) print their words in ink-1 and ink-3 on --draft-ph, not on
       // the ground — tests/projectVisuals.test.ts holds them to those two inks.
       for (const ink of ['--ink-1', '--ink-3']) {
@@ -160,4 +186,40 @@ describe('the drafting palette (tokens.css)', () => {
       });
     });
   }
+});
+
+// CLAUDE.md, The concept: a page reskins a shared component only through role tokens. So the knockouts are declared in
+// the two drafting blocks and nowhere else (the key-set test above holds both blocks), SideRail reads them, and no
+// page's stylesheet reaches into the rail.
+describe('the rail reskins through role tokens only', () => {
+  const SRC = new URL('../src/', import.meta.url);
+  const files = readdirSync(SRC, { recursive: true, encoding: 'utf8' }).filter((f) => /\.(astro|css|ts)$/.test(f));
+  const text = (f: string): string => readFileSync(new URL(f, SRC), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('declares the knockouts in tokens.css alone, once per drafting block', () => {
+    for (const token of KNOCKOUTS) {
+      const where = files.flatMap((f) => [...text(f).matchAll(new RegExp(`${token}\\s*:`, 'g'))].map(() => f));
+      expect(where, token).toEqual(['styles/tokens.css', 'styles/tokens.css']);
+    }
+  });
+
+  it('SideRail reads them, falling back to none', () => {
+    const rail = text('components/SideRail.astro');
+    expect(rail).toMatch(/\.side-rail \.lbl \{[^}]*text-shadow: var\(--knockout, none\);/);
+    expect(rail).toMatch(/\.side-rail \.rule \{[^}]*box-shadow: var\(--rail-dash-halo, none\);/);
+  });
+
+  // One knockout, one spelling: <main>'s text reads the same token as the rail, and no file writes the ring's eight
+  // offsets out again.
+  it("/projects' text reads --knockout, and the ring is written out in tokens.css alone", () => {
+    expect(text('pages/projects.astro')).toMatch(/\.projects-page \{[^}]*text-shadow: var\(--knockout\);/);
+    const elsewhere = files.filter((f) => f !== 'styles/tokens.css' && /-1px -1px 0 /.test(text(f)));
+    expect(elsewhere).toEqual([]);
+  });
+
+  it('no page styles the rail', () => {
+    const styled = files.filter((f) => f.startsWith('pages/')).flatMap((f) => [...text(f).matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)]
+      .filter((m) => /\.side-rail\b/.test(m[1])).map(() => f));
+    expect(styled).toEqual([]);
+  });
 });
