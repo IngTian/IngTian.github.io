@@ -28,7 +28,7 @@ interface Props {
    * REQUIRED, with no default. There used to be a third size, 'small' — "a footer-scale cow" — and it was the
    * default, while all three call sites passed a size explicitly. So the default arm of every ternary below
    * and two CSS rules were unreachable; the dist scan confirmed `.cow-wrap--small` matched zero elements on
-   * all nine pages. It survived because a default is invisible: nothing ever asked for it, and nothing could
+   * every page. It survived because a default is invisible: nothing ever asked for it, and nothing could
    * notice it was never asked for. Required means the next call site that forgets is a type error rather
    * than a cow at whatever size happens to be default.
    */

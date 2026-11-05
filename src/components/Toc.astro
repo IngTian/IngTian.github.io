@@ -30,9 +30,6 @@
 // The tree lives in lib/pageStops (homeStops), the same module every SideRail page's rail reads — one place
 // that knows what a rail carries, and unit-tested. Zones stay HERE on the top-level stops because they are a
 // property of the sky behind a stop, not of the page's structure.
-// flattenStops came off this import when noUnusedLocals went on: SideRail uses it (it numbers the rail's rows in
-// document order for their entrance), and the Toc renders the tree as a tree, so it never had a use for the
-// flattened form.
 import { homeStops } from '../lib/pageStops';
 
 const stops = homeStops();

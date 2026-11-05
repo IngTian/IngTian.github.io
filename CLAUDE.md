@@ -154,7 +154,9 @@ When in doubt, remove rather than add.
   - They live under their own `--ff-*` variables. Never point `cssVariable` at
     `--font-display`/`-body`/`-mono`: those are the site's role tokens, and that
     collision is what stopped every webfont from loading. Fraunces keeps its
-    preload — removing it measured a worse FCP (1956 → 2333ms; see BaseLayout).
+    preload — removing it measured a worse FCP (1956 → 2333ms; see BaseLayout) — but only
+    on a page that shows it, and only the style it shows (`preloadAccent`: `/` the normal,
+    `/writing/<slug>` the italic), as each file is a high-priority fetch of its own.
 - **Math in markdown is typeset at build time.** The markdown chain (spelled once, in
   `lib/paperMarkdown/index.ts`, which `astro.config.mjs` calls) runs
   `remark-math` + `rehype-katex` with **`output: 'mathml'`**, which is the
@@ -563,9 +565,9 @@ phone treatment is *bug fixes only*, and the whole of it is:
   column: a paper page opens with a **Contents** list that replaces the rail, listing
   exactly the rail's stops (`paperSections()`), and its margin notes fall in under the
   block they explain (so they do with no script, at any width). At 640px the type steps
-  down, each equation and figure shows its narrow drawing (an equation's `$$ narrow`,
-  `svg.narrow`, Figure 1's `.pp-art.narrow`) — the same equation or figure, broken for the
-  width — Table 1's dates take their short form, its row heads stick as it scrolls in
+  down, an equation or figure that has a narrow drawing shows it (an equation's `$$ narrow`,
+  Figure 2's `svg.narrow`, Figure 1's `.pp-art.narrow`) — the same equation or figure, broken
+  for the width — Table 1's dates take their short form, its row heads stick as it scrolls in
   its own box, and an index card sets its picture beside its title with a short tag for
   a caption. Figure 2's readout works by tap; a term's link to its note and a symbol's to
   its Notation row are a mouse's or a pen's, never a tap's, so nothing stays marked;
@@ -1521,8 +1523,8 @@ titles came to rest hard against the browser chrome — the lead is a number in
   manifold's two screensaver MP4s for /projects, written by `tools/vendor-projects.mjs`
   (a video is not an image, so it is served by URL rather than through `astro:assets`).
   - **`public/sitemap.xml` is a static index, NOT a list of routes.** `@astrojs/sitemap`
-    emits `sitemap-index.xml` + `sitemap-0.xml`, and `sitemap-0.xml` lists every route (less
-    the `/proto-` ones). This third file is a `<sitemapindex>` whose one `<loc>` is the
+    emits `sitemap-index.xml` + `sitemap-0.xml`, and `sitemap-0.xml` lists every route less
+    `/404` and the `/proto-` ones. This third file is a `<sitemapindex>` whose one `<loc>` is the
     generated `sitemap-0.xml`, so the conventional `/sitemap.xml` name resolves too. A route
     change never touches it: the generated child gains or loses the URL. What would break it is
     the child's name changing, and `tests/distSmoke.test.ts` reads both — that the built

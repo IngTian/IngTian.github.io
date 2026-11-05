@@ -84,11 +84,10 @@ const bootDecider = `(function () {
 </BaseLayout>
 
 <style>
-  /* Above the field (z 0). The right gutter from 1180px is the cow's column, mirroring the rail on the left. */
-  .projects-page { position: relative; z-index: 1; max-width: 1500px; padding: 0 6vw 180px; }
-  /* THE LABEL KNOCKOUT: main has no background, so every glyph in it wears a 1px ring of the bare ground, the one
+  /* Above the field (z 0). The right gutter from 1180px is the cow's column, mirroring the rail on the left.
+     THE LABEL KNOCKOUT: main has no background, so every glyph in it wears a 1px ring of the bare ground, the one
      tokens.css declares for this register (and says why). The rail's labels wear the same token. */
-  .projects-page { text-shadow: var(--knockout); }
+  .projects-page { position: relative; z-index: 1; max-width: 1500px; padding: 0 6vw 180px; text-shadow: var(--knockout); }
   /* Clears SideRail where it shows (it hides at ≤1100px). Every label sits past the dash's gutter whatever its
      state; measured, the rail's right edge ("THE WORKSHOP") is at x=159.4 at 1101px and x=171.0 at 2000px, 2px more
      under the hover nudge, against content starting at 190 and 230. */

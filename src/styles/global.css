@@ -372,7 +372,7 @@ html[data-theme='dark'] .descent::after {
    Transition shows SNAPSHOT pseudo-elements instead of the live page, and in real Chrome with GPU
    rasterisation the GPU-backed canvases are absent from those snapshots. So for half a second the
    page showed --descent-grad alone — warm paper blending to near-black, i.e. a flat grey wash — with
-   no sky and no terrain dots on it, on all eight routes that carry the sky.
+   no sky and no terrain dots on it, on every route that carries the sky.
    Confirmed from a screen recording (dots absent for the whole transition, back at ~0.63s, exactly
    when the 0.5s fade ends) against a probe showing the live canvas never blanks. It did NOT reproduce
    in headless Chrome, where software rendering does capture canvases — which is why it survived two

@@ -53,10 +53,11 @@ const introVars = {
 };
 ---
 
-{/* preloadAccent: the Work slide's sub-headlines and its italic editorial line are the homepage's only
-     Fraunces, and they are also the measurement that put this preload back (FCP 1956 -> 2333ms without it,
-     three runs on a production build). See the note next to <Font> in BaseLayout. */}
-<BaseLayout veilLine="a researcher by day" veilOnLoad={false} preloadAccent={true}>
+{/* preloadAccent: the Work slide's sub-headlines are the homepage's only Fraunces, in the normal style (its
+     italic editorial line shows only while /writing has no piece), and the homepage is the measurement that
+     put this preload back (FCP 1956 -> 2333ms without it, three runs on a production build). See the note
+     next to <Font> in BaseLayout. */}
+<BaseLayout veilLine="a researcher by day" veilOnLoad={false} preloadAccent="normal">
   {/* THE INTRO IS DECIDED HERE, BEFORE FIRST PAINT, and that timing is the whole point.
 
       The reported symptom was the sky flashing warm → flat → warm: `--descent-grad` is the base layer
@@ -127,8 +128,9 @@ const introVars = {
        space/arrows), find-in-page and #anchor jumps, and trackpad momentum all keep working. That is
        deliberate work in Deck.astro (programmatic scrolls are ignored; one flick is coalesced into one
        slide), not something a CSS mechanism was giving us for free.
-         Only the homepage opts in; /research and /projects share .descent and must stay free-scrolling
-       reading pages. The deck also disengages entirely under reduced motion and on phones. */}
+         Only the homepage's main carries .is-slides; every other page scrolls freely, the ones that share
+       .descent (/writing, /experience, /art, the 404) included. The deck also disengages entirely under
+       reduced motion and on phones. */}
   <main class="descent is-fluid is-slides">
     <FluidSky strength={4} variant="descent" />
     <SkyWash />
