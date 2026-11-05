@@ -301,7 +301,7 @@ import { STORY_CODA } from '../data/story';
 
 <script>
   import {
-    project, contoursFor, contourLevels, trail, trailSampler, climbSpan, unknownAttractor, storyBounds,
+    project, storyContours, trail, trailSampler, climbSpan, unknownAttractor, storyBounds,
     waypointFade, type Projection, type View,
   } from '../lib/descentPath';
   import { WAYPOINTS, trajectoryFacts, DEEP_SIDE_LABEL } from '../lib/trajectory';
@@ -326,7 +326,7 @@ import { STORY_CODA } from '../data/story';
    *
    * It then spent one revision as a `Map` at the top of THIS script, which worked and was untestable: no
    * test in this repo reads `DescentPath.astro`, so moving it back inside `init()` would have reverted the
-   * branch's largest perf fix with every test green. `contoursFor()` lives in `lib/` for that reason and is
+   * branch's largest perf fix with every test green. `storyContours()` lives in `lib/` for that reason and is
    * pinned by `tests/descentPath.test.ts`. Keep the cache there; this file should only ever call it.
    */
 
@@ -372,31 +372,27 @@ import { STORY_CODA } from '../data/story';
     // it inside draw() cost ~1.8s per frame and produced a 0.6fps slideshow.
     const facts = trajectoryFacts();
     const attractor = unknownAttractor();
-    const levels = contourLevels(11);
-    // Memoised in lib/descentPath.ts — see the note at the top of this script for the 53-67ms it saves per
-    // navigation, and the note on contoursFor() itself for why the cache cannot live in this file.
-    const CONTOUR_RES = 150;
 
     // PALETTE CACHE. tok() called getComputedStyle() and it ran SIX TIMES PER DRAW — six forced
     // style recalculations per animation frame. Measured before this fix: 0.6 fps, mean 1758ms per
     // frame, which is precisely the "step function, like a powerpoint" symptom. The canvas work
     // itself was never the problem: only ~270 draw calls per frame, and the pure maths costs 10ms.
-    // Read the tokens once and invalidate only when the theme attribute changes.
+    // Read the tokens once per init; a theme flip re-inits (theme:change, at the bottom).
     // Read from the SECTION, not the document root, and read the --dp-* tokens rather than the global
     // ink ramp: the section carries the paper panel's dark-on-paper inks, and the root would return the
-    // light sky inks — invisible on light paper.
+    // light sky inks — invisible on light paper. `.dp` defines all six, so none can read empty.
     type Pal = Record<string, string>;
     let palCache: Pal | null = null;
     const readPalette = (): Pal => {
       const cs = getComputedStyle(section);
-      const get = (n: string, fb: string) => cs.getPropertyValue(n).trim() || fb;
+      const get = (n: string) => cs.getPropertyValue(n).trim();
       return {
-        ink5: get('--dp-line', '#b8b1a1'),
-        ink4: get('--dp-line-soft', '#8c8576'),
-        ink3: get('--dp-body', '#5a544a'),
-        paper: get('--dp-strong', '#efe9dd'),
-        ochre: get('--dp-accent', '#c8a36a'),
-        seal: get('--dp-alert', '#b23a2e'),
+        ink5: get('--dp-line'),
+        ink4: get('--dp-line-soft'),
+        ink3: get('--dp-body'),
+        paper: get('--dp-strong'),
+        ochre: get('--dp-accent'),
+        seal: get('--dp-alert'),
       };
     };
     const palette = (): Pal => (palCache ??= readPalette());
@@ -512,9 +508,11 @@ import { STORY_CODA } from '../data/story';
       // it renders as a dot. It reads as a survey plot and it is kin to the hero's dot field without
       // repeating the hero's object.
       ctx.lineCap = 'round';
-      levels.forEach((lv, i) => {
-        const runs = contoursFor(lv, CONTOUR_RES);
-        const deep = 1 - i / (levels.length - 1);          // 1 at the deepest level
+      // Memoised in lib/descentPath.ts — see the note at the top of this script for the 53-67ms it saves per
+      // navigation, and the note on storyContours() itself for why the cache cannot live in this file.
+      const contours = storyContours();
+      contours.forEach((runs, i) => {
+        const deep = 1 - i / (contours.length - 1);        // 1 at the deepest level
         ctx.strokeStyle = ink5;
         ctx.lineWidth = 1.7 + deep * 1.3;
         for (const run of runs) {
@@ -539,9 +537,7 @@ import { STORY_CODA } from '../data/story';
       // patches that appeared around both minima: a contour run clipped by the frame edge is an open
       // polyline, and closePath() on it draws a chord straight across the frame, filling a slab. A
       // real bowl is a loop whose last point returns to its first.
-      const washLevels = levels.slice(0, 5);
-      washLevels.forEach((lv, i) => {
-        const runs = contoursFor(lv, CONTOUR_RES);
+      contours.slice(0, 5).forEach((runs, i) => {
         ctx.fillStyle = ochre;
         ctx.globalAlpha = 0.034 - i * 0.005;
         for (const run of runs) {
@@ -829,9 +825,6 @@ import { STORY_CODA } from '../data/story';
     };
     window.addEventListener('resize', onResize);
 
-    const mo = new MutationObserver(() => { palCache = null; draw(); });
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-
     // Start when it is on screen, so the reveal is seen rather than missed.
     //
     // rootMargin was '-15% 0px', which shrinks the trigger box — and an INSTANT scroll (or a deep
@@ -868,7 +861,6 @@ import { STORY_CODA } from '../data/story';
       window.clearTimeout(resizeT);
       window.removeEventListener('resize', onResize);
       io.disconnect();
-      mo.disconnect();
       replay?.removeEventListener('click', onReplay);
     };
   }

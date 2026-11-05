@@ -1,46 +1,30 @@
 // Terrain dot-painter — the single source of truth for how the pointillist
-// terrain is drawn. Hero and any future consumer stay in sync by using this
-// module's paint logic and configuration.
+// terrain is drawn.
 //
 // Walkers/bubbles stay in the hero (they're a hero-only flourish); this module
 // owns the static-per-camera terrain: the grid, its precomputed normals + EDL,
-// and the per-frame dot paint (elevation color → optional directional light →
-// optional Eye-Dome Lighting + elevation emphasis → bottom fade).
+// and the per-frame dot paint (elevation color → directional light →
+// Eye-Dome Lighting + elevation emphasis → bottom fade).
 
 import {
-  field, project, projectRaw, normal, computeEDL, litColor,
+  field, project, normal, computeEDL, litColor,
   colormap, RANGE, STEP, edlSpend,
-  type TerrainRamp, type EDLParams, type LightParams, EDL_DEFAULTS, LIGHT_DEFAULTS, lightDir,
+  type TerrainRamp, EDL_DEFAULTS, LIGHT_DEFAULTS, lightDir,
 } from './terrain';
 
-/** All the knobs the lab exposes; the hero passes the baked defaults. */
-export interface TerrainConfig {
+/** What the painter takes per theme; TerrainHero's themePalette() supplies it. */
+export interface TerrainTheme {
   ramp: TerrainRamp;
-  lighting: boolean;         // directional half-Lambert relief + warm/cool tint
-  edl: boolean;              // Eye-Dome Lighting shape cue
-  edlParams: EDLParams;
-  light: LightParams;
-  edlFloor: number;          // darkest an EDL-shadowed dot's opacity goes
-  edlSizeRange: number;      // dot-area spread (lit dots grow, shadowed shrink)
-  elevEmphasis: number;      // extra emphasis on the high ground (valley recedes)
-  zoom: number;              // uniform camera pull-back (<1 shows more footprint)
+  darkness: number;          // 0=light theme, 1=dark — blends the lighting value/gain; above 0.5 the dots are stars
   dotScale: number;          // overall dot-radius multiplier (1 = base; per-theme knob)
-  darkness: number;          // 0=light theme, 1=dark — blends the lighting value/gain
-  /** Dark-theme only: paint the dots as twinkling, temperature-tinted stars. */
-  starfield?: boolean;
 }
 
-export const TERRAIN_CONFIG_DEFAULTS: Omit<TerrainConfig, 'ramp' | 'darkness'> = {
-  lighting: true,
-  edl: true,
-  edlParams: EDL_DEFAULTS,
-  light: LIGHT_DEFAULTS,
-  edlFloor: 0.20,
-  edlSizeRange: 0.75,
-  elevEmphasis: 0.20,
-  zoom: 0.85,
-  dotScale: 1,
-};
+/** The camera's uniform pull-back (<1 shows more footprint). The hero's walkers project with it too,
+ *  or they leave the surface. */
+export const TERRAIN_ZOOM = 0.85;
+const EDL_FLOOR = 0.20;        // darkest an EDL-shadowed dot's opacity goes
+const EDL_SIZE_RANGE = 0.75;   // dot-area spread (lit dots grow, shadowed shrink)
+const ELEV_EMPHASIS = 0.20;    // extra emphasis on the high ground (valley recedes)
 
 export interface GridPoint { x: number; y: number; nx: number; ny: number; nz: number; edl: number }
 
@@ -96,47 +80,36 @@ export function starIdentity(x: number, y: number): { phase: number; rate: numbe
 }
 
 /**
- * MEMOISED, because the comment that used to sit here already claimed it was.
+ * MEMOISED, in one slot with no key. The EDL precompute is a brute-force all-pairs scan: 1089 points,
+ * 1,185,921 pair checks, measured in node at **cold 8.1 ms, warm median 2.4 ms**. TerrainHero calls this from
+ * `initTerrain()`, which runs on every `astro:page-load` and every `theme:change`, so without the memo every
+ * return to `/` and every theme flip paid 2–8 ms of blocked main thread, more on a phone. The result is a pure
+ * function of module constants (`RANGE`, `STEP`, `EDL_DEFAULTS` and the `field`/`normal` geometry), so there is
+ * nothing to key on — the same reason lib/terrainContours.ts's memo has none.
  *
- * The EDL precompute is a brute-force all-pairs scan: 1089 points, 1,185,921 pair checks. Measured in node
- * against the real module, **cold 8.1 ms, warm median 2.4 ms**. TerrainHero called this from `initTerrain()`,
- * which is bound to `astro:page-load` and re-fired by the theme toggle — and nothing ever overrides
- * `edlParams`, so the argument and the result were identical every time. That is 2–8 ms of blocked main
- * thread on every return to `/` and every theme flip, materially worse on a phone. The hero's own comment
- * said "built once (EDL is O(n²); the camera is fixed so it never needs recompute)": the intent was right,
- * the memo was never written.
- *
- * It is a safe memo because the result is a pure function of `edlParams` plus the module constants `RANGE`,
- * `STEP` and the `field`/`normal`/`projectRaw` geometry — there is no hidden input. Keyed on the parameter
- * VALUES rather than object identity, so a caller that builds an equal-but-distinct params object still hits.
- *
- * THE RETURNED ARRAY IS NOW SHARED, which is the one thing a caller has to respect: treat it as read-only.
+ * THE RETURNED ARRAY IS SHARED, which is the one thing a caller has to respect: treat it as read-only.
  * `paintTerrain` only reads it, and nothing else writes it today. If you ever want to hand the painter
  * per-frame-transformed positions (a legitimate trick — it re-reads `g.x`/`g.y` every frame), map to a COPY
  * rather than mutating these objects, or every other consumer inherits the transform.
  */
-const gridCache = new Map<string, GridPoint[]>();
+let gridCache: GridPoint[] | null = null;
 
-export function buildGrid(edlParams: EDLParams = EDL_DEFAULTS): GridPoint[] {
-  const key = `${edlParams.neighborRadius}|${edlParams.strength}|${edlParams.percentile}`;
-  const hit = gridCache.get(key);
-  if (hit) return hit;
-
+export function buildGrid(): GridPoint[] {
+  if (gridCache) return gridCache;
   const raw: Array<{ x: number; y: number }> = [];
   for (let x = -RANGE; x <= RANGE; x += STEP) for (let y = -RANGE; y <= RANGE; y += STEP) raw.push({ x, y });
-  const edl = computeEDL(raw, edlParams);
-  const grid = raw.map((d, i) => {
+  const edl = computeEDL(raw, EDL_DEFAULTS);
+  gridCache = raw.map((d, i) => {
     const [nx, ny, nz] = normal(d.x, d.y);
     return { x: d.x, y: d.y, nx, ny, nz, edl: edl[i] };
   });
-  gridCache.set(key, grid);
-  return grid;
+  return gridCache;
 }
 
 // `paletteDarkness(topSky)` was here: 1 - luminance01(topSky), clamped, meant to DERIVE the lighting
 // value/gain blend from a palette's top sky colour so the blend adapted to the theme automatically.
 //
-// Nothing ever called it, and the reason is the interesting part. `darkness` on TerrainConfig is not derived
+// Nothing ever called it, and the reason is the interesting part. The painter's `darkness` is not derived
 // at all — TerrainHero.astro sets it per theme off `data-theme` (0 for light, 1 for the terminal galaxy),
 // alongside the ramp and the walker palette it picks the same way. That is deliberate: dark mode is a chosen
 // look, not a luminance calculation, and the emerald "stars" are a palette decision no formula would produce.
@@ -154,17 +127,21 @@ const ZR = 1.55; // elevation → [0,1] normalization half-range (matches the he
 
 /** Paint one frame of terrain dots into a Y-down 2D context. `breathAmp` is the
  *  breathing amplitude for this frame (0 = still). Returns nothing; walkers are
- *  drawn by the caller afterward. */
+ *  drawn by the caller afterward.
+ *
+ *  `zoom` is TERRAIN_ZOOM for every production frame. It is a parameter because
+ *  tests/paintTerrain.test.ts's lift-linearity spec pulls the camera back until no
+ *  dot is culled, which the shipped zoom cannot do at any canvas shape. */
 export function paintTerrain(
   ctx: CanvasRenderingContext2D,
   grid: GridPoint[],
-  cfg: TerrainConfig,
+  theme: TerrainTheme,
   W: number, Hh: number, DPR: number, tsec: number, breathAmp: number,
   lift: number = 1,
+  zoom: number = TERRAIN_ZOOM,
 ): void {
   const breathHz = 0.4;
-  const lit = cfg.lighting;
-  const [Lx, Ly, Lz] = lightDir(cfg.light);
+  const [Lx, Ly, Lz] = lightDir(LIGHT_DEFAULTS);
 
   interface Dot { sx: number; sy: number; depth: number; z: number; ndl: number; edl: number; gx: number; gy: number }
   const rd: Dot[] = [];
@@ -182,8 +159,8 @@ export function paintTerrain(
     // exactly why the handoff from the intro to the live loop needs no blending.
     let z = field(g.x, g.y) * lift;
     z += breathAmp * Math.sin(tsec * breathHz + g.x * 0.7 + g.y * 0.6);
-    const [sx, sy, depth] = project(g.x, g.y, z, W, Hh, cfg.zoom);
-    const ndl = lit ? g.nx * Lx + g.ny * Ly + g.nz * Lz : 0;
+    const [sx, sy, depth] = project(g.x, g.y, z, W, Hh, zoom);
+    const ndl = g.nx * Lx + g.ny * Ly + g.nz * Lz;
     rd.push({ sx, sy, depth, z, ndl, edl: g.edl, gx: g.x, gy: g.y });
   }
   rd.sort((p, q) => p.depth - q.depth); // painter's order: far first
@@ -192,7 +169,7 @@ export function paintTerrain(
   for (const p of rd) {
     if (p.sx < -20 || p.sx > W + 20 || p.sy < -20 || p.sy > Hh + 20) continue;
     const hn = Math.max(0, Math.min(1, (p.z + ZR) / (2 * ZR)));
-    let r = (2.9 - hn * 1.6) * DPR * cfg.zoom * cfg.dotScale;
+    let r = (2.9 - hn * 1.6) * DPR * zoom * theme.dotScale;
     // Base opacity by elevation. The shipped ramp fades the RIDGE OUT
     // (0.30+(1-hn)*0.45 → alpha 0.27 at the peak vs 0.75 in the valley), which on
     // pale paper is fatal: the peak dots composite with barely any separation from
@@ -203,45 +180,43 @@ export function paintTerrain(
     // In LIGHT theme the ramp is flattened and lifted so high ground stays present.
     // Dark theme keeps the shipped falloff, where a fading dot correctly recedes
     // into a near-black sky.
-    const aBase = cfg.darkness > 0.5 ? 0.30 + (1 - hn) * 0.45
-                                     : 0.62 + (1 - hn) * 0.16;
+    const aBase = theme.darkness > 0.5 ? 0.30 + (1 - hn) * 0.45
+                                       : 0.62 + (1 - hn) * 0.16;
     let alpha = aBase;
     if (p.sy > fadeStart) alpha *= Math.max(0, 1 - (p.sy - fadeStart) / (Hh - fadeStart));
 
-    let color = colormap(hn, cfg.ramp);
-    if (lit) color = litColor(color, p.ndl, cfg.darkness, cfg.light);
+    let color = colormap(hn, theme.ramp);
+    color = litColor(color, p.ndl, theme.darkness, LIGHT_DEFAULTS);
 
-    if (cfg.edl) {
-      // Eye-Dome Lighting: a receding dot (edl→0) recedes AND shrinks; a
-      // near/high ridge dot (edl→1) stays present and grows. Size coupling is
-      // centered on 1× (sh=0.5 ⇒ unchanged) so mean size is kept.
-      //
-      // HOW the shade is spent is theme-dependent — see edlSpend() in terrain.ts.
-      // Dark theme spends it on ALPHA (fading toward a near-black sky darkens the
-      // dot, which is what an eye-dome shadow is). Light theme spends it mostly on
-      // VALUE, because on the pale sky fading a dot LIGHTENS it — the shipped
-      // alpha-only version ran the shape cue backwards and bleached the ridge into
-      // the sky, which is what made the mountain read as mush over the fluid.
-      const sh = p.edl;
-      const spend = edlSpend(sh, cfg.darkness, cfg.edlFloor);
-      color = [color[0] * spend.value, color[1] * spend.value, color[2] * spend.value];
-      alpha *= spend.alpha;
-      r *= 1 + cfg.edlSizeRange * (sh - 0.5);
-      // Elevation emphasis: the mountain IS the high ground — diminish the
-      // valley (hn→0) toward (1−emphasis) and shrink it so the ridge carries form.
-      const e = cfg.elevEmphasis;
-      alpha *= 1 - e * (1 - hn);
-      r *= (1 - e * 0.5) + (e * 0.5) * hn;
-    }
+    // Eye-Dome Lighting: a receding dot (edl→0) recedes AND shrinks; a
+    // near/high ridge dot (edl→1) stays present and grows. Size coupling is
+    // centered on 1× (sh=0.5 ⇒ unchanged) so mean size is kept.
+    //
+    // HOW the shade is spent is theme-dependent — see edlSpend() in terrain.ts.
+    // Dark theme spends it on ALPHA (fading toward a near-black sky darkens the
+    // dot, which is what an eye-dome shadow is). Light theme spends it mostly on
+    // VALUE, because on the pale sky fading a dot LIGHTENS it — the shipped
+    // alpha-only version ran the shape cue backwards and bleached the ridge into
+    // the sky, which is what made the mountain read as mush over the fluid.
+    const sh = p.edl;
+    const spend = edlSpend(sh, theme.darkness, EDL_FLOOR);
+    color = [color[0] * spend.value, color[1] * spend.value, color[2] * spend.value];
+    alpha *= spend.alpha;
+    r *= 1 + EDL_SIZE_RANGE * (sh - 0.5);
+    // Elevation emphasis: the mountain IS the high ground — diminish the
+    // valley (hn→0) toward (1−emphasis) and shrink it so the ridge carries form.
+    const e = ELEV_EMPHASIS;
+    alpha *= 1 - e * (1 - hn);
+    r *= (1 - e * 0.5) + (e * 0.5) * hn;
 
     let [cr, cg, cb] = color;
 
     // ── STARS: the mountain's dots ARE the star field (dark theme only) ────
     // The dark theme's whole conceit is that these dots read as stars, so make it
     // literal — each dot twinkles on its own phase and carries a stellar
-    // temperature tint. Deliberately gated on cfg.starfield so the shipped LIGHT
-    // terrain (warm ochre→indigo relief) is bit-for-bit unchanged.
-    if (cfg.starfield) {
+    // temperature tint. Gated on the dark theme so the shipped LIGHT terrain
+    // (warm ochre→indigo relief) is bit-for-bit unchanged.
+    if (theme.darkness > 0.5) {
       const { phase, rate, tint } = starIdentity(p.gx, p.gy);
       // two out-of-phase sines: no two dots blink together, and the field never
       // pulses in unison the way a single shared clock would.
@@ -268,6 +243,3 @@ export function paintTerrain(
     ctx.fill();
   }
 }
-
-// Re-export a couple of helpers the callers want alongside this module.
-export { projectRaw, field };

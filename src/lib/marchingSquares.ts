@@ -2,17 +2,14 @@
 //
 // ONE STITCHED MARCHING-SQUARES KERNEL WITH TWO CALLERS, AND ONE SEGMENT-ONLY PASS WITH A THIRD.
 //
-// `descentPath.contours()` drew isolines of the career field within `storyBounds()`; the homepage intro
-// needs isolines of the terrain field within `RANGE`. Those two differ in exactly ONE thing — their bounds.
-// They already call the same `field()` from lib/terrain.ts. So rather than duplicate ~70 lines of
-// marching squares for a difference of four numbers, the kernel lives here and both are callers.
+// The Story graph (`storyContours()` in descentPath.ts) draws isolines of `field()` within `storyBounds()`;
+// the homepage intro (terrainContours.ts) draws isolines of the same `field()` within `RANGE`. Those two
+// differ in their bounds and their counts, so the kernel and the level placement (`isoLevels`) live here
+// and both are callers.
 //
-// Net effect is LESS total code, and `descentPath`'s existing specs are what prove the extraction
-// preserved its behaviour — that test run is the real guard on this refactor, not this file's own spec.
-//
-// Pure, with no module state. The callers memoise (see `contoursFor` in descentPath.ts and
-// `terrainContoursFor` in terrainContours.ts); caching here would mean one cache keyed by a function
-// reference, which is the kind of key that silently stops matching.
+// Pure, with no module state. The callers memoise, each in one slot with no key (`storyContours`,
+// `terrainLevels`, `introContours`); caching here would mean one cache keyed by a function reference,
+// which is the kind of key that silently stops matching.
 //
 // `isoSegments` (bottom of the file) is for a caller that cannot memoise: /projects' drafting field drifts, so its
 // isolines are new on every frame — ~15 a second, 24 levels each. `isoRuns` would sample `fn` four times per
@@ -22,6 +19,28 @@
 
 /** A sampling rectangle in world space. Matches the shape `storyBounds()` returns. */
 export interface IsoBounds { x0: number; y0: number; x1: number; y1: number }
+
+/**
+ * `n` contour levels through `fn`'s own range over `bounds`, ascending. The range is measured on a
+ * `(probe + 1)²` lattice and level k sits at `(k + 0.5) / n` through it: a level at exactly the min or the
+ * max draws no isoline, so the half-step inset is what makes every level draw something.
+ */
+export function isoLevels(
+  fn: (x: number, y: number) => number,
+  bounds: IsoBounds,
+  n: number,
+  probe: number,
+): number[] {
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i <= probe; i++) {
+    for (let j = 0; j <= probe; j++) {
+      const z = fn(bounds.x0 + ((bounds.x1 - bounds.x0) * i) / probe, bounds.y0 + ((bounds.y1 - bounds.y0) * j) / probe);
+      if (z < lo) lo = z;
+      if (z > hi) hi = z;
+    }
+  }
+  return Array.from({ length: n }, (_, k) => lo + ((hi - lo) * (k + 0.5)) / n);
+}
 
 /**
  * Contour polylines of `fn` at `level`, as world-space point runs.

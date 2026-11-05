@@ -109,15 +109,6 @@ html.intro-flat .descent {
    The deck is therefore driven explicitly — see lib/deck.ts (pure,
    unit-tested: where the stops are) and Deck.astro (one gesture =
    one stop).
-
-   BREATHING AIR above each stop is a --deck-lead custom property on
-   the slide, read by the controller. It was `scroll-margin-top`
-   here, which was WRONG and silently did nothing: scroll-margin is
-   only honoured by scrollIntoView(), and the deck moves with
-   window.scrollTo(). The rule read correctly, applied never, and
-   the paper panel's title came to rest hard against the browser
-   chrome. A CSS property that only some scroll APIs respect is a
-   trap; the offset now lives where the scrolling happens.
    ============================================================ */
 
 /* ============================================================
@@ -178,11 +169,11 @@ html.intro-flat .descent {
      "Still an open problem." 212px · "The work" 123px — plus every kicker ("1 / 3", "2 / 3 · the difficulty").
      Not transient: these are the positions the deck comes to REST at, so the headline was permanently obscured.
 
-     THE FIX IS THE PANEL'S OWN PADDING, NOT --deck-lead. A lead was the obvious lever and it is the wrong one:
-     it lifts the deck's resting position ABOVE the slide, so a full-bleed opaque panel gets a strip of sky above
-     it and reads as a card that has slipped down — Story.astro measured exactly that (paper at 1953, deck resting
-     at 1893, 60px of sky) and documents why it carries no lead, naming the panel's padding-top as the right home
-     for this air. Padding keeps the paper flush to the top of the screen and moves only the content inside it.
+     THE FIX IS THE PANEL'S OWN PADDING, NOT A DECK LEAD (a resting position lifted above the slide; the deck had
+     one, and it is deleted). A lead was the obvious lever and it is the wrong one: a full-bleed opaque panel gets
+     a strip of sky above it and reads as a card that has slipped down — measured on Story: paper at 1953, deck
+     resting at 1893, 60px of sky. Padding keeps the paper flush to the top of the screen and moves only the
+     content inside it.
 
      78px clears the wrapped two-row capsule on phones (12px offset + ~54px tall) and the single-row capsule in
      landscape (17px + ~44px). ── */
@@ -270,8 +261,8 @@ html[data-theme='dark'] .descent::after {
 
    The gradient stays as the FALLBACK and is only suppressed once the canvas has
    actually painted — the script adds .fluid-live after a successful draw. So no
-   WebGL, mobile (the canvas is display:none under 640px), a shader compile
-   failure, or warp 0 all fall back to the shipped sky, unchanged.
+   WebGL, mobile (the canvas is display:none under 640px) and a shader compile
+   failure all fall back to the shipped sky, unchanged.
 
    Both archetypes share this: descent pages keep --descent-grad as the fallback,
    reading pages keep --reading-grad, because each page's own rule already sets
@@ -304,12 +295,6 @@ html[data-theme='dark'] .descent::after {
 @media not all and (max-width: 640px) {
   .descent.is-fluid.fluid-live { background: var(--bg); }
 
-  /* Explicitly restore each archetype's own gradient when the canvas is off, rather
-     than relying on revert-layer (whose cascade-layer semantics don't apply here —
-     these are all in the same layer, so it would resolve to nothing). */
-  html[data-fluid-strength='0'] .descent.is-fluid.fluid-live,
-  html[data-fluid='off'] .descent.is-fluid.fluid-live { background: var(--descent-grad); }
-
   /* SkyWash's woven warm/cold strokes are the same broken-colour idea the shader
      now does natively at higher fidelity; doubling them muddies both. */
   .descent.is-fluid.fluid-live .sky-wash { opacity: 0.35; }
@@ -331,8 +316,8 @@ html[data-theme='dark'] .descent::after {
    when the 0.5s fade ends) against a probe showing the live canvas never blanks. It did NOT reproduce
    in headless Chrome, where software rendering does capture canvases — which is why it survived two
    investigations.
-   The flip is instant now and clean, because both canvases read their palette every frame: text, sky
-   and terrain all cross within one frame of each other. If the dissolve is wanted back, lerp the
+   The flip is instant now and clean, because CornerNav's theme:change re-inits both canvases in the
+   same task as the attribute flip: text, sky and terrain all cross within one frame of each other. If the dissolve is wanted back, lerp the
    canvases' ramps in JS alongside the CSS; do not reach for a view transition on a page whose
    background is a canvas. ── */
 

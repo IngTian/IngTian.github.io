@@ -271,7 +271,7 @@ src/
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate; MOTION_LIMIT_MS, WCAG 2.2.2's five seconds
   lib/skyShader.ts, skyPalette.ts, skyLegibility.ts   # the fluid sky: GLSL, ramps, and the text-contrast policy
   lib/terrain.ts, terrainRender.ts  # pure terrain math (field/grad/runDescent/colormap/project) + its painter AND the memoised grid cache
-  lib/marchingSquares.ts            # isoRuns(fn, bounds, level, res) — the ONE stitched kernel; descentPath and terrainContours are both callers. Plus isoSegments: unstitched, over a pre-sampled grid, called by components/projects/DraftingField.astro (redrawn per frame, so the O(n²) stitch is unaffordable)
+  lib/marchingSquares.ts            # isoRuns(fn, bounds, level, res) — the ONE stitched kernel — and isoLevels, the one level placement; descentPath (storyContours) and terrainContours are both callers. Plus isoSegments: unstitched, over a pre-sampled grid, called by components/projects/DraftingField.astro (redrawn per frame, so the O(n²) stitch is unaffordable)
   lib/terrainContours.ts            # the hero field's isolines + levels, memoised — the intro's survey pass
   lib/introTimeline.ts              # the homepage intro's SCHEDULE only — pure. The decision and the ?dur= clamp live in pages/index.astro's is:inline script (it must run before first paint, so it cannot import); lib/introSession.ts reads what that publishes
   lib/descentPath.ts, trajectory.ts # the career descent graph's field and route
@@ -1167,16 +1167,15 @@ luminance banding and a warm bloom. `lib/skyShader.ts` holds the GLSL,
 keeps text readable over it. Two archetypes: `descent` (paper text; the dangerous
 direction is lighter) and `reading` (dark ink on a luminous field; dangerous is
 darker). Every page starts at the top of the pattern: the shader samples it from
-`scrollY / vw` alone, and the component takes `strength` and `variant`, nothing else.
+`scrollY / vw` alone, and the component takes `variant`, nothing else (its warp amplitude follows it).
 
 Two invariants, both about the compositor and both easy to break:
 
 1. **The canvas is OPAQUE, with no `mix-blend-mode`.** A blended full-screen layer
    forces the compositor to re-read the page backdrop every frame, which defeats
    layer caching for the entire document.
-2. **`.fluid-live` must never outlive a visible canvas.** CSS gates the canvas
-   (hidden under 640px, under reduced motion, and at `strength=0`), and the class is
-   additionally dropped on resize-to-hidden and on GL context loss.
+2. **`.fluid-live` must never outlive a visible canvas.** CSS hides the canvas under
+   640px, and the class is additionally dropped on resize-to-hidden and on GL context loss.
 
 Perf: viewport-sized (scroll is a uniform), half internal resolution, ~30fps idle and **every rAF tick while
 scrolling**, paused on tab-hide, skipped on phones. The CSS
@@ -1261,7 +1260,8 @@ galaxy). The whole system is **token override**, not per-component branching:
   `Gallery` (manifold's still and video are per theme). **Never re-fire
   `astro:page-load` for a repaint** — it re-runs every page script's init, re-measuring
   the deck and rebuilding observers no colour affects, and measured as a 357ms long task on `/`. A new
-  JS-painted surface listens for `theme:change`, with its teardown.
+  JS-painted surface listens for `theme:change`, with its teardown. It is the only path: no surface
+  observes `data-theme` or re-reads it per frame, as the flip and the event are one task.
 - **Additive rule (load-bearing):** the dark theme must NEVER degrade the
   shipped light Descent. Light is the base; dark is an override layer. When
   touching themes, verify BOTH — build breaks and contrast regressions hide in
@@ -1325,8 +1325,9 @@ galaxy). The whole system is **token override**, not per-component branching:
 
 Related: `scroll-margin-top` is only honoured by `scrollIntoView()`. The deck moves
 with `window.scrollTo()`, so a CSS rule looked correct, did nothing, and panel
-titles came to rest hard against the browser chrome — the lead is a number in
-`lib/deck.ts` for that reason.
+titles came to rest hard against the browser chrome. The air above a panel title is the panel's own
+`padding-top` (`global.css`), not a deck stop lifted above the slide, which shows a strip of sky over a
+full-bleed panel.
 
 ## Conventions
 

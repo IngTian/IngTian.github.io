@@ -17,7 +17,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { rampFor, type Theme } from '../src/lib/skyPalette';
-import { AA_BODY, nebulaCeiling } from '../src/lib/skyLegibility';
+import { AA_BODY, NEBULA, NEBULA_CEILING } from '../src/lib/skyLegibility';
 import { between, onGround, over, railMark, ratio, rgbOf, tokens, type RGB } from './helpers/palette';
 
 const THEMES = [
@@ -35,8 +35,6 @@ const PANEL = { light: '#c4b7a1', dark: '#14161a' } as const;
  * slide below only lowers it.
  */
 const SKY_DEPTH = 0.3;
-
-const NEBULA: RGB = [0.055, 0.105, 0.115]; // FluidSky's uNebula: the dark sky's lift, at most nebulaCeiling()
 
 /** The descent sky from the top down to `depth`: every ramp stop above it, and the ramp at it. */
 function skyTo(theme: Theme, depth: number): RGB[] {
@@ -80,7 +78,8 @@ describe("the homepage's rail ink (tokens.css)", () => {
       const focus = resolve(tokens(t.sel)['--rail-focus']);
       const panel = rgbOf(PANEL[t.theme]);
       const sky = skyTo(t.theme, SKY_DEPTH).flatMap((g): RGB[] => t.theme === 'dark'
-        ? [g, g.map((c, k) => Math.min(255, c + 255 * NEBULA[k] * nebulaCeiling())) as RGB]
+        // the dark sky's lift: FluidSky's uNebula, at most NEBULA_CEILING
+        ? [g, g.map((c, k) => Math.min(255, c + 255 * NEBULA[k] * NEBULA_CEILING)) as RGB]
         : [g]);
       const grounds = [panel, ...sky];
 

@@ -38,7 +38,7 @@ describe('terrainLevels', () => {
   });
 
   it('spaces levels evenly', () => {
-    // Placed at (k + 0.5) / n through the measured range, the same scheme descentPath.contourLevels uses.
+    // Placed at (k + 0.5) / n through the measured range by isoLevels, as the Story graph's are.
     const lv = terrainLevels();
     const gap = lv[1] - lv[0];
     for (let i = 2; i < lv.length; i++) expect(lv[i] - lv[i - 1]).toBeCloseTo(gap, 9);
@@ -46,6 +46,23 @@ describe('terrainLevels', () => {
 
   it('returns the IDENTICAL array each call — it is shared and read-only by contract', () => {
     expect(terrainLevels()).toBe(terrainLevels());
+  });
+
+  it('places, and traces, exactly the levels the intro drew before isoLevels held the rule', () => {
+    // The former placement, written out longhand and frozen: (k + ½)/9 through the range measured on a
+    // 51² lattice over RANGE. The runs follow from the levels, so both are compared exactly.
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i <= 50; i++) {
+      for (let j = 0; j <= 50; j++) {
+        const z = field(-RANGE + (2 * RANGE * i) / 50, -RANGE + (2 * RANGE * j) / 50);
+        if (z < lo) lo = z;
+        if (z > hi) hi = z;
+      }
+    }
+    const frozen = Array.from({ length: 9 }, (_, k) => lo + ((hi - lo) * (k + 0.5)) / 9);
+    expect(terrainLevels()).toEqual(frozen);
+    const bounds = { x0: -RANGE, y0: -RANGE, x1: RANGE, y1: RANGE };
+    expect(introContours()).toEqual(frozen.map((l) => isoRuns(field, bounds, l, 74)));
   });
 });
 

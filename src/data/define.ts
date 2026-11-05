@@ -25,25 +25,20 @@ export interface Beat {
   ask: string;
   /** The answer, in one sentence. */
   say: string;
-  /** What the drawing is doing while this beat is on screen. */
-  showing: string;
 }
 
 export const BEATS: Beat[] = [
   {
     ask: 'What is a portfolio?',
     say: 'A hundred dollars, split across things you could own. That is all. The split IS the portfolio.',
-    showing: 'one bar, divided four ways',
   },
   {
     ask: 'So what is optimising it?',
     say: 'Choosing the split — and the choice matters, because each thing behaves differently when the news lands.',
-    showing: 'the same hundred dollars, split three other ways',
   },
   {
     ask: 'And multi-period?',
     say: 'You do not choose once. A month later the world has moved and you choose again — from where the last choice left you, paying to change your mind.',
-    showing: 'the split re-chosen, month after month',
   },
 ];
 

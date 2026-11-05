@@ -29,7 +29,7 @@
 // career graph does its own optimisation, which is the one thing about this file that would be worth
 // knowing and is false. Dropped when noUnusedLocals went on.
 import { field, RANGE } from './terrain';
-import { isoRuns } from './marchingSquares';
+import { isoRuns, isoLevels } from './marchingSquares';
 import { WAYPOINTS, trajectoryFacts, type Waypoint } from './trajectory';
 
 export type Projection = '2d' | '3d';
@@ -95,75 +95,29 @@ export function project(x: number, y: number, view: View): [number, number] {
   return [sx, sy];
 }
 
-/** Contour polylines of the field, as world-space point runs. Marching squares proper, so the
- *  result is continuous lines rather than the disconnected 1px stubs an earlier sketch drew —
- *  which is why its contours were invisible.
- *
- *  Prefer `contoursFor()` below for anything that runs more than once — this is the uncached kernel. */
-export function contours(level: number, res = 150): [number, number][][] {
-  // The marching squares itself now lives in lib/marchingSquares.ts, because the homepage intro needs
-  // isolines of the SAME `field()` over different bounds — `RANGE` instead of `storyBounds()` — and that
-  // was the only difference between the two. One kernel, two callers; this function's signature and
-  // behaviour are unchanged, and this file's own specs are what prove that.
-  //
-  // One thing DID change, and for the better: the extracted stitch attaches the nearest candidate rather
-  // than the first within tolerance, which fixes a latent bug that silently dropped fragments of a
-  // contour. See the long note in marchingSquares.ts. For this field it means fewer, longer runs
-  // covering the same geometry.
-  return isoRuns(field, storyBounds(), level, res);
-}
+let storyCache: [number, number][][][] | null = null;
 
 /**
- * THE MEMOISED CONTOURS — and the reason this lives in `lib/` rather than in the component.
+ * THE STORY GRAPH'S CONTOURS: every level's runs, deepest first — 11 levels through the story's own height
+ * range (measured on a 61² lattice, so no level is wasted off-frame), each traced at res 150 over
+ * `storyBounds()` by the shared kernel in lib/marchingSquares.ts. Runs are continuous polylines, not the
+ * disconnected 1px stubs an earlier sketch drew.
  *
- * `contours()` is the single most expensive thing the descent graph does: the full set for
- * `contourLevels(11)` is 17 polylines / 2838 points and costs **53-67 ms of synchronous main thread**,
- * measured over 8 runs on node 24. `DescentPath.astro` binds its init to BOTH `astro:page-load` and
- * `theme:change`, so without a cache that cost landed on every return to `/` and every theme flip, inside
- * the view transition.
+ * MEMOISED, and the reason it lives in `lib/` rather than in the component. The set is 17 polylines / 2838
+ * points and costs **53-67 ms of synchronous main thread**, measured over 8 runs on node 24, and
+ * `DescentPath.astro` re-inits on every `astro:page-load` and every `theme:change`. No test reads
+ * `DescentPath.astro`, so a cache there could move back inside `init()` with every test green; here
+ * `tests/descentPath.test.ts` pins it. One slot and no key, like `introContours()`: there is one call site
+ * and its inputs (`storyBounds()`, itself memoised, and the pure `field()`) never vary.
  *
- * The cache was first written as a `Map` at the top of the component's `<script>`. That worked, but **no
- * test in this repo reads `DescentPath.astro`** (`grep -rln DescentPath tests/` → nothing), so moving the
- * Map back inside `init()` would have silently reverted the largest perf fix on the branch with all 631
- * tests green. Here it is one line to pin — which is the same conclusion `gridCache`/`buildGrid` in
- * `lib/terrainRender.ts` already reached, and this is deliberately the same shape as that.
- *
- * Hoisting is provably safe rather than hopefully safe: `contours()` depends only on `storyBounds()`
- * (itself module-memoised) and `field()`, both pure with no hidden input.
- *
- * Keyed on the level AND the resolution, not the level alone: a key that ignores an argument is a cache that
- * returns the wrong answer the moment someone adds a second call site, which is a class of bug this file has
- * been bitten by before. `toFixed(4)` rather than the raw float so two levels that differ below the drawing
- * resolution share an entry.
- *
- * THE RETURNED ARRAY IS SHARED AND READ-ONLY BY CONTRACT. Callers draw from it; nothing may mutate it.
- * Retains ~2962 points for the life of the page — negligible, and the same data the previous code held for
- * as long as a page lived anyway.
+ * THE RETURNED ARRAYS ARE SHARED AND READ-ONLY BY CONTRACT. Callers draw from them; nothing may mutate them.
  */
-const contourCache = new Map<string, [number, number][][]>();
-
-export function contoursFor(level: number, res = 150): [number, number][][] {
-  const key = `${level.toFixed(4)}|${res}`;
-  let c = contourCache.get(key);
-  if (!c) {
-    c = contours(level, res);
-    contourCache.set(key, c);
+export function storyContours(): [number, number][][][] {
+  if (!storyCache) {
+    const b = storyBounds();
+    storyCache = isoLevels(field, b, 11, 60).map((l) => isoRuns(field, b, l, 150));
   }
-  return c;
-}
-
-/** Contour levels spanning the story's actual height range, so no level is wasted off-frame. */
-export function contourLevels(n = 11): number[] {
-  const b = storyBounds();
-  let lo = Infinity, hi = -Infinity;
-  for (let i = 0; i <= 60; i++) {
-    for (let j = 0; j <= 60; j++) {
-      const z = field(b.x0 + ((b.x1 - b.x0) * i) / 60, b.y0 + ((b.y1 - b.y0) * j) / 60);
-      if (z < lo) lo = z;
-      if (z > hi) hi = z;
-    }
-  }
-  return Array.from({ length: n }, (_, k) => lo + ((hi - lo) * (k + 0.5)) / n);
+  return storyCache;
 }
 
 // ── The trail ───────────────────────────────────────────────────────────────

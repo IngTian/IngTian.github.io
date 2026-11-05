@@ -42,8 +42,8 @@ const bubbles = JSON.stringify([
      math[cid]`, which match nothing in dist on any route: the Moo glyph has been unstyled (wrong colour,
      still italic from `.terrain-bubble.word`) and the three MathML bubbles have had neither their colour nor
      their 1.05em.
-     DescentPath.astro:136-148 documents this exact failure for its own script-created emphasis nodes and
-     fixes it the same way; this is the instance that was missed. The parent stays scoped because the bubble
+     DescentPath.astro's ":global ON THE CHILD" note documents this exact failure for its own
+     script-created emphasis nodes and fixes it the same way; this is the instance that was missed. The parent stays scoped because the bubble
      div IS in the template — going global on the whole selector would leak. */
   .terrain-bubble :global(.m) { color: color-mix(in oklab, var(--on-accent) 70%, var(--indigo)); font-style: normal; }
   .terrain-bubble :global(math) { color: var(--on-accent); font-size: 1.05em; }
@@ -52,7 +52,7 @@ const bubbles = JSON.stringify([
 <script>
   import { field, runDescent, project, SPAWNS,
            TERRAIN_LIGHT, TERRAIN_TERMINAL, type TerrainRamp } from '../lib/terrain';
-  import { buildGrid, paintTerrain, TERRAIN_CONFIG_DEFAULTS, type GridPoint } from '../lib/terrainRender';
+  import { buildGrid, paintTerrain, TERRAIN_ZOOM } from '../lib/terrainRender';
   import { prefersReducedMotion } from '../lib/motion';
   import { introFrame, surveyProgress, type IntroFrame } from '../lib/introTimeline';
   import { introContours, terrainLevels } from '../lib/terrainContours';
@@ -111,43 +111,17 @@ const bubbles = JSON.stringify([
     const ctx = cvs.getContext('2d')!;
     const reduce = prefersReducedMotion();
     const BUBBLES = JSON.parse(cvs.dataset.bubbles || '[]') as Array<null | { word?: string; mathml?: string }>;
-    // THE PALETTE IS RE-READ EVERY FRAME, not captured once per init, and that is a bug fix.
-    //
-    // Measured on a theme toggle: the page text crosses to the new theme at +26ms and the fluid sky at
-    // +26ms, but this canvas crossed at **+559ms** — a 533ms window in which the hero's dots were still
-    // the old theme while everything around them had changed. That is the glitch; it is most obvious on
-    // the hero because the terrain is the biggest JS-painted surface.
-    //
-    // The cause is an asymmetry, not a delay anyone chose. FluidSky's shader takes `uDark` from
-    // `dataset.theme` on EVERY frame, so it flips in the same frame CSS does. This component read
-    // `themePalette()` once at init, so it could only change when CornerNav dispatched `theme:change`
-    // — which it then did only AFTER the View Transition crossfade finished ("a canvas settles into
-    // its new palette a beat after the crossfade"). Re-reading per frame makes the terrain behave like
-    // the sky, and the re-init becomes a repaint this no longer depends on for correctness.
-    //
-    // The read is a `dataset.theme` compare plus, only on an actual change, one small object literal.
-    // `buildGrid` is NOT re-run: its memo is keyed on EDL params, which no theme touches.
-    let pal = themePalette();
-    let palTheme = document.documentElement.dataset.theme ?? '';
-    let cfg = { ...TERRAIN_CONFIG_DEFAULTS, ramp: pal.ramp, darkness: pal.darkness,
-                dotScale: pal.dotScale, starfield: pal.darkness > 0.5 };
-    /** Refresh the palette if the theme attribute changed since the last frame. */
-    function syncPalette(): void {
-      const now = document.documentElement.dataset.theme ?? '';
-      if (now === palTheme) return;
-      palTheme = now;
-      pal = themePalette();
-      cfg = { ...TERRAIN_CONFIG_DEFAULTS, ramp: pal.ramp, darkness: pal.darkness,
-              dotScale: pal.dotScale, starfield: pal.darkness > 0.5 };
-    }
+    // THE PALETTE IS READ ONCE PER INIT. A theme flip reaches this canvas only through CornerNav's
+    // `theme:change`, which re-runs initTerrain in the same task as the attribute flip, so the dots cross
+    // with the text and the sky; nothing here watches the attribute or re-reads it per frame.
+    const pal = themePalette();
 
-    // The static-per-camera terrain: dot grid + precomputed normals + EDL shade, built once (EDL is
-    // O(n²); the camera is fixed so it never needs recompute). Theme-independent, which is exactly why
-    // re-reading the palette per frame above costs nothing: no theme change invalidates this.
-    // starfield: the dark theme's dots twinkle as temperature-tinted stars (its whole conceit is that
-    // they read as a star field); light theme keeps the shipped warm relief untouched.
-    const ZOOM = TERRAIN_CONFIG_DEFAULTS.zoom;   // walkers must use the SAME zoom to stay on the surface
-    let grid: GridPoint[] = buildGrid(TERRAIN_CONFIG_DEFAULTS.edlParams);
+    // The static-per-camera terrain: dot grid + precomputed normals + EDL shade (EDL is O(n²); the camera
+    // is fixed so it never needs recompute). Theme-independent, and memoised in lib/terrainRender.ts, so a
+    // theme flip's re-init does not rebuild it. The dark theme's dots twinkle as temperature-tinted stars
+    // (its whole conceit is that they read as a star field); the painter keys that off `pal.darkness`.
+    const ZOOM = TERRAIN_ZOOM;   // walkers must use the SAME zoom to stay on the surface
+    const grid = buildGrid();
 
     let W = 0, Hh = 0, DPR = 1;
     function resize() {
@@ -304,7 +278,6 @@ const bubbles = JSON.stringify([
      * displacements partly cancel in the mean.
      */
     function frame(ts: number, animate: boolean, breathIn = 1, intro: IntroFrame | null = null) {
-      syncPalette();
       const [gr, gg, gb] = pal.walker.glow;      // walker head-glow
       const [sr, sg, sb] = pal.walker.settled;   // settled-at-minimum accent
       const [tr, tg, tb] = pal.walker.trail;     // descending trail
@@ -338,7 +311,7 @@ const bubbles = JSON.stringify([
       // arc+fill pairs that painted nothing, every frame, for the first 1008ms of an UNTHROTTLED loop.
       if (!intro || intro.dots > 0.004) {
         if (intro) ctx.globalAlpha = intro.dots;
-        paintTerrain(ctx, grid, cfg, W, Hh, DPR, tsec, breathAmp, lift);
+        paintTerrain(ctx, grid, pal, W, Hh, DPR, tsec, breathAmp, lift);
         if (intro) ctx.globalAlpha = 1;
       }
 

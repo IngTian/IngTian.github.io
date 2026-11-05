@@ -9,46 +9,29 @@
 //   1. Canvas is OPAQUE with no mix-blend-mode. A blended full-screen layer forces
 //      the compositor to re-read the page backdrop every frame, defeating layer
 //      caching for the whole document.
-//   2. .fluid-live must never outlive a visible canvas. CSS rules (display:none
-//      under 640px, reduced-motion, strength=0) gate the canvas, and the class is
-//      additionally dropped on resize-to-hidden and GL context loss.
+//   2. .fluid-live must never outlive a visible canvas. CSS hides the canvas under
+//      640px, and the class is additionally dropped on resize-to-hidden and GL
+//      context loss.
 //
 // Perf: viewport-sized (scroll is a uniform), 0.5x internal resolution, ~30fps
 // idle / full rate while scrolling, paused on tab-hide, skipped under 640px.
 //
-// ONE SHAPE: the canvas is always the page-wide fixed backdrop. There used to be a second
-// `mode="contained"` shape — position:absolute inside a 72vh slab, with its own uniform wiring
-// (a fixed depth window, and uYOffset driven by the strength LEVEL rather than by scroll) so five
-// strengths could be stacked on one screen and compared. It existed for /proto-ladder, the
-// strength-calibration route, and for nothing else: `grep -rn 'contained' src/pages` had exactly
-// one hit. The level it was built to pick has been picked and shipped (AMP_BY_LEVEL, below), the
-// route is retired, and that grep is now 0 — so the prop, its class pair and its uniform branch
-// are gone. Deliberately NOT kept "in case": a mode with no caller is a branch nobody exercises,
-// and this component runs on every route with a sky, where an untested branch is the expensive kind.
-//
-// (Note the house habit: this rationale is a frontmatter comment, not an HTML one. Astro emits
-// HTML comments into the build, and FluidSky renders on every route with a sky — an explanation this long
-// would ship to every visitor on each of them. Frontmatter `//` never reaches the output.)
+// A theme change reaches it one way: CornerNav's `theme:change`, which re-inits it
+// (bottom of the script). Nothing here observes the attribute or re-reads it per frame.
 interface Props {
-  strength?: 0 | 1 | 2 | 3 | 4;
   /** 'descent' (paper text, dawn→ground) | 'reading' (dark ink, luminous) */
   variant?: 'descent' | 'reading';
 }
-const { strength = 4, variant = 'descent' } = Astro.props;
+const { variant = 'descent' } = Astro.props;
 ---
 <canvas
   class="fluid-sky"
   data-fluid-canvas
   aria-hidden="true"
-  data-strength={String(strength)}
   data-variant={variant}
 ></canvas>
 
 <style>
-  /* One shape now (see ONE SHAPE in the frontmatter): the fixed, page-wide backdrop. The
-     `.is-background` / `.is-contained` modifier pair went with the contained mode — with a
-     single shape the modifier carried no information, so the geometry sits on the element's
-     own class and there is no second rule to keep in sync with it. */
   .fluid-sky {
     pointer-events: none;
     display: block;
@@ -59,16 +42,13 @@ const { strength = 4, variant = 'descent' } = Astro.props;
     z-index: -2;
   }
 
-  .fluid-sky[data-strength='0'] { display: none; }
-  :global(html[data-fluid-strength='0']) .fluid-sky { display: none !important; }
-  :global(html[data-fluid='off']) .fluid-sky { display: none; }
   @media (max-width: 640px) { .fluid-sky { display: none; } }
 </style>
 
 <script>
   import { prefersReducedMotion } from '../lib/motion';
   import { VERTEX_SHADER, fragmentShader, SKY_UNIFORMS } from '../lib/skyShader';
-  import { gateFor, tintBudget, nebulaCeiling, type SkyVariant } from '../lib/skyLegibility';
+  import { GATES, TINT_BUDGET, NEBULA, NEBULA_CEILING, type SkyVariant } from '../lib/skyLegibility';
   import { rampFor, type Theme } from '../lib/skyPalette';
   import { introProgress } from '../lib/introSession';
   import { introFrame } from '../lib/introTimeline';
@@ -76,8 +56,8 @@ const { strength = 4, variant = 'descent' } = Astro.props;
   const VERT = VERTEX_SHADER;
   const FRAG = fragmentShader();
 
-  // Strength ladder: 0 = off, 1-3 = subtle to strong, 4 = full strength.
-  const AMP_BY_LEVEL = [0, 0.7, 1.0, 1.35, 1.8];
+  // The warp amplitude (the shader's uAmp), one per archetype.
+  const AMP: Record<SkyVariant, number> = { descent: 1.8, reading: 1.35 };
 
   const teardowns: Array<() => void> = [];
 
@@ -104,8 +84,7 @@ const { strength = 4, variant = 'descent' } = Astro.props;
   }
   function initOne(cvs: HTMLCanvasElement): (() => void) | null {
     if (getComputedStyle(cvs).display === 'none') return null;
-    const gl = (cvs.getContext('webgl', { antialias: false, alpha: false, depth: false })
-      || cvs.getContext('experimental-webgl', { antialias: false, alpha: false, depth: false })) as WebGLRenderingContext | null;
+    const gl = cvs.getContext('webgl', { antialias: false, alpha: false, depth: false });
     if (!gl) { cvs.style.display = 'none'; return null; }
     function compile(type: number, src: string): WebGLShader | null {
       const sh = gl!.createShader(type);
@@ -140,45 +119,30 @@ const { strength = 4, variant = 'descent' } = Astro.props;
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
     const variant = (cvs.dataset.variant ?? 'descent') as SkyVariant;
-    let rampTheme: Theme | '' = '';
-    function uploadRamp(force = false): void {
-      const theme: Theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
-      if (!force && theme === rampTheme) return;
-      rampTheme = theme;
-      const ramp = buildRamp(theme, variant);
-      if (!ramp) return;
-      gl!.activeTexture(gl!.TEXTURE0);
-      gl!.bindTexture(gl!.TEXTURE_2D, tex);
-      gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA, gl!.RGBA, gl!.UNSIGNED_BYTE, ramp);
-      gl!.uniform1i(U.uRamp, 0);
+    // Read once: a theme change re-inits this canvas (theme:change, at the bottom).
+    const theme: Theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+    const ramp = buildRamp(theme, variant);
+    if (ramp) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, ramp);
+      gl.uniform1i(U.uRamp, 0);
     }
-    uploadRamp(true);
-    // `html[data-fluid-strength]` is a LIVE OVERRIDE, and it currently has no writer. It existed so
-    // a proto panel could force every canvas on the page to one rung while the level was being
-    // chosen; /proto-ladder and /proto-paper were the only two pages that ever set it, and both are
-    // retired. Nothing in src/ assigns `dataset.fluidStrength` any more — so this branch, the
-    // MutationObserver's `data-fluid-strength` filter below, the `[data-fluid-strength='0']` rule in
-    // the <style> block, and the matching `html[data-fluid-strength='0']` / `html[data-fluid='off']`
-    // fallback rules in global.css are all reachable only from devtools.
-    // Left in place ON PURPOSE for now rather than half-removed: the pieces span this file and
-    // global.css, and stripping only the half that lives here would leave global.css styling an
-    // attribute nothing can set. Remove the set together or not at all.
-    function level(): number {
-      const live = document.documentElement.dataset.fluidStrength;
-      if (live !== undefined) return Number(live);
-      return Number(cvs.dataset.strength ?? '4');
-    }
+    // Every uniform but the scroll, the page depth, the clock, the intro's flatten and the measured gate
+    // top is fixed for this canvas's life, so it is uploaded once; a program keeps its uniforms.
+    gl.uniform1f(U.uAmp, AMP[variant]);
+    gl.uniform1f(U.uDark, theme === 'dark' ? 1 : 0);
+    gl.uniform3f(U.uNebula, NEBULA[0], NEBULA[1], NEBULA[2]);
+    gl.uniform1f(U.uReading, variant === 'reading' ? 1 : 0);
+    gl.uniform1f(U.uGateDark, GATES[variant].dark);
+    gl.uniform1f(U.uGateLight, GATES[variant].light);
+    gl.uniform1f(U.uTintCap, TINT_BUDGET[variant].cap);
+    gl.uniform1f(U.uViscousFloor, TINT_BUDGET[variant].viscousFloor);
+    gl.uniform1f(U.uNebulaCeiling, NEBULA_CEILING);
     let gateTop = 0.55;
     function measureGate(): void {
       if (variant === 'reading') { gateTop = 0.0; return; }
       // Descent pages: find where content starts, i.e. the first element child of <main> that
       // carries text; if there is none, treat the whole page as a reading zone (gateTop = 0.0,
       // the conservative direction — engages the legibility gate everywhere).
-      //
-      // This used to consult `#mountains` first, back when the résumé section was the homepage's
-      // content zone. It isn't: Mountains came off the homepage, and with /proto-paper retired no
-      // route emits that id at all, so the lookup could only ever return null. The <main>-child
-      // scan is what has actually been running on every page, and it is the general rule anyway.
       const content = Array.from(document.querySelector('main')?.children ?? [])
           .find((el): el is HTMLElement => el instanceof HTMLElement && el.textContent?.trim().length > 0) as HTMLElement | undefined;
       if (!content) { gateTop = 0.0; return; }
@@ -261,25 +225,13 @@ const { strength = 4, variant = 'descent' } = Astro.props;
 
     function draw(nowMs: number): void {
       sizeTo();
-      uploadRamp();
       const vw = mVw, vh = mVh, docH = mDocH;
       gl!.uniform1f(U.uYOffset, window.scrollY / vw);
       gl!.uniform1f(U.uFlatten, introFlatten(nowMs));
       gl!.uniform1f(U.uYSpan, vh / vw);
       gl!.uniform1f(U.uDepth0, window.scrollY / docH);
       gl!.uniform1f(U.uDepthSpan, vh / docH);
-      gl!.uniform1f(U.uAmp, AMP_BY_LEVEL[Math.max(0, Math.min(4, level()))] ?? 1.0);
-      gl!.uniform1f(U.uDark, document.documentElement.dataset.theme === 'dark' ? 1 : 0);
-      gl!.uniform3f(U.uNebula, 0.055, 0.105, 0.115);
-      gl!.uniform1f(U.uReading, variant === 'reading' ? 1 : 0);
       gl!.uniform1f(U.uGateTop, gateTop);
-      const gates = gateFor(1, variant);
-      gl!.uniform1f(U.uGateDark, gates.dark);
-      gl!.uniform1f(U.uGateLight, gates.light);
-      const budget = tintBudget(variant);
-      gl!.uniform1f(U.uTintCap, budget.cap);
-      gl!.uniform1f(U.uViscousFloor, budget.viscousFloor);
-      gl!.uniform1f(U.uNebulaCeiling, nebulaCeiling());
       if (lastNow) uTimeSec += Math.min(0.05, (nowMs - lastNow) / 1000);
       lastNow = nowMs;
       gl!.uniform1f(U.uTime, uTimeSec);
@@ -339,12 +291,6 @@ const { strength = 4, variant = 'descent' } = Astro.props;
     };
     window.addEventListener('resize', onResize);
 
-    const mo = new MutationObserver(() => { uploadRamp(true); draw(performance.now()); });
-    mo.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-fluid-strength', 'data-theme'],
-    });
-
     const settle = window.setTimeout(() => { sizeTo(true); measureLayout(); measureGate(); draw(performance.now()); }, 1200);
 
     start();
@@ -360,7 +306,6 @@ const { strength = 4, variant = 'descent' } = Astro.props;
       cvs.removeEventListener('webglcontextrestored', onRestored);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
-      mo.disconnect();
       cvs.closest('.descent')?.classList.remove('fluid-live');
       gl.deleteTexture(tex);
       gl.deleteBuffer(buf);

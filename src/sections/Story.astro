@@ -86,11 +86,6 @@ import { STORY } from '../data/story';
     z-index: 1;
     width: 100vw;
     margin-left: calc(50% - 50vw);
-    /* NO LEAD ON THIS SECTION. The lead lifts the deck's resting position ABOVE the element, which for a
-       full-bleed opaque panel means a strip of sky shows above the paper — measured: paper starts at
-       1953, the deck rested at 1893, so 60px of the descent sky sat above the panel edge and the slide
-       read as a card that had slipped down.
-       The air the title needs is the panel's own padding-top instead, which is inside the paper. */
   }
 
   .story-paper {
@@ -128,9 +123,7 @@ import { STORY } from '../data/story';
   /* STICKY, so the drawing stays beside its explanation while the prose scrolls. That is the argument
      for merging in the first place: the reader can check each claim against the picture without
      scrolling back to it. Sticky is bounded by its parent, so the graph releases by itself at the end
-     of the writing — no JS, no scroll listener.
-     No --deck-lead here: the slot is no longer a deck stop (the deck's slides are top-level sections),
-     and leaving one would inherit down and re-open the sky gap above the panel. */
+     of the writing — no JS, no scroll listener. */
   .story-figure-slot {
     position: sticky;
     top: clamp(40px, 6vh, 80px);

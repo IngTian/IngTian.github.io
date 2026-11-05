@@ -49,14 +49,13 @@ describe('the declared problem sizes', () => {
   it('the real problem is thousands of tickers and thousands of constraints, as claimed', () => {
     expect(FUND.tickers).toBeGreaterThanOrEqual(1000);
     expect(FUND.constraints).toBeGreaterThanOrEqual(1000);
-    expect(FUND.periods).toBeGreaterThan(1);
   });
 
-  // FUND once carried `aum` and `drawdownLimit` too. Nothing read either one: the $1B figure and the 8%
-  // drawdown limit reach the page as prose inside CONSTRAINTS, which is where a reader meets them. A second,
-  // unread copy of a number is how two versions of the same fact end up on one page, so only the read fields
-  // are declared now — and this asserts that, so a reintroduced field has to come with a reader.
+  // The $1B figure and the 8% drawdown limit reach the page as prose inside CONSTRAINTS, which is where a
+  // reader meets them. A second, unread copy of a number is how two versions of the same fact end up on one
+  // page, so only the read fields are declared — and this asserts that, so a new field has to come with a
+  // reader.
   it('declares only the figures something actually reads', () => {
-    expect(Object.keys(FUND).sort()).toEqual(['constraints', 'periods', 'tickers']);
+    expect(Object.keys(FUND).sort()).toEqual(['constraints', 'tickers']);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildGrid, paintTerrain, TERRAIN_CONFIG_DEFAULTS } from '../src/lib/terrainRender';
-import { TERRAIN_LIGHT, TERRAIN_TERMINAL, EDL_DEFAULTS } from '../src/lib/terrain';
+import { buildGrid, paintTerrain } from '../src/lib/terrainRender';
+import { TERRAIN_LIGHT, TERRAIN_TERMINAL } from '../src/lib/terrain';
 import { wcagLuminance } from '../src/lib/skyLegibility';
 
 /** Minimal 2D-context recorder: paintTerrain only needs arc/fill/fillStyle/clearRect.
@@ -34,14 +34,14 @@ describe('paintTerrain', () => {
 
     const lightResult = (() => {
       const { ctx, calls } = recordingCtx();
-      paintTerrain(ctx, grid, { ...TERRAIN_CONFIG_DEFAULTS, ramp: TERRAIN_LIGHT, darkness: 0, dotScale: 1 },
+      paintTerrain(ctx, grid, { ramp: TERRAIN_LIGHT, darkness: 0, dotScale: 1 },
         1440, 900, 1, 0, 0);
       return calls;
     })();
 
     const darkResult = (() => {
       const { ctx, calls } = recordingCtx();
-      paintTerrain(ctx, grid, { ...TERRAIN_CONFIG_DEFAULTS, ramp: TERRAIN_TERMINAL, darkness: 1, dotScale: 1 },
+      paintTerrain(ctx, grid, { ramp: TERRAIN_TERMINAL, darkness: 1, dotScale: 1 },
         1440, 900, 1, 0, 0);
       return calls;
     })();
@@ -98,22 +98,23 @@ describe('paintTerrain', () => {
     expect(spread).toBeGreaterThan(0.10);
   });
 
-  it('starfield flag takes effect and output is otherwise deterministic', () => {
-    // The starfield flag gates stellar tinting; when set, output must differ. When unset, output is stable.
-    const paint = (starfield: boolean) => {
+  it('twinkles the dark theme\'s stars, and only the dark theme\'s', () => {
+    // With the breath at 0 the only time-dependent term is the stars' twinkle, so a dark frame must
+    // change between two times and a light frame must not — the light relief is bit-for-bit still.
+    const paint = (darkness: number, tsec: number) => {
       const { ctx, calls } = recordingCtx();
-      paintTerrain(ctx, grid, { ...TERRAIN_CONFIG_DEFAULTS, ramp: TERRAIN_LIGHT, darkness: 0, dotScale: 1, starfield },
-        1440, 900, 1, 0, 0);
-      return calls.map((c) => c.fill).join('|');
+      paintTerrain(ctx, grid, { ramp: darkness ? TERRAIN_TERMINAL : TERRAIN_LIGHT, darkness, dotScale: 1 },
+        1440, 900, 1, tsec, 0);
+      return calls.map((c) => `${c.r.toFixed(3)}:${c.fill}`).join('|');
     };
-    expect(paint(false)).toBe(paint(false));       // deterministic when flag is off
-    expect(paint(true)).not.toBe(paint(false));    // the flag must actually change output
+    expect(paint(1, 0)).not.toBe(paint(1, 1));
+    expect(paint(0, 0)).toBe(paint(0, 1));
   });
 
   it('is deterministic for a fixed time — no hidden Math.random', () => {
     const once = () => {
       const { ctx, calls } = recordingCtx();
-      paintTerrain(ctx, grid, { ...TERRAIN_CONFIG_DEFAULTS, ramp: TERRAIN_LIGHT, darkness: 0, dotScale: 1 },
+      paintTerrain(ctx, grid, { ramp: TERRAIN_LIGHT, darkness: 0, dotScale: 1 },
         1440, 900, 1, 1.5, 0.04);
       return calls.map((c) => `${c.r.toFixed(3)}:${c.fill}`).join('|');
     };
@@ -123,60 +124,17 @@ describe('paintTerrain', () => {
 
 describe('buildGrid is memoised, and the memo is the point', () => {
   // The EDL precompute is a brute-force all-pairs scan: 1089 points, 1,185,921 pair checks, measured at
-  // 8.1 ms cold / 2.4 ms warm median. TerrainHero called it from `initTerrain()`, which is bound to
-  // `astro:page-load` AND re-fired by the theme toggle — with the same `EDL_DEFAULTS` object every time. So
-  // every return to `/` and every theme flip paid 2–8 ms of blocked main thread for a byte-identical result.
-  // The component's own comment claimed "built once ... never needs recompute"; the memo was never written.
-  it('returns the same array for the same params', () => {
-    expect(buildGrid(EDL_DEFAULTS)).toBe(buildGrid(EDL_DEFAULTS));
-  });
-
-  it('hits on an equal-but-distinct params object, because callers construct their own', () => {
-    // Keyed on the VALUES, not object identity — the gate's painter passes `cfg.edlParams`, which comes from
-    // a spread of the defaults and is therefore a different object with the same contents.
-    const copy = { ...EDL_DEFAULTS };
-    expect(copy).not.toBe(EDL_DEFAULTS);
-    expect(buildGrid(copy)).toBe(buildGrid(EDL_DEFAULTS));
-  });
-
-  it('misses on different params, so the memo cannot serve a wrong grid', () => {
-    const other = { ...EDL_DEFAULTS, neighborRadius: EDL_DEFAULTS.neighborRadius + 0.11 };
-    const a = buildGrid(EDL_DEFAULTS);
-    const b = buildGrid(other);
-    expect(b).not.toBe(a);
-    // Same geometry, different shade: the positions must be identical and the EDL must not be.
-    expect(b.length).toBe(a.length);
-    expect(b.map((p) => p.x)).toEqual(a.map((p) => p.x));
-    expect(b.some((p, i) => p.edl !== a[i].edl)).toBe(true);
-  });
-
-  it('is measurably cheaper warm than cold', () => {
-    // Not a wall-clock threshold — those are flaky in CI. The claim is only that a hit does not redo the
-    // O(n^2) work, and the sharpest available proxy is that a hit is far faster than the first build of a
-    // params set nothing has seen.
-    const fresh = { ...EDL_DEFAULTS, percentile: 0.77 };
-    const t0 = performance.now();
-    buildGrid(fresh);
-    const cold = performance.now() - t0;
-    const t1 = performance.now();
-    for (let i = 0; i < 50; i++) buildGrid(fresh);
-    const warm50 = performance.now() - t1;
-    expect(warm50).toBeLessThan(cold);
-  });
-
-  it('the shared array must be treated as read-only — stated here because nothing can enforce it', () => {
-    // Two painters now hold the same grid. `paintTerrain` only reads it, which is what makes the memo safe.
-    // If you ever hand the painter per-frame-transformed positions (it re-reads g.x/g.y every frame, so that
-    // is a real technique), map to a COPY — mutating these objects would leak the transform into every other
-    // consumer, including the hero.
-    const g = buildGrid(EDL_DEFAULTS);
-    expect(buildGrid(EDL_DEFAULTS)[0]).toBe(g[0]);
+  // 8.1 ms cold / 2.4 ms warm median, and TerrainHero builds the grid on every `astro:page-load` and every
+  // `theme:change`. The array is shared, so it is read-only by contract: 'does not mutate the shared grid'
+  // below holds the painter to that.
+  it('returns the IDENTICAL array every call, so a re-init does not redo the scan', () => {
+    expect(buildGrid()).toBe(buildGrid());
   });
 });
 
 describe('paintTerrain — the intro\'s elevation lift', () => {
   const grid = buildGrid();
-  const cfg = { ...TERRAIN_CONFIG_DEFAULTS, ramp: TERRAIN_LIGHT, darkness: 0, dotScale: 1 };
+  const cfg = { ramp: TERRAIN_LIGHT, darkness: 0, dotScale: 1 };
 
   /** Paint one frame and return the recorded dot calls. Omitting `lift` exercises the default. */
   const paint = (lift?: number) => {
@@ -232,10 +190,9 @@ describe('paintTerrain — the intro\'s elevation lift', () => {
     // the midpoint of the i-th smallest at 0 and 1, because which dot is i-th changes with lift. A
     // version of this test that compared sorted arrays failed by 0.37px for exactly that reason, which
     // is a property of sorting rather than a bug in the lift.
-    const wide = { ...cfg, zoom: 0.2 };
     const meanY = (lift: number) => {
       const { ctx, calls } = recordingCtx();
-      paintTerrain(ctx, grid, wide, 1400, 1400, 1, 0, 0, lift);
+      paintTerrain(ctx, grid, cfg, 1400, 1400, 1, 0, 0, lift, 0.2);
       expect(calls.length).toBe(grid.length); // zoomed out so nothing is culled
       return calls.reduce((s, c) => s + c.y, 0) / calls.length;
     };

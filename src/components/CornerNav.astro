@@ -604,8 +604,8 @@ const items: Item[] = [
       syncToggle();
     }
 
-    // Its listeners are the JS-painted surfaces (CLAUDE.md, Themes). TerrainHero and FluidSky also read the palette
-    // per frame; DescentPath, DraftingField and Gallery repaint ONLY on this event. TerrainHero, DescentPath and
+    // Its listeners are the JS-painted surfaces (CLAUDE.md, Themes), and it is the only way a theme change reaches
+    // them: none observes the attribute or re-reads it per frame. TerrainHero, DescentPath and
     // FluidSky add theirs at module level and never remove it, so after a ClientRouter visit to `/` they still fire
     // elsewhere and return when their canvas is absent. A PerformanceObserver check across a flip on `/` reports no
     // long task (worst rAF gap 34ms, one frame of the hero's own 30fps throttle).
@@ -635,12 +635,12 @@ const items: Item[] = [
       // where software rendering does capture canvases into snapshots. That last point is why two
       // earlier investigations from this machine found nothing.
       //
-      // The flip is clean without it because both canvases now read their palette EVERY FRAME —
-      // FluidSky always did (uDark off dataset.theme) and TerrainHero was changed to. Measured: text,
-      // sky and terrain all cross at +29ms, spread 0ms.
+      // The flip is clean without it because repaintForTheme() re-inits both canvases in the same task as
+      // the attribute flip, before the next frame. Measured: text, sky and terrain all cross at +29ms,
+      // spread 0ms.
       //
       // IF THE DISSOLVE IS WANTED BACK, do it as a JS palette crossfade — lerp both canvases' ramps
-      // over ~500ms alongside the CSS — which per-frame reading makes possible and a snapshot never did.
+      // over ~500ms alongside the CSS — which a live canvas makes possible and a snapshot never did.
       // Do not reach for startViewTransition again on a page whose background is a canvas.
       flipTheme();
       repaintForTheme();

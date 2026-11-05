@@ -5,6 +5,8 @@
 // subtractive broken-color tint (ink-side only, never lightens). Dark theme
 // becomes a phosphor nebula with stars behind the line.
 
+import { READING_TINT_WARM } from './skyLegibility';
+
 export const VERTEX_SHADER = `
   attribute vec2 aPos;
   varying vec2 vUv;
@@ -148,8 +150,8 @@ export function fragmentShader(): string {
       // Dark theme: the field adds a cool phosphor/cyan nebular tint lifted by the
       // warp, damped over the reading zone since adding light is the dangerous
       // direction there. The ceiling is a uniform so the bound lives in
-      // skyLegibility.nebulaCeiling() with a test, rather than as a literal here.
-      // It exists because
+      // skyLegibility.NEBULA_CEILING with a test, rather than as a literal here.
+      // It is sized so the lightest dark descent stop
       // plus full nebula clears WCAG AA (4.5:1) against ink-3 even at zone=0 (where
       // the zone-dependent damping does not apply). See tests/skyLegibility.test.ts.
       if (uDark > 0.5 && uReading < 0.5) {
@@ -205,7 +207,7 @@ export function fragmentShader(): string {
         // The 0.30/0.16 coefficients are the tint's character (ink vs veins response
         // shape); uTintCap and uViscousFloor are the safety bounds that vary by page.
         float amt = min(uTintCap, (ink * 0.30 + veins * 0.16) * uAmp);
-        vec3 warmTint = vec3(0.055, 0.042, 0.024);
+        vec3 warmTint = vec3(${READING_TINT_WARM}, 0.042, 0.024);
         vec3 coolTint = vec3(0.030, 0.033, 0.039);
         float pick = smoothstep(0.30, 0.70, r.x);
         col -= mix(warmTint, coolTint, pick) * amt;

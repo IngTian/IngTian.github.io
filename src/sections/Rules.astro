@@ -51,13 +51,6 @@ const quoted = ladder.find((r) => r.aum === 1_000_000_000) ?? ladder[ladder.leng
 const big = ladder[ladder.length - 1];
 const you = ladder[0];
 
-// One category per group, so beat two names KINDS of rule rather than four examples of one kind — the owner
-// asked for "a few", and four kinds is the more informative reading.
-const groups = ['Mandate', 'Regulatory', 'Liquidity', 'Operational'];
-const named = groups
-  .map((g) => CONSTRAINTS.find((c) => c.group === g))
-  .filter((c): c is (typeof CONSTRAINTS)[number] => !!c);
-
 const paths = trajectories();
 const bounds = trajBounds(paths);
 const W = 560, H = 300;
@@ -189,7 +182,7 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
                    "an authority wrote this down", which a generic facade says without borrowing anyone's
                    identity. Compiled from character matrices in data/ruleGlyphs.ts, so they are data. */}
               <ul class="ru-cats">
-                {named.map((c) => {
+                {CONSTRAINTS.map((c) => {
                   const g = RULE_GLYPHS[c.group as RuleGlyphKey];
                   return (
                     <li>

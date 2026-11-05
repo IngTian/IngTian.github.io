@@ -32,6 +32,9 @@ export interface Constraint {
   why: string;
 }
 
+/** ONE RULE PER GROUP, and Rules.astro renders every entry: beat two names four KINDS of rule rather than
+ *  examples of one kind — the owner asked for "a few", and four kinds is the more informative reading.
+ *  tests/ruleGlyphs.test.ts holds the groups to one entry each. */
 export const CONSTRAINTS: Constraint[] = [
   {
     group: 'Mandate',
@@ -39,19 +42,9 @@ export const CONSTRAINTS: Constraint[] = [
     why: 'Breach it and investors redeem, which forces selling at exactly the wrong moment.',
   },
   {
-    group: 'Mandate',
-    rule: 'No single name above 5% of NAV; no sector above 25%',
-    why: 'One bad position must not be able to end the fund.',
-  },
-  {
     group: 'Regulatory',
     rule: 'Position disclosure above 5% of a company’s shares outstanding',
     why: 'Crossing it publishes your hand and constrains how you can exit.',
-  },
-  {
-    group: 'Regulatory',
-    rule: 'Leverage and margin limits under the fund’s prospectus and Reg T',
-    why: 'Gross exposure is capped whatever the opportunity looks like.',
   },
   {
     group: 'Liquidity',
@@ -66,35 +59,16 @@ export const CONSTRAINTS: Constraint[] = [
 ];
 
 /**
- * Fund-scale figures, declared — and ONLY the ones something reads.
+ * Fund-scale figures, declared — and ONLY the ones something reads: Rules.astro prints `tickers` and
+ * `constraints` through lib/problemSize.ts's humanCount and derives its DP state-count exponent from `tickers`.
  *
- * `tickers` and `constraints` reach the page: Rules.astro prints both through lib/problemSize.ts's humanCount
- * and derives its DP state-count exponent from `tickers`.
- *
- * `periods` NO LONGER REACHES ANY PAGE, and this comment used to say it did. It fed lib/complexity.ts's
- * decisionVariables and scenarioLeaves in Rules.astro until that slide's tally draft was replaced by the
- * conflict web (the reason is at the beat-four comment in Rules.astro); the two calls went when noUnusedLocals
- * surfaced them, and both helpers were themselves deleted later by the dead-export sweep.
- *   ITS READERS ARE IN tests/problemSize.test.ts — `:48` asserts it exceeds 1, and `:56` pins the key set of
- * this object so a field cannot be added without a reader. This comment previously named
- * tests/complexity.test.ts, which reads `constraints` and has never read this field, and justified keeping
- * `periods` by "asserting those helpers against real fund scale" — an argument that died with the helpers.
- * What survives is thinner and worth stating as such: the field is pinned by a key-set assertion, not used in
- * an arithmetic one. So it is still the one field here on probation, and dropping it is still the owner's call
- * rather than a side effect of a typecheck fix — but the cost of dropping it is now two small test edits, not
- * a lost real-scale input.
- *
- * Two more fields used to sit here — `aum: '$1B'` and `drawdownLimit: 0.08` — with no reader anywhere. Both
- * facts DO reach the page, as prose inside the CONSTRAINTS entries above ("Max drawdown 8%…", "At $1B, your
- * own order moves the price…"), so the unread copies bought nothing and risked something: the day one is
- * edited and the other is not, the same slide states two different numbers for the same fact. Adding a field
- * back means adding its reader in the same change — tests/problemSize.test.ts asserts the key set for that
- * reason.
+ * The $1B and the 8% drawdown reach the page as prose inside CONSTRAINTS above, not as fields here: a second,
+ * unread copy is how one slide comes to state two numbers for the same fact. tests/problemSize.test.ts pins
+ * the key set, so a field added here comes with its reader.
  */
 export const FUND = {
   tickers: 3000,
   constraints: 2000,
-  periods: 24,
 };
 
 // TWO COPY BLOCKS LEFT HERE TOO: JOB_STATEMENT ("Find a strategy that optimises a sequence of decisions…")
