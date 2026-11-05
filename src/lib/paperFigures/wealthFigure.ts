@@ -1,6 +1,7 @@
 // src/lib/paperFigures/wealthFigure.ts
-// RL-BHRP's Figure 2, the growth of $1 in the second author's reproduction, and its miniature for the /research
-// index card: HTML strings drawn at build time from REPRO (data/papers/rl-bhrp.ts). Marks carry classes and the
+// The growth of $1 in a reproduction (RL-BHRP's Figure 2, drawn from REPRO in data/papers/rl-bhrp.ts), and its
+// miniature for the /research index card: HTML strings drawn at build time. The figure is told its name and whose
+// reproduction it draws, as the explainer numbers it and the record names the author. Marks carry classes and the
 // page's CSS colours them, so one drawing re-themes with the sheet. Pure.
 //
 // What the markup promises the page's CSS and script:
@@ -19,7 +20,8 @@
 //   legend .f-tip; and a live region. The table is hidden by a div around it, never by .sr-only on itself: a table's
 //   width and height are only minimums, so a 1px table still lays out every column and row (about 1,100 x 2,100px)
 //   in the page's scrollable overflow, where a scroll to a hidden cell moves the page sideways. .f-plot is a plain
-//   block here: the readout's script, which makes it work, makes it a control (a tab stop, a role, its instructions).
+//   block here: the readout's script, which makes it work, makes it a control (a tab stop, a role, its instructions,
+//   which name the figure from its data-name).
 // The <figure> and its caption are the explainer's (a :::figure container), so this is the drawing alone.
 import { monthYear } from '../dates';
 import { readoutWhen } from '../paperPage';
@@ -98,9 +100,12 @@ function drawing(d: WealthSeries, f: typeof WIDE, cls: string, dom: ReturnType<t
     + '</svg>';
 }
 
-/** `full` is Figure 2's drawing: the plot and its readout's markup. `mini` is the series alone, no text, for the
+/** `full` is the figure's drawing: the plot and its readout's markup, `name` what the figure is called ("Figure 2")
+ *  and `author` whose reproduction it draws ("the second author"). `mini` is the series alone, no text, for the
  *  index card, which says what it is in its own caption. */
-export function wealthFigure(d: WealthSeries, size: 'full' | 'mini'): string {
+export function wealthFigure(d: WealthSeries, size: 'mini'): string;
+export function wealthFigure(d: WealthSeries, size: 'full', of: { name: string; author: string }): string;
+export function wealthFigure(d: WealthSeries, size: 'full' | 'mini', of?: { name: string; author: string }): string {
   const dom = domain(d);
   if (size === 'mini') {
     // ponytail: the mask's ids (fm-mini, fm-mini-clip) are fixed, so two papers' wealth miniatures on the /research
@@ -109,20 +114,21 @@ export function wealthFigure(d: WealthSeries, size: 'full' | 'mini'): string {
     return `<svg class="mini" viewBox="0 0 ${f.W} ${f.H}" aria-hidden="true" focusable="false">`
       + `${series(d, f, dom, { id: 'fm-mini', top: f.y0 - 6, bottom: f.y1 + 4 }).svg}</svg>`;
   }
+  if (!of) throw new Error('wealthFigure: the full figure is told its name and whose reproduction it draws');
   const from = monthYear(d.dates[0]), to = monthYear(final(d.dates));
-  const label = `Growth of $1 in the second author’s reproduction, ${from} to ${to}: RL-BHRP, the month-by-month median of `
+  const label = `Growth of $1 in ${of.author}’s reproduction, ${from} to ${to}: RL-BHRP, the month-by-month median of `
     + `${d.runs} runs, ends at $${final(d.rl).toFixed(2)}, BHRP at $${final(d.bhrp).toFixed(2)} and the benchmark at `
     + `$${final(d.bench).toFixed(2)}; the runs end between $${final(d.lo).toFixed(2)} and $${final(d.hi).toFixed(2)}.`;
   const data = (s: readonly number[]) => s.map((v) => Number(v.toFixed(4))).join(' ');
   const cols = ['Date', `RL-BHRP, median of ${d.runs} runs`, 'Lowest of the runs', 'Highest of the runs', 'BHRP', 'Benchmark'];
   const rows = d.rl.map((_, i) => `<tr><th scope="row">${readoutWhen(i, d.dates, d.dataEnd)}</th>`
     + (['rl', 'lo', 'hi', 'bhrp', 'bench'] as const).map((k) => `<td data-k="${k}">$${d[k][i].toFixed(2)}</td>`).join('') + '</tr>');
-  return `<div class="f-plot" data-rl="${data(d.rl)}" data-bhrp="${data(d.bhrp)}" data-bench="${data(d.bench)}">`
+  return `<div class="f-plot" data-name="${of.name}" data-rl="${data(d.rl)}" data-bhrp="${data(d.bhrp)}" data-bench="${data(d.bench)}">`
     + drawing(d, WIDE, 'wide', dom, label) + drawing(d, NARROW, 'narrow', dom, label)
     + `<div class="f-tip" aria-hidden="true"><p class="f-tip-d"></p><dl><dt class="rl">RL-BHRP <i>median of ${d.runs} runs</i></dt>`
     + '<dd data-k="rl"></dd><dt class="band"><i>the runs</i></dt><dd data-k="band"></dd><dt>BHRP</dt><dd data-k="bhrp"></dd>'
     + '<dt>Benchmark</dt><dd data-k="bench"></dd></dl></div>'
-    + '<div class="sr-only"><table class="f-values"><caption>Figure 2’s values, month by month, in the second author’s reproduction</caption>'
+    + `<div class="sr-only"><table class="f-values"><caption>${of.name}’s values, month by month, in ${of.author}’s reproduction</caption>`
     + `<thead><tr>${cols.map((c) => `<th scope="col">${c}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`
     + '<span class="sr-only" aria-live="polite"></span></div>';
 }

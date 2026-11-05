@@ -94,7 +94,7 @@ describe('VALUES — the reproduction\'s figures, from its vendored returns', ()
     expect([v['mdd0.rl'], v['mdd0.runsLo'], v['mdd0.runsHi']]).toEqual(['20.45', '19.95', '20.83']);
   });
 
-  // The prose says the median line falls less than BHRP's, and that its runs fall either side of BHRP's.
+  // The prose says the median line falls less than BHRP's, and that its runs fall on both sides of BHRP's.
   it('keeps the order the drawdown sentence states, unrounded and printed', () => {
     const fall = (w: readonly number[]) => -maxDrawdownFromStart(w);
     const runs = rlBhrpWealth.rlSeeds.map((r) => fall(cumulative(r))), bhrp = fall(REPRO.bhrp);

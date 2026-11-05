@@ -14,8 +14,8 @@ import {
   type Stop, experienceStops, flattenStops, paperPageOwns, paperSections, paperStops, projectSectionId, projectStops,
   researchIndexStops,
 } from '../src/lib/pageStops';
-import type { PaperReport } from '../src/lib/paperMarkdown';
-import { countWords, readingMinutes } from '../src/lib/words';
+import { FIGURE_NAME, PAPERS_DIR, type PaperReport } from '../src/lib/paperMarkdown';
+import { countWords, readingMinutes, wholeParts } from '../src/lib/words';
 import { renderMarkdown } from './helpers/paperChain';
 import { GALLERY_ORDER } from '../src/lib/galleryLayout';
 import { EASE, RAIL, stagger } from '../src/lib/motionTiming';
@@ -214,7 +214,7 @@ const isProto = (p: Page): boolean => p.route.startsWith('/proto-');
  * references a citation renders as its key, so the words are this render's, not the built page's.
  */
 const paperRender = async (slug: string): Promise<{ html: string; report: PaperReport }> => {
-  const path = fileURLToPath(new URL(`../src/content/papers/${slug}.md`, import.meta.url));
+  const path = fileURLToPath(new URL(`../${PAPERS_DIR}/${slug}.md`, import.meta.url));
   const body = readFileSync(path, 'utf8').replace(/^---\n[\s\S]*?\n---\n/, '');
   return renderMarkdown(body, path, { papers: PAPER_DATA, publications, frontmatter: { publication: slug } });
 };
@@ -1154,8 +1154,8 @@ describe('/projects — repo links, private repos, and what assistive tech is to
   });
 });
 
-/** A title's hyphenated words: its whitespace-separated tokens with a hyphen in them. */
-const hyphenated = (title: string): string[] => title.split(/\s+/).filter((w) => w.includes('-'));
+/** What a title keeps on one line (lib/words wholeParts): its names, spans of years, dates and arXiv categories. */
+const kept = (title: string): string[] => wholeParts(title).filter((_, i) => i % 2);
 
 describe('/research — the papers as cards, newest first, then the interests', () => {
   const page = (): Page => builtPage('/research');
@@ -1233,10 +1233,10 @@ describe('/research — the papers as cards, newest first, then the interests', 
   });
 
   // A browser may break a line after any hyphen, and a title would then split a paper's own name ("(RL-BHRP)").
-  it("keeps each card title's hyphenated words whole", () => {
+  it("keeps each card title's names whole", () => {
     expect(cards()).toHaveLength(publications.length);
     for (const [i, c] of cards().entries()) {
-      for (const w of hyphenated(publications[i].title)) expect(c.html, w).toContain(`<span class="nw">${w}</span>`);
+      for (const w of kept(publications[i].title)) expect(c.html, w).toContain(`<span class="nw">${w}</span>`);
     }
   });
 
@@ -1302,10 +1302,10 @@ describe('/research/rl-bhrp — a paper explained, from its file', async () => {
 
   // text-wrap: balance happens to keep "(RL-BHRP)" whole at 390px, but only where balance applies (not past six
   // lines, nor in Safari before 17.5), so the title's hyphenated words are kept whole by markup, as on its card.
-  it("keeps the title's hyphenated words whole", () => {
+  it("keeps the title's names whole", () => {
     const h1 = /<h1 class="ptitle">([\s\S]*?)<\/h1>/.exec(page().markup)?.[1] ?? '';
-    expect(hyphenated(rl.title)).toContain('(RL-BHRP)');
-    for (const w of hyphenated(rl.title)) expect(h1, w).toContain(`<span class="nw">${w}</span>`);
+    expect(kept(rl.title)).toContain('RL-BHRP');
+    for (const w of kept(rl.title)) expect(h1, w).toContain(`<span class="nw">${w}</span>`);
   });
 
   it("prints the paper's Table 2 whole: all 18 rows", () => {
@@ -1372,6 +1372,30 @@ describe('/research/rl-bhrp — a paper explained, from its file', async () => {
     const abstract = /<blockquote class="abstract"[\s\S]*?<\/blockquote>/.exec(page().markup)?.[0] ?? '';
     expect(rl.abstract).toContain('(RL-BHRP)');
     expect(abstract).toContain('(<span class="nw">RL-BHRP</span>)');
+  });
+
+  // The page's own prose round the file (the head, the cite line, the corrections) goes through the rule the body
+  // does (lib/words wholeParts), so nowhere on the page does a line break inside a name: "RL-" / "BHRP)" on the cite
+  // line, "[q-" / "fin.PM" in the meta. Read from the page's text, the maths, drawings, tables and BibTeX aside (the
+  // drawings' text is set on one line by their own CSS: the readout's tip is nowrap).
+  it('keeps every hyphenated name, span of years, ISO date and arXiv category whole, in its own prose too', () => {
+    const markup = page().markup;
+    const prose = markup.slice(markup.indexOf('<main'), markup.indexOf('</main>'))
+      .replace(/(?<=<figure class="fig\b[^>]*>)[\s\S]*?(?=<figcaption>)/g, ' ')
+      .replace(/<(math|svg|pre|table|nav|script)\b[\s\S]*?<\/\1>/g, ' ')
+      .replace(/<span class="nw">[^<]*<\/span>/g, ' ').replace(/<[^>]+>/g, ' ');
+    expect(wholeParts(prose).filter((_, i) => i % 2)).toEqual([]);
+    expect(/<p class="ref-line">[\s\S]*?<\/p>/.exec(markup)?.[0]).toContain('(<span class="nw">RL-BHRP</span>) Approach');
+  });
+
+  // The explainer numbers the figure and the record names its reproduction's author: the drawing says both as they say.
+  it("names Figure 2 by its :::figure's number, and its reproduction by the record's author", () => {
+    const fig = /<figure class="fig" id="figure-(\d+)">\s*<div class="f-plot"[^>]*>[\s\S]*?<\/figure>/.exec(page().markup);
+    expect(fig, 'no figure holds the plot').not.toBeNull();
+    const [whole, n] = fig!;
+    expect(whole).toContain(`<div class="f-plot" data-name="Figure ${n}"`);
+    expect(whole).toContain(`<caption>Figure ${n}’s values, month by month, in the second author’s reproduction</caption>`);
+    expect(pages().filter((p) => p.html.includes(FIGURE_NAME)).map((p) => p.route)).toEqual([]);
   });
 
   // Corrections are against the version the page explains; the record says arXiv lists no other, so none to read.

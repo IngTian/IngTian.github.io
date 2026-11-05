@@ -2,7 +2,7 @@
 // The rehype half of the paper format, after rehype-katex and the MathML letter fix, when the maths is real
 // MathML: KaTeX's errors are reported, the Notation table's symbols are found in the displays and tagged with
 // their row, and the words a reader reads are counted. Papers only.
-import { countWords } from '../words';
+import { countWords, wholeParts } from '../words';
 import { isPaper, plain, report, walk, type Node } from './remarkPaper';
 
 const has = (n: Node, cls: string) => (n.properties?.className as string[] | undefined)?.includes(cls) ?? false;
@@ -17,8 +17,10 @@ function same(a: Node, b: Node): boolean {
 }
 
 /** A row's symbols: every maths in its Symbol cell (`$N$, $G$` is two), each split at the commas between symbols
- *  (`N,\ G` is two as well) and at a membership, which introduces its element and the index of its set (`i ∈ 𝓘_g`,
- *  stock i of sector g: i, g and 𝓘_g), spaces dropped. `tex` is the cell as written, for a problem to name. */
+ *  (`N,\ G` is two as well), spaces dropped. A membership introduces its subject and its set's index, a subscript:
+ *  `i ∈ 𝓘_g`, stock i of sector g, is i and g. Not the set, which is where the subject lives, nor a superscript of
+ *  it: in `w ∈ ℝ^N` only w, as N is a dimension, a symbol only through a row of its own. `tex` is the cell as
+ *  written, for a problem to name. */
 function symbolsOf(row: Node): { tex: string; parts: Node[][] } {
   const cell = row.children?.find((c) => isEl(c, 'th')) ?? row, maths: Node[] = [];
   walk(cell, (n) => { if (isEl(n, 'math')) maths.push(n); });
@@ -26,16 +28,18 @@ function symbolsOf(row: Node): { tex: string; parts: Node[][] } {
     const semantics = math.children?.find((c) => isEl(c, 'semantics'));
     const body = semantics?.children?.filter((c) => isEl(c) && c.tagName !== 'annotation') ?? [];
     const seq = body.length === 1 && body[0].tagName === 'mrow' ? body[0].children ?? [] : body;
-    const own: Node[][] = [[]];
-    let set: Node[] | undefined;
+    const own: Node[][] = [[]], sets: Node[][] = [];
     for (const c of seq) {
       const member = isEl(c, 'mo') && plain(c) === '∈';
       if (member || (isEl(c, 'mo') && c.properties?.separator === 'true')) own.push([]);
       else if (!(isEl(c, 'mspace') || (isEl(c, 'mtext') && !plain(c).trim()))) own.at(-1)!.push(c);
-      if (member) set = own.at(-1);
+      if (member) sets.push(own.at(-1)!);
     }
-    const index = set?.length === 1 && base(set[0]) ? set[0].children!.filter((c) => isEl(c)).slice(1).map((c) => [c]) : [];
-    return [...own, ...index];
+    const index = sets.flatMap(([s, ...more]) => {
+      const sub = !more.length && (isEl(s, 'msub') || isEl(s, 'msubsup')) ? s.children!.filter((c) => isEl(c))[1] : undefined;
+      return sub ? [[sub]] : [];
+    });
+    return [...own.filter((p) => !sets.includes(p)), ...index];
   });
   return { tex: written(cell).trim(), parts: parts.filter((p) => p.length) };
 }
@@ -96,9 +100,7 @@ function inside(n: Node, symbols: Symbols, seen: Set<string>): void {
   if (LETTERED.has(n.tagName!)) n.children?.slice(1).forEach((c) => { if (isEl(c)) tag(c, symbols, seen); });
 }
 
-// A hyphenated name in capitals (RL-BHRP), a span of years and an ISO date each read as one word, so a line never
-// breaks inside one: "RL-" at the end of a line and "BHRP" at the start of the next is two words to a reader.
-const WHOLE = /[A-Z]{2,}-[A-Z]{2,}|\d{4}–\d{4}|\d{4}-\d{2}-\d{2}/g;
+// What reads as one word (lib/words wholeParts) is set in a span.nw, so a line never breaks inside it.
 function keepWhole(n: Node): void {
   if (!n.children || (isEl(n) && n.tagName === 'math')) return;
   const out: Node[] = [];
@@ -108,16 +110,11 @@ function keepWhole(n: Node): void {
     else out.push(c.type === 'text' ? { ...c } : c);
   }
   n.children = out.flatMap((c) => {
-    if (c.type !== 'text' || !c.value!.match(WHOLE)) { keepWhole(c); return [c]; }
-    const parts: Node[] = [];
-    let at = 0;
-    for (const m of c.value!.matchAll(WHOLE)) {
-      if (m.index > at) parts.push({ type: 'text', value: c.value!.slice(at, m.index) });
-      parts.push({ type: 'element', tagName: 'span', properties: { className: ['nw'] }, children: [{ type: 'text', value: m[0] }] });
-      at = m.index + m[0].length;
-    }
-    if (at < c.value!.length) parts.push({ type: 'text', value: c.value!.slice(at) });
-    return parts;
+    const parts = c.type === 'text' ? wholeParts(c.value ?? '') : [];
+    if (parts.length < 2) { keepWhole(c); return [c]; }
+    return parts.flatMap((value, i): Node[] => (!value ? [] : i % 2
+      ? [{ type: 'element', tagName: 'span', properties: { className: ['nw'] }, children: [{ type: 'text', value }] }]
+      : [{ type: 'text', value }]));
   });
 }
 

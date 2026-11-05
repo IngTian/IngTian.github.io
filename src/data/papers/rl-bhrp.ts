@@ -81,8 +81,8 @@ export const REPRO: WealthSeries = {
  *  monthly turnover of BHRP and of one run, the one with the median growth (of ten, the upper middle by CAGR, as the
  *  reproduction's run.py picks its "median seed"; the vendored summary gives no other run's), BHRP's share in its 15
  *  largest weights, and each run's CAGR under both readings of the paper's penalty: centred over all the stocks
- *  (Def. 3.2.3 as written, the runs above) and within each sector (as its Alg. 1's stopping test measures the
- *  dispersion). */
+ *  (Def. 3.2.3 as written, the runs above) and within each sector (where the paper's Alg. 1 measures that dispersion
+ *  for its stopping test). */
 export const REPRO_NOTES = {
   turnover: rlBhrpDiagnostics.turnover,
   top15: rlBhrpDiagnostics.top15,
@@ -203,7 +203,7 @@ function values() {
  *  bench) or a bare name for a single figure. */
 export const VALUES = values();
 /** A key of VALUES: what TypeScript may quote. */
-export type ValueKey = keyof typeof VALUES;
+type ValueKey = keyof typeof VALUES;
 
 /** One of VALUES, for the TypeScript that quotes them. The key is typed, so a typo or a renamed key is a type error;
  *  and since the build strips types without checking them, an unknown key also throws, as an unknown `:v` fails the

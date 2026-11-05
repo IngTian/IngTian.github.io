@@ -6,6 +6,7 @@
 import remarkDirective from 'remark-directive';
 import { unified, type Processor } from 'unified';
 import type { Publication } from '../../data/profile';
+import { FIGURE_NAME, PAPERS_DIR } from './names';
 
 /** A markdown (mdast) or HTML (hast) node, as loosely as both plugins need. */
 export interface Node {
@@ -42,8 +43,7 @@ export interface PaperReport {
 interface File { path?: string; value: unknown; data: { astro?: { frontmatter?: Record<string, unknown> } } }
 interface Reference { key: string; authors: string[]; year: number }
 
-/** Where the papers collection lives (content.config.ts loads it from here): a file under it is a paper. */
-export const PAPERS_DIR = 'src/content/papers';
+/** A file under PAPERS_DIR is a paper. */
 export const isPaper = (file: unknown) => ((file as File).path ?? '').includes(`/${PAPERS_DIR}/`);
 
 type Extensions = { micromarkExtensions?: unknown[]; fromMarkdownExtensions?: unknown[] };
@@ -279,12 +279,15 @@ export function remarkPaper({ papers, publications }: { papers: Record<string, P
 
     // A figure: the drawing registered under `name`, numbered by `n`, the container's prose its caption and its
     // notes beside it. A table (a registered drawing that is a <table>) is captioned above and scrolls in its own
-    // box, its other paragraphs set under it as its notes; anything else is a figure, its whole caption below.
+    // box, its other paragraphs set under it as its notes; anything else is a figure, its whole caption below. Where
+    // the drawing names itself (FIGURE_NAME), it takes the name its number gives it here.
     function figure(n: Node): Node {
-      const { name = '', n: num } = n.attributes ?? {}, art = data.figures[name];
-      if (art === undefined) problem(`unknown :::figure name "${name}"`);
+      const { name = '', n: num } = n.attributes ?? {}, drawn = data.figures[name];
+      if (drawn === undefined) problem(`unknown :::figure name "${name}"`);
       if (!num) problem(`:::figure ${name} has no n=`);
-      const table = /^<table\b/.test(art ?? ''), id = `${table ? 'table' : 'figure'}-${num}`;
+      const table = /^<table\b/.test(drawn ?? ''), id = `${table ? 'table' : 'figure'}-${num}`;
+      const called = `${table ? 'Table' : 'Figure'} ${num}`;
+      const art = drawn?.replaceAll(FIGURE_NAME, called.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`));
       if (num) claim(id);
       for (const [, inner] of (art ?? '').matchAll(/\sid="([^"]+)"/g)) claim(inner);
       const paras: Node[] = [], asides: Node[] = [];
@@ -294,7 +297,7 @@ export function remarkPaper({ papers, publications }: { papers: Record<string, P
         else problem(`:::figure ${name} holds a ${c.type} — a figure holds its caption and its notes`);
       }
       if (!paras.length) problem(`:::figure ${name} has no caption`);
-      paras[0]?.children?.unshift(el('span', { className: ['fig-no'] }, [text(`${table ? 'Table' : 'Figure'} ${num}.`)]), text(' '));
+      paras[0]?.children?.unshift(el('span', { className: ['fig-no'] }, [text(`${called}.`)]), text(' '));
       const drawing: Node = { type: 'html', value: art ?? '' };
       n.children = table
         ? [el('figcaption', { className: ['cap'] }, paras[0]?.children ?? []), el('div', { className: ['tbl-scroll'] }, [drawing]),

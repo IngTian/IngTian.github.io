@@ -1,8 +1,8 @@
 // src/lib/paperPage.ts
 // The paper page's pure half (pages/research/[slug].astro): the prose its frontmatter writes round the file (the
 // owner's place among the authors, a reference's names, the note on the references), where its script puts the
-// margin notes, and what Figure 2's readout reads, says and tells a reader it does. The page measures, paints and
-// prints; this decides. Pure.
+// margin notes, and what a wealth figure's readout (RL-BHRP's Figure 2) reads, says and tells a reader it does. The
+// page measures, paints and prints; this decides. Pure.
 import { longDate, monthYear } from './dates';
 
 const NUMBER = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
@@ -10,6 +10,12 @@ const ORDINAL = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'sevent
 /** A count as prose writes it: in words to twelve, in figures past. */
 const count = (n: number) => NUMBER[n] ?? String(n);
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+
+/** A line of the prose the page writes: text, and dates (YYYY-MM-DD) the page prints as a <time>
+ *  (components/research/PaperLine). */
+export type Line = readonly (string | { date: string })[];
+/** A line as a reader reads it, for the reading time. */
+export const lineText = (line: Line): string => line.map((x) => (typeof x === 'string' ? x : longDate(x.date))).join('');
 
 /** "A", "A and B", "A, B and C". */
 export function listed(xs: readonly string[]): string {
@@ -68,10 +74,12 @@ export function readoutIndex(x: number, x0: number, x1: number, points: number):
   return Math.max(0, Math.min(points - 1, Math.round(((x - x0) / (x1 - x0)) * (points - 1))));
 }
 
-/** What the plot tells a reader who reaches it, set by the script that makes the readout work: every way it reads,
- *  each key as readoutStep handles it. */
-export const READOUT_LABEL = 'Plot of Figure 2. Hover or tap it to read the values at a month; with the keyboard, the left '
-  + 'and right arrow keys step a month, a year with Shift, and Home and End go to the first and the last.';
+/** What the plot of `figure` ("Figure 2") tells a reader who reaches it, set by the script that makes the readout
+ *  work: every way it reads, each key as readoutStep handles it. */
+export function readoutLabel(figure: string): string {
+  return `Plot of ${figure}. Hover or tap it to read the values at a month; with the keyboard, the left `
+    + 'and right arrow keys step a month, a year with Shift, and Home and End go to the first and the last.';
+}
 
 /** Where a key moves the readout from `at`: a month an arrow, a year with Shift, an end Home or End; null for any
  *  other key, which the readout leaves to the page. */
@@ -82,8 +90,8 @@ export function readoutStep(at: number, key: string, shift: boolean, points: num
 }
 
 /** What point `i` is: the start of the first month, a month's end, or (the last, a partial month) the day the data
- *  end. `dates` are the month-ends; point i > 0 is dates[i - 1]. Figure 2's table of values heads each row with it
- *  (lib/paperFigures/wealthFigure), and the readout prints the row. */
+ *  end. `dates` are the month-ends; point i > 0 is dates[i - 1]. A wealth figure's table of values heads each row
+ *  with it (lib/paperFigures/wealthFigure), and the readout prints the row. */
 export function readoutWhen(i: number, dates: readonly string[], dataEnd: string): string {
   if (i === 0) return `Start of ${monthYear(dates[0])}`;
   if (i === dates.length) return `${longDate(dataEnd)}, where the data end`;

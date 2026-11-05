@@ -7,13 +7,17 @@ import { describe, expect, it } from 'vitest';
 import { PAPER_DATA } from '../src/data/papers';
 import { REPRO, TABLE2 } from '../src/data/papers/rl-bhrp';
 import { rlBhrpWealth } from '../src/data/vendor/rlBhrpWealth';
+import { FIGURE_NAME } from '../src/lib/paperMarkdown/names';
 import { metricsTable } from '../src/lib/paperFigures/metricsTable';
 import { pipelineFigure } from '../src/lib/paperFigures/pipelineFigure';
 import { wealthFigure } from '../src/lib/paperFigures/wealthFigure';
 import { readoutWhen } from '../src/lib/paperPage';
 import type { WealthSeries } from '../src/lib/wealth';
 
-const full = wealthFigure(REPRO, 'full'), mini = wealthFigure(REPRO, 'mini'), pipe = pipelineFigure();
+// as RL-BHRP registers it: named by its :::figure, the reproduction the second author's
+const AS_PLACED = { name: FIGURE_NAME, author: 'the second author' };
+const full = wealthFigure(REPRO, 'full', AS_PLACED), mini = wealthFigure(REPRO, 'mini');
+const pipe = pipelineFigure();
 const table = metricsTable(TABLE2);
 
 const svgs = (html: string) => [...html.matchAll(/<svg\b[\s\S]*?<\/svg>/g)].map((m) => m[0]);
@@ -48,8 +52,9 @@ const georgia = (s: string, fs: number) => [...s].reduce((w, c) => {
 const variants = (html: string) => [...html.matchAll(/<(\w+)\b[^>]*\sclass="([^"]*)"/g)]
   .filter((m) => /\b(?:wide|narrow)\b/.test(m[2])).map((m) => [m[1], ...m[2].split(' ')].join('.'));
 
-// That REPRO's line is the runs' median and its band their range is held where it is drawn: projectVisuals.test.ts
-// reads both back from /projects' picture against the vendored runs. Here, only what every drawing of it relies on.
+// That REPRO's line is the runs' median is held where it is drawn: projectVisuals.test.ts reads the median back from
+// /projects' picture at every month, in a frame set by the band's extremes, against the vendored runs. Here, only
+// what every drawing of it relies on.
 describe('REPRO, the series the reproduction is drawn from', () => {
   it('counts every vendored run, and gives each series one point a month from $1, the median inside the band', () => {
     expect(REPRO.runs).toBe(rlBhrpWealth.rlSeeds.length);
@@ -72,7 +77,7 @@ describe('Figure 2, the growth of $1', () => {
   for (const [name, d] of [['the reproduction', REPRO], ['a run far outside it', stretched]] as const) {
     it(`frames every point of ${name}: the domain is derived, and every mark is inside the plot`, () => {
       const lo = Math.min(...values(d)), hi = Math.max(...values(d));
-      for (const svg of svgs(wealthFigure(d, 'full'))) {
+      for (const svg of svgs(wealthFigure(d, 'full', AS_PLACED))) {
         const f = frame(svg);
         expect(f.lo).toBeLessThanOrEqual(lo);
         expect(f.hi).toBeGreaterThanOrEqual(hi);
@@ -96,7 +101,7 @@ describe('Figure 2, the growth of $1', () => {
 
   for (const [name, d] of [['the reproduction', REPRO], ['three lines that end together', tied]] as const) {
     it(`keeps its end labels apart for ${name}, RL-BHRP's on top under its qualifier`, () => {
-      for (const svg of svgs(wealthFigure(d, 'full'))) {
+      for (const svg of svgs(wealthFigure(d, 'full', AS_PLACED))) {
         const fs = Number(open(svg).match(/font-size:([\d.]+)px/)![1]);
         const labels = [...svg.matchAll(/<text class="(f-end|f-qual)"[^>]*\sy="([\d.]+)"[^>]*>([\s\S]*?)<\/text>/g)]
           .map((m) => ({ kind: m[1], y: Number(m[2]), text: m[3] })).sort((a, b) => a.y - b.y);
@@ -110,7 +115,7 @@ describe('Figure 2, the growth of $1', () => {
 
   // "reproduction" is set on the line above RL-BHRP's label, which is clear only while that label is the top one.
   it('refuses a series whose RL-BHRP line does not end on top, rather than set its qualifier over another label', () => {
-    expect(() => wealthFigure({ ...REPRO, rl: REPRO.bench, bench: REPRO.rl }, 'full')).toThrow(/not the top one/);
+    expect(() => wealthFigure({ ...REPRO, rl: REPRO.bench, bench: REPRO.rl }, 'full', AS_PLACED)).toThrow(/not the top one/);
   });
 
   it('fits its end labels inside the drawing, set in Georgia, the widest face --font-display names', () => {
@@ -199,6 +204,16 @@ describe('Figure 2, the growth of $1', () => {
     expect(full).toContain(`median of ${REPRO.runs} runs`);   // the readout's legend
     expect(full).toMatch(/<dd data-k="band"><\/dd>/);
     expect(REPRO.runs).toBe(10);
+  });
+
+  // The explainer numbers the figure and the record says whose the reproduction is, so the drawing is told both: the
+  // same series placed as a sole author's Figure 5 says so wherever it names either.
+  it("names itself and the reproduction's author as it is told", () => {
+    const other = wealthFigure(REPRO, 'full', { name: 'Figure 5', author: 'its author' });
+    expect(other).toContain('<caption>Figure 5’s values, month by month, in its author’s reproduction</caption>');
+    expect(attr(other.match(/<div class="f-plot"[^>]*>/)![0], 'data-name')).toBe('Figure 5');
+    for (const svg of svgs(other)) expect(attr(open(svg), 'aria-label')).toMatch(/^Growth of \$1 in its author’s reproduction, /);
+    expect(other).not.toMatch(/second author|Figure 2/);
   });
 
   // Without a script the plot reads nothing, so it is no control and promises nothing: the script that makes it work
@@ -308,8 +323,11 @@ describe('both figures', () => {
     expect(variants(mini)).toEqual([]);
   });
 
+  // Figure 2 is registered naming itself by FIGURE_NAME, for its :::figure to number, and the reproduction by the
+  // owner's place among the record's authors, as the page's "written by" line says it.
   it("are RL-BHRP's, registered under its slug: the two figures and the card's miniature", () => {
     expect(PAPER_DATA['rl-bhrp'].figures).toEqual({ wealth: full, pipeline: pipe, metrics: table });
     expect(PAPER_DATA['rl-bhrp'].thumb?.svg).toBe(mini);
+    expect(PAPER_DATA['rl-bhrp'].thumb?.caption).toBe('Growth of $1 in the second author’s reproduction, not the paper’s run');
   });
 });

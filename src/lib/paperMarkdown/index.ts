@@ -6,9 +6,11 @@ import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
 import { rehypeMathVariants } from '../mathml';
 import { rehypePaper } from './rehypePaper';
-import { remarkPaper, remarkPaperSyntax, PAPERS_DIR, type PaperData, type PaperRecord, type PaperReport } from './remarkPaper';
+import { PAPERS_DIR } from './names';
+import { remarkPaper, remarkPaperSyntax, type PaperData, type PaperRecord, type PaperReport } from './remarkPaper';
 
-export { PAPERS_DIR, refId, type PaperData, type PaperRecord, type PaperReport } from './remarkPaper';
+export { FIGURE_NAME, PAPERS_DIR } from './names';
+export { refId, type PaperData, type PaperRecord, type PaperReport } from './remarkPaper';
 
 /** A paper's render report (`render(entry).remarkPluginFrontmatter`), checked: the plugins cannot fail the build (a
  *  plugin's throw leaves the entry unrendered), so the paper page fails it here, naming `file`, on every problem they

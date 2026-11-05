@@ -2,7 +2,7 @@
 // where the margin notes go, and what Figure 2's readout reads and says.
 import { describe, expect, it } from 'vitest';
 import {
-  READOUT_LABEL, authorRole, givenFirst, listed, readoutIndex, readoutSays, readoutStep, readoutWhen, referenceNote, stackNotes, tipLeft,
+  authorRole, givenFirst, listed, readoutIndex, readoutLabel, readoutSays, readoutStep, readoutWhen, referenceNote, stackNotes, tipLeft,
 } from '../src/lib/paperPage';
 
 describe('stackNotes', () => {
@@ -38,12 +38,15 @@ describe('the readout', () => {
     expect(readoutStep(30, 'Enter', false, 68)).toBeNull();
   });
 
-  // What the plot tells a reader who reaches it says each way it reads, and no key it does not handle.
-  it('names in its instructions every way to read it, and only those', () => {
-    for (const way of ['Hover', 'tap', 'left and right arrow keys', 'Shift', 'Home', 'End']) expect(READOUT_LABEL).toContain(way);
+  // What the plot tells a reader who reaches it names its figure, as the explainer numbers it, and says each way it
+  // reads, and no key it does not handle.
+  it('names its figure and, in its instructions, every way to read it, and only those', () => {
+    const label = readoutLabel('Figure 5');
+    expect(label).toMatch(/^Plot of Figure 5\. /);
+    for (const way of ['Hover', 'tap', 'left and right arrow keys', 'Shift', 'Home', 'End']) expect(label).toContain(way);
     for (const key of ['ArrowLeft', 'ArrowRight', 'Home', 'End']) expect(readoutStep(30, key, false, 68), key).not.toBeNull();
     for (const key of ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown']) expect(readoutStep(30, key, false, 68), key).toBeNull();
-    expect(READOUT_LABEL).not.toMatch(/\bup\b|\bdown\b|page/i);
+    expect(label).not.toMatch(/\bup\b|\bdown\b|page/i);
   });
 
   it('names a point: the start, a month-end, and the day the data end', () => {

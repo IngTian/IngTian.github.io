@@ -9,12 +9,13 @@ import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Button from '../../components/Button.astro';
 import SideRail from '../../components/SideRail.astro';
+import PaperLine from '../../components/research/PaperLine.astro';
 import { STATUS_LABEL, authorName, publications } from '../../data/profile';
 import { longDate } from '../../lib/dates';
 import { PAPERS_DIR, checkedReport, refId } from '../../lib/paperMarkdown';
-import { authorRole, givenFirst, listed, referenceNote } from '../../lib/paperPage';
+import { type Line, authorRole, givenFirst, lineText, listed, referenceNote } from '../../lib/paperPage';
 import { PAPER_END, paperPageOwns, paperSections, paperStops } from '../../lib/pageStops';
-import { countWords, hyphenatedParts, readingMinutes } from '../../lib/words';
+import { countWords, readingMinutes } from '../../lib/words';
 import '../../styles/paper.css';
 
 export async function getStaticPaths() {
@@ -59,24 +60,27 @@ const readLinks = [
   ...(p.reproduction ? [{ href: p.reproduction, label: 'Code (reproduction)', note: `${repo} — ${role}’s reproduction, rebuilt from the paper` }] : []),
 ];
 const citedAs = `Cited as: ${listed(p.authors.map((a) => a.name))}. ${p.title}. ${p.arxivId ? `arXiv:${p.arxivId}${version}${subjectCode ? ` [${subjectCode}]` : ''}` : p.venue}, ${p.year}.`;
-const noted = errata.map((e) => e.date).sort().at(-1);
+const doi = p.doi ? `doi:${p.doi}` : '';
 const corrections = `Corrections to ${version || 'the paper'}`;
 // why they are against this version: arXiv lists no other, so there is no corrected one to read instead
 const onlyVersion = version && p.versions === 1 ? ` (arXiv lists ${version} only)` : '';
+const noted: Line = errata.length ? [', noted ', { date: errata.map((e) => e.date).sort().at(-1)! }, onlyVersion] : [];
+const errataText = report.errataText.join(' ');
+const byline = p.authors.map((a, i) => ({ ...a, joiner: i === 0 ? '' : i === p.authors.length - 1 ? 'and' : ',' }));
+const meta: Line = [where, ...(p.submitted ? [' · submitted ', { date: p.submitted }] : []), ` · ${status}`];
+const pageLine = (min: number): Line => ['This page: ', { date: entry.data.pageDate }, ` · ${min} min read · written by ${authorName}, ${role}`];
+const tags = { lead: 'Tags:', list: p.tags.join(' · ') };
 
 // The reading time counts every word a reader reads: the file's (bodyWords, the plugin's count, the abstract in it)
 // and the prose this page writes round it — the head, Read the full paper, the note on the references, the cite
 // line, the corrections and the tags. Not the controls (the back link, the links, Copy), nor the Contents, the
-// reference list or the BibTeX, which are looked up rather than read. The page line's minutes are one word, written
-// here as 0. tests/distSmoke.test.ts recounts the built page by the same rule.
+// reference list or the BibTeX, which are looked up rather than read. Each string above is built once and the
+// template prints it as built, so what is counted is what is printed; a line added to the template is added here.
+// The page line's minutes are one word, counted here as 0.
 const prose = [
-  p.title, ...p.authors.flatMap((a) => [a.name, a.affiliation ?? '']), p.authors.length > 1 ? 'and' : '',
-  where, submitted && `submitted ${submitted}`, status,
-  `This page: ${longDate(entry.data.pageDate)} · 0 min read · written by ${authorName}, ${role}`,
+  p.title, ...byline.flatMap((a) => [a.joiner, a.name, a.affiliation ?? '']), lineText(meta), lineText(pageLine(0)),
   read.title, readNote, ...readLinks.flatMap((l) => [l.label, l.note]), refsEnd.title, refnote,
-  cite.title, citedAs, p.doi ? `doi:${p.doi}` : '',
-  ...(errata.length ? [`${corrections}, noted ${longDate(noted!)}${onlyVersion}`, ...report.errataText] : []),
-  `Tags: ${p.tags.join(' · ')}`,
+  cite.title, citedAs, doi, errata.length ? corrections : '', lineText(noted), errataText, tags.lead, tags.list,
 ];
 const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
 ---
@@ -91,14 +95,14 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
 
     <header class="head">
       <a class="back" href="/research">← all research</a>
-      <h1 class="ptitle">{hyphenatedParts(p.title).map((s, i) => (i % 2 ? <span class="nw">{s}</span> : s))}</h1>
+      <h1 class="ptitle"><PaperLine line={[p.title]} /></h1>
       <p class="byline">
-        {p.authors.map((a, i) => (
-          <>{i > 0 && <span class="and">{i === p.authors.length - 1 ? 'and' : ','}</span>}{a.name}{a.affiliation && <> <span class="aff">{a.affiliation}</span></>}</>
+        {byline.map((a) => (
+          <>{a.joiner && <span class="and">{a.joiner}</span>}{a.name}{a.affiliation && <> <span class="aff">{a.affiliation}</span></>}</>
         ))}
       </p>
       <p class="meta">
-        {where}{submitted && <> · submitted <time datetime={p.submitted}>{submitted}</time></>} · {status}
+        <PaperLine line={meta} />
       </p>
       <p class="links">
         <a href={p.href}>abstract</a>
@@ -106,7 +110,7 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
         {p.reproduction && <a href={p.reproduction}>code (reproduction)</a>}
         <a href={`#${cite.id}`}>cite</a>
       </p>
-      <p class="pagemeta">This page: <time datetime={entry.data.pageDate}>{longDate(entry.data.pageDate)}</time> · {minutes} min read · written by {authorName}, {role}</p>
+      <p class="pagemeta"><PaperLine line={pageLine(minutes)} /></p>
     </header>
 
     <nav class="toc-inline" aria-label="Contents">
@@ -120,19 +124,19 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
 
     <section id={read.id} class="sec read">
       <h2>{read.title}</h2>
-      <p>{readNote}</p>
+      <p><PaperLine line={[readNote]} /></p>
       <ul class="readlinks">
-        {readLinks.map((l) => <li><a href={l.href}>{l.label}</a><span>{l.note}</span></li>)}
+        {readLinks.map((l) => <li><a href={l.href}>{l.label}</a><span><PaperLine line={[l.note]} /></span></li>)}
       </ul>
     </section>
 
     <section id={refsEnd.id} class="sec">
       <h2>{refsEnd.title}</h2>
-      <p class="refnote">{refnote}</p>
+      <p class="refnote"><PaperLine line={[refnote]} /></p>
       <ol class="refs">
         {references.map((r, i) => (
           <li id={refId(r.key)}>
-            <span class="rn">[{i + 1}]</span>{listed(r.authors.map(givenFirst))}. “{r.title}.” {r.journal && <i>{r.journal}</i>}{r.journal && r.venue && ' '}{r.venue}, {r.year}.
+            <span class="rn">[{i + 1}]</span>{listed(r.authors.map(givenFirst))}. “<PaperLine line={[r.title]} />.” {r.journal && <i>{r.journal}</i>}{r.journal && r.venue && ' '}{r.venue}, {r.year}.
             {link(r) && <> <a href={link(r)}>{link(r)!.replace(/^https:\/\//, '')}</a></>}
             {r.addedHere && <span class="added">Named in the paper ({r.addedHere}) but not in its bibliography; added here.</span>}
           </li>
@@ -143,8 +147,8 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
     <section id={cite.id} class="sec">
       <h2>{cite.title}</h2>
       <p class="ref-line">
-        {citedAs}
-        {p.doi && <a href={`https://doi.org/${p.doi}`}>doi:{p.doi}</a>}
+        <PaperLine line={[citedAs]} />
+        {doi && <a href={`https://doi.org/${p.doi}`}>{doi}</a>}
       </p>
       {p.bibtex && (
         <div class="bib">
@@ -154,11 +158,11 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
       )}
       {errata.length > 0 && (
         <details class="errata">
-          <summary><span class="runin">{corrections}</span>, noted <time datetime={noted}>{longDate(noted!)}</time>{onlyVersion}</summary>
-          <p>{report.errataText.join(' ')}</p>
+          <summary><span class="runin">{corrections}</span><PaperLine line={noted} /></summary>
+          <p><PaperLine line={[errataText]} /></p>
         </details>
       )}
-      <p class="tags"><span class="runin">Tags:</span> {p.tags.join(' · ')}</p>
+      <p class="tags"><span class="runin">{tags.lead}</span> <PaperLine line={[tags.list]} /></p>
     </section>
   </main>
 </BaseLayout>
@@ -473,7 +477,7 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
   // (scripts/motion.ts). Started through onPageView, so it runs at parse on a full load and once per arrival.
   import { DRAW, PAPER_PAGE } from '../../lib/motionTiming';
   import { onPageView } from '../../scripts/pageView';
-  import { READOUT_LABEL, readoutIndex, readoutSays, readoutStep, stackNotes, tipLeft } from '../../lib/paperPage';
+  import { readoutIndex, readoutLabel, readoutSays, readoutStep, stackNotes, tipLeft } from '../../lib/paperPage';
   import { WIDE_QUERY } from '../../lib/viewport';
   import { batch, onceSeen, play, riseOnceSeen, sweepLines } from '../../scripts/motion';
 
@@ -644,7 +648,7 @@ const minutes = readingMinutes(report.bodyWords + countWords(prose.join(' ')));
       // a control now that it reads: without this script it reads nothing and promises nothing
       plot.tabIndex = 0;
       plot.setAttribute('role', 'group');
-      plot.setAttribute('aria-label', READOUT_LABEL);
+      plot.setAttribute('aria-label', readoutLabel(plot.dataset.name ?? ''));
       let at = -1, hovering = false;
       // the plot was focused by a tap, whose reading stays until the focus goes; a mouse's leaves with the pointer
       let tapped = false;

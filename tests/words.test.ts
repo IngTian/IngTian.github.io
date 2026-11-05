@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countWords, hyphenatedParts, readingMinutes } from '../src/lib/words';
+import { countWords, readingMinutes, wholeParts } from '../src/lib/words';
 
 describe('countWords', () => {
   it('counts tokens with a letter or digit in them, so a price counts and a dash does not', () => {
@@ -21,11 +21,15 @@ describe('readingMinutes', () => {
   });
 });
 
-describe('hyphenatedParts', () => {
-  it('puts the hyphenated words at the odd places, and loses nothing', () => {
-    const t = 'Self-Attention on RNN-based Text (RL-BHRP) Approach';
-    const parts = hyphenatedParts(t);
-    expect(parts.filter((_, i) => i % 2)).toEqual(['Self-Attention', 'RNN-based', '(RL-BHRP)']);
+// A name breaks in two at its hyphen ("RL-" / "BHRP"); a compound in lower case may, as in any prose.
+describe('wholeParts', () => {
+  it('puts each name, span of years, ISO date and arXiv category at the odd places, and loses nothing', () => {
+    const t = 'Self-Attention on RNN-based (RL-BHRP) over 2012–2019, from 2025-08-13 [q-fin.PM], and a risk-parity rule';
+    const parts = wholeParts(t);
+    expect(parts.filter((_, i) => i % 2)).toEqual(['Self-Attention', 'RNN-based', 'RL-BHRP', '2012–2019', '2025-08-13', 'q-fin.PM']);
     expect(parts.join('')).toBe(t);
+  });
+  it('is the text alone when nothing in it is kept whole', () => {
+    expect(wholeParts('a risk-parity rule')).toEqual(['a risk-parity rule']);
   });
 });

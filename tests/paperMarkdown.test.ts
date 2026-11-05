@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import katex from 'katex';
 import { describe, expect, it } from 'vitest';
 import { fixMathVariants } from '../src/lib/mathml';
-import { PAPERS_DIR, checkedReport } from '../src/lib/paperMarkdown';
+import { FIGURE_NAME, PAPERS_DIR, checkedReport } from '../src/lib/paperMarkdown';
 import { renderMarkdown } from './helpers/paperChain';
 
 // The site's markdown plugins, inside the chain Astro runs them in (tests/helpers/paperChain.ts). Astro's other
@@ -222,6 +222,19 @@ describe('a notation row', async () => {
     expect(html.match(/<mi class="sym" data-sym="2">η<\/mi>/g)).toBeNull();
   });
 
+  // A membership names its subject, and its set's index (the g of 𝓘_g, sector g), never the set or the set's other
+  // scripts: ℝ^N is where w lives, and N, a dimension, is a symbol only through a row of its own.
+  it("leaves the set of a membership, and a script that is no index, to rows of their own", async () => {
+    const md = '::::section[Notation]{#notation}\n:::notation\n| Symbol | Meaning |\n| --- | --- |\n'
+      + '| $w\\in\\mathbb{R}^{N}$ | The weights. |\n| $N$ | The number of stocks. |\n:::\n::::\n\n'
+      + '::::section[Eq]{#eq}\n:::eq{#e}\n$$\n\\sum_{i=1}^{N} w_{i}=1,\\quad w\\in\\mathbb{R}^{N}\n$$\n:::\n::::\n';
+    const { html: own, report: ok } = await render(md, PAPER_PATH);
+    expect(ok.paperProblems).toEqual([]);
+    expect(own.match(/<mi class="sym" data-sym="2">N<\/mi>/g)).toHaveLength(2);
+    expect(own.match(/<mi class="sym" data-sym="1">w<\/mi>/g)).toHaveLength(2);   // in w_i and before the ∈
+    expect(own.match(/class="sym"/g)).toHaveLength(4);   // so neither ℝ nor ℝ^N is tagged
+  });
+
   // A Symbol cell may set each symbol as maths of its own, `$N$, $G$`: every one of them is the row's, and the row is
   // matched by any of them, as by any symbol of `N,\ G`.
   it('reads every maths in its Symbol cell, and names the cell as written when none is in a display', async () => {
@@ -233,6 +246,20 @@ describe('a notation row', async () => {
     expect(ok.paperProblems).toEqual([]);
     const { report: none } = await render(two.replace('N + G', 'M + H'), PAPER_PATH);
     expect(none.paperProblems).toEqual(['notation row $N$, $G$ matches no display — mark it {text-only} if it is only in the prose']);
+  });
+});
+
+describe('a drawing that names its own figure', () => {
+  // The explainer numbers its figures, so a drawing is named where it is placed: the same drawing, placed by a second
+  // paper as its Figure 5, says Figure 5 wherever it names itself.
+  it("takes the name its :::figure's number gives it", async () => {
+    const art = `<div class="art" data-name="${FIGURE_NAME}"><p>${FIGURE_NAME}’s values</p></div>`;
+    const papers = { simple: { ...PAPERS.simple, figures: { named: art } } };
+    const md = '::::section[S]{#s}\n:::figure{name=named n=5}\nThe caption.\n:::\n::::\n';
+    const { html, report } = await renderMarkdown(md, PAPER_PATH, { papers, publications: PUBLICATIONS, frontmatter: FRONTMATTER });
+    expect(report.paperProblems).toEqual([]);
+    expect(html).toContain('<figure class="fig" id="figure-5"><div class="art" data-name="Figure 5"><p>Figure 5’s values</p></div>'
+      + '<figcaption><span class="fig-no">Figure 5.</span> The caption.</figcaption></figure>');
   });
 });
 

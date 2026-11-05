@@ -244,10 +244,12 @@ src/
   pages/research/index.astro        # /research: the papers as cards, newest first (a card opens its paper's page when a file explains it), then the interests
   pages/research/[slug].astro       # the one paper page: the record's head, the file's body, references, BibTeX; its script places the notes and runs the motion
   lib/paperMarkdown/{index,remarkPaper,rehypePaper}.ts # the markdown chain (spelled once) + the paper format's compiler and checks — see Papers are files
-  lib/paperFigures/{wealthFigure,pipelineFigure,metricsTable}.ts # a paper's drawings and Table 1, as HTML strings from its data; a :::figure places each
-  lib/paperPage.ts                  # the paper page's pure half: the prose its frontmatter writes (authorRole, givenFirst, listed, referenceNote), note stacking, the readout's month, step, point names, spoken line and instructions
+  lib/paperMarkdown/names.ts        # imports nothing: PAPERS_DIR (content.config.ts reads it from here) and FIGURE_NAME, where a drawing names its own figure
+  lib/paperFigures/{wealthFigure,pipelineFigure,metricsTable}.ts # a paper's drawings and Table 1, as HTML strings from its data; a :::figure places and numbers each
+  lib/paperPage.ts                  # the paper page's pure half: the prose its frontmatter writes (authorRole, givenFirst, listed, referenceNote, Line + lineText), note stacking, the readout's month, step, point names, spoken line and instructions (readoutLabel)
+  components/research/PaperLine.astro # one line of a paper page's own prose: names kept whole (wholeParts), dates as <time>
   lib/wealth.ts                     # the one wealth module: growth of $1, CAGR, drawdown, the band of runs, WealthSeries (the prepared series every picture of a run reads; REPRO is RL-BHRP's), scales and ticks — the paper page's figures and /projects' rl-bhrp picture
-  lib/words.ts                      # the one word counter (countWords, readingMinutes) + hyphenatedParts, so a title keeps "RL-BHRP" whole
+  lib/words.ts                      # the one word counter (countWords, readingMinutes) + wholeParts, the one rule for what never breaks across a line ("RL-BHRP")
   lib/dates.ts                      # the one date helper: longDate, monthYear (UTC)
   lib/motionTiming.ts               # the motion module's pure half: every curve (EASE, DRAW, SWEEP) and duration (REVEAL, RAIL, PAPER_PAGE, CARD) the rail and the research routes move by, stagger, sweepDurations, mergeLines; tests/motionTiming.test.ts holds their CSS literals to it
   scripts/motion.ts                 # THE ONE MOTION MODULE, its DOM half: play, onceSeen, riseOnceSeen, sweepLines — the rail and both research routes; the reduced-motion gate is inside it
@@ -830,11 +832,11 @@ file holds is the prose; everything else has one home of its own:
 | `:hl[…]` | `<mark class="hl">` — Underline, the one highlight style |
 | `::::eq{#eq-4 n=4}` `$$` … `$$` `:::where` … `:::` notes `::::` | `<div class="eq an" id="eq-4">`: the display, its number `(4)` as HTML outside `<math>` (never `\tag`), `<p class="where">`, then its notes. One `$$`, or a `$$ wide` and a `$$ narrow` |
 | `:::::thm{#thm-3-1-11}` … `:::::` | `<div class="thm">`, a theorem's frame, its displays inside it; the paragraphs that open it and introduce a display are its heads |
-| `:::notation` with a GFM table `\| Symbol \| Meaning \|` `:::` | `<div class="tbl-scroll"><table class="notation">`, each row `<tr data-sym><th scope="row">`. Each row's symbols (every maths in its Symbol cell, `$N$, $G$` as well as `$N,\ G$`, split at commas, and at `∈`, which introduces the element and its set's index: `i\in\mathcal{I}_{g}` is `i`, `g` and `𝓘_g`) are matched **structurally** in every display's MathML and tagged `class="sym" data-sym`: an equal subtree first, else the symbol's family — a scripted `W_{g}` also stands for `W` with any other script (`W_{g(i)}`, `W^{\top}`) and for `W` alone; the largest first, then on through what a tagged symbol holds (the `i` and `g` of `W_{g(i)}`, the `w` of `RC_i(w)`) but never its own letter (`W` is not tagged again inside `W_{g(i)}`, nor `Σ` inside `Σ̃`). The page reads a pointer on a nested symbol as the outermost. A row that is only in the prose ends its Symbol cell with `{text-only}`. A row is keyed by its position, so a paper has one `:::notation`, and a second is refused. |
+| `:::notation` with a GFM table `\| Symbol \| Meaning \|` `:::` | `<div class="tbl-scroll"><table class="notation">`, each row `<tr data-sym><th scope="row">`. Each row's symbols (every maths in its Symbol cell, `$N$, $G$` as well as `$N,\ G$`, split at commas; a membership introduces its subject and its set's index, a subscript: `i\in\mathcal{I}_{g}` is `i` and `g`, never the set nor a superscript of it, so `w\in\mathbb{R}^{N}` is `w` alone and `N` is a symbol only through a row of its own) are matched **structurally** in every display's MathML and tagged `class="sym" data-sym`: an equal subtree first, else the symbol's family — a scripted `W_{g}` also stands for `W` with any other script (`W_{g(i)}`, `W^{\top}`) and for `W` alone; the largest first, then on through what a tagged symbol holds (the `i` and `g` of `W_{g(i)}`, the `w` of `RC_i(w)`) but never its own letter (`W` is not tagged again inside `W_{g(i)}`, nor `Σ` inside `Σ̃`). The page reads a pointer on a nested symbol as the outermost. A row that is only in the prose ends its Symbol cell with `{text-only}`. A row is keyed by its position, so a paper has one `:::notation`, and a second is refused. |
 | `:cite[markowitz1952]` | `<a class="cite" href="#ref-markowitz1952">Markowitz, 1952</a>` — one author, two (`Feng and He`), more (`Maillard et al.`) |
 | `:v[usd.rl]` | the text of `PAPER_DATA[slug].values['usd.rl']`. **Every quantity the prose prints that comes from data is a `:v`** — a return, a ratio, a count of stocks, sectors, months or runs, a date or year of the window, a cost, a turnover. Typed by hand, and only these: a reference to the paper or into it (arXiv:2508.11856v1, §4.1, eq. (4), Alg. 1, Def. 3.2.3, Table 2), or to the page's own figures and table (Figure 2, Table 1); a year that names an event rather than a measurement ("the 2020 crash and the 2022 sell-off"); a constant of a method or a convention, stated by the paper or the field (the \$1 every growth figure starts from, the 15 of its top-15 share, 1.96 at the 5% level, VaR 5%, 12 months to a year, a basis point's 0.01%); and a quotation of what the paper itself prints, quoted to correct or discuss it (the errata's "Feb - 2020 to Aug - 2020" and "13.37%" are the paper's misprints: as a `:v` each would print the correction in place of the error it corrects). A word that glosses a value printed beside it ("about a quarter as much", "about half the money") is not a second quantity; where the value is computed, a spec holds the word to it (`tests/paperNumbers.test.ts`, the quarter). A `$` amount is always `:v` or `\$` — a bare `$` starts maths |
 | `$:v[wealth.rl]^{12/67}-1$` | the same value written into the TeX, with `$ % # &` escaped — the one directive that works inside maths, so an equation's numbers are computed too. A `:cite`, `:t` or `:hl` there is refused |
-| `:::figure{name=wealth n=2}` caption `:::` | `<figure class="fig" id="figure-2">`: `PAPER_DATA[slug].figures.wealth`, then the container's prose as its `<figcaption>`, "Figure 2." before it, and any notes beside it. A drawing that is a `<table>` is a table: `<figure class="tbl" id="table-1">`, its first paragraph the caption above it, "Table 1.", the table in its own scroll box, its other paragraphs `<p class="src">` under it. Astro's rehype-raw re-serialises the drawing's markup |
+| `:::figure{name=wealth n=2}` caption `:::` | `<figure class="fig" id="figure-2">`: `PAPER_DATA[slug].figures.wealth`, then the container's prose as its `<figcaption>`, "Figure 2." before it, and any notes beside it. A drawing that is a `<table>` is a table: `<figure class="tbl" id="table-1">`, its first paragraph the caption above it, "Table 1.", the table in its own scroll box, its other paragraphs `<p class="src">` under it. A drawing that names its own figure writes `FIGURE_NAME` (`lib/paperMarkdown/names.ts`) there, and the plugin puts in its place the name `n` gives it ("Figure 2"), so another paper's Figure 5 reads Figure 5. Astro's rehype-raw re-serialises the drawing's markup |
 | `:::inpaper` `**In the paper:** …` `:::` | `<p class="inpaper">`, the pointer to what the page leaves to the paper |
 | `:sup[a]` | `<sup>a</sup>`, a table note's mark |
 
@@ -880,11 +882,19 @@ file holds is the prose; everything else has one home of its own:
   `math`, `table` and the figures' drawings (still raw) left out. The page's reading time counts
   every word a reader reads, as the approved prototype did: `bodyWords` plus the prose the page writes
   round the file (the head, Read the full paper, the note on the references, the cite line, the
-  corrections, the tags), listed beside the count in `pages/research/[slug].astro`. Not the controls,
-  the Contents, the reference list or the BibTeX. `tests/distSmoke.test.ts` recounts the built page
-  by that rule, and the body to the word.
-- **A line never breaks inside a hyphenated name in capitals (RL-BHRP), a span of years or an ISO
-  date**: the last pass wraps each in `<span class="nw">`, after the words are counted.
+  corrections, the tags). Not the controls, the Contents, the reference list or the BibTeX. Each of
+  those strings is built once in `pages/research/[slug].astro`'s frontmatter, printed as built (a line
+  with a date through `components/research/PaperLine.astro`) and counted from the same value, so a
+  string cannot be counted one way and printed another; a new line in the template still has to be
+  added to the count. `tests/distSmoke.test.ts` recounts the built page's minutes by that rule, and
+  checks the plugin's `bodyWords` against the same rule, to the word, over the test chain's render.
+- **A line never breaks inside a hyphenated word led by an acronym (RL-BHRP, RNN-based), two
+  capitalised words joined (Black-Litterman, Self-Attention), a span of years, an ISO date or an
+  arXiv category (q-fin.PM)**: one rule, `wholeParts` in `lib/words.ts`. The body's last pass wraps
+  each in `<span class="nw">`, after the words are counted; the page's own prose (its title, meta,
+  cite line, references, corrections) goes through `PaperLine`, and the /research cards' and the
+  homepage's titles through the same function. A compound in lower case (risk-parity) may break at
+  its hyphen, as in any prose.
 - **The margin notes are placed by the page's script, and held until placed.** Wider than 1100px a note
   sits in the notes column beside its anchor — its term's line, or its block's top — stacked 16px
   apart so none overlap (`stackNotes` in `lib/paperPage.ts`), re-placed by a ResizeObserver

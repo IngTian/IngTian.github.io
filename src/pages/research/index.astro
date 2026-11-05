@@ -10,14 +10,14 @@ import SideRail from '../../components/SideRail.astro';
 import { PAPER_DATA } from '../../data/papers';
 import { STATUS_LABEL, publications, researchInterests } from '../../data/profile';
 import { researchIndexStops } from '../../lib/pageStops';
-import { hyphenatedParts } from '../../lib/words';
+import { wholeParts } from '../../lib/words';
 import '../../styles/paper.css';
 
 const stops = researchIndexStops();
 const [papers, interests] = stops;
 // The records with a page of their own, read from the collection, so a paper's card opens its page once its file exists.
 const explained = new Set((await getCollection('papers')).map((e) => e.data.publication));
-// A title keeps its hyphenated words whole ("RNN-based", "(RL-BHRP)"). A card's meta ("status · venue · year") and its
+// A title keeps whole what reads as one word (lib/words wholeParts: "RL-BHRP"). A card's meta ("status · venue · year") and its
 // tags keep each part nowrap with the separator before it, so a line may break before a separator, never after one.
 ---
 <BaseLayout
@@ -41,7 +41,7 @@ const explained = new Set((await getCollection('papers')).map((e) => e.data.publ
         {publications.map((p) => {
           const here = explained.has(p.slug);
           const thumb = PAPER_DATA[p.slug]?.thumb;
-          const title = hyphenatedParts(p.title).map((s, i) => (i % 2 ? <span class="nw">{s}</span> : s));
+          const title = wholeParts(p.title).map((s, i) => (i % 2 ? <span class="nw">{s}</span> : s));
           return (
             <article class="pc">
               <h3 class="p-title">{here

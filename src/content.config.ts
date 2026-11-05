@@ -2,7 +2,7 @@ import { defineCollection } from 'astro:content';
 import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
 import { publications } from './data/profile';
-import { PAPERS_DIR } from './lib/paperMarkdown';
+import { PAPERS_DIR } from './lib/paperMarkdown/names';
 
 /**
  * An ISO date, normalised to YYYY-MM-DD: every date in every collection is one of these.

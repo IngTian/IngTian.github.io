@@ -13,7 +13,7 @@ import { getCollection } from 'astro:content';
 import { STATUS_LABEL, publications, projects, appendixProjects, type Publication } from '../data/profile';
 import { PAPER_DATA } from '../data/papers';
 import { monthYear } from '../lib/dates';
-import { hyphenatedParts } from '../lib/words';
+import { wholeParts } from '../lib/words';
 import { WRITINGS_PROMISE, WRITINGS_TOPICS } from '../data/making';
 import { KINDS } from '../data/writing';
 import PlushCow from '../components/PlushCow.astro';
@@ -57,9 +57,9 @@ const lineFor = (p: Publication) => {
   return line ? `${line} · ${STATUS_LABEL[p.status].toLowerCase()}` : `${p.venue} · ${p.year}`;
 };
 
-// A title's hyphenated words never break at their hyphen (lib/words hyphenatedParts): without this the full RL-BHRP
-// title wraps as "(RL-" / "BHRP)" at 1440 and 390, splitting the paper's own name. Fraunces has no U+2011, so a
-// non-breaking hyphen would fall back to another face.
+// A title's names never break at their hyphen (lib/words wholeParts): without this the full RL-BHRP title wraps as
+// "(RL-" / "BHRP)" at 1440 and 390, splitting the paper's own name. Fraunces has no U+2011, so a non-breaking hyphen
+// would fall back to another face.
 ---
 {/* THE APPENDIX — the work AND the footer, as one slide. The owner: "i noticed that when i scroll down to the
      work, it seems like you aligned the bottom with the footer so that leaves a huge space below the cow. why not
@@ -81,7 +81,7 @@ const lineFor = (p: Publication) => {
           <p class="wk-col-kicker">Publications</p>
           {publications.map((p) => (
             <div class="wk-item">
-              <p class="wk-item-name">{hyphenatedParts(p.title).map((s, i) => (i % 2 ? <span class="wk-nobreak">{s}</span> : s))}</p>
+              <p class="wk-item-name">{wholeParts(p.title).map((s, i) => (i % 2 ? <span class="wk-nobreak">{s}</span> : s))}</p>
               <p class="wk-item-line">{lineFor(p)}</p>
             </div>
           ))}
