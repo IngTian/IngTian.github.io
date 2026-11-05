@@ -19,8 +19,8 @@
 // WHY A TEST AND NOT A HABIT. This class was swept by hand twice before (CLAUDE.md records both passes) and
 // came back both times, because the falsifying event is a DELETE in one file while the false sentence sits in
 // another — nobody is looking at it. The build is happy, and neither `astro check` nor `tsc` reads a comment.
-// Same reasoning as tests/cssVars.test.ts (a `var(--x)` nothing declares) and tests/nav.test.ts (a nav href
-// with no route): an invariant between two files gets a spec.
+// Same reasoning as tests/cssVars.test.ts (a `var(--x)` nothing declares) and tests/nav.test.ts (a page with
+// no nav href): an invariant between two files gets a spec.
 //
 // THE HARD PART IS THAT A CORRECT COMMENT ALSO NAMES MISSING FILES, and the first version of this test got
 // that wrong. CLAUDE.md's rule is "say what is true rather than only deleting the false part", so deletions

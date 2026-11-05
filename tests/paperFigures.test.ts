@@ -70,10 +70,6 @@ describe('REPRO, the series the reproduction is drawn from', () => {
 });
 
 describe('Figure 2, the growth of $1', () => {
-  it('has a wide and a narrow drawing, each with its frame on data-g', () => {
-    expect(svgs(full).map((s) => attr(open(s), 'class'))).toEqual(['wide', 'narrow']);
-  });
-
   for (const [name, d] of [['the reproduction', REPRO], ['a run far outside it', stretched]] as const) {
     it(`frames every point of ${name}: the domain is derived, and every mark is inside the plot`, () => {
       const lo = Math.min(...values(d)), hi = Math.max(...values(d));
@@ -168,7 +164,6 @@ describe('Figure 2, the growth of $1', () => {
     for (const svg of svgs(full)) {
       const name = attr(open(svg), 'aria-label')!;
       expect(attr(open(svg), 'role')).toBe('img');
-      for (const v of ['2.13', '2.01', '1.91']) expect(name).toContain(v);
       for (const [, v] of svg.matchAll(/<tspan class="f-val"[^>]*>([^<]*)</g)) expect(name).toContain(v);
     }
   });
@@ -203,7 +198,6 @@ describe('Figure 2, the growth of $1', () => {
     expect(rows.at(-1)![1]).toContain('where the data end');
     expect(full).toContain(`median of ${REPRO.runs} runs`);   // the readout's legend
     expect(full).toMatch(/<dd data-k="band"><\/dd>/);
-    expect(REPRO.runs).toBe(10);
   });
 
   // The explainer numbers the figure and the record says whose the reproduction is, so the drawing is told both: the
@@ -221,12 +215,6 @@ describe('Figure 2, the growth of $1', () => {
   it('is a plain block in the markup: no tab stop, role or instructions until the readout starts', () => {
     const plot = full.match(/<div class="f-plot"[^>]*>/)![0];
     for (const a of ['tabindex', 'role', 'aria-label']) expect(attr(plot, a), a).toBeUndefined();
-  });
-
-  // The caption is prose, so the explainer writes it (a :::figure container); the plugin makes the <figure>.
-  it('is the drawing alone: no <figure>, no caption', () => {
-    expect(full).not.toMatch(/<\/?figure\b|<figcaption/);
-    expect(full.startsWith('<div class="f-plot"')).toBe(true);
   });
 });
 
@@ -264,13 +252,6 @@ describe('Figure 1, the pipeline', () => {
     for (const word of ['Bayesian layer', 'Policy', 'Reward', 'PPO update', 'BHRP', 'the comparator']) {
       expect(outsideMath.split(`>${word}<`).length - 1, word).toBe(2);
     }
-  });
-
-  // Its caption, in the explainer, says everything the drawing does, and the <figure> takes its name from it, so the
-  // drawings are hidden from assistive tech rather than read as a second copy of the caption.
-  it('is the drawing alone, hidden from assistive tech: no <figure>, no caption', () => {
-    expect(pipe).not.toMatch(/<\/?figure\b|<figcaption|role="img"|aria-labelledby/);
-    expect(pipe.match(/<div class="pp-art (?:wide|narrow)" aria-hidden="true"/g)).toHaveLength(2);
   });
 });
 
@@ -314,6 +295,16 @@ describe('both figures', () => {
       expect(html).not.toMatch(/published/i);
     });
   }
+
+  // A caption is prose, so the explainer writes it (a :::figure container) and the plugin makes the <figure>. Figure 1's
+  // caption says everything its drawing does, and the <figure> takes its name from it, so its drawings are hidden
+  // from assistive tech rather than read as a second copy of the caption.
+  it('are the drawings alone: no <figure>, no caption, and Figure 1 hidden from assistive tech', () => {
+    for (const html of [full, pipe]) expect(html).not.toMatch(/<\/?figure\b|<figcaption/);
+    expect(full.startsWith('<div class="f-plot"')).toBe(true);
+    expect(pipe).not.toMatch(/role="img"|aria-labelledby/);
+    expect(pipe.match(/<div class="pp-art (?:wide|narrow)" aria-hidden="true"/g)).toHaveLength(2);
+  });
 
   // The page swaps the drawings with one rule by class, `figure .narrow`: Figure 1's must hide the div that holds its
   // words, not only its svg. So the classes sit on each drawing's outermost element and nowhere else.

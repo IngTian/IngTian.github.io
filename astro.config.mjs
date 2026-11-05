@@ -86,7 +86,7 @@ export default defineConfig({
   // the page ships static <math> markup, zero client JS, zero CSS, zero fonts. Safari, Firefox and
   // Chromium have all shipped MathML Core. This is the same guarantee src/lib/equations.ts already
   // holds for the terrain pill and the Rules slide's Bellman recursion, and tests/equations.test.ts asserts it there
-  // ("ships MathML, not a KaTeX runtime") — the markdown path must not be the one that breaks it.
+  // — the markdown path must not be the one that breaks it.
   //
   // A TeX error does not fail the build by itself: rehype-katex always catches it and draws the source in
   // KaTeX's error markup. In a paper that is reported, and the paper page fails the build on it.
@@ -117,7 +117,7 @@ export default defineConfig({
   // In a .astro template `<!-- … -->` is HTML and IS emitted, while `{/* … */}` is a JS expression comment
   // the compiler discards. So all 83 markup comments here are written in the second form, and the ~30KB of
   // internal design review they carry (56 on the homepage alone, quoting review verbatim) never reaches a
-  // visitor's View Source. tests/htmlComments.test.ts asserts dist stays clean.
+  // visitor's View Source. tests/distSmoke.test.ts asserts dist stays clean.
   // A 529-line `astro:build:done` integration did this job first, correctly, and is deleted: the owner asked
   // why it existed when the language already had an answer, and he was right.
   ]

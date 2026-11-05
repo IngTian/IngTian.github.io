@@ -596,10 +596,11 @@ phone treatment is *bug fixes only*, and the whole of it is:
   here", in the site's own hierarchy (research first, art last; /writing directly
   after /research because it's the same subject at a different formality). It lives
   in `data/` because the page set is a *fact* about the site: the site once shipped
-  a link to `/experience` before that page existed, and `tests/nav.test.ts` now
-  asserts every href resolves to a real route, with no duplicate hrefs or labels, and
-  the converse: every page in `src/pages` but `/`, the 404 and a `/proto-` route is in
-  `PAGES`, since the corner nav is the only link to `/experience` anywhere on the site.
+  a link to `/experience` before that page existed. `tests/distSmoke.test.ts` resolves
+  every href the nav renders, on every built page, and `tests/nav.test.ts` asserts no
+  duplicate hrefs or labels and the converse: every page in `src/pages` but `/`, the 404
+  and a `/proto-` route is in `PAGES`, since the corner nav is the only link to
+  `/experience` anywhere on the site.
   `CornerNav` renders it.
 - **The page you are on is marked by a lit DOT before its label**, on every page:
   `aria-current="page"` on the link, a 6px dot plus a glow, and the label at weight 600. A page
@@ -1379,8 +1380,8 @@ full-bleed panel.
     and stay while the pointer crosses onto them (a shown tip takes the pointer, and a bridge
     spans its gap; `tests/distSmoke.test.ts` reads both in the built CSS).
 - **Pure logic is tested.** Anything non-trivial in `lib/` gets a vitest spec, and
-  so does every *invariant between two files* (`nav.test.ts`: every nav href is a
-  real route, and every page a nav href; `writingContent.test.ts`: the schema enum
+  so does every *invariant between two files* (`nav.test.ts`: every page is a nav
+  href; `writingContent.test.ts`: the schema enum
   matches `KINDS`; `pageStops.test.ts`: no stop points at an id the page won't emit;
   `viewport.test.ts`: the breakpoint still says 640; `artSizes.test.ts`: both
   `sizes` hints still describe the layout that decides them). They're the only

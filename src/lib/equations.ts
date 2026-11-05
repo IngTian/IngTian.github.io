@@ -62,8 +62,6 @@ export const BELLMAN_EQUATIONS = {
   ),
   /** Where it breaks: the state space is exponential in the number of assets. */
   curse: tex(String.raw`\lvert \mathcal{X} \rvert \;=\; m^{N}`, display),
-  /** The number, with the slide's own m and N substituted — inline, so it can sit in a sentence. */
-  atScale: tex(String.raw`10^{3000}`, opts),
 };
 
 // ── THE METHOD SLIDE HAS NO EQUATION, and that is the correction ─────────────────────────────────────────
