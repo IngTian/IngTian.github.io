@@ -8,7 +8,7 @@ import {
   INTRO_DURATION_MS, INTRO_DUR_MIN_MS, INTRO_DUR_MAX_MS,
 } from '../src/lib/introTimeline';
 import { INTRO_SEEN_KEY } from '../src/lib/introSession';
-import { inProgress, projects, publications, researchInterests, timeline, type Publication } from '../src/data/profile';
+import { contact, inProgress, projects, publications, researchInterests, timeline, type Publication } from '../src/data/profile';
 import { PAPER_DATA } from '../src/data/papers';
 import {
   type Stop, experienceStops, flattenStops, homeStops, paperPageOwns, paperSections, paperStops, projectSectionId,
@@ -181,11 +181,9 @@ const internalHrefs = (p: Page): string[] =>
  * this path" of `/cv.pdf` would report the CV as a dead link; asking "is there a file on disk" of
  * `/writing` would report every route as one.
  *
- * The dividing line is a dot in the last segment — the same rule check 2 below spells inline as
- * `/\.\w+$/` for the footer's `/cv.pdf`. (Check 2 keeps its own copy on purpose: it *skips* assets,
- * where this one goes on to look for them on disk, so they are not the same predicate doing the same
- * job.) It is a heuristic, and the way it could be wrong is a route whose final segment contains a
- * dot — a writing slug like `v1.0-notes` would be mistaken for a file and looked for on disk. No such
+ * The dividing line is a dot in the last segment. It is a heuristic, and the way it could be wrong is a
+ * route whose final segment contains a dot — a writing slug like `v1.0-notes` would be mistaken for a
+ * file and looked for on disk. No such
  * route exists today; if one is ever added, this is the line to fix, and it will fail loudly rather
  * than quietly pass.
  */
@@ -230,10 +228,9 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
   // IT USED TO CHECK ONLY THE HREFS CONTAINING A '#'. The loop opened with `if (hash === -1)
   // continue;`, which is a much narrower promise than the test's name implied, and the gap was not
   // theoretical: dist/writing/index.html links its only piece as href="/writing/favourite-quotes",
-  // with no fragment — so the sole door to the sole writing piece was checked by nothing at all here,
-  // and check 2 below only ever looks inside the homepage footer. A renamed .md file (the slug IS the
-  // filename) or a moved route would have shipped a 404 on the newest section of the site with all
-  // three gates green.
+  // with no fragment — so the sole door to the sole writing piece was checked by nothing at all here.
+  // A renamed .md file (the slug IS the filename) or a moved route would have shipped a 404 on the
+  // newest section of the site with all three gates green.
   //
   // So the fragment is now the OPTIONAL half of the question. Every internal href is resolved to a
   // path first and that path must exist; an href that also names a fragment must additionally find
@@ -286,66 +283,25 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
     expect(dead, `dead internal links in the built site:\n  ${dead.join('\n  ')}`).toEqual([]);
   });
 
-  // ── 2. THE FOOTER CARRIES THE WHOLE PAGE SET ─────────────────────────────────────────────────
-  const footerNav = (): string => {
-    const home = byRoute().get('/');
-    expect(home, 'dist/index.html is missing').toBeTruthy();
-    // Anchored on the footer nav's aria-label rather than a class, because the label is the part
-    // that is contractually stable — it is what a screen reader announces, so it cannot be renamed
-    // as a styling decision (sections/Signature.astro).
-    const mark = 'aria-label="Links and downloads"';
-    const at = home!.markup.indexOf(mark);
-    expect(
-      at,
-      'could not find the footer nav (aria-label="Links and downloads") in the homepage. If it was ' +
-        'renamed, update this test; if it vanished, the site lost its footer navigation.',
-    ).toBeGreaterThan(-1);
-    return home!.markup.slice(at, home!.markup.indexOf('</nav>', at));
-  };
-
-  /* SKIPPED, AND THE SKIP IS THE FINDING. This assertion fails today, on a real bug that this test
-     is what found: the footer is built from `links` in src/data/profile.ts, the corner nav from
-     PAGES in src/data/nav.ts, and the two lists have drifted — profile.ts never gained /writing, so
-     the rendered footer offers Research / Experience / Projects / Art and the site's newest route is
-     reachable only from the corner nav.
-
-     THE FIX (src/data/profile.ts, in `links`, directly after the Research entry — the position
-     nav.ts uses and for its stated reason, "the papers, then the thinking around them"):
-
-         { label: 'Research', href: '/research' },
-       + { label: 'Writing', href: '/writing' },
-         { label: 'Experience', href: '/experience' },
-
-     UN-SKIPPED: profile.ts now carries the Writing link, so this passes. It stays as the guard against the
-     two lists diverging again — which is how /writing came to be in the nav and absent from the footer
-     that adds the line — it needs no other change. */
-  it('offers every nav page in the footer', () => {
-    const foot = footerNav();
-    const hrefs = new Set([...foot.matchAll(/href="([^"]*)"/g)].map((m) => m[1]));
-    for (const p of PAGES) {
-      expect(
-        hrefs.has(p.href),
-        `the homepage footer has no link to ${p.href} (${p.label}), but data/nav.ts lists it as one ` +
-          'of the site\'s pages. The footer is built from the `links` array in src/data/profile.ts — ' +
-          'add it there.',
-      ).toBe(true);
+  // ── 2. CV AND EMAIL ARE IN EVERY CORNER NAV, AT EVERY WIDTH ──────────────────────────────────────
+  // The corner nav is the only place on the site they are linked. The phone's list is the same <ul>, and below
+  // 1200px only an item marked `profile` (GitHub, LinkedIn) is hidden, so neither of these may carry it.
+  it('links the CV and Email from every corner nav, in the list the phone opens too', () => {
+    const wrong: string[] = [];
+    for (const p of pages()) {
+      if (!/<html[\s>]/i.test(p.html)) continue;
+      const list = /<ul id="cnav-list"[^>]*>[\s\S]*?<\/ul>/.exec(p.markup)?.[0] ?? '';
+      for (const c of [contact.cv, contact.email]) {
+        const li = [...list.matchAll(/<li\b([^>]*)>([\s\S]*?)<\/li>/g)]
+          .find((m) => m[2].includes(`href="${c.href}"`) && m[2].includes(`aria-label="${c.label}"`));
+        if (!li) wrong.push(`${p.route}: no ${c.label} link in the corner nav`);
+        else if (/\bprofile\b/.test(li[1])) wrong.push(`${p.route}: ${c.label} is hidden below 1200px`);
+      }
     }
-  });
-
-  it('never links the footer at a page the site does not have', () => {
-    // The half of the footer/nav agreement that IS green, kept live so the seam has real coverage
-    // while the assertion above is parked. It catches the failure the site has actually shipped
-    // before (a link to /experience while that route did not exist) from the other direction.
-    const foot = footerNav();
-    const routes = byRoute();
-    for (const href of [...foot.matchAll(/href="(\/[^"#]*)"/g)].map((m) => m[1])) {
-      if (/\.\w+$/.test(href)) continue; // /cv.pdf and friends are assets, not routes
-      const path = href.replace(/\/$/, '') || '/';
-      expect(
-        routes.has(path) || routes.has(`${path}.html`),
-        `the homepage footer links to ${href}, which built no page`,
-      ).toBe(true);
-    }
+    expect(wrong).toEqual([]);
+    // and no rule hides the marks wholesale: below 1200px only `.profile` goes.
+    const hides = /\.cnav\[[^\]]+\] \.mark(?:-li)?\[[^\]]+\][^{}]*\{[^}]*display:none/.exec(distCss());
+    expect(hides?.[0], 'a corner-nav rule hides every contact mark').toBeUndefined();
   });
 
   // ── 3. ONE H1, AND NO IMAGE WITHOUT ALT ──────────────────────────────────────────────────────

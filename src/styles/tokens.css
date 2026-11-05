@@ -13,7 +13,7 @@
   /* Role tokens that must NOT flip with the ink ramp:
      --bg        page base behind the gradient (overscroll / loader); always
                  dark, so it never flashes bright. In light theme it = ink-1.
-     --on-accent text sitting ON the accent chip (CV button, nav bloom). The
+     --on-accent text sitting ON the accent (the corner nav's bloom, the hero's pill). The
                  accent is a LIGHT color in both themes (ochre / phosphor
                  green), so text on it stays dark in both themes. */
   --bg: #16140f;

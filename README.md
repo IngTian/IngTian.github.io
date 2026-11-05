@@ -69,7 +69,7 @@ src/
                     /writing/<slug> · /projects · /experience · /art · /404
   layouts/          BaseLayout.astro — <head>, fonts, meta/OG/JSON-LD, the veil, nav
   sections/         Heights · Interlude · Choice · Rules · Solve · Story · Work
-                    — the homepage in scroll order (Signature renders inside Work)
+                    — the homepage in scroll order
   components/       Deck · SideRail · CornerNav · TerrainHero · DescentPath
                     FluidSky (the WebGL sky; not on /projects or /research)
   content/writing/  the writing pieces, as markdown (a new one is a FILE)
@@ -90,8 +90,8 @@ Two kinds, and they do not converge (the reasoning is in CLAUDE.md):
 | What | Where |
 | :--- | :---- |
 | A new **writing piece** | drop a `.md` in `src/content/writing/` with frontmatter. No code change; it appears on `/writing` and gets its own page. |
-| Résumé, bio, timeline, publications, projects, links | `src/data/profile.ts` — typed, cross-referenced by id, and some numbers are computed from it. |
-| The page set (nav + footer doors) | `src/data/nav.ts` (`PAGES` is canonical). |
+| Résumé, bio, timeline, publications, projects, contact links | `src/data/profile.ts` — typed, cross-referenced by id, and some numbers are computed from it. |
+| The page set (the corner nav) | `src/data/nav.ts` (`PAGES` is canonical). |
 | Calligraphy | `src/data/artworks.ts` + images in `src/assets/art/`. |
 | Photographs | drop files in `src/assets/art/photos/` (auto-globbed); per-photo copy in `src/data/photoNotes.ts`. |
 | Palette | `src/styles/tokens.css` — the only colors on the site. |

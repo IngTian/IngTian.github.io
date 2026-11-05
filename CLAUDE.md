@@ -259,7 +259,7 @@ src/
   scripts/pageView.ts               # onPageView(selector, init): starts nine scripts right after parse, not at window `load`, handing init its element — /projects' (all but two), SideRail's and both research routes' (see Interactivity)
   data/papers/{index,rl-bhrp}.ts    # PAPER_DATA (values, figures, the homepage line, thumb); RL-BHRP's Table 2, window, reproduction series, and VALUES — every figure its prose prints, as the string it prints (a :v reads one; TypeScript reads one through paperValue, whose key is typed as VALUES' keys and which also throws on an unknown one)
   lib/mathml.ts                     # the one MathML letter fix: fixMathVariants for lib/equations.ts, rehypeMathVariants for every .md
-  data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline, publications, projects + inProgress, awards, links
+  data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline, publications, projects + inProgress, awards, contact
   data/nav.ts                       # PAGES — the canonical page set (see Navigation)
   data/writing.ts                   # the writing TAXONOMY (KINDS) + buildKinds(), the one seam to the markdown
   data/artworks.ts                  # gallery: calligraphy entries + globbed photos (+ photoNotes.ts for per-photo copy)
@@ -278,18 +278,17 @@ src/
   lib/{bellman,problemSize,complexity,policyPnl,scenario,split}.ts   # the explainer slides' real math
   lib/scrollspy.ts                  # activeStopIndex (the /art rail, and railMarks' fallback) + railMarks, SideRail's marking rule — see Navigation
   lib/{justify,pixels,cowSpeech,knowledge,equations}.ts
-  sections/{Heights,Interlude,Choice,Rules,Solve,Story,Work}.astro   # the homepage, in scroll order — ALL of sections/, there is nothing else in it
-  sections/Signature.astro          # links + seal — rendered INSIDE Work.astro, not as its own slide
+  sections/{Heights,Interlude,Choice,Rules,Solve,Story,Work}.astro   # the homepage, in scroll order — ALL of sections/, there is nothing else in it (Signature.astro, the footer, is deleted)
   components/Deck.astro             # the deck's event plumbing (homepage only)
   components/FluidSky.astro         # the WebGL sky canvas — on 6 routes (/projects and the two research routes omit it)
   components/SkyWash.astro          # woven warm/cold broken-color wash over the sky — CSS + a small script (it is in the Interactivity list below; this line used to say "pure CSS")
   components/TerrainHero.astro      # the hero's terrain canvas (Heights only)
   components/DescentPath.astro      # the career descent graph (inside Story)
   components/SideRail.astro         # the one marginal rail (/, /research, /research/<slug>, /writing, /experience, /projects), driven by a Stop tree — see Navigation
-  components/CornerNav.astro        # the always-visible glass nav + theme toggle
+  components/CornerNav.astro        # the always-visible glass nav: the pages, the contact marks (the only links to CV and Email), the theme toggle
   components/PlushCow.astro         # the cow, at three scales, with a pixel speech bubble; `talk` is /projects' cow, driven by that page's script
   components/Button.astro           # the shared button ANATOMY + a per-page skin ('sticker', /projects'; 'paper', the research routes') — see The concept
-  components/{SealMark,Grain}.astro # (ProjectCard.astro was here; deleted with the /projects redesign)
+  components/Grain.astro            # (SealMark.astro, the footer's seal, was here; deleted with the footer. So was ProjectCard.astro, with the /projects redesign)
   components/projects/*.astro       # /projects only: DraftingField (the background), TerminalHeader (banner, listing, the boot), Gallery (the fan), SelectedRows, WorkshopCards, ProjectAsk (the "open on GitHub?" pop-up), ProjectPicture (no script)
   lib/draftingField.ts              # the drafting field: drift, the ping schedule, probe readouts — pure; DraftingField.astro strokes its isolines through marchingSquares' isoSegments over the grid sampleGrid() lays out
   lib/asciiBanner.ts                # the PROJECTS banner as SVG rects from letter matrices (the mono subset has no block glyphs)
@@ -435,7 +434,9 @@ Section order (= the descent), all seven top-level `<section>`s of `main.is-slid
 full-bleed behind) → **Interlude** (the tagline in the warm sky) → **Choice** →
 **Rules** → **Solve** (the three-slide explainer) → **Story** (the editorial, with
 the descent graph in a sticky column beside it) → **Work** (the appendix: papers,
-writing, projects — with **Signature**, links + seal, inside it).
+writing, projects, and the cow at its foot). The page ends on Work's panel: there is
+no footer (it and its seal were deleted on the owner's word, "Delete it, CV+Email in
+menu"), and CV and Email are in the corner nav.
 
 **What I do comes before how I got here**, on the owner's observation: "the
 descent answered my trajectory, but didn't answer what I do. Normally people think
@@ -477,7 +478,7 @@ hand-type a number a module can compute.
 
 **The résumé is not on the homepage**, on the owner's instruction ("you may delete
 everything from below. The record, the experience, everything"). Nothing was lost:
-every block has its own route, and the corner nav plus the footer carry the doors.
+every block has its own route, and the corner nav carries the doors.
 
 `sections/Mountains.astro` — the old résumé section — **is deleted**, and so is
 /proto-paper, the last route that rendered it. This file used to say it was "kept on
@@ -523,15 +524,16 @@ string itself is built once, as `PHONE_QUERY`: `isPhone()`, the deck's change li
 **The number lives in two places and they are synced BY HAND.** `@media
 (max-width: var(--x))` is not valid CSS, so there is no way to feed one value to
 both. **If you change `PHONE_MAX_WIDTH`, change every `@media (max-width: 640px)`
-block with it.** `grep -rn 'max-width: *640px' src` returns **20 hits in 14 files**,
-and **three of the 20 are prose, not rules** — `viewport.ts` ×2 (its own doc
-comments) plus `global.css:311`, which describes the breakpoint in a comment
+block with it.** `grep -rn 'max-width: *640px' src` returns **21 hits in 14 files**,
+and **three of the 21 are prose, not rules** — `viewport.ts` ×2 (its own doc
+comments) plus `global.css:287`, which describes the breakpoint in a comment
 rather than declaring it — and **one is a `sizes` hint**:
 `projects/Gallery`'s `sizes="(max-width: 640px) 240px, 330px"`, the phone strip's
-card width, which must move with the strip's block. So there are **16 real CSS
-blocks across 13 files**: `experience` ×2, `projects/Gallery` ×2 and `global.css` ×2
-(one of each pair is `@media not all and (max-width: 640px)` — Gallery's desktop-only
-card lift and global.css's sky suppression), and one each in `CornerNav`,
+card width, which must move with the strip's block. So there are **17 real CSS
+blocks across 13 files**: `experience` ×2, `projects/Gallery` ×2, `global.css` ×2 and
+`CornerNav` ×2 (one of each of the last three pairs is `@media not all and (max-width: 640px)`
+— Gallery's desktop-only card lift, global.css's sky suppression and the corner nav's
+tighter capsule from 641 to 1199px), and one each in
 `DescentPath`, `FluidSky`, `Heights`, `projects.astro` (the phone's strip
 for the cow's bubble), `projects/TerminalHeader`, `404`, `research/index`,
 `research/[slug]` and `writing/[...slug]`. **The wide side is always written as that
@@ -545,7 +547,7 @@ which the documented `grep -rn 'max-width: 640px' src` silently missed while a
 careless re-count caught it as a rule. Use the pattern above, with the `*`, and
 classify each hit rather than subtracting a remembered number of prose lines.
 Earlier still it listed "the two proto sections": there are no proto *sections* —
-`src/sections/` holds only the seven homepage slides plus Signature. A prototype
+`src/sections/` holds only the seven homepage slides. A prototype
 route is not part of the phone treatment and need not use this breakpoint.
 `tests/viewport.test.ts` pins the value so a silent drift shows up as a failure
 rather than as a phone with half a treatment.
@@ -555,7 +557,10 @@ design was built **three times and reverted every time** — do not rebuild it. 
 phone treatment is *bug fixes only*, and the whole of it is:
 
 - the corner nav collapses to a **menu mark** that swaps for the list when opened
-  (mutually exclusive, so the capsule can never grow a second row);
+  (mutually exclusive, so the capsule can never grow a second row). The list is the
+  pages, then Email and CV as icon-and-word rows, then the theme toggle, each group
+  past a hairline, every row at least 44px tall; it scrolls inside itself on a
+  screen shorter than its 415px;
 - the **deck disengages** — measured in real WebKit, 5 of the 7 slides are taller
   than the viewport (rules 1.84 screens, story 3.07 on an iPhone 14; 2.5 and 4.2 on
   an SE), so its "every slide owns the screen" contract is simply false there. All
@@ -649,24 +654,16 @@ phone treatment is *bug fixes only*, and the whole of it is:
     range up to it, and `tests/distSmoke.test.ts` compares the built rule's weight with
     the declared face — a weight past the face's range gets a fake bold that no
     computed style can reveal.
-- **`profile.ts`'s `links` array is a SECOND list, and it HAS diverged before.**
-  It exists for a different job — the footer, the CV button, and the GitHub/LinkedIn
-  hrefs that JSON-LD's `sameAs` reads — but it also enumerates pages, and it once
-  went a whole release missing `/writing` while `PAGES` carried it, so the corner nav
-  offered five doors and the footer four. **The two lists now hold the same five
-  pages**, and the seam is no longer trust-based: `tests/distSmoke.test.ts` reads the
-  built homepage's footer nav and asserts every `PAGES` href reaches it, plus the
-  converse — that the footer never links a page the build didn't produce. A human
-  never caught the original drift; that test did.
-  - They agree on **membership, not on order**, and a comment in `profile.ts` claims
-    otherwise ("The order matches PAGES so the two read the same way round"). It
-    doesn't: `PAGES` runs research → writing → **projects → experience** → art, and
-    `links` runs research → writing → **experience → projects** → art. Nothing reads
-    order across the two lists, so this is cosmetic — but don't trust that comment as
-    a spec, and if you make the orders match, fix the comment or delete it.
-  When you add a page: **`PAGES` is canonical, `links` must be updated by hand, and
-  the dist smoke test is what tells you that you forgot.** Anything that just needs
-  "the pages" should read `PAGES`.
+- **The contact links are one typed record, `contact` in `profile.ts`** (`github`,
+  `email`, `cv`, `linkedin`, each an href, a label and a new-tab flag), read by
+  `CornerNav` and by BaseLayout's JSON-LD `sameAs`; `PAGES` is the only page list.
+  - **The corner nav is the only place CV and Email are linked**, so it links them at
+    every width: from 1200px all four marks, as icons (with their words from 2200px);
+    from 641 to 1199px Email and CV only, in a capsule whose paddings tighten to fit one
+    row at 641px (`CornerNav.astro` has the arithmetic, classic scrollbar included); on a
+    phone, rows in the opened list (*Phones*). Below 1200px no page links GitHub or
+    LinkedIn as profiles. `tests/distSmoke.test.ts` checks every built page's nav for the
+    CV and Email links and that no rule hides them.
 - **`src/lib/pageStops.ts` is one tree per page, and it drives BOTH the rail and
   the page's section ids.** This is structural, not stylistic: an old single-page
   /research rendered N papers with `featured.map(...)` while building its rail with
@@ -714,7 +711,8 @@ phone treatment is *bug fixes only*, and the whole of it is:
     comment is the rule). Two stops are lit at a section boundary **on purpose** — the reader
     is looking at both — and one of them leads; links carry `aria-current="true"`, which is
     valid on more than one.
-  - **Every label clears 4.5:1 at rest, on every rail page's ground**, because a label is three
+  - **Every label clears 4.5:1 at rest, on every rail page's ground** (on `/`, the sky as its
+    CSS gradient; see the end of this bullet), because a label is three
     layers of one text (`SideRail.astro`'s header says how): a mark is a cross-fade of
     opacities, never a colour transition, so every state is a solid ink. The label is the only text
     in the markup; the two inks over it are empty `aria-hidden` elements whose text is generated
@@ -728,9 +726,9 @@ phone treatment is *bug fixes only*, and the whole of it is:
     (light `#4e483d`: 4.59:1 on the tan panels, where `--ink-3` is 3.80; dark `--ink-3`) and the
     focus ring `--rail-focus` (light `--ink-1`, 9.32:1 on the tan, where `--ochre` is 1.19; dark
     `--ochre`), held with the marks and the dash by `tests/deckPalette.test.ts` on the panels and
-    on the sky's CSS gradient, its no-WebGL state, down to the Interlude's foot. Not held: the
-    footer's near-black ground, behind the rail only in a window under ~560px tall at the last
-    screen; and the live sky a desktop with WebGL draws over that gradient (FluidSky, SkyWash,
+    on the sky's CSS gradient, its no-WebGL state, down to the Interlude's foot; the last screen
+    is Work's panel, as nothing follows it. Not held: the live sky a desktop with WebGL draws
+    over that gradient (FluidSky, SkyWash,
     the `.descent` washes), which the descent variant lets darken nearly freely, since what it
     guards against is a lighter sky under its paper-coloured text — a danger to the light
     theme's dark labels.
@@ -1293,11 +1291,13 @@ galaxy). The whole system is **token override**, not per-component branching:
      route. The dim had never once applied.
    - **The cheap check is in `dist`, not in review.** Parse every
      `X[data-astro-cid-N]` fragment out of `dist/_astro/*.css` and assert some
-     element in `dist` carries that hash *and* that tag/class. 128 fragments
-     today, 5 of them dead. Be aware this cannot be a blind gate: one of the 5 is
-     a legitimate empty-state branch in `Work.astro` that simply never renders
-     while a writing piece is published, and its signature is identical to a real
-     bug. An allowlist would be needed, which is why it is a tool to run and not a
+     element in `dist` carries that hash *and* that tag/class (an attribute value
+     may hold a `>`: the terrain canvas's `data-bubbles` and Grain's data-URI style
+     do). 356 fragments today, 4 of them dead. Be aware this cannot be a blind gate:
+     all 4 are a legitimate empty-state branch in `Work.astro` (`.wk-tag`,
+     `.wk-promise`, `.wk-topics` and its `li`) that simply never renders while a
+     writing piece is published, and their signature is identical to a real bug.
+     An allowlist would be needed, which is why it is a tool to run and not a
      test that exists.
 2. **At equal specificity, SOURCE ORDER decides.** Put an override **after** the
    rule it overrides. A phone override placed above the desktop rule it was meant to
@@ -1509,8 +1509,10 @@ titles came to rest hard against the browser chrome — the lead is a number in
   **emerald** (`--ochre: #66c28c` under dark) — a second saturated color, on
   purpose, because the terminal/coder identity is the whole point of dark mode
   (the user chose it seeing both this and a "night descent" variant live). Do
-  NOT "fix" this back to ochre. The seal red stays the brand mark in both
-  themes (brightened to `#e0574a` for the dark ground).
+  NOT "fix" this back to ochre. Seal red stays the brand colour in both
+  themes (`--seal`, brightened to `#e0574a` for the dark ground). The IT seal
+  itself is drawn on no page since the footer went; it is the favicon and the
+  OG card.
   **And the exception to the exception: the registers have no emerald**: /projects' and
   the research routes' palettes set `--ochre` to the seal in both themes (see *Themes*), so
   seal red is the only saturated colour on them in dark too.

@@ -253,18 +253,11 @@ export function appendixProjects(ps: readonly Project[]): Project[] {
   return ps.filter((p) => p.tier === 'selected' && p.kind !== 'research').slice(0, 2);
 }
 
-export const links: { label: string; href: string; primary?: boolean }[] = [
-  { label: 'Download CV', href: '/cv.pdf', primary: true },
-  { label: 'Research', href: '/research' },
-  // WRITING WAS MISSING HERE while data/nav.ts's PAGES carried it, so the corner nav offered /writing and the
-  // footer did not — two page lists, already diverged. Caught by the dist smoke test, not by a human.
-  // The order matches PAGES so the two read the same way round; tests/distSmoke.test.ts now asserts every
-  // PAGES href reaches the rendered footer, which is what keeps them in step from here.
-  { label: 'Writing', href: '/writing' },
-  { label: 'Experience', href: '/experience' },
-  { label: 'Projects', href: '/projects' },
-  { label: 'Art', href: '/art' },
-  { label: 'Email', href: 'mailto:zeying.tian@mail.mcgill.ca' },
-  { label: 'GitHub', href: 'https://github.com/IngTian' },
-  { label: 'LinkedIn', href: 'https://www.linkedin.com/in/ing-tian-1b2610149/' },
-];
+/** The four ways to reach the owner, each as the corner nav links it (`external` opens a new tab); BaseLayout's
+ *  JSON-LD `sameAs` names the two profiles. The pages are data/nav.ts's PAGES, the one page list. */
+export const contact = {
+  github: { label: 'GitHub', href: 'https://github.com/IngTian', external: true },
+  email: { label: 'Email', href: 'mailto:zeying.tian@mail.mcgill.ca', external: false },
+  cv: { label: 'CV', href: '/cv.pdf', external: true },
+  linkedin: { label: 'LinkedIn', href: 'https://www.linkedin.com/in/ing-tian-1b2610149/', external: true },
+} as const satisfies Record<string, { label: string; href: string; external: boolean }>;

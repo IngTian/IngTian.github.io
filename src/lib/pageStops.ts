@@ -200,9 +200,7 @@ export function homeStops(): Stop[] {
       ],
     },
     { label: 'The climb', target: 'story' },
-    // ONE STOP, NOT TWO. 'The work' and 'Links' were separate sections and so separate deck stops, which left
-    // 161px of empty panel below the work and made the last stop a 193px footer strip. They are one section now
-    // (see sections/Work.astro), so the rail names it once.
+    // The last slide, and the page ends on it (sections/Work.astro).
     { label: 'Appendix', target: 'appendix' },
   ];
 }

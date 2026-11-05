@@ -3,7 +3,7 @@ import '../styles/global.css';
 import { Font } from 'astro:assets';
 import { ClientRouter } from 'astro:transitions';
 import CornerNav from '../components/CornerNav.astro';
-import { name, roles, links } from '../data/profile';
+import { name, roles, contact } from '../data/profile';
 
 interface Props {
   title?: string;
@@ -74,18 +74,15 @@ const noindex = noindexProp || Astro.url.pathname.startsWith('/proto-');
 
 // JSON-LD Person — the one structured-data type a personal portfolio benefits
 // from, built from the résumé data so it never drifts from the visible content.
-// Emitted once per page (it describes the person, not the page). links[] carries
-// the profile URLs used for sameAs.
+// Emitted once per page (it describes the person, not the page). sameAs is the
+// two profiles in profile.ts's `contact`.
 const personLd = {
   '@context': 'https://schema.org',
   '@type': 'Person',
   name: `${name.first} ${name.last}`,
   url: Astro.site?.href,
   jobTitle: roles,
-  sameAs: [
-    links.find((l) => l.label === 'GitHub')?.href,
-    links.find((l) => l.label === 'LinkedIn')?.href,
-  ].filter((h): h is string => Boolean(h)),
+  sameAs: [contact.github.href, contact.linkedin.href],
   alumniOf: 'McGill University',
 };
 ---

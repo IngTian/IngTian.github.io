@@ -2,21 +2,18 @@
 // THE HOMEPAGE'S RAIL INK — `html[data-page='deck']` in tokens.css.
 //
 // The homepage's rail (SideRail) is fixed, and the page moves under it: off the hero (hideOver), it sits over the
-// Interlude's sky and then over the five opaque paper panels. Light --ink-3, the resting ink on every other rail
-// page, is under 4.5:1 on the tan panel, so the page names its own, --rail-ink, which SideRail reads with --ink-3 as
-// its fallback; and light --ochre, the focus ring on every other page, is barely visible there, so the page names
-// --rail-focus too. Each label the rail draws (resting, the quiet mark's --ink-2, the lead's --ink-1), its dash and
+// Interlude's sky and then over the five opaque paper panels; the last, Work's, fills the page's last screen, as
+// nothing follows it. Light --ink-3, the resting ink on every other rail page, is under 4.5:1 on the tan panel, so
+// the page names its own, --rail-ink, which SideRail reads with --ink-3 as its fallback; and light --ochre, the
+// focus ring on every other page, is barely visible there, so the page names --rail-focus too. Each label the rail draws (resting, the quiet mark's --ink-2, the lead's --ink-1), its dash and
 // its focus ring are measured here on each ground it can sit on, in both themes. The sky is its CSS gradient, the
 // ramp in lib/skyPalette.ts: the state with no WebGL.
 //
-// Not measured:
-// - the footer below the Work panel, on the near-black foot of the sky. It comes behind the rail only in a window
-//   less than about 560px tall, on the page's last screen, and no ink dark enough for the tan clears it;
-// - the live sky over the Interlude: FluidSky's descent shader, which a desktop with WebGL draws over the gradient,
-//   and SkyWash's and .descent::before/::after's washes. The descent variant restrains a lighter sky, the danger for
-//   its paper-coloured text, and leaves darkening nearly free (a viscous floor of 0.86 and a darkward gate of 0.75,
-//   lib/skyLegibility.ts), so in the light theme, whose labels are dark, it can darken the sky under one past the
-//   gradient measured here.
+// Not measured: the live sky over the Interlude, FluidSky's descent shader, which a desktop with WebGL draws over
+// the gradient, and SkyWash's and .descent::before/::after's washes. The descent variant restrains a lighter sky,
+// the danger for its paper-coloured text, and leaves darkening nearly free (a viscous floor of 0.86 and a darkward
+// gate of 0.75, lib/skyLegibility.ts), so in the light theme, whose labels are dark, it can darken the sky under
+// one past the gradient measured here.
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { rampFor, type Theme } from '../src/lib/skyPalette';

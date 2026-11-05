@@ -15,12 +15,6 @@
   --color-ochre: var(--ochre);
   --color-indigo: var(--indigo);
   --color-seal: var(--seal);
-  /* Text sitting ON the accent, as a utility. tokens.css has defined --on-accent all along and names the CV
-     button as the reason it exists, but the footer never used it: it set text-ink-1, which rides the ink ramp,
-     so in dark theme the button painted near-white #dce1dc on phosphor green #66c28c — measured at 1.64:1,
-     against a 4.5:1 requirement. Exposing it here means the fix is a utility swap rather than a hand-written
-     override, and any future accent chip can reach it the same way. */
-  --color-on-accent: var(--on-accent);
   /* THE TYPE ROLES, built from astro:fonts' own --ff-* variables and declared in exactly ONE place.
      They used to be literal stacks written out here AND again in tokens.css, and that duplication is what hid
      a total failure: whichever copy came last won, and both named "Fraunces" — a family with no @font-face rule
@@ -149,16 +143,6 @@ html.intro-flat .descent {
    dead air under it. The paper panels stay full-bleed because
    they are the flex ITEM, so the ground still reaches both edges.
    ============================================================ */
-/* EXCLUDES THE SIGNATURE rather than overriding it afterwards, and that distinction was a real bug. The footer
-   is not a slide — it is a strip — and it used to be exempted below with `display: block`, which silently beat
-   its own Tailwind `flex justify-between items-end` (an ID selector outranks a utility class). So on the
-   homepage, and ONLY on the homepage, the footer laid out as three stacked blocks and the IT seal rendered at
-   the far LEFT instead of the bottom right. The owner reported it twice as the seal "drifting"; both of my
-   earlier attempts edited the markup, which could not have worked, because the markup was never the problem.
-   Excluding it here means the utilities in Signature.astro simply apply, and there is nothing left to override.
-   THE EXCLUSION IS GONE because the footer is no longer a top-level section: it is nested inside #appendix (see
-   sections/Work.astro), so this selector cannot reach it and there is nothing to exempt. Keeping a :not() for an
-   element that can never match would be a false clue about the layout. */
 .is-slides > section {
   min-height: 100vh;
   display: flex;
@@ -201,11 +185,7 @@ html.intro-flat .descent {
      for this air. Padding keeps the paper flush to the top of the screen and moves only the content inside it.
 
      78px clears the wrapped two-row capsule on phones (12px offset + ~54px tall) and the single-row capsule in
-     landscape (17px + ~44px).
-     The footer needs no clearance rule of its own. It used to be a stop, so the deck rested with its first row at
-     the top of the screen and the capsule sat across "Download CV ↓" — 95px of it at 320px, a band where a tap
-     would have hit the nav instead of the link. Nested inside #appendix it is never at the top of the viewport at
-     rest, and this panel's padding above covers the case. ── */
+     landscape (17px + ~44px). ── */
   @media (max-width: 1100px), (max-height: 620px) { padding-top: 78px; }
 
   /* ── ON A PHONE THAT CLEARANCE IS NOW A HOLE, so it comes back down. ──
@@ -221,10 +201,6 @@ html.intro-flat .descent {
      project several silent fixes. ── */
   @media (max-width: 640px) { padding-top: 22px; }
 }
-/* The nested footer must NOT stretch. It is the last flex item in #appendix, and a stretched footer would put its
-   links in the middle of a tall band instead of at the foot of the page. `flex: none` keeps it at its own height
-   and lets the tan panel above it take the slack. */
-.is-slides > section > #signature { flex: none; }
 
 /* ── Atmosphere, upper sky (heights → interlude). Normal blend: these are warm
    LIGHT washes + a soft horizon haze that read on the pale paper. Localized to
