@@ -57,13 +57,13 @@ decides how a page may change it:
   ground, the paper page's Copy BibTeX). A new page **adds a skin, not a new button.** A skin obeys the motion
   rule: the sticker's plate moves by `transform`, not `box-shadow` (`Button.astro` says how).
 
-**Restraint is the aesthetic.** Text is English-only — the literati feel comes from composition and negative
-space, never from displayed CJK glyphs. The lone exceptions are deliberate math glyphs (∇/λ/μ), rendered as
-build-time MathML. **The rule governs TEXT, not pictures of the owner's works:** a capture of a work keeps
-what it shows — the calligraphy on /art, and the two-character motto recorded in manifold's screensaver on
-/projects, which `tools/vendor-projects.mjs` vendors whole, never painted out. Words the site sets (copy,
-labels, the cow's lines, the computed pictures' svg text) stay English, and the tests that hold them say
-"text". When in doubt, remove rather than add.
+**Restraint is the aesthetic.** Text is English, and Chinese where it is the right word: the literati feel
+comes from composition and negative space, not from which script is set. Chinese is set in the reader's
+system faces, never a downloaded one (*Stack*). Math glyphs (∇/λ/μ) are build-time MathML. A capture of a
+work keeps what it shows: the calligraphy on /art, and the two-character motto in manifold's screensaver on
+/projects, which `tools/vendor-projects.mjs` vendors whole. (An English-only rule stood here until
+2026-11-05; the owner lifted it, "we can have chinese as well". Do not re-add it.) When in doubt, remove
+rather than add.
 
 ## Stack
 
@@ -97,8 +97,17 @@ labels, the cow's lines, the computed pictures' svg text) stay English, and the 
   UI stack** — neither downloads anything, and both are deliberate: no webfont rendered for a long time, so the
   design was always judged in them, and when Fraunces finally appeared the owner rejected it on sight ("prod's
   font is better, the current font is kind of weird"). Keep Georgia for structure. `--font-mono` is
-  **JetBrains Mono** and `--font-accent` **Fraunces**, only on sub-headlines and italic editorial lines. No
-  CJK fonts.
+  **JetBrains Mono** and `--font-accent` **Fraunces**, only on sub-headlines and italic editorial lines.
+  - **No CJK webfont** (a CJK face is megabytes): Chinese renders in the reader's system faces, and no stack
+    names one. The fallback already keeps the register on a Mac (measured in Chrome): after Georgia it is
+    Songti, a serif; after the system UI stack and JetBrains Mono, PingFang, a sans. Naming `Songti SC` would
+    force Simplified forms on Traditional text. **Chinese text carries `lang`** (`zh-Hant` or `zh-Hans`, by its
+    script): it picks the glyph forms (Songti TC or SC) and the screen-reader voice, and lets a stack's closing
+    generic find the browser's CJK default. Not in the accent role: Han has no italic, and Fraunces falls back
+    to PingFang, a sans, unless a `zh` `lang` sends it on to Songti.
+    /projects' listing and computed pictures stay inside JetBrains Mono's latin subset
+    (`tests/projectsListing.test.ts`, `tools/vendor-projects.mjs`' `DRAWABLE`), a font-coverage rule, not a
+    language rule.
   - **LOCAL files** in `src/assets/fonts/` through `fontProviders.local()`, never `fontProviders.google()`: a
     build that fetches from Google failed CI with a 404 when a file hash rotated mid-run, and the same failure
     on `main` would leave the site stale. Variable fonts, one file per style, `weight` a range (JetBrains

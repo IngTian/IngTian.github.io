@@ -290,8 +290,7 @@ describe("Table 1, the paper's Table 2", () => {
 
 describe('both figures', () => {
   for (const [name, html] of [['Figure 2', full], ['the miniature', mini], ['Figure 1', pipe], ['Table 1', table]] as const) {
-    it(`${name} prints no CJK and never says "published"`, () => {
-      expect(html).not.toMatch(/[\u3000-\u9fff]/);   // the CJK block
+    it(`${name} never says "published"`, () => {
       expect(html).not.toMatch(/published/i);
     });
   }

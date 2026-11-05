@@ -96,17 +96,6 @@ describe('PROJECT_COW_LINES', () => {
   it("quotes witness's release count from profile.ts", () => {
     expect(byKey.witness.some(([a]) => a === `${WITNESS_RELEASES} releases.`)).toBe(true);
   });
-
-  // By code point: CJK symbols and kana through the unified ideographs, Hangul, the compatibility ideographs and
-  // the full-width forms. TEXT: the English-only rule governs words the site sets, not pictures of the owner's works
-  // (CLAUDE.md, The concept) — manifold's screensaver frames keep the motto they were recorded with.
-  it('prints no CJK text', () => {
-    const cjk = (cp: number): boolean =>
-      (cp >= 0x3000 && cp <= 0x9fff) || (cp >= 0xac00 && cp <= 0xd7af) ||
-      (cp >= 0xf900 && cp <= 0xfaff) || (cp >= 0xff00 && cp <= 0xffef);
-    const found = ALL.flatMap((pair) => [...pair.join(' ')]).filter((c) => cjk(c.codePointAt(0)!));
-    expect(found).toEqual([]);
-  });
 });
 
 // THE BUBBLE IS CAPPED TO THE COW'S COLUMN, AND THE COLUMN IS THE MOCKUP'S. From 1180px the cow is fixed in a
