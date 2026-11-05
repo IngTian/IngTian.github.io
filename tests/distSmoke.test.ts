@@ -679,7 +679,7 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
       else if (m[0] === '</ul>') open -= 1;
       else {
         out.push({
-          target: /\shref="#([^"]*)"/.exec(m[1])?.[1] ?? '', label: decode(/\sdata-l="([^"]*)"/.exec(m[2])?.[1] ?? ''),
+          target: /\shref="#([^"]*)"/.exec(m[1])?.[1] ?? '', label: decode(/<span class="dim"[^>]*>([^<]*)</.exec(m[2])?.[1] ?? ''),
           depth: open - 1, tag: m[1], inner: m[2],
         });
       }
@@ -693,17 +693,18 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
     expect(railPages().map((p) => p.route).sort()).toEqual(['/experience', '/projects', '/research', '/research/rl-bhrp', '/writing']);
   });
 
-  // The label is two layers in the markup and two more in CSS (::before, ::after, from data-l), so its states
-  // cross-fade by opacity. The dash is its own aria-hidden span. The marks are the script's: none is served. The
-  // one thing served on a link is its place in the entrance, --i, its index in document order.
-  it('renders every link as href + aria-hidden dash + one label whose data-l is its text, its --i, and no state', () => {
+  // The label is three layers of its text in the markup, so its states cross-fade by opacity: the dim one, which is
+  // the link's name, and two inks over it, each aria-hidden, so every engine names the link by its label once. The
+  // dash is its own aria-hidden span. The marks are the script's: none is served. The one thing served on a link is
+  // its place in the entrance, --i, its index in document order.
+  it('renders every link as href + aria-hidden dash + its label and two aria-hidden copies, its --i, and no state', () => {
     const bad: string[] = [];
     for (const p of railPages()) {
       for (const [k, it] of itemsOf(p).entries()) {
-        const parts = /^<span class="rule" aria-hidden="true"[^>]*><\/span><span class="lbl" data-l="([^"]*)"[^>]*><span class="dim"[^>]*>([^<]*)<\/span><\/span>$/
+        const parts = /^<span class="rule" aria-hidden="true"[^>]*><\/span><span class="lbl"[^>]*><span class="dim"[^>]*>([^<]*)<\/span><span class="ink2" aria-hidden="true"[^>]*>([^<]*)<\/span><span class="ink1" aria-hidden="true"[^>]*>([^<]*)<\/span><\/span>$/
           .exec(it.inner);
         if (!parts) bad.push(`${p.route} #${it.target}: ${it.inner}`);
-        else if (decode(parts[1]) !== decode(parts[2])) bad.push(`${p.route} #${it.target}: data-l ≠ its text`);
+        else if (parts[2] !== parts[1] || parts[3] !== parts[1]) bad.push(`${p.route} #${it.target}: a copy ≠ its label`);
         if (!p.ids.has(it.target)) bad.push(`${p.route}: the rail links #${it.target}, which the page does not emit`);
         if (/\s(aria-current|class)=/.test(it.tag)) bad.push(`${p.route} #${it.target}: served with ${it.tag}`);
         if (/\sstyle="([^"]*)"/.exec(it.tag)?.[1] !== `--i:${k}`) bad.push(`${p.route} #${it.target}: not style="--i:${k}" in ${it.tag}`);
@@ -784,13 +785,16 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
     expect(railRules().some(([, sel]) => /\.is-hover/.test(sel)), 'no rule reads .is-hover').toBe(true);
   });
 
-  // The label's two generated layers are `attr(data-l) / ''`, an alt text that keeps them out of find-in-page and the
-  // accessible name. An engine that does not parse the alt form drops the whole declaration, and with the served
-  // layer at opacity 0 an active label would show nothing: the plain form before it is that engine's.
-  it("keeps a plain content fallback before the labels' alt-text form, as shipped", () => {
-    const content = railRules().filter(([, sel]) => /\.lbl:{1,2}before/.test(sel) && /\.lbl:{1,2}after/.test(sel))
-      .flatMap(([, , body]) => [...body.matchAll(/(?:^|;)content:([^;]*)/g)].map((m) => m[1].replace(/\s+/g, '')));
-    expect(content).toEqual(['attr(data-l)', 'attr(data-l)/""']);
+  // Generated text is in the accessible name in some engines and not in others (the alt text after a slash that
+  // keeps it out does not parse before Safari 17.4 and Firefox 128), so no label is generated: every layer of one is
+  // in the markup above. The rail's one generated box is the hover preview's dash, which holds no text. The copies
+  // cannot be selected, so a copied selection holds each label once.
+  it('generates no label text, and keeps the copies out of a selection', () => {
+    const content = railRules().flatMap(([, sel, body]) => [...body.matchAll(/(?:^|;)content:([^;]*)/g)]
+      .map((m) => `${sel.trim().replace('::', ':')} ${m[1].replace(/\s+/g, '')}`));
+    expect(content).toEqual(['.side-rail a:after ""']);
+    expect(railRules().some(([, sel, body]) => /\.ink2\b/.test(sel) && /\.ink1\b/.test(sel) && /user-select:none/.test(body)),
+      'the copies can be selected').toBe(true);
   });
 
   // Forced colours (Windows High Contrast) map every ink to one system colour and paint backgrounds as Canvas, so the
@@ -802,7 +806,7 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
     const dash = rules.find((r) => /\.side-rail \.rule\b/.test(r.sel));
     expect(dash?.body, 'no forced-colours rule for the dash').toMatch(/forced-color-adjust:none/);
     expect(dash?.body).toMatch(/background(?:-color)?:highlight\b/i);
-    const current = rules.find((r) => /\.is-active\b/.test(r.sel) && /\.lbl:{1,2}after/.test(r.sel));
+    const current = rules.find((r) => /\.is-active\b/.test(r.sel) && /\.ink1\b/.test(r.sel));
     expect(current?.body, 'no forced-colours underline for the current label').toMatch(/text-decoration(?:-line)?:underline\b/);
   });
 });

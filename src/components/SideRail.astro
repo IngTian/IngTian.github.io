@@ -2,13 +2,13 @@
 // The marginal table-of-contents rail, one component for every page that has one, driven by a Stop tree from
 // lib/pageStops. The template recurses, so the rail is as deep as the tree.
 //
-// Each label is three layers of the same text — the served one, dim (--ink-3), and two generated copies from
-// data-l, --ink-2 for the quieter mark and --ink-1 for the lead — so a state change is a cross-fade of opacities,
-// never a colour transition, and every state is a solid ink at rest (the inactive one clears 4.5:1 on every rail
-// page's ground). The copies are `content: attr(data-l) / ''`, so find-in-page, a copied selection and the
-// accessible name see each label once; a plain `attr(data-l)` before it is for an engine that does not parse the
-// alt text (Safari before 17.4, Firefox before 128), which would otherwise drop the declaration and show an active
-// label as nothing. The dash hangs in a 20px gutter left of the label, so no label ever moves.
+// Each label is three layers of the same text — the dim one (--ink-3), which is the link's name, and two copies over
+// it, .ink2 for the quieter mark and .ink1 for the lead — so a state change is a cross-fade of opacities, never a
+// colour transition, and every state is a solid ink at rest (the inactive one clears 4.5:1 on every rail page's
+// ground). The copies are elements, aria-hidden, so every engine names a link by its label once (generated text is
+// named by some engines and not by others), and they cannot be selected, so a copy of a selection holds each label
+// once; find-in-page, which reads them, can match a label up to three times. The dash hangs in a 20px gutter left
+// of the label, so no label ever moves.
 //
 // Not an island (the site has none): a vanilla <script>, started through onPageView, with a teardown. The entrance
 // is CSS, not the script's: a bundled script runs after the browser has painted, so a from-state it set could land
@@ -44,7 +44,7 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
   <ul class={depth > 0 ? 'sub' : undefined}>
     {stops.map((s) => (
       <li>
-        <a href={`#${s.target}`} style={`--i:${flat.indexOf(s)}`}><span class="rule" aria-hidden="true"></span><span class="lbl" data-l={s.label}><span class="dim">{s.label}</span></span></a>
+        <a href={`#${s.target}`} style={`--i:${flat.indexOf(s)}`}><span class="rule" aria-hidden="true"></span><span class="lbl"><span class="dim">{s.label}</span><span class="ink2" aria-hidden="true">{s.label}</span><span class="ink1" aria-hidden="true">{s.label}</span></span></a>
         {s.children && s.children.length > 0 && <Astro.self stops={s.children} depth={depth + 1} flat={flat} />}
       </li>
     ))}
@@ -94,13 +94,13 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
      it. */
   .side-rail .lbl { position: relative; min-width: 0; text-shadow: var(--knockout, none); }
   .side-rail .dim,
-  .side-rail .lbl::before,
-  .side-rail .lbl::after { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .side-rail .ink2,
+  .side-rail .ink1 { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .side-rail .dim { color: var(--ink-3); }
-  .side-rail .lbl::before,
-  .side-rail .lbl::after { content: attr(data-l); content: attr(data-l) / ''; position: absolute; inset: 0; opacity: 0; }
-  .side-rail .lbl::before { color: var(--ink-2); }
-  .side-rail .lbl::after { color: var(--ink-1); }
+  .side-rail .ink2,
+  .side-rail .ink1 { position: absolute; inset: 0; opacity: 0; -webkit-user-select: none; user-select: none; }
+  .side-rail .ink2 { color: var(--ink-2); }
+  .side-rail .ink1 { color: var(--ink-1); }
 
   /* The dash, and its faint preview at a hovered or focused row (a::after): the same 20px hairline in the gutter,
      shown by opacity and scaled from its left end. A text-shadow does not reach the dash (a painted span), so it
@@ -119,9 +119,9 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
      a time. The quiet dash keeps the full strength: at the prototype's 0.69 of it, it computes to 2.30-2.40:1 in
      light, under 3:1. */
   .side-rail a:is(.is-active, .is-ancestor) .dim { opacity: 0; }
-  .side-rail a.is-active .lbl::after { opacity: 1; }
-  .side-rail a:is(.is-ancestor, .is-quiet) .lbl::before { opacity: 1; }
-  .side-rail a.is-active.is-quiet .lbl::after { opacity: 0; }
+  .side-rail a.is-active .ink1 { opacity: 1; }
+  .side-rail a:is(.is-ancestor, .is-quiet) .ink2 { opacity: 1; }
+  .side-rail a.is-active.is-quiet .ink1 { opacity: 0; }
   .side-rail a:is(.is-active, .is-ancestor) .rule { opacity: 1; }
   .side-rail a:is(.is-ancestor, .is-quiet) .rule { transform: scaleX(0.6); }
 
@@ -130,7 +130,7 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
      dash in Highlight (and the hover preview with it, at its own opacity), the current label underlined. */
   @media (forced-colors: active) {
     .side-rail .rule, .side-rail a::after { forced-color-adjust: none; background: Highlight; box-shadow: none; }
-    .side-rail a.is-active .lbl::before, .side-rail a.is-active .lbl::after { text-decoration: underline; }
+    .side-rail a.is-active .ink2, .side-rail a.is-active .ink1 { text-decoration: underline; }
   }
 
   /* HOVER IS .is-hover, NOT :hover: the script sets it for a mouse or a pen and ignores a touch, so a tap on a
@@ -145,8 +145,8 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
      fades are the script's. The times are lib/motionTiming's RAIL, the curve its EASE (tests/motionTiming.test.ts). */
   @media (prefers-reduced-motion: no-preference) {
     .side-rail .dim,
-    .side-rail .lbl::before,
-    .side-rail .lbl::after { transition: opacity 200ms ease-out; }
+    .side-rail .ink2,
+    .side-rail .ink1 { transition: opacity 200ms ease-out; }
     .side-rail a::after { transition: opacity 160ms ease-out; }
     .side-rail .lbl { transition: transform 160ms cubic-bezier(.2,.7,.2,1); }
     .side-rail a:focus-visible .lbl { transform: translateX(2px); }
