@@ -913,7 +913,7 @@ of sky over a full-bleed panel.
   - **`npm run build` is NOT type-checked.** Astro and vitest hand `.ts` to esbuild, which strips annotations
     without asking the compiler; a green build says nothing about types.
   - **`npm run typecheck` is the only type gate**, and it runs **two** checkers because neither covers the
-    other: `astro check` is the only thing that reads the ~4,200 lines of `<script>` bodies in `.astro` files,
+    other: `astro check` is the only thing that reads the `<script>` bodies in `.astro` files,
     and `tsc --noEmit` the only thing that covers `tests/` and `src/lib`. Run it after a build, so the
     content-collection types in `.astro/` exist. `tsconfig.json` excludes `tmp_*` and `.tmp-*`, the ad-hoc
     probes.

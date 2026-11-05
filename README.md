@@ -5,8 +5,8 @@ Operations Research PhD at the University of Toronto, full-stack SDE/MLE. Live a
 **https://ingtian.github.io**.
 
 The homepage is a vertical scroll *down* one continuous "Monet sky" — *"The Descent"* — paged one slide per
-gesture like a deck. Around it are **/research** (the papers, each explained on its own page), **/writing**,
-**/projects**, **/experience** and **/art**, a quiet museum room for calligraphy and photography.
+gesture like a deck. Around it are **/research** (the papers, each opening its page here or its publisher's),
+**/writing**, **/projects**, **/experience** and **/art**, a quiet museum room for calligraphy and photography.
 
 > **[CLAUDE.md](./CLAUDE.md) is the guide**: the stack, the layout, the design rules, the traps that have each
 > shipped a bug here, and what has already been built and rejected. Read it before changing anything. This
@@ -44,7 +44,7 @@ Before committing, all three, in this order: `npm run build` → `npm run typech
 | The page set (the corner nav) | `src/data/nav.ts` (`PAGES`). |
 | Calligraphy | `src/data/artworks.ts` + images in `src/assets/art/`. |
 | Photographs | files in `src/assets/art/photos/` (auto-globbed); per-photo copy in `src/data/photoNotes.ts`. |
-| Palette | `src/styles/tokens.css` — the only colors on the site. |
+| Palette | `src/styles/tokens.css`. The rule and its exceptions are in CLAUDE.md, *Taste rules* and *Themes*. |
 
 ## License
 
