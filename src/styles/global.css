@@ -355,16 +355,9 @@ html[data-theme='dark'] .descent::after {
   .descent.is-fluid.fluid-live .sky-wash { opacity: 0.35; }
 }
 
-/* (The `.terminal-chrome` fill lived here — two rules, light and dark — because Terminal.tsx was a React island
-   with no <style> of its own. Both are DELETED: the scripted terminal and the whole src/components/terminal/
-   directory are gone, and `grep -rn terminal-chrome src` plus a grep over every dist/**.html now return nothing,
-   so neither rule could match an element on any route. They were shipping in the critical-path stylesheet on
-   every page to style a component that no longer exists.
-   This note used to end "CLAUDE.md still describes the terminal as the site's one React island — that is stale,
-   and correcting it is on the docs pass, not this one." Both halves are done: CLAUDE.md now opens by stating
-   there is no island, and lib/motion.ts's claim that one reads its helper is gone too. A comment that defers
-   its own correction to a later pass is only worth as much as that pass happening. The page count is dropped
-   for the same reason — it said "eleven" and the build prints nine.) */
+/* (No `.terminal-chrome` fill here: the scripted terminal and the whole src/components/terminal/ directory are
+   DELETED, and `grep -rn terminal-chrome src` plus a grep over every dist/**.html return nothing, so a rule for
+   it could match no element on any route — it would only ship in the critical-path stylesheet on every page.) */
 
 /* ── THE THEME-TOGGLE CROSSFADE IS GONE, and this note is why nobody should add it back.
    It wrapped the flip in document.startViewTransition() for a ~0.5s dissolve and claimed to fade

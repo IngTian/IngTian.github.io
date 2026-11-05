@@ -705,8 +705,8 @@ phone treatment is *bug fixes only*, and the whole of it is:
     held by `tests/paperPalette.test.ts` and `tests/draftingPalette.test.ts`; over the reading sky
     they were measured on screen (inactive labels 5.53 / 5.74 on /writing and 5.54 / 5.63 on
     /experience, light / dark; the dash at least 3.74:1).
-  - **Its motion is the rule's, and every piece of it runs once** (the timings are in
-    `SideRail.astro`). The entrance is CSS because a bundled script runs after first paint, and
+  - **Its motion is the rule's, and every piece of it runs once** (the timings are
+    `lib/motionTiming.ts`'s `RAIL`; the entrance's duration reaches the CSS as `--row`). The entrance is CSS because a bundled script runs after first paint, and
     a from-state it set could land on a rail already drawn at rest. Hover is `.is-hover`, not
     `:hover`, set for a mouse or a pen and never for `pointerType === 'touch'`. Reduced motion:
     the same marks, at once.
@@ -1493,11 +1493,13 @@ titles came to rest hard against the browser chrome — the lead is a number in
     limit.
     **The research routes and the rail are held to it, and to 2s per animation.** What moves
     there unasked moves once, by `transform` and `opacity` (the rail's entrance in CSS, the rest
-    through `scripts/motion.ts`), and ends within 2s — no test holds that bound; this sentence is
-    its record. Nothing on the screen the reader lands on is held back, nor anything above it (a
-    deep link, a restored scroll), and what waits runs at the latest after `MOTION_LIMIT_MS` on
-    screen. Under reduced motion each is its finished state at once. The timings are in the code
-    that plays them — `scripts/motion.ts`, the two research pages and `SideRail.astro` — not here.
+    through `scripts/motion.ts`), and ends within 2s. `tests/motionTiming.test.ts` holds each
+    single duration and delay to 2s at most; what it does not hold is delay plus duration across a
+    staggered batch, and this sentence is that half's only record. Nothing on the screen the reader
+    lands on is held back, nor anything above it (a deep link, a restored scroll), and what waits
+    runs at the latest after `MOTION_LIMIT_MS` on screen. Under reduced motion each is its finished
+    state at once. The timings are `lib/motionTiming.ts`'s (`REVEAL`, `RAIL`, `PAPER_PAGE`, `CARD`),
+    not here.
     **Everything older is not held to it yet, and this is the list known, not a guarantee**: the hero terrain, the fluid sky, the drafting field, SkyWash's three breathe
     loops and the `.descent::before/::after` drifts run for as long as they are on screen, and
     `/`'s `.scroll-cue` bobs forever in the foreground (`Heights.astro`). That is the site's
