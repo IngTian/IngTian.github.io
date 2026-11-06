@@ -20,23 +20,8 @@ export const EQUATIONS = {
 // Display-mode (centred, larger), for the equations set on a line of their own.
 const display = { ...opts, displayMode: true };
 
-// ── THE FACTOR MODEL IS GONE, AND IT WAS REJECTED BEFORE IT WAS DEAD ────────────────────────────────────
-//
-// This section held FACTOR_EQUATIONS (a general form and a definition of beta) plus factorExpansion(), a
-// function that baked the same equation with each fitted loading substituted in, muting zero-loading terms
-// via \textcolor. It fed the exposure fan on /proto-showpiece, and that route has been retired, so nothing
-// imports any of it.
-//
-// Two reasons it is deleted rather than parked. The obvious one is that a build-time KaTeX call with no
-// consumer is pure cost — katex is a devDependency precisely so none of it ships, and unreachable bakes make
-// the ledger of what the client receives harder to read.
-//
-// The one that actually settles it: all three rendered `r_{\mathrm{TIAN}}`, and the design note recorded
-// that framing as rejected on a substantive point, not a visual one — "r_TIAN is a RETURN and implies a P&L
-// that does not exist." The maths was mechanically correct and the betas were honest; the variable was a claim
-// the site cannot make. A typeset equation is the most authoritative-looking thing on a page, so a rejected
-// framing kept in perfectly baked form is exactly how it comes back — the next person needing a factor
-// equation finds one ready, correct-looking, and wrong on the only point that mattered.
+// (The factor-model equations, `r_{\mathrm{TIAN}}` and its betas, were deleted with that framing: a return
+// implies a P&L that does not exist (CLAUDE.md, Rejected). A rejected framing kept in baked form comes back.)
 
 // ── THE CURSE OF DIMENSIONALITY, for the difficulty slide's fourth beat ──────────────────────────────────
 //
@@ -62,8 +47,6 @@ export const BELLMAN_EQUATIONS = {
   ),
   /** Where it breaks: the state space is exponential in the number of assets. */
   curse: tex(String.raw`\lvert \mathcal{X} \rvert \;=\; m^{N}`, display),
-  /** The number, with the slide's own m and N substituted — inline, so it can sit in a sentence. */
-  atScale: tex(String.raw`10^{3000}`, opts),
 };
 
 // ── THE METHOD SLIDE HAS NO EQUATION, and that is the correction ─────────────────────────────────────────

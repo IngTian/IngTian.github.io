@@ -5,6 +5,8 @@
 // subtractive broken-color tint (ink-side only, never lightens). Dark theme
 // becomes a phosphor nebula with stars behind the line.
 
+import { READING_TINT } from './skyLegibility';
+
 export const VERTEX_SHADER = `
   attribute vec2 aPos;
   varying vec2 vUv;
@@ -20,7 +22,7 @@ export function fragmentShader(): string {
     varying vec2 vUv;
 
     uniform sampler2D uRamp;
-    uniform float uFlatten;   // SPIKE: 0 = normal sky, 1 = one flat tone
+    uniform float uFlatten;   // the intro's first beat: 0 = normal sky, 1 = one flat tone
     uniform float uAmp;
     uniform float uTime;
     uniform float uYOffset;        // scroll, in viewport widths
@@ -61,17 +63,12 @@ export function fragmentShader(): string {
       // ramp lookup.
       //
       // 0.80 is the global drift speed, chosen on the real page from a live ladder
-      // (0.55 / 0.80 / 1.10 / 1.50 / 2.00). It replaces an earlier 0.55, which had
-      // damped the motion when the sky felt too busy — 0.80 is the point where the sky
-      // reads as alive without becoming distracting.
+      // (0.55 / 0.80 / 1.10 / 1.50 / 2.00): alive without becoming distracting.
       //
-      // SPEED is the lever here, not amplitude. The ramp displacement is already
-      // +/-0.306 of the whole dawn-to-ground span at full strength — nearly two
-      // palette bands — and over text it is the asymmetric legibility gate, not that
-      // constant, that reins it in. So raising amplitude changes little exactly where
-      // text lives while spending the headroom on the un-gated open sky, whereas a
-      // faster drift reads as more alive without swinging further in tone. Verified:
-      // contrast is FLAT across the whole speed ladder on both archetypes.
+      // SPEED is the lever, not amplitude. The displacement is already +/-0.306 of
+      // the whole ramp at full strength, and over text the legibility gate reins it
+      // in, so more amplitude changes little where text lives and spends itself on
+      // the open sky. Contrast measured FLAT across the speed ladder on both archetypes.
       float t = uTime * 0.80 * mix(1.0, 1.35, uReading);
 
       // Anisotropic sample space: more frequency DOWN than ACROSS, which stretches
@@ -147,11 +144,10 @@ export function fragmentShader(): string {
 
       // Dark theme: the field adds a cool phosphor/cyan nebular tint lifted by the
       // warp, damped over the reading zone since adding light is the dangerous
-      // direction there. The ceiling is a uniform so the bound lives in
-      // skyLegibility.nebulaCeiling() with a test, rather than as a literal here.
-      // It exists because
-      // plus full nebula clears WCAG AA (4.5:1) against ink-3 even at zone=0 (where
-      // the zone-dependent damping does not apply). See tests/skyLegibility.test.ts.
+      // direction there. The ceiling is a uniform so its bound lives, with a test,
+      // in skyLegibility.NEBULA_CEILING: the lightest dark descent stop plus full
+      // nebula clears 4.5:1 against ink-3 even at zone=0, where the damping does
+      // not apply. See tests/skyLegibility.test.ts.
       if (uDark > 0.5 && uReading < 0.5) {
         float glow = smoothstep(0.30, 0.95, f);
         float veins = smoothstep(0.45, 1.0, length(r));
@@ -188,9 +184,8 @@ export function fragmentShader(): string {
               ? vec3(0.97, 0.97, 1.00)
               : mix(vec3(0.80, 0.72, 1.00), vec3(1.00, 0.86, 0.72), (temp2 - 0.72) / 0.28));
 
-          // Confined to a narrow band behind the tagline ("A researcher by day, an
-          // artist by night..."). Opens as the heights section ends and closes
-          // before Mountains.
+          // Confined to a narrow band of page depth, 0.20 to 0.35, which opens as
+          // the hero ends.
           float band = smoothstep(0.200, 0.252, depth) * (1.0 - smoothstep(0.300, 0.348, depth));
           col += tint * (core * 1.05 + halo) * tw * band;
         }
@@ -205,27 +200,19 @@ export function fragmentShader(): string {
         // The 0.30/0.16 coefficients are the tint's character (ink vs veins response
         // shape); uTintCap and uViscousFloor are the safety bounds that vary by page.
         float amt = min(uTintCap, (ink * 0.30 + veins * 0.16) * uAmp);
-        vec3 warmTint = vec3(0.055, 0.042, 0.024);
-        vec3 coolTint = vec3(0.030, 0.033, 0.039);
+        vec3 warmTint = vec3(${READING_TINT.warm.join(', ')});
+        vec3 coolTint = vec3(${READING_TINT.cool.join(', ')});
         float pick = smoothstep(0.30, 0.70, r.x);
         col -= mix(warmTint, coolTint, pick) * amt;
       }
 
-      // SPIKE (uFlatten): collapse the whole sky toward ONE tone, then let the gradient resolve in.
-      // 0 = normal sky, 1 = one flat tone. Alpha stays 1.0: the canvas is opaque by invariant and must
-      // not become a blended layer.
+      // uFlatten, the intro's first beat: collapse the whole sky toward ONE tone, then let the gradient
+      // resolve in (0 = normal sky, 1 = one flat tone). Alpha stays 1.0: the canvas is opaque by invariant.
       //
-      // THE REFERENCE POSITION IS PER THEME, and getting that wrong made the light theme "dull as
-      // hell". It was the ramp's MIDPOINT in both themes, which in light is #565660 — a mid grey whose
-      // luminance is almost exactly the contour ink's (ink-3, #5a544a: 6.20:1 against paper, but about
-      // 1:1 against this). So the survey lines, the whole point of the opening, disappeared into the
-      // background. Dark theme looked right purely by luck: its midpoint is near-black, so light lines
-      // popped. NOTE: no backticks in here — this comment lives inside a template literal, and putting
-      // one in it terminated the shader source and produced five bogus TypeScript errors.
-      //
-      // So light flattens toward the ramp's TOP — paper — and dark toward its lower middle. Both then
-      // read as a drawing on a surface, with the lines at full contrast against it, which is also the
-      // reading the site's own calligraphy identity wants: ink on paper, chalk on slate.
+      // THE FLAT TONE IS PER THEME: light flattens toward the ramp's top (paper), dark toward its lower
+      // middle, so the survey lines are ink on paper or chalk on slate. The ramp's midpoint in light is
+      // #565660, about 1:1 against the contour ink, and the lines vanished into it. NO BACKTICKS in here:
+      // this comment is inside a template literal, and one ends the shader source.
       if (uFlatten > 0.001) {
         float flatAt = mix(0.04, 0.55, uDark);
         col = mix(col, texture2D(uRamp, vec2(0.5, flatAt)).rgb, clamp(uFlatten, 0.0, 1.0));

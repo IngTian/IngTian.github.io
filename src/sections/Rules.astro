@@ -16,23 +16,15 @@
 // WHAT WENT, AND WHY. Two earlier drawings lived here: a convex feasible polygon and a lattice of decision
 // sequences. Both were real, exact and unit-tested — and both answer "what is the feasible set", a question a
 // reader who has never been told no does not have. Worse, both SHRINK something, which reads as tidying up.
-// The point is the opposite: the problem gets bigger the closer you look.
+// The point is the opposite: the problem gets bigger the closer you look. Their modules and specs are deleted
+// (CLAUDE.md, "Rejected — do not rebuild"); bringing one back is a rewrite and a fresh look at the register.
 //
-// THE MODULES AND THEIR SPECS ARE DELETED, and this paragraph used to say the opposite — that they "stay in
-// the tree, unreferenced and still fully tested, so nothing verified was thrown away and either can return if
-// a later slide wants it." That was false, and falsest where it mattered: CLAUDE.md lists both drawings under
-// "Rejected — do not rebuild", so a sentence promising recoverable verified code pointed the next reader
-// straight at the work the guide exists to prevent. Git holds them. If a later slide really wants one, it is a
-// rewrite with a fresh look at whether the register is right — which is the actual lesson here, not the
-// geometry. `tests/commentPaths.test.ts` now fails on a claim like the old one.
-//
-// The four constraint categories below have been sitting in data/desk.ts unused since they were written, each
-// with a real reason attached. They are the answer to beat two, and they finally get shown.
+// The four constraint categories are data/desk.ts's, each with a real reason attached: they are beat two.
 //
 // Numbers: cited or computed, never invented. Impact is square-root, calibrated to the published anchor that one
 // day's volume moves the price about one daily sigma. The fund's figures come from data/desk.ts. The
 // trajectories are a seeded walk — identical on every build, because a fan that shimmered would undercut a slide
-// whose whole claim is that this scale is real. Arithmetic in lib/complexity.ts (30 tests).
+// whose whole claim is that this scale is real. Arithmetic in lib/complexity.ts, under tests/complexity.test.ts.
 import { CONSTRAINTS, FUND } from '../data/desk';
 import { RULE_GLYPHS, RULE_TAGS, type RuleGlyphKey } from '../data/ruleGlyphs';
 import { BELLMAN_EQUATIONS } from '../lib/equations';
@@ -51,28 +43,12 @@ const quoted = ladder.find((r) => r.aum === 1_000_000_000) ?? ladder[ladder.leng
 const big = ladder[ladder.length - 1];
 const you = ladder[0];
 
-// One category per group, so beat two names KINDS of rule rather than four examples of one kind — the owner
-// asked for "a few", and four kinds is the more informative reading.
-const groups = ['Mandate', 'Regulatory', 'Liquidity', 'Operational'];
-const named = groups
-  .map((g) => CONSTRAINTS.find((c) => c.group === g))
-  .filter((c): c is (typeof CONSTRAINTS)[number] => !!c);
-
 const paths = trajectories();
 const bounds = trajBounds(paths);
 const W = 560, H = 300;
 const box = { x: 0, y: 10, w: W, h: H - 20 };
 const baseY = box.y + (1 - (100 - bounds.lo) / (bounds.hi - bounds.lo)) * box.h;
 
-// BEAT FOUR'S OLD ARITHMETIC IS GONE, and the reason is written two comments down. `vars` (the decision-variable
-// count) and `leafExp` (the decimal exponent of a 3-way scenario tree) were computed here for the draft that
-// answered "how hard is this?" with a tally. That draft was replaced precisely BECAUSE a tally undercuts the
-// claim — 10^11 futures is brute-forceable in 282 seconds — so the two numbers outlived the sentences that
-// quoted them and noUnusedLocals is what finally said so. `decisionVariables` and `scenarioLeaves` came off the
-// import with them — and then OUT of lib/complexity.ts entirely, in the dead-export sweep, along with their
-// specs. This said "both remain exported and covered by tests/complexity.test.ts, so re-quoting either is one
-// line"; that stopped being true the moment the sweep landed. lib/complexity.ts is still where that arithmetic
-// belongs if a later draft wants it, but it is a rewrite from the definitions, not a re-import.
 
 // Three threads picked out in ink over the fan, so a reader sees that each line is one name's possible future
 // rather than an abstract wash. Fixed indices, so the choice is deterministic like everything else here.
@@ -115,8 +91,8 @@ const ATOMS_EXP = 80;
 const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
 ---
 <section id="rules" class="ru" aria-labelledby="ru-heading">
-  <div class="ru-paper">
-    <div class="ru-inner">
+  <div class="ru-paper slide-paper">
+    <div class="slide-gutter">
       <p class="ru-kicker">2 / 3 · the difficulty</p>
 
       {/* ══ TURNED AXIS. The owner: "now this slide is essentially the same format as the previous one, which
@@ -189,7 +165,7 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
                    "an authority wrote this down", which a generic facade says without borrowing anyone's
                    identity. Compiled from character matrices in data/ruleGlyphs.ts, so they are data. */}
               <ul class="ru-cats">
-                {named.map((c) => {
+                {CONSTRAINTS.map((c) => {
                   const g = RULE_GLYPHS[c.group as RuleGlyphKey];
                   return (
                     <li>
@@ -241,8 +217,6 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
               </p>
             </div>
 
-            {/* ── BEAT 4: the same fan, ghosted, with the scale of the question laid over it — because "all of
-                 it at once" should look like all of it at once rather than like a new subject. */}
             {/* ── BEAT 4: THE CONFLICT WEB, beside the tally rather than a bigger number.
                  The drawing is the argument: rules on a circle, a chord wherever one can breach another. A list
                  of 2,000 rules sounds like 2,000 things to check; the web shows it is really two million PAIRS,
@@ -390,27 +364,11 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
 
 <style>
   .ru { position: relative; z-index: 1; width: 100vw; margin-left: calc(50% - 50vw); }
-  .ru-paper {
-    --r-bg: #c4b7a1; --r-edge: rgba(74,66,54,0.26); --r-ink: #1f1b14;
-    --r-soft: #423b30; --r-faint: #6a6153; --r-accent: #7c5522;
-    background: var(--r-bg);
-    border-top: 1px solid var(--r-edge); border-bottom: 1px solid var(--r-edge);
-    padding: clamp(30px, 4vh, 62px) 0;
-  }
-  :global(html[data-theme='dark']) .ru-paper {
-    --r-bg: #14161a; --r-edge: rgba(184,177,161,0.14); --r-ink: #dce1dc;
-    --r-soft: #a8b0a9; --r-faint: #6d746e; --r-accent: #7fc9a0;
-  }
-  .ru-inner {
-    /* Clears the fixed Toc rail, whose right edge sits at x=151 once it carries its indented tier. Shared
-       across the five paper slides, so it is edited in all of them together or in none. */
-    padding-left: clamp(168px, 10.4vw, 200px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
-  }
-  @media (max-width: 1100px) { .ru-inner { padding-left: clamp(28px, 6vw, 80px); } }
+  .ru-paper { padding: clamp(30px, 4vh, 62px) 0; }
 
   .ru-kicker {
     font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
-    text-transform: uppercase; color: var(--r-accent); margin: 0 0 12px;
+    text-transform: uppercase; color: var(--panel-accent); margin: 0 0 12px;
   }
 
   /* ── THE TURNED AXIS. A vertical flow instead of two columns: headline, then the drawing across the whole
@@ -431,7 +389,7 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
   .ru-head {
     font-family: var(--font-display); font-weight: 300;
     font-size: clamp(24px, 2.4vw, 38px); line-height: 1.16;
-    color: var(--r-ink); margin: 0; max-width: 26ch; letter-spacing: -0.012em;
+    color: var(--panel-ink); margin: 0; max-width: 26ch; letter-spacing: -0.012em;
   }
 
   /* ── THE FOUR BEATS. Buttons, like the defining slide's, so a reader can go back to a number. */
@@ -442,7 +400,7 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     list-style: none; margin: 0; padding: 0;
     display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0 clamp(14px, 1.8vw, 30px);
-    border-top: 1px solid var(--r-edge);
+    border-top: 1px solid var(--panel-edge);
   }
   .ru-beats > li { display: flex; min-width: 0; }
   .ru-beat {
@@ -459,11 +417,11 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
   /* html.complex-js is added by the script before it starts stepping, so the dimming and the pointer affordance
      only appear where the sequence can actually run. Default = every beat legible, which is the no-JS state. */
   :global(html.complex-js) .ru-beat { cursor: pointer; opacity: 0.4; }
-  :global(html.complex-js) .ru-beat.is-on { opacity: 1; border-top-color: var(--r-accent); }
+  :global(html.complex-js) .ru-beat.is-on { opacity: 1; border-top-color: var(--panel-accent); }
   @media (hover: hover) {
     :global(html.complex-js) .ru-beat:not(.is-on):hover { opacity: 0.7; }
   }
-  .ru-beat:focus-visible { outline: 2px solid var(--r-accent); outline-offset: 2px; opacity: 1; }
+  .ru-beat:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 2px; opacity: 1; }
   @media (prefers-reduced-motion: no-preference) {
     .ru-beat { transition: opacity .45s ease, border-color .4s ease; }
   }
@@ -473,25 +431,25 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
 
   .ru-beat-n {
     flex: none;
-    font-family: var(--font-mono); font-size: 9.5px; color: var(--r-accent);
+    font-family: var(--font-mono); font-size: 9.5px; color: var(--panel-accent);
     border: 1px solid currentColor; border-radius: 50%;
     width: 18px; height: 18px; display: grid; place-items: center;
   }
   .ru-beat-head {
     /* Floor 16px: measured at 1366x768 this rendered 13.4px, barely above its own body copy. */
-    display: block; font-size: clamp(16px, 1.18vw, 19px); line-height: 1.3; color: var(--r-ink);
+    display: block; font-size: clamp(16px, 1.18vw, 19px); line-height: 1.3; color: var(--panel-ink);
   }
   /* THE BULLET POINTS, and the owner's actual complaint: "the text is a little bit small, especially the
      bullet points." Measured before this pass: 13px at 1700x1050 and 11.2px at 1366x768 — below caption size
      for the slide's main reading text, because the vw term was collapsing it. The FLOOR is what rose.
-     --r-soft rather than --r-faint too: this is body copy, not an aside. No max-width — each band column is
+     --panel-soft rather than --panel-faint too: this is body copy, not an aside. No max-width — each band column is
      its own measure now. */
   .ru-beat-body {
-    display: block; font-size: clamp(14px, 1.02vw, 16px); line-height: 1.55; color: var(--r-soft);
+    display: block; font-size: clamp(14px, 1.02vw, 16px); line-height: 1.55; color: var(--panel-soft);
     margin-top: 0; max-width: none;
   }
   .ru-beat-body strong {
-    font-family: var(--font-mono); font-weight: 400; color: var(--r-accent); font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono); font-weight: 400; color: var(--panel-accent); font-variant-numeric: tabular-nums;
   }
   .ru-beat-body sup { font-size: 0.7em; }
 
@@ -499,14 +457,14 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
      a left-aligned rule it sat beneath beat one and read as that beat's footnote instead of as the slide's
      closing sentence. Centred and wider, with no rule of its own — the band above already has one. */
   .ru-scale {
-    font-size: clamp(15px, 1.12vw, 17.5px); line-height: 1.62; color: var(--r-soft);
+    font-size: clamp(15px, 1.12vw, 17.5px); line-height: 1.62; color: var(--panel-soft);
     margin: 0 auto; max-width: 78ch; text-align: center;
     padding-top: clamp(8px, 1.2vh, 14px); border-top: 0;
   }
 
   .ru-fig-head {
     font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase;
-    color: var(--r-faint); margin: 0 0 10px; display: grid;
+    color: var(--panel-faint); margin: 0 0 10px; display: grid;
   }
   .ru-fig-head > .ru-panel { grid-area: 1 / 1; }
 
@@ -546,18 +504,18 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
   .ru-rung-track { grid-column: 1 / -1; }
   .ru-rung-cost { grid-column: 3 / 4; grid-row: 1; }
   .ru-rung-aum { grid-column: 2 / 3; grid-row: 1; }
-  .ru-rung-label { font-size: clamp(14px, 1.02vw, 16px); color: var(--r-ink); }
+  .ru-rung-label { font-size: clamp(14px, 1.02vw, 16px); color: var(--panel-ink); }
   .ru-rung-aum {
-    font-family: var(--font-mono); font-size: 12px; color: var(--r-faint); text-align: right;
+    font-family: var(--font-mono); font-size: 12px; color: var(--panel-faint); text-align: right;
     font-variant-numeric: tabular-nums;
   }
   .ru-rung-track {
-    height: 9px; background: color-mix(in srgb, var(--r-ink) 8%, transparent);
+    height: 9px; background: color-mix(in srgb, var(--panel-ink) 8%, transparent);
     border-radius: 1px; overflow: hidden;
   }
-  .ru-rung-bar { display: block; height: 100%; background: var(--r-accent); opacity: 0.75; }
+  .ru-rung-bar { display: block; height: 100%; background: var(--panel-accent); opacity: 0.75; }
   .ru-rung-cost {
-    font-family: var(--font-mono); font-size: 12.5px; color: var(--r-accent);
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--panel-accent);
     text-align: right; font-variant-numeric: tabular-nums;
   }
 
@@ -580,18 +538,18 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
   }
   .ru-cat-mark { display: grid; justify-items: center; gap: 4px; }
   .ru-glyph { display: block; }
-  .ru-glyph rect { fill: var(--r-accent); opacity: 0.85; }
+  .ru-glyph rect { fill: var(--panel-accent); opacity: 0.85; }
   .ru-cat-tag {
     font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.12em;
-    color: var(--r-faint);
+    color: var(--panel-faint);
   }
   .ru-cat-text { display: grid; gap: 2px; min-width: 0; }
   .ru-cat {
     font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase;
-    color: var(--r-accent);
+    color: var(--panel-accent);
   }
-  .ru-cat-rule { font-size: clamp(14px, 1.02vw, 16px); line-height: 1.38; color: var(--r-ink); }
-  .ru-cat-why { font-size: clamp(12.5px, 0.9vw, 14px); line-height: 1.5; color: var(--r-faint); max-width: 60ch; }
+  .ru-cat-rule { font-size: clamp(14px, 1.02vw, 16px); line-height: 1.38; color: var(--panel-ink); }
+  .ru-cat-why { font-size: clamp(12.5px, 0.9vw, 14px); line-height: 1.5; color: var(--panel-faint); max-width: 60ch; }
 
   /* ── BEATS 3 AND 4: the fan of futures. */
   .ru-fan { display: flex; flex-direction: column; justify-content: center; }
@@ -612,7 +570,7 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     height: clamp(210px, 34vh, 460px);
   }
   .ru-traj {
-    fill: none; stroke: var(--r-faint); stroke-width: 1; vector-effect: non-scaling-stroke;
+    fill: none; stroke: var(--panel-faint); stroke-width: 1; vector-effect: non-scaling-stroke;
     opacity: 0.22; stroke-linejoin: round;
   }
 
@@ -638,14 +596,13 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
   /* Reduced motion, and the state before the beat is live: the finished line. Never a blank chart. */
   .ru-traj { stroke-dashoffset: 0; }
   /* Three threads in ink, so a reader sees that each line is one name's possible future. */
-  .ru-traj--lit { stroke: var(--r-accent); opacity: 0.9; stroke-width: 1.8; }
+  .ru-traj--lit { stroke: var(--panel-accent); opacity: 0.9; stroke-width: 1.8; }
   .ru-base {
-    stroke: var(--r-faint); stroke-width: 1; stroke-dasharray: 3 5;
+    stroke: var(--panel-faint); stroke-width: 1; stroke-dasharray: 3 5;
     vector-effect: non-scaling-stroke; opacity: 0.5;
   }
-  /* ── BEAT 4: the conflict web beside the mathematics, in two columns. An earlier version floated a tally of
-     counts over a ghosted <use> clone of the fan; both the tally and the ghost are gone, because the web IS the
-     argument now and it gets its own space instead of being a backdrop to a list of numbers. */
+  /* ── BEAT 4: the conflict web beside the mathematics, in two columns: the web IS the argument, so it gets
+     its own space rather than being a backdrop to a list of numbers. */
   .ru-all { display: grid; align-items: center; }
   /* The web on the left, the mathematics on the right. The web is the "many interlocking rules" half and the
      equation is the "and you cannot solve it exactly" half — two different reasons the problem is hard, which
@@ -660,10 +617,10 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
      already correct, which is the whole reason for going through KaTeX rather than hand-setting spans. */
   .ru-math { display: grid; gap: clamp(5px, 0.9vh, 12px); min-width: 0; }
   .ru-math-lead, .ru-math-mid {
-    font-size: clamp(13.5px, 1.05vw, 16px); line-height: 1.5; color: var(--r-faint); margin: 0;
+    font-size: clamp(13.5px, 1.05vw, 16px); line-height: 1.5; color: var(--panel-faint); margin: 0;
   }
   .ru-eq {
-    color: var(--r-ink);
+    color: var(--panel-ink);
     /* MathML inherits font-size, and KaTeX's display mode already sizes the operators — so one declaration
        controls the whole expression. Slightly larger than body copy: this is the subject, not an aside. */
     /* The equation is the subject of this panel, so it is set well above body copy — measured at 16.5px it read
@@ -673,31 +630,31 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
   }
   .ru-eq :global(math) { display: block; margin: 0 auto; }
   .ru-math-punch {
-    font-size: clamp(14px, 1.12vw, 17.5px); line-height: 1.55; color: var(--r-soft); margin: 0;
+    font-size: clamp(14px, 1.12vw, 17.5px); line-height: 1.55; color: var(--panel-soft); margin: 0;
   }
   .ru-math-punch strong {
-    font-family: var(--font-mono); font-weight: 400; color: var(--r-accent); font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono); font-weight: 400; color: var(--panel-accent); font-variant-numeric: tabular-nums;
   }
   .ru-math-punch sup { font-size: 0.72em; }
   .ru-math-foot {
-    font-size: clamp(13px, 1vw, 15.5px); line-height: 1.5; color: var(--r-faint); margin: 0;
-    padding-top: clamp(3px, 0.6vh, 7px); border-top: 1px solid var(--r-edge);
+    font-size: clamp(13px, 1vw, 15.5px); line-height: 1.5; color: var(--panel-faint); margin: 0;
+    padding-top: clamp(3px, 0.6vh, 7px); border-top: 1px solid var(--panel-edge);
   }
   /* The chords carry the meaning, so they are the only confident marks. Curved through the centre: straight
      chords read as a star burst, curves read as a tangle, and a tangle is the honest impression. */
   .ru-chord {
-    fill: none; stroke: var(--r-accent); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.42;
+    fill: none; stroke: var(--panel-accent); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.42;
   }
-  .ru-webnode { fill: var(--r-faint); opacity: 0.8; }
+  .ru-webnode { fill: var(--panel-faint); opacity: 0.8; }
 
   .ru-note {
     /* 9px is not a readable size for a sentence that qualifies the drawing above it. */
     font-family: var(--font-mono); font-size: 10.5px; line-height: 1.55; letter-spacing: 0.04em;
-    color: var(--r-faint); margin: clamp(8px, 1.2vh, 14px) 0 0; max-width: 60ch;
+    color: var(--panel-faint); margin: clamp(8px, 1.2vh, 14px) 0 0; max-width: 60ch;
   }
 
   .ru-cap {
-    font-size: 12px; line-height: 1.55; color: var(--r-faint);
+    font-size: 12px; line-height: 1.55; color: var(--panel-faint);
     margin: clamp(6px, 1vh, 12px) 0 0; max-width: 82ch; display: grid;
   }
   .ru-cap > .ru-panel { grid-area: 1 / 1; }
@@ -755,7 +712,7 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
        the beat's copy and in the caption, so nothing measured is lost. */
     .ru-webwrap { grid-template-columns: minmax(0, 1fr); gap: 0; }
     .ru-web { display: none; }
-    .ru-fig { padding-top: 3vh; border-top: 1px solid var(--r-edge); }
+    .ru-fig { padding-top: 3vh; border-top: 1px solid var(--panel-edge); }
     .ru-paper { padding-top: clamp(14px, 2vh, 24px); padding-bottom: clamp(14px, 2vh, 24px); }
     .ru-head { font-size: clamp(22px, 3.4vw, 30px); }
     .ru-beats { gap: 1px; }
@@ -800,7 +757,9 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
 </style>
 
 <script>
-  // THE FOUR BEATS, in order, and the reader can take the wheel.
+  import { walkBeats, type Beats } from '../scripts/beats';
+
+  // THE FOUR BEATS, in order, and the reader can take the wheel (scripts/beats.ts walks them).
   //
   // PROGRESSIVE ENHANCEMENT in the only safe direction: the CSS default is beat one shown with all four beats
   // legible as text, and html.complex-js — added only once the sequence is about to run — is what switches on
@@ -810,9 +769,7 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
   // ADDED INSIDE initComplex, NOT AT MODULE SCOPE, for the reason spelled out at the same point in
   // Choice.astro: Astro's ClientRouter swaps <html> and its class list on every in-site navigation, while this
   // bundled module runs once — so the class did not survive the reader's first trip to another page and back.
-  function initComplex(): (() => void) | null {
-    const section = document.querySelector<HTMLElement>('#rules');
-    if (!section) return null;
+  function initComplex(section: HTMLElement): Beats | null {
     const beats = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-beat]'));
     const panels = Array.from(section.querySelectorAll<HTMLElement>('[data-panel]'));
     const heads = Array.from(section.querySelectorAll<HTMLElement>('[data-head]'));
@@ -867,90 +824,28 @@ const dpUniverseAt = Math.ceil(ATOMS_EXP / Math.log10(DP_LEVELS));
     };
     window.addEventListener('resize', onResize, { passive: true });
 
-    const show = (i: number) => {
-      beats.forEach((b, k) => {
-        b.classList.toggle('is-on', k === i);
-        b.setAttribute('aria-pressed', String(k === i));
-      });
-      panels.forEach((p, k) => p.classList.toggle('is-on', k === i));
-      // TWO elements share each head index — the figure's heading and the caption — so match on the attribute
-      // VALUE rather than on position in the list.
-      heads.forEach((h) => h.classList.toggle('is-on', Number(h.dataset.head) === i));
-    };
-
-    let step = 0;
-    let timer = 0;
-    // FROZEN ONCE CLICKED, and it stays frozen — the same rule as the two neighbouring slides. These beats carry
-    // numbers a reader will want to sit with, and a timer that resumed would pull the slide away mid-thought.
-    let frozen = false;
-    const stop = () => { window.clearTimeout(timer); timer = 0; };
-
-    const freeze = (i: number) => {
-      frozen = true;
-      stop();
-      section.dataset.frozen = 'true';
-      step = i;
-      show(i);
-    };
-
-    const pick = (e: Event) => {
-      const i = beats.indexOf(e.currentTarget as HTMLButtonElement);
-      if (i >= 0) freeze(i);
-    };
-    for (const b of beats) b.addEventListener('click', pick);
-
-    // Arrow keys walk the group, so a keyboard reader need not tab through four buttons to reach the last beat.
-    const onKey = (e: KeyboardEvent) => {
-      const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1
-        : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
-      if (!dir) return;
-      e.preventDefault();
-      freeze((step + dir + beats.length) % beats.length);
-      beats[step].focus();
-    };
-    for (const b of beats) b.addEventListener('keydown', onKey);
-
-    show(0);
-
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      // Finished state: the LAST beat, which is the one the slide's argument rests on. The buttons still work,
-      // so a reduced-motion reader gets the same control without anything moving on its own.
-      step = beats.length - 1;
-      show(step);
-      return () => {
+    return {
+      buttons: beats,
+      show: (i) => {
+        beats.forEach((b, k) => {
+          b.classList.toggle('is-on', k === i);
+          b.setAttribute('aria-pressed', String(k === i));
+        });
+        panels.forEach((p, k) => p.classList.toggle('is-on', k === i));
+        // TWO elements share each head index — the figure's heading and the caption — so match on the attribute
+        // VALUE rather than on position in the list.
+        heads.forEach((h) => h.classList.toggle('is-on', Number(h.dataset.head) === i));
+      },
+      firstMs: 4200,
+      // Hold longest on the last beat: it is the slide's whole point and it carries the most to read. It is also
+      // where reduced motion rests, the beat the slide's argument rests on.
+      lastMs: 6400,
+      teardown: () => {
         if (resizeTick) cancelAnimationFrame(resizeTick);
         window.removeEventListener('resize', onResize);
-        for (const b of beats) { b.removeEventListener('click', pick); b.removeEventListener('keydown', onKey); }
-      };
-    }
-
-    const advance = () => {
-      step = (step + 1) % beats.length;
-      show(step);
-      // Hold longest on the last beat: it is the slide's whole point and it carries the most to read.
-      timer = window.setTimeout(advance, step === beats.length - 1 ? 6400 : 4600);
-    };
-
-    const io = new IntersectionObserver((entries) => {
-      const visible = entries.some((e) => e.isIntersecting);
-      if (frozen) return;                        // a reader's choice outranks the observer
-      if (visible && !timer) timer = window.setTimeout(advance, 4200);
-      else if (!visible) stop();
-    }, { threshold: 0.3 });
-    io.observe(section);
-
-    return () => {
-      stop();
-      io.disconnect();
-      if (resizeTick) cancelAnimationFrame(resizeTick);
-      window.removeEventListener('resize', onResize);
-      for (const b of beats) { b.removeEventListener('click', pick); b.removeEventListener('keydown', onKey); }
+      },
     };
   }
 
-  let teardown: (() => void) | null = null;
-  document.addEventListener('astro:page-load', () => {
-    teardown?.();
-    teardown = initComplex();
-  });
+  walkBeats('#rules', initComplex);
 </script>

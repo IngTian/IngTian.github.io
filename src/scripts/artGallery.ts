@@ -36,12 +36,9 @@ function buildRows() {
   if (!tiles.length) return;
   const ars = tiles.map((t) => parseFloat(t.dataset.ar || '1'));
   const W = rowsEl.clientWidth;
-  // 340 IS ALSO WRITTEN IN art.astro, and the pair is synced by hand. The target row height is what bounds a
-  // tile's rendered width (width = aspectRatio * rowHeight, and this call's targetHeight is what caps
-  // rowHeight), so art.astro's per-photo `sizes` hint is computed from the same number — see the long note
-  // above photoSizes() there. Retune it here and the hint silently starts describing a layout that no longer
-  // exists, which is how the previous `30vw` hint came to over-fetch 2.9MB. tests/artSizes.test.ts asserts
-  // the two literals still agree, so a drift fails the suite instead of shipping.
+  // 340 IS ALSO art.astro's PHOTO_ROW_TARGET_H, synced by hand: it caps a tile's width, so the per-photo
+  // `sizes` hint is computed from it (see the note above photoSizes() there). tests/artSizes.test.ts fails if
+  // the two drift.
   const rows = justifyRows(ars, W, 340, 14);
   // clear flex fallback; lay out by absolute row grouping using wrappers
   rowsEl.style.display = 'flex';
@@ -153,7 +150,7 @@ const stops = tocLinks
   .map((a) => ({ a, el: document.getElementById(a.dataset.target || '') }))
   .filter((s): s is { a: HTMLAnchorElement; el: HTMLElement } => !!s.el);
 function updateToc() {
-  // shared pure rule (see lib/scrollspy.ts) — same active-stop logic as the homepage TOC
+  // shared pure rule (see lib/scrollspy.ts); SideRail's railMarks falls back to it
   const idx = activeStopIndex(
     stops.map((s) => s.el.getBoundingClientRect().top),
     window.innerHeight,
@@ -164,7 +161,7 @@ function updateToc() {
   updateTocZone();
 }
 
-// ── THE RAIL'S INK HAS TO FOLLOW THE SKY, and until now it did not.
+// ── THE RAIL'S INK HAS TO FOLLOW THE SKY.
 //
 // /art rides the whole descent — luminous paper at the top to near-black at the ground — and this rail is
 // position: fixed at top: 50%, so the gradient behind it changes completely while its colour did not. The ink
@@ -173,13 +170,14 @@ function updateToc() {
 // actually in was invisible — and the inactive one 2.46:1 against a 4.5:1 requirement. True at 1440 and at
 // 3440, so it was never an ultrawide quirk.
 //
-// CornerNav already solves this for itself with a data-zone flipped off the descent fraction, but its zone
-// cannot be borrowed: it probes at the TOP of the viewport and this rail sits at the MIDDLE, so the rail must
-// go dark earlier. What CAN be shared is the listener — this runs inside the scrollspy's existing rAF-throttled
-// handler rather than adding a second scroll listener, which is how the same fix stays one mechanism.
+// CornerNav solves this for itself with a data-zone flipped off the descent fraction, but its zone cannot be
+// borrowed: it is taken at the nav, near the TOP of the viewport, and this rail sits at the MIDDLE. What CAN be
+// shared is the listener — this runs inside the scrollspy's existing rAF-throttled handler rather than adding a
+// second scroll listener, which is how the same fix stays one mechanism.
 const tocEl = document.getElementById('art-toc');
 const descentEl = document.querySelector<HTMLElement>('.descent');
-// Matches CornerNav's threshold, so the two marks change register together rather than a screen apart.
+// Not CornerNav's 0.57. Both fractions are taken at their own element, so position is not the difference: this
+// rail's inks sit on the bare sky, with no frosted glass, and cross over at their own depth.
 const DARK_FROM = 0.42;
 function updateTocZone() {
   if (!tocEl || !descentEl) return;
@@ -245,8 +243,8 @@ function openLB(src: string, alt: string, w?: number, h?: number) {
   // leaves the browser painting the PREVIOUS decoded image until the new one arrives, so every open after
   // the first showed the wrong photograph for the length of a 0.5-1.4 MB fetch. Removing the attribute
   // renders nothing, which is honest; the reserved box above keeps that from being a layout shift.
-  // Deliberately NOT done with `opacity: 0` — an element whose resting state is invisible is the defect
-  // trap 6 in CLAUDE.md is about, and a failed decode would leave the lightbox permanently blank.
+  // Deliberately NOT done with `opacity: 0` — nothing the reader came for rests invisible (CLAUDE.md, Rejected,
+  // Boot A), and a failed decode would leave the lightbox permanently blank.
   lbImg.removeAttribute('src');
   lbImg.alt = alt; zs = 1; zx = 0; zy = 0; tf();
   lb.showModal();

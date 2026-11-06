@@ -23,6 +23,11 @@ describe('the rule marks', () => {
     for (const g of groups) expect(keys, `no mark for ${g}`).toContain(g);
   });
 
+  it('has one rule per group, since the page renders every entry as its own kind', () => {
+    const groups = CONSTRAINTS.map((c) => c.group);
+    expect(new Set(groups).size).toBe(groups.length);
+  });
+
   it('is an 11x11 grid throughout, so the marks sit on one baseline', () => {
     for (const k of keys) {
       expect(RULE_GLYPHS[k].w, k).toBe(11);

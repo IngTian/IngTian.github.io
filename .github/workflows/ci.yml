@@ -5,11 +5,8 @@ name: CI
 # main branch protection rule to enforce it). Deploy lives in deploy.yml and
 # runs only after a merge to main.
 #
-# workflow_dispatch exists so the gate can be run BY HAND. During the 2026-08-06
-# Actions incident GitHub throttled webhook delivery to ~15%, so pushes and
-# pull_request events silently produced no runs at all — and with only event
-# triggers there was no way to ask for one. A PR then cannot be merged on a green
-# check through no fault of the branch. This makes the gate recoverable:
+# workflow_dispatch lets the gate be run BY HAND, for when GitHub drops the push
+# and pull_request events (it did, in the 2026-08-06 Actions incident):
 #   gh workflow run ci.yml --ref <branch>
 on:
   pull_request:
@@ -37,18 +34,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # This step was called "Build (type-checked)". It was not type-checked, and neither was anything
-      # else: Astro and vitest both hand .ts to esbuild, which strips annotations without ever asking
-      # the compiler. So a build being green said nothing about types — proof, before the Typecheck step
-      # below existed: `tsc --noEmit` reported a real TS2345 in tests/skyShader.test.ts while `npm run
-      # build` and `npm test` were both green. Renamed to stop the name making a promise it cannot keep.
+      # NOT type-checked: Astro and vitest hand .ts to esbuild, which strips annotations unchecked, so a
+      # green build says nothing about types. The Typecheck step below does that.
       - name: Build
         run: npm run build
 
       # THE ONLY PLACE TYPES ARE CHECKED. Two checkers, because neither covers the other: `astro check`
-      # is the only thing that reads the ~4,400 lines of <script> bodies inside .astro files (tsc cannot
-      # parse .astro at all), and plain `tsc --noEmit` is the only thing that covers tests/ and src/lib
-      # on their own terms. `npm run typecheck` runs both.
+      # is the only thing that reads the <script> bodies inside .astro files (tsc cannot parse .astro at
+      # all), and plain `tsc --noEmit` is the only thing that covers tests/ and src/lib on their own
+      # terms. `npm run typecheck` runs both.
       #
       # Placed after Build and before Test on purpose. After Build, so the generated content-collection
       # types in .astro/ exist on a fresh checkout; before Test, because a type error is cheaper to read

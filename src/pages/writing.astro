@@ -15,7 +15,7 @@
 // guessed their own margins would read as three sites.
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PlushCow from '../components/PlushCow.astro';
-import FluidSky from '../components/proto/FluidSky.astro';
+import FluidSky from '../components/FluidSky.astro';
 import SkyWash from '../components/SkyWash.astro';
 import SideRail from '../components/SideRail.astro';
 import { getCollection } from 'astro:content';
@@ -54,7 +54,7 @@ const total = totalEntries(kinds);
   navZone="light"
 >
   <main class="writing descent is-fluid">
-    <FluidSky strength={3} variant="reading" />
+    <FluidSky variant="reading" />
     <SkyWash />
 
     {/* NO RAIL WHEN THERE IS NOTHING TO POINT AT. The kind sections only render once something is published,

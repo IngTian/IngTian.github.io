@@ -1,9 +1,9 @@
 // The contrast policy for the fluid sky, in one place.
 //
 // The sky is generated, so no CSS tool can audit it — Lighthouse's contrast check
-// reads background-color and sees nothing. These functions are therefore the only
-// guarantee that generated colour cannot make text unreadable, which is why they
-// live here as pure functions with tests rather than as inline constants.
+// reads background-color and sees nothing. These values and checks are therefore the
+// only guarantee that generated colour cannot make text unreadable, which is why they
+// live here, named and tested, rather than as literals in the shader or the component.
 //
 // The governing asymmetry: what threatens text depends on the text's own colour.
 //   descent pages carry PAPER-coloured text -> a LIGHTER sky erases it
@@ -31,23 +31,21 @@ export function contrastRatio(a: number, b: number): number {
 export const AA_BODY = 4.5;
 
 /**
- * Per-direction multipliers on the sky's excursion along its palette ramp.
+ * Per-direction multipliers on the sky's excursion along its palette ramp, over the
+ * legibility zone (the shader mixes them in by zone: `mix(1.0, uGateDark, zone)`).
  * The permissive direction stays near 1 so the ink keeps its character; the
  * dangerous direction is clamped.
  */
-export function gateFor(zone: number, variant: SkyVariant): { dark: number; light: number } {
-  const FREE = 0.25;              // the safe direction stays nearly free
-  const CLAMPED_LIGHT = 0.90;     // descent: paper-coloured text, so restrain LIGHTWARD hard
-  const CLAMPED_DARK = 0.30;      // reading: dark ink, so restrain DARKWARD — but only enough
-                                  // to protect contrast, since over-clamping here erases the
-                                  // effect on the reading pages entirely
-  return variant === 'reading'
-    ? { dark: 1 - CLAMPED_DARK * zone, light: 1 - FREE * zone }
-    : { dark: 1 - FREE * zone,          light: 1 - CLAMPED_LIGHT * zone };
-}
+export const GATES: Record<SkyVariant, { dark: number; light: number }> = {
+  // descent: paper-coloured text, so restrain LIGHTWARD hard; the dark side stays nearly free
+  descent: { dark: 0.75, light: 0.10 },
+  // reading: dark ink, so restrain DARKWARD — but only enough to protect contrast, since
+  // over-clamping here erases the effect on the reading pages entirely
+  reading: { dark: 0.70, light: 0.75 },
+};
 
 /**
- * Bounds on the two stages that darken the composed colour: the viscous
+ * Bounds on the two stages that darken a reading page's composed colour: the viscous
  * multiply and the subtractive tint.
  *
  * Bounding these rather than the ramp-lookup index is deliberate. The lookup
@@ -56,17 +54,24 @@ export function gateFor(zone: number, variant: SkyVariant): { dark: number; ligh
  * cap on the index can prevent it.
  *
  * The reading-page constants are derived from holding WCAG AA (4.5:1) against
- * --ink-3 at the ramp's darkest stop (#dcd5cf).
+ * --ink-3 at the ramp's darkest stop (#dcd5cf). A descent page runs neither stage
+ * (the shader reads uTintCap only under `uReading > 0.5`, and uViscousFloor only
+ * through `mix(…, uReading)`), so its pair binds nothing.
  */
-export function tintBudget(variant: SkyVariant): {
-  magnitude: number;
-  cap: number;
-  viscousFloor: number;
-} {
-  return variant === 'reading'
-    ? { magnitude: 0.055, cap: 0.55, viscousFloor: 0.985 }
-    : { magnitude: 0.095, cap: 1.0, viscousFloor: 0.86 };
-}
+export const TINT_BUDGET: Record<SkyVariant, { cap: number; viscousFloor: number }> = {
+  reading: { cap: 0.55, viscousFloor: 0.985 },
+  descent: { cap: 1.0, viscousFloor: 0.86 },
+};
+
+/** The reading tint, the shader's warmTint and coolTint, mixed per pixel and subtracted from
+ *  the colour. skyShader.ts interpolates both, so the AA test holds the tint that ships. */
+export const READING_TINT: Record<'warm' | 'cool', readonly [number, number, number]> = {
+  warm: [0.055, 0.042, 0.024],
+  cool: [0.030, 0.033, 0.039],
+};
+
+/** The cool tint the dark theme's nebula lifts a descent sky with, uploaded as uNebula. */
+export const NEBULA: readonly [number, number, number] = [0.055, 0.105, 0.115];
 
 /**
  * Hard ceiling on the dark theme's nebula lift.
@@ -79,6 +84,4 @@ export function tintBudget(variant: SkyVariant): {
  * Sized against the dark theme's --ink-3 (#8b938c), the smallest ink these pages
  * set on the sky. tests/skyLegibility.test.ts pins the resulting contrast.
  */
-export function nebulaCeiling(): number {
-  return 0.16;
-}
+export const NEBULA_CEILING = 0.16;

@@ -1,20 +1,26 @@
 // tests/marchingSquares.test.ts
 // THE MARCHING-SQUARES KERNEL, extracted so there is one implementation instead of two.
 //
-// `descentPath.contours()` and the homepage intro's terrain isolines differ in exactly one thing: their
-// bounds. They already call the SAME `field()` from lib/terrain.ts. Duplicating ~70 lines of marching
-// squares for that would have been the wrong trade, so the kernel moved here and both became callers.
+// The Story graph's isolines (`storyContours()` in descentPath.ts) and the homepage intro's
+// (terrainContours.ts) differ in their bounds and counts. They call the SAME `field()` from lib/terrain.ts,
+// so the kernel lives here and both are callers.
 //
 // Tested against a CLOSED-FORM field — `x² + y²`, whose level sets are circles of radius √level — because
 // the point of these assertions is that the algorithm is right, and a Gaussian mixture has no answer to
-// check against. `descentPath`'s own specs are what prove the extraction preserved its behaviour; this file
-// proves the kernel itself.
+// check against. The callers' own specs pin what they draw; this file proves the kernel itself.
 import { describe, expect, it } from 'vitest';
-import { isoRuns, isoSegments, type IsoBounds } from '../src/lib/marchingSquares';
+import { isoRuns, isoLevels, isoSegments, type IsoBounds } from '../src/lib/marchingSquares';
 
 /** Level sets are circles: fn(x, y) = r² ⇒ the contour at level L is the circle of radius √L. */
 const circles = (x: number, y: number): number => x * x + y * y;
 const BOX: IsoBounds = { x0: -2, y0: -2, x1: 2, y1: 2 };
+
+describe('isoLevels', () => {
+  it('places level k at (k + ½)/n through the range the probe lattice measures', () => {
+    // Over BOX the lattice hits the centre (0) and the corners (8), so the range is exactly [0, 8].
+    expect(isoLevels(circles, BOX, 4, 40)).toEqual([1, 3, 5, 7]);
+  });
+});
 
 describe('isoRuns', () => {
   it('returns runs whose every point lies on the requested level set', () => {
@@ -83,7 +89,7 @@ describe('isoRuns', () => {
   });
 
   it('is deterministic — which is what makes memoising it sound', () => {
-    // lib/terrainContours.ts and descentPath's contoursFor() both cache these results. If this function
+    // lib/terrainContours.ts and descentPath's storyContours() both cache these results. If this function
     // ever acquires a hidden input, those caches become wrong rather than merely stale.
     expect(isoRuns(circles, BOX, 1.5, 40)).toEqual(isoRuns(circles, BOX, 1.5, 40));
   });

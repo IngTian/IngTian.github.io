@@ -17,20 +17,13 @@ import { wholeParts } from '../lib/words';
 import { WRITINGS_PROMISE, WRITINGS_TOPICS } from '../data/making';
 import { KINDS } from '../data/writing';
 import PlushCow from '../components/PlushCow.astro';
-import Signature from './Signature.astro';
 
 const shownProjects = appendixProjects(projects);
 
-// ── THE WRITING COLUMN IS DERIVED, NOT PROMISED. This column said "coming" and carried
-// WRITINGS_PROMISE while /writing/favourite-quotes/ was published, in the nav and live — the homepage was
-// telling visitors the writing did not exist yet. The cause was that its state came from a hand-written
-// constant, so publishing a piece could not possibly update it: nothing linked the two.
-//
-// Reading the collection is what makes that class of lie impossible. `getCollection('writing')` filtered on
-// `!draft` is EXACTLY how src/pages/writing.astro decides what exists, so the homepage and /writing cannot
-// disagree about whether there is any writing — and the next piece is still just a file, with no code change
-// here. The `coming` state below is kept and is correct when the folder is genuinely empty; it is now a
-// consequence of the content rather than a claim about it.
+// ── THE WRITING COLUMN IS DERIVED, NOT PROMISED: a hand-written "coming" state once told visitors there was
+// no writing while a piece was live in the nav. `getCollection('writing')` filtered on `!draft` is EXACTLY how
+// src/pages/writing.astro decides what exists, so the two pages cannot disagree, and the next piece is still
+// just a file. The `coming` state below is correct when the folder is genuinely empty.
 const writings = (await getCollection('writing'))
   .filter((e) => !e.data.draft)
   // Newest first. Deliberately the same rule as sorted() in data/writing.ts — a plain compare on the
@@ -61,18 +54,12 @@ const lineFor = (p: Publication) => {
 // "(RL-" / "BHRP)" at 1440 and 390, splitting the paper's own name. Fraunces has no U+2011, so a non-breaking hyphen
 // would fall back to another face.
 ---
-{/* THE APPENDIX — the work AND the footer, as one slide. The owner: "i noticed that when i scroll down to the
-     work, it seems like you aligned the bottom with the footer so that leaves a huge space below the cow. why not
-     merge the footer and the last slide? name it appendix."
-     He read the symptom exactly right. The two were separate top-level sections, so the deck gave each its own
-     stop: resting on the work left 161px of empty tan below the cow with the footer entirely below the fold, and
-     the final stop was a 193px strip. One section, one stop — the page now ends where it stops.
-     `Appendix` is his word and it is the better one now: with the links, the seal and the copyright inside it,
-     this is no longer only "the work" but the reference matter at the end of a paper, which is exactly the
-     register the rest of the site is written in. */}
+{/* THE APPENDIX, the last slide: the page ends on it. `Appendix` is the owner's word, the reference matter at the
+     end of a paper, which is the register the rest of the site is written in. Nothing follows it: the footer and
+     its seal are deleted, and CV and Email are in the corner nav on every page. */}
 <section id="appendix" class="wk" aria-labelledby="ap-heading">
-  <div class="wk-paper">
-    <div class="wk-inner">
+  <div class="wk-paper slide-paper">
+    <div class="slide-gutter">
       <h2 id="ap-heading" class="wk-title">Appendix</h2>
 
       <div class="wk-cols">
@@ -133,60 +120,22 @@ const lineFor = (p: Publication) => {
         </div>
       </div>
 
-      {/* THE COW LIVES HERE NOW — "im thinking if it's better to move the cow to above", pointing at exactly
-           this empty band. It solves two things at once: the footer stops asking a 19-word strip to hold both the
-           IT seal and a pixel animal, and this slide stops ending in 480px of blank panel (measured: 422px of
-           content in a 900px slide). It is still the last thing before the footer, so it keeps its place as the
-           page's closing aside. */}
+      {/* THE COW, the page's closing aside, in what was 480px of blank panel at the slide's foot (measured: 422px
+           of content in a 900px slide). */}
       <div class="wk-cow">
         <PlushCow size="mark" />
       </div>
 
     </div>
   </div>
-
-  {/* The footer, NESTED rather than a sibling. lib/deck.ts counts only the direct <section> children of <main>,
-       so nesting is what collapses the two stops into one — no change to the deck itself. It keeps its own dark
-       ground because it sits on the descent gradient below the tan panel, which is where the sky reaches
-       near-black: the page still ENDS in the dark, which is the whole point of the descent. */}
-  <Signature />
+</section>
 
 <style>
   .wk {
     position: relative; z-index: 1;
     width: 100vw; margin-left: calc(50% - 50vw);
   }
-  .wk-paper {
-    --wk-bg: #c4b7a1;
-    --wk-edge: rgba(74, 66, 54, 0.26);
-    --wk-ink: #1f1b14;
-    --wk-ink-soft: #423b30;
-    --wk-ink-faint: #6a6153;
-    --wk-accent: #7c5522;
-    background: var(--wk-bg);
-    border-top: 1px solid var(--wk-edge);
-    border-bottom: 1px solid var(--wk-edge);
-    padding: clamp(52px, 7.4vh, 104px) 0;
-  }
-  :global(html[data-theme='dark']) .wk-paper {
-    --wk-bg: #14161a;
-    --wk-edge: rgba(184, 177, 161, 0.14);
-    --wk-ink: #dce1dc;
-    --wk-ink-soft: #a8b0a9;
-    --wk-ink-faint: #6d746e;
-    --wk-accent: #7fc9a0;
-  }
-  .wk-inner {
-    /* Clears the fixed Toc rail. The rail now carries an INDENTED tier ("Problem / Limits / Method" nested
-       under "The field"), so its right edge moved from x=129 to x=151 at 1700px and the old clamp left as
-       little as 5px of air — measured at 1440px on this slide. 168px min / 10.4vw keeps at least ~20px of
-       margin at every width the rail is shown (it collapses to dots below 1100px). Shared across the five
-       paper slides, so it is edited in all of them together or in none. */
-    padding-left: clamp(168px, 10.4vw, 200px);
-    padding-right: clamp(20px, 2.4vw, 52px);
-    box-sizing: border-box;
-  }
-  @media (max-width: 1099px) { .wk-inner { padding-left: clamp(28px, 6vw, 80px); } }
+  .wk-paper { padding: clamp(52px, 7.4vh, 104px) 0; }
 
   /* BIGGER THROUGHOUT, on the owner's note ("the work is okay. fonts can be bigger"). The slide had the
      most vertical room of the three — it measured 501px of a 1050px screen — so the type was small for no
@@ -195,7 +144,7 @@ const lineFor = (p: Publication) => {
   .wk-title {
     font-family: var(--font-display); font-weight: 300;
     font-size: clamp(28px, 2.6vw, 42px); line-height: 1.22;
-    color: var(--wk-ink); margin: 0; letter-spacing: -0.008em;
+    color: var(--panel-ink); margin: 0; letter-spacing: -0.008em;
   }
 
   .wk-cols {
@@ -203,22 +152,22 @@ const lineFor = (p: Publication) => {
     gap: 0 clamp(26px, 3vw, 60px);
     margin: clamp(28px, 3.8vh, 52px) 0 0;
   }
-  .wk-col + .wk-col { border-left: 1px solid var(--wk-edge); padding-left: clamp(26px, 3vw, 60px); }
+  .wk-col + .wk-col { border-left: 1px solid var(--panel-edge); padding-left: clamp(26px, 3vw, 60px); }
   @media (max-width: 980px) {
     .wk-cols { grid-template-columns: 1fr; gap: 4vh 0; }
-    .wk-col + .wk-col { border-left: 0; padding-left: 0; padding-top: 4vh; border-top: 1px solid var(--wk-edge); }
+    .wk-col + .wk-col { border-left: 0; padding-left: 0; padding-top: 4vh; border-top: 1px solid var(--panel-edge); }
   }
 
   .wk-col-head { display: flex; align-items: baseline; gap: 10px; }
   .wk-col-kicker {
     font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.22em;
-    text-transform: uppercase; color: var(--wk-accent); margin: 0 0 20px;
+    text-transform: uppercase; color: var(--panel-accent); margin: 0 0 20px;
   }
   .wk-col-head .wk-col-kicker { margin-bottom: 20px; }
   .wk-tag {
     font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
-    color: var(--wk-ink-faint);
-    border: 1px solid var(--wk-edge); border-radius: 2px; padding: 3px 7px;
+    color: var(--panel-faint);
+    border: 1px solid var(--panel-edge); border-radius: 2px; padding: 3px 7px;
   }
 
   .wk-item { margin: 0 0 clamp(18px, 2.2vh, 26px); }
@@ -226,11 +175,11 @@ const lineFor = (p: Publication) => {
     /* ACCENT FACE: these are the sub-headlines the owner asked to give some variety to — the paper and project
        names sitting under each mono column label. Fraunces earns its keep at this size. */
     font-family: var(--font-accent); font-weight: 500; font-size: clamp(17px, 1.35vw, 20px);
-    line-height: 1.28; color: var(--wk-ink); margin: 0;
+    line-height: 1.28; color: var(--panel-ink); margin: 0;
   }
   .wk-nobreak { white-space: nowrap; }
   .wk-item-line {
-    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.58; color: var(--wk-ink-faint);
+    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.58; color: var(--panel-faint);
     margin: 6px 0 0; max-width: 40ch;
   }
 
@@ -238,16 +187,16 @@ const lineFor = (p: Publication) => {
     /* An italic editorial line, which is where a characterful serif reads as voice rather than as mannerism. */
     font-family: var(--font-accent); font-style: italic;
     font-size: clamp(17px, 1.4vw, 21px); line-height: 1.45;
-    color: var(--wk-ink); margin: 0; max-width: 34ch;
+    color: var(--panel-ink); margin: 0; max-width: 34ch;
   }
   .wk-topics { list-style: none; margin: clamp(16px, 2vh, 22px) 0 0; padding: 0; display: grid; gap: 9px; }
   .wk-topics li {
-    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.55; color: var(--wk-ink-soft);
+    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.55; color: var(--panel-soft);
     padding-left: 16px; position: relative; max-width: 40ch;
   }
   .wk-topics li::before {
     content: ""; position: absolute; left: 0; top: 0.62em;
-    width: 7px; height: 1px; background: var(--wk-accent); opacity: 0.7;
+    width: 7px; height: 1px; background: var(--panel-accent); opacity: 0.7;
   }
 
   /* RIGHT EDGE, NOT CENTRED — the owner picked this from six real renders. Centring was the version he called
@@ -267,10 +216,10 @@ const lineFor = (p: Publication) => {
     margin: clamp(8px, 1.2vh, 14px) 0 0;
     font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.12em;
     text-transform: uppercase; text-decoration: none;
-    color: var(--wk-accent);
+    color: var(--panel-accent);
     border-bottom: 1px solid currentColor; padding-bottom: 3px;
   }
   .wk-arrow { transition: transform .28s cubic-bezier(.2,.7,.3,1); }
   @media (hover: hover) { .wk-link:hover .wk-arrow { transform: translateX(4px); } }
-  .wk-link:focus-visible { outline: 2px solid var(--wk-accent); outline-offset: 4px; }
+  .wk-link:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 4px; }
 </style>

@@ -2,9 +2,9 @@
 // The living Monet sky — woven warm/cool broken color over the .descent gradient.
 // MUST render inside <main class="descent"> (a child), so its z-index:-1 tucks
 // behind content within .descent's z-index:0 stacking context — a BaseLayout
-// sibling would fall behind the opaque gradient and vanish. Pure CSS, no JS.
-// Breathe animation is added in a later step (see <style>); this static state
-// (woven color, no motion) is also the reduced-motion / Firefox fallback.
+// sibling would fall behind the opaque gradient and vanish. CSS, plus a small
+// script that pauses the breathe while scrolling. The static state (woven color,
+// no motion) is also the reduced-motion / Firefox fallback.
 ---
 <div class="sky-wash" aria-hidden="true">
   <div class="sky-warm"></div>
@@ -94,24 +94,18 @@
       to   { transform: scale(1.08); opacity: 0.16; }
     }
 
-    /* ── THE BREATHE HOLDS ITS BREATH WHILE YOU SCROLL, and this is the fix for the deck feeling rough.
-       The owner: "i found that scroll down and up the slides is not smooth enough."
-       MEASURED, because the obvious suspects were all wrong. During a deck advance the page was rendering a
-       median frame of 33.7ms — 82% of frames dropped, worst 142ms — where 16.7ms is 60fps. Bisecting the layers
-       cleared the corner-nav backdrop-filter, the descent washes, the grain and the hero canvas (all made no
-       difference), and landed here: each of these three elements is 1685 x 7812 = 13.2 MEGAPIXELS, because
-       `inset: 0` inside main.descent means the whole DOCUMENT, not one viewport. Three of them, each with
-       mix-blend-mode, animating without pause. Every frame re-blends about 40 megapixels against its backdrop.
-       Fix candidates, all measured against a four-advance walk:
+    /* ── THE BREATHE HOLDS ITS BREATH WHILE YOU SCROLL (the owner found the deck's scroll "not smooth enough").
+       MEASURED: during a deck advance the median frame was 33.7ms (82% dropped). Bisecting cleared the nav's
+       backdrop-filter, the descent washes, the grain and the hero canvas, and landed here: each of these three
+       elements is 1685 x 7812 = 13.2 MEGAPIXELS (`inset: 0` inside main.descent is the whole DOCUMENT), each
+       blended and animating, so every frame re-blends about 40 megapixels. Measured on a four-advance walk:
          will-change removed          32.5ms   (no help)
          blend modes off              24.6ms   (helps, and costs the Monet look)
          wash fixed to the viewport   25.0ms   (helps, and the sky stops descending with you)
          ANIMATION PAUSED              8.4ms   (as good as deleting the wash outright, which also gave 8.4ms)
-       So the animation is the whole cost, and pausing it only WHILE SCROLLING costs nothing at all: the sky
-       still breathes whenever the reader is still, which is when they can actually see it breathe.
-       `animation-play-state: paused` freezes mid-cycle and resumes from the same point, so there is no jump.
-       Safe direction: the class is only ever ADDED by script, so with no JS the animation simply runs — the
-       current behaviour, and a finished state. */
+       So pausing only WHILE SCROLLING costs nothing visible: the sky breathes whenever the reader is still.
+       `animation-play-state: paused` resumes from the same point, so there is no jump. Only script ADDS the
+       class, so with no JS the animation simply runs. */
     :global(html.wash-still) .sky-warm,
     :global(html.wash-still) .sky-cool,
     :global(html.wash-still) .sky-sun {

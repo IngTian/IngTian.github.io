@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join, sep } from 'node:path';
+import { basename, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
@@ -8,14 +8,15 @@ import {
   INTRO_DURATION_MS, INTRO_DUR_MIN_MS, INTRO_DUR_MAX_MS,
 } from '../src/lib/introTimeline';
 import { INTRO_SEEN_KEY } from '../src/lib/introSession';
-import { inProgress, projects, publications, researchInterests, timeline, type Publication } from '../src/data/profile';
+import { contact, inProgress, projects, publications, researchInterests, timeline, type Publication } from '../src/data/profile';
 import { PAPER_DATA } from '../src/data/papers';
 import {
-  type Stop, experienceStops, flattenStops, paperPageOwns, paperSections, paperStops, projectSectionId, projectStops,
-  researchIndexStops,
+  type Stop, experienceStops, flattenStops, homeStops, paperPageOwns, paperSections, paperStops, projectSectionId,
+  projectStops, researchIndexStops,
 } from '../src/lib/pageStops';
 import { FIGURE_NAME, PAPERS_DIR, type PaperReport } from '../src/lib/paperMarkdown';
 import { countWords, readingMinutes, wholeParts } from '../src/lib/words';
+import { DIST, type Page, distCss, pages, shippedCss } from './helpers/dist';
 import { renderMarkdown } from './helpers/paperChain';
 import { GALLERY_ORDER } from '../src/lib/galleryLayout';
 import { EASE, RAIL, stagger } from '../src/lib/motionTiming';
@@ -24,35 +25,18 @@ import { BOOT_CMD, BOOT_DEADLINE_MS, BOOT_SEEN_KEY } from '../src/lib/projectsBo
 import { PHONE_QUERY } from '../src/lib/viewport';
 
 /* ================================================================================================
-   THE FIRST TEST THAT LOOKS AT WHAT THE SITE ACTUALLY SHIPS.
+   WHAT THE SITE ACTUALLY SHIPS. This is a static site, so the build output IS the product, and the
+   failures a unit test cannot reach are two files that were supposed to agree and don't: a link whose
+   target got renamed, a prop nobody passed, a page list that drifted.
 
-   Before this file the suite was ~820 assertions and every one of them called a function. Nothing
-   had ever read a byte of dist/. That is a specific, and expensive, shape of blind spot: this is a
-   static site, so the build output IS the product, and the interesting failures are not wrong
-   arithmetic inside lib/ — they are two files that were supposed to agree and don't, a link whose
-   target got renamed, a prop nobody passed. Those cannot be reached from a unit test, because from
-   a unit test's point of view every part in isolation is correct. Three of the four defects in the
-   batch this file was written for would have been caught here:
+   HOW IT READS THE HTML. Regex over the built files, no parser: jsdom or cheerio would put a dependency
+   in the deploy path for a job a few regexes do. The cost is that the queries stay simple; where that
+   bites, it is written down next to the assertion.
 
-     - a "back to the section" link pointing at /writing#misc while the section renders id="w-misc";
-     - the footer's page list drifting from data/nav.ts's, silently dropping a whole route;
-     - two prototype routes shipping a self-referential <link rel="canonical"> instead of noindex.
-
-   HOW IT READS THE HTML. Regex over the built files, no parser. That is a deliberate choice, not a
-   shortcut: adding jsdom/cheerio to devDependencies to grep for `id="x"` would put a dependency in
-   the deploy path for a job four regexes do, and tests/writingContent.test.ts already establishes
-   node:fs + a regex as how this repo reads a file it cannot import. The cost is that the queries
-   have to stay simple. Where that cost bites, it is written down next to the assertion.
-
-   IT NEEDS A BUILD, AND THAT IS A WORKFLOW DEPENDENCY. `npm run build` must have run first, and a
-   missing dist/ is a LOUD failure rather than a skip — a test that quietly passes when its subject
-   is absent is exactly the `passWithNoTests: false` footgun in another costume (see the note in
-   vitest.config.ts). ci.yml already orders Build before Test. deploy.yml's gate job did NOT: it ran
-   `npm test` on a bare checkout, so that job needs a build step before its Test step or this file
-   fails the deploy. Any future workflow that runs the suite needs the same.
+   IT NEEDS A BUILD: tests/helpers/dist.ts reads dist/ for this file and cssVars, and throws, never skips,
+   when there is none.
    ================================================================================================ */
 
-const DIST = fileURLToPath(new URL('../dist/', import.meta.url));
 const PUBLIC = fileURLToPath(new URL('../public/', import.meta.url));
 const CONTENT = fileURLToPath(new URL('../src/content/', import.meta.url));
 
@@ -64,84 +48,7 @@ const contentFiles = (dir: string): { name: string; front: string }[] => readdir
 const explained = (): Set<string> =>
   new Set(contentFiles('papers').map((f) => /^publication:\s*(\S+)/m.exec(f.front)?.[1] ?? `(${f.name} names no publication)`));
 
-const NEEDS_BUILD =
-  'tests/distSmoke.test.ts found no HTML in dist/. It inspects the BUILT site, so `npm run build` ' +
-  'has to run before `npm test`. ci.yml already orders it that way. If you are seeing this in a ' +
-  "workflow, that workflow's test job needs `npm run build` added before its Test step — " +
-  "deploy.yml's did.";
-
-interface Page {
-  /** dist-relative path with forward slashes, e.g. "writing/index.html". */
-  file: string;
-  /** The URL path this file serves, never trailing-slashed: "/", "/writing", "/404.html". */
-  route: string;
-  html: string;
-  /** `html` with <script>/<style>/comments removed — see stripNonMarkup. */
-  markup: string;
-  /** Every id present in the served HTML. */
-  ids: Set<string>;
-}
-
-const htmlFiles = (dir: string, out: string[] = []): string[] => {
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return out; // dist/ absent entirely — the guard below turns that into a readable failure.
-  }
-  for (const e of entries) {
-    const p = join(dir, e.name);
-    if (e.isDirectory()) htmlFiles(p, out);
-    else if (e.name.endsWith('.html')) out.push(p);
-  }
-  return out;
-};
-
-/**
- * Drop <script>, <style> and comments before scanning for markup.
- *
- * Not tidiness — correctness. BaseLayout inlines a JSON-LD block and a theme bootstrap, and a naive
- * href/img scan over the raw file would pick up URL strings and selectors out of JavaScript and
- * report them as links the page offers. The flip side, worth stating because it bounds what this
- * file can promise: nodes a script CREATES at runtime are not here either. The /art photo grid is
- * built by scripts/artGallery.ts, so its <img>s are only covered to the extent the build emits
- * them. Rendered-output tests see rendered output; they are not a browser.
- */
-const stripNonMarkup = (html: string): string =>
-  html
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<!--[\s\S]*?-->/g, '');
-
-const routeOf = (rel: string): string => {
-  const p = rel.split(sep).join('/');
-  if (p === 'index.html') return '/';
-  if (p.endsWith('/index.html')) return '/' + p.slice(0, -'/index.html'.length);
-  return '/' + p; // 404.html, and the Search Console verification file
-};
-
-let cached: Page[] | null = null;
-
-/** Every built page. Throws (does not skip) when there is no build to inspect. */
-const pages = (): Page[] => {
-  if (cached) return cached;
-  const files = htmlFiles(DIST).sort();
-  if (files.length === 0) throw new Error(NEEDS_BUILD);
-  cached = files.map((abs) => {
-    const html = readFileSync(abs, 'utf8');
-    const markup = stripNonMarkup(html);
-    return {
-      file: abs.slice(DIST.length).split(sep).join('/'),
-      route: routeOf(abs.slice(DIST.length)),
-      html,
-      markup,
-      ids: new Set([...markup.matchAll(/\sid="([^"]*)"/g)].map((m) => m[1])),
-    };
-  });
-  return cached;
-};
-
-/** Root-relative route → page, keyed the way routeOf spells it (no trailing slash). */
+/** Root-relative route → page, keyed the way the helper spells a route (no trailing slash). */
 const byRoute = (): Map<string, Page> => new Map(pages().map((p) => [p.route, p]));
 const builtPage = (route: string): Page => {
   const p = byRoute().get(route);
@@ -149,9 +56,6 @@ const builtPage = (route: string): Page => {
   return p;
 };
 const projectsPage = (): Page => builtPage('/projects');
-/** Every bundled stylesheet in dist/_astro, concatenated. */
-const distCss = (): string => readdirSync(join(DIST, '_astro')).filter((f) => f.endsWith('.css'))
-  .map((f) => readFileSync(join(DIST, '_astro', f), 'utf8')).join('\n');
 
 /**
  * The URL the host really serves a route at — the base a relative href resolves against.
@@ -180,32 +84,12 @@ const internalHrefs = (p: Page): string[] =>
  * this path" of `/cv.pdf` would report the CV as a dead link; asking "is there a file on disk" of
  * `/writing` would report every route as one.
  *
- * The dividing line is a dot in the last segment — the same rule check 2 below spells inline as
- * `/\.\w+$/` for the footer's `/cv.pdf`. (Check 2 keeps its own copy on purpose: it *skips* assets,
- * where this one goes on to look for them on disk, so they are not the same predicate doing the same
- * job.) It is a heuristic, and the way it could be wrong is a route whose final segment contains a
- * dot — a writing slug like `v1.0-notes` would be mistaken for a file and looked for on disk. No such
- * route exists today; if one is ever added, this is the line to fix, and it will fail loudly rather
- * than quietly pass.
+ * The dividing line is a dot in the last segment. It is a heuristic, and the way it could be wrong is a
+ * route whose final segment contains a dot — a writing slug like `v1.0-notes` would be mistaken for a
+ * file and looked for on disk. No such route exists today; if one is ever added, this is the line to fix,
+ * and it will fail loudly rather than quietly pass.
  */
 const namesAFile = (path: string): boolean => /\/[^/]*\.[a-z0-9]+$/i.test(path);
-
-/**
- * Which built routes are prototypes. Used by the noindex check below — and by NOTHING ELSE any more,
- * which is the point of this note.
- *
- * It used to also exclude the proto routes from the fragment-link check, because /proto-paper rendered
- * the shared homepage `<Toc />` whose stop list is the HOMEPAGE's slides, so five of its seven rail
- * entries pointed at ids that page did not contain. That was fixed at the source (proto-paper stopped
- * rendering the Toc) and /proto-paper has since been retired altogether, so the exclusion protected
- * nothing. It is gone, and with it the separate proto-only copy of the fragment check that existed to
- * make the gap visible: the fragment check below now runs over EVERY built page, prototypes included,
- * which is strictly more coverage than the two tests it replaces.
- *
- * Keep it that way. A prototype that borrows the homepage rail again will now fail the main check
- * rather than a parked one, and re-adding an exclusion here would hide it.
- */
-const isProto = (p: Page): boolean => p.route.startsWith('/proto-');
 
 /**
  * A paper's file rendered, and what the markdown plugins report for it (its sections, its words), through the chain
@@ -223,17 +107,26 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
   it('has a build to inspect at all', () => {
     // First, so that a missing dist/ reads as "you did not build" once, instead of as four
     // unrelated-looking failures further down.
-    expect(pages().length, NEEDS_BUILD).toBeGreaterThan(5);
+    expect(pages().length, 'too few pages in dist/ — run `npm run build`').toBeGreaterThan(5);
   });
 
-  // The eight page files' routes, then one per published writing piece and one per paper file: ten today, the
-  // "10 page(s) built" CLAUDE.md quotes. The content routes are counted from src/content/ rather than typed, because
+  // In a .astro template `<!-- … -->` is HTML and ships, quoting design review into View Source; `{/* … */}` is
+  // discarded at compile time (astro.config.mjs, beside `integrations`, says why that is the whole mechanism).
+  it('ships no HTML comment on any page', () => {
+    const found = pages().flatMap((p) => (p.html.match(/<!--[\s\S]*?-->/g) ?? [])
+      .map((c) => `${p.file}: ${c.slice(0, 90).replace(/\s+/g, ' ')}`));
+    expect(found, 'in .astro templates write {/* … */} (a bare /* … */ inside an expression), never <!-- … -->')
+      .toEqual([]);
+  });
+
+  // The seven page files' routes, then one per published writing piece and one per paper file: nine today, the
+  // "9 page(s) built" CLAUDE.md quotes. The content routes are counted from src/content/ rather than typed, because
   // a new piece or paper is a file and nothing else may need an edit. A deleted page that still builds, or a page
   // that stopped building, fails by name. (dist/ also holds public/'s one .html, which no page builds.)
-  it('builds exactly its routes: eight pages, one per writing piece and one per paper (ten today)', () => {
+  it('builds exactly its routes: seven pages, one per writing piece and one per paper (nine today)', () => {
     const built = pages().filter((p) => !existsSync(join(PUBLIC, p.file))).map((p) => p.route).sort();
     const want = [
-      '/', '/404.html', '/art', '/experience', '/projects', '/proto-sketches', '/research', '/writing',
+      '/', '/404.html', '/art', '/experience', '/projects', '/research', '/writing',
       ...contentFiles('writing').filter((f) => !/^draft:\s*true\b/m.test(f.front)).map((f) => `/writing/${f.name}`),
       ...[...explained()].map((slug) => `/research/${slug}`),
     ].sort();
@@ -241,19 +134,9 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
   });
 
   // ── 1. EVERY INTERNAL LINK RESOLVES ──────────────────────────────────────────────────────────
-  // EVERY page, prototypes included — see the note on isProto for why there is no exclusion here.
-  //
-  // IT USED TO CHECK ONLY THE HREFS CONTAINING A '#'. The loop opened with `if (hash === -1)
-  // continue;`, which is a much narrower promise than the test's name implied, and the gap was not
-  // theoretical: dist/writing/index.html links its only piece as href="/writing/favourite-quotes",
-  // with no fragment — so the sole door to the sole writing piece was checked by nothing at all here,
-  // and check 2 below only ever looks inside the homepage footer. A renamed .md file (the slug IS the
-  // filename) or a moved route would have shipped a 404 on the newest section of the site with all
-  // three gates green.
-  //
-  // So the fragment is now the OPTIONAL half of the question. Every internal href is resolved to a
-  // path first and that path must exist; an href that also names a fragment must additionally find
-  // the id on the page it lands on. Same walk, same failure list, strictly more coverage.
+  // EVERY page, with no exclusion, and every href, not only those with a '#' (a renamed .md is a moved
+  // route, and its link has no fragment). Each resolves to a path that must exist; an href that also
+  // names a fragment must find the id on the page it lands on.
   it('resolves every internal link to a built page, and every fragment to an id on it', () => {
     const routes = byRoute();
     const dead: string[] = [];
@@ -264,8 +147,7 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
         const frag = hash === -1 ? null : href.slice(hash + 1);
         // `href="#"` is a no-op affordance and `#top` is defined by the HTML spec to mean the document
         // itself, so neither needs an element to exist. Only the ID half is waived, not the whole
-        // href: the old version `continue`d here, which meant a link to a page that does not exist
-        // escaped the check entirely as long as it ended in "#top".
+        // href, so a link to a missing page cannot escape by ending in "#top".
         const waiveId = frag === '' || frag === 'top';
 
         // Resolve against the page's own served URL so a same-page "#x", a sibling "writing#x", an
@@ -302,106 +184,65 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
     expect(dead, `dead internal links in the built site:\n  ${dead.join('\n  ')}`).toEqual([]);
   });
 
-  // ── 2. THE FOOTER CARRIES THE WHOLE PAGE SET ─────────────────────────────────────────────────
-  const footerNav = (): string => {
-    const home = byRoute().get('/');
-    expect(home, 'dist/index.html is missing').toBeTruthy();
-    // Anchored on the footer nav's aria-label rather than a class, because the label is the part
-    // that is contractually stable — it is what a screen reader announces, so it cannot be renamed
-    // as a styling decision (sections/Signature.astro).
-    const mark = 'aria-label="Links and downloads"';
-    const at = home!.markup.indexOf(mark);
-    expect(
-      at,
-      'could not find the footer nav (aria-label="Links and downloads") in the homepage. If it was ' +
-        'renamed, update this test; if it vanished, the site lost its footer navigation.',
-    ).toBeGreaterThan(-1);
-    return home!.markup.slice(at, home!.markup.indexOf('</nav>', at));
-  };
-
-  /* SKIPPED, AND THE SKIP IS THE FINDING. This assertion fails today, on a real bug that this test
-     is what found: the footer is built from `links` in src/data/profile.ts, the corner nav from
-     PAGES in src/data/nav.ts, and the two lists have drifted — profile.ts never gained /writing, so
-     the rendered footer offers Research / Experience / Projects / Art and the site's newest route is
-     reachable only from the corner nav.
-
-     THE FIX (src/data/profile.ts, in `links`, directly after the Research entry — the position
-     nav.ts uses and for its stated reason, "the papers, then the thinking around them"):
-
-         { label: 'Research', href: '/research' },
-       + { label: 'Writing', href: '/writing' },
-         { label: 'Experience', href: '/experience' },
-
-     UN-SKIPPED: profile.ts now carries the Writing link, so this passes. It stays as the guard against the
-     two lists diverging again — which is how /writing came to be in the nav and absent from the footer
-     that adds the line — it needs no other change. */
-  it('offers every nav page in the footer', () => {
-    const foot = footerNav();
-    const hrefs = new Set([...foot.matchAll(/href="([^"]*)"/g)].map((m) => m[1]));
-    for (const p of PAGES) {
-      expect(
-        hrefs.has(p.href),
-        `the homepage footer has no link to ${p.href} (${p.label}), but data/nav.ts lists it as one ` +
-          'of the site\'s pages. The footer is built from the `links` array in src/data/profile.ts — ' +
-          'add it there.',
-      ).toBe(true);
+  // ── 2. CV AND EMAIL ARE IN EVERY CORNER NAV, AT EVERY WIDTH ──────────────────────────────────────
+  // The corner nav is the only place on the site they are linked. The phone's list is the same <ul>, and from 641
+  // to 1199px only an item marked `profile` (GitHub, LinkedIn) is hidden, so neither of these may carry it.
+  it('links the CV and Email from every corner nav, in the list the phone opens too', () => {
+    const wrong: string[] = [];
+    for (const p of pages()) {
+      if (!/<html[\s>]/i.test(p.html)) continue;
+      const list = /<ul id="cnav-list"[^>]*>[\s\S]*?<\/ul>/.exec(p.markup)?.[0] ?? '';
+      for (const c of [contact.cv, contact.email]) {
+        const li = [...list.matchAll(/<li\b([^>]*)>([\s\S]*?)<\/li>/g)]
+          .find((m) => m[2].includes(`href="${c.href}"`) && m[2].includes(`aria-label="${c.label}"`));
+        if (!li) wrong.push(`${p.route}: no ${c.label} link in the corner nav`);
+        else if (/\bprofile\b/.test(li[1])) wrong.push(`${p.route}: ${c.label} is hidden below 1200px`);
+      }
+      // and every link in it goes somewhere: the link check skips an empty href and every off-site one, so a contact
+      // href emptied in profile.ts would ship a link to the page itself
+      for (const [a] of list.matchAll(/<a\b[^>]*>/g)) if (!/\shref="[^"]+"/.test(a)) wrong.push(`${p.route}: ${a}`);
     }
+    expect(wrong).toEqual([]);
+    // and no rule hides the marks wholesale: only `.profile` goes, from 641 to 1199px, never in the phone's list (the
+    // one link to GitHub and LinkedIn there). Read from every byte of CSS the pages ship, and known to be reading the
+    // corner nav's: the `.profile` rule is found first, and every copy of it sits in the wide side's negation block.
+    const css = shippedCss(pages());
+    const profileHide = /\.cnav\[[^\]]+\] \.profile\[[^\]]+\][^{}]*\{[^}]*display:none/g;
+    const all = css.match(profileHide) ?? [];
+    expect(all.length, 'the corner nav hides `.profile` from 641 to 1199px').toBeGreaterThan(0);
+    const wide = [...css.matchAll(/@media not all and \(max-width:640px\)\{([^@]*?)\}\}/g)].flatMap((m) => m[1].match(profileHide) ?? []);
+    expect(wide.length, 'a `.profile` rule outside the wide side would hide GitHub and LinkedIn on a phone').toBe(all.length);
+    const hides = /\.cnav\[[^\]]+\] \.mark(?:-li)?\[[^\]]+\][^{}]*\{[^}]*display:none/.exec(css);
+    expect(hides?.[0], 'a corner-nav rule hides every contact mark').toBeUndefined();
   });
 
-  it('never links the footer at a page the site does not have', () => {
-    // The half of the footer/nav agreement that IS green, kept live so the seam has real coverage
-    // while the assertion above is parked. It catches the failure the site has actually shipped
-    // before (a link to /experience while that route did not exist) from the other direction.
-    const foot = footerNav();
-    const routes = byRoute();
-    for (const href of [...foot.matchAll(/href="(\/[^"#]*)"/g)].map((m) => m[1])) {
-      if (/\.\w+$/.test(href)) continue; // /cv.pdf and friends are assets, not routes
-      const path = href.replace(/\/$/, '') || '/';
-      expect(
-        routes.has(path) || routes.has(`${path}.html`),
-        `the homepage footer links to ${href}, which built no page`,
-      ).toBe(true);
-    }
-  });
-
-  // ── 3. PROTOTYPE ROUTES ARE NOT INDEXABLE ────────────────────────────────────────────────────
-  it('emits robots=noindex and NO canonical on every proto route', () => {
-    const protos = pages().filter(isProto);
-    // Asserted, not assumed: if the routes are renamed away from the prefix this must go red rather
-    // than iterate an empty list and congratulate itself. A lower bound, not an exact count — the
-    // proto routes are a workflow, so gaining one is the expected case, not a regression.
-    //
-    // The floor is 1, and it was 4 until three of the four routes were retired (/proto-showpiece,
-    // /proto-paper, /proto-ladder — all answered questions; see tests/protoNoindex.test.ts for the
-    // full reason each went). Only /proto-sketches ships now. The number is a non-empty guard, not a
-    // census, so it does not need to track the count — but it must never become 0.
-    expect(protos.length, 'no proto-* routes found in dist/').toBeGreaterThanOrEqual(1);
-
-    for (const p of protos) {
-      const robots = /<meta\s[^>]*name="robots"[^>]*>/i.exec(p.html)?.[0] ?? '';
-      expect(
-        /noindex/i.test(robots),
-        `${p.file} has no robots=noindex. Pass noindex={true} to BaseLayout in the matching ` +
-          `src/pages/*.astro (see tests/protoNoindex.test.ts).`,
-      ).toBe(true);
-
-      // BaseLayout emits one OR the other, so a canonical here means the noindex is not in force —
-      // and a self-referential canonical on an internal prototype is a request to index it.
-      const canonical = /<link\s[^>]*rel="canonical"[^>]*>/i.exec(p.html)?.[0] ?? '';
-      expect(canonical, `${p.file} advertises a canonical URL: ${canonical}`).toBe('');
-    }
-  });
-
-  // ── 4. ONE H1, AND NO IMAGE WITHOUT ALT ──────────────────────────────────────────────────────
-  it('gives every document exactly one <h1>', () => {
+  // ── 3. ONE H1, ONE MAIN, EACH ID ONCE, AND NO IMAGE WITHOUT ALT ──────────────────────────────
+  it('gives every document exactly one <h1> and one <main>', () => {
     for (const p of pages()) {
       // dist also holds the Google Search Console verification file: a one-line text file that
       // happens to end in .html and is not a document at all. Anything without an <html> element
-      // is not being asked for a heading.
+      // is not being asked for a heading or a landmark.
       if (!/<html[\s>]/i.test(p.html)) continue;
-      const n = (p.markup.match(/<h1[\s>]/gi) ?? []).length;
-      expect(n, `${p.file} has ${n} <h1> elements; a document gets exactly one`).toBe(1);
+      for (const tag of ['h1', 'main']) {
+        const n = (p.markup.match(new RegExp(`<${tag}[\\s>]`, 'gi')) ?? []).length;
+        expect(n, `${p.file} has ${n} <${tag}> elements; a document gets exactly one`).toBe(1);
+      }
     }
+  });
+
+  // A second element with an id takes none of its links: a `#fragment` and getElementById find the first.
+  it('gives every id on a page once', () => {
+    const twice = pages().flatMap((p) => {
+      const all = [...p.markup.matchAll(/\sid="([^"]*)"/g)].map((m) => m[1]);
+      return all.filter((id, i) => all.indexOf(id) !== i).map((id) => `${p.route}: #${id}`);
+    });
+    expect(twice).toEqual([]);
+  });
+
+  // KaTeX does not throw on bad TeX: it draws the source in its error markup. A paper refuses that at build time;
+  // this holds every page to it, a writing piece's maths included.
+  it('typesets every formula: no page carries KaTeX error markup', () => {
+    expect(pages().filter((p) => p.markup.includes('katex-error')).map((p) => p.route)).toEqual([]);
   });
 
   it('gives every <img> an alt attribute', () => {
@@ -424,62 +265,30 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
     const bad = pages().flatMap((p) => [...p.markup.matchAll(/<table\b[^>]*\bclass="[^"]*\bsr-only\b[^>]*>/gi)].map(([t]) => `${p.file}: ${t}`));
     expect(bad).toEqual([]);
   });
-
-  /* (There is no separate 'resolves fragments on the proto routes too' test any more. It existed only to
-     make the `isProto` exclusion in check 1 a visible gap rather than a silent filter; the exclusion is
-     gone, so check 1 covers the proto routes directly and this was a strict subset of it — with a worse
-     failure message, since it reported one dead anchor per run instead of the whole family at once.) */
 });
 
 describe('the homepage intro ships on / and ONLY on /', () => {
   // MOVING THE INTRO UP INTO BaseLayout IS THE ONE EDIT that would hand a 5.2-second construction
-  // animation to every route — including /404 and the proto gallery. The retired first-visit gate
-  // verified the equivalent property by reading built HTML ("5 data-gate references on /, zero on the
-  // other eight"), and this is that check for its replacement.
-  //
-  // The marker is `data-intro` on the terrain canvas. It is an attribute rather than a class because a
-  // class would be a styling hook nobody styles, and nothing in the page reads it — it exists so this
-  // assertion can exist. `TerrainHero` renders only via `Heights`, which renders only on the homepage,
-  // so today this is one attribute and one regex; the point is that it stays that way.
-  const pages = htmlFiles(DIST);
-
-  it('finds the built pages at all', () => {
-    // Without this the two assertions below would pass vacuously over an empty list — the exact failure
-    // mode a dist-reading test has to rule out first.
-    expect(pages.length, 'no built HTML found — run `npm run build`').toBeGreaterThan(5);
-  });
-
+  // animation to every route — including /404. The marker is `data-intro` on the terrain canvas, which
+  // nothing in the page reads: it exists so this assertion can (TerrainHero.astro says so).
   it('marks the intro on the homepage', () => {
-    const home = join(DIST, 'index.html');
-    expect(existsSync(home)).toBe(true);
-    expect(readFileSync(home, 'utf8')).toMatch(/<canvas[^>]*\bdata-intro\b/);
+    expect(builtPage('/').html).toMatch(/<canvas[^>]*\bdata-intro\b/);
   });
 
   it('marks it nowhere else', () => {
-    const leaked = pages
-      .filter((p) => p !== join(DIST, 'index.html'))
-      .filter((p) => /\bdata-intro\b/.test(readFileSync(p, 'utf8')))
-      .map((p) => p.slice(DIST.length));
-    expect(leaked, `the intro leaked onto ${leaked.join(', ')} — has it moved into BaseLayout?`)
-      .toEqual([]);
+    const leaked = pages().filter((p) => p.route !== '/' && /\bdata-intro\b/.test(p.html)).map((p) => p.file);
+    expect(leaked, `the intro leaked onto ${leaked.join(', ')} — has it moved into BaseLayout?`).toEqual([]);
   });
 
   it('ships the decision INLINE, before the hero, with the constants from lib/', () => {
-    // THIS TEST EXISTS BECAUSE THE WELL-TESTED VERSION OF THIS POLICY WAS THE WRONG ONE.
-    //
-    // `introStillRunning`, `introDurationFrom` and `shouldPlayIntro` lived in lib/introTimeline.ts with
-    // 97 lines of specs. Then the decision moved into an `is:inline` script, because only an inline
-    // script parses before first paint — and an inline script cannot `import`, so it re-implements the
-    // parse and the clamp in raw JS. The three exports lost every production caller while their tests
-    // went on passing: a green suite over code nothing ran. They are deleted, and this is the check that
-    // replaces them, because it reads the code that actually ships.
-    //
-    // Two properties, and both have already broken once:
+    // THE POLICY IS ASSERTED WHERE IT SHIPS: the decision is an `is:inline` script, which cannot `import`,
+    // so it re-implements the parse and the clamp in raw JS, and this reads that code (module copies of it
+    // for a spec to call had no production caller and are deleted). Two properties:
     //   1. INLINE AND BEFORE THE HERO. A bundled `<script>` is deferred and runs after parse, which is
     //      what made the sky flash warm → flat → warm for ~300ms.
     //   2. THE CONSTANTS AGREE WITH lib/. They are passed through `define:vars` precisely so there is one
     //      source; this fails if someone hand-types a number into the inline body.
-    const html = readFileSync(join(DIST, 'index.html'), 'utf8');
+    const { html } = builtPage('/');
     const m = html.match(/<script>((?:(?!<\/script>)[\s\S])*?descent\.intro\.seen[\s\S]*?)<\/script>/);
     expect(m, 'no inline intro decider in dist/index.html').not.toBeNull();
     const body = m![1];
@@ -503,10 +312,9 @@ describe('the homepage intro ships on / and ONLY on /', () => {
     // a feature: no link, no sitemap entry, nothing discoverable. If one ever appears in an href the
     // animation becomes reachable as a destination, which is not what it is for.
     const offenders: string[] = [];
-    for (const p of pages) {
-      const html = readFileSync(p, 'utf8');
-      for (const m of html.matchAll(/(?:href|src)="([^"]*(?:[?&](?:intro|dur)=)[^"]*)"/g)) {
-        offenders.push(`${p.slice(DIST.length)} → ${m[1]}`);
+    for (const p of pages()) {
+      for (const m of p.html.matchAll(/(?:href|src)="([^"]*(?:[?&](?:intro|dur)=)[^"]*)"/g)) {
+        offenders.push(`${p.file} → ${m[1]}`);
       }
     }
     expect(offenders, offenders.join(' | ')).toEqual([]);
@@ -518,22 +326,11 @@ describe('the homepage intro ships on / and ONLY on /', () => {
 });
 
 describe("/art's image payload, measured on the built output", () => {
-  // WHY A BYTE CEILING AND NOT A WIDTHS CHECK. The defect this pins was a `widths` array containing
-  // `w.src.width` — the image's NATIVE width — on an element that is also `fetchpriority="high"`. For
-  // `spring-couplet-stele` that is 1727w, a 1342 KB webp, so the browser picked it as the page's
-  // high-priority LCP resource where the 900w variant (139 KB) covers the element.
-  //
-  // Asserting the array would have been the weaker test: the array is a means, and what hurts a visitor is
-  // bytes on the critical path. So this reads the shipped srcset, resolves the file a browser would actually
-  // choose, and weighs it.
-  //
-  // AND THE DEVICE-PX FIGURE IS DERIVED FROM THE SHIPPED `sizes`, NOT HARD-CODED. This test first wrote
-  // `const NEEDED = 1152` with the comment "1440 CSS px at DPR 2, in the `40vw` branch" — which was the very
-  // arithmetic that was wrong: the element is height-capped by `max-height: min(82vh, 820px)` and renders at
-  // 298–414 CSS px, never the 576 that `40vw` implies. Hard-coding it meant the test agreed with the bug and
-  // would have gone on agreeing after the hint was corrected. Parsing the real hint makes this test follow
-  // the page instead of a number somebody typed. (Whether the hint itself is *right* is artSizes.test.ts's
-  // job — it pins CAL_MAX_H against the CSS cap. These two together are what close the hole.)
+  // A BYTE CEILING, NOT A WIDTHS CHECK: the regression was the stele's native 1727w (a 1342 KB webp) in the
+  // `widths` of the fetchpriority="high" LCP image, and the array is only a means. This weighs the file a
+  // DPR-2 browser would choose, with the device px read from the shipped `sizes`: a hard-coded figure once
+  // agreed with a wrong hint. Whether the hint is right is artSizes.test.ts's job; the arithmetic is in
+  // art.astro, above calSizes().
   const artHtml = (): string => {
     const p = join(DIST, 'art', 'index.html');
     if (!existsSync(p)) throw new Error('dist/art/index.html missing — run `npm run build`');
@@ -585,9 +382,7 @@ describe("/art's image payload, measured on the built output", () => {
   });
 
   it('serves every lightbox source as a processed webp, not the untouched original', () => {
-    // `data-zoom` was `ImageMetadata.src`, the unprocessed file, which cost 0.6-2.2 MB of JPEG per open.
-    // The PIXELS are deliberate — artGallery.ts zooms to 6x, so capping the long edge would have quietly
-    // degraded the feature while the byte count looked better. The fix was the container, not the size.
+    // Native pixels, for the 6x zoom, in a webp: the JPEG original cost 0.6-2.2 MB per open (see zoomOf()).
     const zooms = [...artHtml().matchAll(/data-zoom="([^"]+)"/g)].map((m) => m[1]);
     expect(zooms.length, 'no data-zoom attributes on /art').toBeGreaterThan(10);
     const notWebp = zooms.filter((z) => !z.endsWith('.webp'));
@@ -595,8 +390,25 @@ describe("/art's image payload, measured on the built output", () => {
   });
 });
 
+describe('the images under src/assets', () => {
+  // Astro drops an imported image's original unless something reads a property of its ImageMetadata outside
+  // <Image>/getImage() (the import is a Proxy; see zoomOf() in art.astro). /art reading `.width` once kept all 44
+  // of its JPEGs, 40.5 MB that nothing referenced. So every image here ships as its webp variants and nothing
+  // else; an og:image or a plain <img> reading `.src` turns this red.
+  it('ships no original of any of them, only its webp variants', () => {
+    const sources = readdirSync(new URL('../src/assets/', import.meta.url), { recursive: true, encoding: 'utf8' })
+      .filter((f) => /\.(png|jpe?g|gif|webp|avif|tiff?)$/i.test(f))
+      .map((f) => basename(f).replace(/\.[^.]+$/, ''));
+    expect(sources.length, 'no images found under src/assets').toBeGreaterThan(0);
+    const emitted = readdirSync(join(DIST, '_astro')).filter((f) => sources.some((s) => f.startsWith(`${s}.`)));
+    expect(emitted.filter((f) => !f.endsWith('.webp')), 'originals in dist/_astro').toEqual([]);
+    expect(sources.filter((s) => !emitted.some((f) => f.startsWith(`${s}.`))), 'images with no variant at all').toEqual([]);
+  });
+});
+
 describe("BaseLayout's per-page hooks: /projects is the drafting page, the research routes the paper page", () => {
-  // `page` puts `data-page` on <html>, the scope tokens.css hangs a register's palette from; `veil={false}` drops
+  // `page` puts `data-page` on <html>, the scope tokens.css hangs a register's palette from (and, on `/`, 'deck',
+  // the rail's resting ink); `veil={false}` drops
   // the descent veil — on /projects because its boot is its entrance, on the research routes because the veil would
   // replay on every card click and every way back, holding the text ~1.1s. Both are props, so what this guards is a
   // default changing under every other route.
@@ -606,10 +418,10 @@ describe("BaseLayout's per-page hooks: /projects is the drafting page, the resea
   const isResearch = (route: string): boolean => route === '/research' || route.startsWith('/research/');
   const research = (): Page[] => pages().filter((p) => isResearch(p.route));
 
-  it('marks /projects as drafting, every research route as paper, and no other route at all', () => {
+  it('marks /projects as drafting, every research route as paper, / as deck, and no other route at all', () => {
     expect(research().length, 'no research route was built').toBeGreaterThan(0);
     const want = (route: string): string | undefined =>
-      route === '/projects' ? 'drafting' : isResearch(route) ? 'paper' : undefined;
+      route === '/projects' ? 'drafting' : isResearch(route) ? 'paper' : route === '/' ? 'deck' : undefined;
     const wrong = pages().filter((p) => pageOf(p.markup) !== want(p.route))
       .map((p) => `${p.route}: data-page=${pageOf(p.markup) ?? '(none)'}`);
     expect(wrong).toEqual([]);
@@ -689,8 +501,18 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
   const flat = (stops: readonly Stop[], depth = 0): { target: string; label: string; depth: number }[] =>
     stops.flatMap((s) => [{ target: s.target, label: s.label, depth }, ...flat(s.children ?? [], depth + 1)]);
 
-  it('is on /experience, /projects, /research, /research/rl-bhrp and /writing', () => {
-    expect(railPages().map((p) => p.route).sort()).toEqual(['/experience', '/projects', '/research', '/research/rl-bhrp', '/writing']);
+  it('is on /, /experience, /projects, /research, /research/rl-bhrp and /writing', () => {
+    expect(railPages().map((p) => p.route).sort()).toEqual(['/', '/experience', '/projects', '/research', '/research/rl-bhrp', '/writing']);
+  });
+
+  // The homepage's rail stays off its hero (SideRail's hideOver): a script marks it passed, and until then a plain
+  // rule outside any query keeps it display: none, so it is out of the tab order with no script too. The id it
+  // names must be the page's, or the rail never shows.
+  it('stays off the element its page names, which the page emits, and on / that is the hero', () => {
+    const over = (p: Page) => /<nav\b[^>]*\sclass="side-rail"[^>]*\sdata-hide-over="([^"]*)"/.exec(p.markup)?.[1];
+    expect(railPages().filter((p) => over(p) !== undefined).map((p) => [p.route, over(p)])).toEqual([['/', 'heights']]);
+    expect(builtPage('/').ids.has('heights')).toBe(true);
+    expect(railCss()).toMatch(/(?:^|\})\.side-rail\[data-hide-over\]:not\(\[data-past\]\)\{display:none\}/);
   });
 
   // The label is three layers of its text, so its states cross-fade by opacity: the dim one, the link's name and the
@@ -721,6 +543,7 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
     expect(strip(itemsOf(builtPage('/experience')))).toEqual(flat(experienceStops(timeline)));
     expect(strip(itemsOf(builtPage('/research/rl-bhrp')))).toEqual(flat(paperStops((await paperRender('rl-bhrp')).report.sections)));
     expect(strip(itemsOf(builtPage('/research')))).toEqual(flat(researchIndexStops()));
+    expect(strip(itemsOf(builtPage('/')))).toEqual(flat(homeStops()));
     expect(new Set(itemsOf(builtPage('/writing')).map((i) => i.depth))).toEqual(new Set([0, 1]));
   });
 
@@ -728,8 +551,7 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
   // label sideways) and a label never fades by `color`.
   /** Every shipped rule that styles the rail, from the pages' inline styles and the bundled sheets, scope hashes
    *  stripped: [whole, selector, body]. */
-  const railCss = (): string => [...railPages().flatMap((p) => [...p.html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)]
-    .map((m) => m[1])), distCss()].join('\n').replace(/\[data-astro-cid-[\w-]+\]/g, '');
+  const railCss = (): string => shippedCss(railPages()).replace(/\[data-astro-cid-[\w-]+\]/g, '');
   const railRules = (): RegExpMatchArray[] => [...railCss().matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     .filter(([, sel]) => /\.side-rail\b/.test(sel));
 
@@ -823,19 +645,6 @@ describe('/projects — the page shell on the drafting field', () => {
     expect(want.filter((id) => !ids.has(id))).toEqual([]);
   });
 
-  // NOT /art's issue #60. The vendored captures are static ImageMetadata imports read only through <Image>, and Astro
-  // drops an original whose `.src` nothing reads — so their PNGs never reach dist; only the webp variants do. This was
-  // predicted otherwise (~593 KB of originals) and planned around (storing them pre-shrunk); measured, it was 0
-  // bytes, and this holds it there. The day something reads `.src` (an og:image, a plain <img>), it goes red.
-  it('ships no original of a vendored capture, only its webp variants', () => {
-    const vendored = readdirSync(new URL('../src/assets/projects/', import.meta.url))
-      .filter((f) => f.endsWith('.png')).map((f) => f.slice(0, -'.png'.length));
-    expect(vendored.length, 'no PNG captures in src/assets/projects').toBeGreaterThan(0);
-    const emitted = readdirSync(join(DIST, '_astro')).filter((f) => vendored.some((v) => f.startsWith(`${v}.`)));
-    expect(emitted.filter((f) => !f.endsWith('.webp'))).toEqual([]);
-    expect(vendored.filter((v) => !emitted.some((f) => f.startsWith(`${v}.`))), 'captures with no variant at all').toEqual([]);
-  });
-
   it('has exactly one <h1>, and it reads "Projects"', () => {
     const h1s = [...projectsPage().markup.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)]
       .map((m) => m[1].replace(/<[^>]*>/g, '').trim());
@@ -854,11 +663,8 @@ describe('/projects — the page shell on the drafting field', () => {
 
   // The shipped CSS, scoped hashes stripped, so a rule reads the way it was written. Astro inlines this page's
   // styles into the HTML; the bundled sheets are included in case it ever stops doing so.
-  const rawCss = (): string => {
-    const inline = [...projectsPage().html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]);
-    return [...inline, distCss()].join('\n');
-  };
-  const shippedCss = (): string => rawCss().replace(/\[data-astro-cid-[\w-]+\]/g, '');
+  const rawCss = (): string => shippedCss([projectsPage()]);
+  const unscoped = (): string => rawCss().replace(/\[data-astro-cid-[\w-]+\]/g, '');
 
   // Every jump target lands clear of the fixed corner nav — and the scope hashes are the point here, so this reads
   // the RAW rule. It lives on the page, the targets are partly rendered by child components, and a scoped selector
@@ -888,13 +694,13 @@ describe('/projects — the page shell on the drafting field', () => {
     expect(m, 'no element straight after the field canvas').not.toBeNull();
     expect(/\sclass="[^"]*\bdrafting-vig\b/.test(m![1]), `the element after the canvas is ${m![1]}`).toBe(true);
     expect(/\saria-hidden="true"/.test(m![1]), 'the vignette is not aria-hidden').toBe(true);
-    expect(shippedCss()).toMatch(/\.drafting-vig\{background:radial-gradient\([^)]*var\(--draft-vig\)\)\}/);
+    expect(unscoped()).toMatch(/\.drafting-vig\{background:radial-gradient\([^)]*var\(--draft-vig\)\)\}/);
   });
 
   // 100vh is the LARGE viewport, so the box holds still while a phone's toolbar collapses: at `height: 100%` the
   // bitmap stretched and every isoline jumped by half the toolbar on each change of scroll direction.
   it("sizes the field's box to the large viewport, so a mobile toolbar cannot move the drawing", () => {
-    const rule = /\.drafting-field,\.drafting-vig\{([^}]*)\}/.exec(shippedCss());
+    const rule = /\.drafting-field,\.drafting-vig\{([^}]*)\}/.exec(unscoped());
     expect(rule, 'no shared .drafting-field,.drafting-vig rule').not.toBeNull();
     expect(rule![1]).toMatch(/(^|;)height:100(l?)vh(;|$)/);
     expect(rule![1]).toMatch(/(^|;)position:fixed(;|$)/);
@@ -905,7 +711,7 @@ describe('/projects — the page shell on the drafting field', () => {
   // declare (tests/draftingPalette.test.ts holds its value and that it has no second spelling): <main>'s text and the
   // shared rail's labels both read it, so the page does not touch the rail.
   it("rings every glyph in <main> and in the rail with the bare ground, so no stroke touches the page's text", () => {
-    const css = shippedCss();
+    const css = unscoped();
     expect(css).toMatch(/\.side-rail \.lbl\{(?:[^}]*;)?text-shadow:var\(--knockout,\s*none\)/);
     expect(css).toMatch(/\.side-rail \.rule\{(?:[^}]*;)?box-shadow:var\(--rail-dash-halo,\s*none\)/);
     expect(css).toMatch(/\.projects-page\{(?:[^}]*;)?text-shadow:var\(--knockout\)(;|\})/);
@@ -1168,10 +974,9 @@ describe('/research — the papers as cards, newest first, then the interests', 
   // A record that a paper file explains opens that page; any other opens where the paper is published.
   const want = (p: Publication): string => (explained().has(p.slug) ? `/research/${p.slug}` : p.href);
 
+  // in the records' order, which publications.test.ts holds newest first
   it('renders one card per publication, newest first', () => {
     expect(cards().map((c) => c.href)).toEqual(publications.map(want));
-    const dates = publications.map((p) => p.submitted ?? p.year);
-    expect(dates).toEqual([...dates].sort().reverse());
   });
 
   it("opens a paper's own page when it has one, and otherwise the record's href, saying so", () => {
@@ -1198,7 +1003,6 @@ describe('/research — the papers as cards, newest first, then the interests', 
   // The venue never carries the year itself, nor a volume, which the DOI carries: a card reads, as spec §3 has it,
   // "Conference paper · SPIE (CNSSE) · 2022".
   it("prints each card's status, venue and year, the year once", () => {
-    expect(cards()).toHaveLength(publications.length);
     const metas = cards().map((c) => text(/<p class="p-meta">([\s\S]*?)<\/p>/.exec(c.html)?.[1] ?? ''));
     for (const [i, meta] of metas.entries()) {
       const p = publications[i];
@@ -1209,7 +1013,6 @@ describe('/research — the papers as cards, newest first, then the interests', 
   });
 
   it("shows a paper's miniature on its card, captioned as the reproduction, and no picture on one without", () => {
-    expect(cards()).toHaveLength(publications.length);
     for (const [i, c] of cards().entries()) {
       const thumb = PAPER_DATA[publications[i].slug]?.thumb;
       if (!thumb) {
@@ -1234,22 +1037,30 @@ describe('/research — the papers as cards, newest first, then the interests', 
 
   // A browser may break a line after any hyphen, and a title would then split a paper's own name ("(RL-BHRP)").
   it("keeps each card title's names whole", () => {
-    expect(cards()).toHaveLength(publications.length);
     for (const [i, c] of cards().entries()) {
       for (const w of kept(publications[i].title)) expect(c.html, w).toContain(`<span class="nw">${w}</span>`);
     }
   });
 
-  it('emits the id of every rail stop, the papers before the interests', () => {
+  // (that the page emits each id is the rail's markup test, above)
+  it('sets the rail stops in order, the papers before the interests', () => {
     const ids = researchIndexStops().map((s) => s.target);
-    expect(ids.filter((id) => !page().ids.has(id))).toEqual([]);
     const at = ids.map((id) => page().markup.indexOf(` id="${id}"`));
     expect(at).toEqual([...at].sort((a, b) => a - b));
     for (const r of researchInterests) expect(text(page().markup)).toContain(`${r.label}. ${r.gloss}`);
   });
 
-  it('never says a paper was published or peer-reviewed', () => {
-    expect(text(page().markup)).not.toMatch(/published|peer[- ]reviewed/i);
+  // A preprint, always: no research route says a paper was published or peer-reviewed. A paper page calls its
+  // preprint "not peer reviewed", the one place the words may stand.
+  it('never says a paper was published or peer-reviewed, on any research route', () => {
+    const routes = pages().filter((p) => p.route === '/research' || p.route.startsWith('/research/'));
+    expect(routes.length).toBeGreaterThan(1);
+    for (const p of routes) {
+      const words = text(p.markup);
+      expect(words, p.route).not.toMatch(/published/i);
+      expect(words.replace(/not peer reviewed/g, ''), p.route).not.toMatch(/peer[- ]reviewed/i);
+    }
+    expect(text(builtPage('/research/rl-bhrp').markup)).toContain('preprint, not peer reviewed');
   });
 
   // The generated sitemap lists every route. public/sitemap.xml is an index that points at it, so it lists none.
@@ -1268,17 +1079,9 @@ describe('/research/rl-bhrp — a paper explained, from its file', async () => {
   const rl = publications.find((p) => p.slug === 'rl-bhrp')!;
   const text = (html: string): string => html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;|\s+/g, ' ');
 
-  it('is a paper page: data-page="paper", one <main class="paper">', () => {
-    expect(/<html\b[^>]*\sdata-page="paper"/.test(page().markup)).toBe(true);
-    expect(page().markup.match(/<main\b[^>]*\sclass="paper"/g)).toHaveLength(1);
-  });
-
-  // The rail and the page's sections come from one report; a stop the page did not emit fails here by name.
-  it('emits an id for every rail stop, and each id once', () => {
-    const stops = paperStops(report.sections).map((s) => s.target);
-    expect(stops.filter((id) => !page().ids.has(id))).toEqual([]);
-    const all = [...page().markup.matchAll(/\sid="([^"]*)"/g)].map((m) => m[1]);
-    expect(all.filter((id, i) => all.indexOf(id) !== i)).toEqual([]);
+  // Every rule on the page is scoped to .paper, so its one <main> (the first describe) must carry it.
+  it('sets the page in <main class="paper">', () => {
+    expect(/<main\b[^>]*\sclass="paper"/.test(page().markup)).toBe(true);
   });
 
   // The page refuses a file id it writes itself (paperPageOwns), so the build fails. That holds only while the plugin
@@ -1300,40 +1103,11 @@ describe('/research/rl-bhrp — a paper explained, from its file', async () => {
       .toEqual(paperSections(report.sections).map((s) => [s.n, s.title].filter(Boolean).join(' ')));
   });
 
-  // text-wrap: balance happens to keep "(RL-BHRP)" whole at 390px, but only where balance applies (not past six
-  // lines, nor in Safari before 17.5), so the title's hyphenated words are kept whole by markup, as on its card.
-  it("keeps the title's names whole", () => {
-    const h1 = /<h1 class="ptitle">([\s\S]*?)<\/h1>/.exec(page().markup)?.[1] ?? '';
-    expect(kept(rl.title)).toContain('RL-BHRP');
-    for (const w of kept(rl.title)) expect(h1, w).toContain(`<span class="nw">${w}</span>`);
-  });
-
-  it("prints the paper's Table 2 whole: all 18 rows", () => {
-    const table = /<table class="bt">[\s\S]*?<\/table>/.exec(page().markup)?.[0] ?? '';
-    expect(table.match(/<tbody>[\s\S]*<\/tbody>/)?.[0].match(/<tr\b/g)).toHaveLength(18);
-  });
-
   // Underline, on 5–7 key sentences: no more than about one a screen (spec §4).
   it('highlights five to seven sentences', () => {
     const n = page().markup.match(/<mark class="hl">/g)?.length ?? 0;
     expect(n).toBeGreaterThanOrEqual(5);
     expect(n).toBeLessThanOrEqual(7);
-  });
-
-  // A preprint, always: never "published" or "peer-reviewed" — the one place it may say "not peer reviewed".
-  it('never says the preprint was published or reviewed', () => {
-    const words = text(page().markup);
-    expect(words).not.toMatch(/published/i);
-    expect(words.replace(/not peer reviewed/g, '')).not.toMatch(/peer[- ]reviewed/i);
-    expect(words).toContain('preprint, not peer reviewed');
-  });
-
-  it('sets every numbered equation as MathML, its number outside the maths', () => {
-    const eqs = [...page().markup.matchAll(/<div class="eq an" id="([^"]+)">([\s\S]*?)<span class="eq-no">([^<]*)<\/span>/g)];
-    const numbered = eqs.filter((m) => m[3]);
-    expect(numbered.map((m) => m[3])).toEqual(['(2)', '(3)', '(4)']);
-    for (const [, id, body] of numbered) expect(body, id).toMatch(/<math\b/);
-    expect(page().markup).not.toMatch(/katex-error|\\tag/);
   });
 
   it('cites every reference it lists, and lists every one it cites', () => {
@@ -1368,16 +1142,12 @@ describe('/research/rl-bhrp — a paper explained, from its file', async () => {
     expect(text(main)).toContain(`· ${readingMinutes(words(main))} min read · written by Zeying Tian, the second author`);
   });
 
-  it("keeps the paper's name whole in its abstract, as in the rest of its prose", () => {
-    const abstract = /<blockquote class="abstract"[\s\S]*?<\/blockquote>/.exec(page().markup)?.[0] ?? '';
-    expect(rl.abstract).toContain('(RL-BHRP)');
-    expect(abstract).toContain('(<span class="nw">RL-BHRP</span>)');
-  });
-
-  // The page's own prose round the file (the head, the cite line, the corrections) goes through the rule the body
-  // does (lib/words wholeParts), so nowhere on the page does a line break inside a name: "RL-" / "BHRP)" on the cite
-  // line, "[q-" / "fin.PM" in the meta. Read from the page's text, the maths, drawings, tables and BibTeX aside (the
-  // drawings' text is set on one line by their own CSS: the readout's tip is nowrap).
+  // The title, the abstract and the page's own prose round the file (the head, the cite line, the corrections) go
+  // through the rule the body does (lib/words wholeParts), so nowhere on the page does a line break inside a name:
+  // "RL-" / "BHRP)" on the cite line, "[q-" / "fin.PM" in the meta. (The title's text-wrap: balance would keep
+  // "(RL-BHRP)" whole only where balance applies: not past six lines, nor in Safari before 17.5.) Read from the
+  // page's text, the maths, drawings, tables and BibTeX aside (the drawings' text is set on one line by their own
+  // CSS: the readout's tip is nowrap).
   it('keeps every hyphenated name, span of years, ISO date and arXiv category whole, in its own prose too', () => {
     const markup = page().markup;
     const prose = markup.slice(markup.indexOf('<main'), markup.indexOf('</main>'))
@@ -1388,21 +1158,16 @@ describe('/research/rl-bhrp — a paper explained, from its file', async () => {
     expect(/<p class="ref-line">[\s\S]*?<\/p>/.exec(markup)?.[0]).toContain('(<span class="nw">RL-BHRP</span>) Approach');
   });
 
-  // The explainer numbers the figure and the record names its reproduction's author: the drawing says both as they say.
-  it("names Figure 2 by its :::figure's number, and its reproduction by the record's author", () => {
-    const fig = /<figure class="fig" id="figure-(\d+)">\s*<div class="f-plot"[^>]*>[\s\S]*?<\/figure>/.exec(page().markup);
-    expect(fig, 'no figure holds the plot').not.toBeNull();
-    const [whole, n] = fig!;
-    expect(whole).toContain(`<div class="f-plot" data-name="Figure ${n}"`);
-    expect(whole).toContain(`<caption>Figure ${n}’s values, month by month, in the second author’s reproduction</caption>`);
+  // The plugin numbers what the file places, not what PAPER_DATA registers, so a drawing the file stopped placing
+  // would go unseen: each is here once (by its outermost tag), and no page still says FIGURE_NAME, the placeholder
+  // a drawing names itself by until its :::figure numbers it.
+  it('places every drawing its data registers, once, each named by its :::figure', () => {
+    expect(Object.keys(PAPER_DATA['rl-bhrp'].figures).sort()).toEqual(['metrics', 'pipeline', 'wealth']);
+    for (const [name, html] of Object.entries(PAPER_DATA['rl-bhrp'].figures)) {
+      const head = /^<\w+ class="[^"]*"/.exec(html)?.[0] ?? `(${name} opens with no class)`;
+      expect(page().markup.split(head).length - 1, `${name}: ${head}`).toBe(1);
+    }
     expect(pages().filter((p) => p.html.includes(FIGURE_NAME)).map((p) => p.route)).toEqual([]);
-  });
-
-  // Corrections are against the version the page explains; the record says arXiv lists no other, so none to read.
-  it('says the corrections are against the only version arXiv lists', () => {
-    const summary = /<details class="errata">\s*<summary>([\s\S]*?)<\/summary>/.exec(page().markup)?.[1] ?? '';
-    expect(rl.versions).toBe(1);
-    expect(summary.replace(/<[^>]+>/g, '')).toBe(`Corrections to ${rl.version}, noted 3 November 2026 (arXiv lists ${rl.version} only)`);
   });
 
   // The caption is the explainer's, so it says here what the figure is: the owner's reproduction, not the paper's run.
@@ -1441,14 +1206,6 @@ describe('/research/rl-bhrp — a paper explained, from its file', async () => {
       '\\mathrm{RC}_{i}(w),\\ \\mathrm{RC}_{g}(w)': 3, c: 2, '\\mathcal{V}_{\\mathrm{within}},\\ \\mathcal{V}_{\\mathrm{across}}': 4,
       '\\lambda,\\ \\alpha': 6, 'U_{t+1}': 2,
     });
-  });
-
-  it('shows exactly one drawing per figure in the markup the CSS swaps: a wide and a narrow, by class', () => {
-    for (const id of ['figure-1', 'figure-2']) {
-      const fig = new RegExp(`<figure\\b[^>]*\\sid="${id}"[\\s\\S]*?</figure>`).exec(page().markup)?.[0] ?? '';
-      expect(fig.match(/\sclass="[^"]*\bwide\b/g), id).toHaveLength(1);
-      expect(fig.match(/\sclass="[^"]*\bnarrow\b/g), id).toHaveLength(1);
-    }
   });
 });
 

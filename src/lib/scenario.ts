@@ -1,20 +1,9 @@
 // src/lib/scenario.ts
 // THE SEEDED RANDOMNESS EVERY GENERATED FIGURE ON THE SITE DRAWS FROM.
 //
-// This file used to be a 371-line world simulator: an invented year of six real tickers, six news shocks, and
-// a population of 48 discretionary "traders" whose dials (chase / cut / revert / concentration) produced a fan
-// of PnL curves. That generation is GONE, and the reason is worth writing down so nobody rebuilds it.
-//
-// The slide it fed was replaced. What ships now is data/define.ts — FIVE NAMED POLICIES over FOUR HOLDINGS,
-// each a rule a real book actually follows (buy-and-never-rebalance, sell-after-the-fall, 2x levered,
-// mandated rebalance, vol-targeted), run through lib/policyPnl.ts. Five legible policies beat 48 anonymous
-// dial-settings for the same argument: a reader can name the difference between the curves, which was never
-// true of a Monte Carlo cloud. Keeping the cloud around meant maintaining a second, unrendered model of the
-// same idea — a model that could drift out of agreement with the shipped one and be believed anyway, because
-// it had unit tests. Git has it if the argument ever needs the other shape.
-//
-// WHAT SURVIVES IS THE LOW-LEVEL HALF, and it survives because three live modules need it: lib/complexity.ts
-// and lib/policyPnl.ts both import { mulberry32, gauss } to build their declared figures.
+// lib/complexity.ts and lib/policyPnl.ts import { mulberry32, gauss } to build their declared figures. (This
+// file once also simulated 48 anonymous "traders"; it was deleted when Choice moved to data/define.ts's five
+// NAMED policies, whose curves a reader can tell apart. Do not rebuild the cloud.)
 //
 // DETERMINISM IS THE WHOLE POINT OF THESE TWO FUNCTIONS. The project bans Math.random() at paint time: a
 // figure that shimmered between repaints would make the site's own claim — that these specific differences

@@ -54,8 +54,8 @@ describe('rampFor — variant selection', () => {
 
    Why the drift matters more than a normal duplication. The two copies are not two renderings of
    one thing that a viewer compares side by side — they are the SAME BAND OF SKY on different
-   devices. The WebGL sky samples the TS ramp; the CSS gradient is what phones get, what a
-   no-WebGL browser gets, and what `data-fluid=off` and reduced-motion get. So a stop edited in one
+   devices. The WebGL sky samples the TS ramp; the CSS gradient is what phones get and what a
+   no-WebGL browser gets. So a stop edited in one
    place and not the other does not look wrong to whoever edits it — it looks wrong only to someone
    on the other rendering path, i.e. to the visitor and not the author. That is the exact failure
    profile a test has to cover, because looking at the page cannot.

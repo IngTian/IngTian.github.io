@@ -2,20 +2,9 @@
 // THE DESK AS THE SITE DESCRIBES IT: what a real mandate forbids, how big the problem is, and what an
 // attempt on it would be assembled from.
 //
-// WHAT LEFT THIS FILE, so nobody rebuilds it. It opened with a "concrete example" dataset — six real tickers
-// (AAPL, NVDA, META, BAC, XAUUSD, WTI) with invented drifts and vols, six invented news headlines with a
-// per-ticker shock each, a 48-path trader count, and a disclaimer sentence about the whole thing being made
-// up. All of it fed one consumer: the 48-trader Monte Carlo in lib/scenario.ts, which no page renders. The
-// slide that argues "same year, different decisions, different outcome" is src/sections/Choice.astro, and it
-// reads data/define.ts — five NAMED policies over four holdings — because a reader can say out loud what
-// separates five curves and cannot say anything at all about forty-eight.
-//
-// The disclaimer went with the data and that is the right direction, not a loss of honesty: the invented
-// figures it disclaimed no longer exist. data/define.ts carries its own statement about its own numbers,
-// next to the numbers, which is where such a sentence belongs.
-//
-// What remains is all live: CONSTRAINTS and FUND feed src/sections/Rules.astro, METHODOLOGIES and the OPEN_*
-// copy feed src/sections/Solve.astro.
+// CONSTRAINTS and FUND feed src/sections/Rules.astro; METHODOLOGIES and the OPEN_* copy feed
+// src/sections/Solve.astro. (An invented six-ticker dataset and its 48-trader Monte Carlo were deleted: no page
+// rendered them. Choice's five named policies are data/define.ts's, which states its own numbers' status.)
 
 // ── FUND SCALE, AND THE CONSTRAINTS THAT COME WITH IT ────────────────────────────────────────────────
 //
@@ -32,6 +21,9 @@ export interface Constraint {
   why: string;
 }
 
+/** ONE RULE PER GROUP, and Rules.astro renders every entry: beat two names four KINDS of rule rather than
+ *  examples of one kind — the owner asked for "a few", and four kinds is the more informative reading.
+ *  tests/ruleGlyphs.test.ts holds the groups to one entry each. */
 export const CONSTRAINTS: Constraint[] = [
   {
     group: 'Mandate',
@@ -39,19 +31,9 @@ export const CONSTRAINTS: Constraint[] = [
     why: 'Breach it and investors redeem, which forces selling at exactly the wrong moment.',
   },
   {
-    group: 'Mandate',
-    rule: 'No single name above 5% of NAV; no sector above 25%',
-    why: 'One bad position must not be able to end the fund.',
-  },
-  {
     group: 'Regulatory',
     rule: 'Position disclosure above 5% of a company’s shares outstanding',
     why: 'Crossing it publishes your hand and constrains how you can exit.',
-  },
-  {
-    group: 'Regulatory',
-    rule: 'Leverage and margin limits under the fund’s prospectus and Reg T',
-    why: 'Gross exposure is capped whatever the opportunity looks like.',
   },
   {
     group: 'Liquidity',
@@ -66,57 +48,29 @@ export const CONSTRAINTS: Constraint[] = [
 ];
 
 /**
- * Fund-scale figures, declared — and ONLY the ones something reads.
+ * Fund-scale figures, declared — and ONLY the ones something reads: Rules.astro prints `tickers` and
+ * `constraints` through lib/problemSize.ts's humanCount and derives its DP state-count exponent from `tickers`.
  *
- * `tickers` and `constraints` reach the page: Rules.astro prints both through lib/problemSize.ts's humanCount
- * and derives its DP state-count exponent from `tickers`.
- *
- * `periods` NO LONGER REACHES ANY PAGE, and this comment used to say it did. It fed lib/complexity.ts's
- * decisionVariables and scenarioLeaves in Rules.astro until that slide's tally draft was replaced by the
- * conflict web (the reason is at the beat-four comment in Rules.astro); the two calls went when noUnusedLocals
- * surfaced them, and both helpers were themselves deleted later by the dead-export sweep.
- *   ITS READERS ARE IN tests/problemSize.test.ts — `:48` asserts it exceeds 1, and `:56` pins the key set of
- * this object so a field cannot be added without a reader. This comment previously named
- * tests/complexity.test.ts, which reads `constraints` and has never read this field, and justified keeping
- * `periods` by "asserting those helpers against real fund scale" — an argument that died with the helpers.
- * What survives is thinner and worth stating as such: the field is pinned by a key-set assertion, not used in
- * an arithmetic one. So it is still the one field here on probation, and dropping it is still the owner's call
- * rather than a side effect of a typecheck fix — but the cost of dropping it is now two small test edits, not
- * a lost real-scale input.
- *
- * Two more fields used to sit here — `aum: '$1B'` and `drawdownLimit: 0.08` — with no reader anywhere. Both
- * facts DO reach the page, as prose inside the CONSTRAINTS entries above ("Max drawdown 8%…", "At $1B, your
- * own order moves the price…"), so the unread copies bought nothing and risked something: the day one is
- * edited and the other is not, the same slide states two different numbers for the same fact. Adding a field
- * back means adding its reader in the same change — tests/problemSize.test.ts asserts the key set for that
- * reason.
+ * The $1B and the 8% drawdown reach the page as prose inside CONSTRAINTS above, not as fields here: a second,
+ * unread copy is how one slide comes to state two numbers for the same fact. tests/problemSize.test.ts pins
+ * the key set, so a field added here comes with its reader.
  */
 export const FUND = {
   tickers: 3000,
   constraints: 2000,
-  periods: 24,
 };
-
-// TWO COPY BLOCKS LEFT HERE TOO: JOB_STATEMENT ("Find a strategy that optimises a sequence of decisions…")
-// and JOB_NOTE (the Sharpe gloss). Neither had appeared on the site in any build — `grep -c 'optimises a
-// sequence of decisions' dist/index.html` returned 0 — because the sections that once framed the job were
-// rewritten around their own inline copy. Unrendered prose in a data file is the worst kind of stale: it
-// reads like the site's current voice on a claim the site may no longer make, and an editor fixing the page's
-// wording never sees it. If the framing is wanted again it should be written next to the markup that shows it.
 
 // ── THE LAST SLIDE: STILL AN OPEN PROBLEM, AND A FEW GENERAL DIRECTIONS ──────────────────────────────────
 //
-// THIS FILE HAS BEEN WRONG TWICE, in opposite directions, and both corrections belong here.
-//
-// First it typeset the Bellman recursion as this slide's spine and walked four "moves" over it — "That is the
-// whole method". The owner:
+// THE OWNER'S TWO CORRECTIONS, verbatim, because they are why the slide has no equation and no survey.
+// The slide once typeset the Bellman recursion as its spine ("That is the whole method"). The owner:
 //
 //   "we dont know how to solve this problem yet. it's an open problem. so dont write out that equation as if
 //    it's known. it's not. i only have some ideas how to attack this, from RL, with math, or, stochastic
 //    process, probability, as the backbone."
 //
-// The fix went too far the other way: four directions, each with a named-and-dated literature and a labelled
-// limit block. Accurate, but it read as a survey of a field the slide had just called open. The owner again:
+// Then four directions, each with a dated literature and a limit block, read as a survey of a field the slide
+// had just called open. The owner again:
 //
 //   "i wouldnt say this as solved. probably at first we can only solve a small chunk of it. in the future maybe
 //    we can do more. so my idea is that we only name a few methodologies only general ones to begin with.
@@ -124,10 +78,9 @@ export const FUND = {
 //    we list a few viable methodologies. that's it. we dont need to go that deep. you can also drop the first
 //    one attempt. that's what work is for."
 //
-// So: the heading states the openness outright, the tabs name THREE GENERAL methodologies — the three families
-// he named himself — and each gets a couple of plain sentences rather than a reading list. The RL-BHRP tab is
-// gone: the paper is work, and the work section is where work goes. Naming a posted attempt (a preprint, not a
-// publication) on a slide about an open problem also quietly implied the attempt had closed part of it.
+// So the heading states the openness outright, and the tabs name a few general methodologies (four; see
+// METHODOLOGIES), each in a couple of plain sentences rather than a reading list. No RL-BHRP tab: the paper is
+// work, the work section is where work goes, and naming an attempt here would imply it closed part of it.
 //
 // The restraint is the honesty here. A general direction, plainly stated, cannot overclaim; a survey with dates
 // on it starts to sound like a solution assembled from parts.
@@ -149,17 +102,11 @@ export interface Methodology {
 /**
  * FOUR GENERAL FAMILIES, and explicitly not the whole toolbox.
  *
- * An earlier version listed three — probability, convex optimisation, reinforcement learning — and the owner
- * pushed back: "probability + convex optimization + rl might just be tools to do this. but there are more
- * right? i dont think only these 3 actually."
- *
- * He is right, and there were two separate faults. The list was short of things that genuinely matter (nothing
- * about ESTIMATION, which is where most real damage happens; nothing about the integer side of optimisation,
- * which is what a rule book actually forces), and it was FRAMED as though it were complete, which is the worse
- * of the two. The fix does both: a fourth family, and a thesis that says outright this is not a full toolbox.
- *
- * Reinforcement learning now sits inside "stochastic control" rather than standing alone, which is also more
- * truthful about it: for this problem RL is approximate dynamic programming, not a separate idea.
+ * The owner, on a list of three: "probability + convex optimization + rl might just be tools to do this. but
+ * there are more right? i dont think only these 3 actually." So the list adds ESTIMATION (where most real damage
+ * happens) and the integer side of optimisation (what a rule book forces), and the thesis says outright it is
+ * not a full toolbox. Reinforcement learning sits inside "stochastic control": for this problem RL is
+ * approximate dynamic programming, not a separate idea.
  *
  * Left out on purpose, and it is worth knowing what: robust and distributionally-robust optimisation,
  * simulation and scenario generation, filtering for regime estimation, time-series econometrics, multiple-
@@ -209,13 +156,9 @@ export const METHODOLOGIES: Methodology[] = [
 export const OPEN_HEADING = 'Still an open problem.';
 
 /**
- * WHAT IS MISSING, and nothing about what is realistic.
- *
- * An earlier version said "The realistic ambition is a chunk: solve a small part properly, then widen." The
- * owner asked for evidence for it and there is none — it was my editorialising dressed as a finding, and a
- * confident sentence about what is achievable is exactly the kind of thing this slide exists to avoid. Dropped.
- *
- * What replaces it is the honest disclaimer the list needs: these are a few of the families, not all of them.
+ * WHAT IS MISSING, and nothing about what is realistic: a sentence on what is achievable has no evidence behind
+ * it (the owner asked), and is the kind of claim this slide exists to avoid. The disclaimer it carries instead:
+ * these are a few of the families, not all of them.
  */
 export const OPEN_STATEMENT =
   'No one has a method for the whole of it at this size — one that runs at three thousand names and still tells you how far from optimal it is. What follows is not a plan and not a full toolbox: a few of the general families any attempt would be assembled from.';

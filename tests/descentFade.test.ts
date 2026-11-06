@@ -1,32 +1,20 @@
 // tests/descentFade.test.ts
-// THE DESCENT GRAPH'S WAYPOINT FADE, which has produced two bugs and had no spec either time.
-//
-// Reported: *"the descent's last tag, the PhD, jumped out a few hundred milliseconds after the path ends."*
-// The first fix for it shipped as DEAD CODE — the clamp it added sat below an early return that bailed on
-// the un-clamped arrival, so for the one waypoint it existed for the function returned before the fade was
-// evaluated. Both bugs were pure arithmetic inside a canvas draw loop, where nothing could see them, and a
-// pixel probe that A/B'd the region measured no change and was read as "the band is too coarse" rather than
-// as "the fix is not running". The null result was the signal.
-//
-// So the rule is in `lib/` now and this is its spec. The assertions are about the SHAPE of the window, not
-// about pixels.
+// THE DESCENT GRAPH'S WAYPOINT FADE: the last tag, the PhD, must not jump out after the path ends. It is pure
+// arithmetic that once lived inside a canvas draw loop, where a fix shipped as dead code (below an early
+// return) and a pixel probe could not tell; so the rule is in `lib/`, and these assertions are about the SHAPE
+// of the window, not about pixels.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { waypointFade } from '../src/lib/descentPath';
 import { WAYPOINTS } from '../src/lib/trajectory';
 
 /**
- * WP_FADE IS READ OUT OF THE COMPONENT, not re-typed here.
- *
- * This line used to be `const WP_FADE = 0.055;` under the comment "kept here so a change there has to come
- * past this file" — which was exactly backwards. A local copy means the component's value can drift to
- * anything at all and every assertion below keeps passing against the stale number, testing a window the
- * graph no longer draws. The comment asserted the guarantee instead of providing it.
+ * WP_FADE IS READ OUT OF THE COMPONENT, not re-typed here: a local copy would let the component's value drift
+ * while every assertion below passed against the stale number.
  *
  * Read as TEXT because DescentPath.astro is an Astro component whose `<script>` touches `document` at module
- * scope, so it cannot be imported here — the same arrangement, for the same reason, as artSizes.test.ts and
- * protoNoindex.test.ts. The regex not matching is itself a failure (asserted first, below), since otherwise
- * every spec in this file would pass vacuously.
+ * scope, so it cannot be imported here — the same arrangement, for the same reason, as artSizes.test.ts. The
+ * regex not matching is itself a failure (asserted first, below), or every spec here would pass vacuously.
  */
 const component = readFileSync(new URL('../src/components/DescentPath.astro', import.meta.url), 'utf8');
 const wpFadeMatch = /const\s+WP_FADE\s*=\s*(\d*\.?\d+)\s*;/.exec(component);

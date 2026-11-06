@@ -5,13 +5,9 @@
 // known early — so that if anyone retunes the radii or moves a waypoint and the story stops being true,
 // it fails here rather than becoming a quiet lie on the page.
 //
-// AGAINST THE MODEL THE PAGE RUNS, which is the whole change to this file. It used to assert the story
-// against `knownAfter`/`isKnown`/`discoveredAt` — a per-stop model the page had stopped calling. So the
-// sentence the page actually prints ("a deeper basin is now visible — it was there the whole time",
-// DescentPath.astro's readout) was guarded by tests of a function nothing rendered, and the two models do
-// NOT agree: the old one found the basin at the last stop, the live one finds it just past the seventh.
-// Everything below uses `knownnessFn` over `trail()` through `trailSampler` — the exact three calls the
-// component makes — and the readout's own 0.02 threshold.
+// AGAINST THE MODEL THE PAGE RUNS: `knownnessFn` over `trail()` through `trailSampler`, the exact three calls
+// the component makes, and the readout's own 0.02 threshold. That is what guards the sentence the page prints
+// ("a deeper basin is now visible — it was there the whole time", DescentPath.astro's readout).
 
 import { describe, it, expect } from 'vitest';
 import { knowledgeRadius, knownnessFn } from '../src/lib/knowledge';

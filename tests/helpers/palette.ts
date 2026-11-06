@@ -1,5 +1,5 @@
 // tests/helpers/palette.ts
-// What the palette specs (draftingPalette, paperPalette) share: tokens.css read as TEXT, and WCAG contrast on it.
+// What the palette specs (draftingPalette, paperPalette, deckPalette) share: tokens.css read as TEXT, and WCAG contrast on it.
 // Not a spec itself — vitest collects only tests/**/*.test.ts.
 //
 // tokens.css is read as text (comments stripped) because the values live in a stylesheet, not a module. `tokens()`

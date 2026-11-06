@@ -33,12 +33,8 @@
 // waypoint — so the readout's first "a deeper basin is now visible" prints on "stop 7/8". The local
 // basin is known from u = 0.115, before the second stop. None of that was tuned to come out that way.
 //
-// THIS TABLE WAS WRONG IN TWO WAYS UNTIL IT WAS RE-MEASURED, and both are worth knowing. It was a
-// measurement of a DIFFERENT model — discs at each waypoint, keyed to stop count — that the walker
-// model below superseded and that has since been deleted; under it the basin appeared only at the
-// last stop. And it listed Independent quant BEFORE Electronic Arts, while the waypoints run the other
-// way. Both errors were invisible because the table is prose. tests/knowledge.test.ts now asserts the
-// story against the live function and the page's own path, so a retune that changes it goes red.
+// The table is prose, so tests/knowledge.test.ts asserts the story against the live function and the
+// page's own path: a retune that changes it goes red.
 
 import { WAYPOINTS } from './trajectory';
 
@@ -100,10 +96,8 @@ function walkerKnowledge(
  * Hoisting the frontier out of the inner loop is the whole fix. The caller builds this once per frame
  * and then the per-point cost is just a distance test against a fixed array.
  *
- * THE ONLY EXPORT THE PAGE USES. Five more used to sit below it — `knownAfter`, `isKnown`, `knownness`,
- * `discoveredAt`, `knownMean` — the per-stop model of the same feature, which this replaced and which
- * nothing on the site had called since. Their spec was the only thing that made them look alive, and it
- * was also the only thing asserting the discovery story; it now asserts it against this.
+ * THE ONLY EXPORT THE PAGE USES, and what tests/knowledge.test.ts asserts the discovery story against. (A
+ * per-stop model of the same feature, `knownAfter` and four others, was deleted: nothing called it.)
  */
 export function knownnessFn(
   u: number, pathAt: (t: number) => { x: number; y: number },

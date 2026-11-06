@@ -15,24 +15,20 @@
 // walkers, and this shows ONE trajectory, named, with its barrier called out. Same field,
 // different subject. The caption says so rather than pretending the surface is new.
 //
-// No React island (the terminal is deleted). Vanilla script, re-inits on astro:page-load with teardown,
-// matching TerrainHero / Toc. Canvas is decoration; the waypoints are a real <ol> so the content works
-// with JS off and for a screen reader.
+// A vanilla script, no island: it re-inits on astro:page-load with a teardown, like TerrainHero. The canvas
+// is decoration; the waypoints are a real <ol> so the content works with JS off and for a screen reader.
 //
-// NO MEASUREMENTS IN THE COPY. The lede used to quote the climb's height and the readout its "reach".
-// Both were true numbers about an INVENTED surface, which beside real job titles read as quantified
-// claims about a career. trajectoryFacts() is still used inside the drawing (it locates the basins), but
-// nothing it returns is printed as text any more.
+// NO MEASUREMENTS IN THE COPY: a true number about an INVENTED surface, beside real job titles, reads as a
+// quantified claim about a career. trajectoryFacts() locates the basins in the drawing; nothing it returns
+// is printed.
 import { WAYPOINTS } from '../lib/trajectory';
 import { STORY_CODA } from '../data/story';
 ---
 <section id="descent-path" class="dp" aria-labelledby="dp-heading">
   <header class="dp-head">
     <h2 id="dp-heading">A descent, with one climb</h2>
-    {/* SHORT, and no number. The lede used to state the climb's height as a figure — but the height is
-         a real measurement of an INVENTED surface, so quoting it next to a career reads as a claim about
-         the career, which it is not. The owner: "you don't need the numbers, the numbers are made up."
-         What is left is the only thing the picture needs said out loud. */}
+    {/* SHORT, and no number (the owner: "you don't need the numbers, the numbers are made up"): only what
+         the picture needs said out loud. */}
     <p class="dp-lede">
       Years in engineering, and a pivot to quantitative research.
     </p>
@@ -53,13 +49,10 @@ import { STORY_CODA } from '../data/story';
   <div class="dp-stage" data-dp-stage>
     <canvas class="dp-canvas" data-dp-canvas aria-hidden="true"></canvas>
 
-    {/* THE CODA, MOVED HERE, and this is a reachability fix rather than a layout preference.
-         It used to close the editorial column, where the deck made it unreadable: the story section is
-         taller than one screen, so the gesture that would scroll to the coda advanced to the next slide
-         instead. The owner: "totally unreacheable with normal scroll… a simple strategy is to put this
-         phrase here [the graph's empty lower-right], after the Quantitative Researcher is shown, animated."
-         So it lives in the drawing's empty quadrant and fades in once the walk has actually discovered the
-         deeper basin — the line only makes sense after that. HTML rather than canvas text, so the display
+    {/* THE CODA LIVES IN THE DRAWING, for reachability: at the foot of the editorial column, taller than a
+         screen, the deck's next gesture skipped it (the owner: "totally unreacheable with normal scroll… put
+         this phrase here [the graph's empty lower-right], after the Quantitative Researcher is shown,
+         animated"). It fades in once the walk has discovered the deeper basin, the only point it makes sense. HTML rather than canvas text, so the display
          italic renders properly and a screen reader can read it. */}
     {/* STORY_CODA, not a copy of it. This sentence was hardcoded here AND exported from data/story.ts with
         a byte-identical value, which is the "two places must agree" shape this project keeps getting bitten
@@ -91,37 +84,37 @@ import { STORY_CODA } from '../data/story';
 </section>
 
 <style>
-  /* ── INK IS CONTEXTUAL, and this is what makes the piece portable onto the paper panel.
-     Both the CSS and the CANVAS read these --dp-* tokens instead of the global ink ramp. The
-     defaults below are the sky values (light ink on a dark descent); when this section renders
-     inside .story-paper, that panel redefines them to dark-on-paper. Without the indirection the
-     labels drew in --paper — a near-white — directly onto light paper, i.e. invisible. */
+  /* ── THE INK IS STORY'S PAPER PANEL'S, the one ground this renders on (styles/slides.css sets the
+     --panel-* inks, Story.astro's .story-paper the two --story-line tones, per theme). Both the CSS and
+     the CANVAS read these --dp-* tokens, never the
+     global ink ramp: that ramp is light ink for the sky, and on paper it drew near-invisible.
+     `position: relative` makes this the containing block for the overlaid header. No vertical padding:
+     the panel opens with its own, and the stage is sized to the viewport. */
   .dp {
-    position: relative; padding: 12vh 0 8vh;
-    --dp-strong: var(--paper);
-    --dp-body: var(--ink-3);
-    --dp-quiet: var(--ink-4);
-    --dp-line: var(--ink-5);
-    --dp-line-soft: var(--ink-4);
-    --dp-accent: var(--ochre);
+    position: relative; display: grid;
+    --dp-strong: var(--panel-ink);
+    --dp-body: var(--panel-soft);
+    --dp-quiet: var(--panel-faint);
+    --dp-line: var(--story-line);
+    --dp-line-soft: var(--story-line-soft);
+    --dp-accent: var(--panel-accent);
+    /* The seal red is the brand mark in both themes and reads correctly on paper, so the climb keeps
+       it rather than being recoloured. */
     --dp-alert: var(--seal);
   }
-  .dp-head { max-width: 70ch; }
+  /* The graph shares the section with the writing, so its title is scaled to sit BESIDE "Why the climb"
+     as a peer rather than out-shouting it, and kept to one line. */
   .dp-head h2 {
-    font-family: var(--font-display); font-size: clamp(26px, 3vw, 38px); font-weight: 300;
-    color: var(--dp-strong); margin: 0;
+    font-family: var(--font-display); font-size: clamp(25px, 2.2vw, 40px); font-weight: 300;
+    color: var(--dp-strong); margin: 0; text-wrap: balance;
   }
-  /* On the paper panel the graph shares the section with the writing, so its title is scaled to sit
-     BESIDE "Why the climb" as a peer rather than out-shouting it, and kept to one line. */
-  :global(.story-paper) .dp-head h2 { font-size: clamp(25px, 2.2vw, 40px); text-wrap: balance; }
-  :global(.story-paper) .dp-lede { max-width: 44ch; }
   /* No `.dp-lede strong` rule, and none is wanted: the lede is one plain sentence by design — see "NO
      MEASUREMENTS IN THE COPY" at the top of this file — so there is no emphasis to accent. The rule that used
      to sit here arrived in the same commit as the element and the element never contained a `<strong>` in any
      revision, so it never matched. Deleting it also removes the temptation to bold a number back into a
      sentence the file's own header explains must not carry one. */
   .dp-lede {
-    font-size: 15.5px; line-height: 1.75; color: var(--dp-body); margin: 14px 0 0;
+    font-size: 15.5px; line-height: 1.75; color: var(--dp-body); margin: 14px 0 0; max-width: 44ch;
   }
 
   .dp-readout {
@@ -158,11 +151,7 @@ import { STORY_CODA } from '../data/story';
   .dp-btn:focus-visible { outline: 1px solid var(--dp-accent); outline-offset: 2px; }
 
 
-  .dp-stage {
-    position: relative; margin: 3vh 0 0; width: 100%; aspect-ratio: 16 / 9;
-    transition: opacity .18s ease;
-  }
-  /* ── ON THE PAPER PANEL: the graph owns the whole slide, and the header OVERLAYS it.
+  /* ── THE GRAPH OWNS ITS COLUMN, and the header OVERLAYS it.
      The measurement that forced this layout. The drawing must keep the field's true aspect or the
      contour rings render as flattened ovals — the world box is 4.61 x 3.64, aspect 1.27, and the field
      is only 5.2 units wide so it cannot be widened to suit a letterbox frame. With the header stacked
@@ -171,17 +160,14 @@ import { STORY_CODA } from '../data/story';
      the binding constraint, so the fix is to stop spending height on stacked text.
      The header now sits over the drawing's empty upper-left (the field's content runs lower-right, so
      nothing is covered), and the stage takes the full slide: ~1043px of drawing, close to double. */
-  :global(.story-paper) .dp { display: grid; }
-  :global(.story-paper) .dp-stage {
-    aspect-ratio: auto;
+  .dp-stage {
+    position: relative; width: 100%;
     /* Sized to the viewport, not a ratio: the graph is sticky in a column beside the writing, so it must
-       fit one screen with its overlaid header. The strip that used to be reserved for the "why the
-       climb" cue is reclaimed — that cue is gone, since the writing is now beside the graph rather
-       than on a slide below it. */
+       fit one screen with its overlaid header. */
     height: min(80vh, 88vw);
-    margin: 0;
+    transition: opacity .18s ease;
   }
-  :global(.story-paper) .dp-head {
+  .dp-head {
     position: absolute;
     top: 0; left: 0;
     /* Wide enough to keep "A descent, with one climb" on one line — at 42% it wrapped after "one",
@@ -191,11 +177,11 @@ import { STORY_CODA } from '../data/story';
     z-index: 2;
     pointer-events: none;      /* the drawing is not interactive, but never block it either */
   }
-  :global(.story-paper) .dp-head .dp-btn { pointer-events: auto; }
+  .dp-head .dp-btn { pointer-events: auto; }
   /* Narrow screens keep the stacked flow: there is no empty corner to overlay into. */
   @media (max-width: 1000px) {
-    :global(.story-paper) .dp-head { position: static; max-width: 70ch; }
-    :global(.story-paper) .dp-stage { height: min(56vh, 90vw); margin: 3vh 0 0; }
+    .dp-head { position: static; max-width: 70ch; }
+    .dp-stage { height: min(56vh, 90vw); margin: 3vh 0 0; }
   }
   .dp-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
@@ -224,13 +210,9 @@ import { STORY_CODA } from '../data/story';
   @media (prefers-reduced-motion: reduce) {
     .dp-coda { opacity: 1; }
   }
-  /* Narrow screens: the drawing gives way to the ordered list, so the coda returns to normal flow.
-     720px, NOT 1000px — and the mismatch was a real collision. The sentence above states the condition
-     correctly ("the drawing gives way"), but the drawing gives way at 720px, so between 721px and 1000px the
-     canvas was still drawing AND the coda had already returned to flow INSIDE the stage, landing on top of the
-     graph. Measured at 844x390: stage y 256..474, coda static at y 267..311 — inside the drawing, with the
-     italic coda and the node label "B.Eng · McGill" interpenetrating at x≈420-476. Two breakpoints that mean
-     the same thing have to be the same number. */
+  /* Narrow screens: below 720px the coda returns to normal flow rather than sitting in the drawing's
+     lower-right. NOT 1000px: a coda in flow inside a stage whose canvas still draws lands on the graph
+     (measured at 844x390). On a phone the stage also becomes a column (below), so it reads after the drawing. */
   @media (max-width: 720px) {
     .dp-coda {
       position: static; max-width: 60ch; text-align: left; opacity: 1; transform: none;
@@ -245,51 +227,17 @@ import { STORY_CODA } from '../data/story';
   }
   .dp-stage.is-live .dp-fallback { display: none; }
 
-  /* (There is no `.dp-foot`, and there never was. Three rule sets for it — a base block here, a bottom-left
-     overlay on the paper panel, and a narrow-screen return to flow — arrived in one commit alongside a
-     `.dp-foot` element that was never actually written; `git log -S 'dp-foot'` returns that single commit and
-     `-S 'class="dp-foot"'` returns nothing at all. So they were born orphaned and styled a footnote no reader
-     ever saw. Deleted. The caption the header comment mentions is the section's own copy, and `.dp-coda`
-     above is the only thing that overlays a corner of the stage.) */
+  /* THE GRAPH STAYS THE GRAPH ON A PHONE (the owner: "for the descent, that graph is better than a timeline
+     of careers"). The script omits the in-frame type under 560px (COMPACT_MAX_W), and the ordered list of stops
+     stays a screen-reader path only. If a fallback ever un-hides it: Tailwind's sr-only hides with BOTH `clip`
+     and `clip-path: inset(50%)`, and resetting only `clip` left 573px of blank panel. */
 
-  /* Narrow screens: the graph's in-frame labels collide below ~720px, so the canvas gives way to the
-     ordered list, which stops being visually hidden and becomes the content.
-     `clip-path: none` IS THE WHOLE FIX, and without it this entire fallback painted nothing. The rule reset
-     `clip`, the LEGACY property — but Tailwind v4's `sr-only` hides with `clip-path: inset(50%)`, which was never
-     reset, so on every phone the list was laid out and invisible at the same time. Measured at 320x568:
-     .dp-stage display none, .dp-stops display grid with 8 items, position static, visibility visible, opacity 1,
-     height 573px, clip-path inset(50%). The result was the career graph gone AND its replacement unpaintable —
-     573px of blank panel where the site's showpiece should be, on every phone, in both themes.
-     Undoing a visually-hidden helper means undoing EVERY property it sets, and the two clip properties are not
-     the same property. */
-  /* THE GRAPH STAYS THE GRAPH ON A PHONE. The owner, given the choice: "for the descent, that graph is better
-     than a timeline of careers."
-     The canvas used to give way here to the ordered list, on the grounds that the in-frame labels collide below
-     ~720px. True — but the labels were the only problem, and the drawing does not need them: the script now
-     omits all in-frame type under 560px (see COMPACT_MAX_W) and reclaims the 120-230px right gutter that only
-     existed to hold it, so the descent renders LARGER on a phone than a labelled version could.
-     The list goes back to being purely a screen-reader path, which is where it started. That also removes 228
-     words from the phone's visible text — the single largest visible block on the page after the collapse work,
-     and the owner's report was "still way too many texts".
-     WHAT MUST NOT COME BACK: the list is hidden by Tailwind's sr-only, which uses BOTH `clip` and
-     `clip-path: inset(50%)`. A previous fix un-hid it by resetting only the legacy `clip`, so it was laid out
-     and invisible at once — 573px of blank panel where the showpiece belongs. Nothing here un-hides it, so that
-     trap is gone with the rule that sprang it, but the lesson stands for any future fallback. */
-
-  /* ── AND THE STAGE BECOMES A REAL COLUMN, because "show the canvas again" alone rendered badly.
-     The stage is an overlay box: the canvas is position:absolute inset:0 and the coda is positioned into the
-     drawing's empty lower-right. That composition depends on there BEING an empty lower-right, which is a
-     desktop luxury. On a phone the narrow-screen rule turns the coda static, so it flowed at the TOP of the
-     stage and printed straight over the drawing, while the drawing itself — squeezed into a 342x351 box that
-     still had to hold the world's 1.27 aspect — came out as a few faint arcs in one corner.
-     So on a phone the stage stops being an overlay: the canvas is a block with its own height and the coda
-     follows underneath it. The drawing gets a square-ish box of its own, and the sentence that explains it is
-     read after it rather than across it. */
+  /* ── AND THE STAGE BECOMES A REAL COLUMN. The stage is an overlay box (canvas inset:0, the coda in the
+     drawing's empty lower-right), and a phone has no empty lower-right: a static coda printed over the drawing.
+     So here the canvas is a block with its own height and the coda is read after it rather than across it. */
   @media (max-width: 640px) {
-    :global(.story-paper) .dp-stage,
     .dp-stage {
       height: auto;
-      aspect-ratio: auto;
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -306,29 +254,11 @@ import { STORY_CODA } from '../data/story';
       max-width: none;
     }
   }
-
-  /* ON THE PAPER PANEL: dark ink, and no top padding — the panel already opens with 9vh, and the
-     section's own 12vh on top of it left the title floating. */
-  :global(.story-paper) .dp {
-    /* No vertical padding here: the panel already opens with its own, and the stage is sized to the
-       viewport. `position: relative` makes this the containing block for the overlaid header/footnote. */
-    position: relative;
-    padding: 0;
-    --dp-strong: var(--story-ink);
-    --dp-body: var(--story-ink-soft);
-    --dp-quiet: var(--story-ink-faint);
-    --dp-line: var(--story-line);
-    --dp-line-soft: var(--story-line-soft);
-    --dp-accent: var(--story-accent);
-    /* The seal red is the brand mark in both themes and reads correctly on paper, so the climb keeps
-       it rather than being recoloured. */
-    --dp-alert: var(--seal);
-  }
 </style>
 
 <script>
   import {
-    project, contoursFor, contourLevels, trail, trailSampler, climbSpan, unknownAttractor, storyBounds,
+    project, storyContours, trail, trailSampler, climbSpan, unknownAttractor, storyBounds,
     waypointFade, type Projection, type View,
   } from '../lib/descentPath';
   import { WAYPOINTS, trajectoryFacts, DEEP_SIDE_LABEL } from '../lib/trajectory';
@@ -353,7 +283,7 @@ import { STORY_CODA } from '../data/story';
    *
    * It then spent one revision as a `Map` at the top of THIS script, which worked and was untestable: no
    * test in this repo reads `DescentPath.astro`, so moving it back inside `init()` would have reverted the
-   * branch's largest perf fix with every test green. `contoursFor()` lives in `lib/` for that reason and is
+   * branch's largest perf fix with every test green. `storyContours()` lives in `lib/` for that reason and is
    * pinned by `tests/descentPath.test.ts`. Keep the cache there; this file should only ever call it.
    */
 
@@ -399,32 +329,27 @@ import { STORY_CODA } from '../data/story';
     // it inside draw() cost ~1.8s per frame and produced a 0.6fps slideshow.
     const facts = trajectoryFacts();
     const attractor = unknownAttractor();
-    const levels = contourLevels(11);
-    // Memoised in lib/descentPath.ts — see the note at the top of this script for the 53-67ms it saves per
-    // navigation, and the note on contoursFor() itself for why the cache cannot live in this file.
-    const CONTOUR_RES = 150;
 
     // PALETTE CACHE. tok() called getComputedStyle() and it ran SIX TIMES PER DRAW — six forced
     // style recalculations per animation frame. Measured before this fix: 0.6 fps, mean 1758ms per
     // frame, which is precisely the "step function, like a powerpoint" symptom. The canvas work
     // itself was never the problem: only ~270 draw calls per frame, and the pure maths costs 10ms.
-    // Read the tokens once and invalidate only when the theme attribute changes.
+    // Read the tokens once per init; a theme flip re-inits (theme:change, at the bottom).
     // Read from the SECTION, not the document root, and read the --dp-* tokens rather than the global
-    // ink ramp. The section inherits sky ink by default and dark-on-paper ink when it renders inside
-    // .story-paper, so the same canvas code draws correctly on either ground. Reading the root would
-    // always return the light sky inks — invisible on light paper.
+    // ink ramp: the section carries the paper panel's dark-on-paper inks, and the root would return the
+    // light sky inks — invisible on light paper. `.dp` defines all six, so none can read empty.
     type Pal = Record<string, string>;
     let palCache: Pal | null = null;
     const readPalette = (): Pal => {
       const cs = getComputedStyle(section);
-      const get = (n: string, fb: string) => cs.getPropertyValue(n).trim() || fb;
+      const get = (n: string) => cs.getPropertyValue(n).trim();
       return {
-        ink5: get('--dp-line', '#b8b1a1'),
-        ink4: get('--dp-line-soft', '#8c8576'),
-        ink3: get('--dp-body', '#5a544a'),
-        paper: get('--dp-strong', '#efe9dd'),
-        ochre: get('--dp-accent', '#c8a36a'),
-        seal: get('--dp-alert', '#b23a2e'),
+        ink5: get('--dp-line'),
+        ink4: get('--dp-line-soft'),
+        ink3: get('--dp-body'),
+        paper: get('--dp-strong'),
+        ochre: get('--dp-accent'),
+        seal: get('--dp-alert'),
       };
     };
     const palette = (): Pal => (palCache ??= readPalette());
@@ -442,12 +367,10 @@ import { STORY_CODA } from '../data/story';
      * Below this CSS width the graph draws as a PICTURE: the surface, the path and the points, with none of
      * the in-frame type.
      *
-     * The owner, choosing between the drawing and the text list it used to fall back to: "for the descent,
-     * that graph is better than a timeline of careers." The labels were the only real obstacle — they collide
-     * under ~720px, which is why the canvas was switched off there — and they are also the reason the frame
-     * carried a 120-230px right gutter it does not otherwise need. Dropping them on a phone solves both at
-     * once: the collision cannot happen, and the drawing gets the gutter back, so the descent is rendered
-     * LARGER on a phone than a labelled version could have been.
+     * The owner, choosing between the drawing and a text list: "for the descent, that graph is better than a
+     * timeline of careers." The labels collide under ~720px, and they are the reason the frame carries a
+     * 120-230px right gutter; dropping them on a phone avoids the collision and gives the drawing the gutter,
+     * so it renders LARGER than a labelled version could.
      * The names are not lost. The ordered list of stops stays in the DOM as a screen-reader path, which is
      * also what keeps the employer names indexable on the phone rendering.
      */
@@ -540,9 +463,11 @@ import { STORY_CODA } from '../data/story';
       // it renders as a dot. It reads as a survey plot and it is kin to the hero's dot field without
       // repeating the hero's object.
       ctx.lineCap = 'round';
-      levels.forEach((lv, i) => {
-        const runs = contoursFor(lv, CONTOUR_RES);
-        const deep = 1 - i / (levels.length - 1);          // 1 at the deepest level
+      // Memoised in lib/descentPath.ts — see the note at the top of this script for the 53-67ms it saves per
+      // navigation, and the note on storyContours() itself for why the cache cannot live in this file.
+      const contours = storyContours();
+      contours.forEach((runs, i) => {
+        const deep = 1 - i / (contours.length - 1);        // 1 at the deepest level
         ctx.strokeStyle = ink5;
         ctx.lineWidth = 1.7 + deep * 1.3;
         for (const run of runs) {
@@ -567,9 +492,7 @@ import { STORY_CODA } from '../data/story';
       // patches that appeared around both minima: a contour run clipped by the frame edge is an open
       // polyline, and closePath() on it draws a chord straight across the frame, filling a slab. A
       // real bowl is a loop whose last point returns to its first.
-      const washLevels = levels.slice(0, 5);
-      washLevels.forEach((lv, i) => {
-        const runs = contoursFor(lv, CONTOUR_RES);
+      contours.slice(0, 5).forEach((runs, i) => {
         ctx.fillStyle = ochre;
         ctx.globalAlpha = 0.034 - i * 0.005;
         for (const run of runs) {
@@ -594,15 +517,12 @@ import { STORY_CODA } from '../data/story';
       });
       ctx.globalAlpha = 1;
 
-      // ── NO KNOWLEDGE CIRCLES. Two earlier versions drew the horizon explicitly: first as radial
-      // gradient fills (which flooded the frame, 3.4% -> 57.6% ink) and then as boundary hairlines
-      // (which drew circles straight across both basins and fought the shapes they were meant to
-      // reveal). The horizon does not need its own marks: masking the contours by knowledge already
-      // shows exactly how far understanding reaches, and it shows it in the field's own language.
+      // ── NO KNOWLEDGE CIRCLES: radial fills flooded the frame (3.4% -> 57.6% ink) and hairlines cut across
+      // both basins. Masking the contours by knowledge already shows how far understanding reaches.
 
-      // ── The deeper basin. HELD BACK until experience actually reaches it: measured, it is
-      // invisible for seven of eight stops and discovered at the last, missing by 0.01 at the stop
-      // before. Drawing it earlier would give away an ending the walker had not yet earned.
+      // ── The deeper basin. HELD BACK until experience actually reaches it: it is discovered just past the
+      // seventh stop (lib/knowledge.ts's table, which tests/knowledge.test.ts holds). Drawing it earlier would
+      // give away an ending the walker had not yet earned.
       const att = attractor;
       const discovered = known(att.x, att.y) > 0.02;
       const [ax, ay] = project(att.x, att.y, v);
@@ -732,9 +652,8 @@ import { STORY_CODA } from '../data/story';
         ctx.lineTo(mx - 54, my - 38);
         ctx.stroke();
         ctx.globalAlpha = 1;
-        // Named, not measured. It used to read "climb +1.26" — a true height on an invented surface,
-        // which beside a real career reads as a quantified claim about the career. The red stretch
-        // already shows WHERE the climb is; the word says what it is.
+        // Named, not measured (no numbers in the copy; see the header). The red stretch shows WHERE the
+        // climb is; the word says what it is.
         label(ctx, mx - 58, my - 44, 'the climb', 13, seal, 'end');
       }
 
@@ -764,18 +683,10 @@ import { STORY_CODA } from '../data/story';
     const reduce = prefersReducedMotion();
     function animate(): void {
       cancelAnimationFrame(raf);
-      // markStops() TOO, not just draw() — and AFTER it. Two bugs, found one after the other.
-      //
-      // This branch used to be `reveal = 1; draw(); return;`, so under reduced motion the graph showed the
-      // finished walk — deep basin revealed — while the aria-live readout stayed on what the initial
-      // markStops() wrote at reveal 0: "stop 1/8 · nothing deeper is visible from here". The picture and its
-      // own caption contradicted each other, for exactly the readers most likely to be relying on the
-      // caption. CLAUDE.md's rule is that the no-motion state must look FINISHED; the readout is part of it.
-      //
-      // Adding markStops() BEFORE draw() then printed "stop 8/8 · nothing deeper is visible" — right stop,
-      // wrong discovery. markStops() reads `known()`, and the frontier behind it is only rebuilt by
-      // refreshKnown() at the top of draw(), so called first it reads the PREVIOUS reveal's knowledge. Hence
-      // draw, then markStops — here and in the animated step below, which had the same one-frame lag.
+      // markStops() TOO, not just draw(), and AFTER it. Without it the finished picture (reduced motion) keeps
+      // the readout's "stop 1/8 · nothing deeper is visible": the no-motion state must look FINISHED, readout
+      // included. After, because markStops() reads `known()`, whose frontier draw() rebuilds; called first it
+      // reads the previous reveal's knowledge. Same order in the animated step below.
       if (reduce) { reveal = 1; draw(); markStops(); return; }
       // Drive the reveal from ELAPSED TIME, not from an accumulated per-frame delta.
       //
@@ -857,9 +768,6 @@ import { STORY_CODA } from '../data/story';
     };
     window.addEventListener('resize', onResize);
 
-    const mo = new MutationObserver(() => { palCache = null; draw(); });
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-
     // Start when it is on screen, so the reveal is seen rather than missed.
     //
     // rootMargin was '-15% 0px', which shrinks the trigger box — and an INSTANT scroll (or a deep
@@ -896,7 +804,6 @@ import { STORY_CODA } from '../data/story';
       window.clearTimeout(resizeT);
       window.removeEventListener('resize', onResize);
       io.disconnect();
-      mo.disconnect();
       replay?.removeEventListener('click', onReplay);
     };
   }

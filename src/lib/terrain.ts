@@ -76,38 +76,13 @@ function lp(a: number[], b: number[], t: number): [number, number, number] {
 //   • DARK  = "Glacier" — cool cyan-blue ice, slate valleys → bright rime peaks,
 //     on the charcoal night sky.
 export interface TerrainRamp { valley: [number, number, number]; mid: [number, number, number]; peak: [number, number, number] }
-// LIGHT ramp — "Classic": warm ochre valleys → cool indigo heights, at the token
-// values. A deepened variant was tried and REVERTED: composited on screen (paper
-// backdrop, EDL shade 0.5) the ridge still landed LIGHTER than the valley
-// because terrainRender's base alpha ramp 0.30+(1-hn)*0.45 more than cancels any
-// value ramp. The deepened variant was the only part that altered the shipped
-// hero's colour identity, while edlSpend() delivers the vast majority of the
-// separation win. Not worth the palette risk.
-// Classic: warm ochre valleys → cool indigo heights.
-//
-// REAL VALUE RANGE, added after the light mountain still read as mush. Before this
-// change, light theme dots were essentially FLAT in luminance across elevation —
-// dark theme carried far more elevation→value information. Each light dot separated
-// from the sky perfectly well, but the dots did not separate from EACH OTHER, so
-// there was no value structure and therefore no readable mountain form. That is why
-// raising contrast against the background never fixed it.
-// Now: valley = deep ochre (dark), peak = pale indigo (light), so elevation reads as
-// light on the ridge the way it does in dark theme. Hues stay --ochre → --indigo.
-//
-// (Earlier note, still true: the MID knot was hue-identical to the sky, so mid-
-// elevation dots vanished into it while the valley and peak still read. Cooling
-// the mid stop separates them by putting the whole ramp on the cool side of the
-// warm sky except the valley, which separates by being much darker instead.)
-//
-// Still --ochre → --indigo: the endpoints are the tokens, only the interior knot
-// moved, so the palette identity holds and no new hue is introduced.
-// The endpoints are pushed far apart because the pipeline compresses them: every
-// stage from litColor through edlSpend, alpha and the paper composite narrows the
-// range the ramp started with. A ramp that looks well separated in isolation can
-// still land on screen as one grey mass with no readable ridge, so the ramp is
-// specified wide enough that real form survives the compression. Hues unchanged:
-// --ochre warm low, --indigo cool high. tests/edlSpend.test.ts pins the spread
-// that must survive, over the elevation range the renderer actually paints.
+// LIGHT ramp — "Classic": --ochre valleys → --indigo heights, no new hue. It needs a REAL VALUE RANGE,
+// deep ochre valley to pale indigo peak: dots flat in luminance each separate from the sky but not from
+// each other, so no mountain form reads, and raising contrast against the background cannot fix that.
+// The mid knot is cooled because at the sky's hue mid-elevation dots vanish into it. The endpoints are
+// pushed far apart because every stage after this (litColor, edlSpend, alpha, the paper composite)
+// narrows the range; tests/edlSpend.test.ts pins the spread that must survive. (A deepened, off-token
+// variant was tried and reverted: edlSpend() gives most of the separation without the palette risk.)
 export const TERRAIN_LIGHT: TerrainRamp = { valley: [58, 40, 18], mid: [104, 108, 126], peak: [154, 168, 196] };
 export const TERRAIN_TERMINAL: TerrainRamp = { valley: [47, 90, 110], mid: [91, 147, 168], peak: [198, 227, 237] };     // Glacier: cyan-blue ice valleys → bright rime peaks
 
@@ -206,31 +181,11 @@ export function computeEDL(dots: Array<{ x: number; y: number }>, params: EDLPar
 }
 
 // ── How EDL shade is SPENT: opacity, or value? ──────────────────────────────
-// computeEDL returns a shade in [0,1]; something has to turn that into pixels.
-// The shipped renderer spent it on ALPHA (`alpha *= floor + (1-floor)*shade`),
-// and on the dark theme that is exactly right: fading a dot toward a near-black
-// sky DARKENS it, which is what an eye-dome shadow looks like.
-//
-// On the LIGHT theme the same line runs BACKWARDS. Compositing against the pale
-// paper backdrop, reducing a dot's alpha makes it LIGHTER, not darker:
-//
-//     alpha  1.00 → the dot's own value
-//     alpha  0.30 → LIGHTER than unshaded
-//     alpha  0.08 → almost exactly the sky
-//
-// So the dots EDL most wants to darken — the receding ridge, the silhouette,
-// the shape cue itself — instead BLEACH OUT into the pale sky. That is the
-// reported "the dots blend into the fluid background": not a palette problem
-// (the marbled sky just makes an existing inversion obvious), but Eye-Dome
-// Lighting subtracting contrast where it should be adding it. It also explains
-// why dark theme reads as a mountain and light theme reads as mush from the
-// SAME shade array.
-//
-// The fix is to spend the shade on VALUE in light theme — multiply the colour
-// down instead of the opacity — so a shadowed dot goes to ink rather than to
-// air. `darkness` (0 = light, 1 = dark) picks the split, so the crossover is
-// continuous and the dark theme's alpha behaviour is preserved bit-for-bit at
-// darkness = 1.
+// computeEDL returns a shade in [0,1]. Spent on ALPHA it is right on the dark theme: fading a dot toward
+// a near-black sky darkens it, which is what an eye-dome shadow looks like. On the LIGHT theme it runs
+// BACKWARDS: over pale paper a lower alpha is a LIGHTER dot, so the receding ridge and the silhouette, the
+// shape cue itself, bleach into the sky. So light theme spends it on VALUE (the colour goes toward ink, not
+// air). `darkness` (0 = light, 1 = dark) picks the split, continuously; at 1 it is the alpha behaviour.
 export interface EDLSpend {
   /** multiply the dot's RGB by this (1 = untouched) */
   value: number;
@@ -304,8 +259,8 @@ export function lightDir(p: LightParams = LIGHT_DEFAULTS): [number, number, numb
 }
 
 /** Shade an elevation-resolved base color by the light. `ndl` = N·L in [-1,1];
- *  `darkness` in [0,1] (0 = light theme, 1 = dark) blends the value/gain split so
- *  it adapts across the theme cross-fade. Returns an RGB triple in [0,255]. */
+ *  `darkness` in [0,1] (0 = light theme, 1 = dark) blends the value/gain split.
+ *  Returns an RGB triple in [0,255]. */
 export function litColor(
   base: [number, number, number], ndl: number, darkness: number, p: LightParams = LIGHT_DEFAULTS,
 ): [number, number, number] {
@@ -313,21 +268,17 @@ export function litColor(
   const shade = p.ambient + (1 - p.ambient) * h;
   const value = 1 - (p.valueLight * (1 - darkness)) * (1 - shade);  // ≤1: darken shadows
   const gain = 1 + (p.gainDark * darkness) * h;                    // ≥1: brighten lit
-  // Warm/cool directional tint. In LIGHT theme this is scaled back hard, because
-  // it was silently CANCELLING the cooled TERRAIN_LIGHT ramp: the directional warm
-  // tint pushed every dot warm, landing them on the sky's own hue, so the mountain
-  // read as mush no matter what the ramp said. That is why the hue change "didn't
-  // update" on screen — it shipped, then the lighting undid it. Light theme keeps a
-  // whisper (0.08) so the relief still has warm/cool direction; dark theme is
-  // unchanged, where the tint is doing no harm.
+  // Warm/cool directional tint, scaled back hard in LIGHT theme: at full strength it pushes every dot
+  // warm, onto the sky's own hue, cancelling the cooled TERRAIN_LIGHT ramp. Light keeps a whisper (0.08)
+  // so the relief still has warm/cool direction; dark keeps it whole.
   const warmEff = p.warm * (0.27 + 0.73 * darkness);
   const t = warmEff * (h - 0.5) * 2;                               // [-warm,+warm]
   const cl = (v: number) => Math.max(0, Math.min(255, v));
   return [cl(base[0] * value * gain * (1 + t)), cl(base[1] * value * gain), cl(base[2] * value * gain * (1 - t))];
 }
 
-/** Relative luminance (0..1) of an RGB[0..255] triple — used to derive a
- *  palette's "darkness" from its top sky color for the lighting blend. */
+/** Relative luminance (0..1) of an RGB[0..255] triple. No production caller: it is kept for
+ *  tests/edlSpend.test.ts and tests/terrain.test.ts, which measure the live ramps through it. */
 export function luminance01([r, g, b]: [number, number, number]): number {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 }

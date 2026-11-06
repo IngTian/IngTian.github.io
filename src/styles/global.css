@@ -15,39 +15,14 @@
   --color-ochre: var(--ochre);
   --color-indigo: var(--indigo);
   --color-seal: var(--seal);
-  /* Text sitting ON the accent, as a utility. tokens.css has defined --on-accent all along and names the CV
-     button as the reason it exists, but the footer never used it: it set text-ink-1, which rides the ink ramp,
-     so in dark theme the button painted near-white #dce1dc on phosphor green #66c28c — measured at 1.64:1,
-     against a 4.5:1 requirement. Exposing it here means the fix is a utility swap rather than a hand-written
-     override, and any future accent chip can reach it the same way. */
-  --color-on-accent: var(--on-accent);
-  /* THE TYPE ROLES, built from astro:fonts' own --ff-* variables and declared in exactly ONE place.
-     They used to be literal stacks written out here AND again in tokens.css, and that duplication is what hid
-     a total failure: whichever copy came last won, and both named "Fraunces" — a family with no @font-face rule
-     anywhere, because astro:fonts registers its faces under a hashed name. Nothing self-hosted rendered.
-     No tail after the var(): astro:fonts already builds the whole stack, ending in the generic family, from the
-     per-family `fallbacks` in astro.config.mjs. Appending our own repeated it — the computed value came out as
-     "…, serif, Georgia, 'Times New Roman', serif" — so the var()'s DEFAULT carries the safety instead, and it
-     only applies if astro:fonts stops emitting the variable at all. */
-  /* ── DISPLAY IS GEORGIA, NOT FRAUNCES, on the owner's call after seeing Fraunces render for the first time:
-     "i think prod's font is better. the current font is kind of weird."
-     Worth recording precisely what he was comparing, because it is not what it looks like. The live site has
-     never loaded a webfont — that was the bug fixed a few commits ago — so "prod's font" IS Georgia, and the
-     months he spent judging this design were all in Georgia. Fraunces is a high-contrast display serif with
-     deliberately wonky curves; against a calm workhorse serif it reads as mannered at headline size. He is
-     choosing the one he has actually been reading, which is the right basis for the choice.
-     Consequence worth having: no display webfont in the critical path, so Fraunces stops being preloaded and
-     the FCP cost of the font fix largely goes back. */
+  /* THE TYPE ROLES, declared in exactly ONE place (CLAUDE.md, Stack, says why each face). Display is Georgia
+     and body the system stack, on the owner's call, so neither downloads anything. Mono and accent read
+     astro:fonts' own --ff-* variables with no tail after the var(): astro:fonts already ends the stack in its
+     generic family (the `fallbacks` in astro.config.mjs), so the var()'s default only applies if the variable
+     is never emitted. */
   --font-display: Georgia, 'Times New Roman', 'Nimbus Roman', serif;
-  /* BODY IS THE SYSTEM UI STACK — no webfont. Inter is dropped: it was the most expensive face on the site
-     (100KB of 222KB) for a sans-serif almost indistinguishable from SF at body size, and it is also what the
-     live site has been rendering all along, since no webfont ever loaded until a few commits ago. The order
-     matters: system-ui resolves to SF on Apple and Segoe on Windows, with the rest as belt and braces. */
   --font-body: system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   --font-mono: var(--ff-jetbrains, ui-monospace, monospace);
-  /* FRAUNCES KEPT, AS AN ACCENT — "but maybe you can use it in some sub headlines to add some varieties." So it
-     stops being the site's voice and becomes a second one, used on sub-headlines and the italic editorial lines
-     where a characterful serif is an asset rather than a distraction. Structure stays Georgia. */
   --font-accent: var(--ff-fraunces, Georgia, serif);
 }
 
@@ -68,14 +43,8 @@ body { background: var(--bg); color: var(--ink-1); font-family: var(--font-body)
    per-section backgrounds. Reads top→bottom: dawn paper → warming
    ochre → cool indigo dusk → grey ink mountains → near-black ground.
    ============================================================ */
-/* THE INTRO'S FLAT BACKDROP — beat 1 of the homepage intro.
-   `--descent-grad` is the sky's base AND its no-WebGL state, and it is the FINISHED colours — so for
-   the ~300ms before the WebGL canvas first draws, a visitor saw the real sky, then the canvas replaced
-   it with the intro's flat tone, then it resolved back. Warm → flat → warm: a state shown and then
-   un-shown, which is the same defect class as the terrain painting a finished frame before collapsing
-   to a plane. The class is set by the `is:inline` decider in index.astro, before first paint, so the
-   very first frame is already flat and there is nothing to correct. The canvas is opaque and covers
-   this the moment it draws; TerrainHero drops the class when the intro lands. */
+/* THE INTRO'S FLAT BACKDROP, beat 1 of the homepage intro. The class is set before first paint by the
+   `is:inline` decider in index.astro (why it must be is there), and TerrainHero drops it at the landing. */
 html.intro-flat .descent {
   background: var(--intro-flat-tone, var(--descent-grad));
 }
@@ -89,76 +58,16 @@ html.intro-flat .descent {
 }
 
 /* ============================================================
-   THE SCROLLABLE DECK — "like a PPT, one scroll guides you to the
-   next slide; it's not a free scroll."
+   EVERY SLIDE OWNS THE SCREEN. The homepage is a deck (one gesture,
+   one stop; lib/deck.ts says why it is not CSS scroll-snap), and a
+   slide shorter than the screen shows a strip of the NEXT slide while
+   the deck rests on it (measured at 1700x1050: up to 477px).
 
-   The descent stays one continuous sky; what changes is that the
-   scroll now RESTS at slide boundaries instead of anywhere.
-
-   CSS scroll-snap was tried FIRST and MEASURED, because it is the
-   cheap answer with no JS. It does not work at this page's
-   proportions, and the numbers are worth keeping so nobody
-   "simplifies" the deck back into it:
-
-     slide gaps at 1700x1050:  1134px, 819px, 2279px, 2346px, 581px
-     one wheel gesture:        ~320px
-
-   Every gap is 1.8x-7.3x a single scroll, so with `y mandatory` one
-   gesture proposes a destination ~320px away and the nearest snap
-   position to it is the slide it just left — the browser snaps back
-   and the page does not move. Measured: stuck at y=84 through eight
-   gestures, and through a 12-event burst shaped like a trackpad
-   flick. `proximity`, `scroll-snap-stop: always`, and shrinking the
-   hero to exactly 100vh all produced identical stuck walks; only
-   gestures of 640px+ ever advanced.
-
-   The deck is therefore driven explicitly — see lib/deck.ts (pure,
-   unit-tested: where the stops are) and Deck.astro (one gesture =
-   one stop).
-
-   BREATHING AIR above each stop is a --deck-lead custom property on
-   the slide, read by the controller. It was `scroll-margin-top`
-   here, which was WRONG and silently did nothing: scroll-margin is
-   only honoured by scrollIntoView(), and the deck moves with
-   window.scrollTo(). The rule read correctly, applied never, and
-   the paper panel's title came to rest hard against the browser
-   chrome. A CSS property that only some scroll APIs respect is a
-   trap; the offset now lives where the scrolling happens.
+   min-height rather than height: the hero and Story are taller than
+   a screen, and lib/deck.ts pages through them. The flex centring
+   sets a short slide in the middle of its own screen; the paper
+   panels are the flex ITEM, so their ground still reaches both edges.
    ============================================================ */
-
-/* ============================================================
-   EVERY SLIDE OWNS THE SCREEN.
-
-   Measured at 1700x1050 before this rule, the shortfall per slide
-   was: choice 448px, work 477px, rules 378px, interlude 231px,
-   solve 147px. That shortfall is not empty space — it is exactly
-   how much of the NEXT slide is visible while the deck rests on
-   this one, which is why the Solve headline appeared at the foot
-   of the Rules slide. A deck whose slides each show a strip of the
-   following slide is not a deck; it is a scroll that pauses.
-
-   min-height rather than height: two slides (the hero at 1134px
-   and the career story at 1282px) are legitimately TALLER than a
-   screen, and lib/deck.ts already pages through those. Forcing a
-   fixed height would either crop them or reintroduce the overflow
-   this fixes.
-
-   The flex centring is what makes it look deliberate rather than
-   padded: a 600px slide in a 1050px frame sits in the middle of
-   its own screen instead of clinging to the top with 450px of
-   dead air under it. The paper panels stay full-bleed because
-   they are the flex ITEM, so the ground still reaches both edges.
-   ============================================================ */
-/* EXCLUDES THE SIGNATURE rather than overriding it afterwards, and that distinction was a real bug. The footer
-   is not a slide — it is a strip — and it used to be exempted below with `display: block`, which silently beat
-   its own Tailwind `flex justify-between items-end` (an ID selector outranks a utility class). So on the
-   homepage, and ONLY on the homepage, the footer laid out as three stacked blocks and the IT seal rendered at
-   the far LEFT instead of the bottom right. The owner reported it twice as the seal "drifting"; both of my
-   earlier attempts edited the markup, which could not have worked, because the markup was never the problem.
-   Excluding it here means the utilities in Signature.astro simply apply, and there is nothing left to override.
-   THE EXCLUSION IS GONE because the footer is no longer a top-level section: it is nested inside #appendix (see
-   sections/Work.astro), so this selector cannot reach it and there is nothing to exempt. Keeping a :not() for an
-   element that can never match would be a false clue about the layout. */
 .is-slides > section {
   min-height: 100vh;
   display: flex;
@@ -167,34 +76,18 @@ html.intro-flat .descent {
 }
 
 /* ============================================================
-   THE FIVE SLIDE PANELS, ENUMERATED EXACTLY ONCE.
-   .story-paper (Story) · .ch-paper (Choice) · .ru-paper (Rules) · .so-paper (Solve) ·
-   .wk-paper (Work) — the opaque full-bleed panel each slide hangs its content on.
+   THE SLIDE PANELS: .slide-paper, the opaque full-bleed panel each of the five paper
+   slides (Choice, Rules, Solve, Story, Work) hangs its content on. styles/slides.css
+   paints it; this gives it its fill and nav clearance. One class rather than a list of
+   the five, so a panel cannot be half-added: hand-kept lists here missed one before (on
+   a phone, the Appendix kept 78px of blank tan above its kicker).
 
-   THIS USED TO BE THREE HAND-WRITTEN COPIES of the same five-class list (flex fill,
-   nav clearance, phone correction) and the third copy had only FOUR entries: .wk-paper
-   was missing from the phone correction. The consequence was live and measurable — the
-   78px nav clearance below applies at max-width:1100px, the 22px correction only at
-   max-width:640px, so on a phone #appendix (class="wk-paper", confirmed in
-   dist/index.html) kept 78px of blank tan above its kicker while its four siblings got
-   22px. A band of empty paper that reads as something that failed to render, in the one
-   place nobody was looking, because the bug was a missing line rather than a wrong one.
-
-   Three parallel lists cannot be kept in sync by care, so there is now one. The nested
-   @media rules below inherit this selector list, which means a SIXTH panel is added in
-   exactly one place and cannot be half-added. Nesting rather than :is() so the emitted
-   selectors — and therefore the specificity — are byte-for-byte what they were:
-   `.is-slides > section > .wk-paper` is (0,2,1), which is what beats Astro's scoped
+   `.is-slides > section > .slide-paper` is (0,2,1), which is what beats Astro's scoped
    `.wk-paper[data-astro-cid-…]` at (0,2,0) and lets a longhand `padding-top` here
-   override each panel's own `padding` shorthand. An earlier attempt at the clearance
-   used a plain `.is-slides > section` rule, lost that specificity race, and silently
-   changed nothing.
+   override each panel's own `padding` shorthand. A plain `.is-slides > section` rule
+   loses that race and silently changes nothing.
    ============================================================ */
-.is-slides > section > .story-paper,
-.is-slides > section > .ch-paper,
-.is-slides > section > .ru-paper,
-.is-slides > section > .so-paper,
-.is-slides > section > .wk-paper {
+.is-slides > section > .slide-paper {
   /* The panel inside a slide must be able to fill it, or the centring above just moves a
      short panel down the screen and leaves sky above and below it. */
   flex: 1 0 auto;
@@ -202,45 +95,17 @@ html.intro-flat .descent {
   flex-direction: column;
   justify-content: center;
 
-  /* ── THE NAV MUST NOT LAND ON A HEADLINE, which on phones it did — on every slide.
-     The corner nav is a fixed capsule at the top; the deck rests with a slide's top at the viewport top; and a
-     paper panel puts its kicker and headline in the first ~90px. So at rest, on a phone, the capsule sat across
-     the headline of each explainer slide. Measured at 390x844 resting on each stop, covered widths:
-     "What is multi-period portfolio optimization?" 228px · "Now imagine it is not your money." 341px ·
-     "Still an open problem." 212px · "The work" 123px — plus every kicker ("1 / 3", "2 / 3 · the difficulty").
-     Not transient: these are the positions the deck comes to REST at, so the headline was permanently obscured.
-
-     THE FIX IS THE PANEL'S OWN PADDING, NOT --deck-lead. A lead was the obvious lever and it is the wrong one:
-     it lifts the deck's resting position ABOVE the slide, so a full-bleed opaque panel gets a strip of sky above
-     it and reads as a card that has slipped down — Story.astro measured exactly that (paper at 1953, deck resting
-     at 1893, 60px of sky) and documents why it carries no lead, naming the panel's padding-top as the right home
-     for this air. Padding keeps the paper flush to the top of the screen and moves only the content inside it.
-
-     78px clears the wrapped two-row capsule on phones (12px offset + ~54px tall) and the single-row capsule in
-     landscape (17px + ~44px).
-     The footer needs no clearance rule of its own. It used to be a stop, so the deck rested with its first row at
-     the top of the screen and the capsule sat across "Download CV ↓" — 95px of it at 320px, a band where a tap
-     would have hit the nav instead of the link. Nested inside #appendix it is never at the top of the viewport at
-     rest, and this panel's padding above covers the case. ── */
+  /* ── THE NAV MUST NOT LAND ON A HEADLINE. The deck rests a slide's top at the viewport top, and a panel puts
+     its kicker and headline in the first ~90px, under the fixed capsule. THE FIX IS THE PANEL'S OWN PADDING,
+     NOT A DECK LEAD (a rest lifted above the slide): a lead shows a strip of sky above a full-bleed panel, which
+     then reads as a card that slipped down. 78px clears the capsule (17px offset + ~44px) with room. ── */
   @media (max-width: 1100px), (max-height: 620px) { padding-top: 78px; }
 
-  /* ── ON A PHONE THAT CLEARANCE IS NOW A HOLE, so it comes back down. ──
-     The 78px above was sized for the nav as it then was: a wrapped, effectively full-width capsule 68px tall,
-     with the deck resting each slide's top exactly at the viewport top so a headline landed right underneath it.
-     Neither premise holds any more. The phone nav is a 40x38 mark in the top-RIGHT corner, these headlines are
-     left-aligned, and the deck does not engage on phones at all, so no slide is parked with its top against the
-     chrome. What is left is 79px of blank paper above a one-line kicker — measured on all three explainers, and
-     on a COLLAPSED slide that band is a third of the whole section. It reads as something that failed to render,
-     which is part of what the owner saw when they said the slides "collide and doesn't work".
-     22px keeps the panel from starting hard against its own edge. Placed after the rule it overrides and at the
-     same specificity, deliberately: source order is what decides here, and getting that backwards has cost this
-     project several silent fixes. ── */
+  /* ── ON A PHONE IT COMES BACK DOWN to 22px: the nav there is a small mark in the top-right corner over
+     left-aligned headlines, and the deck does not engage, so 78px is only a blank band above the kicker.
+     After the rule it overrides, at the same specificity: source order decides. ── */
   @media (max-width: 640px) { padding-top: 22px; }
 }
-/* The nested footer must NOT stretch. It is the last flex item in #appendix, and a stretched footer would put its
-   links in the middle of a tall band instead of at the foot of the page. `flex: none` keeps it at its own height
-   and lets the tan panel above it take the slack. */
-.is-slides > section > #signature { flex: none; }
 
 /* ── Atmosphere, upper sky (heights → interlude). Normal blend: these are warm
    LIGHT washes + a soft horizon haze that read on the pale paper. Localized to
@@ -249,13 +114,8 @@ html.intro-flat .descent {
   content: "";
   position: absolute;
   top: 0; left: 0; right: 0;
-  /* min(), NOT a bare 120vh — this wash was making short pages scrollable into nothing. It is absolutely
-     positioned, so it still contributes to the document's scroll height, and 120vh is TALLER THAN THE VIEWPORT by
-     definition. On the homepage that never showed, because the content is thousands of pixels tall. On /404,
-     whose content is exactly one screen, the document measured 1080px against a 900px viewport — 180px of empty
-     scrollable space below the page, which is precisely 120vh minus 100vh. Capping at the container's own height
-     leaves the homepage untouched (100% there is ~6600px, so 120vh still wins) and makes a one-screen page
-     exactly one screen. */
+  /* min(), NOT a bare 120vh: an absolutely positioned box still adds to the scroll height, so on a one-screen
+     page (/404) a bare 120vh is 20vh of empty scroll below it. On the homepage 120vh still wins. */
   height: min(120vh, 100%);
   pointer-events: none;
   background:
@@ -265,9 +125,7 @@ html.intro-flat .descent {
     radial-gradient(46% 30% at 18% 26%, rgba(150,160,180,0.18), transparent 70%),
     /* mid warm haze */
     radial-gradient(40% 26% at 60% 48%, rgba(220,200,170,0.14), transparent 72%);
-    /* (removed the wide "horizon mist" streak at 50% 80% — its 125%×10% band
-       read as a faint horizontal divider at the hero/interlude seam. The terrain
-       bowl already gives the name its ground plane, so the streak was redundant.) */
+    /* (No wide horizon-mist streak: a band at 50% 80% read as a divider at the hero/interlude seam.) */
 }
 
 /* ── Atmosphere, mid → deep sky. Screen blend lightens the darker gradient to
@@ -281,9 +139,9 @@ html.intro-flat .descent {
   pointer-events: none;
   mix-blend-mode: screen;
   background:
-    /* interlude vapor — a soft cloud the tagline floats inside */
+    /* interlude vapor — a soft cloud behind the Interlude's line */
     radial-gradient(52% 16% at 38% 32%, rgba(238,232,222,0.15), transparent 74%),
-    /* dark-gap fog — rising haze through the dusk→ink void before the terminal.
+    /* dark-gap fog — rising haze through the dusk→ink void lower down.
        Higher alpha than the light-zone washes: screen blend over near-black
        needs more to register without reading as a grey smudge. Taller spread so
        it reads as fog filling the void rather than a band. */
@@ -304,77 +162,24 @@ html[data-theme='dark'] .descent::after {
 }
 
 /* ── The fluid sky, shared by every route that renders it ────────────────────
-   FluidSky is an OPAQUE canvas that replaces the page's CSS gradient. It is a
-   negative-z child of .descent, so it paints above the parent's own background
-   but below all content.
+   FluidSky is an OPAQUE canvas, a negative-z child of .descent, that replaces the
+   page's CSS gradient. The gradient (--descent-grad or --reading-grad, each page's
+   own) is the FALLBACK, suppressed only once the script has added .fluid-live after
+   a successful draw, so no WebGL, a phone and a shader failure all keep it.
 
-   The gradient stays as the FALLBACK and is only suppressed once the canvas has
-   actually painted — the script adds .fluid-live after a successful draw. So no
-   WebGL, mobile (the canvas is display:none under 640px), a shader compile
-   failure, or warp 0 all fall back to the shipped sky, unchanged.
-
-   Both archetypes share this: descent pages keep --descent-grad as the fallback,
-   reading pages keep --reading-grad, because each page's own rule already sets
-   the right one and we only need to know whether to hide it.
-
-   ── CRITICAL: every suppression rule below is inside the exact negation of the 640px query ──
-   An audit caught a reproducible way to render the hero INVISIBLE. .fluid-live is
-   added once after the first successful draw and removed only in the
-   astro:page-load teardown, so ANY state change that hides the canvas without a
-   navigation left the gradient suppressed with nothing painting it. The
-   reproducible trigger is simply crossing the 640px breakpoint after load —
-   narrowing a window, rotating a tablet, docking devtools, or zooming to 250% —
-   because `@media (max-width: 640px) { .fluid-sky { display: none } }` hides the
-   canvas while the resize handler never re-checks display and never drops the
-   class.
-
-   Measured on the built page at 1440px then narrowed to 420px with no reload:
-       main background-image  none
-       main background-color  rgb(22, 20, 15)
-       hero h1 color          rgb(22, 20, 15)   ← identical, 1.00:1 contrast
-   --bg and --ink-1 are both #16140f, so the name vanished completely. Heights.astro
-   also hides .hero-legibility inside the same 640px query, so the paper halo could
-   not rescue it either.
-
-   Gating the CSS on the SAME breakpoint that hides the canvas makes the two
-   physically unable to desync — the suppression cannot apply anywhere the canvas
-   is display:none, regardless of what the class says. That is a structural
-   guarantee rather than another JS listener that could be forgotten. The negation, not a second bound at 641px,
-   is what makes it the same breakpoint: a zoomed window 640.5 CSS px wide is on one side of it. */
+   ── CRITICAL: every suppression rule is inside the exact negation of the phone query ──
+   `@media (max-width: 640px) { .fluid-sky { display: none } }` can hide the canvas
+   after load (a narrowed window, a rotation, a zoom) while .fluid-live stays on:
+   measured, the hero's name then drew at 1.00:1 (--bg and --ink-1 are both #16140f).
+   Gating on the same breakpoint makes the two unable to desync, and the negation,
+   not a second bound at 641px, is what makes it the same breakpoint. */
 @media not all and (max-width: 640px) {
   .descent.is-fluid.fluid-live { background: var(--bg); }
-
-  /* Explicitly restore each archetype's own gradient when the canvas is off, rather
-     than relying on revert-layer (whose cascade-layer semantics don't apply here —
-     these are all in the same layer, so it would resolve to nothing). */
-  html[data-fluid-strength='0'] .descent.is-fluid.fluid-live,
-  html[data-fluid='off'] .descent.is-fluid.fluid-live { background: var(--descent-grad); }
 
   /* SkyWash's woven warm/cold strokes are the same broken-colour idea the shader
      now does natively at higher fidelity; doubling them muddies both. */
   .descent.is-fluid.fluid-live .sky-wash { opacity: 0.35; }
 }
-
-/* (No `.terminal-chrome` fill here: the scripted terminal and the whole src/components/terminal/ directory are
-   DELETED, and no element and no rule in src or dist carries the class — this comment is its only mention — so a
-   rule for it could match no element on any route; it would only ship in the critical-path stylesheet on every
-   page.) */
-
-/* ── THE THEME-TOGGLE CROSSFADE IS GONE, and this note is why nobody should add it back.
-   It wrapped the flip in document.startViewTransition() for a ~0.5s dissolve and claimed to fade
-   "the whole site (gradient, text, canvas snapshot)". The canvas half was never true: a View
-   Transition shows SNAPSHOT pseudo-elements instead of the live page, and in real Chrome with GPU
-   rasterisation the GPU-backed canvases are absent from those snapshots. So for half a second the
-   page showed --descent-grad alone — warm paper blending to near-black, i.e. a flat grey wash — with
-   no sky and no terrain dots on it, on every route that carries the sky.
-   Confirmed from a screen recording (dots absent for the whole transition, back at ~0.63s, exactly
-   when the 0.5s fade ends) against a probe showing the live canvas never blanks. It did NOT reproduce
-   in headless Chrome, where software rendering does capture canvases — which is why it survived two
-   investigations.
-   The flip is instant now and clean, because both canvases read their palette every frame: text, sky
-   and terrain all cross within one frame of each other. If the dissolve is wanted back, lerp the
-   canvases' ramps in JS alongside the CSS; do not reach for a view transition on a page whose
-   background is a canvas. ── */
 
 /* slow drift — transform/opacity only, never blur. The static state above is
    the finished composition (also the Firefox / reduced-motion fallback). */
@@ -391,8 +196,7 @@ html[data-theme='dark'] .descent::after {
   }
 }
 
-/* motion is OFF by default; opt in only when the user has no reduced-motion preference.
-   Phase 3 wraps all scroll animations in this query. */
+/* motion is opt-in (prefers-reduced-motion: no-preference); this zeroes anything that slips through. */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
     animation-duration: 0.001ms !important;

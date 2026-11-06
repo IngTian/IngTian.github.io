@@ -5,12 +5,11 @@
 // illustrated with an example. Very concrete example. Maybe we can't even state this in one slide. Maybe we
 // can first explain what is portfolio optimization?"
 //
-// The audit that made this necessary: the slide opened with "Every month, decide how much of each to own",
-// which ASSUMES the concept. Nowhere on the page did anything say what a portfolio is, what optimising one
-// means, or what "multi-period" adds to it. A reader with no finance background had no way in.
+// It defines rather than assumes: nothing else on the site says what a portfolio is, what optimising one
+// means, or what "multi-period" adds to it.
 //
 // ONE SLIDE CAN CARRY BOTH TERMS, but only if the EXAMPLE does the defining and the prose only labels what is
-// already visible. So the structure is three beats over one object:
+// already visible. So the structure is three beats over one object (and BEAT4 below, the consequence):
 //   1. a portfolio IS this — $100 split across four things you have heard of
 //   2. optimising it is choosing the split, and the split has consequences
 //   3. multi-period is that you must choose again, and the last choice constrains the next
@@ -25,25 +24,20 @@ export interface Beat {
   ask: string;
   /** The answer, in one sentence. */
   say: string;
-  /** What the drawing is doing while this beat is on screen. */
-  showing: string;
 }
 
 export const BEATS: Beat[] = [
   {
     ask: 'What is a portfolio?',
     say: 'A hundred dollars, split across things you could own. That is all. The split IS the portfolio.',
-    showing: 'one bar, divided four ways',
   },
   {
     ask: 'So what is optimising it?',
     say: 'Choosing the split — and the choice matters, because each thing behaves differently when the news lands.',
-    showing: 'the same hundred dollars, split three other ways',
   },
   {
     ask: 'And multi-period?',
     say: 'You do not choose once. A month later the world has moved and you choose again — from where the last choice left you, paying to change your mind.',
-    showing: 'the split re-chosen, month after month',
   },
 ];
 
@@ -101,17 +95,13 @@ export const DEFINE_DISCLAIMER =
 // getting there. Return and risk are two separate outcomes of one decision process, and this is where a reader
 // meets that — which is also the vocabulary the later slides need.
 //
-// Four RECOGNISABLE WAYS OF BEHAVING rather than four strategy names: someone who never touches it, someone
-// who panics after the fall, someone who chases whatever just went up, and someone who trims into strength and
-// adds into weakness. A reader should be able to find themselves in one of them.
-//
-// Each is a full SCHEDULE of splits rather than a rule, because this slide defines the idea rather than solving
-// it. The optimising is slide 3.
+// The players are RECOGNISABLE WAYS OF BEHAVING rather than strategy names, so a reader can find themselves in
+// one of them; POLICIES says which five, and why each is a rule.
 
 import type { Player, PlayerContext } from '../lib/policyPnl';
 import { gross } from '../lib/policyPnl';
 
-/** The policy weights the institutional players are mandated to hold — a plain 60/20/10/10 book. */
+/** The policy weights the institutional players are mandated to hold, in the order of HOLDINGS. */
 const MANDATE = [45, 22, 15, 18];
 
 /** Normalise a weight vector to a target gross exposure, preserving its shape. */

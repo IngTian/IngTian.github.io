@@ -1,19 +1,8 @@
 // src/lib/problemSize.ts
-// ONE FORMATTER, and the reason it is alone in a file that used to hold five functions.
-//
-// This module was written to compute "why the problem is hard": decision-variable counts for the single- and
-// multi-period problems, the ratio between the teaching example and a real book, and the log10 count of
-// feasible-simplex vertices. Two modules deriving the same arithmetic is how a slide ends up quoting one of
-// them while a test guards the other, so the duplicate half went rather than being kept "in case".
-//   WHERE IT WENT IS NOT WHERE THIS USED TO SAY. The line read "every one of those numbers is now computed in
-// lib/complexity.ts instead — decisionVariables, scenarioLeaves, rulePairs — which is what Rules.astro
-// actually renders." Only `rulePairs` is true: the tally draft those counts fed was replaced by the conflict
-// web, so `decisionVariables` and `scenarioLeaves` stopped being rendered and were later deleted outright.
-// Nothing on the page computes a decision-variable count today.
-//
-// What Rules.astro imports from here is exactly `humanCount`, and it stays HERE rather than moving into
-// complexity.ts on purpose: it is presentation, not arithmetic. The counting and the wording of the count are
-// separate concerns, and the wording is the part that has to be identical everywhere it appears on the page.
+// ONE FORMATTER. Rules.astro imports `humanCount` from here, and it stays out of lib/complexity.ts on purpose:
+// it is presentation, not arithmetic, and the wording of a count has to be identical everywhere it appears.
+// (This file's problem-size arithmetic was deleted as a duplicate of complexity.ts's; nothing on the page
+// computes a decision-variable count today.)
 //
 // Pure. No DOM.
 

@@ -6,13 +6,12 @@
 // an example. Very concrete example. Maybe we can't even state this in one slide. Maybe we can first explain
 // what is portfolio optimization?"
 //
-// THE AUDIT THAT MADE THIS NECESSARY. The previous version of this slide opened with "Every month, decide how
-// much of each to own" — which ASSUMES the concept. Grepping the built page confirmed nothing anywhere said
-// what a portfolio is, what optimising one means, or what "multi-period" adds. A reader with no finance
-// background had no way in, which is fatal for the one slide that is supposed to let them in.
+// IT DEFINES RATHER THAN ASSUMES: nothing else on the site says what a portfolio is, what optimising one
+// means, or what "multi-period" adds, and a reader with no finance background needs a way in.
 //
 // AND IT DOES FIT ON ONE SLIDE, but only because the EXAMPLE does the defining and the prose only labels what
-// is already on screen. Three beats over ONE object — a hundred dollars in a bar:
+// is already on screen. Three beats over ONE object — a hundred dollars in a bar — and a fourth that shows the
+// consequence (BEAT4: different decisions in time, as PnL curves):
 //    1. a portfolio IS this            -> the bar divides four ways
 //    2. optimising it is choosing      -> the same bar, split three other ways, with what each is worth after
 //                                         one piece of news
@@ -56,11 +55,6 @@ const quarters = QUARTER_MARKS.filter((q) => q.week > 0).map((q) => ({
 // that matters here, and it is deliberately NOT the same as the highest curve.
 const bestRatio = runs.reduce((b, r) => (r.returnPerRisk > b.returnPerRisk ? r : b));
 const levered = runs.find((r) => r.key === 'levered');
-// `topReturn` (the highest final value) and `deepest` (the worst fall) used to be computed here and went when
-// noUnusedLocals went on. They were the two ends of an earlier verdict that named its own extremes; the closing
-// sentence now makes the same point WITH the levered row instead, because a reduce over `runs` that picks the
-// biggest number is not the argument — "you paid $X to borrow and fell Y%, while this reached less on a smaller
-// fall" is. Both are one line to recompute if the prose ever wants them again.
 // Grouped by who actually holds these books, because that division is the point of the beat.
 const retail = runs.filter((r) => r.kind === 'retail');
 const institutional = runs.filter((r) => r.kind === 'institutional');
@@ -100,8 +94,8 @@ const CELL = 3;
 const allBeats = [...BEATS, BEAT4];
 ---
 <section id="choice" class="ch" aria-labelledby="ch-heading">
-  <div class="ch-paper">
-    <div class="ch-inner">
+  <div class="ch-paper slide-paper">
+    <div class="slide-gutter">
       <p class="ch-kicker">1 / 3</p>
       <h2 id="ch-heading" class="ch-head">What is multi-period portfolio optimization?</h2>
 
@@ -296,8 +290,6 @@ const allBeats = [...BEATS, BEAT4];
 <style>
   .ch { position: relative; z-index: 1; width: 100vw; margin-left: calc(50% - 50vw); }
   .ch-paper {
-    --c-bg: #c4b7a1; --c-edge: rgba(74,66,54,0.26); --c-ink: #1f1b14;
-    --c-soft: #423b30; --c-faint: #6a6153; --c-accent: #7c5522;
     /* Four holding colours, from the palette only: the accent, two ink tones, and the indigo. No new hues —
        the site allows exactly one saturated colour in light theme and it is the seal, which is reserved. */
     --c-h0: #7c5522; --c-h1: #9a8353; --c-h2: #5d6472; --c-h3: #b9a880;
@@ -306,37 +298,27 @@ const allBeats = [...BEATS, BEAT4];
        emerald, so the winner and the chaser drew as one line). Only the subject carries the accent; the other
        three are ink tones separated by lightness. */
     /* p2 is the LEVERED book and must not be the accent — it was literally #7c5522, the same value
-       --c-accent resolves to in light, so two of the five curves drew in one colour. A desaturated plum is a
+       --panel-accent resolves to in light, so two of the five curves drew in one colour. A desaturated plum is a
        distinct hue that still holds the palette's rule (the seal stays the only saturated colour). */
-    --c-p0: #4a5464; --c-p1: #3a3428; --c-p2: #5d4a5e; --c-p3: #6e6555; --c-p4: var(--c-accent);
-    background: var(--c-bg);
-    border-top: 1px solid var(--c-edge); border-bottom: 1px solid var(--c-edge);
+    --c-p0: #4a5464; --c-p1: #3a3428; --c-p2: #5d4a5e; --c-p3: #6e6555; --c-p4: var(--panel-accent);
     padding: clamp(28px, 3.6vh, 56px) 0;
   }
   :global(html[data-theme='dark']) .ch-paper {
-    --c-bg: #14161a; --c-edge: rgba(184,177,161,0.14); --c-ink: #dce1dc;
-    --c-soft: #a8b0a9; --c-faint: #6d746e; --c-accent: #7fc9a0;
     --c-h0: #7fc9a0; --c-h1: #5f9b7c; --c-h2: #6b7686; --c-h3: #a9b4a5;
     /* Dark: three cool greys stepped in lightness, plus the phosphor accent for the subject. */
-    --c-p0: #7d8798; --c-p1: #d3d8d2; --c-p2: #a98cb0; --c-p3: #5f6763; --c-p4: var(--c-accent);
+    --c-p0: #7d8798; --c-p1: #d3d8d2; --c-p2: #a98cb0; --c-p3: #5f6763; --c-p4: var(--panel-accent);
   }
-  .ch-inner {
-    /* Clears the fixed Toc rail, whose right edge moved from x=129 to x=151 once it gained an indented tier
-       ("Problem / Limits / Method" under "The field"). Shared across the five paper slides. */
-    padding-left: clamp(168px, 10.4vw, 200px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
-  }
-  @media (max-width: 1100px) { .ch-inner { padding-left: clamp(28px, 6vw, 80px); } }
 
   .ch-kicker {
     font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em;
-    text-transform: uppercase; color: var(--c-accent); margin: 0 0 12px;
+    text-transform: uppercase; color: var(--panel-accent); margin: 0 0 12px;
   }
   /* THE QUESTION, said out loud, as the owner asked. Largest thing on the slide because it is what the slide
      answers. */
   .ch-head {
     font-family: var(--font-display); font-weight: 300;
     font-size: clamp(26px, 2.8vw, 46px); line-height: 1.1;
-    color: var(--c-ink); margin: 0 0 clamp(18px, 2.4vh, 32px); max-width: 30ch;
+    color: var(--panel-ink); margin: 0 0 clamp(18px, 2.4vh, 32px); max-width: 30ch;
     letter-spacing: -0.014em; text-wrap: balance;
   }
 
@@ -369,13 +351,13 @@ const allBeats = [...BEATS, BEAT4];
   /* html.define-js is set by the script before it starts sequencing, so dimming — and the pointer affordance —
      only happen where the sequence can actually run. */
   :global(html.define-js) .ch-beat { opacity: 0.3; cursor: pointer; }
-  :global(html.define-js) .ch-beat.is-on { opacity: 1; border-left-color: var(--c-accent); }
+  :global(html.define-js) .ch-beat.is-on { opacity: 1; border-left-color: var(--panel-accent); }
   /* Hovering a dim beat previews that it is reachable, without pretending it is the active one. */
   @media (hover: hover) {
     :global(html.define-js) .ch-beat:hover { opacity: 0.72; }
     :global(html.define-js) .ch-beat.is-on:hover { opacity: 1; }
   }
-  .ch-beat:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; opacity: 1; }
+  .ch-beat:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 3px; opacity: 1; }
   @media (prefers-reduced-motion: no-preference) {
     .ch-beat { transition: opacity .5s ease, border-color .5s ease; }
   }
@@ -385,13 +367,13 @@ const allBeats = [...BEATS, BEAT4];
     display: block;
     /* Floor raised from 16px: at 1366x768 the question rendered 15.7px, barely above its own answer. */
     font-family: var(--font-display); font-size: clamp(18px, 1.45vw, 22px); line-height: 1.3;
-    color: var(--c-ink); margin: 0 0 5px;
+    color: var(--panel-ink); margin: 0 0 5px;
   }
   /* MEASURED, and raised on the owner's note that the bullet points read small. Before: 14.5px at 1700x1050,
      12px at 1366x768 — the vw term collapsed it below caption size for the slide's main reading text. The FLOOR
      is what matters, so it goes to 14.5px and the ceiling to 17px. */
   .ch-say {
-    display: block; font-size: clamp(14.5px, 1.08vw, 17px); line-height: 1.62; color: var(--c-soft); margin: 0;
+    display: block; font-size: clamp(14.5px, 1.08vw, 17px); line-height: 1.62; color: var(--panel-soft); margin: 0;
   }
 
   /* THE OBJECT. One stage, three panels stacked in it — only one visible at a time, so the money bar is the
@@ -428,23 +410,23 @@ const allBeats = [...BEATS, BEAT4];
 
   .ch-panel-head {
     font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.14em;
-    color: var(--c-faint); margin: 0 0 12px; text-transform: uppercase;
+    color: var(--panel-faint); margin: 0 0 12px; text-transform: uppercase;
   }
-  .ch-when { color: var(--c-accent); }
+  .ch-when { color: var(--panel-accent); }
   .ch-panel-foot {
-    font-size: clamp(14px, 1.02vw, 16px); line-height: 1.6; color: var(--c-soft);
+    font-size: clamp(14px, 1.02vw, 16px); line-height: 1.6; color: var(--panel-soft);
     margin: clamp(12px, 1.8vh, 18px) 0 0; max-width: 62ch;
   }
   .ch-panel-foot strong {
-    font-family: var(--font-mono); font-weight: 400; color: var(--c-ink); font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono); font-weight: 400; color: var(--panel-ink); font-variant-numeric: tabular-nums;
   }
-  .ch-panel-foot em { font-style: italic; color: var(--c-ink); }
+  .ch-panel-foot em { font-style: italic; color: var(--panel-ink); }
 
   /* THE BAR: one hundred dollars, divided. The whole definition rests on this being obviously ONE thing cut
      into parts rather than four separate things. */
   .ch-bar {
     position: relative; display: block; width: 100%; height: 14px;
-    background: color-mix(in srgb, var(--c-faint) 18%, transparent);
+    background: color-mix(in srgb, var(--panel-faint) 18%, transparent);
     border-radius: 2px; overflow: hidden;
   }
   .ch-bar--big { height: clamp(34px, 4.4vh, 52px); border-radius: 3px; }
@@ -453,14 +435,9 @@ const allBeats = [...BEATS, BEAT4];
   .ch-seg--1 { background: var(--c-h1); }
   .ch-seg--2 { background: var(--c-h2); }
   .ch-seg--3 { background: var(--c-h3); }
-  /* THERE IS NO TRANSITION ON .ch-seg, AND THE COMMENT THAT USED TO BE HERE DESCRIBED ONE THAT COULD NEVER
-     FIRE. It read: "the bar re-dividing between months is the visual of choosing again, so the segments move
-     rather than cut", with `transition: left .6s, width .6s`. But every segment's `left`/`width` is a
-     BUILD-TIME inline style (see the panels at :139/:172/:182/:207) and no script ever writes either — each
-     month is a separate panel that crossfades in, so no segment's geometry ever changes and the transition
-     had nothing to interpolate. Deleted rather than made true: making it real means one persistent bar whose
-     segments are re-measured per month, which is a different slide. The panels crossfade; that is the
-     design. */
+  /* NO TRANSITION ON .ch-seg: every segment's `left`/`width` is a build-time inline style that no script
+     writes, and each month is its own panel that crossfades in, so a transition would have nothing to
+     interpolate. Segments that move would be one persistent, re-measured bar: a different slide. */
 
   .ch-legend {
     list-style: none; margin: clamp(12px, 1.8vh, 18px) 0 0; padding: 0;
@@ -469,12 +446,12 @@ const allBeats = [...BEATS, BEAT4];
   .ch-legend li { display: grid; grid-template-columns: auto auto auto 1fr auto; align-items: center; gap: 0 9px; }
   .ch-swatch { width: 9px; height: 9px; border-radius: 1px; display: block; }
   .ch-glyph { display: block; }
-  .ch-glyph rect { fill: var(--c-faint); }
+  .ch-glyph rect { fill: var(--panel-faint); }
   .ch-money {
-    font-family: var(--font-mono); font-size: 13.5px; color: var(--c-ink); font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono); font-size: 13.5px; color: var(--panel-ink); font-variant-numeric: tabular-nums;
   }
-  .ch-what { font-size: 12.5px; color: var(--c-soft); }
-  .ch-tick { font-family: var(--font-mono); font-size: 9.5px; color: var(--c-faint); letter-spacing: 0.06em; }
+  .ch-what { font-size: 12.5px; color: var(--panel-soft); }
+  .ch-tick { font-family: var(--font-mono); font-size: 9.5px; color: var(--panel-faint); letter-spacing: 0.06em; }
 
   /* BEAT 2: the alternatives, each a bar and a number. */
   .ch-alts { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(9px, 1.4vh, 14px); }
@@ -482,18 +459,18 @@ const allBeats = [...BEATS, BEAT4];
     display: grid; grid-template-columns: 11ch minmax(0, 1fr) 5ch; align-items: center;
     gap: 2px clamp(10px, 1.4vw, 20px);
   }
-  .ch-alt.is-yours .ch-alt-label { color: var(--c-accent); }
-  .ch-alt-label { font-family: var(--font-mono); font-size: 10.5px; color: var(--c-soft); letter-spacing: 0.04em; }
+  .ch-alt.is-yours .ch-alt-label { color: var(--panel-accent); }
+  .ch-alt-label { font-family: var(--font-mono); font-size: 10.5px; color: var(--panel-soft); letter-spacing: 0.04em; }
   .ch-alt-val {
-    font-family: var(--font-mono); font-size: 14px; color: var(--c-ink);
+    font-family: var(--font-mono); font-size: 14px; color: var(--panel-ink);
     font-variant-numeric: tabular-nums; text-align: right;
   }
-  .ch-alt-note { grid-column: 2 / -1; font-size: 11px; line-height: 1.4; color: var(--c-faint); }
+  .ch-alt-note { grid-column: 2 / -1; font-size: 11px; line-height: 1.4; color: var(--panel-faint); }
 
   /* BEAT 3: the same bar, month after month. */
   .ch-months { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(8px, 1.2vh, 12px); }
   .ch-months li { display: grid; grid-template-columns: 4ch minmax(0, 1fr); align-items: center; gap: 0 clamp(10px, 1.4vw, 18px); }
-  .ch-month-label { font-family: var(--font-mono); font-size: 10px; color: var(--c-accent); letter-spacing: 0.06em; }
+  .ch-month-label { font-family: var(--font-mono); font-size: 10px; color: var(--panel-accent); letter-spacing: 0.06em; }
 
   /* BEAT 4: the PnL curves. One shared scale, so the four are comparable — and the winner is the one line at
      full ink, because the beat's claim is that the sequences differ rather than that they are all equal. */
@@ -504,7 +481,7 @@ const allBeats = [...BEATS, BEAT4];
   .ch-panel[data-panel='3'] { display: flex; flex-direction: column; }
   .ch-pnl { width: 100%; flex: 1 1 auto; min-height: clamp(120px, 16vh, 200px); display: block; }
   .ch-pnl-base {
-    stroke: var(--c-faint); stroke-width: 1; stroke-dasharray: 3 5;
+    stroke: var(--panel-faint); stroke-width: 1; stroke-dasharray: 3 5;
     vector-effect: non-scaling-stroke; opacity: 0.55;
   }
   .ch-pnl-line {
@@ -535,24 +512,24 @@ const allBeats = [...BEATS, BEAT4];
   .ch-pnl-head-row { margin-bottom: 2px; }
   .ch-pnl-col {
     font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--c-faint); text-align: right;
+    color: var(--panel-faint); text-align: right;
   }
   /* The legend's line samples: same width as a swatch column, vertically centred on the label's baseline. */
   .ch-key { display: block; align-self: center; overflow: visible; }
-  .ch-pnl-name { font-size: 14.5px; color: var(--c-ink); }
+  .ch-pnl-name { font-size: 14.5px; color: var(--panel-ink); }
   .ch-pnl-end, .ch-pnl-fall, .ch-pnl-exp {
     font-family: var(--font-mono); font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right;
   }
-  .ch-pnl-end { color: var(--c-ink); }
-  .ch-pnl-fall { color: var(--c-faint); }
-  .ch-pnl-exp { color: var(--c-faint); }
+  .ch-pnl-end { color: var(--panel-ink); }
+  .ch-pnl-fall { color: var(--panel-faint); }
+  .ch-pnl-exp { color: var(--panel-faint); }
 
   /* QUARTER MARKS. Fifty-two points is a year only if the year is labelled; without these the x axis is an
      unlabelled sequence and "week 19" means nothing to a reader. Faint enough to sit under the curves. */
-  .ch-pnl-grid { stroke: var(--c-faint); stroke-width: 1; opacity: 0.2; vector-effect: non-scaling-stroke; }
+  .ch-pnl-grid { stroke: var(--panel-faint); stroke-width: 1; opacity: 0.2; vector-effect: non-scaling-stroke; }
   .ch-pnl-axis {
     position: relative; list-style: none; margin: 3px 0 0; padding: 0; height: 12px;
-    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; color: var(--c-faint);
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; color: var(--panel-faint);
     text-transform: uppercase;
   }
   .ch-pnl-axis li { position: absolute; top: 0; transform: translateX(-1px); }
@@ -573,7 +550,7 @@ const allBeats = [...BEATS, BEAT4];
   .ch-pnl-group:first-child { margin-top: 0; }
   .ch-pnl-group-label {
     font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase;
-    color: var(--c-accent);
+    color: var(--panel-accent);
   }
   /* (.ch-pnl-gloss is gone with its element — a per-legend explanatory line under the group label. The
      disclaimer it duplicated is .ch-cap below, which is one sentence for the whole figure rather than one per
@@ -581,7 +558,7 @@ const allBeats = [...BEATS, BEAT4];
 
   .ch-cap {
     /* 10.5px is a footnote size and this is a real disclaimer a reader should be able to read. */
-    font-size: 12px; line-height: 1.5; color: var(--c-faint);
+    font-size: 12px; line-height: 1.5; color: var(--panel-faint);
     margin: clamp(12px, 1.8vh, 20px) 0 0; max-width: 62ch; font-style: italic;
   }
 
@@ -676,6 +653,8 @@ const allBeats = [...BEATS, BEAT4];
 </style>
 
 <script>
+  import { walkBeats, type Beats } from '../scripts/beats';
+
   // THE DEFINITION BUILDS: beat 1, beat 2, beat 3, then it holds and repeats. Sequential because a definition
   // is an ORDER — what a portfolio is, then what optimising means, then what multi-period adds — and showing
   // all three at once is a wall of text that a reader has to sort themselves.
@@ -694,9 +673,7 @@ const allBeats = [...BEATS, BEAT4];
   // just "solve-js", #choice grew from 900px to 1585px, every panel fell back to position: relative and all four
   // stacked at once, and the beat buttons became silent no-ops. solve-js was the survivor precisely because
   // Solve.astro already adds its class inside its init, which re-runs on astro:page-load. This now matches it.
-  function initDefine(): (() => void) | null {
-    const section = document.querySelector<HTMLElement>('#choice');
-    if (!section) return null;
+  function initDefine(section: HTMLElement): Beats | null {
     const beats = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-beat]'));
     const panels = Array.from(section.querySelectorAll<HTMLElement>('[data-panel]'));
     // Nothing to sequence — hand the slide back to its CSS default. Returning before the class is added is why
@@ -704,92 +681,26 @@ const allBeats = [...BEATS, BEAT4];
     if (beats.length !== panels.length || !beats.length) return null;
     document.documentElement.classList.add('define-js');
 
-    const show = (i: number) => {
-      beats.forEach((el, k) => {
-        el.classList.toggle('is-on', k === i);
-        el.setAttribute('aria-pressed', String(k === i));
-      });
-      panels.forEach((el, k) => el.classList.toggle('is-on', k === i));
-    };
-
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      // Finished state: every beat legible, first panel shown. No automatic walk — but the buttons still work,
-      // so a reduced-motion reader gets exactly the same control, just without anything moving on its own.
-      for (const el of beats) el.classList.add('is-on');
-      panels[0].classList.add('is-on');
-      const pickStill = (e: Event) => {
-        const i = beats.indexOf(e.currentTarget as HTMLButtonElement);
-        if (i >= 0) show(i);
-      };
-      for (const b of beats) b.addEventListener('click', pickStill);
-      return () => { for (const b of beats) b.removeEventListener('click', pickStill); };
-    }
-
-    let step = 0;
-    let timer = 0;
-    // FROZEN ONCE CLICKED, and it stays frozen. The owner: "once i clicked it should freeze there (i dont know
-    // if it's wise to add a timer so it starts automatic again) i need time to read."
-    // It is not wise, so there is no resume timer. A timer that restarts is the original complaint in a new
-    // costume: it would pull the slide out from under a reader in the middle of the beat they deliberately
-    // asked for. No interval is both long enough to be safe for a chart that takes a while to read and short
-    // enough to feel automatic. The walk exists to show a reader there is something here; a click says they
-    // already know, and from then on the slide is theirs.
-    let frozen = false;
-
-    const stop = () => { window.clearTimeout(timer); timer = 0; };
-
-    show(0);
-    const advance = () => {
-      step = (step + 1) % beats.length;
-      show(step);
+    return {
+      buttons: beats,
+      show: (i) => {
+        beats.forEach((el, k) => {
+          el.classList.toggle('is-on', k === i);
+          el.setAttribute('aria-pressed', String(k === i));
+        });
+        panels.forEach((el, k) => el.classList.toggle('is-on', k === i));
+      },
+      firstMs: 4600,
       // Hold longest on the last beat: it is the one the slide is named after, and it carries a chart.
-      timer = window.setTimeout(advance, step === beats.length - 1 ? 6200 : 4600);
-    };
-
-    const freeze = (i: number) => {
-      frozen = true;
-      stop();
-      section.dataset.frozen = 'true';
-      step = i;
-      show(i);
-    };
-
-    const pick = (e: Event) => {
-      const i = beats.indexOf(e.currentTarget as HTMLButtonElement);
-      if (i >= 0) freeze(i);
-    };
-    for (const b of beats) b.addEventListener('click', pick);
-
-    // Arrow keys walk the group the way a tablist does, so a keyboard reader need not tab through four buttons
-    // to reach the last beat. Arrowing freezes too — it is just as deliberate as a click.
-    const onKey = (e: KeyboardEvent) => {
-      const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1
-        : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
-      if (!dir) return;
-      e.preventDefault();
-      freeze((step + dir + beats.length) % beats.length);
-      beats[step].focus();
-    };
-    for (const b of beats) b.addEventListener('keydown', onKey);
-
-    const io = new IntersectionObserver((entries) => {
-      const visible = entries.some((e) => e.isIntersecting);
-      if (frozen) return;                        // a reader's choice outranks the observer
-      if (visible && !timer) timer = window.setTimeout(advance, 4600);
-      else if (!visible) stop();
-    }, { threshold: 0.3 });
-    io.observe(section);
-
-    return () => {
-      stop();
-      io.disconnect();
-      for (const b of beats) { b.removeEventListener('click', pick); b.removeEventListener('keydown', onKey); }
+      lastMs: 6200,
+      // Reduced motion: every beat legible, first panel shown, and no walk. A click still picks a beat; the arrow
+      // keys stay the page's here, where Rules and Solve walk their beats with them.
+      still: () => {
+        for (const el of beats) el.classList.add('is-on');
+        panels[0].classList.add('is-on');
+      },
     };
   }
 
-  let teardown: (() => void) | null = null;
-  document.addEventListener('astro:page-load', () => {
-    teardown?.();
-    teardown = initDefine();
-  });
+  walkBeats('#choice', initDefine);
 </script>

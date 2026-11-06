@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import {
   projectStops, projectSectionId, experienceStops, railLabel, homeStops, flattenStops, fragmentId, paperPageOwns, paperSections,
@@ -231,10 +232,8 @@ describe('homeStops', () => {
   const flat = flattenStops(stops);
 
   // Section ids actually rendered by src/pages/index.astro, in document order.
-  // 'work' and 'signature' became ONE section, #appendix: they were separate deck stops, which left 161px of
-  // empty panel below the work and made the final stop a 193px footer strip. The footer is now nested inside the
-  // appendix, so it is not a top-level section and the deck does not stop on it. This list is the guard that
-  // caught the rename — it is the only thing tying the rail's targets to the page's real ids.
+  // This list is the only thing tying the rail's targets to the page's real ids; it caught the rename of 'work' to
+  // 'appendix'.
   const RENDERED = ['heights', 'interlude', 'choice', 'rules', 'solve', 'story', 'appendix'];
 
   it('points every stop at a section the homepage renders', () => {
@@ -267,23 +266,24 @@ describe('homeStops', () => {
     expect(problem!.label.toLowerCase()).not.toBe('choice');
   });
 
-  // TREE ORDER MUST MATCH DOCUMENT ORDER. The scrollspy walks stops as rendered and marks the last one whose
-  // top crossed the reference line; a rail whose order disagrees with the page lights stops out of sequence.
+  // TREE ORDER MUST MATCH DOCUMENT ORDER. railMarks sorts by measured top where it must, but a rail whose rows
+  // disagree with the page reads as a different page, and its marks would step up and down the list.
   it('lists stops in the order the page renders them', () => {
     const positions = flat.map((s) => RENDERED.indexOf(s.target));
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
   });
 
-  // A thin left margin is the constraint that shortened these labels: at "The problem" / "Constraints" the
-  // indented tier measured past the slide's text edge.
-  it('keeps rail labels short enough for an 11px mono margin', () => {
+  // The slides' text starts at the gutter's minimum beside the rail, so these lengths are what keep the labels off
+  // it: 11 characters end at x=162 at most, 8 nested ones at 138 (homeStops has the arithmetic).
+  it('keeps rail labels short enough for the slides’ gutter', () => {
+    const css = readFileSync(new URL('../src/styles/slides.css', import.meta.url), 'utf8');
+    const gutter = Number(/\.slide-gutter \{\s*padding-left: clamp\((\d+)px/.exec(css)?.[1]);
+    // the rail's left at most (38px) + its 30px dash gutter + the label: 8.58px a character, or 7.2px after a 12px indent
+    expect(38 + 30 + 11 * 8.58, 'the gutter').toBeLessThanOrEqual(gutter);
+    expect(38 + 30 + 12 + 8 * 7.2, 'the gutter').toBeLessThanOrEqual(gutter);
     for (const s of stops) expect(s.label.length, s.label).toBeLessThanOrEqual(11);
     for (const c of stops.flatMap((s) => s.children ?? [])) {
       expect(c.label.length, c.label).toBeLessThanOrEqual(8);
     }
-  });
-
-  it('zones every top-level stop, since the label colour follows the sky behind it', () => {
-    for (const s of stops) expect(['light', 'dark']).toContain(s.zone);
   });
 });

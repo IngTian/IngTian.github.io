@@ -1,30 +1,27 @@
 ---
 // Persistent top-right utility nav — surfaces the "reach me" actions
-// (GitHub · Email · CV · LinkedIn) from the very first paint, so a visitor
-// never has to scroll to the foot of the page to make contact (issue #21).
+// (GitHub · Email · CV · LinkedIn) from the very first paint (issue #21). It is
+// the only place on the site they are linked: Email and CV at every width,
+// GitHub and LinkedIn from 1200px.
 //
-// Mirrors the Toc pattern: plain Astro + a bundled vanilla <script> (NOT a
-// React island), re-inits on astro:page-load with a teardown, and adapts its
-// color to the sky beneath it. Where the Toc sits at the viewport MIDDLE and
-// flips per-section, this nav is pinned to the TOP edge — so it flips on the
-// gradient fraction painted directly behind it, dark ink on the pale upper
-// sky → paper once the descent sinks into dusk. Ochre on hover, the site's
-// one interaction accent.
+// Plain Astro + a bundled vanilla <script> (NOT a React island), re-inits on
+// astro:page-load with a teardown, and adapts its color to the sky beneath it.
+// Pinned to the TOP edge, it flips on the gradient fraction painted directly
+// behind it, dark ink on the pale upper sky → paper once the descent sinks
+// into dusk. Ochre on hover, the site's one interaction accent.
 //
 // Hrefs come from profile.ts (the single source of résumé facts); the icons
 // live here (presentation, not content). Built so the deferred light/dark
 // theme toggle drops in as one more item with no restructuring.
 //
-// IT ALSO CARRIES THE SITE'S PAGE SET NOW. The owner: "it might be wiser to add navigations directly on the
-// top right hovering bar, so it's always visible. the click stays an easter egg." Before this the only way to
-// reach /research or /art was the hero tagline — two words in an italic line that a visitor had to guess were
-// links. Real navigation cannot depend on a discovery, so the pages sit here, always visible, and the tagline
-// keeps its quiet marker-wash affordances as the easter egg it was meant to be.
+// IT ALSO CARRIES THE SITE'S PAGE SET. The owner: "it might be wiser to add navigations directly on the
+// top right hovering bar, so it's always visible. the click stays an easter egg." Real navigation cannot
+// depend on a discovery, so the pages sit here, always visible, and the tagline's links stay the easter egg.
 //
 // Pages are TEXT (they are destinations, and a label is what makes them scannable); the contact marks drop to
 // ICON-ONLY above mobile, because eight text items in one capsule would run past a third of the viewport —
 // measured at 1700px before the change. Contact is recognisable by glyph; a page is not.
-import { links } from '../data/profile';
+import { contact } from '../data/profile';
 import { PAGES } from '../data/nav';
 
 interface Props {
@@ -38,37 +35,36 @@ const { navZone = 'scroll' } = Astro.props;
 // The current route, normalised without a trailing slash, so aria-current marks the page you are on.
 const current = Astro.url.pathname.replace(/\/+$/, '') || '/';
 
-// Resolve hrefs from the profile links by label — keeps URLs in one place.
-const href = (label: string) => links.find((l) => l.label === label)?.href ?? '#';
-
-type Item = { key: string; label: string; href: string; external: boolean; icon: string };
+// `profile`: GitHub and LinkedIn, the items that go first when the capsule runs out of room (641-1199px; a phone's
+// list shows all four).
+type Item = { key: string; label: string; href: string; external: boolean; icon: string; profile?: boolean };
 const items: Item[] = [
   {
-    key: 'github', label: 'GitHub', href: href('GitHub'), external: true,
+    key: 'github', ...contact.github, profile: true,
     // GitHub mark (fill, currentColor)
     icon: '<path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>',
   },
   {
-    key: 'email', label: 'Email', href: href('Email'), external: false,
+    key: 'email', ...contact.email,
     // Envelope (stroke, currentColor)
     icon: '<path fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" d="M1.75 3.75h12.5v8.5H1.75z"/><path fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="m2.25 4.25 5.75 4.5 5.75-4.5"/>',
   },
   {
-    key: 'cv', label: 'CV', href: href('Download CV'), external: true,
+    key: 'cv', ...contact.cv,
     // Document with a download arrow (stroke, currentColor)
     icon: '<path fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" d="M3.75 1.75h5l3.5 3.5v9h-8.5z"/><path fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" d="M8 7v4m0 0L6.4 9.4M8 11l1.6-1.6"/>',
   },
   {
-    key: 'linkedin', label: 'LinkedIn', href: href('LinkedIn'), external: true,
+    key: 'linkedin', ...contact.linkedin, profile: true,
     // LinkedIn "in" mark (fill, currentColor)
     icon: '<path fill="currentColor" d="M3.4 5.6H.9V14h2.5V5.6ZM2.15 1A1.45 1.45 0 1 0 2.15 3.9 1.45 1.45 0 0 0 2.15 1ZM14 9.28c0-2.3-1.23-3.37-2.86-3.37-1.32 0-1.91.72-2.24 1.23V5.6H6.4c.03.71 0 8.4 0 8.4h2.5V9.31c0-.22.02-.45.08-.6.18-.45.59-.91 1.28-.91.9 0 1.26.69 1.26 1.69V14H14V9.28Z"/>',
   },
 ];
 ---
 <nav class="cnav" aria-label="Site navigation, contact and profiles" data-cnav data-nav-mode={navZone}>
-  {/* PHONE MENU BUTTON — only rendered visible in nav variant 3 (see the mobile block in <style>). It is a
-      real <button> with aria-expanded/aria-controls so the disclosure is announced; in variants 1 and 2 it is
-      display:none and therefore out of the tab order and the a11y tree entirely. */}
+  {/* PHONE MENU BUTTON — visible only on a phone (the mobile block in <style>). A real <button> with
+      aria-expanded/aria-controls so the disclosure is announced; at every other width it is display:none,
+      and so out of the tab order and the a11y tree. */}
   <button
     type="button"
     class="navmenu"
@@ -100,7 +96,7 @@ const items: Item[] = [
     ))}
     <li class="sep" aria-hidden="true"></li>
     {items.map((it) => (
-      <li class="mark-li">
+      <li class:list={['mark-li', { profile: it.profile }]}>
         <a
           class="mark"
           href={it.href}
@@ -146,7 +142,7 @@ const items: Item[] = [
     position: fixed;
     top: clamp(14px, 2vw, 22px);
     right: clamp(14px, 7vw, 64px);
-    z-index: 40;                 /* above Toc (30) and content */
+    z-index: 40;                 /* above the rail (30) and content */
   }
 
   /* ── The frosted-glass capsule. A rounded, lucid panel the links sit inside
@@ -208,10 +204,9 @@ const items: Item[] = [
   .cnav .toggle { background: none; border: 0; cursor: pointer; -webkit-appearance: none; appearance: none; padding: 9px 12px; }
   .cnav[data-zone="dark"] a, .cnav[data-zone="dark"] .toggle { color: var(--paper); }
 
-  /* ── The phone menu button (variant 3 only). Self-contained rather than folded into the shared item base,
-     so it carries its own frost: when the list is closed this button IS the whole nav, with no <ul> behind it
-     to provide the glass. display:none by default keeps it out of the tab order and the a11y tree everywhere
-     except the variant that uses it. ── */
+  /* ── The phone menu button. Self-contained rather than folded into the shared item base, so it carries
+     its own frost: when the list is closed this button IS the whole nav, with no <ul> behind it to provide
+     the glass. display:none by default keeps it out of the tab order and the a11y tree off a phone. ── */
   .cnav .navmenu {
     display: none;
     position: relative;
@@ -263,7 +258,7 @@ const items: Item[] = [
        46% of 1920   ·   40% of 2200   ·   34.5% of 2560   ·   23% of 3840
      At 1920 it has stopped being a corner affordance and reads as a header bar, so the labels appear from
      2200px up — where the capsule is at most two fifths of the screen and there is still more empty space to
-     its left than capsule. Below that the icons carry the meaning, and every mark is also in the footer.
+     its left than capsule. Below that the icons carry the meaning, and each one's name is its aria-label.
      `unset` rather than re-declaring each property: the hidden state is a clip-path trick with four
      interacting declarations, and undoing them one by one is how one gets left behind. */
   @media (min-width: 2200px) {
@@ -332,28 +327,27 @@ const items: Item[] = [
     100% { transform: translateY(0); }
   }
 
-  /* Narrow: the page WORDS are what must survive (they are the navigation), so the contact marks go first —
-     every one of them is still reachable from the Signature section at the foot of the page.
-     The threshold is 1200px, not 1000: with five pages the full capsule measured 664px, which is 65% of a
-     1024px viewport and 52% of a 1280px one. A nav is a corner affordance, and at two thirds of the width it
-     has stopped being one. Dropping the marks brought it to 512px (50% at 1024). Both are 30px wider since the
-     page links reserve 6px each for the current-page dot (694 and 542px); the reasoning is unchanged. */
-  /* BOTH separators go with the icons, not just the first. Hiding the icon links but keeping the rule on each
-     side of them left a stray double divider with an empty slot between them: measured at 768px, rules at x=646
-     and x=663 with 14px of blank pill between, then the toggle at x=683. It read as a missing button.
-     (A later ≤640px rule also hid .sep, which is why this only showed between 641px and 1199px.) */
-  /* HIDE THE <li>, NOT JUST THE <a> INSIDE IT. `.mark` is the link; its list-item wrapper is a separate
-     element, so hiding only the link left four EMPTY list items still laid out in the capsule. In the flex
-     row that cost 8px of stray gap (invisible, so it went unnoticed for a long time). In a grid it is not
-     invisible at all: the empty items claim four cells, which pushed the theme toggle onto a row of its own
-     and made the capsule 97px tall instead of 61px. Hiding the wrapper removes the items from layout in
-     every form. */
+  /* Narrow: the page WORDS are what must survive (they are the navigation), so the profiles go first and Email
+     and CV stay: they are linked nowhere else on the site. The threshold is 1200px: the full capsule is 693px,
+     68% of a 1024px viewport, and a nav at two thirds of the width has stopped being a corner affordance.
+     Both separators stay, since Email and CV sit between them.
+     HIDE THE <li>, NOT JUST THE <a> INSIDE IT: an empty list item is still a flex item, and costs a gap.
+     FROM 641px THE CAPSULE IS TIGHTER, so it fits one row. At 12px JetBrains Mono (0.6em advance, a fixed-pitch
+     face) plus 0.06em letter-spacing a label character is 7.92px, and the five labels are 36 of them: 285.12px.
+     With the paddings above the capsule is 613.12px, and a 641px window has 596.13px left of the 7vw offset,
+     581.13px beside a classic 15px scrollbar: 17px and 32px over. A page link's right padding 14 → 8 (the
+     left's 20 is the dot's) and a mark's 11 → 8 make it 571.12px, 10px under with the scrollbar and 25px
+     without. Every current-page state is that width: the dot sits in reserved padding, and 600 keeps the
+     advances. */
   @media (max-width: 1199px) {
-    .cnav .mark, .cnav .sep, .cnav .mark-li { display: none; }
+    /* A phone's list keeps all four: it is a column with room for them, and the only link to the profiles there. */
+    @media not all and (max-width: 640px) {
+      .cnav .profile { display: none; }
+      .cnav .page { padding-right: 8px; }
+      .cnav .mark { padding: 9px 8px; }
+    }
   }
 
-  /* Mobile: tighter capsule, and the pages shrink rather than disappear — a phone visitor with no nav at all
-     would be stranded on whichever page they landed on. */
   /* ── ON A PHONE THE NAV IS ONE MARK, AND THE DESTINATIONS ARE A TAP AWAY. ──
      The capsule that works on a desktop cannot work here, and the reason is arithmetic rather than taste: five
      labels plus a theme toggle DO NOT FIT one row at 320px at any font size this design would accept. Every
@@ -379,6 +373,11 @@ const items: Item[] = [
       padding: 4px;
       border-radius: 14px;
       min-width: 148px;
+      /* The open list is ~510px tall (415px measured with two contact rows, plus two more 48px rows), past a
+         landscape phone's screen (640x360), so it scrolls inside itself rather than leave its last rows off the
+         bottom. */
+      max-height: calc(100dvh - 24px);
+      overflow-y: auto;
     }
     /* Open state lives on <html> rather than on the nav, so the page can respond to it too (a future scrim
        would hang off the same attribute) and so the script has one place to look. */
@@ -387,9 +386,15 @@ const items: Item[] = [
     /* SIZED TO APPLE'S 44pt MINIMUM, not to the desktop capsule's proportions. These rows are now the ONLY way
        to navigate on a phone, so a cramped target here is not a cosmetic problem. Measured, not guessed: 9px of
        vertical padding gave 31px rows and 14px gave 41px — both under the guideline. 16px on a 13px line
-       measures 45px, which clears it. */
-    .cnav .page { font-size: 13px; }
-    .cnav a, .cnav .toggle { padding: 16px 13px; }
+       measures 45px, which clears it; Email, CV and the toggle carry a 16px icon, so 48px. (`.cnav .mark` is
+       named because it outranks `.cnav a`.) */
+    .cnav .page, .cnav .mark { font-size: 13px; }
+    .cnav a, .cnav .mark, .cnav .toggle { padding: 16px 13px; }
+    /* GitHub, Email, CV and LinkedIn are rows under the pages, icon and word (the marks' 2200px form), and a
+       hairline sets each group apart: pages, then contact, then the toggle. */
+    .cnav .mark .label { position: unset; width: unset; height: unset; overflow: unset; clip-path: unset; }
+    .cnav .mark .content { gap: 7px; }
+    .cnav .sep { width: auto; height: 1px; margin: 4px 13px; }
   }
 
   /* Reduced motion: no bloom scale / nudge — the pill still appears (instant)
@@ -417,7 +422,8 @@ const items: Item[] = [
   // of the rendered sky shows ink-1 holds AA (≥4.5:1) down to ~0.55 and paper
   // takes over from ~0.57 upward, so flipping here keeps the higher-contrast
   // color on each side. (The lone mid-grey dusk point right at the crossover
-  // sits just under 4.5 for both — the adaptive text-shadow halo covers it.)
+  // sits just under 4.5 for both inks on the bare sky; the capsule's frosted
+  // glass lifts its backdrop there, see the .cnav ul note.)
   const DARK_FROM = 0.57;
 
   let teardown: (() => void) | null = null;
@@ -426,12 +432,8 @@ const items: Item[] = [
     teardown?.();
     teardown = null;
 
-    // ALIASED AFTER THE GUARD, and this is a type fix rather than a style choice. TypeScript does not carry a
-    // const's narrowing into a HOISTED `function` declaration — only into arrow functions — because a hoisted
-    // function could in principle be called before the guard ran. The guard below is real and correct, but the
-    // `function` bodies further down still saw `HTMLElement | null` and `astro check` reported them the first time it
-    // ever ran on this file. Declaring a non-null alias makes the type true at the declaration, so no narrowing
-    // has to survive anything.
+    // ALIASED AFTER THE GUARD: TypeScript does not carry a const's narrowing into a hoisted `function`
+    // (CLAUDE.md, Conventions), so the functions below read a non-null alias.
     const maybeNav = document.querySelector<HTMLElement>('[data-cnav]');
     if (!maybeNav || !('requestAnimationFrame' in window)) return;
     const nav = maybeNav;
@@ -448,17 +450,12 @@ const items: Item[] = [
     // Hoisted to the teardown's scope, not the branch's: the re-measure listener and the content observer must
     // be removable, or every View Transition would stack another observer on the same <main>.
     let onResize: (() => void) | null = null;
-    // Declared OUT here, beside onResize, because the teardown that clears it runs in this scope. It was
-    // declared inside the block that builds the handlers, which typechecks as `Cannot find name` at the
-    // teardown — caught by CI, not locally, because the local check was grepping for "error ts" against
-    // colourised output where ANSI escapes sit between the two words.
+    // Declared OUT here, beside onResize, because the teardown that clears it runs in this scope.
     let navResizeTimer = 0;
     let zoneRO: ResizeObserver | null = null;
     if (mode === 'light' || !descent) {
       nav.dataset.zone = 'light';
     } else {
-      // (The old per-frame `probe()` is gone: it read the nav's rect TWICE on every frame to find a value that
-      // cannot change while scrolling, since the nav is position:fixed. It is now navCenterY, measured once.)
 
       /**
        * Relative luminance of the first OPAQUE thing actually painted behind the nav, or null if the sky is
@@ -474,18 +471,11 @@ const items: Item[] = [
        * and it keeps working when panels move or new ones are added. elementsFromPoint (plural) is used
        * because the nav itself is the topmost thing at that point; its own subtree is skipped.
        */
-      // ── MEASURED ONCE, NOT PER FRAME. This is the fix for a regression I shipped: the owner reported the
-      // slide transitions had become "almost like sluggish" in prod, and this function was why.
-      //
-      // It used to run inside the scroll handler, i.e. on EVERY animation frame of every scroll — and a deck
-      // slide transition is a ~500ms smooth scroll, so every frame of it. Each call did a fresh
-      // querySelectorAll and then interleaved getBoundingClientRect() with getComputedStyle() per element,
-      // which is the textbook layout-thrash pattern: each style read forces the layout the previous rect read
-      // just invalidated. The handler it replaced did one offsetHeight and two rect reads.
-      //
-      // Nothing it measures actually changes while you scroll. A panel's DOCUMENT-space top and bottom and its
-      // background colour are fixed; only scrollY moves. So the measurement is hoisted into measureBackdrops()
-      // and the per-frame path becomes pure arithmetic over a cached array — no DOM reads at all.
+      // ── MEASURED ONCE, NOT PER FRAME. querySelectorAll, then interleaved getBoundingClientRect() and
+      // getComputedStyle() per element, is the textbook layout-thrash pattern; run on every scroll frame it made
+      // the deck's transitions "almost like sluggish" (the owner). Nothing it measures changes while scrolling
+      // (a panel's document-space box and colour are fixed; only scrollY moves), so measureBackdrops() caches it
+      // and the per-frame path is arithmetic with no DOM reads.
       type Band = { top: number; bottom: number; lum: number };
       let bands: Band[] = [];
       let navCenterY = 0;
@@ -499,15 +489,10 @@ const items: Item[] = [
         const vw = window.innerWidth;
         const sy = window.scrollY;
         const next: Band[] = [];
-        // GEOMETRY, NOT HIT-TESTING. document.elementsFromPoint looked like the obvious tool and is the wrong
-        // one: it SKIPS every element with pointer-events: none, which is precisely what all of this site's
-        // decorative sky layers are (the fluid-sky canvas, the atmosphere washes, the hero legibility band).
-        // On the homepage — main.descent.is-fluid, where the sky is PAINTED BY A CANVAS and .descent's own
-        // background-color is the opaque dark base — hit-testing therefore walked straight past the visible
-        // dawn sky and reported `rgb(22,20,15)`, flipping the light theme's nav to dark glass over its own
-        // pale hero. Measured 3.09:1 at 10% of scroll on desktop: a regression I introduced while fixing the
-        // phone, and the reason this function now asks a different question.
-        // The question it asks: is a FULL-BLEED OPAQUE PANEL covering the nav's line right now? Those are the
+        // GEOMETRY, NOT HIT-TESTING. document.elementsFromPoint SKIPS every element with pointer-events: none,
+        // which is what all the decorative sky layers are, so on the homepage it walked past the canvas-painted
+        // dawn sky to .descent's opaque dark base and flipped the light nav to dark glass over the pale hero
+        // (measured 3.09:1). The question it asks instead: is a FULL-BLEED OPAQUE PANEL covering the nav's line right now? Those are the
         // only things that hide the sky, they are always `main > section > <block>`, and their boxes are
         // ordinary geometry that no pointer-events value can hide. Anything else means the sky is what shows,
         // and the descent-fraction proxy below is the right model for a sky whose colour varies with depth.
@@ -552,15 +537,9 @@ const items: Item[] = [
         ticking = true;
         requestAnimationFrame(() => { update(); ticking = false; });
       };
-      // RESIZE RE-MEASURES; SCROLL DOES NOT. Previously both events ran the same handler, which is how the
-      // measurement ended up in the scroll path in the first place.
-      // AND IT IS DEBOUNCED, at the 160ms this codebase already uses elsewhere. `measureBackdrops()` is what
-      // the comment at its own definition calls "the textbook layout-thrash pattern" — querySelectorAll, then
-      // interleaved getBoundingClientRect() and getComputedStyle(). Hoisting it out of the SCROLL path was
-      // the important fix and it was done; the resize path was simply never given the same treatment, so a
-      // window drag thrashed layout once per event.
-      // Declared here but cleared in the teardown below — a pending 160ms callback that fires after a
-      // View Transition would run measureBackdrops() against a document ClientRouter has already replaced.
+      // RESIZE RE-MEASURES; SCROLL DOES NOT. Debounced at 160ms, as elsewhere, or a window drag thrashes
+      // layout once per event. Cleared in the teardown below: a pending callback after a View Transition would
+      // measure a document ClientRouter has already replaced.
       onResize = () => {
         window.clearTimeout(navResizeTimer);
         navResizeTimer = window.setTimeout(() => { measureBackdrops(); onScroll?.(); }, 160);
@@ -599,50 +578,32 @@ const items: Item[] = [
       syncToggle();
     }
 
-    // Its listeners are the JS-painted surfaces (CLAUDE.md, Themes). TerrainHero and FluidSky also read the palette
-    // per frame; DescentPath, DraftingField and Gallery repaint ONLY on this event. TerrainHero, DescentPath and
+    // Its listeners are the JS-painted surfaces (CLAUDE.md, Themes), and it is the only way a theme change reaches
+    // them: none observes the attribute or re-reads it per frame. TerrainHero, DescentPath and
     // FluidSky add theirs at module level and never remove it, so after a ClientRouter visit to `/` they still fire
     // elsewhere and return when their canvas is absent. A PerformanceObserver check across a flip on `/` reports no
     // long task (worst rAF gap 34ms, one frame of the hero's own 30fps throttle).
     function repaintForTheme() {
       // A DEDICATED EVENT, never astro:page-load: re-firing that re-runs every page script's init (the deck's
-      // re-measure, the Toc's observers, the beat steppers, the cow), none of which a colour change affects. Isolated
+      // re-measure, the rail, the beat steppers, the cow), none of which a colour change affects. Isolated
       // by measurement: 357ms of long task on the homepage against 55ms on /404, and unchanged when the View
       // Transition was disabled, so the cost was always this re-init and never the transition.
       document.dispatchEvent(new Event('theme:change'));
     }
 
     function onToggle() {
-      // AN INSTANT FLIP, DELIBERATELY — the View Transition this used to wrap was the glitch.
-      //
-      // It read: "the whole site (gradient, text, canvas) dissolves from one theme to the other." The
-      // canvas half was never true. During a View Transition the compositor shows SNAPSHOT
-      // pseudo-elements rather than the live page, and in real Chrome with GPU rasterisation the
-      // GPU-backed canvases do not make it into those snapshots. So for 500ms the page showed the
-      // --descent-grad gradient ALONE — a warm-paper gradient blending to a near-black one passes
-      // through a flat grey — with no sky and no terrain dots over it. The owner's screen recording
-      // shows the hero's dots absent for the whole transition and returning at ~0.63s, which is exactly
-      // when the 0.5s crossfade ends.
-      //
-      // Three things make the diagnosis solid rather than a guess: that timing coincidence; a per-frame
-      // probe showing the LIVE canvas never blanks across a flip (ink steady at 118 -> 133 px), so what
-      // was on screen was never the canvas; and the fact that it reproduces on main but NOT headless,
-      // where software rendering does capture canvases into snapshots. That last point is why two
-      // earlier investigations from this machine found nothing.
-      //
-      // The flip is clean without it because both canvases now read their palette EVERY FRAME —
-      // FluidSky always did (uDark off dataset.theme) and TerrainHero was changed to. Measured: text,
-      // sky and terrain all cross at +29ms, spread 0ms.
-      //
-      // IF THE DISSOLVE IS WANTED BACK, do it as a JS palette crossfade — lerp both canvases' ramps
-      // over ~500ms alongside the CSS — which per-frame reading makes possible and a snapshot never did.
-      // Do not reach for startViewTransition again on a page whose background is a canvas.
+      // AN INSTANT FLIP, DELIBERATELY: NO VIEW TRANSITION. A View Transition shows SNAPSHOTS, and in real
+      // Chrome with GPU rasterisation the canvases are absent from them, so a 0.5s crossfade showed the bare
+      // --descent-grad (a flat grey) with no sky and no terrain dots. Headless Chrome's software rendering does
+      // capture canvases, so it does not reproduce there. repaintForTheme() re-inits both canvases in the same
+      // task as the attribute flip: text, sky and terrain cross at +29ms, spread 0ms. If a dissolve is wanted,
+      // lerp the canvases' ramps in JS alongside the CSS; never startViewTransition over a canvas.
       flipTheme();
       repaintForTheme();
     }
     toggle?.addEventListener('click', onToggle);
 
-    // ── PHONE MENU (variant 3). The button and the list are one disclosure: opening swaps the ☰ for the list,
+    // ── PHONE MENU. The button and the list are one disclosure: opening swaps the ☰ for the list,
     // so the two are never on screen together and the capsule never grows a second row.
     const menu = nav.querySelector<HTMLButtonElement>('[data-nav-menu]');
     function setOpen(open: boolean): void {

@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { deckStops, nextStop, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide } from '../src/lib/deck';
+import { deckStops, nextStop, wheelAction, WHEEL_THRESHOLD, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide } from '../src/lib/deck';
 
-// The real homepage geometry, measured in Chrome at 1700x1050. These numbers are the reason the deck
-// is not CSS scroll-snap: every gap between slides is 1.8x-7.3x a single ~320px wheel gesture, so
-// mandatory snap re-snapped backwards and the page froze at y=84.
+// A REPRESENTATIVE mixed-height page, not today's: the homepage's geometry as measured in Chrome at 1700x1050
+// when the deck was built, six slides in an earlier order (the labels name them). What it holds is the mix of
+// slides that fit and slides that need interior stops, and gaps 1.8x-7.3x a single ~320px wheel gesture,
+// which is why the deck is not CSS scroll-snap.
 const VH = 1050;
 const HOME: DeckSlide[] = [
   { top: 0, height: 1134 },     // heights   — 1.08vh, just over one screen
@@ -197,49 +198,7 @@ describe('nextStop', () => {
   });
 });
 
-// The `lead` is BREATHING AIR above a slide's resting position. It exists because scroll-margin-top is
-// only honoured by scrollIntoView() and the deck moves with window.scrollTo() — so the CSS rule that
-// looked like it provided this air did nothing, and the paper panel's title came to rest hard against
-// the browser chrome.
-describe('deckStops with a lead (breathing air above the stop)', () => {
-  it('places the stop above the slide top by the lead', () => {
-    expect(deckStops([{ top: 1000, height: 500, lead: 60 }], 1000, 5000)).toEqual([940]);
-  });
-
-  it('never produces a negative stop, even when the first slide asks for a lead', () => {
-    const stops = deckStops([{ top: 0, height: 500, lead: 60 }], 1000, 5000);
-    for (const s of stops) expect(s).toBeGreaterThanOrEqual(0);
-  });
-
-  it('treats the lead as occupying screen when deciding whether to page a slide', () => {
-    // 1000px slide in a 1000px viewport fits — but with 300px of air above it no longer does, so
-    // paging must kick in or the bottom 300px would be unreachable at any stop.
-    const noLead = deckStops([{ top: 0, height: 1000 }], 1000, 5000);
-    const withLead = deckStops([{ top: 500, height: 1000, lead: 300 }], 1000, 5000);
-    expect(noLead.length).toBe(1);
-    expect(withLead.length).toBeGreaterThan(1);
-  });
-
-  it('still bottom-aligns the last stop of a tall slide, with no lead eating the final screen', () => {
-    const stops = deckStops([{ top: 0, height: 2500, lead: 60 }], 1000, 5000);
-    expect(stops[stops.length - 1]).toBe(1500);   // top + height - vh, unaffected by the lead
-  });
-
-  it('keeps full coverage of a tall slide when a lead is applied', () => {
-    const H = 2600, VP = 1000, TOP = 400, LEAD = 60;
-    const stops = deckStops([{ top: TOP, height: H, lead: LEAD }], VP, 9000);
-    for (let i = 1; i < stops.length; i++) {
-      expect(stops[i]).toBeLessThan(stops[i - 1] + VP);   // consecutive screens overlap
-    }
-    expect(stops[stops.length - 1] + VP).toBeGreaterThanOrEqual(TOP + H);
-  });
-
-  it('defaults to no lead when the field is absent', () => {
-    expect(deckStops([{ top: 800, height: 400 }], 1000, 5000)).toEqual([800]);
-  });
-});
-
-describe('the real homepage geometry', () => {
+describe('a mixed-height page (HOME)', () => {
   const stops = deckStops(HOME, VH, MAX_Y);
 
   it('produces more stops than slides, because two slides need paging', () => {
@@ -257,7 +216,7 @@ describe('the real homepage geometry', () => {
 
   it('never skips a full screen of content in one advance', () => {
     // The bound that actually protects the reading: no gesture may leap more than a screen of TEXT.
-    // Slides carrying prose (story, mountains) are paged, so their internal steps stay under a screen.
+    // The two tall prose slides (HOME[2], HOME[3]) are paged, so their internal steps stay under a screen.
     const prose = deckStops([HOME[2], HOME[3]], VH, MAX_Y);
     for (let i = 1; i < prose.length; i++) {
       expect(prose[i] - prose[i - 1]).toBeLessThanOrEqual(VH);
@@ -334,5 +293,32 @@ describe('deck transition easing', () => {
     // frames at low velocity and the same distance has to be covered in the middle.
     expect(DECK_TWEEN_MS).toBeGreaterThanOrEqual(450);
     expect(DECK_TWEEN_MS).toBeLessThanOrEqual(900);
+  });
+});
+
+/**
+ * ONE WHEEL EVENT. The wiring (popstate and hashchange set the deck yielding; the tween is cancelled) can only be
+ * seen in a browser; this holds the decision every wheel event goes through.
+ */
+describe('wheelAction', () => {
+  const STOPS = [0, 1000, 2000];
+
+  it('never starts a slide while one is live: moving, still streaming, or a jump the deck did not start', () => {
+    for (const travel of [-400, -6, 6, 40, 400]) {
+      for (const y of [0, 1000, 2000]) expect(wheelAction(travel, true, STOPS, y)).toBe('swallow');
+    }
+  });
+
+  it('swallows a gesture under the threshold rather than passing it, so the rest of it stays cancelable', () => {
+    expect(wheelAction(6, false, STOPS, 1000)).toBe('swallow');
+    expect(wheelAction(-6, false, STOPS, 1000)).toBe('swallow');
+    expect(wheelAction(WHEEL_THRESHOLD - 0.1, false, STOPS, 1000)).toBe('swallow');
+    expect(wheelAction(WHEEL_THRESHOLD, false, STOPS, 1000)).toBe('start');
+    expect(wheelAction(-WHEEL_THRESHOLD, false, STOPS, 1000)).toBe('start');
+  });
+
+  it("passes at an end, small or not, so the page's ends never feel locked", () => {
+    for (const travel of [6, 40]) expect(wheelAction(travel, false, STOPS, 2000)).toBe('pass');
+    for (const travel of [-6, -40]) expect(wheelAction(travel, false, STOPS, 0)).toBe('pass');
   });
 });

@@ -2,17 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { humanCount } from '../src/lib/problemSize';
 import { FUND } from '../src/data/desk';
 
-// WHY THIS FILE SHRANK. It used to cover singlePeriodVars / multiPeriodVars / scaleFactor /
-// log10Combinations as well. Those computed the difficulty slide's numbers a second time. A test suite that is
-// green on arithmetic nothing renders is a liability: it makes the unused copy look load-bearing, and it
-// invites the next edit into the wrong module. So the duplicate half went with its subject.
-//   That reasoning then ate its own tail, which is the part worth recording. This comment said "the slide
-// reads lib/complexity.ts (decisionVariables, scenarioLeaves, rulePairs), and tests/complexity.test.ts guards
-// those" — but the difficulty slide's tally draft was replaced by the conflict web, so the first two stopped
-// being rendered, became exports whose only caller was their own spec, and were deleted by the dead-export
-// sweep. `rulePairs` is the one that is still both rendered and guarded.
-//
-// The declared-sizes block below stays here even though FUND lives in data/desk.ts, because what it guards is
+// humanCount is the one export of lib/problemSize.ts. The declared-sizes block below stays here even though
+// FUND lives in data/desk.ts, because what it guards is
 // the same thing humanCount serves: the figures Rules.astro prints in its copy. If FUND.tickers ever dropped
 // below a thousand, the page's sentence "thousands of tickers" would become false while every other test
 // stayed green.
@@ -49,14 +40,13 @@ describe('the declared problem sizes', () => {
   it('the real problem is thousands of tickers and thousands of constraints, as claimed', () => {
     expect(FUND.tickers).toBeGreaterThanOrEqual(1000);
     expect(FUND.constraints).toBeGreaterThanOrEqual(1000);
-    expect(FUND.periods).toBeGreaterThan(1);
   });
 
-  // FUND once carried `aum` and `drawdownLimit` too. Nothing read either one: the $1B figure and the 8%
-  // drawdown limit reach the page as prose inside CONSTRAINTS, which is where a reader meets them. A second,
-  // unread copy of a number is how two versions of the same fact end up on one page, so only the read fields
-  // are declared now — and this asserts that, so a reintroduced field has to come with a reader.
+  // The $1B figure and the 8% drawdown limit reach the page as prose inside CONSTRAINTS, which is where a
+  // reader meets them. A second, unread copy of a number is how two versions of the same fact end up on one
+  // page, so only the read fields are declared — and this asserts that, so a new field has to come with a
+  // reader.
   it('declares only the figures something actually reads', () => {
-    expect(Object.keys(FUND).sort()).toEqual(['constraints', 'periods', 'tickers']);
+    expect(Object.keys(FUND).sort()).toEqual(['constraints', 'tickers']);
   });
 });

@@ -1,6 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { readdirSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { KINDS, sorted, totalEntries, kindSectionId, entrySectionId, type WritingKind, type WritingEntry } from '../src/data/writing';
 import { writingStops, flattenStops } from '../src/lib/pageStops';
 import { PAGES } from '../src/data/nav';
@@ -128,16 +126,8 @@ describe('writingStops', () => {
   });
 });
 
+// That /writing is built is distSmoke's route census; that the nav carries it is the test below.
 describe('the route is wired up', () => {
-  it('exists as a page', () => {
-    const pages = readdirSync(resolve(import.meta.dirname, '../src/pages'));
-    expect(pages).toContain('writing.astro');
-  });
-
-  it('is reachable from the always-visible nav', () => {
-    expect(PAGES.map((p) => p.href)).toContain('/writing');
-  });
-
   // The split only makes sense if the two are adjacent and in this order: the papers, then the thinking around
   // them. If someone reorders the nav, that should be a decision rather than an accident.
   it('sits directly after /research', () => {

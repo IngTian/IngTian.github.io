@@ -4,11 +4,11 @@
 // The owner's brief: "like a PPT, one scroll guides you to the next slide. It's not a free scroll."
 //
 // WHY THIS IS NOT CSS SCROLL-SNAP. That was tried first and MEASURED, because it is the cheap answer
-// and it looked like it should work. It cannot, at this page's proportions:
+// and it looked like it should work. It cannot, at this page's proportions (measured at 1700x1050 on an
+// earlier slide order; the arithmetic, not the order, is the point):
 //
-//   slide gaps (1700x1050):  heights→interlude 1134px   interlude→story 819px
-//                            story→mountains  2279px   mountains→ground 2346px
-//   one wheel gesture:       ~320px  — i.e. every gap is 1.8x to 7.3x a single scroll
+//   slide gaps:          581px to 2346px
+//   one wheel gesture:   ~320px  — i.e. every gap is 1.8x to 7.3x a single scroll
 //
 // With `scroll-snap-type: y mandatory`, one gesture proposes a destination ~320px away, and the
 // nearest snap position to that destination is the slide it just left — so the browser snaps back and
@@ -22,9 +22,9 @@
 // stops are and WHICH one comes next — kept separate from the event plumbing so it can be unit-tested
 // (the project's rule: anything non-trivial in lib/ gets a spec).
 //
-// TALL SLIDES ARE THE HARD CASE and the reason a naive "scroll to the next section" fails. Two slides
-// are more than two viewports of text (story 2.17vh, mountains 2.23vh). Jumping straight from their
-// top to the next section would skip most of the writing unread. Instead a tall slide gets INTERIOR
+// TALL SLIDES ARE THE HARD CASE and the reason a naive "scroll to the next section" fails. A slide can
+// hold more than a viewport of text (Story does). Jumping straight from its top to the next section
+// would skip most of the writing unread. Instead a tall slide gets INTERIOR
 // stops, one viewport apart, so the deck pages through it — the reader always advances by exactly one
 // screen, and never lands somewhere that hides content.
 
@@ -33,15 +33,6 @@ export interface DeckSlide {
   top: number;
   /** Slide height in px. */
   height: number;
-  /**
-   * Breathing air above the slide when the deck rests on it, in px. The stop is placed this far ABOVE
-   * the slide's top edge, so the content opens with space rather than flush against the browser chrome.
-   *
-   * This lives here rather than in CSS because `scroll-margin-top` is only honoured by
-   * scrollIntoView(), and the deck moves with window.scrollTo() — so a CSS rule looked correct, did
-   * nothing, and the panel title came to rest hard against the top of the window.
-   */
-  lead?: number;
 }
 
 /**
@@ -76,15 +67,10 @@ export function deckStops(
   const out: number[] = [];
 
   for (const s of slides) {
-    // The stop sits `lead` px above the slide's top, so the slide opens with air. The interior paging
-    // below is measured from this same lifted origin, which keeps the last stop's bottom-alignment
-    // honest — otherwise the lead would eat a strip of the final screen.
-    const lead = s.lead ?? 0;
-    const origin = s.top - lead;
-    out.push(origin);
+    out.push(s.top);
     // Slightly-too-tall slides are left as a single stop: the sliver below the fold costs less than a
-    // stop that advances by a sliver. The lead counts toward the height, since it occupies screen too.
-    if (s.height + lead <= vh + minAdvance) continue;
+    // stop that advances by a sliver.
+    if (s.height <= vh + minAdvance) continue;
     // Interior stops, a (slightly overlapped) viewport apart. The overlap keeps a couple of lines of
     // the previous screen visible, so a paragraph broken across two stops stays readable.
     //
@@ -93,10 +79,10 @@ export function deckStops(
     // stop. A fixed stride broke the coverage guarantee: for a 3000px slide in a 1000px viewport it
     // produced 0, 920, 2000 — a 1080px jump across which 80px of content is visible at no stop at all.
     const lastUseful = s.top + s.height - vh;
-    const span = lastUseful - origin;
+    const span = lastUseful - s.top;
     const legs = Math.max(1, Math.ceil(span / step));
     const stride = span / legs;
-    for (let k = 1; k < legs; k++) out.push(origin + stride * k);
+    for (let k = 1; k < legs; k++) out.push(s.top + stride * k);
     // Align the slide's bottom edge to the viewport bottom.
     out.push(lastUseful);
   }
@@ -176,4 +162,31 @@ export const DECK_TWEEN_MS = 650;
 export function easeInOutCubic(t: number): number {
   const p = t <= 0 ? 0 : t >= 1 ? 1 : t;
   return p < 0.5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2;
+}
+
+/** Wheel travel, in px, a gesture must cover before it moves a slide: less is a brush of the trackpad. */
+export const WHEEL_THRESHOLD = 18;
+
+/**
+ * What the deck does with one wheel event: 'start' a slide, 'swallow' it (preventDefault, move nothing), or
+ * 'pass' it to the browser's own scroll.
+ *
+ * - `live`: a slide is moving, the gesture that started it is still streaming, or the browser is running a
+ *   jump the deck did not start (a rail link, an #anchor). Everything is swallowed then, so leftover momentum
+ *   cannot advance a slide the reader did not ask for, and a wheel during a jump cannot cut it short.
+ * - `travel`: the gesture's travel so far, this event included, signed. Under the threshold it is swallowed,
+ *   NOT passed: Chrome lets a gesture's events be cancelled only if its first one was. Measured on a phased
+ *   trackpad gesture when the deck passed a small opener: [6.2px cancelable, 70 not, 43.1 not, 30.7 not], so
+ *   the rest of the gesture, momentum included, scrolled natively under the deck's tween.
+ * - At an end (no stop in travel's direction) it passes, so the page's ends never feel locked.
+ */
+export function wheelAction(
+  travel: number,
+  live: boolean,
+  stops: readonly number[],
+  y: number,
+): 'start' | 'swallow' | 'pass' {
+  if (live) return 'swallow';
+  if (nextStop(stops, y, travel > 0 ? 1 : -1) === null) return 'pass';
+  return Math.abs(travel) < WHEEL_THRESHOLD ? 'swallow' : 'start';
 }

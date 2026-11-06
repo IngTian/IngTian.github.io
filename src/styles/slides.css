@@ -1,0 +1,33 @@
+/* THE HOMEPAGE'S PAPER PANEL: the opaque full-bleed ground that Choice, Rules, Solve, Story and Work each hang their
+   content on (class="slide-paper"), and the gutter that content sits in (class="slide-gutter"). Set once, and
+   imported only by pages/index.astro, the one page with panels. global.css's `.is-slides > section > .slide-paper`
+   gives the panel its flex fill and its nav clearance; each slide's own class keeps its vertical padding and any
+   colour only it draws (Choice's charts, Story's graph lines).
+
+   The ground follows the theme, on every panel: a slide kept dark in the light theme read as a bug, not as emphasis
+   (CLAUDE.md, Rejected). Light is a toned printing stock, not bright paper. Past the Interlude the sky is already
+   warm-dark (measured at the seam: rgb(115,115,123), luminance 0.173), so a bright #efe7d8 panel (0.805) snapped
+   back to full light there, 3.8:1 against the sky; #c4b7a1 (0.482) is 2.4:1, with the ink at 8.7:1. Dark is a slate a shade
+   above --bg, so the panel is felt rather than seen.
+
+   The ground and inks are the panel's own, never the global ramp (--paper, --ink-*): --paper is the sky's text
+   colour, and the ramp's light inks, chosen for the dark sky, vanish on the tan. DescentPath's canvas reads them
+   too. PlushCow's dark bubble repeats --panel-bg as a literal, because a cow can sit on no panel (/404). */
+.slide-paper {
+  --panel-bg: #c4b7a1; --panel-edge: rgba(74,66,54,0.26); --panel-ink: #1f1b14;
+  --panel-soft: #423b30; --panel-faint: #6a6153; --panel-accent: #7c5522;
+  background: var(--panel-bg);
+  border-top: 1px solid var(--panel-edge); border-bottom: 1px solid var(--panel-edge);
+}
+html[data-theme='dark'] .slide-paper {
+  --panel-bg: #14161a; --panel-edge: rgba(184,177,161,0.14); --panel-ink: #dce1dc;
+  --panel-soft: #a8b0a9; --panel-faint: #6d746e; --panel-accent: #7fc9a0;
+}
+
+/* Clears the fixed rail (SideRail), whose widest label ends at x=145 at most (lib/pageStops' homeStops has the
+   arithmetic, and tests/pageStops.test.ts reads the 168 here). The rail hides at 1100px and below, and the gutter
+   goes with it, on the same query (tests/viewport.test.ts holds the two together). */
+.slide-gutter {
+  padding-left: clamp(168px, 10.4vw, 200px); padding-right: clamp(20px, 2.4vw, 52px); box-sizing: border-box;
+}
+@media (max-width: 1100px) { .slide-gutter { padding-left: clamp(28px, 6vw, 80px); } }

@@ -127,10 +127,7 @@ describe('every computed picture', () => {
         expect(all.filter((f) => f !== 'var(--ink-1)' && f !== 'var(--ink-3)')).toEqual([]);
       });
 
-      it('prints no CJK text, and only characters the mono subset can draw', () => {
-        // the CJK block, /[U+3000-U+9FFF]/: these pictures are drawn from TEXT the site sets, so the text rule holds
-        // (a capture of a work is a picture, and keeps what it shows; see CLAUDE.md, The concept)
-        expect(svg).not.toMatch(/[\u3000-\u9fff]/);
+      it('prints only characters the mono subset can draw', () => {
         // the class tests/projectsListing.test.ts reads from the vendored woff2's cmap — no arrows, no emoji
         expect(printed(svg)).toMatch(/^[\x20-\x7e\xa0-\xff–—‘’“”•…\n]*$/);
       });

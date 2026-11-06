@@ -15,20 +15,12 @@
 
 // ── Duration ─────────────────────────────────────────────────────────────────────────────────────
 //
-// 5200ms, JUDGED ON THE REAL PAGE AT FULL VIEWPORT — the owner's verdict on this version was "just
-// perfect". It arrived there in two steps, and both are worth keeping because they point opposite ways.
-// 3600ms was chosen first, from 320px-tall prototypes in a browser panel, with a note that a full-bleed
-// hero is a much larger object and large objects read as slower, so it might want to come DOWN toward
-// 3000ms. Seen at full size the answer was the other direction: once the beats were separated (see
-// Phases) each one needed room, and 1.44x the duration is what let the background, the lines, the relief
-// and the dots each read as its own event. The mockup's instinct was backwards, which is the case for
-// judging this on the page rather than in a panel.
+// 5200ms, JUDGED ON THE REAL PAGE AT FULL VIEWPORT (the owner: "just perfect"). Small prototypes had
+// predicted ~3000ms; once the beats were separated (see Phases) each one needed room. Judge it on the page.
 //
-// A duration this long is affordable for one specific reason: the hero text is NOT part of this
-// animation. It keeps its own tuned 1.4s arrival and is untouched, so the intro adds zero milliseconds
-// to the first thing a visitor came to read — and the H1 is this page's measured LCP element. A `?seq=1`
-// spike that held the text until the landing was built and deleted for exactly that reason. If the text
-// is ever folded in, this number must come down with it.
+// A duration this long is affordable because the hero text is NOT part of it: the text keeps its own 1.4s
+// arrival, and the H1 is this page's measured LCP element. (A `?seq=1` spike that held the text until the
+// landing was deleted for that reason.) If the text is ever folded in, this number must come down with it.
 export const INTRO_DURATION_MS = 5200;
 
 /** Clamp bounds for the URL override. Below the floor the animation is a flicker; above the ceiling the
@@ -42,16 +34,10 @@ export const INTRO_DUR_MAX_MS = 20000;
 // animation coherently and the phases keep their relationships — which is what makes the owner's tuning
 // pass one number instead of seven.
 //
-// FOUR BEATS, IN ORDER — ground, then lines, then relief, then substance.
+// FOUR BEATS, IN ORDER — ground, then lines, then relief, then substance — on the owner's note: "give it
+// a clear phase to draw the background. then we draw the line, and so on." (A fused version was rejected.)
 //
-// This replaced a structure where everything overlapped heavily. That was the right answer when the
-// risk was a plateau (a strict sequence had read as three disconnected events, and an earlier schedule
-// left a measured 620ms frozen frame), but the owner asked for the opposite once it was on the real
-// page: "give it a clear phase to draw the background. then we draw the line, and so on." So the beats
-// are now legible in sequence rather than fused into one gesture.
-//
-// Each handoff still OVERLAPS by a few hundredths, which is not a contradiction: distinct beats must
-// not mean dead air between them. `tests/introTimeline.test.ts` enforces both ends of that — the
+// Each handoff still OVERLAPS by a few hundredths: distinct beats must not mean dead air between them. `tests/introTimeline.test.ts` enforces both ends of that — the
 // no-plateau test fails if any 150ms window goes quiet, and the ordering tests fail if a beat starts
 // before the one it should follow.
 //
@@ -60,16 +46,12 @@ export const INTRO_DUR_MAX_MS = 20000;
 export const INTRO_PHASES = {
   /**
    * BEAT 1 — the ground. The sky resolves from one flat tone to its full gradient, ALONE: no line, no
-   * dot, nothing else moving. This is the phase the owner asked to exist; previously the background's
-   * resolve ran underneath everything else and so read as no beat at all.
+   * dot, nothing else moving.
    */
   skyEnd: 0.20,
-  /** BEAT 2 — the survey. Lines begin as the ground settles, and get ~2x the time they had. */
+  /** BEAT 2 — the survey. Lines begin as the ground settles. */
   surveyStart: 0.17,
-  /**
-   * The contour map finishes drawing. Was 0.40 of 3600ms (1440ms); now 0.62 of 5200ms (3224ms), which
-   * is the "lines animation is a little bit too fast" note — slightly over double.
-   */
+  /** The contour map finishes drawing: 3224ms at 5200 (the owner found 1440ms "a little bit too fast"). */
   surveyEnd: 0.62,
   /** BEAT 3 — the relief. The surface rises out of the map, carrying the lines with it. */
   liftStart: 0.52,
@@ -90,15 +72,8 @@ export const INTRO_PHASES = {
  *
  * The map draws as a sequence of passes rather than nine lines appearing together, which is what reads
  * as "surveyed". With nine levels at 0.05 the last one starts at 0.40 of the phase and gets the
- * remaining 0.60 to finish, so every level lands exactly at `surveyEnd` — see `surveyProgress`.
- *
- * THIS USED TO BE THREE INLINE LITERALS IN TerrainHero'S DRAW CALL (0.05, 0.45 and a 1.6 alpha ramp),
- * which broke two project rules at once and shipped a visible bug. It put phase boundaries somewhere
- * the spec's tunability requirement forbids ("no phase boundary is an inline literal buried in a draw
- * call") and somewhere no test could reach — so when the schedule made the survey finish at t≈0.19
- * instead of 0.40, leaving a ~620ms frozen frame before the lift became perceptible, this module's own
- * `survey` channel went on rising innocently and the suite saw nothing. The no-plateau test now
- * measures what is actually drawn.
+ * remaining 0.60 to finish, so every level lands exactly at `surveyEnd` — see `surveyProgress`. It is
+ * here rather than in TerrainHero's draw call so the no-plateau test measures what is actually drawn.
  */
 export const INTRO_SURVEY_STAGGER = 0.05;
 
@@ -139,8 +114,7 @@ const outQuad = (t: number): number => {
  * **At t=1 this returns exactly the hero's resting state** — `lift: 1, dots: 1, contourAlpha: 0` — and
  * that is load-bearing, not incidental. `TerrainHero` paints the intro and then falls through to its
  * live loop, which ramps breath up from the static frame over `BREATH_IN_MS`. That ramp is only the
- * right continuation if the intro finished where the static frame is. Getting an analogous handoff
- * wrong has already shipped a ±8.8px jump in this component once.
+ * right continuation if the intro finished where the static frame is.
  */
 export function introFrame(t: number): IntroFrame {
   const u = clamp01(t);
@@ -153,10 +127,8 @@ export function introFrame(t: number): IntroFrame {
     sky: 1 - smoother(phase(u, 0, INTRO_PHASES.skyEnd)),
     lift: smoother(phase(u, INTRO_PHASES.liftStart, INTRO_PHASES.liftEnd)),
     dots: smoother(phase(u, INTRO_PHASES.dotsStart, INTRO_PHASES.dotsEnd)),
-    // smootherstep, not out-cubic. Out-cubic's maximum velocity is exactly AT the join, so the lines
-    // went from perfectly steady to shedding opacity fast in a single frame — a derivative
-    // discontinuity, invisible to a step test and inconsistent with the zero-velocity-at-both-ends
-    // reasoning that governs `lift` and `dots`.
+    // smootherstep, not out-cubic, whose maximum velocity is AT the join: the lines would go from steady
+    // to shedding opacity fast in one frame, a derivative discontinuity a step test cannot see.
     contourAlpha: 1 - smoother(phase(u, INTRO_PHASES.fadeStart, INTRO_PHASES.fadeEnd)),
   };
 }
@@ -166,29 +138,18 @@ export function introFrame(t: number): IntroFrame {
  *
  * Levels start `INTRO_SURVEY_STAGGER` apart and each gets whatever is left, so the LAST level finishes
  * exactly at `surveyEnd` and `surveyEnd` means what its name says. The easing is applied here, per
- * level, to that level's own window — not to the phase as a whole before this clamp, which is the
- * mistake that made the whole map finish in the first fifth of its phase.
+ * level, to that level's own window — not to the phase as a whole before this clamp, which makes the
+ * whole map finish in the first fifth of its phase.
  */
 export function surveyProgress(survey: number, levelIndex: number, levelCount: number): number {
   const start = levelCount > 1 ? levelIndex * INTRO_SURVEY_STAGGER : 0;
   const width = 1 - (levelCount > 1 ? (levelCount - 1) * INTRO_SURVEY_STAGGER : 0);
   if (width <= 0) return clamp01(survey) >= 1 ? 1 : 0;   // degenerate stagger; fail visible, not NaN
-  // outQuad, not outCubic. A pen finishing a stroke may decelerate, but out-cubic's tail is flat
-  // enough that combined with the lift's smootherstep toe it produced a dead patch between the two
-  // phases. Quadratic keeps the line moving into its own finish.
+  // outQuad, not outCubic: out-cubic's flat tail plus the lift's smootherstep toe leaves a dead patch
+  // between the two phases. Quadratic keeps the line moving into its own finish.
   return outQuad((clamp01(survey) - start) / width);
 }
 
-// THREE EXPORTS USED TO LIVE HERE — `introStillRunning`, `introDurationFrom`, `shouldPlayIntro` — and
-// their deletion is worth recording, because the suite was quietly lying about them.
-//
-// The intro's decision moved into an `is:inline` script at the top of index.astro, which must run before
-// first paint and therefore cannot `import`. So it re-implements the parse and the clamp in raw JS, and
-// these three stopped having any production caller: a grep over comment-stripped `src` found one hit
-// each, their own declaration. Their 97 lines of tests went on passing, so the suite looked like it
-// covered the intro decision while the code that actually runs it was untested.
-//
-// Keeping them "for the tests" would have been the worse trade — a parallel implementation kept alive to
-// host assertions about behaviour it no longer provides. The clamp is instead asserted where it ships:
-// `tests/distSmoke.test.ts` reads the built index.html. If the decision ever moves back into a module,
-// bring them back with it.
+// THE DECISION (play? for how long?) IS NOT HERE: it runs before first paint in index.astro's `is:inline`
+// script, which cannot import, and `tests/distSmoke.test.ts` asserts the clamp where it ships. Module copies
+// of it for a spec to call (`shouldPlayIntro` and two others) were deleted as having no production caller.

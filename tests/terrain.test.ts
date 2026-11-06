@@ -112,20 +112,10 @@ describe('terrain shape-reading (EDL + lighting)', () => {
 
 describe("the hero field's steepest slope, measured over the whole footprint", () => {
   it('peaks at 1.8668', () => {
-    // RESCUED FROM A DELETED TEST, which is why it arrives looking like a stranger.
-    //
-    // This bound lived in tests/gateLines.test.ts, because the gate's combed-contour candidate needed it: that
-    // design's no-knot property was a theorem resting on a tilt exceeding max|grad field|, so the tilt had to be
-    // chosen against this number. The candidate was rejected and the module is now deleted — but the assertion
-    // was never really about the comb. It pins a property of `grad` in THIS module, and it was the only test
-    // that did so across the full domain: the gradient check above is local, at one minimum. Deleting the comb
-    // would have quietly taken the site's only measurement of its own steepest slope with it.
-    //
-    // 1.8668 occurs at (-0.82, 0.14), on the flank of the deep valley, where a Gaussian's slope peaks at r = s.
-    // The grid is deliberately finer than anything the renderer samples, so it cannot miss a spike.
-    //
-    // What did NOT come across: a companion assertion that the comb's tilt of 2.6 stayed above this. That bound
-    // belonged to the deleted design, and keeping it would mean asserting a constraint nothing is under.
+    // The site's only measurement of its own steepest slope across the full domain (the gradient check
+    // above is local, at one minimum). 1.8668 occurs at (-0.82, 0.14), on the flank of the deep valley,
+    // where a Gaussian's slope peaks at r = s. The grid is finer than anything the renderer samples, so it
+    // cannot miss a spike.
     let maxGrad = 0;
     for (let i = 0; i <= 400; i++) {
       for (let j = 0; j <= 400; j++) {

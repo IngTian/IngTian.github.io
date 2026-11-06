@@ -266,8 +266,7 @@ function macboot() {
 
 // ── the binaries: captures and manifold's motion ─────────────────────────────────────────────────────────────
 
-/** Frames vendored whole, the CJK motto under the clock included: the no-CJK rule governs the site's text, not
- *  pictures of the owner's work (CLAUDE.md, The concept). The filter only evens the frame, which yuv420p requires. */
+/** Frames vendored whole, the motto under the clock included. The filter only evens the frame, which yuv420p requires. */
 const VIDEO_FILTER = 'scale=trunc(iw/2)*2:trunc(ih/2)*2';
 
 function binaries() {

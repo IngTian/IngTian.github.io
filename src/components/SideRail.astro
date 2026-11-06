@@ -2,35 +2,39 @@
 // The marginal table-of-contents rail, one component for every page that has one, driven by a Stop tree from
 // lib/pageStops. The template recurses, so the rail is as deep as the tree.
 //
-// Each label is three layers of the same text — the dim one (--ink-3), which is the link's name, and two copies over
-// it, .ink2 for the quieter mark and .ink1 for the lead — so a state change is a cross-fade of opacities, never a
-// colour transition, and every state is a solid ink at rest (the inactive one clears 4.5:1 on every rail page's
-// ground). The copies are empty aria-hidden elements whose text is generated (::before, from data-l): aria-hidden
-// keeps them out of the link's name in every engine (generated text alone is named by some and not by others), and
-// generated text is in no selection, no find-in-page and no unstyled page, so each of those holds a label once. The
-// dash hangs in a 20px gutter left of the label, so no label ever moves.
+// Each label is three layers of the same text — the dim one (--rail-ink, else --ink-3), which is the link's name,
+// and two copies over it, .ink2 for the quieter mark and .ink1 for the lead — so a state change is a cross-fade of
+// opacities, never a colour transition, and every state is a solid ink at rest (the inactive one clears 4.5:1 on
+// every rail page's ground). The copies are empty aria-hidden elements whose text is generated (::before, from
+// data-l): aria-hidden keeps them out of the link's name in every engine (generated text alone is named by some and
+// not by others), and generated text is in no selection, no find-in-page and no unstyled page, so each of those
+// holds a label once. The dash hangs in a 20px gutter left of the label, so no label ever moves.
 //
 // Not an island (the site has none): a vanilla <script>, started through onPageView, with a teardown. The entrance
 // is CSS, not the script's: a bundled script runs after the browser has painted, so a from-state it set could land
 // on a rail already painted at rest. Each row carries its index (--i) and the rail the gap between rows (--gap).
 //
 // A page reskins it only through role tokens (CLAUDE.md, The concept): --knockout and --rail-dash-halo, declared
-// by the registers whose ground needs them (today /projects' drafting sheet), `none` everywhere else.
+// by the registers whose ground needs them (today /projects' drafting sheet), `none` everywhere else; and
+// --rail-ink and --rail-focus, the resting label's ink and the focus ring's (else --ink-3 and --ochre), declared by
+// the homepage (tokens.css, `deck`), whose tan panels neither light --ink-3 nor light ochre clears.
 //
-// Scope note: the site has two OTHER rails — Toc.astro (post-hero fade-in) and the /art rail (coupled to gallery
-// formation). Both carry behaviour this component deliberately does not model, so they are left alone rather than
-// half-migrated.
+// The site's one other rail is /art's, coupled to its gallery's formation and left alone.
 import { type Stop, flattenStops } from '../lib/pageStops';
 import { RAIL, stagger } from '../lib/motionTiming';
 
 interface Props {
   stops: Stop[];
+  /** The id of an element the rail stays off (the homepage's hero): hidden until that element's bottom has risen
+   *  above the middle of the screen, by `display: none`, so its links leave the tab order with it. With no script
+   *  it stays hidden: over a hero it would print across the name on a short window. */
+  hideOver?: string;
   /** Set only by the template's own recursion: the depth of the list being rendered. */
   depth?: number;
   /** Set only by the template's own recursion: the whole rail in document order, which numbers its rows. */
   flat?: Stop[];
 }
-const { stops, depth, flat = flattenStops(stops) } = Astro.props;
+const { stops, hideOver, depth, flat = flattenStops(stops) } = Astro.props;
 // The entrance (lib/motionTiming RAIL): each row RAIL.row long, RAIL.rowStep after the one before, closer on a long
 // rail so the last is in by RAIL.enter. The CSS reads both from the nav's style, --row and --gap, so it plays the
 // duration this arithmetic used. With no `max`, stagger(i) is i x stagger(1), so the CSS multiplies.
@@ -38,7 +42,7 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
 ---
 {depth === undefined ? (
   stops.length > 0 && (
-    <nav class="side-rail" aria-label="On this page" style={`--gap:${gap}ms;--row:${RAIL.row}ms`}><Astro.self stops={stops} depth={0} flat={flat} /></nav>
+    <nav class="side-rail" aria-label="On this page" data-hide-over={hideOver} style={`--gap:${gap}ms;--row:${RAIL.row}ms`}><Astro.self stops={stops} depth={0} flat={flat} /></nav>
   )
 ) : (
   <ul class={depth > 0 ? 'sub' : undefined}>
@@ -66,8 +70,9 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
        everywhere to fix one string. */
     max-width: 200px;
     padding-left: 30px;
-    /* The dash's strength: ink-1 at 55% clears 3:1 as a mark on every rail page's ground (worst measured, 3.74:1
-       over the light reading sky; tests/paperPalette.test.ts and tests/draftingPalette.test.ts hold the sheets).
+    /* The dash's strength: ink-1 at 55% clears 3:1 as a mark on every rail page's ground (worst computed, 3.21:1
+       on the homepage's light sky at its deepest under the rail; 3.74:1 measured over the light reading sky). tests/deckPalette.test.ts,
+       tests/paperPalette.test.ts and tests/draftingPalette.test.ts hold the panels and the sheets.
        It is the alpha of the dash's colour, not its opacity, so a register can ring the dash with an opaque knockout. */
     --mk: 55%;
   }
@@ -96,7 +101,7 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
   .side-rail .dim,
   .side-rail .ink2,
   .side-rail .ink1 { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .side-rail .dim { color: var(--ink-3); }
+  .side-rail .dim { color: var(--rail-ink, var(--ink-3)); }
   .side-rail .ink2,
   .side-rail .ink1 { position: absolute; inset: 0; opacity: 0; }
   .side-rail .ink2::before,
@@ -141,7 +146,7 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
     .side-rail a.is-hover:not(.is-active)::after { opacity: 0.2; }
   }
   .side-rail a:not(.is-active):focus-visible::after { opacity: 0.2; }
-  .side-rail a:focus-visible { outline: 1px solid var(--ochre); outline-offset: 3px; border-radius: 2px; }
+  .side-rail a:focus-visible { outline: 1px solid var(--rail-focus, var(--ochre)); outline-offset: 3px; border-radius: 2px; }
 
   /* The label's cross-fade and the 2px nudge toward a hovered or focused row. The dash's slide and the quiet marks'
      fades are the script's. The times are lib/motionTiming's RAIL, the curves its FADE and EASE
@@ -157,13 +162,14 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
   @media (prefers-reduced-motion: no-preference) and (hover: hover) {
     .side-rail a.is-hover .lbl { transform: translateX(2px); }
   }
-  /* THE ENTRANCE, once per page view (a ClientRouter arrival renders a new rail, so it plays there too): every row in
+  /* THE ENTRANCE, once each time the rail renders (a ClientRouter arrival renders a new rail; on `/`, see below): every row in
      from 6px left, --row long and --i x --gap late (both set by the frontmatter, so the last row is in by RAIL.enter).
      CSS, so it runs from the first frame with nothing to wait for, and the backwards fill holds each row in its
      from-state through its delay. A CSS animation restarts when its element is rendered again, so a rail hidden at
      1100px and below runs it when it first shows, and a row the script hid (its target stopped rendering) replays its
      own when it shows again; today no rail page hides a target wider than 1100px. On a page with a veil (/writing,
-     /experience) most of it plays under the veil's wipe. */
+     /experience) most of it plays under the veil's wipe. On `/` the rail is off the hero (hideOver), so it plays as the
+     reader leaves the hero, and again each time they come back down past it. */
   @media (prefers-reduced-motion: no-preference) {
     .side-rail a {
       animation: side-rail-enter var(--row) cubic-bezier(.2,.7,.2,1) backwards;
@@ -172,13 +178,16 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
   }
   @keyframes side-rail-enter { from { opacity: 0; transform: translateX(-6px); } }
 
+  /* Off the element its page names (hideOver) until the script marks it passed. */
+  .side-rail[data-hide-over]:not([data-past]) { display: none; }
+
   /* The rail is a wide-viewport affordance; below this the page re-centers. */
   @media (max-width: 1100px) { .side-rail { display: none; } }
 </style>
 
 <script>
   // The rail's script: which stops are marked (lib/scrollspy's railMarks, measured on every scroll frame) and the
-  // motion between marks, ported from the v4 prototype. Only transform and opacity move, each thing once:
+  // motion between marks, ported from the v4 prototype. Only transform and opacity move, once per change of mark:
   // - ONE dash moves, the lead's. When the lead changes, its dash slides from wherever the old one is (at rest or
   //   mid-flight) and grows to its length; with nowhere to slide from, it grows in place. Any other current stop
   //   takes the quiet mark, fading in and out where it stands. So a section boundary in the reading band is one
@@ -199,6 +208,7 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
       return el && rule && li ? [{ a, el, rule, li }] : [];
     });
     if (!stops.length) return undefined;
+    const over = rail.dataset.hideOver ? document.getElementById(rail.dataset.hideOver) : null;
     // Each stop's parent: the nearest enclosing row that is itself a stop.
     const indexOf = new Map(stops.map((s, i) => [s.li, i]));
     const parent = stops.map((s) => {
@@ -303,7 +313,9 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
 
     function frame(): void {
       raf = 0;
-      const shown = rail.getClientRects().length > 0; // display: none at 1100px and below
+      // Passed once its bottom is above mid-screen, as the hero is when the deck rests on the slide after it.
+      if (over) rail.toggleAttribute('data-past', over.getBoundingClientRect().bottom < window.innerHeight / 2);
+      const shown = rail.getClientRects().length > 0; // display: none at 1100px and below, and off hideOver
       if (shown) apply(measure(), was && !prefersReducedMotion());
       was = shown;
     }

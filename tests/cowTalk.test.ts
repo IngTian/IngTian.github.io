@@ -96,17 +96,6 @@ describe('PROJECT_COW_LINES', () => {
   it("quotes witness's release count from profile.ts", () => {
     expect(byKey.witness.some(([a]) => a === `${WITNESS_RELEASES} releases.`)).toBe(true);
   });
-
-  // By code point: CJK symbols and kana through the unified ideographs, Hangul, the compatibility ideographs and
-  // the full-width forms. TEXT: the English-only rule governs words the site sets, not pictures of the owner's works
-  // (CLAUDE.md, The concept) — manifold's screensaver frames keep the motto they were recorded with.
-  it('prints no CJK text', () => {
-    const cjk = (cp: number): boolean =>
-      (cp >= 0x3000 && cp <= 0x9fff) || (cp >= 0xac00 && cp <= 0xd7af) ||
-      (cp >= 0xf900 && cp <= 0xfaff) || (cp >= 0xff00 && cp <= 0xffef);
-    const found = ALL.flatMap((pair) => [...pair.join(' ')]).filter((c) => cjk(c.codePointAt(0)!));
-    expect(found).toEqual([]);
-  });
 });
 
 // THE BUBBLE IS CAPPED TO THE COW'S COLUMN, AND THE COLUMN IS THE MOCKUP'S. From 1180px the cow is fixed in a
@@ -202,7 +191,10 @@ describe("the phone's strip (projects.astro, ≤640px)", () => {
     const perRow = Math.floor(text / (ADVANCE_EM * font));
     expect(perRow).toBeGreaterThan(0);
     // Greedy word wrap, as the browser does it: a half breaks only at spaces, and a word longer than a row overflows.
+    // It models Latin mono advances only: Han is ~1em wide and breaks between any two characters.
     const wrap = (s: string): number => {
+      expect(s, 'wrap() counts 0.6em advances; teach it Han (~1em, a break between characters) before a Chinese line')
+        .not.toMatch(/\p{Script=Han}/u);
       let n = 1, at = 0;
       for (const w of s.split(' ')) {
         expect(w.length, `"${w}" is wider than a row`).toBeLessThanOrEqual(perRow);
