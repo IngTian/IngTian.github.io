@@ -448,6 +448,21 @@ describe("BaseLayout's per-page hooks: /projects is the drafting page, the resea
     expect(/class="sky-wash"/.test(markup), '/writing lost the SkyWash layer').toBe(true);
   });
 
+  // The wash's paper-coloured strokes are a lift on the night ground, banded into rings (the dark intro's "two big
+  // bubbles"), so the dark theme hides the whole layer. Not a per-stroke opacity: the breathe's keyframes set
+  // opacity, an animation outranks a normal rule, and the dark per-stroke overrides that stood here never applied.
+  it('hides the sky wash in the dark theme, as a layer, with no per-stroke dark override to lose to the breathe', () => {
+    const css = shippedCss(pages());
+    const hide = /html\[data-theme=dark\] \.sky-wash\[[^\]]+\]\{display:none\}/.exec(css);
+    expect(hide?.[0], 'the dark theme no longer hides .sky-wash').toBeDefined();
+    // at the top level, not in a media block: inside `prefers-reduced-motion: no-preference` it would leave a reduced-
+    // motion dark reader the strokes at full strength, with no override at all
+    const before = css.slice(0, hide!.index);
+    expect(before.split('{').length - before.split('}').length, 'the dark .sky-wash hide sits inside a block').toBe(0);
+    // and nothing styles a stroke in dark, directly or through the layer's `> div`
+    expect(/\[data-theme=dark\] \.sky-(?:warm|cool|sun|wash\[[^\]]+\]>)/.exec(css)?.[0], 'a dark rule on a stroke, which its breathe overrides').toBeUndefined();
+  });
+
   // The dot is on every page under a door: its own link's ("page"), or on a page under one (/research/<slug>,
   // /writing/<slug>) its section's ("true"). No other link is marked.
   it('marks the page you are on in the corner nav, or the section it is under', () => {

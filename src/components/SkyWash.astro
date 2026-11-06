@@ -63,13 +63,14 @@
     transform-origin: 80% 9%;
   }
 
-  /* Dark theme: the warm Monet broken-color washes would muddy the charcoal
-     void, so kill the warm entirely and leave only a whisper of cool nebular
-     tint. Uses :global so it reaches this scoped component from the <html>
-     theme attribute. */
-  :global(html[data-theme='dark']) .sky-warm { opacity: 0; }
-  :global(html[data-theme='dark']) .sky-cool { opacity: 0.06; }
-  :global(html[data-theme='dark']) .sky-sun  { opacity: 0; }
+  /* NO WASH IN THE DARK THEME. The strokes (gold, blue, a pale sun) are far lighter than the night ground, and the
+     group isolates their blends, so each paints as plain colour at a few percent: a lift of about 10 code values over
+     a 500px radius, which 8 bits draw as rings. These were the "two big bubbles" (warm left, cool right). They read
+     worst on the intro's flat first beat, stayed as a muddy cast at rest, and were strongest on a phone or without
+     WebGL, where nothing lowers the layer's opacity. Hidden, not faded: the per-stroke dark opacities that stood here
+     never applied while motion was on, because the breathe's keyframes set opacity, and an animation outranks a
+     normal declaration. The dark sky's texture is the shader's nebula, or without WebGL the .descent washes. */
+  :global(html[data-theme='dark']) .sky-wash { display: none; }
 
   /* Gentle breathe — warm & cool pulse OUT OF PHASE (as warm swells, cool
      recedes, then they trade), so the sky's temperature visibly shifts even
