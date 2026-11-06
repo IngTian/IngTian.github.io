@@ -149,13 +149,12 @@ html.intro-flat .descent {
 }
 
 /* ── Dark-theme atmosphere. The light washes are warm sun-glow — wrong over a
-   charcoal void — so nearly kill them: just a whisper of phosphor haze
-   upper-right and a faint cyan fog in the mid-gap, so the void isn't dead flat
-   but the terrain "stars" stay the star of the show. ── */
-html[data-theme='dark'] .descent::before {
-  background:
-    radial-gradient(50% 32% at 78% 10%, rgba(102,194,140,0.06), transparent 72%);
-}
+   charcoal void — so dark keeps only a faint cyan fog in the mid-gap, so the
+   void isn't dead flat but the terrain "stars" stay the star of the show.
+   No upper sky: its phosphor-green haze (a 6% radial at 78% 10%) sat round the
+   corner nav, and on the intro's near-flat first beat it read as a green glow
+   there. Hidden, not cleared, so its drift no longer runs on an empty layer. ── */
+html[data-theme='dark'] .descent::before { display: none; }
 html[data-theme='dark'] .descent::after {
   background:
     radial-gradient(90% 20% at 54% 66%, rgba(95,178,201,0.10), transparent 82%);

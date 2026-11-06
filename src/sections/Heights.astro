@@ -9,9 +9,9 @@ for (const phrase of bio.strong) {
   bioHtml = bioHtml.replace(phrase, `<strong class="font-medium text-ink-2">${phrase}</strong>`);
 }
 ---
-<section id="heights" class="relative min-h-[108vh] px-[7vw] pb-[12vh]">
+<section id="heights" class="relative px-[7vw] pb-[12vh]">
   <TerrainHero />
-  {/* legibility: soft paper fades behind the name (bottom-left) and bio (top-right) */}
+  {/* legibility: soft paper fades behind the name (bottom-left) and bio (top-right); none on a dark desktop */}
   <div class="hero-legibility" aria-hidden="true"></div>
 
   {/* about-me, floated top-right; the empty diagonal to the name IS the composition */}
@@ -26,7 +26,7 @@ for (const phrase of bio.strong) {
       {name.first} <em class="italic text-ink-3 font-medium">{name.last}</em>
     </h1>
     <p class="font-display italic text-ink-3 mt-5 text-[clamp(15px,2.2vw,21px)]">{roles}</p>
-    <p class="font-mono uppercase tracking-[0.22em] text-ink-3/90 mt-2.5 text-[11px]">{phd} &nbsp;·&nbsp; {rolesSub}</p>
+    <p class="hero-id font-mono uppercase tracking-[0.22em] text-ink-3/90 mt-2.5 text-[11px]">{phd} &nbsp;·&nbsp; {rolesSub}</p>
 
     {/* THE TAGLINE, directly under the role line. The owner: "maybe put A researcher by day tag line
          underneath the Quant Researcher · Portfolio Optimization."
@@ -154,23 +154,28 @@ for (const phrase of bio.strong) {
     position: absolute; inset: 0; z-index: 1; pointer-events: none;
     background:
       /* name halo, bottom-left. Pulled up to 74% and tightened so the wash
-         reaches fully transparent (~94% of the box) BEFORE the #heights bottom
-         edge (108vh). Otherwise it was still ~0.12 opaque at the box boundary
-         and got clipped in a straight horizontal line — that hard cut read as
-         a faint divider at the hero/interlude seam.
-         Uses --paper so it lifts the LIGHT text on the pale dawn; dark themes
-         override below to a soft DARKEN behind the now-light text instead. */
+         reaches fully transparent (91% of the box) BEFORE the #heights bottom
+         edge (100vh, `.is-slides > section`'s floor). Otherwise it was still
+         ~0.12 opaque at the box boundary and got clipped in a straight
+         horizontal line — that hard cut read as a faint divider at the
+         hero/interlude seam.
+         Uses --paper, lifting the pale dawn behind the light theme's dark
+         text. The dark theme has no halo on a desktop (below). */
       radial-gradient(40% 26% at 22% 74%, color-mix(in oklab, var(--paper) 85%, transparent), transparent 66%),
       radial-gradient(30% 22% at 82% 22%, color-mix(in oklab, var(--paper) 70%, transparent), transparent 72%);
   }
-  /* Dark themes: the halo must DARKEN behind the light hero text, not brighten
-     — a paper blob on a night sky would be a glaring smear. Swap to a soft
-     near-black veil at the same anchor points. */
-  :global(html[data-theme='dark']) .hero-legibility {
-    background:
-      radial-gradient(44% 30% at 22% 74%, color-mix(in oklab, var(--bg) 62%, transparent), transparent 68%),
-      radial-gradient(34% 24% at 82% 22%, color-mix(in oklab, var(--bg) 46%, transparent), transparent 74%);
-  }
+  /* NO HALO IN THE DARK THEME, on a desktop: a darkening oval on the night ground is the same artefact as
+     SkyWash's strokes were. The dark halos were two --bg veils (62% behind the name, 46% behind the bio) with
+     linear falloffs. On the intro's first beat they faded in over a near-flat sky, and the falloff's edge drew as
+     a ring: a dark oval behind the name, up to 40% darker at its centre, and a dark rim framing the bio's corner.
+     The light text does not need them. Measured at rest over the live sky, dots and walkers included, with no
+     halo, at the 5th percentile and the lower of 1440x900 and 2048x1090@2: the name 11.95 (it needs 3:1, as
+     large type), its italic 5.21, the role line 5.07, the tagline 5.21, the bio 6.93.
+       Only the 11px identity line fell short, at 4.45, and it fell short on its own /90 alpha. So dark sets it
+     at full --ink-3, the role line's ink, which computes to 5.14 on the same grounds.
+       On a phone the dark band below re-shows the layer: its `display: block` outranks this rule. */
+  :global(html[data-theme='dark']) .hero-legibility { display: none; }
+  :global(html[data-theme='dark']) .hero-id { color: var(--ink-3); }
 
   /* THE HALOS FADE IN WITH THE SKY'S COLOUR, through the intro's first beat — and the rule is GATED ON
      THE CLASS, not on the custom property alone, which is a correctness requirement rather than a style.
@@ -226,7 +231,9 @@ for (const phrase of bio.strong) {
        treats as load-bearing, so it cannot be atmosphere's to lose.
        Lowering the canvas alone was not enough — measured at 0.32 the line was still broken up — so this is a
        vertical band of paper across the middle, where every piece of hero text sits, fading out top and bottom so
-       the terrain still reads as terrain above and below it. */
+       the terrain still reads as terrain above and below it.
+       Its `display: block` is load-bearing in dark: it outranks the dark theme's desktop hide above, (1,1,0)
+       against (0,2,0), so the band below is what a dark phone gets. */
     #heights .hero-legibility {
       display: block;
       background: linear-gradient(
