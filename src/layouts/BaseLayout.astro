@@ -1,5 +1,7 @@
 ---
 import '../styles/global.css';
+import '../styles/spike-darkpal.css';   // SPIKE (task 19)
+import SpikeDarkPal from '../components/SpikeDarkPal.astro';
 import { Font } from 'astro:assets';
 import { ClientRouter } from 'astro:transitions';
 import CornerNav from '../components/CornerNav.astro';
@@ -111,6 +113,10 @@ const personLd = {
                              : matchMedia('(prefers-color-scheme: dark)').matches;
             if (dark) document.documentElement.dataset.theme = 'dark';
             else document.documentElement.removeAttribute('data-theme');
+            // SPIKE (task 19): the dark palette under trial, re-applied after a swap like the theme.
+            var pal = localStorage.getItem('spike.darkpal');
+            document.documentElement.dataset.darkpal =
+              /^(current|midnight|blackout|graphite)$/.test(pal || '') ? pal : 'current';
           } catch (e) {}
         }
         applyTheme();
@@ -172,6 +178,7 @@ const personLd = {
         (not per-page) means it survives View Transitions as part of the shell.
         navZone tells it how to pick light-theme text color per page. */}
     <CornerNav navZone={navZone} />
+    <SpikeDarkPal />
     {/* "The Descent" loader: a night veil covering the page wipes DOWNWARD off
         the bottom to reveal it. It plays on EVERY client-side navigation into a
         page that renders one (the after-swap listener at the bottom of this

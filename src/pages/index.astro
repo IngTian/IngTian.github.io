@@ -18,7 +18,8 @@ import {
   INTRO_DURATION_MS, INTRO_DUR_MIN_MS, INTRO_DUR_MAX_MS,
 } from '../lib/introTimeline';
 import { INTRO_SEEN_KEY } from '../lib/introSession';
-import { rampFor } from '../lib/skyPalette';
+import { rampFor, type RampStop } from '../lib/skyPalette';
+import { DARK_PALS } from '../lib/spikeDarkPalettes';   // SPIKE (task 19)
 import { homeStops } from '../lib/pageStops';
 
 // The tone the intro's first beat flattens the sky to, read from the SAME ramp data the shader samples
@@ -31,9 +32,8 @@ import { homeStops } from '../lib/pageStops';
 const FLAT_AT = { light: 0.04, dark: 0.55 } as const;
 
 /** Sample a ramp at `at`, interpolating between its two bracketing stops. */
-const rampAt = (theme: 'light' | 'dark') => {
+const rampAt = (theme: 'light' | 'dark', stops: readonly RampStop[] = rampFor('descent', theme)) => {
   const at = FLAT_AT[theme];
-  const stops = rampFor('descent', theme);
   let lo = stops[0], hi = stops[stops.length - 1];
   for (const st of stops) {
     if (st[0] <= at && st[0] >= lo[0]) lo = st;
@@ -52,6 +52,8 @@ const introVars = {
   MAX: INTRO_DUR_MAX_MS,
   TONE_LIGHT: rampAt('light'),
   TONE_DARK: rampAt('dark'),
+  // SPIKE (task 19): each dark palette's flat tone, from its own descent ramp.
+  TONE_DARK_PAL: Object.fromEntries(Object.entries(DARK_PALS).map(([k, p]) => [k, rampAt('dark', p.descent)])),
 };
 ---
 
@@ -93,7 +95,7 @@ const introVars = {
         root.style.setProperty('--intro-flatten', '1');
         root.style.setProperty(
           '--intro-flat-tone',
-          root.dataset.theme === 'dark' ? TONE_DARK : TONE_LIGHT,
+          root.dataset.theme === 'dark' ? (TONE_DARK_PAL[root.dataset.darkpal] || TONE_DARK) : TONE_LIGHT,
         );
       } catch (e) { /* never let the hero fail to render over this */ }
     })();

@@ -47,6 +47,8 @@ const bubbles = JSON.stringify([
   import { introFrame, surveyProgress, type IntroFrame } from '../lib/introTimeline';
   import { introContours, terrainLevels } from '../lib/terrainContours';
   import { introSession, endIntroSession } from '../lib/introSession';
+  import { activeDarkPal } from '../lib/spikeDarkPalettes';   // SPIKE (task 19)
+  import type { StarBands } from '../lib/terrainRender';
 
   // The canvas is JS-painted, so it can't inherit CSS tokens — pick the ramp +
   // walker colors from the active theme (data-theme on <html>). Read fresh on
@@ -63,11 +65,15 @@ const bubbles = JSON.stringify([
   // secondary ink a rail label uses — present, clearly behind the dots it precedes.
   function themePalette(): {
     ramp: TerrainRamp; walker: WalkerPalette; darkness: number; dotScale: number;
-    survey: [number, number, number];
+    survey: [number, number, number]; warm?: number; stars?: StarBands;
   } {
     // Walker trios:
     //   dark  = Glacier — frost glow, ice settle, recessive teal trail (screensaver)
     //   light = Classic — the shipped paper glow, ochre settle, indigo trail
+    // SPIKE (task 19): a dark palette other than 'current' supplies the whole dark set.
+    const sp = document.documentElement.dataset.theme === 'dark' ? activeDarkPal() : null;
+    if (sp)
+      return { ramp: sp.terrain, walker: sp.walker, darkness: 1, dotScale: 1.18, survey: sp.survey, warm: sp.terrainWarm, stars: sp.stars };
     if (document.documentElement.dataset.theme === 'dark')
       return { ramp: TERRAIN_TERMINAL, walker: { glow: [227,242,247], settled: [134,188,204], trail: [73,127,146] }, darkness: 1, dotScale: 1.18, survey: [139, 147, 140] };
     // Light's dotScale is 1.08: it spends its EDL shade on value, not opacity (edlSpend in lib/terrain.ts),

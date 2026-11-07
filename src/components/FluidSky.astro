@@ -49,9 +49,10 @@ const { variant = 'descent' } = Astro.props;
   import { prefersReducedMotion } from '../lib/motion';
   import { VERTEX_SHADER, fragmentShader, SKY_UNIFORMS } from '../lib/skyShader';
   import { GATES, TINT_BUDGET, NEBULA, NEBULA_CEILING, type SkyVariant } from '../lib/skyLegibility';
-  import { rampFor, type Theme } from '../lib/skyPalette';
+  import { rampFor, type Theme, type RampStop } from '../lib/skyPalette';
   import { introProgress } from '../lib/introSession';
   import { introFrame } from '../lib/introTimeline';
+  import { activeDarkPal, CURRENT_STARS } from '../lib/spikeDarkPalettes';   // SPIKE (task 19)
 
   const VERT = VERTEX_SHADER;
   const FRAG = fragmentShader();
@@ -69,7 +70,7 @@ const { variant = 'descent' } = Astro.props;
     });
   }
 
-  function buildRamp(theme: Theme, variant: SkyVariant): HTMLCanvasElement | null {
+  function buildRamp(theme: Theme, variant: SkyVariant, stops?: readonly RampStop[]): HTMLCanvasElement | null {
     const N = 512;
     const c = document.createElement('canvas');
     c.width = 1;
@@ -77,7 +78,7 @@ const { variant = 'descent' } = Astro.props;
     const ctx = c.getContext('2d');
     if (!ctx) return null;
     const g = ctx.createLinearGradient(0, 0, 0, N);
-    for (const [pos, hex] of rampFor(variant, theme)) g.addColorStop(pos, hex);
+    for (const [pos, hex] of stops ?? rampFor(variant, theme)) g.addColorStop(pos, hex);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 1, N);
     return c;
@@ -121,7 +122,8 @@ const { variant = 'descent' } = Astro.props;
     const variant = (cvs.dataset.variant ?? 'descent') as SkyVariant;
     // Read once: a theme change re-inits this canvas (theme:change, at the bottom).
     const theme: Theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
-    const ramp = buildRamp(theme, variant);
+    const sp = theme === 'dark' ? activeDarkPal() : null;   // SPIKE (task 19): null = today's dark
+    const ramp = buildRamp(theme, variant, sp?.[variant]);
     if (ramp) {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, ramp);
       gl.uniform1i(U.uRamp, 0);
@@ -131,7 +133,16 @@ const { variant = 'descent' } = Astro.props;
     // a program keeps its uniforms.
     gl.uniform1f(U.uAmp, AMP[variant]);
     gl.uniform1f(U.uDark, theme === 'dark' ? 1 : 0);
-    gl.uniform3f(U.uNebula, NEBULA[0], NEBULA[1], NEBULA[2]);
+    const neb = sp?.nebula ?? NEBULA;
+    gl.uniform3f(U.uNebula, neb[0], neb[1], neb[2]);
+    const stars = sp?.stars ?? CURRENT_STARS;
+    gl.uniform1f(U.uBloomK, sp ? sp.bloom : 1);
+    gl.uniform1f(U.uTintK, sp ? sp.readingTint : 1);
+    gl.uniform3fv(U.uStarCoolA, stars.coolA);
+    gl.uniform3fv(U.uStarCoolB, stars.coolB);
+    gl.uniform3fv(U.uStarWhite, stars.white);
+    gl.uniform3fv(U.uStarWarmA, stars.warmA);
+    gl.uniform3fv(U.uStarWarmB, stars.warmB);
     gl.uniform1f(U.uReading, variant === 'reading' ? 1 : 0);
     gl.uniform1f(U.uGateDark, GATES[variant].dark);
     gl.uniform1f(U.uGateLight, GATES[variant].light);

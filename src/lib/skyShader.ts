@@ -38,6 +38,14 @@ export function fragmentShader(): string {
     uniform float uTintCap;        // reading-page tint hard ceiling
     uniform float uViscousFloor;
     uniform float uNebulaCeiling;   // hard bound on the dark nebula's added light
+    // SPIKE (task 19): the dark palette's bloom and reading-tint gains and its star tints.
+    uniform float uBloomK;
+    uniform float uTintK;
+    uniform vec3  uStarCoolA;
+    uniform vec3  uStarCoolB;
+    uniform vec3  uStarWhite;
+    uniform vec3  uStarWarmA;
+    uniform vec3  uStarWarmB;
 
     float hash(vec2 p) {
       p = fract(p * vec2(443.897, 441.423));
@@ -140,7 +148,7 @@ export function fragmentShader(): string {
 
       // Warm bloom where the warp piles up, faded out over the reading zone since
       // it lightens.
-      col += 0.045 * vec3(0.784, 0.639, 0.416) * smoothstep(0.55, 1.0, length(r)) * (1.0 - zone) * (1.0 - uReading);
+      col += 0.045 * vec3(0.784, 0.639, 0.416) * smoothstep(0.55, 1.0, length(r)) * (1.0 - zone) * (1.0 - uReading) * uBloomK;
 
       // Dark theme: the field adds a cool phosphor/cyan nebular tint lifted by the
       // warp, damped over the reading zone since adding light is the dangerous
@@ -179,10 +187,10 @@ export function fragmentShader(): string {
           // Stellar colour by temperature.
           float temp2 = hash(cell + 41.7);
           vec3 tint = temp2 < 0.34
-            ? mix(vec3(0.62, 0.74, 1.00), vec3(0.86, 0.92, 1.00), temp2 / 0.34)
+            ? mix(uStarCoolA, uStarCoolB, temp2 / 0.34)
             : (temp2 < 0.72
-              ? vec3(0.97, 0.97, 1.00)
-              : mix(vec3(0.80, 0.72, 1.00), vec3(1.00, 0.86, 0.72), (temp2 - 0.72) / 0.28));
+              ? uStarWhite
+              : mix(uStarWarmA, uStarWarmB, (temp2 - 0.72) / 0.28));
 
           // Confined to a narrow band of page depth, 0.20 to 0.35, which opens as
           // the hero ends.
@@ -203,7 +211,7 @@ export function fragmentShader(): string {
         vec3 warmTint = vec3(${READING_TINT.warm.join(', ')});
         vec3 coolTint = vec3(${READING_TINT.cool.join(', ')});
         float pick = smoothstep(0.30, 0.70, r.x);
-        col -= mix(warmTint, coolTint, pick) * amt;
+        col -= mix(warmTint, coolTint, pick) * amt * uTintK;
       }
 
       // uFlatten, the intro's first beat: collapse the whole sky toward ONE tone, then let the gradient
@@ -227,4 +235,5 @@ export const SKY_UNIFORMS = [
   'uRamp', 'uAmp', 'uFlatten', 'uTime', 'uYOffset', 'uYSpan', 'uDepth0', 'uDepthSpan',
   'uGateTop', 'uGateDark', 'uGateLight', 'uDark', 'uNebula', 'uReading',
   'uTintCap', 'uViscousFloor', 'uNebulaCeiling',
+  'uBloomK', 'uTintK', 'uStarCoolA', 'uStarCoolB', 'uStarWhite', 'uStarWarmA', 'uStarWarmB',
 ] as const;

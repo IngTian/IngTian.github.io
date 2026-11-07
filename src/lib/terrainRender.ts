@@ -17,6 +17,14 @@ export interface TerrainTheme {
   ramp: TerrainRamp;
   darkness: number;          // 0=light theme, 1=dark — blends the lighting value/gain; above 0.5 the dots are stars
   dotScale: number;          // overall dot-radius multiplier (1 = base; per-theme knob)
+  warm?: number;             // SPIKE (task 19): litColor's warm swing, replacing LIGHT_DEFAULTS.warm
+  stars?: StarBands;         // SPIKE (task 19): the star tints, replacing starIdentity's own
+}
+
+/** SPIKE (task 19): a star palette, the shader's three temperature bands (cool a→b, white, warm a→b), 0–1. */
+export interface StarBands {
+  coolA: [number, number, number]; coolB: [number, number, number]; white: [number, number, number];
+  warmA: [number, number, number]; warmB: [number, number, number];
 }
 
 /** The camera's uniform pull-back (<1 shows more footprint). The hero's walkers project with it too,
@@ -40,7 +48,7 @@ export interface GridPoint { x: number; y: number; nx: number; ny: number; nz: n
  *
  * Pure and exported so it can be unit-tested like the rest of lib/.
  */
-export function starIdentity(x: number, y: number): { phase: number; rate: number; tint: [number, number, number] } {
+export function starIdentity(x: number, y: number, bands?: StarBands): { phase: number; rate: number; tint: [number, number, number] } {
   // Two independent hashes from the same lattice point.
   //
   // NOT the classic sin(dot(p, k)) * big form: a unit test caught it producing
@@ -66,7 +74,14 @@ export function starIdentity(x: number, y: number): { phase: number; rate: numbe
   // Stellar colour by "temperature". Real stars run blue-white → white → amber;
   // a little violet is included because that is what reads as deep space.
   let tint: [number, number, number];
-  if (h2 < 0.34) {
+  if (bands) {
+    // SPIKE (task 19): the same three bands, from a palette.
+    const mixB = (a: [number, number, number], b: [number, number, number], t: number): [number, number, number] =>
+      [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+    tint = h2 < 0.34 ? mixB(bands.coolA, bands.coolB, h2 / 0.34)
+      : h2 < 0.72 ? bands.white
+      : mixB(bands.warmA, bands.warmB, (h2 - 0.72) / 0.28);
+  } else if (h2 < 0.34) {
     const t = h2 / 0.34;
     tint = [0.62 + 0.24 * t, 0.74 + 0.18 * t, 1.0];                    // blue-white
   } else if (h2 < 0.72) {
@@ -128,6 +143,7 @@ export function paintTerrain(
 ): void {
   const breathHz = 0.4;
   const [Lx, Ly, Lz] = lightDir(LIGHT_DEFAULTS);
+  const light = theme.warm === undefined ? LIGHT_DEFAULTS : { ...LIGHT_DEFAULTS, warm: theme.warm };  // SPIKE (task 19)
 
   interface Dot { sx: number; sy: number; depth: number; z: number; ndl: number; edl: number; gx: number; gy: number }
   const rd: Dot[] = [];
@@ -158,7 +174,7 @@ export function paintTerrain(
     if (p.sy > fadeStart) alpha *= Math.max(0, 1 - (p.sy - fadeStart) / (Hh - fadeStart));
 
     let color = colormap(hn, theme.ramp);
-    color = litColor(color, p.ndl, theme.darkness, LIGHT_DEFAULTS);
+    color = litColor(color, p.ndl, theme.darkness, light);
 
     // Eye-Dome Lighting: a receding dot (edl→0) recedes AND shrinks; a
     // near/high ridge dot (edl→1) stays present and grows. Size coupling is
@@ -184,7 +200,7 @@ export function paintTerrain(
     // temperature tint. Gated on the dark theme so the shipped LIGHT terrain
     // (warm ochre→indigo relief) is bit-for-bit unchanged.
     if (theme.darkness > 0.5) {
-      const { phase, rate, tint } = starIdentity(p.gx, p.gy);
+      const { phase, rate, tint } = starIdentity(p.gx, p.gy, theme.stars);
       // two out-of-phase sines: no two dots blink together, and the field never
       // pulses in unison the way a single shared clock would.
       // Damped 0.6x to match the calmed sky warp — the terrain's twinkle and the

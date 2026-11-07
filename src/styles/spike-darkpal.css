@@ -1,0 +1,171 @@
+/* SPIKE (throwaway, task 19): the CSS half of three dark palettes under trial, switched live by
+   <html data-darkpal> (BaseLayout's theme resolver sets it before first paint; components/SpikeDarkPal.astro
+   changes it). 'current' has no block: it is the site as it ships. The JS half is lib/spikeDarkPalettes.ts.
+
+   Each block is keyed on the dark theme AND the palette, and leaves the two registers out by construction
+   (:not on data-page), so /projects and the research routes keep their own palettes and the light theme is
+   untouched. Its specificity, (0,4,1) before any nested selector, is above every dark rule it overrides, the
+   scoped ones included (the corner nav's capsule, the highest, is (0,4,2) against this file's (0,5,2)). */
+
+/* ── Midnight IDE ─────────────────────────────────────────────────────────────────────────────────────── */
+html[data-theme='dark'][data-darkpal='midnight']:not([data-page='drafting']):not([data-page='paper']) {
+  --paper: #e3e8ef;
+  --ink-1: #d6dde6;
+  --ink-2: #b1bbc8;
+  --ink-3: #929dac;
+  --ink-4: #7c8797;
+  --ink-5: #2c3440;
+  --ochre: #4b9ff2;
+  --indigo: #6b84aa;
+  --seal: #e0574a;
+  --bg: #05070a;
+  --on-accent: #06080c;
+  --hairline-rgb: 132, 150, 178;
+  --descent-grad: linear-gradient(180deg, #0d1117 0%, #0b0f14 20%, #0a0d12 40%, #080b0f 60%, #06090d 80%, #05070a 100%);
+  --reading-grad: linear-gradient(168deg, #0d1117 0%, #0c1016 48%, #0b0e14 100%);
+
+  .slide-paper {
+    --panel-bg: #0e1218; --panel-edge: rgba(132, 150, 178, 0.14); --panel-ink: #d6dde6;
+    --panel-soft: #a3adbb; --panel-faint: #7d8899; --panel-accent: #4b9ff2;
+  }
+  .ch-paper {
+    --c-h0: #4b9ff2; --c-h1: #5b677a; --c-h2: #7e8a9c; --c-h3: #c3ccd8;
+    --c-p0: #7a8698; --c-p1: #e1e7ee; --c-p2: #b8c1ce; --c-p3: #5b677a; --c-p4: var(--panel-accent);
+  }
+  .story-paper { --story-line: rgba(214, 221, 230, 0.66); --story-line-soft: rgba(152, 166, 188, 0.6); }
+  .descent::after { background: radial-gradient(90% 20% at 54% 66%, rgba(86, 128, 196, 0.04), transparent 82%); }
+
+  .cnav ul { background: rgba(8, 11, 16, 0.62); border-color: rgba(132, 150, 178, 0.18); }
+  .cnav .navmenu { background: rgba(8, 11, 16, 0.62); border-color: rgba(132, 150, 178, 0.18); }
+  .cnav a:focus-visible .pill, .cnav .toggle:focus-visible .pill {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--ochre) 75%, transparent);
+  }
+
+  .research-link::before { opacity: 0.14; }
+  .cow-wrap { --moo-paper: #0e1218; }
+  .experience { --dot-fill: #0c1016; }
+
+  .art-toc a:not(.is-active), .art-toc[data-zone] a:not(.is-active) { color: var(--ink-4); opacity: 1; }
+  .art-toc a:not(.is-active):hover, .art-toc a:not(.is-active):focus-visible,
+  .art-toc[data-zone] a:not(.is-active):hover, .art-toc[data-zone] a:not(.is-active):focus-visible { color: var(--ink-3); opacity: 1; }
+  .placard.dark .pl-title { color: var(--paper); }
+  .placard.dark .pl-kicker, .placard.dark .pl-meta { color: var(--ink-4); }
+  .placard.dark .pl-desc { color: var(--ink-3); }
+  .seclabel.dark { color: var(--ink-4); }
+  .lightbox, .lightbox::backdrop { background: rgba(5, 7, 10, 0.97); }
+
+  .prose blockquote::before { opacity: 1; }
+  .prose blockquote + p::before { color: var(--ink-4); }
+
+  .descent-veil { background: linear-gradient(180deg, #0d1117, #05070a); }
+  .descent-veil__line { color: rgba(214, 221, 230, 0.53); }
+}
+
+/* ── Blackout Graphite ────────────────────────────────────────────────────────────────────────────────── */
+html[data-theme='dark'][data-darkpal='blackout']:not([data-page='drafting']):not([data-page='paper']) {
+  --paper: #efeff2;
+  --ink-1: #e9e9ec;
+  --ink-2: #c2c2c6;
+  --ink-3: #9c9ca1;
+  --ink-4: #7f7f84;
+  --ink-5: #3a3a3e;
+  --ochre: #e0574a;
+  --indigo: #c8c8cc;
+  --seal: #e0574a;
+  --bg: #050505;
+  --on-accent: #0a0a0a;
+  --hairline-rgb: 212, 212, 216;
+  --descent-grad: linear-gradient(180deg, #0c0c0c 0%, #0b0b0b 20%, #0a0a0a 40%, #080808 60%, #070707 80%, #050505 100%);
+  --reading-grad: linear-gradient(168deg, #0c0c0c 0%, #0b0b0b 48%, #0a0a0a 100%);
+
+  .slide-paper {
+    --panel-bg: #0c0c0c; --panel-edge: rgba(212, 212, 216, 0.16); --panel-ink: #e9e9ec;
+    --panel-soft: #b4b4b8; --panel-faint: #8a8a8f; --panel-accent: #e0574a;
+  }
+  .ch-paper {
+    --c-h0: var(--panel-accent); --c-h1: #66666b; --c-h2: #acacb1; --c-h3: #dadade;
+    --c-p0: #a4a4a9; --c-p1: #f0f0f3; --c-p2: #c8c8cc; --c-p3: #66666b; --c-p4: var(--panel-accent);
+  }
+  .story-paper { --story-line: rgba(233, 233, 236, 0.66); --story-line-soft: rgba(176, 176, 181, 0.55); }
+  .dp { --dp-alert: var(--panel-ink); }
+  .descent::after { display: none; }
+
+  .cnav ul, .cnav .navmenu {
+    background: rgba(6, 6, 6, 0.72); border-color: rgba(212, 212, 216, 0.16);
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    -webkit-backdrop-filter: blur(14px) saturate(1);
+    backdrop-filter: blur(14px) saturate(1);
+  }
+
+  .research-link::before { opacity: 0.24; }
+  .terrain-bubble .m { color: var(--on-accent); }
+  .cow-wrap { --moo-paper: #0c0c0c; }
+  .experience { --dot-fill: #0b0b0b; }
+
+  .art-toc a:not(.is-active), .art-toc[data-zone] a:not(.is-active) { color: var(--ink-4); opacity: 1; }
+  .art-toc a:not(.is-active):hover, .art-toc a:not(.is-active):focus-visible,
+  .art-toc[data-zone] a:not(.is-active):hover, .art-toc[data-zone] a:not(.is-active):focus-visible { color: var(--ink-3); opacity: 1; }
+  .placard.dark .pl-title { color: var(--paper); }
+  .placard.dark .pl-kicker, .placard.dark .pl-meta { color: var(--ink-4); }
+  .placard.dark .pl-desc { color: var(--ink-3); }
+  .seclabel.dark { color: var(--ink-4); }
+  .lightbox, .lightbox::backdrop { background: rgba(5, 5, 5, 0.97); }
+
+  .prose blockquote::before { opacity: 1; }
+  .prose blockquote + p::before { color: var(--ink-4); }
+
+  .descent-veil { background: linear-gradient(180deg, #0c0c0c, #050505); }
+  .descent-veil__line { color: rgba(239, 239, 242, 0.5); }
+}
+
+/* ── Graphite and Seal ────────────────────────────────────────────────────────────────────────────────── */
+html[data-theme='dark'][data-darkpal='graphite']:not([data-page='drafting']):not([data-page='paper']) {
+  --paper: #e8e7e2;
+  --ink-1: #e3e2dd;
+  --ink-2: #bab9b4;
+  --ink-3: #9b9a95;
+  --ink-4: #85847f;
+  --ink-5: #4a4946;
+  --ochre: #e0574a;
+  --indigo: #c4c3be;
+  --seal: #e0574a;
+  --bg: #080808;
+  --on-accent: #160c0a;
+  --hairline-rgb: 200, 198, 193;
+  --descent-grad: linear-gradient(180deg, #161616 0%, #131313 20%, #111111 40%, #0e0e0e 60%, #0b0b0b 80%, #080808 100%);
+  --reading-grad: linear-gradient(168deg, #151515 0%, #141414 48%, #121212 100%);
+
+  .slide-paper {
+    --panel-bg: #161616; --panel-edge: rgba(200, 198, 193, 0.14); --panel-ink: #e3e2dd;
+    --panel-soft: #b0afaa; --panel-faint: #8b8a85; --panel-accent: #e0574a;
+  }
+  .ch-paper {
+    --c-h0: var(--panel-accent); --c-h1: #696864; --c-h2: #a9a8a3; --c-h3: #d6d5d0;
+    --c-p0: #aaa9a4; --c-p1: #eeede8; --c-p2: #cbcac5; --c-p3: #696864; --c-p4: var(--panel-accent);
+  }
+  .story-paper { --story-line: rgba(227, 226, 221, 0.66); --story-line-soft: rgba(170, 169, 164, 0.55); }
+  .dp { --dp-alert: var(--panel-ink); }
+  .descent::after { background: radial-gradient(90% 20% at 54% 66%, rgba(200, 198, 193, 0.04), transparent 82%); }
+
+  .cnav ul, .cnav .navmenu { background: rgba(12, 12, 12, 0.62); border-color: rgba(200, 198, 193, 0.18); }
+
+  .research-link::before { opacity: 0.20; }
+  .terrain-bubble .m { color: var(--on-accent); }
+  .cow-wrap { --moo-paper: #161616; }
+  .experience { --dot-fill: #141414; }
+
+  .art-toc a:not(.is-active), .art-toc[data-zone] a:not(.is-active) { color: var(--ink-4); opacity: 1; }
+  .art-toc a:not(.is-active):hover, .art-toc a:not(.is-active):focus-visible,
+  .art-toc[data-zone] a:not(.is-active):hover, .art-toc[data-zone] a:not(.is-active):focus-visible { color: var(--ink-3); opacity: 1; }
+  .placard.dark .pl-title { color: var(--paper); }
+  .placard.dark .pl-kicker, .placard.dark .pl-meta { color: var(--ink-4); }
+  .placard.dark .pl-desc { color: var(--ink-3); }
+  .seclabel.dark { color: var(--ink-4); }
+  .lightbox, .lightbox::backdrop { background: rgba(12, 12, 12, 0.97); }
+
+  .prose blockquote::before { opacity: 1; }
+  .prose blockquote + p::before { color: var(--ink-4); }
+
+  .descent-veil { background: linear-gradient(180deg, #161616, #0e0e0e); }
+  .descent-veil__line { color: rgba(232, 231, 226, 0.5); }
+}

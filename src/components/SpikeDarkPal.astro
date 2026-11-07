@@ -1,0 +1,62 @@
+---
+// SPIKE (throwaway, task 19): the dark-palette switcher, bottom-left on every page. A click sets
+// <html data-darkpal>, stores it in localStorage['spike.darkpal'], turns the theme dark if it is light
+// (through the corner nav's own toggle, so its a11y state and stored theme follow), and repaints the
+// JS-painted surfaces through `theme:change`. Its colours are its own literals, so it reads the same
+// on every palette, in both themes and on the registers.
+import { DARKPAL_LABELS } from '../lib/spikeDarkPalettes';
+---
+<div class="spike-pal" data-spike-pal role="group" aria-label="Dark palette (spike)">
+  <span class="spike-pal__label">Dark palette:</span>
+  {DARKPAL_LABELS.map(([key, label]) => (
+    <button type="button" data-pal={key} aria-pressed="false">{label}</button>
+  ))}
+</div>
+
+<style>
+  .spike-pal {
+    position: fixed; left: 12px; bottom: 12px; z-index: 35;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 2px; max-width: calc(100vw - 24px); box-sizing: border-box;
+    padding: 4px 4px 4px 12px;
+    font-family: var(--font-mono), ui-monospace, monospace; font-size: 11px; letter-spacing: 0.03em; line-height: 1;
+    color: #d6d6d6; background: rgba(10, 10, 10, 0.86);
+    border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px;
+  }
+  .spike-pal__label { margin-right: 6px; color: #a8a8a8; }
+  .spike-pal button {
+    font: inherit; color: inherit; background: none; cursor: pointer;
+    border: 1px solid transparent; border-radius: 999px; padding: 6px 10px;
+  }
+  .spike-pal button:hover { border-color: rgba(255, 255, 255, 0.32); }
+  .spike-pal button[aria-pressed='true'] { background: #ececec; color: #0a0a0a; }
+  .spike-pal button:focus-visible { outline: 2px solid #ececec; outline-offset: 1px; }
+  @media print { .spike-pal { display: none; } }
+</style>
+
+<script>
+  import { onPageView } from '../scripts/pageView';
+
+  onPageView('[data-spike-pal]', (bar) => {
+    const root = document.documentElement;
+    const buttons = Array.from(bar.querySelectorAll<HTMLButtonElement>('button[data-pal]'));
+    const sync = (): void => {
+      const cur = root.dataset.darkpal ?? 'current';
+      for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.pal === cur));
+    };
+    sync();
+    for (const b of buttons) {
+      b.addEventListener('click', () => {
+        const pal = b.dataset.pal ?? 'current';
+        root.dataset.darkpal = pal;
+        try { localStorage.setItem('spike.darkpal', pal); } catch (e) { /* the attribute still holds */ }
+        sync();
+        // The toggle flips the theme, stores it, syncs its own aria state and dispatches theme:change.
+        const toggle = document.querySelector<HTMLButtonElement>('[data-theme-toggle]');
+        if (root.dataset.theme !== 'dark' && toggle) toggle.click();
+        else document.dispatchEvent(new Event('theme:change'));
+      });
+    }
+    // Listeners on the bar leave with the swapped <body>; nothing on window or document to undo.
+    return undefined;
+  });
+</script>
