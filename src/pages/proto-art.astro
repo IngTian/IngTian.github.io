@@ -1,13 +1,14 @@
 ---
 // PROTOTYPE (throwaway): the /art redesign, to look at on the real site. A globe of places, five chosen photographs,
-// the wall of the rest, and the calligraphy in its own room. /art itself is untouched. Data: data/protoArt.ts.
-// Retire it by deleting this page, that file, its `want` entry in tests/distSmoke.test.ts and CLAUDE.md's count.
+// the calligraphy in its own room, and the rest of the photographs by place. /art itself is untouched. Data and the
+// stack layout: data/protoArt.ts. Retire it by deleting this page, that file, its `want` entry in
+// tests/distSmoke.test.ts and CLAUDE.md's count.
 import BaseLayout from '../layouts/BaseLayout.astro';
 import FluidSky from '../components/FluidSky.astro';
 import SkyWash from '../components/SkyWash.astro';
 import { Image, getImage } from 'astro:assets';
 import { calligraphy, photography } from '../data/artworks';
-import { PICKS, PLACES } from '../data/protoArt';
+import { CULL, PICKS, PLACES } from '../data/protoArt';
 
 // /art's byte rules (CLAUDE.md, Stack), as art.astro keeps them: sizes from getImage(), never off the import (the
 // import is a Proxy; reading `.width` keeps the original in dist), a webp at native pixels for the lightbox's 6x.
@@ -20,30 +21,33 @@ const zoomOf = async (src: ImageMetadata) => {
 const photoZoom = await Promise.all(photography.map((p) => zoomOf(p.src)));
 const calZoom = await Promise.all(calligraphy.map((w) => zoomOf(w.src)));
 
-// Every photograph sits in exactly one placeholder place.
+// Every photograph sits in exactly one placeholder place; the placeholder cull leaves a few off the page, never a pick.
 const placed = PLACES.flatMap((p) => p.photos).sort((a, b) => a - b);
 if (placed.length !== photography.length || placed.some((n, i) => n !== i + 1)) {
   throw new Error(`proto-art: the places hold ${placed.length} photographs; every one of the ${photography.length} goes in exactly one`);
 }
+const culled = new Set(CULL);
+if (PICKS.some((n) => culled.has(n))) throw new Error('proto-art: a pick is in the cull');
 const placeOf = new Map(PLACES.flatMap((p) => p.photos.map((n) => [n, p] as const)));
 const photo = (n: number) => {
   const p = photography[n - 1];
   const z = photoZoom[n - 1];
   return { n, src: p.src, alt: p.alt, title: p.title ?? 'Untitled', note: p.note ?? '', z, ar: z.w / z.h, place: placeOf.get(n)! };
 };
+const places = PLACES.map((pl) => ({ ...pl, shown: pl.photos.filter((n) => !culled.has(n)) })).filter((pl) => pl.shown.length);
+// A stack's faces: its first three, top card first. The top card's photograph leads the hover box.
+const stacks = places.map((pl) => ({ pl, faces: pl.shown.slice(0, 3).map(photo) }));
 const picks = PICKS.map(photo);
-const rest = photography.map((_, i) => i + 1).filter((n) => !PICKS.includes(n)).map(photo);
+// The rest, by place: what the stacks hold that the carousel does not.
+const groups = places.map((pl) => ({ pl, photos: pl.shown.filter((n) => !PICKS.includes(n)).map(photo) })).filter((g) => g.photos.length);
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
-// THE WALL'S ROWS. A tile spans round(50 / ar) rows of u = a column's width / 50 (the grid's auto rows), plus
-// GAP_U rows of gap, so its box keeps the photo's real ratio to within half a row (under 0.8%, which object-fit
-// takes up) at any column count, with no script. 50, not finer: one column of the 37 is ~2,300 rows already. Sparse auto-placement puts each tile at the first free place
-// after the last, so the reading order stays the order of the data.
-const GAP_U = 3;
-const rowsOf = (ar: number) => Math.round(50 / ar);
-// A tile is one column wide: at most 360px at three columns (a 1096px wall), half the window at two, the window at
-// one. Upper bounds, never under-declared; [300, 600, 900] are /art's own widths, so the variants are shared.
-const TILE_SIZES = '(max-width: 640px) 100vw, (max-width: 900px) 50vw, 360px';
+// THE CONTACT SHEET. Every tile is the sheet's row height tall (TILE_H, TILE_H_PHONE at 640px and under) and its
+// photograph's real ratio wide, so its `sizes` is exactly that width. [300, 600, 900] are /art's own widths, so the
+// variants are shared.
+const TILE_H = 148;
+const TILE_H_PHONE = 112;
+const tileSizes = (ar: number) => `(max-width: 640px) ${Math.ceil(TILE_H_PHONE * ar)}px, ${Math.ceil(TILE_H * ar)}px`;
 // The carousel's frame is min(520px, 36vw, 50vh) wide, 440px at most below 900px.
 const SEL_SIZES = '(max-width: 900px) 440px, 520px';
 // A polaroid's window is a 56px square of the photo, so a landscape photo needs 56 * ar px of width to fill it.
@@ -56,7 +60,7 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
 ---
 <BaseLayout
   title="PROTOTYPE · An artist by night — Ing Tian"
-  description="A prototype of the redesigned /art: places, selected photographs, the wall, and the calligraphy."
+  description="A prototype of the redesigned /art: places, selected photographs, the calligraphy, and the rest by place."
   veilLine="an artist by night"
   veilOnLoad={true}
 >
@@ -64,42 +68,41 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
     <FluidSky variant="descent" />
     <SkyWash />
     <div class="pa-wrap">
-      <header class="pa-head" data-ink>
+      <header class="pa-head veil" data-ink>
         <a class="back" href="/">← back</a>
         <h1>An artist by night</h1>
-        <p class="lede">Photographs from where they were taken, a few chosen, then the whole wall; and the calligraphy, in a room of its own.</p>
+        <p class="lede">Photographs from where they were taken, a few chosen, the calligraphy in a room of its own, then the rest, place by place.</p>
       </header>
 
-      <section class="room places-room" id="places" aria-labelledby="places-h" data-ink>
-        <div class="places-side">
+      <section class="room places-room" id="places" aria-labelledby="places-h">
+        <div class="places-side veil" data-ink>
           <h2 class="seclabel" id="places-h">Places</h2>
           <p class="side-line">Each stack is the photographs from one place. Drag to turn the globe; open a stack to look closely.</p>
           <ol class="places">
-            {PLACES.map((pl) => (
+            {places.map((pl) => (
               <li><button type="button" class="place-btn" data-place={pl.id}>
-                <span class="pl-name">{pl.name}</span><span class="pl-region">{pl.region}</span><span class="pl-n">{pl.photos.length}</span>
+                <span class="pl-name">{pl.name}</span><span class="pl-region">{pl.region}</span><span class="pl-n">{pl.shown.length}</span>
               </button></li>
             ))}
           </ol>
-          <p class="placeholder-note">Pins are placeholders: the real places come from the owner.</p>
+          <p class="placeholder-note sealed">Pins are placeholders: the real places come from the owner.</p>
         </div>
-        <div class="globe-stage" data-mode="whole">
+        <div class="globe-stage" data-mode="crop" data-ink>
           <canvas class="globe-canvas" aria-hidden="true"></canvas>
-          {PLACES.map((pl) => (
-            <div class="stack has-tip" data-place={pl.id} data-lat={pl.lat} data-lon={pl.lon} data-photos={pl.photos.join(',')}>
-              <button class="stack-btn" type="button" aria-label={`${pl.name}, ${pl.photos.length} photographs: open`} aria-describedby={`tip-${pl.id}`}>
-                {pl.photos.slice(0, 3).map(photo).reverse().map((ph, k, all) => (
+          {stacks.map(({ pl, faces }) => (
+            <div class="stack has-tip" data-place={pl.id} data-lat={pl.lat} data-lon={pl.lon} data-photos={pl.shown.join(',')}>
+              <button class="stack-btn" type="button" aria-label={`${pl.name}, ${pl.shown.length} photographs: open`} aria-describedby={`tip-${pl.id}`}>
+                {faces.slice().reverse().map((ph, k, all) => (
                   <span class="pol" style={`--k:${all.length - 1 - k}`}>
                     <Image src={ph.src} alt={ph.alt} widths={[160, 300]} sizes={thumbSizes(ph.ar)} loading="lazy" decoding="async" />
+                    {k === all.length - 1 && <span class="pol-n" aria-hidden="true">{pl.shown.length}</span>}
                   </span>
                 ))}
-                <span class="stack-n" aria-hidden="true">{pl.photos.length}</span>
               </button>
               <div class="tip stack-tip" role="tooltip" id={`tip-${pl.id}`}>
-                <p class="tip-k">{pl.name} · {pl.region} · {pl.photos.length} photographs</p>
-                <p class="tip-t">{photo(pl.photos[0]).title}</p>
-                <p class="tip-n">{photo(pl.photos[0]).note}</p>
-                <p class="tip-more">With {pl.photos.slice(1).map((n) => photo(n).title).join(', ')}.</p>
+                <p class="tip-k">{pl.region}</p>
+                <p class="tip-t">{pl.name}</p>
+                <p class="tip-n"><i>{faces[0].title}.</i> {faces[0].note}</p>
               </div>
             </div>
           ))}
@@ -108,7 +111,7 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
 
       <section class="room sel" id="selected" aria-roledescription="carousel" aria-label="Selected photographs">
         <div class="sel-grid">
-          <div class="sel-text" data-ink>
+          <div class="sel-text veil" data-ink>
             <h2 class="seclabel">Selected</h2>
             <p class="sel-count" aria-hidden="true"><span class="sel-rule"></span><span class="sel-cur">01</span> / {pad2(picks.length)}</p>
             <div class="sel-slides">
@@ -116,7 +119,7 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
                 <div class:list={['sel-slide', { 'is-on': i === 0 }]} role="group" aria-roledescription="slide"
                      aria-label={`${i + 1} of ${picks.length}`} inert={i !== 0}>
                   <h3 class="sel-title">{ph.title}</h3>
-                  <p class="sel-sub">{ph.place.name}, {ph.place.region}</p>
+                  <p class="sel-sub sealed">{ph.place.name}, {ph.place.region}</p>
                   <p class="sel-story">{ph.note}</p>
                 </div>
               ))}
@@ -138,34 +141,15 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
             ))}
           </div>
         </div>
-        <ol class="sel-progress" data-ink>
+        <ol class="sel-progress veil" data-ink>
           {picks.map((ph, i) => (
             <li><button type="button" data-go={i} aria-current={i === 0 ? 'true' : undefined}>{ph.title}</button></li>
           ))}
         </ol>
       </section>
 
-      <section class="room wall-room" id="wall" aria-labelledby="wall-h">
-        <h2 class="seclabel" id="wall-h" data-ink>All photographs</h2>
-        <div class="wall">
-          {rest.map((ph) => (
-            <figure class="tile has-tip" style={`--r:${rowsOf(ph.ar)};--span:${rowsOf(ph.ar) + GAP_U}`}>
-              <button type="button" class="tile-btn" aria-describedby={`cap-${ph.n}`}
-                      data-photo={ph.n} data-zoom={ph.z.src} data-zw={ph.z.w} data-zh={ph.z.h} data-alt={ph.alt}
-                      data-title={ph.title} data-note={ph.note} data-where={`${ph.place.name}, ${ph.place.region}`}>
-                <Image src={ph.src} alt={ph.alt} widths={[300, 600, 900]} sizes={TILE_SIZES} loading="lazy" decoding="async" />
-              </button>
-              <figcaption class="tip tile-tip" id={`cap-${ph.n}`}>
-                <span class="tip-t">{ph.title}</span>
-                <span class="tip-n">{ph.note}</span>
-              </figcaption>
-            </figure>
-          ))}
-        </div>
-      </section>
-
       <section class="room cal-room" id="calligraphy" aria-labelledby="cal-h">
-        <h2 class="seclabel" id="cal-h" data-ink data-zone="dark">Calligraphy</h2>
+        <h2 class="seclabel veil" id="cal-h" data-ink>Calligraphy</h2>
         <div class="cal-host">
           {calligraphy.map((w, i) => (
             <figure class="cal-work">
@@ -175,7 +159,7 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
                 <Image src={w.src} alt={w.alt} widths={[480, 900, 1200]} sizes={calSizes(calZoom[i].w / calZoom[i].h)}
                        loading="lazy" decoding="async" />
               </button>
-              <figcaption class="cal-cap" data-ink data-zone="dark">
+              <figcaption class="cal-cap veil" data-ink data-zone="dark">
                 <span class="cal-k">{kickerParts(w.kicker ?? '').en}{kickerParts(w.kicker ?? '').zh && <> · <span lang="zh-Hant">{kickerParts(w.kicker ?? '').zh}</span></>}</span>
                 <span class="cal-t">{w.title}</span>
                 <span class="cal-m">{w.medium}</span>
@@ -185,7 +169,31 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
         </div>
       </section>
 
-      <footer class="pa-foot" data-ink data-zone="dark"><a class="back" href="/">← back to the descent</a></footer>
+      <section class="room wall-room" id="wall" aria-labelledby="wall-h">
+        <h2 class="seclabel veil" id="wall-h" data-ink data-zone="dark">The rest, by place</h2>
+        {groups.map(({ pl, photos }) => (
+          <div class="wall-group" data-ink data-zone="dark">
+            <h3 class="wg-head veil"><span class="wg-name">{pl.name}</span><span class="wg-region">{pl.region}</span></h3>
+            <div class="sheet">
+              {photos.map((ph) => (
+                <figure class="tile has-tip" style={`--ar:${ph.ar.toFixed(4)}`}>
+                  <button type="button" class="tile-btn" aria-describedby={`cap-${ph.n}`}
+                          data-photo={ph.n} data-zoom={ph.z.src} data-zw={ph.z.w} data-zh={ph.z.h} data-alt={ph.alt}
+                          data-title={ph.title} data-note={ph.note} data-where={`${ph.place.name}, ${ph.place.region}`}>
+                    <Image src={ph.src} alt={ph.alt} widths={[300, 600, 900]} sizes={tileSizes(ph.ar)} loading="lazy" decoding="async" />
+                  </button>
+                  <figcaption class="tip tile-tip" id={`cap-${ph.n}`}>
+                    <span class="tip-t">{ph.title}</span>
+                    <span class="tip-n">{ph.note}</span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <footer class="pa-foot veil" data-ink data-zone="dark"><a class="back" href="/">← back to the descent</a></footer>
     </div>
 
     <dialog class="lightbox" id="pa-lightbox" aria-label="Photograph detail">
@@ -202,40 +210,54 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
     <div class="proto-bar" role="group" aria-label="Prototype controls">
       <span class="pb-tag">Prototype controls</span>
       <span class="pb-group"><span class="pb-l">Globe</span>
-        <button type="button" data-globe="whole" aria-pressed="true">whole globe</button>
-        <button type="button" data-globe="crop" aria-pressed="false">cropped hemisphere</button>
+        <button type="button" data-globe="crop" aria-pressed="true">cropped hemisphere</button>
+        <button type="button" data-globe="whole" aria-pressed="false">whole globe</button>
       </span>
       <span class="pb-group"><span class="pb-l">Calligraphy</span>
         <button type="button" data-calpos="first" aria-pressed="false">before the globe</button>
-        <button type="button" data-calpos="carousel" aria-pressed="false">after the carousel</button>
-        <button type="button" data-calpos="end" aria-pressed="true">at the end</button>
+        <button type="button" data-calpos="carousel" aria-pressed="true">after the carousel</button>
+        <button type="button" data-calpos="end" aria-pressed="false">at the end</button>
       </span>
-      <span class="pb-legend">Not part of the design. Pins and picks are placeholders; compare with <a href="/art">/art</a>.</span>
+      <span class="pb-legend">Not part of the design. Pins, picks and the cull are placeholders (left off: {CULL.map(pad2).join(', ')}); compare with <a href="/art">/art</a>.</span>
     </div>
   </main>
 </BaseLayout>
 
 <style>
-  .pa { position: relative; z-index: 0; min-height: 100vh; }
+  /* overflow-x: clip, so a hover box near the edge (laid out while hidden) never widens the page. */
+  .pa { position: relative; z-index: 0; min-height: 100vh; overflow-x: clip;
+    /* The hover boxes' inks, resolved here, outside every zone: a box is a card of its own ground. */
+    --tip-ground: var(--paper); --tip-ink: var(--ink-1); --tip-ink-2: var(--ink-2); --tip-edge: rgba(var(--hairline-rgb), 0.28); }
+  :global(html[data-theme='dark']) .pa { --tip-ground: var(--bg); }
   .pa-wrap { max-width: 1240px; margin: 0 auto; padding: 0 clamp(22px, 5vw, 72px); }
 
-  /* THE INK FOLLOWS THE SKY. The light descent runs from paper to near-black, so text past its middle is set in
-     paper. The script sets data-zone on each [data-ink] block from where its middle falls on the page (the sky is
-     drawn by page depth); the markup's own values are the default order's, for no script. Dark theme: the ink ramp
-     is already light, so none of this applies. */
+  /* THE INK FOLLOWS THE SKY (light theme; in dark the ink ramp is light on a dark sky everywhere). The script sets
+     data-zone on each [data-ink] block from the sky's luminance over its span, and data-veil where neither ink
+     clears 4.5:1 there; a .veil block, or the .veil inside one, then sits on a soft knockout of its zone's ground.
+     The markup's own zones are a guess at the default order, for no script. */
+  .pa [data-zone='light'] { --veil: rgba(239, 233, 221, 0.45); }
+  .pa [data-zone='dark'] { --veil: rgba(22, 20, 15, 0.5); }
   :global(html:not([data-theme='dark'])) .pa [data-zone='dark'] {
     --ink-1: #efe9dd; --ink-2: rgba(239, 233, 221, 0.88); --ink-3: rgba(239, 233, 221, 0.76); --ink-4: rgba(239, 233, 221, 0.6);
+    --hairline-rgb: 239, 233, 221;
   }
+  :global(html:not([data-theme='dark'])) .pa [data-veil].veil, :global(html:not([data-theme='dark'])) .pa [data-veil] .veil {
+    position: relative; isolation: isolate; }
+  :global(html:not([data-theme='dark'])) .pa [data-veil].veil::before, :global(html:not([data-theme='dark'])) .pa [data-veil] .veil::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: 18px;
+    background: var(--veil); box-shadow: 0 0 30px 22px var(--veil); }
 
   .pa-head { padding: 13vh 0 2vh; }
-  .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
+  .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); text-decoration: none; letter-spacing: 0.04em; }
   .back:hover { color: var(--seal); }
   .pa h1 { font-family: var(--font-display); font-weight: 500; font-size: clamp(38px, 5vw, 60px); line-height: 1.04;
     letter-spacing: -0.01em; margin-top: 16px; color: var(--ink-1); }
-  .lede { font-size: 15px; color: var(--ink-3); margin-top: 16px; line-height: 1.7; max-width: 52ch; }
+  .lede { font-size: 15px; color: var(--ink-2); margin-top: 16px; line-height: 1.7; max-width: 52ch; }
   .seclabel { font-family: var(--font-mono); font-weight: 400; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase;
-    color: var(--ink-3); margin: 0 0 18px; }
+    color: var(--ink-2); margin: 0 0 18px; width: fit-content; }
   .room { padding: 7vh 0; }
+  /* Seal red as a rule beside small text, never as the small text's colour (3.2-3.7:1 on the light sky). */
+  .sealed::before { content: ""; display: inline-block; width: 16px; height: 1px; margin-right: 10px; vertical-align: 0.32em; background: var(--seal); }
 
   /* ── 1. PLACES ───────────────────────────────────────────────────────────────────────────────── */
   .places-room { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 40px; align-items: center; }
@@ -255,44 +277,52 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
     transform: translate(calc(var(--k) * 3px), calc(var(--k) * -2px)) rotate(calc(-4deg + var(--k) * 5deg));
     transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1); }
   .pol :global(img) { display: block; width: 56px; height: 56px; object-fit: cover; }
+  /* The count, as a note in the top card's margin. The card is paper in both themes, so its ink is fixed: 6:1. */
+  .pol-n { position: absolute; right: 6px; bottom: 1px; font: 400 9px/13px var(--font-mono); letter-spacing: 0.04em; color: #5a544a; }
   @media (hover: hover) and (prefers-reduced-motion: no-preference) {
     .stack:hover .pol, .stack.is-lit .pol { transform: translate(calc(var(--k) * 9px), calc(var(--k) * -4px)) rotate(calc(-6deg + var(--k) * 8deg)); }
   }
-  .stack-n { position: absolute; right: -2px; top: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
-    background: var(--seal); color: #f6efe6; font: 600 10px/18px var(--font-mono); text-align: center; z-index: 4; }
   .stack-btn:focus-visible { outline: 2px solid var(--seal); outline-offset: 4px; }
 
   /* THE HOVER BOX (WCAG 1.4.13): on hover (a mouse or pen) or keyboard focus; it takes the pointer while shown, a
-     bridge spans the gap to it, and Escape hides it without moving either (the script's data-tip-off). Its ground
-     is the page base, its text paper: 15:1 in both themes, on any depth of the sky. */
+     bridge spans the gap to it, and Escape hides it without moving either (the script's data-tip-off). A card in
+     the site's ink on its own ground (paper in light, the page base in dark), so it reads on any depth of the sky. */
   .tip { position: absolute; z-index: 6; opacity: 0; pointer-events: none; transform: translateY(4px);
-    background: var(--bg); color: var(--paper); border-radius: 3px; box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.55);
-    transition: opacity 0.18s ease, transform 0.18s ease; text-align: left; }
+    background: var(--tip-ground); color: var(--tip-ink); border: 1px solid var(--tip-edge); border-radius: 2px;
+    box-shadow: 0 16px 36px -20px rgba(20, 18, 14, 0.5); transition: opacity 0.18s ease, transform 0.18s ease; text-align: left; }
   @media (hover: hover) { .has-tip:hover:not([data-tip-off]) .tip { opacity: 1; transform: none; pointer-events: auto; } }
   .has-tip:has(:focus-visible):not([data-tip-off]) .tip { opacity: 1; transform: none; pointer-events: auto; }
-  .stack-tip { left: 50%; top: calc(100% + 10px); width: 250px; margin-left: -125px; padding: 12px 14px 13px; }
-  .stack-tip::before { content: ""; position: absolute; left: 0; right: 0; top: -12px; height: 12px; }
-  .tip-k { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.7; }
-  .tip-t { display: block; font-family: var(--font-display); font-size: 17px; line-height: 1.25; margin-top: 6px; }
-  .tip-n { display: block; font-size: 13px; line-height: 1.55; margin-top: 4px; opacity: 0.86; }
-  .tip-more { font-size: 12px; line-height: 1.5; margin-top: 8px; opacity: 0.62; }
+  .tip::before { content: ""; position: absolute; }
+  .tip-k { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--tip-ink-2); white-space: nowrap; }
+  .tip-t { display: block; font-family: var(--font-display); font-size: 18px; line-height: 1.25; margin-top: 5px; }
+  .tip-n { display: block; font-size: 13px; line-height: 1.55; margin-top: 6px; color: var(--tip-ink-2); }
+  .tip-n i { font-family: var(--font-display); color: var(--tip-ink); }
+  /* A stack's box goes to the side of it that covers the fewest other stacks and pins (the script's data-side). */
+  .stack-tip { width: 240px; padding: 12px 14px 13px; left: calc(100% + 14px); top: 0; }
+  .stack-tip::before { top: 0; bottom: 0; left: -16px; width: 16px; }
+  .stack[data-side='left'] .stack-tip { left: auto; right: calc(100% + 14px); }
+  .stack[data-side='left'] .stack-tip::before { left: auto; right: -16px; }
+  .stack[data-side='below'] .stack-tip { left: 50%; margin-left: -120px; top: calc(100% + 14px); }
+  .stack[data-side='above'] .stack-tip { left: 50%; margin-left: -120px; top: auto; bottom: calc(100% + 14px); }
+  .stack[data-side='below'] .stack-tip::before { left: 0; right: 0; width: auto; top: -16px; bottom: auto; height: 16px; }
+  .stack[data-side='above'] .stack-tip::before { left: 0; right: 0; width: auto; top: auto; bottom: -16px; height: 16px; }
 
-  .side-line { font-size: 14px; line-height: 1.65; color: var(--ink-3); margin-bottom: 18px; }
+  .side-line { font-size: 14px; line-height: 1.65; color: var(--ink-2); margin-bottom: 18px; }
   .places { list-style: none; margin: 0; padding: 0; border-top: 1px solid rgba(var(--hairline-rgb), 0.3); }
   .places li { border-bottom: 1px solid rgba(var(--hairline-rgb), 0.3); }
   .place-btn { display: grid; grid-template-columns: 1fr auto; column-gap: 10px; width: 100%; padding: 9px 2px; border: 0;
     background: none; text-align: left; cursor: pointer; color: var(--ink-1); min-height: 44px; }
   .pl-name { font-family: var(--font-display); font-size: 16px; }
-  .pl-region { grid-row: 2; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--ink-3); }
-  .pl-n { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); }
+  .pl-region { grid-row: 2; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--ink-2); }
+  .pl-n { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); }
   .place-btn:hover .pl-name, .place-btn:focus-visible .pl-name { color: var(--seal); }
   .place-btn:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
-  .placeholder-note { margin-top: 16px; font-family: var(--font-mono); font-size: 11px; line-height: 1.6; color: var(--seal); }
+  .placeholder-note { margin-top: 16px; font-family: var(--font-mono); font-size: 11px; line-height: 1.6; color: var(--ink-2); }
 
   /* ── 2. SELECTED ─────────────────────────────────────────────────────────────────────────────── */
   .sel-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: clamp(32px, 5vw, 72px); align-items: center; }
   .sel-text { max-width: 440px; }
-  .sel-count { display: flex; align-items: center; gap: 12px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.2em; color: var(--ink-3); }
+  .sel-count { display: flex; align-items: center; gap: 12px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.2em; color: var(--ink-2); }
   .sel-rule { width: 32px; height: 1px; background: currentColor; }
   /* Every slide's text in one cell, so the panel is as tall as the longest and nothing below it moves. */
   .sel-slides { display: grid; margin-top: 26px; }
@@ -300,7 +330,7 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
   .sel-slide.is-on { opacity: 1; transform: none; }
   .sel-title { font-family: var(--font-display); font-weight: 400; font-size: clamp(36px, 4.4vw, 58px); line-height: 1.08;
     letter-spacing: -0.015em; color: var(--ink-1); }
-  .sel-sub { margin-top: 14px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--seal); }
+  .sel-sub { margin-top: 14px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink-2); }
   .sel-story { margin-top: 18px; font-size: 17px; line-height: 1.75; color: var(--ink-2); max-width: 38ch; }
   .sel-arrows { display: flex; gap: 12px; margin-top: 34px; }
   .arrow { width: 48px; height: 48px; border-radius: 50%; border: 1px solid currentColor; background: none; color: var(--ink-1);
@@ -324,7 +354,7 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
   }
   .sel-progress { list-style: none; margin: 44px 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
   .sel-progress button { position: relative; width: 100%; padding: 14px 0 0; border: 0; background: none; text-align: left; cursor: pointer;
-    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--ink-3); min-height: 44px; }
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--ink-2); min-height: 44px; }
   .sel-progress button::before, .sel-progress button::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; }
   .sel-progress button::before { background: rgba(var(--hairline-rgb), 0.35); }
   .sel-progress button::after { background: var(--seal); transform: scaleX(0); transform-origin: left; }
@@ -334,32 +364,7 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
   .sel-progress button:focus-visible { outline: 2px solid var(--seal); outline-offset: 3px; }
   @media (prefers-reduced-motion: no-preference) { .sel-progress button::after { transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); } }
 
-  /* ── 3. THE WALL ─────────────────────────────────────────────────────────────────────────────── */
-  .wall-room { container-type: inline-size; }
-  .wall { --cols: 3; --gap: 18px; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); column-gap: var(--gap);
-    grid-auto-rows: calc((100cqw - (var(--cols) - 1) * var(--gap)) / var(--cols) / 50); }
-  .tile { grid-row: span var(--span); height: calc(var(--r) * (100cqw - (var(--cols) - 1) * var(--gap)) / var(--cols) / 50);
-    margin: 0; position: relative; overflow: hidden; border-radius: 2px; background: rgba(var(--hairline-rgb), 0.2); }
-  .tile-btn { position: absolute; inset: 0; padding: 0; border: 0; background: none; cursor: zoom-in; }
-  .tile-btn :global(img) { display: block; width: 100%; height: 100%; object-fit: cover; position: relative; z-index: 1; }
-  .tile-btn:focus-visible { outline: 2px solid var(--seal); outline-offset: -2px; }
-  /* /art's loading tile: a palette-tone ground, a transform-only shimmer while the picture decodes (three passes,
-     inside five seconds, then the tone rests), and a fade once it has. No script or reduced motion: shown at once. */
-  .tile::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; transform: translateX(-100%);
-    background: linear-gradient(100deg, transparent 30%, rgba(239, 233, 221, 0.22) 50%, transparent 70%); }
-  .tile.is-loaded::before { content: none; }
-  @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
-    .tile::before { animation: pa-shimmer 1.6s ease-in-out 3; }
-    .tile-btn :global(img) { opacity: 0; transition: opacity 0.6s ease, transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
-    .tile.is-loaded .tile-btn :global(img) { opacity: 1; }
-    @keyframes pa-shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
-  }
-  @media (hover: hover) and (prefers-reduced-motion: no-preference) { .tile:hover .tile-btn :global(img) { transform: scale(1.03); } }
-  .tile-tip { left: 10px; right: 10px; bottom: 10px; padding: 10px 12px 11px; z-index: 3; }
-  @media (max-width: 900px) { .wall { --cols: 2; --gap: 14px; } }
-  @media (max-width: 640px) { .wall { --cols: 1; } }
-
-  /* ── 4. CALLIGRAPHY ──────────────────────────────────────────────────────────────────────────── */
+  /* ── 3. CALLIGRAPHY ──────────────────────────────────────────────────────────────────────────── */
   .cal-host { display: flex; flex-direction: column; gap: clamp(8vh, 10vh, 120px); padding: 4vh 0; }
   .cal-work { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 22px; }
   .cal { padding: 0; border: 0; background: none; line-height: 0; cursor: zoom-in; }
@@ -368,10 +373,40 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
   .cal.paper :global(img) { border: 1px solid rgba(255, 255, 255, 0.16); box-shadow: 0 24px 60px -22px rgba(20, 18, 14, 0.5); }
   .cal:focus-visible { outline: 2px solid var(--seal); outline-offset: 6px; }
   .cal-cap { display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center; }
-  .cal-k { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-3); }
+  .cal-k { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-2); }
   .cal-t { font-family: var(--font-display); font-size: 24px; color: var(--ink-1); }
-  .cal-m { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); }
-  .pa-foot { padding: 10vh 0 18vh; }
+  .cal-m { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); }
+
+  /* ── 4. THE REST, BY PLACE: a contact sheet ─────────────────────────────────────────────────── */
+  .wall-group { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 12px 32px; padding: 24px 0;
+    border-top: 1px solid rgba(var(--hairline-rgb), 0.3); }
+  .wg-head { margin: 0; font-weight: 400; display: flex; flex-direction: column; gap: 5px; align-self: start; width: fit-content; }
+  .wg-name { font-family: var(--font-display); font-size: 19px; line-height: 1.2; color: var(--ink-1); }
+  .wg-region { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: var(--ink-2); }
+  .sheet { --h: 148px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .tile { flex: none; height: var(--h); aspect-ratio: var(--ar); max-width: 100%; margin: 0; position: relative; }
+  .tile:hover, .tile:focus-within { z-index: 5; }
+  .tile-btn { position: absolute; inset: 0; padding: 0; border: 0; overflow: hidden; border-radius: 2px; cursor: zoom-in;
+    background: rgba(var(--hairline-rgb), 0.2); }
+  .tile-btn :global(img) { display: block; width: 100%; height: 100%; object-fit: cover; position: relative; z-index: 1; }
+  .tile-btn:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
+  /* /art's loading tile: a palette-tone ground, a transform-only shimmer while the picture decodes (three passes,
+     inside five seconds, then the tone rests), and a fade once it has. No script or reduced motion: shown at once. */
+  .tile-btn::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; transform: translateX(-100%);
+    background: linear-gradient(100deg, transparent 30%, rgba(239, 233, 221, 0.22) 50%, transparent 70%); }
+  .tile.is-loaded .tile-btn::before { content: none; }
+  @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+    .tile-btn::before { animation: pa-shimmer 1.6s ease-in-out 3; }
+    .tile-btn :global(img) { opacity: 0; transition: opacity 0.6s ease, transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
+    .tile.is-loaded .tile-btn :global(img) { opacity: 1; }
+    @keyframes pa-shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+  }
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) { .tile:hover .tile-btn :global(img) { transform: scale(1.03); } }
+  /* Under the tile, from its left edge, or its right where the sheet ends (the script's data-end). */
+  .tile-tip { top: calc(100% + 10px); left: 0; width: 260px; padding: 10px 12px 11px; }
+  .tile-tip::before { left: 0; right: 0; top: -12px; height: 12px; }
+  .tile[data-end] .tile-tip { left: auto; right: 0; }
+  .pa-foot { padding: 10vh 0 18vh; width: fit-content; }
 
   /* ── THE LIGHTBOX ────────────────────────────────────────────────────────────────────────────── */
   .lightbox { border: 0; padding: 0; margin: 0; max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh; background: rgba(16, 15, 12, 0.97); }
@@ -416,9 +451,11 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
     .sel-text { max-width: none; }
     .sel-progress { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
     .sel-progress button { font-size: 10px; }
+    .wall-group { grid-template-columns: 1fr; }
   }
   @media (max-width: 640px) {
     .globe-stage { display: none; }
+    .sheet { --h: 112px; gap: 8px; }
     .lb-nav { position: fixed; bottom: 44px; }
     .lb-nav[data-step='-1'] { left: 16px; }
     .lb-nav[data-step='1'] { right: 16px; }
@@ -430,14 +467,45 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
 <script>
   import { onPageView } from '../scripts/pageView';
   import { prefersReducedMotion } from '../lib/motion';
-  import { LAND, PLACES } from '../data/protoArt';
+  import { rampFor } from '../lib/skyPalette';
+  import { AA_BODY, contrastRatio, wcagLuminance } from '../lib/skyLegibility';
+  import { CARD_H, CARD_W, LAND, PLACES, layoutCards, type Card, type Pin } from '../data/protoArt';
 
   const D = Math.PI / 180;
-  // Past this depth of the page the light sky is dark enough to set text in paper (/art's rail flips at 0.42).
-  const DARK_FROM = 0.45;
   type Mode = 'whole' | 'crop';
   type CalPos = 'first' | 'carousel' | 'end';
+  type RGB = [number, number, number];
   interface View { lam: number; phi: number; R: number; cx: number; cy: number }
+
+  // ── The ink policy on the light descent. The sky is drawn by page depth from this ramp, and the live sky (warp,
+  // wash, grain) measured 0.68-1.0x its luminance, so a block's ground is taken as 0.62-1.0x the ramp at its top,
+  // middle and bottom. It gets the ink that clears more there: tokens.css's light --ink-2 (the lightest dark ink the
+  // page sets as text) or paper at 0.88. Where neither clears 4.5:1 (about 0.34-0.50 of the page's depth) it is
+  // veiled too; the least veil that clears that band is 0.29 paper or 0.34 dark, and the CSS sets 0.45 and 0.5.
+  const rgb = (hex: string): RGB => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as RGB;
+  const RAMP = rampFor('descent', 'light').map(([t, hex]) => [t, rgb(hex)] as const);
+  const skyAt = (t: number): RGB => {
+    for (let i = 1; i < RAMP.length; i++) {
+      const [t1, b] = RAMP[i];
+      if (t > t1) continue;
+      const [t0, a] = RAMP[i - 1];
+      const k = (Math.max(t, t0) - t0) / (t1 - t0);
+      return a.map((x, j) => x + (b[j] - x) * k) as RGB;
+    }
+    return RAMP[RAMP.length - 1][1];
+  };
+  const L_INK = wcagLuminance(rgb('#2f2b24'));
+  const PAPER = rgb('#efe9dd');
+  const LIVE_DARKER = 0.62;
+  const inkFor = (depths: number[]): { zone: 'light' | 'dark'; veil: boolean } => {
+    let dark = Infinity, paper = Infinity;
+    for (const t of depths) {
+      const g = skyAt(t), lg = wcagLuminance(g);
+      dark = Math.min(dark, contrastRatio(L_INK, LIVE_DARKER * lg));
+      paper = Math.min(paper, contrastRatio(wcagLuminance(PAPER.map((c, i) => 0.88 * c + 0.12 * g[i]) as RGB), lg));
+    }
+    return { zone: dark >= paper ? 'light' : 'dark', veil: Math.max(dark, paper) < AA_BODY };
+  };
 
   // ── The land: a Fibonacci lattice on the sphere, kept where the mask says land. [sin lat, cos lat, lon] per dot.
   const bits = Uint8Array.from(atob(LAND.b64), (c) => c.charCodeAt(0));
@@ -464,9 +532,9 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
     return arr;
   };
 
-  // The places' middle, where both views look. Whole: the globe at 0.4 of the stage, tilted so the places sit a
-  // little above its centre. Cropped: a globe 0.9 of the stage wide, its top just inside the stage and its centre
-  // below it, turned so the places sit mid-stage: a dome of the near hemisphere, the places about three times larger.
+  // The places' middle, where both views look. Cropped (the default): a globe 0.9 of the stage wide, its top just
+  // inside the stage and its centre below it, turned so the places sit mid-stage: a dome of the near hemisphere,
+  // the places at continent scale. Whole: the globe at 0.4 of the stage, tilted so the places sit above its centre.
   const HOME_LAM = -104 * D;
   const PLACE_LAT = PLACES.reduce((s, p) => s + p.lat, 0) / PLACES.length;
   const home = (mode: Mode, w: number, h: number): View => {
@@ -485,6 +553,9 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
     lam: a.lam + (b.lam - a.lam) * t, phi: a.phi + (b.phi - a.phi) * t,
     R: a.R + (b.R - a.R) * t, cx: a.cx + (b.cx - a.cx) * t, cy: a.cy + (b.cy - a.cy) * t,
   });
+  // The rect a box of size w x h covers of another, in px².
+  const cover = (x: number, y: number, w: number, h: number, x0: number, y0: number, x1: number, y1: number): number =>
+    Math.max(0, Math.min(x + w, x1) - Math.max(x, x0)) * Math.max(0, Math.min(y + h, y1) - Math.max(y, y0));
 
   onPageView<HTMLElement>('main.proto-art', (main) => {
     const ac = new AbortController();
@@ -493,7 +564,7 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
     const cleanups: (() => void)[] = [];
     const params = new URLSearchParams(location.search);
 
-    // ── Zones: each [data-ink] block's ink, from the depth of its middle.
+    // ── Zones: each [data-ink] block's ink, and its veil, from the sky over its span.
     const inks = Array.from(main.querySelectorAll<HTMLElement>('[data-ink]'));
     let onZone: () => void = () => {};
     const zone = (): void => {
@@ -501,8 +572,10 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
       const top0 = main.getBoundingClientRect().top;
       for (const el of inks) {
         const r = el.getBoundingClientRect();
-        const z = (r.top - top0 + r.height / 2) / H > DARK_FROM ? 'dark' : 'light';
+        const a = (r.top - top0) / H, b = (r.bottom - top0) / H;
+        const { zone: z, veil } = inkFor([a, (a + b) / 2, b]);
         if (el.dataset.zone !== z) el.dataset.zone = z;
+        el.toggleAttribute('data-veil', veil);
       }
       onZone();
     };
@@ -585,7 +658,8 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
       });
     }, on);
 
-    // ── The wall: open from a tile, prev/next through the wall; mark each tile loaded as its picture decodes.
+    // ── The contact sheet: open from a tile, prev/next through all of it; mark each tile loaded as its picture
+    // decodes; a tile near the sheet's right end hangs its box from its right edge.
     const tiles = Array.from(main.querySelectorAll<HTMLElement>('.tile-btn'));
     tiles.forEach((b, i) => b.addEventListener('click', () => openList(tiles, i)));
     main.querySelectorAll<HTMLElement>('.tile').forEach((fig) => {
@@ -593,6 +667,13 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
       const mark = (): void => fig.classList.add('is-loaded');
       if (!img || (img.complete && img.naturalWidth > 0)) mark();
       else { img.addEventListener('load', mark, { once: true }); img.addEventListener('error', mark, { once: true }); }
+      const side = (): void => {
+        const tip = fig.querySelector<HTMLElement>('.tile-tip');
+        const sheet = fig.parentElement;
+        if (tip && sheet) fig.toggleAttribute('data-end', fig.getBoundingClientRect().left + tip.offsetWidth > sheet.getBoundingClientRect().right);
+      };
+      fig.addEventListener('pointerenter', side);
+      fig.addEventListener('focusin', side);
     });
 
     // ── Calligraphy: its own two-work list.
@@ -655,8 +736,7 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
     if (stage && canvas && ctx2d) {
       const st = stage, cvs = canvas, ctx = ctx2d;
       const pins = stacks.map((s) => ({ el: s, lat: Number(s.dataset.lat) * D, lon: Number(s.dataset.lon) * D }));
-      const CW = 74, CH = 82, LIFT = CH / 2 + 22;
-      let mode: Mode = params.get('globe') === 'crop' ? 'crop' : 'whole';
+      let mode: Mode = params.get('globe') === 'whole' ? 'whole' : 'crop';
       st.dataset.mode = mode;
       let w = 0, h = 0, dpr = 1;
       let view: View = { lam: HOME_LAM, phi: 0, R: 1, cx: 0, cy: 0 };
@@ -668,14 +748,21 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
       };
       recolor();
 
-      // One motion at a time, each to rest: a tween (the arrival, a view change) or the drag's coast.
+      // One motion at a time, each to rest: a tween (the arrival, a view change), the drag, or the drag's coast.
+      // The stacks follow it (layoutCards, warm-started from the last frame) and get frames of their own to come to
+      // rest after it, at most SETTLE.
       let tween: { from: View; to: View; t0: number; ms: number; fn: (t: number) => number } | null = null;
       let coast: { vl: number; vp: number; t: number; t0: number } | null = null;
-      let raf = 0;
+      let drag: { x: number; y: number; t: number; vl: number; vp: number } | null = null;
+      let lay: { pins: Pin[]; cards: Card[] } | null = null;
+      let still = true;
+      let raf = 0, restN = 0;
+      const SETTLE = 120;
       const clampPhi = (p: number) => Math.max(-75 * D, Math.min(80 * D, p));
 
       const draw = (): void => {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.globalCompositeOperation = 'source-over';
         ctx.clearRect(0, 0, w, h);
         const { lam, phi, R, cx, cy } = view;
         ctx.globalAlpha = 1;
@@ -704,8 +791,25 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
         ctx.fillStyle = colors.dot;
         [0.2, 0.4, 0.62, 0.86].forEach((a, b) => { ctx.globalAlpha = a; ctx.fill(buckets[b]); });
 
-        // The places: each pin, and its stack set clear of the others with a hairline back to the pin.
-        const at = pins.map((p) => {
+        // A globe larger than the stage would be cut by the canvas in straight lines (the dome's tint and dots
+        // ending in a box). Its sides and its foot fade into the sky instead, the fade coming in as the globe
+        // outgrows the stage (none in the whole view). The pins and leaders are drawn after, untouched.
+        const spill = Math.max(0, Math.min(1, (R - 0.42 * Math.min(w, h)) / (0.3 * w)));
+        if (spill > 0) {
+          const edge = `rgba(0,0,0,${(1 - spill).toFixed(3)})`;
+          ctx.globalAlpha = 1;
+          ctx.globalCompositeOperation = 'destination-in';
+          const gx = ctx.createLinearGradient(0, 0, w, 0);
+          gx.addColorStop(0, edge); gx.addColorStop(0.14, '#000'); gx.addColorStop(0.86, '#000'); gx.addColorStop(1, edge);
+          ctx.fillStyle = gx; ctx.fillRect(0, 0, w, h);
+          const gy = ctx.createLinearGradient(0, 0, 0, h);
+          gy.addColorStop(0, '#000'); gy.addColorStop(0.7, '#000'); gy.addColorStop(1, edge);
+          ctx.fillStyle = gy; ctx.fillRect(0, 0, w, h);
+          ctx.globalCompositeOperation = 'source-over';
+        }
+
+        // The places: each pin, and its stack (data/protoArt.ts's layoutCards) with a hairline back to the pin.
+        const at: Pin[] = pins.map((p) => {
           const dl = p.lon - lam, cdl = Math.cos(dl);
           const z = sp0 * Math.sin(p.lat) + cp0 * Math.cos(p.lat) * cdl;
           const x = cx + R * Math.cos(p.lat) * Math.sin(dl);
@@ -713,53 +817,25 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
           const inside = x > 0 && y > 0 && x < w && y < h;
           return { x, y, o: inside ? Math.max(0, Math.min(1, (z - 0.1) / 0.2)) : 0 };
         });
-        // Thirty rounds pull each card toward its place above its pin while pushing it off every pin and every other
-        // card; the rest only push, so they end apart (replayed offline at 600-1000px stages, whole and cropped: no
-        // card over another or over a pin). Eight cards, so ~6,000 steps a frame.
-        const cards = at.map((a) => ({ x: a.x, y: a.y - LIFT }));
-        for (let it = 0; it < 60; it++) {
-          let moved = false;
-          for (let i = 0; i < cards.length; i++) {
-            if (!at[i].o || it >= 30) continue;
-            cards[i].x += (at[i].x - cards[i].x) * 0.12; cards[i].y += (at[i].y - LIFT - cards[i].y) * 0.12;
-          }
-          for (let i = 0; i < cards.length; i++) for (let j = 0; j < at.length; j++) {
-            if (!at[i].o || !at[j].o) continue;
-            const dx = cards[i].x - at[j].x, dy = cards[i].y - at[j].y;
-            const ox = CW / 2 + 8 - Math.abs(dx), oy = CH / 2 + 8 - Math.abs(dy);
-            if (ox <= 0 || oy <= 0) continue;
-            moved = true;
-            if (ox < oy) cards[i].x += (dx >= 0 ? 1 : -1) * ox; else cards[i].y += (dy > 0 ? 1 : -1) * oy;
-          }
-          for (let i = 0; i < cards.length; i++) for (let j = i + 1; j < cards.length; j++) {
-            if (!at[i].o || !at[j].o) continue;
-            const dx = cards[j].x - cards[i].x, dy = cards[j].y - cards[i].y;
-            const ox = CW + 10 - Math.abs(dx), oy = CH + 10 - Math.abs(dy);
-            if (ox <= 0 || oy <= 0) continue;
-            moved = true;
-            if (ox < oy) { const m = ((dx >= 0 ? 1 : -1) * ox) / 2; cards[i].x -= m; cards[j].x += m; }
-            else { const m = ((dy >= 0 ? 1 : -1) * oy) / 2; cards[i].y -= m; cards[j].y += m; }
-          }
-          for (const c of cards) {
-            c.x = Math.max(CW / 2 + 4, Math.min(w - CW / 2 - 4, c.x));
-            c.y = Math.max(CH / 2 + 4, Math.min(h - CH / 2 - 4, c.y));
-          }
-          if (!moved && it >= 30) break;
-        }
+        // Under reduced motion nothing settles on its own: a view the reader did not drag is solved at once.
+        const out = layoutCards(at, reduce && !drag ? null : lay, w, h);
+        lay = { pins: at, cards: out.cards };
+        still = out.still;
+        const cards = out.cards;
         ctx.lineWidth = 1; ctx.strokeStyle = colors.lead;
         at.forEach((a, i) => {
           if (!a.o) return;
           const c = cards[i];
-          const ex = Math.max(c.x - CW / 2, Math.min(c.x + CW / 2, a.x)), ey = Math.max(c.y - CH / 2, Math.min(c.y + CH / 2, a.y));
+          const ex = Math.max(c.x - CARD_W / 2, Math.min(c.x + CARD_W / 2, a.x)), ey = Math.max(c.y - CARD_H / 2, Math.min(c.y + CARD_H / 2, a.y));
           if (Math.hypot(ex - a.x, ey - a.y) > 4) {
-            ctx.globalAlpha = 0.7 * a.o;
+            ctx.globalAlpha = 0.5 * a.o;
             ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(ex, ey); ctx.stroke();
           }
           ctx.globalAlpha = a.o; ctx.fillStyle = colors.pin;
-          ctx.beginPath(); ctx.arc(a.x, a.y, 2.8, 0, 2 * Math.PI); ctx.fill();
+          ctx.beginPath(); ctx.arc(a.x, a.y, 2.3, 0, 2 * Math.PI); ctx.fill();
         });
         pins.forEach((p, i) => {
-          p.el.style.transform = `translate3d(${(cards[i].x - CW / 2).toFixed(1)}px, ${(cards[i].y - CH / 2).toFixed(1)}px, 0)`;
+          p.el.style.transform = `translate3d(${(cards[i].x - CARD_W / 2).toFixed(1)}px, ${(cards[i].y - CARD_H / 2).toFixed(1)}px, 0)`;
           p.el.style.opacity = at[i].o.toFixed(3);
           p.el.classList.toggle('is-away', at[i].o < 0.5);
         });
@@ -781,9 +857,11 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
           if (Math.hypot(coast.vl, coast.vp) > 2e-5 && now - coast.t0 < 1500) more = true; else coast = null;
         }
         draw();
-        if (more) raf = requestAnimationFrame(frame);
+        restN = more || drag ? 0 : restN + 1;
+        if (more || (!still && restN < SETTLE)) raf = requestAnimationFrame(frame);
       };
-      const kick = (): void => { if (!raf) raf = requestAnimationFrame(frame); };
+      const kick = (): void => { restN = 0; if (!raf) raf = requestAnimationFrame(frame); };
+      const paint = (): void => { draw(); if (!still) kick(); };
       const goTo = (to: View, ms: number, fn = easeInOut): void => {
         coast = null;
         if (reduce || ms <= 0) { tween = null; view = to; kick(); return; }
@@ -805,7 +883,7 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
         coast = null;
         if (tween) tween = { ...tween, from: { ...tween.from, R: rest.R, cx: rest.cx, cy: rest.cy }, to: rest };
         else view = arrived ? rest : { ...rest, lam: rest.lam + 120 * D, phi: 8 * D };
-        draw();
+        paint();
       };
       size();
       const io = new IntersectionObserver((entries) => {
@@ -821,7 +899,6 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
       cleanups.push(() => { cancelAnimationFrame(raf); io.disconnect(); ro.disconnect(); clearTimeout(rt); });
 
       // Drag to turn; on release it coasts to rest (no coast under reduced motion).
-      let drag: { x: number; y: number; t: number; vl: number; vp: number } | null = null;
       cvs.addEventListener('pointerdown', (e) => {
         if (e.button !== 0) return;
         if (tween) arrived = true;
@@ -847,10 +924,39 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
       };
       cvs.addEventListener('pointerup', release);
       cvs.addEventListener('pointercancel', release);
-      // A stack the keyboard reaches round the back brings the globe home, where every place is in front.
-      stacks.forEach((s) => s.addEventListener('focusin', () => {
-        if (s.classList.contains('is-away') && w) { arrived = true; goTo(home(mode, w, h), 900); }
-      }));
+
+      // A stack's box goes where it covers least: of the four sides, the one over the fewest other stacks and pins,
+      // inside the stage. Decided as the pointer or the focus arrives, from where the stacks are then.
+      const TIP_GAP = 14;
+      const sideFor = (i: number): void => {
+        const s = pins[i].el, tip = s.querySelector<HTMLElement>('.stack-tip');
+        const c = lay?.cards[i];
+        if (!tip || !c || !lay) return;
+        const L = lay;
+        const tw = tip.offsetWidth, th = tip.offsetHeight, x0 = c.x - CARD_W / 2, y0 = c.y - CARD_H / 2;
+        const boxes: [string, number, number][] = [
+          ['right', x0 + CARD_W + TIP_GAP, y0], ['left', x0 - TIP_GAP - tw, y0],
+          ['below', c.x - tw / 2, y0 + CARD_H + TIP_GAP], ['above', c.x - tw / 2, y0 - TIP_GAP - th],
+        ];
+        let best = 'right', least = Infinity;
+        for (const [side, x, y] of boxes) {
+          let cost = 3 * (tw * th - cover(x, y, tw, th, 0, 0, w, h));
+          L.cards.forEach((o, j) => {
+            if (j !== i && L.pins[j].o > 0.5) cost += cover(x, y, tw, th, o.x - CARD_W / 2, o.y - CARD_H / 2, o.x + CARD_W / 2, o.y + CARD_H / 2);
+          });
+          L.pins.forEach((p) => { if (p.o > 0.5) cost += 20 * cover(x, y, tw, th, p.x - 6, p.y - 6, p.x + 6, p.y + 6); });
+          if (cost < least - 1) { best = side; least = cost; }
+        }
+        s.dataset.side = best;
+      };
+      stacks.forEach((s, i) => {
+        s.addEventListener('pointerenter', () => sideFor(i));
+        s.addEventListener('focusin', () => {
+          sideFor(i);
+          // A stack the keyboard reaches round the back brings the globe home, where every place is in front.
+          if (s.classList.contains('is-away') && w) { arrived = true; goTo(home(mode, w, h), 900); }
+        });
+      });
 
       setMode = (m: Mode): void => {
         mode = m; st.dataset.mode = m;
@@ -858,8 +964,8 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
         arrived = true; io.disconnect();
         goTo(home(m, w, h), 900);
       };
-      onZone = () => { recolor(); draw(); };
-      document.addEventListener('theme:change', () => { recolor(); draw(); }, on);
+      onZone = () => { recolor(); paint(); };
+      document.addEventListener('theme:change', () => { recolor(); paint(); }, on);
     }
 
     // ── The prototype toolbar: the globe's view and where the calligraphy room stands, kept in the URL.
@@ -881,20 +987,22 @@ const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { 
       zone();
     };
     bar?.querySelectorAll<HTMLElement>('[data-globe]').forEach((b) => b.addEventListener('click', () => {
-      const m: Mode = b.dataset.globe === 'crop' ? 'crop' : 'whole';
-      press('data-globe', m); remember('globe', m, 'whole'); setMode(m);
+      const m: Mode = b.dataset.globe === 'whole' ? 'whole' : 'crop';
+      press('data-globe', m); remember('globe', m, 'crop'); setMode(m);
     }));
     bar?.querySelectorAll<HTMLElement>('[data-calpos]').forEach((b) => b.addEventListener('click', () => {
-      const p = (b.dataset.calpos ?? 'end') as CalPos;
-      remember('cal', p, 'end'); placeCal(p);
+      const p = (b.dataset.calpos ?? 'carousel') as CalPos;
+      remember('cal', p, 'carousel'); placeCal(p);
     }));
-    press('data-globe', params.get('globe') === 'crop' ? 'crop' : 'whole');
+    press('data-globe', params.get('globe') === 'whole' ? 'whole' : 'crop');
     const calParam = params.get('cal');
-    placeCal(calParam === 'first' || calParam === 'carousel' ? calParam : 'end');
+    placeCal(calParam === 'first' || calParam === 'end' ? calParam : 'carousel');
 
+    // The zones follow the page's layout: a resize, a font landing, a room moved.
     let zt = 0;
-    window.addEventListener('resize', () => { clearTimeout(zt); zt = window.setTimeout(zone, 160); }, on);
-    cleanups.push(() => clearTimeout(zt));
+    const zro = new ResizeObserver(() => { clearTimeout(zt); zt = window.setTimeout(zone, 160); });
+    zro.observe(main);
+    cleanups.push(() => { zro.disconnect(); clearTimeout(zt); });
 
     return () => { ac.abort(); cleanups.forEach((f) => f()); };
   });

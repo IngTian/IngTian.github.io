@@ -244,7 +244,7 @@ tools/vendor-projects.mjs           # the ONLY thing that touches the network, r
 | `/experience` | the timeline — education and roles |
 | `/art` | calligraphy + photography |
 | `/404` | the not-found page (noindex, no canonical) |
-| `/proto-art` | PROTOTYPE (throwaway): the /art redesign to judge on the real site: a globe of places, a carousel, the wall, the calligraphy room, with a toolbar of options |
+| `/proto-art` | PROTOTYPE (throwaway): the /art redesign to judge on the real site: a globe of places, a carousel, the calligraphy room, the rest of the photographs by place as a contact sheet, with a toolbar of options |
 
 **Prototype routes: one today, `/proto-art`** (git holds the retired ones; its data is `src/data/protoArt.ts`, deleted with it). A `src/pages/proto-<name>.astro` page exists to
 make a visual choice by looking at the real thing in the real page, options as a switcher. It is kept out of
