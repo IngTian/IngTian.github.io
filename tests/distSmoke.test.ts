@@ -119,14 +119,15 @@ describe('the built site (dist/) — rendered-output smoke test', () => {
       .toEqual([]);
   });
 
-  // The seven page files' routes, then one per published writing piece and one per paper file: nine today, the
-  // "9 page(s) built" CLAUDE.md quotes. The content routes are counted from src/content/ rather than typed, because
+  // The seven page files' routes, then one per published writing piece and one per paper file, and the prototype
+  // route: ten today, the "10 page(s) built" CLAUDE.md quotes. The content routes are counted from src/content/ rather than typed, because
   // a new piece or paper is a file and nothing else may need an edit. A deleted page that still builds, or a page
   // that stopped building, fails by name. (dist/ also holds public/'s one .html, which no page builds.)
-  it('builds exactly its routes: seven pages, one per writing piece and one per paper (nine today)', () => {
+  it('builds exactly its routes: seven pages, one per writing piece and one per paper, and the prototype (ten today)', () => {
     const built = pages().filter((p) => !existsSync(join(PUBLIC, p.file))).map((p) => p.route).sort();
     const want = [
       '/', '/404.html', '/art', '/experience', '/projects', '/research', '/writing',
+      '/proto-art', // PROTOTYPE (throwaway): delete with src/pages/proto-art.astro
       ...contentFiles('writing').filter((f) => !/^draft:\s*true\b/m.test(f.front)).map((f) => `/writing/${f.name}`),
       ...[...explained()].map((slug) => `/research/${slug}`),
     ].sort();

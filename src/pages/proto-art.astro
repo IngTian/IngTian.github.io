@@ -1,0 +1,901 @@
+---
+// PROTOTYPE (throwaway): the /art redesign, to look at on the real site. A globe of places, five chosen photographs,
+// the wall of the rest, and the calligraphy in its own room. /art itself is untouched. Data: data/protoArt.ts.
+// Retire it by deleting this page, that file, its `want` entry in tests/distSmoke.test.ts and CLAUDE.md's count.
+import BaseLayout from '../layouts/BaseLayout.astro';
+import FluidSky from '../components/FluidSky.astro';
+import SkyWash from '../components/SkyWash.astro';
+import { Image, getImage } from 'astro:assets';
+import { calligraphy, photography } from '../data/artworks';
+import { PICKS, PLACES } from '../data/protoArt';
+
+// /art's byte rules (CLAUDE.md, Stack), as art.astro keeps them: sizes from getImage(), never off the import (the
+// import is a Proxy; reading `.width` keeps the original in dist), a webp at native pixels for the lightbox's 6x.
+const zoomOf = async (src: ImageMetadata) => {
+  const z = await getImage({ src, format: 'webp' });
+  const { width: w, height: h } = z.options;
+  if (!w || !h) throw new Error(`getImage() gave no native size for ${z.src}`);
+  return { src: z.src, w, h };
+};
+const photoZoom = await Promise.all(photography.map((p) => zoomOf(p.src)));
+const calZoom = await Promise.all(calligraphy.map((w) => zoomOf(w.src)));
+
+// Every photograph sits in exactly one placeholder place.
+const placed = PLACES.flatMap((p) => p.photos).sort((a, b) => a - b);
+if (placed.length !== photography.length || placed.some((n, i) => n !== i + 1)) {
+  throw new Error(`proto-art: the places hold ${placed.length} photographs; every one of the ${photography.length} goes in exactly one`);
+}
+const placeOf = new Map(PLACES.flatMap((p) => p.photos.map((n) => [n, p] as const)));
+const photo = (n: number) => {
+  const p = photography[n - 1];
+  const z = photoZoom[n - 1];
+  return { n, src: p.src, alt: p.alt, title: p.title ?? 'Untitled', note: p.note ?? '', z, ar: z.w / z.h, place: placeOf.get(n)! };
+};
+const picks = PICKS.map(photo);
+const rest = photography.map((_, i) => i + 1).filter((n) => !PICKS.includes(n)).map(photo);
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+// THE WALL'S ROWS. A tile spans round(50 / ar) rows of u = a column's width / 50 (the grid's auto rows), plus
+// GAP_U rows of gap, so its box keeps the photo's real ratio to within half a row (under 0.8%, which object-fit
+// takes up) at any column count, with no script. 50, not finer: one column of the 37 is ~2,300 rows already. Sparse auto-placement puts each tile at the first free place
+// after the last, so the reading order stays the order of the data.
+const GAP_U = 3;
+const rowsOf = (ar: number) => Math.round(50 / ar);
+// A tile is one column wide: at most 360px at three columns (a 1096px wall), half the window at two, the window at
+// one. Upper bounds, never under-declared; [300, 600, 900] are /art's own widths, so the variants are shared.
+const TILE_SIZES = '(max-width: 640px) 100vw, (max-width: 900px) 50vw, 360px';
+// The carousel's frame is min(520px, 36vw, 50vh) wide, 440px at most below 900px.
+const SEL_SIZES = '(max-width: 900px) 440px, 520px';
+// A polaroid's window is a 56px square of the photo, so a landscape photo needs 56 * ar px of width to fill it.
+const thumbSizes = (ar: number) => `${Math.ceil(56 * Math.max(1, ar))}px`;
+// The calligraphy, as on /art: height-capped at 820px, so 820 * ar px wide at most.
+const CAL_MAX_H = 820;
+const calSizes = (ar: number) => `(max-width:1024px) 80vw, ${Math.ceil(ar * CAL_MAX_H)}px`;
+// The kicker's Chinese gets its own `lang`.
+const kickerParts = (k: string) => { const [en, zh] = k.split(' · '); return { en, zh }; };
+---
+<BaseLayout
+  title="PROTOTYPE · An artist by night — Ing Tian"
+  description="A prototype of the redesigned /art: places, selected photographs, the wall, and the calligraphy."
+  veilLine="an artist by night"
+  veilOnLoad={true}
+>
+  <main class="proto-art pa descent is-fluid">
+    <FluidSky variant="descent" />
+    <SkyWash />
+    <div class="pa-wrap">
+      <header class="pa-head" data-ink>
+        <a class="back" href="/">← back</a>
+        <h1>An artist by night</h1>
+        <p class="lede">Photographs from where they were taken, a few chosen, then the whole wall; and the calligraphy, in a room of its own.</p>
+      </header>
+
+      <section class="room places-room" id="places" aria-labelledby="places-h" data-ink>
+        <div class="places-side">
+          <h2 class="seclabel" id="places-h">Places</h2>
+          <p class="side-line">Each stack is the photographs from one place. Drag to turn the globe; open a stack to look closely.</p>
+          <ol class="places">
+            {PLACES.map((pl) => (
+              <li><button type="button" class="place-btn" data-place={pl.id}>
+                <span class="pl-name">{pl.name}</span><span class="pl-region">{pl.region}</span><span class="pl-n">{pl.photos.length}</span>
+              </button></li>
+            ))}
+          </ol>
+          <p class="placeholder-note">Pins are placeholders: the real places come from the owner.</p>
+        </div>
+        <div class="globe-stage" data-mode="whole">
+          <canvas class="globe-canvas" aria-hidden="true"></canvas>
+          {PLACES.map((pl) => (
+            <div class="stack has-tip" data-place={pl.id} data-lat={pl.lat} data-lon={pl.lon} data-photos={pl.photos.join(',')}>
+              <button class="stack-btn" type="button" aria-label={`${pl.name}, ${pl.photos.length} photographs: open`} aria-describedby={`tip-${pl.id}`}>
+                {pl.photos.slice(0, 3).map(photo).reverse().map((ph, k, all) => (
+                  <span class="pol" style={`--k:${all.length - 1 - k}`}>
+                    <Image src={ph.src} alt={ph.alt} widths={[160, 300]} sizes={thumbSizes(ph.ar)} loading="lazy" decoding="async" />
+                  </span>
+                ))}
+                <span class="stack-n" aria-hidden="true">{pl.photos.length}</span>
+              </button>
+              <div class="tip stack-tip" role="tooltip" id={`tip-${pl.id}`}>
+                <p class="tip-k">{pl.name} · {pl.region} · {pl.photos.length} photographs</p>
+                <p class="tip-t">{photo(pl.photos[0]).title}</p>
+                <p class="tip-n">{photo(pl.photos[0]).note}</p>
+                <p class="tip-more">With {pl.photos.slice(1).map((n) => photo(n).title).join(', ')}.</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section class="room sel" id="selected" aria-roledescription="carousel" aria-label="Selected photographs">
+        <div class="sel-grid">
+          <div class="sel-text" data-ink>
+            <h2 class="seclabel">Selected</h2>
+            <p class="sel-count" aria-hidden="true"><span class="sel-rule"></span><span class="sel-cur">01</span> / {pad2(picks.length)}</p>
+            <div class="sel-slides">
+              {picks.map((ph, i) => (
+                <div class:list={['sel-slide', { 'is-on': i === 0 }]} role="group" aria-roledescription="slide"
+                     aria-label={`${i + 1} of ${picks.length}`} inert={i !== 0}>
+                  <h3 class="sel-title">{ph.title}</h3>
+                  <p class="sel-sub">{ph.place.name}, {ph.place.region}</p>
+                  <p class="sel-story">{ph.note}</p>
+                </div>
+              ))}
+            </div>
+            <div class="sel-arrows">
+              <button type="button" class="arrow" data-step="-1" aria-label="Previous photograph">←</button>
+              <button type="button" class="arrow" data-step="1" aria-label="Next photograph">→</button>
+            </div>
+          </div>
+          <div class="sel-frame">
+            <span class="corner tl" aria-hidden="true"></span><span class="corner br" aria-hidden="true"></span>
+            {picks.map((ph, i) => (
+              <button type="button" class:list={['sel-img', { 'is-on': i === 0 }]} inert={i !== 0}
+                      aria-label={`Open ${ph.title} full screen`}
+                      data-photo={ph.n} data-zoom={ph.z.src} data-zw={ph.z.w} data-zh={ph.z.h} data-alt={ph.alt}
+                      data-title={ph.title} data-note={ph.note} data-where={`${ph.place.name}, ${ph.place.region}`}>
+                <Image src={ph.src} alt={ph.alt} widths={[600, 900, 1200]} sizes={SEL_SIZES} loading="lazy" decoding="async" draggable="false" />
+              </button>
+            ))}
+          </div>
+        </div>
+        <ol class="sel-progress" data-ink>
+          {picks.map((ph, i) => (
+            <li><button type="button" data-go={i} aria-current={i === 0 ? 'true' : undefined}>{ph.title}</button></li>
+          ))}
+        </ol>
+      </section>
+
+      <section class="room wall-room" id="wall" aria-labelledby="wall-h">
+        <h2 class="seclabel" id="wall-h" data-ink>All photographs</h2>
+        <div class="wall">
+          {rest.map((ph) => (
+            <figure class="tile has-tip" style={`--r:${rowsOf(ph.ar)};--span:${rowsOf(ph.ar) + GAP_U}`}>
+              <button type="button" class="tile-btn" aria-describedby={`cap-${ph.n}`}
+                      data-photo={ph.n} data-zoom={ph.z.src} data-zw={ph.z.w} data-zh={ph.z.h} data-alt={ph.alt}
+                      data-title={ph.title} data-note={ph.note} data-where={`${ph.place.name}, ${ph.place.region}`}>
+                <Image src={ph.src} alt={ph.alt} widths={[300, 600, 900]} sizes={TILE_SIZES} loading="lazy" decoding="async" />
+              </button>
+              <figcaption class="tip tile-tip" id={`cap-${ph.n}`}>
+                <span class="tip-t">{ph.title}</span>
+                <span class="tip-n">{ph.note}</span>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      <section class="room cal-room" id="calligraphy" aria-labelledby="cal-h">
+        <h2 class="seclabel" id="cal-h" data-ink data-zone="dark">Calligraphy</h2>
+        <div class="cal-host">
+          {calligraphy.map((w, i) => (
+            <figure class="cal-work">
+              <button type="button" class:list={['cal', w.treatment]} aria-label={`View ${w.title} full screen`}
+                      data-photo={`c${i}`} data-zoom={calZoom[i].src} data-zw={calZoom[i].w} data-zh={calZoom[i].h}
+                      data-alt={w.alt} data-title={w.title} data-note={w.medium}>
+                <Image src={w.src} alt={w.alt} widths={[480, 900, 1200]} sizes={calSizes(calZoom[i].w / calZoom[i].h)}
+                       loading="lazy" decoding="async" />
+              </button>
+              <figcaption class="cal-cap" data-ink data-zone="dark">
+                <span class="cal-k">{kickerParts(w.kicker ?? '').en}{kickerParts(w.kicker ?? '').zh && <> · <span lang="zh-Hant">{kickerParts(w.kicker ?? '').zh}</span></>}</span>
+                <span class="cal-t">{w.title}</span>
+                <span class="cal-m">{w.medium}</span>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      <footer class="pa-foot" data-ink data-zone="dark"><a class="back" href="/">← back to the descent</a></footer>
+    </div>
+
+    <dialog class="lightbox" id="pa-lightbox" aria-label="Photograph detail">
+      <button type="button" class="lb-close" aria-label="Close">✕ close</button>
+      <button type="button" class="lb-nav" data-step="-1" aria-label="Previous">←</button>
+      <figure class="lb-fig">
+        <img class="lb-img" src="" alt="" draggable="false" />
+        <figcaption class="lb-cap"><span class="lb-count"></span><span class="lb-title"></span><span class="lb-where"></span><span class="lb-note"></span></figcaption>
+      </figure>
+      <button type="button" class="lb-nav" data-step="1" aria-label="Next">→</button>
+      <p class="lb-hint" aria-hidden="true">scroll to zoom · drag to pan · ← → to move · Esc to close</p>
+    </dialog>
+
+    <div class="proto-bar" role="group" aria-label="Prototype controls">
+      <span class="pb-tag">Prototype controls</span>
+      <span class="pb-group"><span class="pb-l">Globe</span>
+        <button type="button" data-globe="whole" aria-pressed="true">whole globe</button>
+        <button type="button" data-globe="crop" aria-pressed="false">cropped hemisphere</button>
+      </span>
+      <span class="pb-group"><span class="pb-l">Calligraphy</span>
+        <button type="button" data-calpos="first" aria-pressed="false">before the globe</button>
+        <button type="button" data-calpos="carousel" aria-pressed="false">after the carousel</button>
+        <button type="button" data-calpos="end" aria-pressed="true">at the end</button>
+      </span>
+      <span class="pb-legend">Not part of the design. Pins and picks are placeholders; compare with <a href="/art">/art</a>.</span>
+    </div>
+  </main>
+</BaseLayout>
+
+<style>
+  .pa { position: relative; z-index: 0; min-height: 100vh; }
+  .pa-wrap { max-width: 1240px; margin: 0 auto; padding: 0 clamp(22px, 5vw, 72px); }
+
+  /* THE INK FOLLOWS THE SKY. The light descent runs from paper to near-black, so text past its middle is set in
+     paper. The script sets data-zone on each [data-ink] block from where its middle falls on the page (the sky is
+     drawn by page depth); the markup's own values are the default order's, for no script. Dark theme: the ink ramp
+     is already light, so none of this applies. */
+  :global(html:not([data-theme='dark'])) .pa [data-zone='dark'] {
+    --ink-1: #efe9dd; --ink-2: rgba(239, 233, 221, 0.88); --ink-3: rgba(239, 233, 221, 0.76); --ink-4: rgba(239, 233, 221, 0.6);
+  }
+
+  .pa-head { padding: 13vh 0 2vh; }
+  .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
+  .back:hover { color: var(--seal); }
+  .pa h1 { font-family: var(--font-display); font-weight: 500; font-size: clamp(38px, 5vw, 60px); line-height: 1.04;
+    letter-spacing: -0.01em; margin-top: 16px; color: var(--ink-1); }
+  .lede { font-size: 15px; color: var(--ink-3); margin-top: 16px; line-height: 1.7; max-width: 52ch; }
+  .seclabel { font-family: var(--font-mono); font-weight: 400; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase;
+    color: var(--ink-3); margin: 0 0 18px; }
+  .room { padding: 7vh 0; }
+
+  /* ── 1. PLACES ───────────────────────────────────────────────────────────────────────────────── */
+  .places-room { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 40px; align-items: center; }
+  .globe-stage { position: relative; height: min(70vh, 620px); min-height: 420px; touch-action: pan-y; cursor: grab;
+    --globe-disc: rgba(239, 233, 221, 0.28); }
+  :global(html[data-theme='dark']) .globe-stage { --globe-disc: rgba(223, 227, 223, 0.035); }
+  .globe-stage.is-grabbing { cursor: grabbing; }
+  .globe-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  /* No script: no globe, the list is the page. Until placed, a stack sits nowhere: the script shows it. */
+  @media (scripting: none) { .globe-stage { display: none; } .places-room { grid-template-columns: 1fr; } }
+  .stack { position: absolute; left: 0; top: 0; width: 74px; height: 82px; opacity: 0; z-index: 1; will-change: transform, opacity; }
+  .stack.is-away { pointer-events: none; }
+  .stack:hover, .stack:focus-within, .stack.is-lit { z-index: 5; }
+  .stack-btn { position: relative; display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
+  .pol { position: absolute; left: 5px; top: 4px; width: 64px; height: 74px; padding: 4px 4px 14px; background: var(--paper);
+    box-shadow: 0 1px 2px rgba(20, 18, 14, 0.22), 0 6px 14px -6px rgba(20, 18, 14, 0.45);
+    transform: translate(calc(var(--k) * 3px), calc(var(--k) * -2px)) rotate(calc(-4deg + var(--k) * 5deg));
+    transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .pol :global(img) { display: block; width: 56px; height: 56px; object-fit: cover; }
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .stack:hover .pol, .stack.is-lit .pol { transform: translate(calc(var(--k) * 9px), calc(var(--k) * -4px)) rotate(calc(-6deg + var(--k) * 8deg)); }
+  }
+  .stack-n { position: absolute; right: -2px; top: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
+    background: var(--seal); color: #f6efe6; font: 600 10px/18px var(--font-mono); text-align: center; z-index: 4; }
+  .stack-btn:focus-visible { outline: 2px solid var(--seal); outline-offset: 4px; }
+
+  /* THE HOVER BOX (WCAG 1.4.13): on hover (a mouse or pen) or keyboard focus; it takes the pointer while shown, a
+     bridge spans the gap to it, and Escape hides it without moving either (the script's data-tip-off). Its ground
+     is the page base, its text paper: 15:1 in both themes, on any depth of the sky. */
+  .tip { position: absolute; z-index: 6; opacity: 0; pointer-events: none; transform: translateY(4px);
+    background: var(--bg); color: var(--paper); border-radius: 3px; box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.55);
+    transition: opacity 0.18s ease, transform 0.18s ease; text-align: left; }
+  @media (hover: hover) { .has-tip:hover:not([data-tip-off]) .tip { opacity: 1; transform: none; pointer-events: auto; } }
+  .has-tip:has(:focus-visible):not([data-tip-off]) .tip { opacity: 1; transform: none; pointer-events: auto; }
+  .stack-tip { left: 50%; top: calc(100% + 10px); width: 250px; margin-left: -125px; padding: 12px 14px 13px; }
+  .stack-tip::before { content: ""; position: absolute; left: 0; right: 0; top: -12px; height: 12px; }
+  .tip-k { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.7; }
+  .tip-t { display: block; font-family: var(--font-display); font-size: 17px; line-height: 1.25; margin-top: 6px; }
+  .tip-n { display: block; font-size: 13px; line-height: 1.55; margin-top: 4px; opacity: 0.86; }
+  .tip-more { font-size: 12px; line-height: 1.5; margin-top: 8px; opacity: 0.62; }
+
+  .side-line { font-size: 14px; line-height: 1.65; color: var(--ink-3); margin-bottom: 18px; }
+  .places { list-style: none; margin: 0; padding: 0; border-top: 1px solid rgba(var(--hairline-rgb), 0.3); }
+  .places li { border-bottom: 1px solid rgba(var(--hairline-rgb), 0.3); }
+  .place-btn { display: grid; grid-template-columns: 1fr auto; column-gap: 10px; width: 100%; padding: 9px 2px; border: 0;
+    background: none; text-align: left; cursor: pointer; color: var(--ink-1); min-height: 44px; }
+  .pl-name { font-family: var(--font-display); font-size: 16px; }
+  .pl-region { grid-row: 2; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--ink-3); }
+  .pl-n { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); }
+  .place-btn:hover .pl-name, .place-btn:focus-visible .pl-name { color: var(--seal); }
+  .place-btn:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
+  .placeholder-note { margin-top: 16px; font-family: var(--font-mono); font-size: 11px; line-height: 1.6; color: var(--seal); }
+
+  /* ── 2. SELECTED ─────────────────────────────────────────────────────────────────────────────── */
+  .sel-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: clamp(32px, 5vw, 72px); align-items: center; }
+  .sel-text { max-width: 440px; }
+  .sel-count { display: flex; align-items: center; gap: 12px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.2em; color: var(--ink-3); }
+  .sel-rule { width: 32px; height: 1px; background: currentColor; }
+  /* Every slide's text in one cell, so the panel is as tall as the longest and nothing below it moves. */
+  .sel-slides { display: grid; margin-top: 26px; }
+  .sel-slide { grid-area: 1 / 1; opacity: 0; transform: translateY(10px); }
+  .sel-slide.is-on { opacity: 1; transform: none; }
+  .sel-title { font-family: var(--font-display); font-weight: 400; font-size: clamp(36px, 4.4vw, 58px); line-height: 1.08;
+    letter-spacing: -0.015em; color: var(--ink-1); }
+  .sel-sub { margin-top: 14px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--seal); }
+  .sel-story { margin-top: 18px; font-size: 17px; line-height: 1.75; color: var(--ink-2); max-width: 38ch; }
+  .sel-arrows { display: flex; gap: 12px; margin-top: 34px; }
+  .arrow { width: 48px; height: 48px; border-radius: 50%; border: 1px solid currentColor; background: none; color: var(--ink-1);
+    font-size: 18px; cursor: pointer; transition: transform 0.3s ease, background-color 0.3s ease, color 0.3s ease; }
+  @media (hover: hover) { .arrow:hover { color: var(--seal); } }
+  .arrow:active { transform: scale(0.95); }
+  .arrow:focus-visible { outline: 2px solid var(--seal); outline-offset: 3px; }
+  .sel-frame { position: relative; width: min(520px, 36vw, 50vh); aspect-ratio: 3 / 4; touch-action: pan-y; }
+  .corner { position: absolute; width: 40px; height: 40px; border: 0 solid var(--ink-3); opacity: 0.55; pointer-events: none; }
+  .corner.tl { left: -10px; top: -10px; border-left-width: 1px; border-top-width: 1px; }
+  .corner.br { right: -10px; bottom: -10px; border-right-width: 1px; border-bottom-width: 1px; }
+  .sel-img { position: absolute; inset: 0; padding: 0; border: 0; background: rgba(var(--hairline-rgb), 0.16); cursor: zoom-in;
+    opacity: 0; transform: scale(1.02); }
+  .sel-img.is-on { opacity: 1; transform: none; }
+  .sel-img :global(img) { display: block; width: 100%; height: 100%; object-fit: cover; box-shadow: 0 30px 60px -30px rgba(20, 18, 14, 0.6); }
+  .sel-img:focus-visible { outline: 2px solid var(--seal); outline-offset: 4px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .sel-img { transition: opacity 0.7s ease, transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
+    .sel-slide { transition: opacity 0.45s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
+    .sel-slide.is-on { transition-delay: 0.12s; }
+  }
+  .sel-progress { list-style: none; margin: 44px 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+  .sel-progress button { position: relative; width: 100%; padding: 14px 0 0; border: 0; background: none; text-align: left; cursor: pointer;
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--ink-3); min-height: 44px; }
+  .sel-progress button::before, .sel-progress button::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; }
+  .sel-progress button::before { background: rgba(var(--hairline-rgb), 0.35); }
+  .sel-progress button::after { background: var(--seal); transform: scaleX(0); transform-origin: left; }
+  .sel-progress button[aria-current] { color: var(--ink-1); }
+  .sel-progress button[aria-current]::after { transform: scaleX(1); }
+  .sel-progress button:hover { color: var(--ink-1); }
+  .sel-progress button:focus-visible { outline: 2px solid var(--seal); outline-offset: 3px; }
+  @media (prefers-reduced-motion: no-preference) { .sel-progress button::after { transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); } }
+
+  /* ── 3. THE WALL ─────────────────────────────────────────────────────────────────────────────── */
+  .wall-room { container-type: inline-size; }
+  .wall { --cols: 3; --gap: 18px; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); column-gap: var(--gap);
+    grid-auto-rows: calc((100cqw - (var(--cols) - 1) * var(--gap)) / var(--cols) / 50); }
+  .tile { grid-row: span var(--span); height: calc(var(--r) * (100cqw - (var(--cols) - 1) * var(--gap)) / var(--cols) / 50);
+    margin: 0; position: relative; overflow: hidden; border-radius: 2px; background: rgba(var(--hairline-rgb), 0.2); }
+  .tile-btn { position: absolute; inset: 0; padding: 0; border: 0; background: none; cursor: zoom-in; }
+  .tile-btn :global(img) { display: block; width: 100%; height: 100%; object-fit: cover; position: relative; z-index: 1; }
+  .tile-btn:focus-visible { outline: 2px solid var(--seal); outline-offset: -2px; }
+  /* /art's loading tile: a palette-tone ground, a transform-only shimmer while the picture decodes (three passes,
+     inside five seconds, then the tone rests), and a fade once it has. No script or reduced motion: shown at once. */
+  .tile::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; transform: translateX(-100%);
+    background: linear-gradient(100deg, transparent 30%, rgba(239, 233, 221, 0.22) 50%, transparent 70%); }
+  .tile.is-loaded::before { content: none; }
+  @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+    .tile::before { animation: pa-shimmer 1.6s ease-in-out 3; }
+    .tile-btn :global(img) { opacity: 0; transition: opacity 0.6s ease, transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
+    .tile.is-loaded .tile-btn :global(img) { opacity: 1; }
+    @keyframes pa-shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+  }
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) { .tile:hover .tile-btn :global(img) { transform: scale(1.03); } }
+  .tile-tip { left: 10px; right: 10px; bottom: 10px; padding: 10px 12px 11px; z-index: 3; }
+  @media (max-width: 900px) { .wall { --cols: 2; --gap: 14px; } }
+  @media (max-width: 640px) { .wall { --cols: 1; } }
+
+  /* ── 4. CALLIGRAPHY ──────────────────────────────────────────────────────────────────────────── */
+  .cal-host { display: flex; flex-direction: column; gap: clamp(8vh, 10vh, 120px); padding: 4vh 0; }
+  .cal-work { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+  .cal { padding: 0; border: 0; background: none; line-height: 0; cursor: zoom-in; }
+  .cal :global(img) { display: block; width: auto; max-width: 100%; max-height: min(82vh, 820px); }
+  .cal.stele :global(img) { filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.55)); }
+  .cal.paper :global(img) { border: 1px solid rgba(255, 255, 255, 0.16); box-shadow: 0 24px 60px -22px rgba(20, 18, 14, 0.5); }
+  .cal:focus-visible { outline: 2px solid var(--seal); outline-offset: 6px; }
+  .cal-cap { display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center; }
+  .cal-k { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-3); }
+  .cal-t { font-family: var(--font-display); font-size: 24px; color: var(--ink-1); }
+  .cal-m { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); }
+  .pa-foot { padding: 10vh 0 18vh; }
+
+  /* ── THE LIGHTBOX ────────────────────────────────────────────────────────────────────────────── */
+  .lightbox { border: 0; padding: 0; margin: 0; max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh; background: rgba(16, 15, 12, 0.97); }
+  .lightbox::backdrop { background: rgba(16, 15, 12, 0.97); }
+  .lightbox[open] { display: flex; align-items: center; justify-content: center; gap: 12px; }
+  .lb-fig { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .lb-img { max-width: 86vw; max-height: 82vh; will-change: transform; cursor: grab; transform-origin: 0 0;
+    box-shadow: 0 40px 120px -30px rgba(0, 0, 0, 0.8); }
+  .lb-cap { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 4px 14px; max-width: 80ch;
+    color: rgba(239, 233, 221, 0.86); font-size: 13px; line-height: 1.5; text-align: center; }
+  .lb-count, .lb-where { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: rgba(239, 233, 221, 0.6); }
+  .lb-title { font-family: var(--font-display); font-size: 17px; color: #efe9dd; }
+  .lb-note { flex-basis: 100%; }
+  .lb-close { position: fixed; top: 20px; right: 24px; font-family: var(--font-mono); font-size: 13px; color: rgba(239, 233, 221, 0.75);
+    background: none; border: 0; cursor: pointer; z-index: 2; }
+  .lb-nav { flex: none; width: 48px; height: 48px; border-radius: 50%; border: 1px solid rgba(239, 233, 221, 0.4); background: none;
+    color: rgba(239, 233, 221, 0.85); font-size: 18px; cursor: pointer; z-index: 2; }
+  .lb-nav[hidden] { display: none; }
+  .lb-hint { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); font-family: var(--font-mono); font-size: 11px;
+    color: rgba(239, 233, 221, 0.5); letter-spacing: 0.06em; pointer-events: none; white-space: nowrap; }
+
+  /* ── THE PROTOTYPE TOOLBAR: a control for choosing, not part of the design. ─────────────────────── */
+  .proto-bar { position: fixed; left: 14px; bottom: 14px; z-index: 50; max-width: calc(100vw - 28px); display: flex; flex-wrap: wrap;
+    align-items: center; gap: 6px 14px; padding: 8px 12px; background: #16140f; color: #efe9dd; border: 1px dashed #e0574a;
+    border-radius: 4px; font-family: var(--font-mono); font-size: 11px; line-height: 1.4; box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.6); }
+  .pb-tag { color: #e0574a; letter-spacing: 0.14em; text-transform: uppercase; }
+  .pb-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .pb-l { color: rgba(239, 233, 221, 0.6); margin-right: 2px; }
+  .proto-bar button { font: inherit; color: inherit; background: none; border: 1px solid rgba(239, 233, 221, 0.3); border-radius: 3px;
+    padding: 3px 7px; cursor: pointer; }
+  .proto-bar button[aria-pressed='true'] { background: #efe9dd; color: #16140f; border-color: #efe9dd; }
+  .proto-bar button:focus-visible { outline: 2px solid #e0574a; outline-offset: 2px; }
+  .pb-legend { color: rgba(239, 233, 221, 0.6); flex-basis: 100%; }
+  .pb-legend a { color: inherit; }
+
+  @media (max-width: 1100px) {
+    .places-room { grid-template-columns: 1fr; gap: 24px; }
+  }
+  @media (max-width: 900px) {
+    .sel-grid { grid-template-columns: 1fr; }
+    .sel-frame { order: -1; width: min(100%, 440px); margin: 0 auto; }
+    .sel-text { max-width: none; }
+    .sel-progress { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+    .sel-progress button { font-size: 10px; }
+  }
+  @media (max-width: 640px) {
+    .globe-stage { display: none; }
+    .lb-nav { position: fixed; bottom: 44px; }
+    .lb-nav[data-step='-1'] { left: 16px; }
+    .lb-nav[data-step='1'] { right: 16px; }
+    .lb-hint { display: none; }
+    .proto-bar { left: 8px; right: 8px; bottom: 8px; max-width: none; }
+  }
+</style>
+
+<script>
+  import { onPageView } from '../scripts/pageView';
+  import { prefersReducedMotion } from '../lib/motion';
+  import { LAND, PLACES } from '../data/protoArt';
+
+  const D = Math.PI / 180;
+  // Past this depth of the page the light sky is dark enough to set text in paper (/art's rail flips at 0.42).
+  const DARK_FROM = 0.45;
+  type Mode = 'whole' | 'crop';
+  type CalPos = 'first' | 'carousel' | 'end';
+  interface View { lam: number; phi: number; R: number; cx: number; cy: number }
+
+  // ── The land: a Fibonacci lattice on the sphere, kept where the mask says land. [sin lat, cos lat, lon] per dot.
+  const bits = Uint8Array.from(atob(LAND.b64), (c) => c.charCodeAt(0));
+  const isLand = (lat: number, lon: number): boolean => {
+    const x = Math.min(LAND.w - 1, Math.floor(((lon + 180) / 360) * LAND.w));
+    const y = Math.min(LAND.h - 1, Math.floor(((90 - lat) / 180) * LAND.h));
+    const i = y * LAND.w + x;
+    return ((bits[i >> 3] >> (i & 7)) & 1) === 1;
+  };
+  const lattices = new Map<number, Float32Array>();
+  const lattice = (n: number): Float32Array => {
+    const hit = lattices.get(n);
+    if (hit) return hit;
+    const out: number[] = [];
+    const golden = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < n; i++) {
+      const s = 1 - (2 * i + 1) / n;
+      let lon = ((i * golden) / D) % 360;
+      if (lon >= 180) lon -= 360;
+      if (isLand(Math.asin(s) / D, lon)) out.push(s, Math.sqrt(1 - s * s), lon * D);
+    }
+    const arr = Float32Array.from(out);
+    lattices.set(n, arr);
+    return arr;
+  };
+
+  // The places' middle, where both views look. Whole: the globe at 0.4 of the stage, tilted so the places sit a
+  // little above its centre. Cropped: a globe 0.9 of the stage wide, its top just inside the stage and its centre
+  // below it, turned so the places sit mid-stage: a dome of the near hemisphere, the places about three times larger.
+  const HOME_LAM = -104 * D;
+  const PLACE_LAT = PLACES.reduce((s, p) => s + p.lat, 0) / PLACES.length;
+  const home = (mode: Mode, w: number, h: number): View => {
+    if (mode === 'whole') {
+      const R = Math.min(w, h) * 0.4;
+      return { lam: HOME_LAM, phi: 24 * D, R, cx: w / 2, cy: h / 2 + R * 0.08 };
+    }
+    const R = w * 0.9;
+    const cy = h * 0.06 + R;
+    const delta = Math.asin(Math.min(0.95, (cy - h * 0.48) / R));
+    return { lam: HOME_LAM, phi: PLACE_LAT * D - delta, R, cx: w / 2, cy };
+  };
+  const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+  const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const mix = (a: View, b: View, t: number): View => ({
+    lam: a.lam + (b.lam - a.lam) * t, phi: a.phi + (b.phi - a.phi) * t,
+    R: a.R + (b.R - a.R) * t, cx: a.cx + (b.cx - a.cx) * t, cy: a.cy + (b.cy - a.cy) * t,
+  });
+
+  onPageView<HTMLElement>('main.proto-art', (main) => {
+    const ac = new AbortController();
+    const on = { signal: ac.signal };
+    const reduce = prefersReducedMotion();
+    const cleanups: (() => void)[] = [];
+    const params = new URLSearchParams(location.search);
+
+    // ── Zones: each [data-ink] block's ink, from the depth of its middle.
+    const inks = Array.from(main.querySelectorAll<HTMLElement>('[data-ink]'));
+    let onZone: () => void = () => {};
+    const zone = (): void => {
+      const H = main.offsetHeight || 1;
+      const top0 = main.getBoundingClientRect().top;
+      for (const el of inks) {
+        const r = el.getBoundingClientRect();
+        const z = (r.top - top0 + r.height / 2) / H > DARK_FROM ? 'dark' : 'light';
+        if (el.dataset.zone !== z) el.dataset.zone = z;
+      }
+      onZone();
+    };
+
+    // ── The lightbox: a list of photo elements (each carries its data-zoom etc.), prev/next, wheel zoom to 6x.
+    const lb = main.querySelector<HTMLDialogElement>('#pa-lightbox');
+    const lbImg = lb?.querySelector<HTMLImageElement>('.lb-img') ?? null;
+    let list: HTMLElement[] = [];
+    let at = 0;
+    let zx = 0, zy = 0, zs = 1, panning = false, px = 0, py = 0;
+    const tf = (): void => { if (lbImg) lbImg.style.transform = `translate(${zx}px,${zy}px) scale(${zs})`; };
+    const setText = (sel: string, text: string): void => { const el = lb?.querySelector(sel); if (el) el.textContent = text; };
+    const show = (): void => {
+      const el = list[at];
+      if (!lb || !lbImg || !el) return;
+      const w = Number(el.dataset.zw), h = Number(el.dataset.zh);
+      // The box is reserved from the native size as a ratio and a capped width, and the old picture blanked
+      // first: art's lightbox (scripts/artGallery.ts) says why each of the obvious alternatives was wrong.
+      if (w && h) {
+        lbImg.style.aspectRatio = `${w}/${h}`;
+        lbImg.style.width = `min(86vw, ${((82 * w) / h).toFixed(3)}vh)`;
+      }
+      lbImg.removeAttribute('src');
+      lbImg.alt = el.dataset.alt ?? '';
+      zs = 1; zx = 0; zy = 0; tf();
+      lbImg.src = el.dataset.zoom ?? '';
+      setText('.lb-count', list.length > 1 ? `${at + 1} / ${list.length}` : '');
+      setText('.lb-title', el.dataset.title ?? '');
+      setText('.lb-where', el.dataset.where ?? '');
+      setText('.lb-note', el.dataset.note ?? '');
+      lb.querySelectorAll<HTMLElement>('.lb-nav').forEach((b) => { b.hidden = list.length < 2; });
+    };
+    const openList = (els: (HTMLElement | null)[], i: number): void => {
+      list = els.filter((e): e is HTMLElement => !!e);
+      if (!lb || !list.length) return;
+      at = Math.max(0, Math.min(list.length - 1, i));
+      show();
+      if (!lb.open) lb.showModal();
+    };
+    const step = (d: number): void => { if (list.length > 1) { at = (at + d + list.length) % list.length; show(); } };
+    const photoEl = (n: string): HTMLElement | null => main.querySelector<HTMLElement>(`[data-photo="${n}"]`);
+    if (lb && lbImg) {
+      const img = lbImg;
+      lb.querySelector('.lb-close')?.addEventListener('click', () => lb.close());
+      lb.querySelectorAll<HTMLElement>('.lb-nav').forEach((b) => b.addEventListener('click', () => step(Number(b.dataset.step))));
+      lb.addEventListener('click', (e) => { if (e.target === lb) lb.close(); });
+      lb.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+      });
+      lb.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const ns = Math.min(6, Math.max(1, zs * (e.deltaY < 0 ? 1.12 : 0.89)));
+        const r = img.getBoundingClientRect();
+        const k = ns / zs;
+        zx -= (e.clientX - r.left) * (k - 1); zy -= (e.clientY - r.top) * (k - 1); zs = ns;
+        if (zs === 1) { zx = 0; zy = 0; }
+        tf();
+      }, { passive: false });
+      img.addEventListener('pointerdown', (e) => { if (zs <= 1) return; panning = true; px = e.clientX; py = e.clientY; img.setPointerCapture(e.pointerId); e.stopPropagation(); });
+      img.addEventListener('pointermove', (e) => { if (!panning) return; zx += e.clientX - px; zy += e.clientY - py; px = e.clientX; py = e.clientY; tf(); });
+      img.addEventListener('pointerup', () => { panning = false; });
+    }
+
+    // ── Hover boxes: Escape hides the one shown, until both the pointer and the focus have left it.
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || lb?.open) return;
+      main.querySelectorAll<HTMLElement>('.has-tip').forEach((el) => {
+        if (!el.matches(':hover, :focus-within') || el.dataset.tipOff !== undefined) return;
+        el.dataset.tipOff = '';
+        const done = new AbortController();
+        const clear = (): void => {
+          if (el.matches(':hover, :focus-within')) return;
+          delete el.dataset.tipOff;
+          done.abort();
+        };
+        el.addEventListener('pointerleave', clear, { signal: done.signal });
+        el.addEventListener('focusout', () => setTimeout(clear, 0), { signal: done.signal });
+        ac.signal.addEventListener('abort', () => done.abort());
+      });
+    }, on);
+
+    // ── The wall: open from a tile, prev/next through the wall; mark each tile loaded as its picture decodes.
+    const tiles = Array.from(main.querySelectorAll<HTMLElement>('.tile-btn'));
+    tiles.forEach((b, i) => b.addEventListener('click', () => openList(tiles, i)));
+    main.querySelectorAll<HTMLElement>('.tile').forEach((fig) => {
+      const img = fig.querySelector('img');
+      const mark = (): void => fig.classList.add('is-loaded');
+      if (!img || (img.complete && img.naturalWidth > 0)) mark();
+      else { img.addEventListener('load', mark, { once: true }); img.addEventListener('error', mark, { once: true }); }
+    });
+
+    // ── Calligraphy: its own two-work list.
+    const cals = Array.from(main.querySelectorAll<HTMLElement>('.cal'));
+    cals.forEach((b, i) => b.addEventListener('click', () => openList(cals, i)));
+
+    // ── The carousel: no autoplay. Arrows, the titles, ← → while focus is in it, a swipe on the picture.
+    const sel = main.querySelector<HTMLElement>('.sel');
+    if (sel) {
+      const imgs = Array.from(sel.querySelectorAll<HTMLElement>('.sel-img'));
+      const slides = Array.from(sel.querySelectorAll<HTMLElement>('.sel-slide'));
+      const marks = Array.from(sel.querySelectorAll<HTMLElement>('.sel-progress button'));
+      const cur = sel.querySelector('.sel-cur');
+      let i = 0;
+      const go = (n: number): void => {
+        const hadFocus = imgs.some((el) => el === document.activeElement);
+        i = (n + imgs.length) % imgs.length;
+        [imgs, slides].forEach((els) => els.forEach((el, k) => { el.classList.toggle('is-on', k === i); el.inert = k !== i; }));
+        marks.forEach((m, k) => { if (k === i) m.setAttribute('aria-current', 'true'); else m.removeAttribute('aria-current'); });
+        if (cur) cur.textContent = String(i + 1).padStart(2, '0');
+        if (hadFocus) imgs[i].focus({ preventScroll: true });
+      };
+      sel.querySelectorAll<HTMLElement>('.arrow').forEach((b) => b.addEventListener('click', () => go(i + Number(b.dataset.step))));
+      marks.forEach((m, k) => m.addEventListener('click', () => go(k)));
+      sel.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') { e.preventDefault(); go(i - 1); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); go(i + 1); }
+      });
+      let sx = 0, sy = 0, swiped = false;
+      const frame = sel.querySelector<HTMLElement>('.sel-frame');
+      frame?.addEventListener('pointerdown', (e) => { sx = e.clientX; sy = e.clientY; swiped = false; });
+      frame?.addEventListener('pointerup', (e) => {
+        const dx = e.clientX - sx, dy = e.clientY - sy;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) { swiped = true; go(i + (dx < 0 ? 1 : -1)); }
+      });
+      imgs.forEach((b, k) => b.addEventListener('click', () => { if (swiped) { swiped = false; return; } openList(imgs, k); }));
+    }
+
+    // ── The globe.
+    const stage = main.querySelector<HTMLElement>('.globe-stage');
+    const canvas = stage?.querySelector('canvas') ?? null;
+    const ctx2d = canvas?.getContext('2d') ?? null;
+    const stacks = Array.from(main.querySelectorAll<HTMLElement>('.stack'));
+    const openPlace = (id: string): void => {
+      const s = stacks.find((x) => x.dataset.place === id);
+      openList((s?.dataset.photos ?? '').split(',').map(photoEl), 0);
+    };
+    stacks.forEach((s) => s.querySelector('.stack-btn')?.addEventListener('click', () => openPlace(s.dataset.place ?? '')));
+    main.querySelectorAll<HTMLElement>('.place-btn').forEach((b) => {
+      const id = b.dataset.place ?? '';
+      const lit = (v: boolean) => stacks.find((x) => x.dataset.place === id)?.classList.toggle('is-lit', v);
+      b.addEventListener('click', () => openPlace(id));
+      b.addEventListener('pointerenter', () => lit(true));
+      b.addEventListener('pointerleave', () => lit(false));
+      b.addEventListener('focus', () => lit(true));
+      b.addEventListener('blur', () => lit(false));
+    });
+
+    let setMode: (m: Mode) => void = () => {};
+    if (stage && canvas && ctx2d) {
+      const st = stage, cvs = canvas, ctx = ctx2d;
+      const pins = stacks.map((s) => ({ el: s, lat: Number(s.dataset.lat) * D, lon: Number(s.dataset.lon) * D }));
+      const CW = 74, CH = 82, LIFT = CH / 2 + 22;
+      let mode: Mode = params.get('globe') === 'crop' ? 'crop' : 'whole';
+      st.dataset.mode = mode;
+      let w = 0, h = 0, dpr = 1;
+      let view: View = { lam: HOME_LAM, phi: 0, R: 1, cx: 0, cy: 0 };
+      let colors = { dot: '', rim: '', lead: '', pin: '', disc: '' };
+      const recolor = (): void => {
+        const cs = getComputedStyle(st);
+        const v = (name: string) => cs.getPropertyValue(name).trim();
+        colors = { dot: v('--ink-2'), rim: v('--ink-4'), lead: v('--ink-3'), pin: v('--seal'), disc: v('--globe-disc') };
+      };
+      recolor();
+
+      // One motion at a time, each to rest: a tween (the arrival, a view change) or the drag's coast.
+      let tween: { from: View; to: View; t0: number; ms: number; fn: (t: number) => number } | null = null;
+      let coast: { vl: number; vp: number; t: number; t0: number } | null = null;
+      let raf = 0;
+      const clampPhi = (p: number) => Math.max(-75 * D, Math.min(80 * D, p));
+
+      const draw = (): void => {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        const { lam, phi, R, cx, cy } = view;
+        ctx.globalAlpha = 1;
+        ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+        ctx.fillStyle = colors.disc; ctx.fill();
+        ctx.globalAlpha = 0.5; ctx.lineWidth = 1; ctx.strokeStyle = colors.rim; ctx.stroke();
+        const sp0 = Math.sin(phi), cp0 = Math.cos(phi);
+        // ~7px between dots at the whole view's radius and ~9px at the cropped one's; the switch falls mid-tween.
+        const dense = R > 420;
+        const pts = lattice(dense ? 90000 : 16000);
+        const rad = dense ? 1.6 : 1.15;
+        const buckets = [new Path2D(), new Path2D(), new Path2D(), new Path2D()];
+        for (let k = 0; k < pts.length; k += 3) {
+          const s = pts[k], c = pts[k + 1], dl = pts[k + 2] - lam;
+          const cdl = Math.cos(dl);
+          const z = sp0 * s + cp0 * c * cdl;
+          if (z <= 0) continue;
+          const x = cx + R * c * Math.sin(dl);
+          const y = cy - R * (cp0 * s - sp0 * c * cdl);
+          if (x < -2 || y < -2 || x > w + 2 || y > h + 2) continue;
+          const b = Math.min(3, (z * 4) | 0);
+          const r = rad * (0.55 + 0.15 * b);
+          buckets[b].moveTo(x + r, y);
+          buckets[b].arc(x, y, r, 0, 2 * Math.PI);
+        }
+        ctx.fillStyle = colors.dot;
+        [0.2, 0.4, 0.62, 0.86].forEach((a, b) => { ctx.globalAlpha = a; ctx.fill(buckets[b]); });
+
+        // The places: each pin, and its stack set clear of the others with a hairline back to the pin.
+        const at = pins.map((p) => {
+          const dl = p.lon - lam, cdl = Math.cos(dl);
+          const z = sp0 * Math.sin(p.lat) + cp0 * Math.cos(p.lat) * cdl;
+          const x = cx + R * Math.cos(p.lat) * Math.sin(dl);
+          const y = cy - R * (cp0 * Math.sin(p.lat) - sp0 * Math.cos(p.lat) * cdl);
+          const inside = x > 0 && y > 0 && x < w && y < h;
+          return { x, y, o: inside ? Math.max(0, Math.min(1, (z - 0.1) / 0.2)) : 0 };
+        });
+        // Thirty rounds pull each card toward its place above its pin while pushing it off every pin and every other
+        // card; the rest only push, so they end apart (replayed offline at 600-1000px stages, whole and cropped: no
+        // card over another or over a pin). Eight cards, so ~6,000 steps a frame.
+        const cards = at.map((a) => ({ x: a.x, y: a.y - LIFT }));
+        for (let it = 0; it < 60; it++) {
+          let moved = false;
+          for (let i = 0; i < cards.length; i++) {
+            if (!at[i].o || it >= 30) continue;
+            cards[i].x += (at[i].x - cards[i].x) * 0.12; cards[i].y += (at[i].y - LIFT - cards[i].y) * 0.12;
+          }
+          for (let i = 0; i < cards.length; i++) for (let j = 0; j < at.length; j++) {
+            if (!at[i].o || !at[j].o) continue;
+            const dx = cards[i].x - at[j].x, dy = cards[i].y - at[j].y;
+            const ox = CW / 2 + 8 - Math.abs(dx), oy = CH / 2 + 8 - Math.abs(dy);
+            if (ox <= 0 || oy <= 0) continue;
+            moved = true;
+            if (ox < oy) cards[i].x += (dx >= 0 ? 1 : -1) * ox; else cards[i].y += (dy > 0 ? 1 : -1) * oy;
+          }
+          for (let i = 0; i < cards.length; i++) for (let j = i + 1; j < cards.length; j++) {
+            if (!at[i].o || !at[j].o) continue;
+            const dx = cards[j].x - cards[i].x, dy = cards[j].y - cards[i].y;
+            const ox = CW + 10 - Math.abs(dx), oy = CH + 10 - Math.abs(dy);
+            if (ox <= 0 || oy <= 0) continue;
+            moved = true;
+            if (ox < oy) { const m = ((dx >= 0 ? 1 : -1) * ox) / 2; cards[i].x -= m; cards[j].x += m; }
+            else { const m = ((dy >= 0 ? 1 : -1) * oy) / 2; cards[i].y -= m; cards[j].y += m; }
+          }
+          for (const c of cards) {
+            c.x = Math.max(CW / 2 + 4, Math.min(w - CW / 2 - 4, c.x));
+            c.y = Math.max(CH / 2 + 4, Math.min(h - CH / 2 - 4, c.y));
+          }
+          if (!moved && it >= 30) break;
+        }
+        ctx.lineWidth = 1; ctx.strokeStyle = colors.lead;
+        at.forEach((a, i) => {
+          if (!a.o) return;
+          const c = cards[i];
+          const ex = Math.max(c.x - CW / 2, Math.min(c.x + CW / 2, a.x)), ey = Math.max(c.y - CH / 2, Math.min(c.y + CH / 2, a.y));
+          if (Math.hypot(ex - a.x, ey - a.y) > 4) {
+            ctx.globalAlpha = 0.7 * a.o;
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(ex, ey); ctx.stroke();
+          }
+          ctx.globalAlpha = a.o; ctx.fillStyle = colors.pin;
+          ctx.beginPath(); ctx.arc(a.x, a.y, 2.8, 0, 2 * Math.PI); ctx.fill();
+        });
+        pins.forEach((p, i) => {
+          p.el.style.transform = `translate3d(${(cards[i].x - CW / 2).toFixed(1)}px, ${(cards[i].y - CH / 2).toFixed(1)}px, 0)`;
+          p.el.style.opacity = at[i].o.toFixed(3);
+          p.el.classList.toggle('is-away', at[i].o < 0.5);
+        });
+      };
+
+      const frame = (now: number): void => {
+        raf = 0;
+        let more = false;
+        if (tween) {
+          const t = Math.min(1, (now - tween.t0) / tween.ms);
+          view = mix(tween.from, tween.to, tween.fn(t));
+          if (t < 1) more = true; else tween = null;
+        } else if (coast) {
+          const dt = Math.max(0, Math.min(48, now - coast.t));
+          coast.t = now;
+          const k = Math.exp(-dt / 220);
+          coast.vl *= k; coast.vp *= k;
+          view = { ...view, lam: view.lam + coast.vl * dt, phi: clampPhi(view.phi + coast.vp * dt) };
+          if (Math.hypot(coast.vl, coast.vp) > 2e-5 && now - coast.t0 < 1500) more = true; else coast = null;
+        }
+        draw();
+        if (more) raf = requestAnimationFrame(frame);
+      };
+      const kick = (): void => { if (!raf) raf = requestAnimationFrame(frame); };
+      const goTo = (to: View, ms: number, fn = easeInOut): void => {
+        coast = null;
+        if (reduce || ms <= 0) { tween = null; view = to; kick(); return; }
+        tween = { from: view, to, t0: performance.now(), ms, fn };
+        kick();
+      };
+
+      // The arrival: a third of a turn, west to east as the Earth turns, settled in 3.6s, then still. It starts when
+      // the globe is first a quarter on screen; under reduced motion the globe is at rest from the start.
+      let arrived = reduce;
+      const size = (): void => {
+        const r = st.getBoundingClientRect();
+        const d = Math.min(2, window.devicePixelRatio || 1);
+        if (!r.width || !r.height || (r.width === w && r.height === h && d === dpr)) return;
+        w = r.width; h = r.height; dpr = d;
+        cvs.width = Math.round(w * dpr); cvs.height = Math.round(h * dpr);
+        // A new size re-homes the view; a running tween keeps its turn and lands on the new home.
+        const rest = home(mode, w, h);
+        coast = null;
+        if (tween) tween = { ...tween, from: { ...tween.from, R: rest.R, cx: rest.cx, cy: rest.cy }, to: rest };
+        else view = arrived ? rest : { ...rest, lam: rest.lam + 120 * D, phi: 8 * D };
+        draw();
+      };
+      size();
+      const io = new IntersectionObserver((entries) => {
+        if (!entries.some((e) => e.isIntersecting) || arrived || !w) return;
+        io.disconnect();
+        arrived = true;
+        goTo(home(mode, w, h), 3600, ease);
+      }, { threshold: 0.25 });
+      if (!arrived) io.observe(st);
+      let rt = 0;
+      const ro = new ResizeObserver(() => { clearTimeout(rt); rt = window.setTimeout(size, 160); });
+      ro.observe(st);
+      cleanups.push(() => { cancelAnimationFrame(raf); io.disconnect(); ro.disconnect(); clearTimeout(rt); });
+
+      // Drag to turn; on release it coasts to rest (no coast under reduced motion).
+      let drag: { x: number; y: number; t: number; vl: number; vp: number } | null = null;
+      cvs.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        if (tween) arrived = true;
+        tween = null; coast = null;
+        drag = { x: e.clientX, y: e.clientY, t: performance.now(), vl: 0, vp: 0 };
+        cvs.setPointerCapture(e.pointerId);
+        st.classList.add('is-grabbing');
+      });
+      cvs.addEventListener('pointermove', (e) => {
+        if (!drag) return;
+        const now = performance.now(), dt = Math.max(1, now - drag.t);
+        const dl = -(e.clientX - drag.x) / view.R, dp = (e.clientY - drag.y) / view.R;
+        view = { ...view, lam: view.lam + dl, phi: clampPhi(view.phi + dp) };
+        drag = { x: e.clientX, y: e.clientY, t: now, vl: dl / dt, vp: dp / dt };
+        kick();
+      });
+      const release = (): void => {
+        if (!drag) return;
+        if (!reduce && performance.now() - drag.t < 80) coast = { vl: drag.vl, vp: drag.vp, t: performance.now(), t0: performance.now() };
+        drag = null;
+        st.classList.remove('is-grabbing');
+        kick();
+      };
+      cvs.addEventListener('pointerup', release);
+      cvs.addEventListener('pointercancel', release);
+      // A stack the keyboard reaches round the back brings the globe home, where every place is in front.
+      stacks.forEach((s) => s.addEventListener('focusin', () => {
+        if (s.classList.contains('is-away') && w) { arrived = true; goTo(home(mode, w, h), 900); }
+      }));
+
+      setMode = (m: Mode): void => {
+        mode = m; st.dataset.mode = m;
+        if (!w) return;
+        arrived = true; io.disconnect();
+        goTo(home(m, w, h), 900);
+      };
+      onZone = () => { recolor(); draw(); };
+      document.addEventListener('theme:change', () => { recolor(); draw(); }, on);
+    }
+
+    // ── The prototype toolbar: the globe's view and where the calligraphy room stands, kept in the URL.
+    const bar = main.querySelector<HTMLElement>('.proto-bar');
+    const press = (attr: string, val: string): void => {
+      bar?.querySelectorAll<HTMLElement>(`[${attr}]`).forEach((b) => b.setAttribute('aria-pressed', String(b.getAttribute(attr) === val)));
+    };
+    const remember = (key: string, val: string, dflt: string): void => {
+      const q = new URLSearchParams(location.search);
+      if (val === dflt) q.delete(key); else q.set(key, val);
+      const s = q.toString();
+      history.replaceState(history.state, '', `${location.pathname}${s ? `?${s}` : ''}${location.hash}`);
+    };
+    const room = main.querySelector<HTMLElement>('#calligraphy');
+    const placeCal = (pos: CalPos): void => {
+      const anchor = { first: main.querySelector('#places'), carousel: main.querySelector('#selected')?.nextElementSibling, end: main.querySelector('.pa-foot') }[pos];
+      if (room && anchor && anchor !== room) anchor.before(room);
+      press('data-calpos', pos);
+      zone();
+    };
+    bar?.querySelectorAll<HTMLElement>('[data-globe]').forEach((b) => b.addEventListener('click', () => {
+      const m: Mode = b.dataset.globe === 'crop' ? 'crop' : 'whole';
+      press('data-globe', m); remember('globe', m, 'whole'); setMode(m);
+    }));
+    bar?.querySelectorAll<HTMLElement>('[data-calpos]').forEach((b) => b.addEventListener('click', () => {
+      const p = (b.dataset.calpos ?? 'end') as CalPos;
+      remember('cal', p, 'end'); placeCal(p);
+    }));
+    press('data-globe', params.get('globe') === 'crop' ? 'crop' : 'whole');
+    const calParam = params.get('cal');
+    placeCal(calParam === 'first' || calParam === 'carousel' ? calParam : 'end');
+
+    let zt = 0;
+    window.addEventListener('resize', () => { clearTimeout(zt); zt = window.setTimeout(zone, 160); }, on);
+    cleanups.push(() => clearTimeout(zt));
+
+    return () => { ac.abort(); cleanups.forEach((f) => f()); };
+  });
+</script>

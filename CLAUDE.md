@@ -231,7 +231,7 @@ tools/vendor-projects.mjs           # the ONLY thing that touches the network, r
 
 ### Routes
 
-`npm run build` prints `9 page(s) built`; check this table against that, and `ls src/pages` beats both.
+`npm run build` prints `10 page(s) built` (one of them the prototype route below); check this table against that, and `ls src/pages` beats both.
 
 | Route | What it is |
 | --- | --- |
@@ -244,8 +244,9 @@ tools/vendor-projects.mjs           # the ONLY thing that touches the network, r
 | `/experience` | the timeline — education and roles |
 | `/art` | calligraphy + photography |
 | `/404` | the not-found page (noindex, no canonical) |
+| `/proto-art` | PROTOTYPE (throwaway): the /art redesign to judge on the real site: a globe of places, a carousel, the wall, the calligraphy room, with a toolbar of options |
 
-**Prototype routes: none today** (git holds the retired ones). A `src/pages/proto-<name>.astro` page exists to
+**Prototype routes: one today, `/proto-art`** (git holds the retired ones; its data is `src/data/protoArt.ts`, deleted with it). A `src/pages/proto-<name>.astro` page exists to
 make a visual choice by looking at the real thing in the real page, options as a switcher. It is kept out of
 the index **by construction**: `BaseLayout` gives every `/proto-` path `noindex` whatever the page passes (no
 noindex means a self-referential canonical, an explicit request to index the page, and two proto routes once
@@ -256,7 +257,7 @@ and to the page count above; retiring one deletes the page and both.
 ### Interactivity — vanilla scripts, and the contract they keep
 
 Every interactive thing is a plain Astro component or page with a bundled `<script>`, **not** an island.
-`grep -rln '<script' src/{components,sections,pages,layouts}` lists them: 23 files today (`ProjectPicture.astro`
+`grep -rln '<script' src/{components,sections,pages,layouts}` lists them: 24 files today, the prototype route's included (`ProjectPicture.astro`
 and `Button.astro` have none; unfiltered, the grep also hits three `lib/` files that say `<script>` in
 comments). `scripts/{artGallery,beats,motion,pageView}.ts` are modules those scripts import.
 
@@ -281,7 +282,7 @@ finished page (`tests/distSmoke.test.ts` fails on a hold-back outside one).
   page load: a script that only runs at parse time is dead after the first navigation.
   - **On a FULL load `astro:page-load` is window `load`**, which waits for every font and eager subresource,
     and never comes if one never arrives (in headless Chrome 156 a held lazy picture did not hold `load`; held
-    fonts did). So nine scripts start through `scripts/pageView.ts`'s `onPageView()`: at module evaluation
+    fonts did). So nine scripts, and a prototype route's (`/proto-art`'s today), start through `scripts/pageView.ts`'s `onPageView()`: at module evaluation
     right after parse, then once per new DOM on `astro:page-load`, with the element its selector found (a page
     without one gets only the last teardown). Six are /projects': `TerminalHeader`, `ProjectAsk`, `Gallery`
     (a slow card shimmers, and a picture fades in, even before `load`), `DraftingField` (the field draws while
