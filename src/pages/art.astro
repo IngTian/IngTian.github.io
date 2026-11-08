@@ -284,6 +284,9 @@ const darkData = (w: Work) => ({
     /* The whole room, so a pinch that starts off the work (on the ground or the bar) never zooms the page. */
     touch-action: none; }
   .dark::backdrop { background: #0a0a0c; }
+  /* The dialog is a container, not a control: a tap on the work focuses it, and the browser's ring would frame the
+     whole room. Its controls keep their own (.d-btn:focus-visible). */
+  .dark:focus { outline: none; }
   /* The work is centred in the band between the close button's 56px strip and the bar, so a tall work never runs
      under either, however unequal the two are (56 and 104 on a phone). */
   .dark[open] { display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 56px 0 var(--d-bar); }
@@ -519,8 +522,7 @@ const darkData = (w: Work) => ({
       };
       const rebase = (): void => {
         if (pts.size < 2) return;
-        const q = pair();
-        pinch = { dist: q.dist || 1, x: q.x, y: q.y };
+        pinch = pair();
         pts.forEach((p) => { p.multi = true; });
         last = null;
       };
@@ -540,11 +542,14 @@ const darkData = (w: Work) => ({
         if (pts.size > 1) {
           // Pan by the midpoint's movement, then scale about where it now is: the point of the work that was under
           // the fingers stays under them. After the pan the top-left has moved as far as the midpoint has, so the
-          // point, from the moved top-left, is the old midpoint from the old one.
+          // point, from the moved top-left, is the old midpoint from the old one. Two pointers within a pixel of each
+          // other have no distance to scale by (a reading of 0 would snap the work to 1x, and a step from one under a
+          // pixel would jump it to 6x), so a step either end of which reads under 1px only pans.
           const q = pair(), r = img.getBoundingClientRect();
-          z = zoomAbout({ x: z.x + q.x - pinch.x, y: z.y + q.y - pinch.y, s: z.s }, z.s * q.dist / pinch.dist,
+          const k = q.dist >= 1 && pinch.dist >= 1 ? q.dist / pinch.dist : 1;
+          z = zoomAbout({ x: z.x + q.x - pinch.x, y: z.y + q.y - pinch.y, s: z.s }, z.s * k,
             pinch.x - r.left, pinch.y - r.top);
-          pinch = { dist: q.dist || pinch.dist, x: q.x, y: q.y };
+          pinch = q;
           tf();
         } else if (z.s > 1) {
           z = { x: z.x + dx, y: z.y + dy, s: z.s };
