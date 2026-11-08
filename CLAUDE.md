@@ -150,17 +150,17 @@ rather than add.
     every constant behind the three hints to the rule it mirrors and sweeps each hint the page ships over the
     layout; `tests/distSmoke.test.ts` weighs the file a browser would choose, reading the device px from the
     shipped `sizes`.
-  - **Only the first mat image is eager** (photo-23's 900w, 181,642 B), with `fetchpriority="high"`; both
-    calligraphy works and every photograph are lazy. `tests/distSmoke.test.ts` sums the eager images a DPR-2
-    browser picks, at most 300 KB, the first-load goal as the spec measures it. A real first load also fetches
-    what the browser's lazy-load margin reaches; its goal is 400 KB, measured in the browser: at 1440×900 DPR 2,
-    headless Chrome 157 transferred 399,198 B of images (the mat's photograph, the couplet's 900w and the poem's
-    1080w) and no photograph, as the rows start ~3,070px down.
+  - **Only the first mat image is eager**, with `fetchpriority="high"`; every other image is lazy.
+    `tests/distSmoke.test.ts` sums the eager images a DPR-2 browser picks, at most 300 KB, the first-load goal as
+    the spec measures it. A real first load also fetches what the lazy-load margin reaches, both calligraphy works
+    and none of the rows' photographs, which start ~3,070px down. Its goal is 400 KB, which the same file holds as
+    a model (the eager work and every calligraphy work a DPR-2 browser picks) and a browser measured once (the pass
+    is above `CAL_MAX_H` in `lib/artPage.ts`). The first phrase of the sentence picks the eager work, so a heavier
+    one there is what fails it.
   - **A lazy work reserves its box before it decodes**, or everything under it starts higher and the lazy-load
-    margin reaches it. The calligraphy blocks, sized by their images inside shrink-to-fit buttons, were 2px tall
-    at first layout, so the first load also fetched seven photographs (988,428 B in all). A block's width now
-    comes from its work's ratio (`--ar`) at the height cap, as a tile's does; `tests/artSizes.test.ts` holds the
-    rule and `tests/distSmoke.test.ts` each block's ratio.
+    margin fetches it: a calligraphy block's width comes from its work's ratio (`--ar`) at the height cap, as a
+    tile's does, and the dark room's image takes the same ratio. The bug it fixed is above `CAL_MAX_H`;
+    `tests/artSizes.test.ts` holds the rule and `tests/distSmoke.test.ts` each block's ratio.
   - **Read an image's size from `getImage()`, never off its `ImageMetadata`.** The import is a Proxy, and
     reading any property of it but `clone` or `fsPath` keeps the original in `dist`. /art's `.width` and
     `.height` reads kept all 44 JPEGs there (40,525,788 B, 55% of a 74.3 MB artifact, referenced by nothing;

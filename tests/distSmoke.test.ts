@@ -354,7 +354,7 @@ describe("/art's image payload, measured on the built output", () => {
    * regression (every work on /art is height-capped or row-bound, so its width does not scale with the viewport),
    * which is why that case fails loudly rather than picking a viewport to multiply by.
    */
-  const pickAt2x = (tag: string): { w: number; bytes: number } => {
+  const pickAt2x = (tag: string): { url: string; w: number; bytes: number } => {
     const srcset = /srcset="([^"]+)"/.exec(tag)?.[1] ?? '';
     const candidates = srcset.split(',')
       .map((s) => s.trim().split(/\s+/))
@@ -372,8 +372,8 @@ describe("/art's image payload, measured on the built output", () => {
       + 'back; see the note above matSizes() in lib/artPage.ts and the sweeps in artSizes.test.ts.',
     ).toMatch(/^\d+(\.\d+)?px$/);
     const needed = Math.ceil(parseFloat(desktopBranch) * 2);
-    const { w, bytes } = candidates.find((c) => c.w >= needed) ?? candidates[candidates.length - 1];
-    return { w, bytes };
+    const { url, w, bytes } = candidates.find((c) => c.w >= needed) ?? candidates[candidates.length - 1];
+    return { url, w, bytes };
   };
 
   it('keeps the eager, high-priority LCP image well under what it was', () => {
@@ -386,8 +386,9 @@ describe("/art's image payload, measured on the built output", () => {
     expect(
       chosen.bytes,
       `the LCP candidate is ${(chosen.bytes / 1024).toFixed(0)} KB (${chosen.w}w). `
-      + 'If this jumped, check whether a native image width got back into `widths`, or whether `sizes` went '
-      + 'back to a viewport fraction, in matSizes() in lib/artPage.ts.',
+      + "If this jumped, check whether SENTENCE's first phrase (data/artworks.ts) now names a heavier work, whether "
+      + 'a native image width got back into `widths`, or whether `sizes` went back to a viewport fraction, in '
+      + 'matSizes() in lib/artPage.ts.',
     ).toBeLessThan(250 * 1024);
   });
 
@@ -395,6 +396,20 @@ describe("/art's image payload, measured on the built output", () => {
     const eager = imgTags().filter((t) => /srcset=/.test(t) && !/\bloading="lazy"/.test(t));
     expect(eager.filter((t) => /fetchpriority="high"/.test(t))).toHaveLength(1);
     expect(eager.reduce((s, t) => s + pickAt2x(t).bytes, 0)).toBeLessThanOrEqual(300 * 1024);
+  });
+
+  // A first load at 1440x900 DPR 2: the eager work and every calligraphy work, which the lazy-load margin reaches
+  // from the first screen (the rows start ~3,070px down, beyond it). A model, not a measurement: headless Chrome 157
+  // transferred these three files and nothing else (the pass is above CAL_MAX_H in lib/artPage.ts).
+  it('fetches at most 400 KB of images on a first load: the first work and the calligraphy', () => {
+    const cal = [...artHtml().matchAll(/<button\b[^>]*\bclass="cal\b[^>]*>\s*(<img\b[^>]*>)/g)].map((m) => m[1]);
+    const eager = imgTags().filter((t) => /srcset=/.test(t) && !/\bloading="lazy"/.test(t));
+    // By URL: when the couplet leads, its mat and its block both pick its 900w, one file fetched once.
+    const files = new Map([...eager, ...cal].map((t) => { const p = pickAt2x(t); return [p.url, p.bytes] as const; }));
+    const total = [...files.values()].reduce((s, b) => s + b, 0);
+    expect(total, `${total} B: ${[...files.keys()].map((u) => basename(u)).join(', ')}. The usual cause is SENTENCE's `
+      + 'first phrase (data/artworks.ts) naming a heavier work: lead with a lighter one, or re-measure in a browser.')
+      .toBeLessThanOrEqual(400 * 1024);
   });
 
   it("ships each photograph in the tiles' widths only, on the mat too, with a px desktop hint", () => {
