@@ -432,6 +432,14 @@ describe("/art's image payload, measured on the built output", () => {
     expect(printed.filter((s) => /—|Untitled|placeholder|undefined|null/.test(s))).toEqual([]);
     expect(m).toMatch(new RegExp(`>${photoFiles().length} photographs\\.<`));
   });
+
+  // The lock is on <html>, which no component declares, so art.astro writes it :global (CLAUDE.md, trap 1). Astro 6
+  // happens to leave an `html` selector and a :has() argument unscoped even without it (measured: the same rule
+  // ships either way), so this pins the shipped rule, not the source's spelling: a lock that a later Astro scopes, or
+  // that moves onto an element of the page, carries [data-astro-cid-…] or loses `html:has(` and fails here.
+  it('locks the scroll behind the dark room with an unscoped rule', () => {
+    expect(shippedCss([builtPage('/art')])).toMatch(/(?:^|[}\s,])html:has\(dialog\.dark\[open\]\)\{overflow:hidden\}/);
+  });
 });
 
 describe('the images under src/assets', () => {

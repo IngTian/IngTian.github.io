@@ -57,8 +57,10 @@ decides how a page may change it:
   press, focus ring and the `<a>`/`<button>` behaviour; a page's look is a `skin` value plus one
   `.btn--<skin>` block. The skins today are /projects' **sticker** (a slight tilt, a 1.5px ink edge, a hard
   4px offset plate in the accent) and the research routes' **paper** (a hairline box in the sheet's own
-  ground, the paper page's Copy BibTeX). A new page **adds a skin, not a new button.** A skin obeys the motion
-  rule: the sticker's plate moves by `transform`, not `box-shadow` (`Button.astro` says how).
+  ground, the paper page's Copy BibTeX). A new page **adds a skin, not a new button.** /art's dark-room
+  controls are icon squares, and its works open from the image itself. Neither has a label or an arrow, so
+  neither is `Button.astro`. A skin obeys the motion rule: the sticker's plate moves by `transform`, not
+  `box-shadow` (`Button.astro` says how).
 
 **Restraint is the aesthetic.** Text is English, and Chinese where it is the right word: the literati feel
 comes from composition and negative space, not from which script is set. Chinese is set in the reader's
@@ -157,7 +159,8 @@ rather than add.
     `.height` reads kept all 44 JPEGs there (40,525,788 B, 55% of a 74.3 MB artifact, referenced by nothing;
     issue #60). Nothing reads one now, so Astro drops every original and `dist` is 33.8 MB;
     `tests/distSmoke.test.ts` fails if any image under `src/assets` ships anything but webp variants. Every
-    work carries its native-pixel webp from that same `getImage()` call, as `data-zoom`.
+    work carries its native-pixel webp from that same `getImage()` call, as `data-zoom`: the dark room's source,
+    which zooms 6×, so the pixels stay.
 - `site: 'https://ingtian.github.io'`, no `base` (user site at root).
 
 ## Layout
@@ -462,7 +465,9 @@ and reverted every time** — do not rebuild it. The phone treatment is *bug fix
     reports "nothing moves when it speaks" while the cow moves: assert the cow's rect for every line.
 - on **/art**, at 900px and under the sentence comes first with the mat directly under it, so a tap swaps the
   work just below the line being read, and a block's work sits above its words. At 640px the sentence is 21px,
-  the mat is `min(40vh, 320px)` (computed: its top on the first screen at 390×844), and rows are 150px.
+  the mat is `min(40vh, 320px)` (computed: its top on the first screen at 390×844), and rows are 150px; the dark
+  room's bar takes two rows, the line (up to two lines) and the count, then the squares; the work is centred in
+  the band between the close strip and the bar.
 
 ## Navigation & structure
 
@@ -1024,8 +1029,10 @@ of sky over a full-bleed panel.
   of the role tokens (/projects' eight `--draft-*` and two knockouts, the research routes' eight `--sheet-*`;
   *Themes*); and on `/`, which is not a register, `--rail-ink` and `--rail-focus` (*Navigation*), the six
   `--panel-*` of `styles/slides.css` (the five paper panels' ground and inks per theme), Choice's chart colours
-  `--c-h*` and `--c-p*`, and Story's two graph-line tones, `--story-line` and `--story-line-soft`. Beyond
-  those, a component may hold a literal for a drawing of its own (the cow's coat, /experience's timeline dots).
+  `--c-h*` and `--c-p*`, and Story's two graph-line tones, `--story-line` and `--story-line-soft`. /art's dark
+  room, dark in both themes, holds its own inks (`--room*` on `.dark`), held by `tests/paperPalette.test.ts`.
+  Beyond those, a component may hold a literal for a drawing of its own (the cow's coat, /experience's timeline
+  dots).
   - **An undeclared `var()` voids the whole shorthand** (every longhand falls back to its initial, and
     `border-style`'s is `none`): /experience's dividers never drew against an undefined `--rule`, which is now
     `rgba(var(--hairline-rgb), 0.32)`. `tests/cssVars.test.ts` fails on any `var(--x)` without a fallback that

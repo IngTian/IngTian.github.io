@@ -1,6 +1,7 @@
 ---
 // /art, "The sentence", on a still sheet: one sentence in the owner's voice whose seal-red phrases each bring a work
-// onto the mat beside it, then the calligraphy as object blocks, then every photograph in justified rows. It borrows
+// onto the mat beside it, then the calligraphy as object blocks, then every photograph in justified rows; any work
+// opens full screen in the dark room. It borrows
 // the research routes' paper register (page="paper"): no sky, no veil, no rail, and nothing moves on its own but a
 // photograph's one fade as it arrives. The works and the sentence are data/artworks.ts; the sentence's rules and the
 // label line are lib/artPage.ts.
@@ -186,6 +187,22 @@ const darkData = (w: Work) => ({
 
       <footer class="art-foot"><a class="back" href="/">← back to the descent</a></footer>
     </div>
+
+    {/* The dark room: one work full screen, opened by any work's button. Its src, alt, line and count are the
+        script's, from the opener's data-*. */}
+    <dialog class="dark" aria-label="The dark room: one work, full screen" aria-describedby="art-dark-line">
+      <button type="button" class="d-btn d-close" aria-label="Close">✕</button>
+      <img class="d-img" alt="" draggable="false" />
+      <div class="d-bar">
+        <p class="d-line" id="art-dark-line"></p>
+        <span class="d-count" aria-hidden="true"></span>
+        <div class="d-ctl">
+          <button type="button" class="d-btn" data-step="-1" aria-label="Previous work">←</button>
+          <button type="button" class="d-btn" data-step="1" aria-label="Next work">→</button>
+          <button type="button" class="d-btn d-info" aria-pressed="true" aria-label="Show the label">i</button>
+        </div>
+      </div>
+    </dialog>
   </main>
 </BaseLayout>
 
@@ -287,6 +304,48 @@ const darkData = (w: Work) => ({
     .obj-mat { padding: 16px; }
     .rows { --row-h: 150; --pad: 6px; column-gap: 10px; row-gap: 20px; }
   }
+
+  /* ── THE DARK ROOM: an empty dark dialog, the work as large as fits, small square controls. It is #0a0a0c in both
+     themes, so its inks are its own, declared here once and read by every room rule (tests/paperPalette.test.ts
+     measures them on it). The page behind it does not scroll while it is open: the lock is on <html>, which no
+     component declares, so it is written :global (trap 1). Astro 6 leaves it unscoped either way, measured, and
+     tests/distSmoke.test.ts holds the shipped rule. ─────────────────────────────────────────────────────── */
+  :global(html:has(dialog.dark[open])) { overflow: hidden; }
+  .dark { --room: #0a0a0c; --room-ink: rgba(239, 233, 221, 0.8); --room-ink-2: rgba(239, 233, 221, 0.6);
+    --room-edge: rgba(239, 233, 221, 0.45); --room-edge-hover: rgba(239, 233, 221, 0.85); --room-focus: #e0574a;
+    --d-bar: 56px;
+    border: 0; padding: 0; margin: 0; width: 100vw; height: 100dvh; max-width: 100vw; max-height: 100dvh;
+    background: var(--room); color: var(--room-ink); overflow: hidden; }
+  .dark::backdrop { background: #0a0a0c; }
+  /* The work is centred in the band between the close button's 56px strip and the bar, so a tall work never runs
+     under either, however unequal the two are (56 and 104 on a phone). */
+  .dark[open] { display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 56px 0 var(--d-bar); }
+  .d-img { max-width: calc(100vw - 32px); max-height: calc(100dvh - 56px - var(--d-bar)); transform-origin: 0 0; cursor: grab;
+    will-change: transform; }
+  .d-btn { width: 44px; height: 44px; flex: none; border: 1px solid var(--room-edge); background: var(--room);
+    color: var(--room-ink); font: 15px/1 var(--font-mono); cursor: pointer; }
+  @media (hover: hover) { .d-btn:hover { border-color: var(--room-edge-hover); } }
+  .d-btn:focus-visible { outline: 2px solid var(--room-focus); outline-offset: 2px; }
+  .d-close { position: fixed; top: 6px; left: 16px; z-index: 2; }
+  /* The bar is a solid strip of the room's ground, so a zoomed work passes under it and never under the line. */
+  .d-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 8px;
+    height: var(--d-bar); padding: 0 16px; background: var(--room); }
+  .d-line { flex: 1; min-width: 0; font-size: 13px; line-height: 1.4; color: var(--room-ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dark[data-line-off] .d-line { visibility: hidden; }
+  .d-count { font: 12px/1 var(--font-mono); color: var(--room-ink-2); margin-right: 4px; }
+  .d-ctl { display: flex; gap: 8px; }
+  .d-info[aria-pressed='false'] { color: var(--room-ink-2); }
+  /* On a phone the bar takes two rows: the line, wrapped to at most two lines, with the count beside it, then the
+     squares at the right. Five 44px squares and four 8px gaps are 252px, inside a 320px screen's 288; two 13px/1.4
+     lines (36.4) + the 8px row gap + 44 + 2 x 6px of padding are 100.4px, inside the 104. */
+  @media (max-width: 640px) {
+    .dark { --d-bar: 104px; }
+    .d-bar { flex-wrap: wrap; align-content: center; padding: 6px 16px; row-gap: 8px; }
+    .d-line { flex: 1 1 0; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+      line-clamp: 2; }
+    .d-ctl { flex-basis: 100%; justify-content: flex-end; }
+  }
 </style>
 
 <script>
@@ -294,6 +353,8 @@ const darkData = (w: Work) => ({
   import { justifyRows } from '../lib/justify';
   import { prefersReducedMotion } from '../lib/motion';
   import { ART } from '../lib/motionTiming';
+
+  const LINE_KEY = 'art.dark-line';
 
   onPageView<HTMLElement>('main.art', (main) => {
     const reduce = prefersReducedMotion();
@@ -343,8 +404,103 @@ const darkData = (w: Work) => ({
       a.addEventListener('click', (e) => { e.preventDefault(); swap(key); });
       a.addEventListener('focus', () => swap(key));
     });
-    // Leaving drops a swap still decoding and clears the timers that hide a replaced work.
-    const stop = (): void => { seq += 1; timers.forEach((t) => clearTimeout(t)); };
+
+    // ── The dark room: a list of works (each opener carries data-zoom and the rest), stepped through by prev/next and
+    // the arrow keys, with the label line under the work. Escape is the dialog's own.
+    const dark = main.querySelector<HTMLDialogElement>('dialog.dark');
+    const dImg = dark?.querySelector<HTMLImageElement>('.d-img') ?? null;
+    let list: HTMLElement[] = [];
+    let at = 0;
+    let opener: HTMLElement | null = null;
+    // The zoom, translate(x, y) scale(s) about the image's top-left: every open and every step starts at 1x.
+    let z = { x: 0, y: 0, s: 1 };
+    const tf = (): void => { if (dImg) dImg.style.transform = `translate(${z.x}px,${z.y}px) scale(${z.s})`; };
+    const show = (): void => {
+      const el = list[at];
+      if (!dark || !dImg || !el) return;
+      const w = Number(el.dataset.zw), h = Number(el.dataset.zh);
+      // RESERVE THE BOX FROM THE NATIVE SIZE, AS A RATIO AND A CAPPED WIDTH, NOT as width/height attributes. The
+      // image has no intrinsic size until it decodes, so without a box the room opens empty and the work jumps in.
+      // The obvious fix, `img.width = w; img.height = h`, shipped once and was wrong: those are presentational hints,
+      // which lose to author rules, and Tailwind's preflight `img { max-width: 100%; height: auto }` beats the height
+      // hint while nothing beats the width one. A definite width and an auto height is the one case where the
+      // max-height clamp does not keep the ratio (CSS2.2 §10.7 needs both auto), so the clamp squashed the height
+      // alone: the old lightbox drew the 1727x3422 stele 1353.6x846 at 1440x900, stretched 3.17x across, then
+      // zoomed 6x. A ratio and a width hold: the box exists before decode, its height comes from the ratio, and
+      // min() caps the width exactly where the height would reach the band's (.d-img's max-height), so that clamp
+      // never binds; it re-fits on a resize too. `width: auto; height: auto` would not do: with nothing decoded
+      // there is no size, the default 300x150 applies and the box jumps on decode.
+      if (w && h) {
+        dImg.style.aspectRatio = `${w}/${h}`;
+        dImg.style.width = `min(calc(100vw - 32px), calc((100dvh - 56px - var(--d-bar)) * ${(w / h).toFixed(4)}))`;
+      }
+      // BLANK IT FIRST, before the new src and before showModal(): set in the same tick over the old one, the browser
+      // keeps painting the PREVIOUS work until the new one arrives, so every open after the first showed the wrong
+      // work for the length of its fetch. No src paints nothing, which is honest, and the box above keeps that from
+      // shifting anything. Not `opacity: 0`: nothing the reader came for rests invisible, and a failed decode would
+      // leave the room blank for good.
+      dImg.removeAttribute('src');
+      dImg.alt = el.dataset.alt ?? '';
+      z = { x: 0, y: 0, s: 1 };
+      tf();
+      dImg.src = el.dataset.zoom ?? '';
+      const line = dark.querySelector('.d-line');
+      if (line) line.textContent = el.dataset.line ?? '';
+      const count = dark.querySelector('.d-count');
+      if (count) count.textContent = list.length > 1 ? `${at + 1} / ${list.length}` : '';
+      dark.querySelectorAll<HTMLElement>('[data-step]').forEach((b) => { b.hidden = list.length < 2; });
+    };
+    const openList = (els: HTMLElement[], el: HTMLElement): void => {
+      list = els;
+      if (!dark || !list.length) return;
+      at = Math.max(0, list.indexOf(el));
+      show();
+      if (!dark.open) {
+        // Safari does not focus a clicked button, so the opener is the element clicked unless focus is elsewhere.
+        const a = document.activeElement;
+        opener = a instanceof HTMLElement && a !== document.body ? a : el;
+        dark.showModal();
+      }
+    };
+    const step = (d: number): void => { if (list.length > 1) { at = (at + d + list.length) % list.length; show(); } };
+    if (dark && dImg) {
+      const dlg = dark, img = dImg;
+      // The label line, hidden or shown, is remembered for the session.
+      const info = dlg.querySelector<HTMLElement>('.d-info');
+      const setLine = (shown: boolean): void => {
+        dlg.toggleAttribute('data-line-off', !shown);
+        info?.setAttribute('aria-pressed', String(shown));
+        try { sessionStorage.setItem(LINE_KEY, shown ? 'on' : 'off'); } catch { /* private mode: not remembered */ }
+      };
+      let stored: string | null = null;
+      try { stored = sessionStorage.getItem(LINE_KEY); } catch { /* private mode */ }
+      setLine(stored !== 'off');
+      info?.addEventListener('click', () => setLine(dlg.hasAttribute('data-line-off')));
+      dlg.querySelector('.d-close')?.addEventListener('click', () => dlg.close());
+      dlg.querySelectorAll<HTMLElement>('[data-step]').forEach((b) => b.addEventListener('click', () => step(Number(b.dataset.step))));
+      // The ground closes it, and nothing else. A click goes to the nearest common ancestor of where the pointer went
+      // down and where it came up, so a press that begins on the work or the bar and ends on the ground is a click on
+      // the dialog too: only one that also began on the ground closes it.
+      let downOnGround = false;
+      dlg.addEventListener('pointerdown', (e) => { downOnGround = e.target === dlg; });
+      dlg.addEventListener('click', (e) => { if (downOnGround && e.target === dlg) dlg.close(); });
+      // Focus goes back to what opened it.
+      dlg.addEventListener('close', () => { img.removeAttribute('src'); opener?.focus({ preventScroll: true }); opener = null; });
+      dlg.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+      });
+    }
+    // What each opener steps through: the mat, the sentence's works in its order (data-works); a block, both
+    // calligraphy works; a tile, every photograph.
+    const openFrom = (els: HTMLElement[]): void => els.forEach((b) => b.addEventListener('click', () => openList(els, b)));
+    openFrom((sentence?.dataset.works ?? '').split(',').flatMap((k) => figs.get(k)?.querySelector<HTMLElement>('.mat-btn') ?? []));
+    openFrom(Array.from(main.querySelectorAll<HTMLElement>('.cal')));
+    openFrom(Array.from(main.querySelectorAll<HTMLElement>('.tile-btn')));
+
+    // Leaving drops a swap still decoding, clears the timers that hide a replaced work, and closes the dark room, which
+    // releases the scroll lock (its :has() stops matching).
+    const stop = (): void => { seq += 1; timers.forEach((t) => clearTimeout(t)); if (dark?.open) dark.close(); };
 
     // ── The rows: justified at the stylesheet's --row-h, gap and --pad. A tile is its photograph's ratio times the
     // row's height, plus its mat; justifyRows takes the mat's padding into the gap and off the width, so every row

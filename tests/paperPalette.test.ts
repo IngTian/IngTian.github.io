@@ -36,14 +36,14 @@ const pageCss = [
 // /art borrows the register (BaseLayout `page="paper"`): its own scoped <style>, comments stripped.
 const artPage = readFileSync(new URL('../src/pages/art.astro', import.meta.url), 'utf8');
 const artCss = (/^<style>([\s\S]*?)^<\/style>/m.exec(artPage)?.[1] ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
-/** The declarations of the page's rule whose selector is exactly `sel`. */
-function rule(sel: string): string {
-  const body = new RegExp(`(?:^|[}\\s])${sel.replace(/[.()[\]*+?^$|\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(pageCss)?.[1];
-  expect(body, `the paper page has no "${sel} {" rule`).toBeTruthy();
+/** The declarations of the page's rule whose selector is exactly `sel` (the first, in `css`). */
+function rule(sel: string, css = pageCss): string {
+  const body = new RegExp(`(?:^|[}\\s])${sel.replace(/[.()[\]*+?^$|\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(css)?.[1];
+  expect(body, `the page read has no "${sel} {" rule`).toBeTruthy();
   return body!;
 }
-const decl = (sel: string, prop: string): string => {
-  const v = new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`).exec(rule(sel))?.[1].trim();
+const decl = (sel: string, prop: string, css = pageCss): string => {
+  const v = new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`).exec(rule(sel, css))?.[1].trim();
   expect(v, `${sel} sets no ${prop}`).toBeTruthy();
   return v!;
 };
@@ -178,5 +178,45 @@ describe('the paper palette (tokens.css)', () => {
     expect(pageCss).not.toMatch(/var\(--paper\b/);
     expect(artCss.length, 'no <style> block in art.astro').toBeGreaterThan(1000);
     expect(artCss).not.toMatch(/var\(--paper\b/);
+  });
+});
+
+// /art's dark room is the one ground on the sheet that does not follow the theme: #0a0a0c in both, its inks declared
+// once on `.dark` and read by every room rule, so they are measured on it once.
+describe("/art's dark room, dark in both themes", () => {
+  const room = (): RGB => rgbOf(decl('.dark', '--room', artCss));
+
+  it('is #0a0a0c, and so is its backdrop', () => {
+    expect(decl('.dark', '--room', artCss)).toBe('#0a0a0c');
+    // a backdrop need not inherit the dialog's custom properties, so it states the colour itself
+    expect(decl('.dark::backdrop', 'background', artCss)).toBe('#0a0a0c');
+  });
+
+  for (const ink of ['--room-ink', '--room-ink-2']) {
+    it(`${ink} clears AA on the room`, () => {
+      expect(between(over(...rgbaOf(decl('.dark', ink, artCss)), room()), room())).toBeGreaterThanOrEqual(AA_BODY);
+    });
+  }
+
+  it("the squares' edge and the focus ring clear 3:1 on the room", () => {
+    expect(between(over(...rgbaOf(decl('.dark', '--room-edge', artCss)), room()), room())).toBeGreaterThanOrEqual(NON_TEXT);
+    expect(onGround(decl('.dark', '--room-focus', artCss), room())).toBeGreaterThanOrEqual(NON_TEXT);
+  });
+
+  // A literal is a hex or an rgb()/rgba() of numbers: the mats', the rooms' rule's and the works' edge's
+  // rgba(var(--hairline-rgb), …) are tokens, and follow the theme.
+  it('holds every colour literal in /art inside the dark room', () => {
+    const LITERAL = /#[0-9a-f]{3,8}\b|rgba?\(\s*\d/gi;
+    const outside: string[] = [];
+    let held = 0;
+    for (const [, sel, body] of artCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const n = body.match(LITERAL)?.length ?? 0;
+      if (!n) continue;
+      if (sel.split(',').every((s) => /^\s*\.(?:dark\b|d-)/.test(s))) held += n;
+      else outside.push(sel.trim());
+    }
+    expect(outside).toEqual([]);
+    expect(held, 'no colour literal in a dark-room rule').toBeGreaterThan(0);
+    expect(held, 'a colour literal sits outside every rule').toBe(artCss.match(LITERAL)?.length);
   });
 });
