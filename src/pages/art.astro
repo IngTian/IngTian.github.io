@@ -197,6 +197,8 @@ const darkData = (w: Work) => ({
         <p class="d-line" id="art-dark-line"></p>
         <span class="d-count" aria-hidden="true"></span>
         <div class="d-ctl">
+          <button type="button" class="d-btn" data-zoom-by="out" aria-label="Zoom out">−</button>
+          <button type="button" class="d-btn" data-zoom-by="in" aria-label="Zoom in">+</button>
           <button type="button" class="d-btn" data-step="-1" aria-label="Previous work">←</button>
           <button type="button" class="d-btn" data-step="1" aria-label="Next work">→</button>
           <button type="button" class="d-btn d-info" aria-pressed="true" aria-label="Show the label">i</button>
@@ -315,7 +317,9 @@ const darkData = (w: Work) => ({
     --room-edge: rgba(239, 233, 221, 0.45); --room-edge-hover: rgba(239, 233, 221, 0.85); --room-focus: #e0574a;
     --d-bar: 56px;
     border: 0; padding: 0; margin: 0; width: 100vw; height: 100dvh; max-width: 100vw; max-height: 100dvh;
-    background: var(--room); color: var(--room-ink); overflow: hidden; }
+    background: var(--room); color: var(--room-ink); overflow: hidden;
+    /* The whole room, so a pinch that starts off the work (on the ground or the bar) never zooms the page. */
+    touch-action: none; }
   .dark::backdrop { background: #0a0a0c; }
   /* The work is centred in the band between the close button's 56px strip and the bar, so a tall work never runs
      under either, however unequal the two are (56 and 104 on a phone). */
@@ -353,8 +357,11 @@ const darkData = (w: Work) => ({
   import { justifyRows } from '../lib/justify';
   import { prefersReducedMotion } from '../lib/motion';
   import { ART } from '../lib/motionTiming';
+  import { DOUBLE_TAP, ZOOM, isDoubleTap, wheelScale, zoomAbout, type Tap, type Zoom } from '../lib/artPage';
 
   const LINE_KEY = 'art.dark-line';
+  // The keys that zoom, by the factor each zooms by: 0 resets, as zoomAbout fits the work at any scale up to 1.
+  const KEY_ZOOM = new Map([['+', ZOOM.key], ['=', ZOOM.key], ['-', 1 / ZOOM.key], ['_', 1 / ZOOM.key], ['0', 0]]);
 
   onPageView<HTMLElement>('main.art', (main) => {
     const reduce = prefersReducedMotion();
@@ -412,8 +419,13 @@ const darkData = (w: Work) => ({
     let list: HTMLElement[] = [];
     let at = 0;
     let opener: HTMLElement | null = null;
-    // The zoom, translate(x, y) scale(s) about the image's top-left: every open and every step starts at 1x.
-    let z = { x: 0, y: 0, s: 1 };
+    // The zoom, translate(x, y) scale(s) about the image's top-left: every open and every step starts at 1x, with no
+    // pointer down and no tap before it. Every zoom goes through zoomAbout (lib/artPage.ts), then tf().
+    let z: Zoom = { x: 0, y: 0, s: 1 };
+    // The pointers down, by id: where each is now, where it went down, whether that was on the work, and whether it
+    // ever took part in a pinch. `last` is the previous tap, for a double-tap.
+    const pts = new Map<number, { x: number; y: number; x0: number; y0: number; onImg: boolean; multi: boolean }>();
+    let last: Tap | null = null;
     const tf = (): void => { if (dImg) dImg.style.transform = `translate(${z.x}px,${z.y}px) scale(${z.s})`; };
     const show = (): void => {
       const el = list[at];
@@ -443,6 +455,8 @@ const darkData = (w: Work) => ({
       dImg.alt = el.dataset.alt ?? '';
       z = { x: 0, y: 0, s: 1 };
       tf();
+      pts.clear();
+      last = null;
       dImg.src = el.dataset.zoom ?? '';
       const line = dark.querySelector('.d-line');
       if (line) line.textContent = el.dataset.line ?? '';
@@ -480,16 +494,106 @@ const darkData = (w: Work) => ({
       dlg.querySelectorAll<HTMLElement>('[data-step]').forEach((b) => b.addEventListener('click', () => step(Number(b.dataset.step))));
       // The ground closes it, and nothing else. A click goes to the nearest common ancestor of where the pointer went
       // down and where it came up, so a press that begins on the work or the bar and ends on the ground is a click on
-      // the dialog too: only one that also began on the ground closes it.
+      // the dialog too: only one that also began on the ground closes it, and only as a tap (the pointers, below).
       let downOnGround = false;
       dlg.addEventListener('pointerdown', (e) => { downOnGround = e.target === dlg; });
       dlg.addEventListener('click', (e) => { if (downOnGround && e.target === dlg) dlg.close(); });
       // Focus goes back to what opened it.
       dlg.addEventListener('close', () => { img.removeAttribute('src'); opener?.focus({ preventScroll: true }); opener = null; });
+      // ── The zoom, to ZOOM.max. The keys and the squares zoom about the image's centre as fitted, the middle of the
+      // room, however far the work is panned: zoomAbout's point is from the transformed top-left, which the pan has
+      // moved by (z.x, z.y).
+      const zoomBy = (f: number): void => {
+        z = zoomAbout(z, z.s * f, img.offsetWidth / 2 - z.x, img.offsetHeight / 2 - z.y);
+        tf();
+      };
+      dlg.querySelectorAll<HTMLElement>('[data-zoom-by]').forEach((b) => b.addEventListener('click', () => {
+        zoomBy(b.dataset.zoomBy === 'in' ? ZOOM.key : 1 / ZOOM.key);
+      }));
       dlg.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
         if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+        // With a modifier it is the browser's own zoom, which stays the reader's.
+        const f = KEY_ZOOM.get(e.key);
+        if (f === undefined || e.ctrlKey || e.metaKey || e.altKey) return;
+        e.preventDefault();
+        zoomBy(f);
       });
+      // The wheel zooms about the cursor, by distance (wheelScale). Not passive, so a trackpad pinch's ctrl+wheel
+      // never zooms the page.
+      dlg.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const r = img.getBoundingClientRect();
+        z = zoomAbout(z, z.s * wheelScale(e.deltaY, e.deltaMode), e.clientX - r.left, e.clientY - r.top);
+        tf();
+      }, { passive: false });
+
+      // ── Pointers, on the whole room but its buttons: two pinch the work about their midpoint, one pans it once it
+      // is zoomed, and two taps on the work toggle 1x and 3x. Only the work captures a pointer: one captured on the
+      // dialog would retarget its click there and close the room on every tap.
+      // The pinch's baseline, re-read on every down and up: the two pointers' distance and the scale then, and their
+      // midpoint as of the last move. So lifting one finger of two pans on from where the other is, with no jump.
+      let pinch = { dist: 1, s: 1, x: 0, y: 0 };
+      const pair = (): { dist: number; x: number; y: number } => {
+        const [a, b] = pts.values();
+        return { dist: Math.hypot(b.x - a.x, b.y - a.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      };
+      const rebase = (): void => {
+        if (pts.size < 2) return;
+        const q = pair();
+        pinch = { dist: q.dist || 1, s: z.s, x: q.x, y: q.y };
+        pts.forEach((p) => { p.multi = true; });
+        last = null;
+      };
+      dlg.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || (e.target instanceof Element && e.target.closest('button'))) return;
+        const onImg = e.target === img;
+        if (onImg) img.setPointerCapture(e.pointerId);
+        pts.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, onImg, multi: false });
+        rebase();
+      });
+      dlg.addEventListener('pointermove', (e) => {
+        const p = pts.get(e.pointerId);
+        if (!p) return;
+        const dx = e.clientX - p.x, dy = e.clientY - p.y;
+        p.x = e.clientX;
+        p.y = e.clientY;
+        if (pts.size > 1) {
+          // Pan by the midpoint's movement, then scale about where it now is: the point of the work that was under
+          // the fingers stays under them. After the pan the top-left has moved as far as the midpoint has, so the
+          // point, from the moved top-left, is the old midpoint from the old one.
+          const q = pair(), r = img.getBoundingClientRect();
+          z = zoomAbout({ x: z.x + q.x - pinch.x, y: z.y + q.y - pinch.y, s: z.s }, pinch.s * q.dist / pinch.dist,
+            pinch.x - r.left, pinch.y - r.top);
+          pinch.x = q.x;
+          pinch.y = q.y;
+          tf();
+        } else if (z.s > 1) {
+          z = { x: z.x + dx, y: z.y + dy, s: z.s };
+          tf();
+        }
+      });
+      const up = (e: PointerEvent): void => {
+        const p = pts.get(e.pointerId);
+        if (!p) return;
+        pts.delete(e.pointerId);
+        // A tap is a pointer that never pinched and went up within DOUBLE_TAP.px of where it went down. Anything else
+        // was a drag or a pinch, which does not close the room even when it began and ended on the ground.
+        const tap = e.type === 'pointerup' && !p.multi && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < DOUBLE_TAP.px;
+        if (!tap) downOnGround = false;
+        else if (p.onImg) {
+          const t = { t: e.timeStamp, x: e.clientX, y: e.clientY };
+          if (isDoubleTap(last, t)) {
+            const r = img.getBoundingClientRect();
+            z = z.s > 1 ? zoomAbout(z, 1, 0, 0) : zoomAbout(z, ZOOM.toggle, t.x - r.left, t.y - r.top);
+            tf();
+            last = null;
+          } else last = t;
+        }
+        rebase();
+      };
+      dlg.addEventListener('pointerup', up);
+      dlg.addEventListener('pointercancel', up);
     }
     // What each opener steps through: the mat, the sentence's works in its order (data-works); a block, both
     // calligraphy works; a tile, every photograph.
