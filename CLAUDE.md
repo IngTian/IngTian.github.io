@@ -184,7 +184,7 @@ src/
   lib/wealth.ts                     # the one wealth module: growth of $1, CAGR, drawdown, the band of runs, WealthSeries (the prepared series every picture of a run reads; REPRO is RL-BHRP's), scales and ticks — the paper page's figures and /projects' rl-bhrp picture
   lib/words.ts                      # the one word counter (countWords, readingMinutes) + wholeParts, the one rule for what never breaks across a line ("RL-BHRP")
   lib/dates.ts                      # the one date helper: longDate, monthYear (UTC)
-  lib/motionTiming.ts               # the motion module's pure half: every curve (EASE, DRAW, SWEEP, FADE, WITHDRAW) and duration (REVEAL, RAIL, PAPER_PAGE, CARD, MOVE_MAX) the rail and the research routes move by, stagger and the paper page's batches (highlightDelay, arrowDelay), sweepDurations, mergeLines
+  lib/motionTiming.ts               # the motion module's pure half: every curve (EASE, DRAW, SWEEP, FADE, WITHDRAW) and duration (REVEAL, RAIL, PAPER_PAGE, CARD, ART, MOVE_MAX) the rail, the research routes and /art move by, stagger and the paper page's batches (highlightDelay, arrowDelay), sweepDurations, mergeLines
   scripts/motion.ts                 # THE ONE MOTION MODULE, its DOM half: play, onceSeen, riseOnceSeen, sweepLines — the rail and both research routes; the reduced-motion gate is inside it
   scripts/pageView.ts               # onPageView(selector, init): starts ten scripts right after parse, not at window `load` (see Interactivity)
   scripts/beats.ts, lib/beats.ts    # walkBeats: the beat walk the three explainer slides share (timer, freeze on a click or an arrow, the observer at 0.3, the reduced-motion rest, the teardown); arrowBeat, its key map, is the pure half
@@ -278,9 +278,11 @@ first paint:
 The research routes need none: nothing on them is hidden by markup. What waits for a reveal carries
 `data-pending`, set by a bundled script and only on what is still below the screen the reader lands on
 (`onceSeen` in `scripts/motion.ts`), so nothing a reader can see flips; a wide margin note is held by CSS
-alone, `@media (scripting: enabled)`, until the script places it (*Papers are files*). Every hold-back rule is
-inside `@media screen`: a printout is laid out where no observer sees it and no backstop runs, so it gets the
-finished page (`tests/distSmoke.test.ts` fails on a hold-back outside one).
+alone, `@media (scripting: enabled)`, until the script places it (*Papers are files*). /art needs none
+either: a photograph whose image has not loaded when its script starts carries `data-pending` for its one fade,
+until the image loads or errors, so the hold covers only an image that has painted nothing. Every hold-back rule,
+/art's too, is inside `@media screen`: a printout is laid out where no observer sees it and no backstop runs, so
+it gets the finished page (`tests/distSmoke.test.ts` fails on a hold-back outside one).
 
 - **Re-init on `astro:page-load`, with a teardown**, because `ClientRouter` replaces the DOM without a fresh
   page load: a script that only runs at parse time is dead after the first navigation.
@@ -294,8 +296,9 @@ finished page (`tests/distSmoke.test.ts` fails on a hold-back outside one).
     `load`, and does not greet a reader whose pop-up is already open). The other four: `SideRail`, whose first
     marks land while its rows are still entering; the paper page, whose notes are placed and reveals armed
     before the reader sees it; the /research index, whose cards answer the first pointer or Tab; and /art,
-    whose rows are justified as soon as it parses. Only `SelectedRows`' preview and `WorkshopCards`' spotlight
-    start at `load`: both are hover-only, and the first pointer move after it finds them.
+    whose rows are justified and photographs held for their fade as soon as it parses. Only `SelectedRows`'
+    preview and `WorkshopCards`' spotlight start at `load`: both are hover-only, and the first pointer move
+    after it finds them.
   - **The teardown is returned.** An `onPageView` init returns it and `onPageView` runs it before the next
     init: one `AbortController`'s `abort()` for the `window`/`document` listeners, plus the timers, rAF loops,
     observers and video. Listeners on elements in the swapped `<body>` leave with it (nothing here is
@@ -310,15 +313,16 @@ finished page (`tests/distSmoke.test.ts` fails on a hold-back outside one).
   by line. The reduced-motion gate is inside it, not in the callers: under it `play` lands on its last frame
   at once and `onceSeen` holds nothing back. A teardown finishes every live animation.
   - **Every curve and duration they move by is stated once, in `lib/motionTiming.ts`**, and a script imports
-    it. CSS cannot, so `tests/motionTiming.test.ts` reads each transition and animation declaration,
-    shorthand or longhand, in `SideRail.astro`'s and the two research pages' `<style>` blocks and
-    `styles/paper.css`, and holds it to its constant, in order: a literal added there without one fails by
-    name. In those scripts and `scripts/motion.ts` it fails a curve written out (`cubic-bezier(`, or a keyword
-    such as `'ease-out'`; `'linear'` is no curve), and a number of ms of two digits or more after
-    `duration:`/`delay:`/`step:`/`max:`/`total:` or as a `later()`/`setTimeout()` delay. It does not see a
-    literal in any other stylesheet, or a duration a script builds some other way. The rail's entrance
-    duration reaches the CSS as `--row` on the nav, beside `--gap`, as the frontmatter's stagger is computed
-    from it.
+    it; it states /art's two too (`ART`: the mat's swap and a photograph's one fade), though /art moves by CSS
+    transitions and not through `scripts/motion.ts`. CSS cannot import them, so `tests/motionTiming.test.ts`
+    reads each transition and animation declaration, shorthand or longhand, in `SideRail.astro`'s, the two
+    research pages' and `art.astro`'s `<style>` blocks and `styles/paper.css`, and holds it to its constant, in
+    order: a literal added there without one fails by name. In those scripts and `scripts/motion.ts` it fails
+    a curve written out (`cubic-bezier(`, or a keyword such as `'ease-out'`; `'linear'` is no curve), and a
+    number of ms of two digits or more after `duration:`/`delay:`/`step:`/`max:`/`total:` or as a
+    `later()`/`setTimeout()` delay. It does not see a literal in any other stylesheet, or a duration a script
+    builds some other way. The rail's entrance duration reaches the CSS as `--row` on the nav, beside `--gap`,
+    as the frontmatter's stagger is computed from it.
 
 ## The homepage — the deck
 

@@ -1,8 +1,9 @@
 ---
 // /art, "The sentence", on a still sheet: one sentence in the owner's voice whose seal-red phrases each bring a work
 // onto the mat beside it, then the calligraphy as object blocks, then every photograph in justified rows. It borrows
-// the research routes' paper register (page="paper"): no sky, no veil, no rail, and nothing moves on its own. The
-// works and the sentence are data/artworks.ts; the sentence's rules and the label line are lib/artPage.ts.
+// the research routes' paper register (page="paper"): no sky, no veil, no rail, and nothing moves on its own but a
+// photograph's one fade as it arrives. The works and the sentence are data/artworks.ts; the sentence's rules and the
+// label line are lib/artPage.ts.
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { Image, getImage } from 'astro:assets';
 import { SENTENCE, calligraphy, photography } from '../data/artworks';
@@ -214,6 +215,8 @@ const darkData = (w: Work) => ({
   .stage { display: grid; }
   .mw { grid-area: 1 / 1; margin: 0; opacity: 0; }
   .mw.is-on { opacity: 1; }
+  /* The swap's cross-fade, ART.swap (lib/motionTiming.ts): the script hides the work it replaces after it. */
+  @media (prefers-reduced-motion: no-preference) { .mw { transition: opacity 300ms ease-out; } }
   .mat { height: min(62vh, 560px); padding: 24px; background: var(--mat); }
   .mat-btn { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 0; border: 0;
     background: none; cursor: zoom-in; }
@@ -256,6 +259,13 @@ const darkData = (w: Work) => ({
   .tile-btn { display: block; width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: zoom-in; }
   .tile-mat { display: block; padding: var(--pad); background: var(--mat-faint); }
   .tile-mat :global(img) { display: block; width: 100%; height: auto; aspect-ratio: var(--ar); }
+  /* A photograph fades in once, over ART.tileFade: the script marks a tile whose image has not loaded when it starts
+     data-pending, and drops the mark on load or error. Only an image that has painted nothing is held, so nothing a
+     reader sees flips. The hold is screen-only, so a printout gets every photograph, and a held image's transition
+     is none in every medium, so a printout's dropping of the hold is a snap rather than a fade it prints at 0. */
+  @media (prefers-reduced-motion: no-preference) { .tile-mat :global(img) { transition: opacity 600ms ease-out; } }
+  .tile[data-pending] .tile-mat :global(img) { transition: none; }
+  @media screen and (prefers-reduced-motion: no-preference) { .tile[data-pending] .tile-mat :global(img) { opacity: 0; } }
   .t-cap { display: block; margin-top: 8px; font-size: 13px; line-height: 1.4; color: var(--ink-3); white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; }
   .t-title { color: var(--ink-1); font-weight: 400; text-underline-offset: 0.18em; }
@@ -282,15 +292,67 @@ const darkData = (w: Work) => ({
 <script>
   import { onPageView } from '../scripts/pageView';
   import { justifyRows } from '../lib/justify';
+  import { prefersReducedMotion } from '../lib/motion';
+  import { ART } from '../lib/motionTiming';
 
   onPageView<HTMLElement>('main.art', (main) => {
+    const reduce = prefersReducedMotion();
+    const timers: number[] = [];
+
+    // ── The opening: a phrase, clicked or focused, brings its work onto the mat. The new work is decoded first, so
+    // the cross-fade never fades in an empty mat; a later phrase supersedes a swap still waiting.
+    const sentence = main.querySelector<HTMLElement>('.sentence');
+    const phrases = Array.from(main.querySelectorAll<HTMLAnchorElement>('.phrase'));
+    const figs = new Map(Array.from(main.querySelectorAll<HTMLElement>('.mw')).map((f) => [f.dataset.work ?? '', f]));
+    const live = main.querySelector<HTMLElement>('[data-live]');
+    let cur = sentence?.dataset.works?.split(',')[0] ?? '';
+    let seq = 0;
+    const mark = (): void => {
+      phrases.forEach((a) => {
+        if (a.dataset.work === cur) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+      });
+    };
+    const swap = (key: string): void => {
+      const next = figs.get(key), prev = figs.get(cur);
+      if (!next) return;
+      // Any swap still waiting is dropped, and every work but the shown one and this one leaves the mat.
+      const t = ++seq;
+      figs.forEach((f, k) => { if (k !== cur && k !== key) { f.hidden = true; f.classList.remove('is-on'); } });
+      if (key === cur) return;
+      // Unseen until it is decoded, and out of reach while unseen.
+      next.inert = true;
+      next.hidden = false;
+      const img = next.querySelector('img');
+      if (img) img.loading = 'eager';
+      (img ? img.decode() : Promise.resolve()).catch(() => {}).then(() => {
+        if (t !== seq) return;
+        cur = key;
+        mark();
+        prev?.classList.remove('is-on');
+        next.classList.add('is-on');
+        if (prev) prev.inert = true;
+        next.inert = false;
+        // The polite live region reads the shown work's description.
+        if (live) live.textContent = next.querySelector<HTMLElement>('.mat-btn')?.dataset.alt ?? '';
+        const hide = (): void => { if (prev && cur !== prev.dataset.work) prev.hidden = true; };
+        if (reduce) hide(); else timers.push(window.setTimeout(hide, ART.swap));
+      });
+    };
+    phrases.forEach((a) => {
+      const key = a.dataset.work ?? '';
+      a.addEventListener('click', (e) => { e.preventDefault(); swap(key); });
+      a.addEventListener('focus', () => swap(key));
+    });
+    // Leaving drops a swap still decoding and clears the timers that hide a replaced work.
+    const stop = (): void => { seq += 1; timers.forEach((t) => clearTimeout(t)); };
+
     // ── The rows: justified at the stylesheet's --row-h, gap and --pad. A tile is its photograph's ratio times the
     // row's height, plus its mat; justifyRows takes the mat's padding into the gap and off the width, so every row
     // fills exactly. Widths are floored to 0.01px so a full row's sum never overflows into a wrap. W is the fractional
     // width (.rows has no padding or border): clientWidth rounds, and a column 921.6px wide (1024px window) read as 922
     // overflowed every row by ~0.4px, wrapping its last tile.
     const rows = main.querySelector<HTMLElement>('.rows');
-    if (!rows) return undefined;
+    if (!rows) return stop;
     const tiles = Array.from(rows.querySelectorAll<HTMLElement>('.tile'));
     const ars = tiles.map((t) => parseFloat(t.style.getPropertyValue('--ar')) || 1);
     let lastW = 0;
@@ -309,6 +371,18 @@ const darkData = (w: Work) => ({
     layout();
     const ro = new ResizeObserver(layout);
     ro.observe(rows);
-    return () => ro.disconnect();
+
+    // ── The one fade: a tile whose image has not arrived when this starts is held (data-pending) until it loads or
+    // errors, then fades in over ART.tileFade. An image already loaded is not held, so it never flips.
+    tiles.forEach((t) => {
+      const img = t.querySelector('img');
+      if (!img || (img.complete && img.naturalWidth > 0)) return;
+      t.setAttribute('data-pending', '');
+      const done = (): void => t.removeAttribute('data-pending');
+      img.addEventListener('load', done, { once: true });
+      img.addEventListener('error', done, { once: true });
+    });
+
+    return () => { ro.disconnect(); stop(); };
   });
 </script>
