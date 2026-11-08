@@ -14,8 +14,8 @@ import {
 
 // EACH WORK'S NATIVE-PIXEL WEBP AND ITS SIZE, from one getImage() call: every work carries it as data-zoom, to be
 // looked at closely (6x), so the pixels stay. It is the native variant <Image> emits anyway for its `src` (18.6 MB a
-// browser with `srcset` never requests), so it adds no file. `w`/`h` are data-zw/data-zh, which reserve a box
-// before the image decodes, and they give each work its `ar`: the tile's --ar and the three `sizes` hints.
+// browser with `srcset` never requests), so it adds no file. `w`/`h` give each work its `ar`, which reserves its box
+// before the image decodes (a tile's and a block's --ar, the dark room's data-ar) and sets the three `sizes` hints.
 // They are read off getImage()'s options, never off the ImageMetadata: Astro's import is a Proxy, and reading
 // any property of it but `clone` or `fsPath` keeps the original in dist. Reading `.width`/`.height` kept all
 // 44 JPEGs there (40,525,788 B, referenced by nothing); tests/distSmoke.test.ts fails if an original ships.
@@ -47,9 +47,9 @@ const phrases = phrasesOf(SENTENCE);
 const matWorks = phrases.flatMap((x) => byKey.get(x.work) ?? []);
 const first = phrases[0].work;
 
-// What every opener carries: the native webp, its size, the alt and the label's one line.
+// What every opener carries: the native webp, its ratio, the alt and the label's one line.
 const darkData = (w: Work) => ({
-  'data-zoom': w.z.src, 'data-zw': w.z.w, 'data-zh': w.z.h, 'data-alt': w.alt, 'data-line': labelLine(w),
+  'data-zoom': w.z.src, 'data-ar': w.ar.toFixed(4), 'data-alt': w.alt, 'data-line': labelLine(w),
 });
 ---
 <BaseLayout
@@ -68,7 +68,7 @@ const darkData = (w: Work) => ({
       <section class="opening" aria-label="Selected works">
         <div class="words">
           {/* A phrase is a link to its work's place on the page, so without a script it jumps there. */}
-          <p class="sentence" data-works={phrases.map((x) => x.work).join(',')}>
+          <p class="sentence">
             {SENTENCE.map((x) => typeof x === 'string' ? x : (
               <a class="phrase" href={`#${x.work}`} data-work={x.work} aria-controls="art-mat"
                  aria-current={x.work === first ? 'true' : undefined}>{x.text}</a>
@@ -287,7 +287,13 @@ const darkData = (w: Work) => ({
   /* The work is centred in the band between the close button's 56px strip and the bar, so a tall work never runs
      under either, however unequal the two are (56 and 104 on a phone). */
   .dark[open] { display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 56px 0 var(--d-bar); }
-  .d-img { max-width: calc(100vw - 32px); max-height: calc(100dvh - 56px - var(--d-bar)); transform-origin: 0 0; cursor: grab;
+  /* The box is the work's ratio, set as --ar by the script, so it exists before the image decodes, as a tile's does;
+     its width is capped where its height reaches the band, so max-height never binds. Not width/height attributes:
+     preflight's height: auto beats that hint, and a definite width over an auto height under a max-height squashes
+     the work (CSS2.2 §10.7; the stele drew 3.17x too wide). Nor width: auto, which falls to 300x150 until the image
+     decodes and then jumps. Before any --ar both var() declarations are invalid, so the max-* rules alone apply. */
+  .d-img { aspect-ratio: var(--ar); width: min(calc(100vw - 32px), calc((100dvh - 56px - var(--d-bar)) * var(--ar)));
+    max-width: calc(100vw - 32px); max-height: calc(100dvh - 56px - var(--d-bar)); transform-origin: 0 0; cursor: grab;
     will-change: transform; }
   .d-btn { width: 44px; height: 44px; flex: none; border: 1px solid var(--room-edge); background: var(--room);
     color: var(--room-ink); font: 15px/1 var(--font-mono); cursor: pointer; }
@@ -332,11 +338,10 @@ const darkData = (w: Work) => ({
 
     // ── The opening: a phrase, clicked or focused, brings its work onto the mat. The new work is decoded first, so
     // the cross-fade never fades in an empty mat; a later phrase supersedes a swap still waiting.
-    const sentence = main.querySelector<HTMLElement>('.sentence');
     const phrases = Array.from(main.querySelectorAll<HTMLAnchorElement>('.phrase'));
     const figs = new Map(Array.from(main.querySelectorAll<HTMLElement>('.mw')).map((f) => [f.dataset.work ?? '', f]));
     const live = main.querySelector<HTMLElement>('[data-live]');
-    let cur = sentence?.dataset.works?.split(',')[0] ?? '';
+    let cur = main.querySelector<HTMLElement>('.mw.is-on')?.dataset.work ?? '';
     let seq = 0;
     const mark = (): void => {
       phrases.forEach((a) => {
@@ -377,71 +382,62 @@ const darkData = (w: Work) => ({
 
     // ── The dark room: a list of works (each opener carries data-zoom and the rest), stepped through by prev/next and
     // the arrow keys, with the label line under the work. Escape is the dialog's own.
-    const dark = main.querySelector<HTMLDialogElement>('dialog.dark');
-    const dImg = dark?.querySelector<HTMLImageElement>('.d-img') ?? null;
-    let list: HTMLElement[] = [];
-    let at = 0;
-    let opener: HTMLElement | null = null;
-    // The zoom, translate(x, y) scale(s) about the image's top-left: every open and every step starts at 1x, with no
-    // pointer down and no tap before it. Every zoom goes through zoomAbout (lib/artPage.ts), then tf().
-    let z: Zoom = { x: 0, y: 0, s: 1 };
-    // The pointers down, by id: where each is now, where it went down, whether that was on the work, and whether it
-    // ever took part in a pinch. `last` is the previous tap, for a double-tap.
-    const pts = new Map<number, { x: number; y: number; x0: number; y0: number; onImg: boolean; multi: boolean }>();
-    let last: Tap | null = null;
-    const tf = (): void => { if (dImg) dImg.style.transform = `translate(${z.x}px,${z.y}px) scale(${z.s})`; };
-    const show = (): void => {
-      const el = list[at];
-      if (!dark || !dImg || !el) return;
-      const w = Number(el.dataset.zw), h = Number(el.dataset.zh);
-      // RESERVE THE BOX FROM THE NATIVE SIZE, AS A RATIO AND A CAPPED WIDTH, NOT as width/height attributes. The
-      // image has no intrinsic size until it decodes, so without a box the room opens empty and the work jumps in.
-      // The obvious fix, `img.width = w; img.height = h`, shipped once and was wrong: those are presentational hints,
-      // which lose to author rules, and Tailwind's preflight `img { max-width: 100%; height: auto }` beats the height
-      // hint while nothing beats the width one. A definite width and an auto height is the one case where the
-      // max-height clamp does not keep the ratio (CSS2.2 §10.7 needs both auto), so the clamp squashed the height
-      // alone: the old lightbox drew the 1727x3422 stele 1353.6x846 at 1440x900, stretched 3.17x across, then
-      // zoomed 6x. A ratio and a width hold: the box exists before decode, its height comes from the ratio, and
-      // min() caps the width exactly where the height would reach the band's (.d-img's max-height), so that clamp
-      // never binds; it re-fits on a resize too. `width: auto; height: auto` would not do: with nothing decoded
-      // there is no size, the default 300x150 applies and the box jumps on decode.
-      if (w && h) {
-        dImg.style.aspectRatio = `${w}/${h}`;
-        dImg.style.width = `min(calc(100vw - 32px), calc((100dvh - 56px - var(--d-bar)) * ${(w / h).toFixed(4)}))`;
+    const dlg = main.querySelector<HTMLDialogElement>('dialog.dark');
+    const img = dlg?.querySelector<HTMLImageElement>('.d-img');
+    if (dlg && img) {
+      let list: HTMLElement[] = [];
+      let at = 0;
+      let opener: HTMLElement | null = null;
+      // The zoom, translate(x, y) scale(s) about the image's top-left: every open and every step starts at 1x, with
+      // no pointer down and no tap before it. Every zoom goes through zoomAbout (lib/artPage.ts), then tf().
+      let z: Zoom = { x: 0, y: 0, s: 1 };
+      // The pointers down, by id: where each is now, where it went down, whether that was on the work, and whether it
+      // ever took part in a pinch. `last` is the previous tap, for a double-tap.
+      const pts = new Map<number, { x: number; y: number; x0: number; y0: number; onImg: boolean; multi: boolean }>();
+      let last: Tap | null = null;
+      const tf = (): void => { img.style.transform = `translate(${z.x}px,${z.y}px) scale(${z.s})`; };
+      const show = (): void => {
+        const el = list[at];
+        if (!el) return;
+        // The box is the work's ratio before it decodes (.d-img's rule says how).
+        img.style.setProperty('--ar', el.dataset.ar ?? '');
+        // BLANK IT FIRST, before the new src and before showModal(): set in the same tick over the old one, the
+        // browser keeps painting the PREVIOUS work until the new one arrives, so every open after the first showed the
+        // wrong work for the length of its fetch. No src paints nothing, which is honest, and the box from --ar keeps
+        // that from shifting anything. Not `opacity: 0`: nothing the reader came for rests invisible, and a failed
+        // decode would leave the room blank for good.
+        img.removeAttribute('src');
+        img.alt = el.dataset.alt ?? '';
+        z = { x: 0, y: 0, s: 1 };
+        tf();
+        pts.clear();
+        last = null;
+        img.src = el.dataset.zoom ?? '';
+        const line = dlg.querySelector('.d-line');
+        if (line) line.textContent = el.dataset.line ?? '';
+        const count = dlg.querySelector('.d-count');
+        if (count) count.textContent = list.length > 1 ? `${at + 1} / ${list.length}` : '';
+        dlg.querySelectorAll<HTMLElement>('[data-step]').forEach((b) => { b.hidden = list.length < 2; });
+      };
+      const openList = (els: HTMLElement[], el: HTMLElement): void => {
+        list = els;
+        if (!list.length) return;
+        at = Math.max(0, list.indexOf(el));
+        show();
+        if (!dlg.open) {
+          // Safari does not focus a clicked button, so the opener is the element clicked unless focus is elsewhere.
+          const a = document.activeElement;
+          opener = a instanceof HTMLElement && a !== document.body ? a : el;
+          dlg.showModal();
+        }
+      };
+      const step = (d: number): void => { if (list.length > 1) { at = (at + d + list.length) % list.length; show(); } };
+      // What each opener steps through: the mat, the sentence's works in its order (the mat's figures are rendered in
+      // it); a block, both calligraphy works; a tile, every photograph.
+      for (const sel of ['.mat-btn', '.cal', '.tile-btn']) {
+        const els = Array.from(main.querySelectorAll<HTMLElement>(sel));
+        els.forEach((b) => b.addEventListener('click', () => openList(els, b)));
       }
-      // BLANK IT FIRST, before the new src and before showModal(): set in the same tick over the old one, the browser
-      // keeps painting the PREVIOUS work until the new one arrives, so every open after the first showed the wrong
-      // work for the length of its fetch. No src paints nothing, which is honest, and the box above keeps that from
-      // shifting anything. Not `opacity: 0`: nothing the reader came for rests invisible, and a failed decode would
-      // leave the room blank for good.
-      dImg.removeAttribute('src');
-      dImg.alt = el.dataset.alt ?? '';
-      z = { x: 0, y: 0, s: 1 };
-      tf();
-      pts.clear();
-      last = null;
-      dImg.src = el.dataset.zoom ?? '';
-      const line = dark.querySelector('.d-line');
-      if (line) line.textContent = el.dataset.line ?? '';
-      const count = dark.querySelector('.d-count');
-      if (count) count.textContent = list.length > 1 ? `${at + 1} / ${list.length}` : '';
-      dark.querySelectorAll<HTMLElement>('[data-step]').forEach((b) => { b.hidden = list.length < 2; });
-    };
-    const openList = (els: HTMLElement[], el: HTMLElement): void => {
-      list = els;
-      if (!dark || !list.length) return;
-      at = Math.max(0, list.indexOf(el));
-      show();
-      if (!dark.open) {
-        // Safari does not focus a clicked button, so the opener is the element clicked unless focus is elsewhere.
-        const a = document.activeElement;
-        opener = a instanceof HTMLElement && a !== document.body ? a : el;
-        dark.showModal();
-      }
-    };
-    const step = (d: number): void => { if (list.length > 1) { at = (at + d + list.length) % list.length; show(); } };
-    if (dark && dImg) {
-      const dlg = dark, img = dImg;
       // The label line, hidden or shown, is remembered for the session.
       const info = dlg.querySelector<HTMLElement>('.d-info');
       const setLine = (shown: boolean): void => {
@@ -465,9 +461,14 @@ const darkData = (w: Work) => ({
       dlg.addEventListener('close', () => { img.removeAttribute('src'); opener?.focus({ preventScroll: true }); opener = null; });
       // ── The zoom, to ZOOM.max. The keys and the squares zoom about the image's centre as fitted, the middle of the
       // room, however far the work is panned: zoomAbout's point is from the transformed top-left, which the pan has
-      // moved by (z.x, z.y).
+      // moved by (z.x, z.y). The wheel, a gesture and a double-tap zoom about a point on the screen (zoomAt).
       const zoomBy = (f: number): void => {
         z = zoomAbout(z, z.s * f, img.offsetWidth / 2 - z.x, img.offsetHeight / 2 - z.y);
+        tf();
+      };
+      const zoomAt = (s: number, cx: number, cy: number): void => {
+        const r = img.getBoundingClientRect();
+        z = zoomAbout(z, s, cx - r.left, cy - r.top);
         tf();
       };
       dlg.querySelectorAll<HTMLElement>('[data-zoom-by]').forEach((b) => b.addEventListener('click', () => {
@@ -486,33 +487,32 @@ const darkData = (w: Work) => ({
       // never zooms the page.
       dlg.addEventListener('wheel', (e) => {
         e.preventDefault();
-        const r = img.getBoundingClientRect();
-        z = zoomAbout(z, z.s * wheelScale(e.deltaY, e.deltaMode), e.clientX - r.left, e.clientY - r.top);
-        tf();
+        zoomAt(z.s * wheelScale(e.deltaY, e.deltaMode), e.clientX, e.clientY);
       }, { passive: false });
       // Desktop Safari sends a trackpad pinch as WebKit's gesture events, not as ctrl+wheel, and touch-action does
       // nothing for a trackpad: unprevented, the pinch zooms the page, bar and all, and it stays zoomed after Escape.
-      // So both are prevented, and the pinch scales the work from the scale it began at, about the cursor. iOS sends
-      // them for a touch pinch too, beside the pointers that already zoom it (below), so with a pointer down they
-      // only prevent. GestureEvent is WebKit's alone and not in lib.dom, so its three fields read here are typed here.
-      // Unverified in Safari when written (no Safari on the machine): one trackpad pinch in the owner's pass is its check.
+      // So both are prevented, and each change scales the work by its own step of the gesture's scale, about the
+      // cursor, so a clamp at 1x or 6x leaves no dead zone. iOS sends them for a touch pinch too, beside the pointers
+      // that already zoom it (below), so with a pointer down they only prevent. GestureEvent is WebKit's alone and not
+      // in lib.dom, so its three fields read here are typed here. Unverified in Safari when written (no Safari on the
+      // machine): one trackpad pinch in the owner's pass is its check.
       type Gesture = Event & { scale: number; clientX: number; clientY: number };
-      let base = 1;
-      dlg.addEventListener('gesturestart', (e) => { e.preventDefault(); base = z.s; });
+      let gScale = 1;
+      dlg.addEventListener('gesturestart', (e) => { e.preventDefault(); gScale = 1; });
       dlg.addEventListener('gesturechange', (e) => {
         e.preventDefault();
-        if (pts.size) return;
-        const g = e as Gesture, r = img.getBoundingClientRect();
-        z = zoomAbout(z, base * g.scale, g.clientX - r.left, g.clientY - r.top);
-        tf();
+        const g = e as Gesture;
+        if (!pts.size) zoomAt(z.s * g.scale / gScale, g.clientX, g.clientY);
+        gScale = g.scale || gScale;
       });
 
       // ── Pointers, on the whole room but its buttons: two pinch the work about their midpoint, one pans it once it
       // is zoomed, and two taps on the work toggle 1x and 3x. Only the work captures a pointer: one captured on the
       // dialog would retarget its click there and close the room on every tap.
-      // The pinch's baseline, re-read on every down and up: the two pointers' distance and the scale then, and their
-      // midpoint as of the last move. So lifting one finger of two pans on from where the other is, with no jump.
-      let pinch = { dist: 1, s: 1, x: 0, y: 0 };
+      // The pinch's last reading, the two pointers' distance and midpoint, re-read on every down, up and move: each
+      // move scales by its own step, so a clamp at 1x or 6x leaves no dead zone, and lifting one finger of two pans on
+      // with no jump.
+      let pinch = { dist: 1, x: 0, y: 0 };
       const pair = (): { dist: number; x: number; y: number } => {
         const [a, b] = pts.values();
         return { dist: Math.hypot(b.x - a.x, b.y - a.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
@@ -520,7 +520,7 @@ const darkData = (w: Work) => ({
       const rebase = (): void => {
         if (pts.size < 2) return;
         const q = pair();
-        pinch = { dist: q.dist || 1, s: z.s, x: q.x, y: q.y };
+        pinch = { dist: q.dist || 1, x: q.x, y: q.y };
         pts.forEach((p) => { p.multi = true; });
         last = null;
       };
@@ -542,10 +542,9 @@ const darkData = (w: Work) => ({
           // the fingers stays under them. After the pan the top-left has moved as far as the midpoint has, so the
           // point, from the moved top-left, is the old midpoint from the old one.
           const q = pair(), r = img.getBoundingClientRect();
-          z = zoomAbout({ x: z.x + q.x - pinch.x, y: z.y + q.y - pinch.y, s: z.s }, pinch.s * q.dist / pinch.dist,
+          z = zoomAbout({ x: z.x + q.x - pinch.x, y: z.y + q.y - pinch.y, s: z.s }, z.s * q.dist / pinch.dist,
             pinch.x - r.left, pinch.y - r.top);
-          pinch.x = q.x;
-          pinch.y = q.y;
+          pinch = { dist: q.dist || pinch.dist, x: q.x, y: q.y };
           tf();
         } else if (z.s > 1) {
           z = { x: z.x + dx, y: z.y + dy, s: z.s };
@@ -563,9 +562,7 @@ const darkData = (w: Work) => ({
         else if (p.onImg) {
           const t = { t: e.timeStamp, x: e.clientX, y: e.clientY };
           if (isDoubleTap(last, t)) {
-            const r = img.getBoundingClientRect();
-            z = z.s > 1 ? zoomAbout(z, 1, 0, 0) : zoomAbout(z, ZOOM.toggle, t.x - r.left, t.y - r.top);
-            tf();
+            zoomAt(z.s > 1 ? 1 : ZOOM.toggle, t.x, t.y);
             last = null;
           } else last = t;
         }
@@ -574,16 +571,10 @@ const darkData = (w: Work) => ({
       dlg.addEventListener('pointerup', up);
       dlg.addEventListener('pointercancel', up);
     }
-    // What each opener steps through: the mat, the sentence's works in its order (data-works); a block, both
-    // calligraphy works; a tile, every photograph.
-    const openFrom = (els: HTMLElement[]): void => els.forEach((b) => b.addEventListener('click', () => openList(els, b)));
-    openFrom((sentence?.dataset.works ?? '').split(',').flatMap((k) => figs.get(k)?.querySelector<HTMLElement>('.mat-btn') ?? []));
-    openFrom(Array.from(main.querySelectorAll<HTMLElement>('.cal')));
-    openFrom(Array.from(main.querySelectorAll<HTMLElement>('.tile-btn')));
 
     // Leaving drops a swap still decoding, clears the timers that hide a replaced work, and closes the dark room, which
     // releases the scroll lock (its :has() stops matching).
-    const stop = (): void => { seq += 1; timers.forEach((t) => clearTimeout(t)); if (dark?.open) dark.close(); };
+    const stop = (): void => { seq += 1; timers.forEach((t) => clearTimeout(t)); if (dlg?.open) dlg.close(); };
 
     // ── The rows: justified at the stylesheet's --row-h, gap and --pad. A tile is its photograph's ratio times the
     // row's height, plus its mat; justifyRows takes the mat's padding into the gap and off the width, so every row
