@@ -1,10 +1,9 @@
 ---
 // /art, "The sentence", on a still sheet: one sentence in the owner's voice whose seal-red phrases each bring a work
 // onto the mat beside it, then the calligraphy as object blocks, then every photograph in justified rows; any work
-// opens full screen in the dark room. It borrows
-// the research routes' paper register (page="paper"): no sky, no veil, no rail, and nothing moves on its own but a
-// photograph's one fade as it arrives. The works and the sentence are data/artworks.ts; the sentence's rules, the
-// label line and the three `sizes` hints are lib/artPage.ts.
+// opens full screen in the dark room. It borrows the research routes' paper register (page="paper"): no sky, no
+// veil, no rail, and nothing moves on its own but a photograph's one fade as it arrives. The works and the sentence
+// are data/artworks.ts; the sentence's rules, the label line and the three `sizes` hints are lib/artPage.ts.
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { Image, getImage } from 'astro:assets';
 import { SENTENCE, calligraphy, photography } from '../data/artworks';
@@ -222,8 +221,8 @@ const darkData = (w: Work) => ({
   .obj-words dl { display: grid; gap: 6px; }
   .obj-mat { display: flex; justify-content: center; padding: 32px; background: var(--mat); }
   /* The block is the work's width at the height cap, from its ratio, and the image fills it, so its box exists before
-     the image decodes (the note above CAL_MAX_H in lib/artPage.ts). No max-height on the image: on a 100%-wide one it would squash the
-     work rather than narrow it. */
+     the image decodes (the note above CAL_MAX_H in lib/artPage.ts). No max-height on the image: on a 100%-wide one
+     it would squash the work rather than narrow it. */
   .cal { width: min(100%, calc(var(--ar) * min(82vh, 820px))); padding: 0; border: 0; background: none; line-height: 0;
     cursor: zoom-in; }
   .cal :global(img) { display: block; width: 100%; height: auto; }
@@ -242,8 +241,9 @@ const darkData = (w: Work) => ({
   .tile-mat :global(img) { display: block; width: 100%; height: auto; aspect-ratio: var(--ar); }
   /* A photograph fades in once, over ART.tileFade: the script marks a tile whose image has not loaded when it starts
      data-pending, and drops the mark on load or error. An image already loaded is not held, so it never flips; one
-     still arriving, even partly painted, is held and fades in. The hold is screen-only, so a printout gets every photograph, and a held image's transition
-     is none in every medium, so a printout's dropping of the hold is a snap rather than a fade it prints at 0. */
+     still arriving, even partly painted, is held and fades in. The hold is screen-only, so a printout gets every
+     photograph, and a held image's transition is none in every medium, so a printout's dropping of the hold is a
+     snap rather than a fade it prints at 0. */
   @media (prefers-reduced-motion: no-preference) { .tile-mat :global(img) { transition: opacity 600ms ease-out; } }
   .tile[data-pending] .tile-mat :global(img) { transition: none; }
   @media screen and (prefers-reduced-motion: no-preference) { .tile[data-pending] .tile-mat :global(img) { opacity: 0; } }

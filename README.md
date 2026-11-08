@@ -43,7 +43,7 @@ Before committing, all three, in this order: `npm run build` → `npm run typech
 | Résumé, bio, timeline, publications, projects, contact links | `src/data/profile.ts` — typed, cross-referenced by id, and some numbers are computed from it. |
 | The page set (the corner nav) | `src/data/nav.ts` (`PAGES`). |
 | Calligraphy | `src/data/artworks.ts` (works + the sentence) + images in `src/assets/art/`. |
-| Photographs | files in `src/assets/art/photos/` (auto-globbed); alt, drafted title and place in `src/data/photoNotes.ts`. |
+| Photographs | two edits: the file in `src/assets/art/photos/`, named `photo-…` (`.jpg`, `.jpeg`, `.JPG` or `.JPEG`), and its entry in `src/data/photoNotes.ts`, keyed by the file's name, with an `alt` at least (`title`, `place` and `year` optional; a place prints only once `confirmed`). The build fails, naming the file, on a photograph without an entry, an entry without a photograph, or a file not named `photo-…`. |
 | Palette | `src/styles/tokens.css`. The rule and its exceptions are in CLAUDE.md, *Taste rules* and *Themes*. |
 
 ## License

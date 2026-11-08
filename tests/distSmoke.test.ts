@@ -344,7 +344,8 @@ describe("/art's image payload, measured on the built output", () => {
   };
   /** Every <img> tag on /art. */
   const imgTags = (): string[] => [...artHtml().matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
-  /** The photographs' files, as src/assets/art/photos holds them (data/artworks.ts globs these four spellings). */
+  /** Every .jpg or .jpeg in src/assets/art/photos, in any mix of case. data/artworks.ts globs four spellings of those
+   *  (jpg, jpeg, JPG, JPEG), so a file in another (.Jpg) is counted here, missed there, and fails the page's count. */
   const photoFiles = (): string[] =>
     readdirSync(new URL('../src/assets/art/photos/', import.meta.url)).filter((f) => /\.jpe?g$/i.test(f));
 

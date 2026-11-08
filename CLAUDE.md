@@ -420,9 +420,8 @@ test's stand-in all read it.
 `PHONE_MAX_WIDTH`, change every hit of `grep -rn 'max-width: *640px' src` — the `*` matters, as a hit written
 without the space has been missed before. Classify each hit rather than subtracting a remembered number: a rule;
 prose (comments in `lib/viewport.ts` and `global.css`); `projects/Gallery`'s
-`sizes="(max-width: 640px) 240px, 330px"`, the phone strip's card width, which moves with the strip's block;
-or /art's three `sizes` hints (`matSizes()`, `rowSizes()`, `calSizes()` in `lib/artPage.ts`), which move with its
-640px block.
+`sizes="(max-width: 640px) 240px, 330px"`, the phone strip's card width, which moves with the strip's block; or /art's
+three `sizes` hints (`matSizes()`, `rowSizes()`, `calSizes()` in `lib/artPage.ts`), which move with its 640px block.
 **The wide side is always the negation, `not all and (max-width: 640px)`, never `min-width: 641px`**: a second
 bound leaves a zoomed window 640.5 CSS px wide to neither side, and this grep would miss it.
 `tests/viewport.test.ts` pins the value and fails on any such pair, at any breakpoint in `src`. A prototype
@@ -837,12 +836,12 @@ the why; `tests/introTimeline.test.ts` fails on a quiet 150ms window or a beat o
 `components/FluidSky.astro` is the sky on five routes: `/`, `/writing`, `/writing/<slug>`, `/experience` and the
 404. The register pages (`/projects`, both research routes and /art) render neither it nor `SkyWash`: each
 register's ink is sized for its own ground (light drafting `--ink-3` over `--reading-grad` measured 3.89:1), and
-the paper register is a still sheet by design. A WebGL canvas: a two-level domain warp over the descent/reading ramps, sampled from scroll position,
-with viscous luminance banding and a warm bloom. `lib/skyShader.ts` holds the GLSL, `lib/skyPalette.ts` the
-ramps, `lib/skyLegibility.ts` the **contrast policy** that keeps text readable over it. Two archetypes: `descent`
-(paper text; the dangerous direction is lighter) and `reading` (dark ink on a luminous field; dangerous is
-darker). Every page starts at the top of the pattern: the shader samples it from `scrollY / vw` alone, and the
-component takes `variant`, nothing else (its warp amplitude follows it).
+the paper register is a still sheet by design. A WebGL canvas: a two-level domain warp over the descent/reading
+ramps, sampled from scroll position, with viscous luminance banding and a warm bloom. `lib/skyShader.ts` holds the
+GLSL, `lib/skyPalette.ts` the ramps, `lib/skyLegibility.ts` the **contrast policy** that keeps text readable over
+it. Two archetypes: `descent` (paper text; the dangerous direction is lighter) and `reading` (dark ink on a
+luminous field; dangerous is darker). Every page starts at the top of the pattern: the shader samples it from
+`scrollY / vw` alone, and the component takes `variant`, nothing else (its warp amplitude follows it).
 
 Two invariants, both about the compositor:
 

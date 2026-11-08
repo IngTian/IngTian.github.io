@@ -157,9 +157,9 @@ describe("/art's `sizes` hints", () => {
 
   it("reserves each calligraphy work's box from its ratio, before the image decodes", () => {
     // The block's width comes from --ar and the cap, and the image fills it: an image sized by its own width inside
-    // the shrink-to-fit button is 0px wide until it decodes, which put the photographs ~1,400px higher at first layout,
-    // inside Chrome's lazy-load margin (the note above CAL_MAX_H in lib/artPage.ts). A max-height on a 100%-wide image would
-    // squash it rather than narrow it, so the cap lives in the width alone.
+    // the shrink-to-fit button is 0px wide until it decodes, which put the photographs ~1,400px higher at first
+    // layout, inside Chrome's lazy-load margin (the note above CAL_MAX_H in lib/artPage.ts). A max-height on a
+    // 100%-wide image would squash it rather than narrow it, so the cap lives in the width alone.
     expect(decl('', '.cal :global(img)', 'width'), '.cal img width').toBe('100%');
     expect(decl('', '.cal :global(img)', 'height'), '.cal img height').toBe('auto');
     expect(decl('', '.cal :global(img)', 'max-height'), '.cal img max-height').toBeUndefined();
