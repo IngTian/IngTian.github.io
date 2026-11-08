@@ -14,7 +14,7 @@ interface Props {
   veilOnLoad?: boolean;
   /** Render the veil? `false` emits no `[data-veil]`, so nothing plays it — for a page whose own entrance
    *  replaces it (/projects' boot), that a reader moves in and out of too often to hold back (/research), or where
-   *  nothing may move on its own (/art). */
+   *  it would be motion that runs on its own (/art). */
   veil?: boolean;
   /** Sets `data-page` on <html>; tokens.css re-skins the role tokens from it ('drafting' is /projects, 'paper' the
    *  research routes and /art, 'deck' the homepage, whose block sets only the rail's resting ink). ClientRouter
@@ -183,7 +183,7 @@ const personLd = {
         Pages opt in on a fresh load with veilOnLoad (`grep veilOnLoad src/pages`);
         /projects renders none (veil={false}): its boot is its entrance. Nor does
         /research: the veil would replay on every card click and every way back.
-        Nor does /art, where nothing moves on its own.
+        Nor does /art, where the veil would be motion that runs on its own.
 
         `/` does not opt in on a fresh load: its first open is the hero's own intro
         (CLAUDE.md, "The first-open intro"), the content arriving rather than a layer

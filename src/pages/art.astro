@@ -242,8 +242,8 @@ const darkData = (w: Work) => ({
   .tile-mat { display: block; padding: var(--pad); background: var(--mat-faint); }
   .tile-mat :global(img) { display: block; width: 100%; height: auto; aspect-ratio: var(--ar); }
   /* A photograph fades in once, over ART.tileFade: the script marks a tile whose image has not loaded when it starts
-     data-pending, and drops the mark on load or error. Only an image that has painted nothing is held, so nothing a
-     reader sees flips. The hold is screen-only, so a printout gets every photograph, and a held image's transition
+     data-pending, and drops the mark on load or error. An image already loaded is not held, so it never flips; one
+     still arriving, even partly painted, is held and fades in. The hold is screen-only, so a printout gets every photograph, and a held image's transition
      is none in every medium, so a printout's dropping of the hold is a snap rather than a fade it prints at 0. */
   @media (prefers-reduced-motion: no-preference) { .tile-mat :global(img) { transition: opacity 600ms ease-out; } }
   .tile[data-pending] .tile-mat :global(img) { transition: none; }

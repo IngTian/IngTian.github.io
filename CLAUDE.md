@@ -290,7 +290,7 @@ The research routes need none: nothing on them is hidden by markup. What waits f
 (`onceSeen` in `scripts/motion.ts`), so nothing a reader can see flips; a wide margin note is held by CSS
 alone, `@media (scripting: enabled)`, until the script places it (*Papers are files*). /art needs none
 either: a photograph whose image has not loaded when its script starts carries `data-pending` for its one fade,
-until the image loads or errors, so the hold covers only an image that has painted nothing. Every hold-back rule,
+until the image loads or errors (one partly painted by then blinks out once and fades back). Every hold-back rule,
 /art's too, is inside `@media screen`: a printout is laid out where no observer sees it and no backstop runs, so
 it gets the finished page (`tests/distSmoke.test.ts` fails on a hold-back outside one).
 
@@ -473,9 +473,9 @@ and reverted every time** — do not rebuild it. The phone treatment is *bug fix
     reports "nothing moves when it speaks" while the cow moves: assert the cow's rect for every line.
 - on **/art**, at 900px and under the sentence comes first with the mat directly under it, so a tap swaps the
   work just below the line being read, and a block's work sits above its words. At 640px the sentence is 21px,
-  the mat is `min(40vh, 320px)` (computed: its top on the first screen at 390×844), and rows are 150px; the dark
-  room's bar takes two rows, the line (up to two lines) and the count, then the squares; the work is centred in
-  the band between the close strip and the bar.
+  the mat is `min(40vh, 320px)` (so its top is on the first screen at 390×844; computed, not measured), and rows
+  are 150px; the dark room's bar takes two rows, the line (up to two lines) and the count, then the squares; the
+  work is centred in the band between the close strip and the bar.
 
 ## Navigation & structure
 
@@ -834,11 +834,10 @@ the why; `tests/introTimeline.test.ts` fails on a quiet 150ms window or a beat o
 
 ## The fluid sky
 
-`components/FluidSky.astro` is the sky on **every page except the register pages** (/projects, the research
-routes, /art): five routes, `/`, `/writing`, `/writing/<slug>`, `/experience` and the 404. `/projects`, both
-research routes and /art render neither it nor `SkyWash`: each register's ink is sized for its own ground
-(light drafting `--ink-3` over `--reading-grad` measured 3.89:1), and the paper register is a still sheet by
-design. A WebGL canvas: a two-level domain warp over the descent/reading ramps, sampled from scroll position,
+`components/FluidSky.astro` is the sky on five routes: `/`, `/writing`, `/writing/<slug>`, `/experience` and the
+404. The register pages (`/projects`, both research routes and /art) render neither it nor `SkyWash`: each
+register's ink is sized for its own ground (light drafting `--ink-3` over `--reading-grad` measured 3.89:1), and
+the paper register is a still sheet by design. A WebGL canvas: a two-level domain warp over the descent/reading ramps, sampled from scroll position,
 with viscous luminance banding and a warm bloom. `lib/skyShader.ts` holds the GLSL, `lib/skyPalette.ts` the
 ramps, `lib/skyLegibility.ts` the **contrast policy** that keeps text readable over it. Two archetypes: `descent`
 (paper text; the dangerous direction is lighter) and `reading` (dark ink on a luminous field; dangerous is
@@ -1038,9 +1037,8 @@ of sky over a full-bleed panel.
   *Themes*); and on `/`, which is not a register, `--rail-ink` and `--rail-focus` (*Navigation*), the six
   `--panel-*` of `styles/slides.css` (the five paper panels' ground and inks per theme), Choice's chart colours
   `--c-h*` and `--c-p*`, and Story's two graph-line tones, `--story-line` and `--story-line-soft`. /art's dark
-  room, dark in both themes, holds its own inks (`--room*` on `.dark`), held by `tests/paperPalette.test.ts`.
-  Beyond those, a component may hold a literal for a drawing of its own (the cow's coat, /experience's timeline
-  dots).
+  room, dark in both themes, holds its own inks (`--room*` on `.dark`), held by `tests/paperPalette.test.ts`. Beyond
+  those, a component may hold a literal for a drawing of its own (the cow's coat, /experience's timeline dots).
   - **An undeclared `var()` voids the whole shorthand** (every longhand falls back to its initial, and
     `border-style`'s is `none`): /experience's dividers never drew against an undefined `--rule`, which is now
     `rgba(var(--hairline-rgb), 0.32)`. `tests/cssVars.test.ts` fails on any `var(--x)` without a fallback that

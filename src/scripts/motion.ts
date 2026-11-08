@@ -1,6 +1,6 @@
 // THE ONE MOTION MODULE: the DOM half of every animation the rail and the research pages play. The timing and
 // geometry it needs are pure and specified in lib/motionTiming.ts; this half measures and plays. It lives in
-// scripts/, as scripts/pageView.ts does, because it touches the DOM.
+// scripts/ because it touches the DOM.
 //
 // The rules it keeps for every caller (CLAUDE.md, Motion): only transform and opacity animate; everything runs once
 // and lands on the element's own finished style; under reduced motion nothing plays and nothing waits, because the

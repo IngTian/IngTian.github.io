@@ -189,8 +189,9 @@ html[data-page='drafting'][data-theme='dark'] {
    dot, pill and focus ring) becomes the seal.
    The ground is `--sheet-ground`, never `--paper`: in the site's dark convention `--paper` is the light text colour.
    `--bg` is the ground, so the body paints it and overscroll shows paper.
-   ink-1..3 are the approved prototype's (but dark ink-1, lifted two steps for /art's phrases); ink-4 is ink-3 (both must clear 4.5:1 on the ground) and ink-5 the midpoint
-   of ink-3 and the ground. tests/paperPalette.test.ts holds the numbers.
+   ink-1..3 are the approved prototype's (dark ink-1 lifted two steps for /art's phrases); ink-4 is ink-3 (both must
+   clear 4.5:1 on the ground) and ink-5 the midpoint of ink-3 and the ground. tests/paperPalette.test.ts holds the
+   numbers.
      --sheet-ul    the underline highlight: a band under words that stay fully legible on their own, so it is
                    emphasis, not a mark the reader needs (WCAG 1.4.11 does not apply). Its strength, 0.42, is the one
                    the owner approved on the prototype; ink-1 over it stays above 8:1.
