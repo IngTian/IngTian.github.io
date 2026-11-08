@@ -30,42 +30,45 @@ const p = (text: string, work: WorkKey): Phrase => ({ text, work });
  * THE THREE CANDIDATE SENTENCES, in the owner's voice, for the owner to choose from or rewrite. Each phrase stands for
  * one work, and says only what that work shows (checked against the picture and its alt) or what artworks.ts records
  * (the couplet's clerical script and stele setting, the poem's running-cursive): no place, date or story is claimed.
+ * A phrase is the noun alone and the description stays in ink, so red marks and never fills: the page refuses a
+ * sentence whose red is outside RED_SHARE of its words (the Met's index sentence is about 32%).
  */
+export const RED_SHARE = { min: 0.3, max: 0.4 };
 export const SENTENCES: Sentence[] = [
   {
     tone: 'plain',
     parts: [
-      'I take photographs and write calligraphy: ',
-      p('a red canoe on a turquoise lake', 'photo-23'), ', ',
-      p('a bridge tower lit against the city', 'photo-09'), ', ',
-      p('a heron waiting on a stone', 'photo-12'), ', ',
-      p('cherry blossoms against a clear sky', 'photo-42'), ', ',
-      p('a spring couplet in clerical script', 'cal-1'), ' and ',
-      p('a poem in running-cursive', 'cal-2'), '.',
+      'I take photographs — of ',
+      p('a red canoe', 'photo-23'), ' on a turquoise lake, ',
+      p('a bridge tower', 'photo-09'), ' lit against the city, ',
+      p('a heron', 'photo-12'), ' waiting on a stone and ',
+      p('cherry blossoms', 'photo-42'), ' against a clear sky — and I write calligraphy, among it ',
+      p('a spring couplet', 'cal-1'), ' in clerical script and ',
+      p('a poem', 'cal-2'), ' in running-cursive.',
     ],
   },
   {
     tone: 'lyrical',
     parts: [
-      'Outdoors, weather and light do a brush’s work — ',
-      p('mist erasing a mountainside', 'photo-25'), ', ',
-      p('a crescent moon come early over the sea', 'photo-06'), ', ',
-      p('white water writing along mossy stone', 'photo-35'), ', ',
-      p('a sailboat on hammered silver', 'photo-41'), ' — and with the brush itself I write ',
-      p('a poem in running hand', 'cal-2'), ' and ',
-      p('a spring couplet, set as a stele', 'cal-1'), '.',
+      'Outdoors, light does a brush’s work — ',
+      p('a mountainside', 'photo-25'), ' erased by mist, ',
+      p('a crescent moon', 'photo-06'), ' early over the sea, ',
+      p('white water', 'photo-35'), ' writing on mossy stone, ',
+      p('a sailboat', 'photo-41'), ' on hammered silver — and with the brush itself I write ',
+      p('a poem', 'cal-2'), ' in running hand and ',
+      p('a spring couplet', 'cal-1'), '.',
     ],
   },
   {
     tone: 'wry',
     parts: [
-      'Calligraphy is slow and a camera is not, so beside ',
-      p('a spring couplet in clerical script', 'cal-1'), ' and ',
-      p('a poem in running-cursive', 'cal-2'), ' I keep ',
-      p('a steam engine still at work', 'photo-08'), ', ',
-      p('a view gone to streaks at speed', 'photo-38'), ', ',
-      p('plush cows posing at a monument', 'photo-18'), ' and ',
-      p('one plush cow looking over the real thing', 'photo-30'), '.',
+      'Calligraphy is slow and a camera is quick, so beside ',
+      p('a spring couplet', 'cal-1'), ' and ',
+      p('a poem', 'cal-2'), ' in running-cursive I keep ',
+      p('a steam engine', 'photo-08'), ' still at work, ',
+      p('a landscape', 'photo-38'), ' gone to streaks at speed, ',
+      p('plush cows', 'photo-18'), ' posing at a monument and ',
+      p('one plush cow', 'photo-30'), ' looking over the real thing.',
     ],
   },
 ];

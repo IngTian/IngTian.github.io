@@ -7,7 +7,8 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { Image, getImage } from 'astro:assets';
 import { calligraphy, photography } from '../data/artworks';
-import { PLACES, SENTENCES, type Phrase, type WorkKey } from '../data/protoArt';
+import { PLACES, RED_SHARE, SENTENCES, type Phrase, type WorkKey } from '../data/protoArt';
+import { countWords } from '../lib/words';
 
 // /art's byte rules (CLAUDE.md, Stack), as art.astro keeps them: sizes from getImage(), never off the import (the
 // import is a Proxy; reading `.width` keeps the original in dist), a webp at native pixels for the dark room's 6x.
@@ -35,8 +36,10 @@ interface Work {
 }
 // The dark room's one line, built once from the label's own fields.
 const lineOf = (w: Work) => [w.title, w.place, w.year, w.medium].join(' · ');
+// A photograph is "Untitled" until the owner names it: photoNotes.ts's titles were written by a model, and a label
+// prints a real title or none (the Met's rule), never an invented one dressed as real.
 const photos: Work[] = photography.map((p, i) => ({
-  key: `photo-${String(i + 1).padStart(2, '0')}`, src: p.src, alt: p.alt, title: p.title ?? 'Untitled',
+  key: `photo-${String(i + 1).padStart(2, '0')}`, src: p.src, alt: p.alt, title: 'Untitled',
   place: `${placeOf.get(i + 1)} (placeholder)`, year: UNKNOWN, medium: 'Photograph',
   z: photoZoom[i], ar: photoZoom[i].w / photoZoom[i].h,
 }));
@@ -53,13 +56,16 @@ const cals = calligraphy.map((w, i) => {
 });
 const byKey = new Map<string, Work>([...photos, ...cals].map((w) => [w.key, w]));
 
-// The sentences: each phrase must name a real work, and each sentence holds five to seven.
+// The sentences: each phrase must name a real work, each sentence holds five to seven, and its red is RED_SHARE of
+// its words (lib/words.ts's countWords, the site's one counter).
 const phrasesOf = (s: (typeof SENTENCES)[number]) => s.parts.filter((x): x is Phrase => typeof x !== 'string');
 SENTENCES.forEach((s, k) => {
   const ph = phrasesOf(s);
   if (ph.length < 5 || ph.length > 7) throw new Error(`proto-art: sentence ${k + 1} has ${ph.length} phrases, not 5-7`);
   const bad = ph.filter((x) => !byKey.has(x.work));
   if (bad.length) throw new Error(`proto-art: sentence ${k + 1} names no such work: ${bad.map((x) => x.work).join(', ')}`);
+  const red = countWords(ph.map((x) => x.text).join(' ')) / countWords(s.parts.map((x) => typeof x === 'string' ? x : x.text).join(''));
+  if (red < RED_SHARE.min || red > RED_SHARE.max) throw new Error(`proto-art: sentence ${k + 1} is ${Math.round(red * 100)}% red, not ${RED_SHARE.min * 100}-${RED_SHARE.max * 100}%`);
 });
 // The mat holds each work a sentence names, once; the first sentence's first work is on it at arrival.
 const first = phrasesOf(SENTENCES[0])[0].work;
@@ -68,11 +74,12 @@ const matWorks = [...new Set(SENTENCES.flatMap((s) => phrasesOf(s).map((x) => x.
 // ── `sizes`, from the CSS below (each bound is a maximum, so the hint never under-declares).
 // THE MAT. .pa-wrap is at most 1240px with 72px sides, .opening's columns are 1fr / 1.15fr with a 64px gap, so the
 // mat column is at most (1096 - 64) * 1.15 / 2.15 = 552px; less its 24px padding, the image is at most 504px wide
-// and 552px tall (the mat's 600px cap). Stacked (900px and under) the mat is at most 520px tall with 16px padding,
-// 488px for the image, and at most 778px wide (810px of column at 900px); on a phone, 100vw less 2 x 22px of side
+// and 552px tall (the mat's 600px cap). Stacked (900px and under) the mat is at most 380px tall with 16px padding,
+// 348px for the image, and at most 778px wide (810px of column at 900px); on a phone, 100vw less 2 x 22px of side
 // and 2 x 16px of mat.
+const MAT_H_STACKED = 348;
 const matSizes = (ar: number) =>
-  `(max-width: 640px) calc(100vw - 76px), (max-width: 900px) ${Math.min(Math.ceil(ar * 488), 778)}px, ${Math.min(Math.ceil(ar * 552), 504)}px`;
+  `(max-width: 640px) calc(100vw - 76px), (max-width: 900px) ${Math.min(Math.ceil(ar * MAT_H_STACKED), 778)}px, ${Math.min(Math.ceil(ar * 552), 504)}px`;
 // THE ROWS. ROW_H and ROW_H_PHONE are .rows' --row-h, synced by hand: the script lays the rows out with justifyRows
 // at that target, which closes a row at or under it and caps the last row at 1.16x, so a photograph is at most
 // ar * --row-h * 1.16 wide; and at most the 1096px column less its 2 x 10px of mat.
@@ -197,7 +204,7 @@ const darkData = (w: Work) => ({ 'data-zoom': w.z.src, 'data-zw': w.z.w, 'data-z
         {SENTENCES.map((s, k) => (
           <button type="button" class="pb-s" data-s={k} aria-pressed={k === 0 ? 'true' : 'false'} aria-label={`Sentence ${k + 1}, ${s.tone}`} title={s.tone}>{k + 1}</button>
         ))}
-        <span class="pb-note">Places are placeholders; “—” is unknown.</span>
+        <span class="pb-note">Photos are “Untitled” until named; places are placeholders; “—” is unknown.</span>
       </span>
     </div>
   </main>
@@ -214,7 +221,8 @@ const darkData = (w: Work) => ({ 'data-zoom': w.z.src, 'data-zw': w.z.w, 'data-z
   .pa h1 { font-family: var(--font-display); font-weight: 500; font-size: clamp(40px, 4.6vw, 60px); line-height: 1.04;
     letter-spacing: -0.01em; margin-top: 16px; color: var(--ink-1); }
 
-  /* ── THE OPENING: words left, the work right; stacked at 900px and under, the work first. ──────────── */
+  /* ── THE OPENING: words left, the work right; stacked at 900px and under, the sentence first and the mat under
+     it, so a tap swaps the work just below the line being read and nothing scrolls. ─────────────────── */
   .opening { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 64px; align-items: start; margin-top: 40px; }
   .sentence { font-family: var(--font-display); font-weight: 400; font-size: clamp(24px, 2.4vw, 34px); line-height: 1.5;
     color: var(--ink-1); }
@@ -222,7 +230,7 @@ const darkData = (w: Work) => ({ 'data-zoom': w.z.src, 'data-zw': w.z.w, 'data-z
   .phrase[aria-current] { text-decoration-line: underline; text-decoration-thickness: 2px; }
   @media (hover: hover) { .phrase:hover { text-decoration-line: underline; } }
   .phrase:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; border-radius: 1px; }
-  .stage { display: grid; scroll-margin-top: 72px; }
+  .stage { display: grid; }
   .mw { grid-area: 1 / 1; margin: 0; opacity: 0; }
   .mw.is-on { opacity: 1; }
   @media (prefers-reduced-motion: no-preference) { .mw { transition: opacity 300ms ease; } }
@@ -254,9 +262,9 @@ const darkData = (w: Work) => ({ 'data-zoom': w.z.src, 'data-zw': w.z.w, 'data-z
   .obj-mat { display: flex; justify-content: center; padding: 32px; background: var(--mat); }
   .cal { padding: 0; border: 0; background: none; line-height: 0; cursor: zoom-in; }
   .cal :global(img) { display: block; width: auto; max-width: 100%; max-height: min(82vh, 820px); }
-  /* The stele treatment, kept: the slab stands off its mat. A work on paper gets a hairline edge, no shadow. */
-  .stele :global(img) { filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.55)); }
-  .paper :global(img) { border: 1px solid rgba(var(--hairline-rgb), 0.25); }
+  /* No shadow (the Met's rule): the stele's black ground already stands off the pale mat, and a hairline edge keeps
+     it off the dark mat too, as it does the work on paper. */
+  .stele :global(img), .paper :global(img) { border: 1px solid rgba(var(--hairline-rgb), 0.25); }
 
   /* The photographs: rows of one height, each photograph whole on a faint mat, its title and place under it. With no
      script each tile is its photograph at --row-h, and the rows wrap ragged; the script justifies them. */
@@ -282,8 +290,8 @@ const darkData = (w: Work) => ({ 'data-zoom': w.z.src, 'data-zw': w.z.w, 'data-z
 
   @media (max-width: 900px) {
     .opening, .obj { grid-template-columns: minmax(0, 1fr); gap: 28px; }
-    .stage, .obj-mat { order: -1; }
-    .mat { height: min(60vh, 520px); padding: 16px; }
+    .obj-mat { order: -1; }
+    .mat { height: min(45vh, 380px); padding: 16px; } /* 380 - 2 x 16 = MAT_H_STACKED */
   }
   @media (max-width: 640px) {
     .obj-mat { padding: 16px; }
@@ -304,7 +312,9 @@ const darkData = (w: Work) => ({ 'data-zoom': w.z.src, 'data-zw': w.z.w, 'data-z
   @media (hover: hover) { .d-btn:hover { border-color: rgba(239, 233, 221, 0.85); } }
   .d-btn:focus-visible { outline: 2px solid #e0574a; outline-offset: 2px; }
   .d-close { position: fixed; top: 6px; left: 16px; z-index: 2; }
-  .d-bar { position: fixed; left: 16px; right: 16px; bottom: 6px; z-index: 2; display: flex; align-items: center; gap: 8px; height: 44px; }
+  /* The bar is a solid strip of the room's ground, so a zoomed work passes under it and never under the line. */
+  .d-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 8px; height: 56px;
+    padding: 0 16px; background: #1c1b18; }
   .d-line { flex: 1; min-width: 0; font-size: 13px; line-height: 1.4; color: rgba(239, 233, 221, 0.8);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .dark[data-line-off] .d-line { visibility: hidden; }
@@ -422,7 +432,6 @@ const darkData = (w: Work) => ({ 'data-zoom': w.z.src, 'data-zw': w.z.w, 'data-z
     // the cross-fade never fades in an empty mat; a later phrase supersedes a swap still waiting.
     const sentences = Array.from(main.querySelectorAll<HTMLElement>('.sentence'));
     const figs = new Map(Array.from(main.querySelectorAll<HTMLElement>('.mw')).map((f) => [f.dataset.work ?? '', f]));
-    const stage = main.querySelector<HTMLElement>('.stage');
     const live = main.querySelector<HTMLElement>('[data-live]');
     let s = 0;
     let cur = sentences[0]?.dataset.works?.split(',')[0] ?? '';
@@ -452,19 +461,15 @@ const darkData = (w: Work) => ({ 'data-zoom': w.z.src, 'data-zw': w.z.w, 'data-z
         next.classList.add('is-on');
         if (prev) prev.inert = true;
         next.inert = false;
-        if (live) live.textContent = next.querySelector('.l-title')?.textContent ?? '';
+        // The work's description, as most titles are "Untitled".
+        if (live) live.textContent = next.querySelector<HTMLElement>('.mat-btn')?.dataset.alt ?? '';
         const hide = (): void => { if (prev && cur !== prev.dataset.work) prev.hidden = true; };
         if (reduce) hide(); else timers.push(window.setTimeout(hide, FADE_MS));
       });
     };
     main.querySelectorAll<HTMLAnchorElement>('.phrase').forEach((a) => {
       const key = a.dataset.work ?? '';
-      a.addEventListener('click', (e) => {
-        e.preventDefault();
-        swap(key);
-        // Stacked, the work is above the sentence: bring it back on screen if the reader has scrolled past it.
-        if (stage && stage.getBoundingClientRect().top < 0) stage.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
-      });
+      a.addEventListener('click', (e) => { e.preventDefault(); swap(key); });
       a.addEventListener('focus', () => swap(key));
     });
     // The mat opens the dark room on the shown sentence's works, in its order.
