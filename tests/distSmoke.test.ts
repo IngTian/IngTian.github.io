@@ -422,7 +422,9 @@ describe("BaseLayout's per-page hooks: /projects is the drafting page, the resea
   it('marks /projects as drafting, every research route as paper, / as deck, and no other route at all', () => {
     expect(research().length, 'no research route was built').toBeGreaterThan(0);
     const want = (route: string): string | undefined =>
-      route === '/projects' ? 'drafting' : isResearch(route) ? 'paper' : route === '/' ? 'deck' : undefined;
+      route === '/projects' ? 'drafting' : isResearch(route) ? 'paper' : route === '/' ? 'deck'
+        : route === '/proto-art' ? 'paper' // PROTOTYPE (throwaway): borrows the paper sheet; delete with the page
+        : undefined;
     const wrong = pages().filter((p) => pageOf(p.markup) !== want(p.route))
       .map((p) => `${p.route}: data-page=${pageOf(p.markup) ?? '(none)'}`);
     expect(wrong).toEqual([]);
