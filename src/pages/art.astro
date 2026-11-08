@@ -286,14 +286,16 @@ const darkData = (w: Work) => ({
   onPageView<HTMLElement>('main.art', (main) => {
     // ── The rows: justified at the stylesheet's --row-h, gap and --pad. A tile is its photograph's ratio times the
     // row's height, plus its mat; justifyRows takes the mat's padding into the gap and off the width, so every row
-    // fills exactly. Widths are floored to 0.01px so a full row's sum never overflows into a wrap.
+    // fills exactly. Widths are floored to 0.01px so a full row's sum never overflows into a wrap. W is the fractional
+    // width (.rows has no padding or border): clientWidth rounds, and a column 921.6px wide (1024px window) read as 922
+    // overflowed every row by ~0.4px, wrapping its last tile.
     const rows = main.querySelector<HTMLElement>('.rows');
     if (!rows) return undefined;
     const tiles = Array.from(rows.querySelectorAll<HTMLElement>('.tile'));
     const ars = tiles.map((t) => parseFloat(t.style.getPropertyValue('--ar')) || 1);
     let lastW = 0;
     const layout = (): void => {
-      const W = rows.clientWidth;
+      const W = rows.getBoundingClientRect().width;
       if (!W || W === lastW) return;
       lastW = W;
       const cs = getComputedStyle(rows);
