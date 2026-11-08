@@ -330,7 +330,7 @@ describe("/art's image payload, measured on the built output", () => {
   // `widths` of the fetchpriority="high" LCP image, and the array is only a means. This weighs the file a
   // DPR-2 browser would choose, with the device px read from the shipped `sizes`: a hard-coded figure once
   // agreed with a wrong hint. Whether the hint is right is artSizes.test.ts's job; the arithmetic is in
-  // art.astro, above calSizes().
+  // art.astro, above matSizes().
   const artHtml = (): string => {
     const p = join(DIST, 'art', 'index.html');
     if (!existsSync(p)) throw new Error('dist/art/index.html missing — run `npm run build`');
@@ -340,45 +340,72 @@ describe("/art's image payload, measured on the built output", () => {
     const p = join(DIST, url.replace(/^\//, ''));
     return existsSync(p) ? readFileSync(p).byteLength : -1;
   };
+  /** Every <img> tag on /art. */
+  const imgTags = (): string[] => [...artHtml().matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
+  /** The photographs' files, as src/assets/art/photos holds them. */
+  const photoFiles = (): string[] =>
+    readdirSync(new URL('../src/assets/art/photos/', import.meta.url)).filter((f) => f.endsWith('.jpg'));
 
-  it('keeps the eager, high-priority LCP image well under what it was', () => {
-    const tag = /<img[^>]*fetchpriority="high"[^>]*>/.exec(artHtml())?.[0] ?? '';
-    expect(tag, 'no fetchpriority="high" image on /art — has the LCP hint been dropped?').not.toBe('');
-
+  /**
+   * The candidate a DPR-2 display picks from an <img>'s srcset: the DESKTOP branch of its `sizes` (the trailing,
+   * media-conditionless entry) times two, and the first width that covers it. A `vw` unit there is itself the
+   * regression (every work on /art is height-capped or row-bound, so its width does not scale with the viewport),
+   * which is why that case fails loudly rather than picking a viewport to multiply by.
+   */
+  const pickAt2x = (tag: string): { w: number; bytes: number } => {
     const srcset = /srcset="([^"]+)"/.exec(tag)?.[1] ?? '';
     const candidates = srcset.split(',')
       .map((s) => s.trim().split(/\s+/))
       .map(([url, w]) => ({ url, w: Number(String(w).replace('w', '')), bytes: bytesOf(url) }))
       .sort((a, b) => a.w - b.w);
-    expect(candidates.length, 'the LCP image has no srcset').toBeGreaterThan(1);
+    expect(candidates.length, `an image has no srcset: ${tag.slice(0, 120)}`).toBeGreaterThan(1);
     for (const c of candidates) {
       expect(c.bytes, `a srcset candidate is missing from dist: ${c.url}`).toBeGreaterThan(0);
     }
-
-    // Resolve the DESKTOP branch of the shipped `sizes` — the trailing, media-conditionless entry — and read
-    // the device px a DPR-2 display asks for from it. A `vw` unit here is itself the regression (the element
-    // is height-capped, so its width does not scale with the viewport), which is why that case fails loudly
-    // rather than picking a viewport to multiply by.
     const sizes = /sizes="([^"]+)"/.exec(tag)?.[1] ?? '';
     const desktopBranch = sizes.split(',').map((s) => s.trim()).pop() ?? '';
     expect(
       desktopBranch,
-      `/art's LCP hint has no px desktop branch — got "${sizes}". A vw bound here means the fluid hint is `
-      + 'back; see the note above calSizes() in art.astro and the pair pinned in artSizes.test.ts.',
+      `an /art hint has no px desktop branch — got "${sizes}". A vw bound here means the fluid hint is `
+      + 'back; see the note above matSizes() in art.astro and the pairs pinned in artSizes.test.ts.',
     ).toMatch(/^\d+(\.\d+)?px$/);
-    const NEEDED = Math.ceil(parseFloat(desktopBranch) * 2);
+    const needed = Math.ceil(parseFloat(desktopBranch) * 2);
+    const { w, bytes } = candidates.find((c) => c.w >= needed) ?? candidates[candidates.length - 1];
+    return { w, bytes };
+  };
 
-    const chosen = candidates.find((c) => c.w >= NEEDED) ?? candidates[candidates.length - 1];
-
-    // 139 KB today (the 900w variant at 828 device px), down from 1342 KB native and from the 387 KB that
-    // capping `widths` alone still fetched. The ceiling leaves room to retune the cap without being so loose
-    // that either regression slips back through.
+  it('keeps the eager, high-priority LCP image well under what it was', () => {
+    const tag = imgTags().find((t) => /fetchpriority="high"/.test(t)) ?? '';
+    expect(tag, 'no fetchpriority="high" image on /art — has the LCP hint been dropped?').not.toBe('');
+    const chosen = pickAt2x(tag);
+    // photo-23's 900w on the mat, 181,642 B, down from the stele's 1342 KB native and from the 387 KB that capping
+    // `widths` alone still fetched. The ceiling leaves room to retune the cap without being so loose that either
+    // regression slips back through.
     expect(
       chosen.bytes,
-      `the LCP candidate at ${NEEDED} device px is ${(chosen.bytes / 1024).toFixed(0)} KB (${chosen.w}w). `
+      `the LCP candidate is ${(chosen.bytes / 1024).toFixed(0)} KB (${chosen.w}w). `
       + 'If this jumped, check whether a native image width got back into `widths`, or whether `sizes` went '
-      + 'back to a viewport fraction, in art.astro.',
+      + 'back to a viewport fraction, in matSizes() in art.astro.',
     ).toBeLessThan(250 * 1024);
+  });
+
+  it('loads at most 300 KB of images eagerly, one of them high-priority', () => {
+    const eager = imgTags().filter((t) => /srcset=/.test(t) && !/\bloading="lazy"/.test(t));
+    expect(eager.filter((t) => /fetchpriority="high"/.test(t))).toHaveLength(1);
+    expect(eager.reduce((s, t) => s + pickAt2x(t).bytes, 0)).toBeLessThanOrEqual(300 * 1024);
+  });
+
+  it("ships each photograph in the tiles' widths only, on the mat too, with a px desktop hint", () => {
+    // The mat reuses the tiles' widths, so dist gains no variants. Only an <img> with a srcset is a sized work.
+    const sized = imgTags().filter((t) => /srcset=/.test(t));
+    expect(sized.length, 'no image with a srcset on /art').toBeGreaterThan(0);
+    const photos = sized
+      .flatMap((t) => (/srcset="([^"]+)"/.exec(t)?.[1] ?? '').split(',').map((s) => s.trim().split(/\s+/)))
+      .filter(([url]) => basename(url).startsWith('photo-'));
+    expect(photos.length, 'no photo- srcset candidate on /art').toBeGreaterThan(0);
+    expect(photos.filter(([, w]) => !['300w', '600w', '900w'].includes(w)).map((c) => c.join(' '))).toEqual([]);
+    const arms = sized.map((t) => (/sizes="([^"]+)"/.exec(t)?.[1] ?? '').split(',').map((s) => s.trim()).pop());
+    expect(arms.filter((a) => !/^\d+px$/.test(a ?? ''))).toEqual([]);
   });
 
   it('serves every lightbox source as a processed webp, not the untouched original', () => {
@@ -387,6 +414,23 @@ describe("/art's image payload, measured on the built output", () => {
     expect(zooms.length, 'no data-zoom attributes on /art').toBeGreaterThan(10);
     const notWebp = zooms.filter((z) => !z.endsWith('.webp'));
     expect(notWebp, `lightbox sources that are not webp: ${notWebp.slice(0, 3).join(', ')}`).toEqual([]);
+  });
+
+  // A label prints what is known and nothing in place of what is not, on every surface a reader gets one: the dark
+  // room's line, an untitled block's name, the mat's label and a tile's caption. A tile's .t-cap is its button's
+  // last child, so `</span>\s*</button>` closes it.
+  it('prints only what is known: no dash, placeholder or Untitled in a label, a caption, a line or an untitled block', () => {
+    const m = builtPage('/art').markup;
+    const text = (s: string) => s.replace(/<[^>]+>/g, ' ');
+    const printed = [
+      ...[...m.matchAll(/data-line="([^"]*)"/g)].map((x) => x[1]),
+      ...[...m.matchAll(/<article\b[^>]*aria-label="([^"]*)"/g)].map((x) => x[1]),
+      ...[...m.matchAll(/<figcaption\b[^>]*class="label[^"]*"[^>]*>([\s\S]*?)<\/figcaption>/g)].map((x) => text(x[1])),
+      ...[...m.matchAll(/<span\b[^>]*class="t-cap[^"]*"[^>]*>([\s\S]*?)<\/span>\s*<\/button>/g)].map((x) => text(x[1])),
+    ];
+    expect(printed.length).toBeGreaterThan(42);
+    expect(printed.filter((s) => /—|Untitled|placeholder|undefined|null/.test(s))).toEqual([]);
+    expect(m).toMatch(new RegExp(`>${photoFiles().length} photographs\\.<`));
   });
 });
 
@@ -406,40 +450,40 @@ describe('the images under src/assets', () => {
   });
 });
 
-describe("BaseLayout's per-page hooks: /projects is the drafting page, the research routes the paper page", () => {
+describe("BaseLayout's per-page hooks: /projects is the drafting page, the research routes and /art the paper page", () => {
   // `page` puts `data-page` on <html>, the scope tokens.css hangs a register's palette from (and, on `/`, 'deck',
-  // the rail's resting ink); `veil={false}` drops
-  // the descent veil — on /projects because its boot is its entrance, on the research routes because the veil would
-  // replay on every card click and every way back, holding the text ~1.1s. Both are props, so what this guards is a
-  // default changing under every other route.
+  // the rail's resting ink); /art borrows 'paper', as no token of its own differs. `veil={false}` drops the descent
+  // veil — on /projects because its boot is its entrance, on the research routes because the veil would replay on
+  // every card click and every way back, holding the text ~1.1s, and on /art because it is motion that runs on its
+  // own. Both are props, so what this guards is a default changing under every other route.
   // Read from `markup` (scripts stripped): the veil's own inline script names `[data-veil]` on every page.
   const veilEl = /<div\b[^>]*\sdata-veil\b/;
   const pageOf = (markup: string): string | undefined => /<html\b[^>]*\sdata-page="([^"]*)"/.exec(markup)?.[1];
   const isResearch = (route: string): boolean => route === '/research' || route.startsWith('/research/');
   const research = (): Page[] => pages().filter((p) => isResearch(p.route));
 
-  it('marks /projects as drafting, every research route as paper, / as deck, and no other route at all', () => {
+  it('marks /projects as drafting, every research route and /art as paper, / as deck, and no other route at all', () => {
     expect(research().length, 'no research route was built').toBeGreaterThan(0);
-    const want = (route: string): string | undefined =>
-      route === '/projects' ? 'drafting' : isResearch(route) ? 'paper' : route === '/' ? 'deck' : undefined;
+    const want = (route: string): string | undefined => route === '/projects' ? 'drafting'
+      : isResearch(route) || route === '/art' ? 'paper' : route === '/' ? 'deck' : undefined;
     const wrong = pages().filter((p) => pageOf(p.markup) !== want(p.route))
       .map((p) => `${p.route}: data-page=${pageOf(p.markup) ?? '(none)'}`);
     expect(wrong).toEqual([]);
   });
 
   // `.test()` rather than `toMatch` so a failure names the defect instead of printing the whole page.
-  it('renders /projects and the research routes no veil, and /writing its veil', () => {
-    for (const p of [projectsPage(), ...research()]) {
+  it('renders /projects, the research routes and /art no veil, and /writing its veil', () => {
+    for (const p of [projectsPage(), ...research(), builtPage('/art')]) {
       expect(veilEl.test(p.markup), `${p.route} renders a [data-veil] element`).toBe(false);
     }
     expect(veilEl.test(builtPage('/writing').markup), '/writing lost its [data-veil] element').toBe(true);
   });
 
   // Each register's ink is sized for its own ground (tests/draftingPalette.test.ts, tests/paperPalette.test.ts), not
-  // for the reading sky: light drafting --ink-3 over --reading-grad's lower stops measured 4.20 and 3.89. So neither
-  // page paints a sky. /writing is the control: the sky it keeps is the markup these patterns look for.
-  it('paints /projects and the research routes no fluid sky and no sky wash, and /writing both', () => {
-    for (const p of [projectsPage(), ...research()]) {
+  // for the reading sky: light drafting --ink-3 over --reading-grad's lower stops measured 4.20 and 3.89. So no
+  // register page paints a sky. /writing is the control: the sky it keeps is the markup these patterns look for.
+  it('paints /projects, the research routes and /art no fluid sky and no sky wash, and /writing both', () => {
+    for (const p of [projectsPage(), ...research(), builtPage('/art')]) {
       expect(/class="fluid-sky"/.test(p.markup), `${p.route} renders the fluid-sky canvas`).toBe(false);
       expect(/class="sky-wash"/.test(p.markup), `${p.route} renders the SkyWash layer`).toBe(false);
     }

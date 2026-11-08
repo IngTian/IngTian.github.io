@@ -1,40 +1,17 @@
 ---
+// /art, "The sentence", on a still sheet: one sentence in the owner's voice whose seal-red phrases each bring a work
+// onto the mat beside it, then the calligraphy as object blocks, then every photograph in justified rows. It borrows
+// the research routes' paper register (page="paper"): no sky, no veil, no rail, and nothing moves on its own. The
+// works and the sentence are data/artworks.ts; the sentence's rules and the label line are lib/artPage.ts.
 import BaseLayout from '../layouts/BaseLayout.astro';
-import FluidSky from '../components/FluidSky.astro';
 import { Image, getImage } from 'astro:assets';
-import { calligraphy, photography, photoDefault } from '../data/artworks';
-import SkyWash from '../components/SkyWash.astro';
+import { SENTENCE, calligraphy, photography } from '../data/artworks';
+import { labelLine, phrasesOf, sentenceProblems, type LabelFields } from '../lib/artPage';
 
-// ── /art's image bytes. The rules are CLAUDE.md's (Stack); the arithmetic is here, beside the code it sets.
-//
-// THE PHOTO HINT. scripts/artGallery.ts lays the grid out with `justifyRows(ars, W, 340, 14)`, which closes a
-// row once its height would fall to or below 340 and clamps the final, unfilled row to 340 * 1.16. A tile is
-// `ar * rowHeight` wide, so `ar * 340 * 1.16` bounds it at any viewport: nothing in it scales with vw. At
-// 1440/DPR 2 a `30vw` hint picked the 900w variant for all 42 photos, 6,007,600 B; these bounds select
-// 3,128,936 (47.9% less), within 2.4% of the per-tile optimum (3,056,032), and never under-declare from 260 to
-// 3000px wide (worst actual/hint 0.9993). The two constants are synced by hand: tests/artSizes.test.ts holds
-// them to that call and to justify.ts's `targetHeight * 1.16`.
-// The <=1024px branch stays 45vw. There .art-wrap is a centred 900px column that a row cannot fill at the
-// target height, so the px bound goes loose (a 390px phone's portrait tile is ~166px against 222) and
-// quantises up a variant: it measured +325,556 B at DPR 2 and +3,204,220 at DPR 3.
-const PHOTO_ROW_TARGET_H = 340;   // justifyRows' targetHeight — every non-final row closes at or below it
-const PHOTO_LAST_ROW_SLACK = 1.16; // justifyRows' cap on the final, unfilled row
-const photoSizes = (ar: number) =>
-  `(max-width:1024px) 45vw, ${Math.ceil(ar * PHOTO_ROW_TARGET_H * PHOTO_LAST_ROW_SLACK)}px`;
-
-// THE CALLIGRAPHY HINT. `.cal :global(img)` is height-capped (width auto, max-width 100%, a max-height whose px
-// arm is 820), so a tall work renders at most 820 * ar CSS px at any window height: 414 for the 1727x3422
-// stele, at most 413.8 measured over 13 viewports from 1024 to 3840 wide. A `40vw` hint declared 512-1536 and
-// made DPR 2 fetch the 1200w variant (396,030 B) where 900w (142,128 B) covers the 828 device px needed.
-// `widths` stays [480, 900, 1200]: a DPR-3 phone at ~346 CSS px needs ~1038. The <=1024px branch stays 80vw,
-// where max-width binds. CAL_MAX_H mirrors the stylesheet's 820, and tests/artSizes.test.ts fails on drift.
-const CAL_MAX_H = 820; // the px arm of `.cal :global(img)`'s max-height
-const calSizes = (ar: number) => `(max-width:1024px) 80vw, ${Math.ceil(ar * CAL_MAX_H)}px`;
-
-// THE LIGHTBOX AND EACH WORK'S SIZE, from one getImage() call: a webp at NATIVE pixels, which artGallery.ts
-// zooms to 6x, so the pixels stay. It is the native variant <Image> emits anyway for its `src` (18.6 MB a
-// browser with `srcset` never requests), so it adds no file. `w`/`h` are data-zw/data-zh, which reserve the
-// lightbox's box before the image decodes, and they feed data-ar and the two hints above.
+// EACH WORK'S NATIVE-PIXEL WEBP AND ITS SIZE, from one getImage() call: every work carries it as data-zoom, to be
+// looked at closely (6x), so the pixels stay. It is the native variant <Image> emits anyway for its `src` (18.6 MB a
+// browser with `srcset` never requests), so it adds no file. `w`/`h` are data-zw/data-zh, which reserve a box
+// before the image decodes, and they give each work its `ar`: the tile's --ar and the three hints below.
 // They are read off getImage()'s options, never off the ImageMetadata: Astro's import is a Proxy, and reading
 // any property of it but `clone` or `fsPath` keeps the original in dist. Reading `.width`/`.height` kept all
 // 44 JPEGs there (40,525,788 B, referenced by nothing); tests/distSmoke.test.ts fails if an original ships.
@@ -44,241 +21,292 @@ const zoomOf = async (src: ImageMetadata) => {
   if (!w || !h) throw new Error(`getImage() gave no native size for ${z.src}`);
   return { src: z.src, w, h };
 };
-const calZoom = await Promise.all(calligraphy.map((w) => zoomOf(w.src)));
-const photoZoom = await Promise.all(photography.map((p) => zoomOf(p.src)));
+
+// The page's one list of works. A label prints only the fields that are known (labelLine): a photograph's medium is
+// 'Photograph', and its title, place and year appear once they exist.
+const photos = await Promise.all(photography.map(async (p) => {
+  const z = await zoomOf(p.src);
+  const fields: LabelFields = { title: p.title, place: p.place, year: p.year, medium: 'Photograph' };
+  return { ...p, kind: 'photo' as const, fields, z, ar: z.w / z.h };
+}));
+const cals = await Promise.all(calligraphy.map(async (c) => {
+  const z = await zoomOf(c.src);
+  const fields: LabelFields = { title: c.title, script: c.script, medium: c.medium };
+  return { ...c, kind: 'cal' as const, fields, z, ar: z.w / z.h };
+}));
+const works = [...photos, ...cals];
+type Work = (typeof works)[number];
+const byKey = new Map(works.map((w) => [w.key, w]));
+
+// The sentence's rules (lib/artPage.ts): a sentence that breaks one fails the build here, naming it.
+const problems = sentenceProblems(SENTENCE, new Set(byKey.keys()));
+if (problems.length) throw new Error(`art: ${problems.join('; ')}`);
+// The mat holds each work the sentence names, in its order; the first phrase's work is on it at arrival.
+const phrases = phrasesOf(SENTENCE);
+const matWorks = phrases.flatMap((x) => byKey.get(x.work) ?? []);
+const first = phrases[0].work;
+
+// ── `sizes`, from the CSS below. Each hint is a maximum, so it never under-declares; tests/artSizes.test.ts holds
+// every constant to the rule it mirrors and sweeps each hint over the layout.
+//
+// THE MAT. .art-wrap is at most 1240px wide with clamp(22px, 5vw, 72px) sides, so its column peaks at 1116px at
+// vw 1240 (side 62), not at the cap's far side (1096 at 1440). .opening's columns are 1fr / 1.15fr with a 64px gap,
+// so the mat's column is at most (1116 - 64) * 1.15 / 2.15 = 562.7px; less 2 x 24px of padding, the image is at most
+// 514.7px wide (MAT_W) and, under the mat's min(62vh, 560px), 560 - 48 = 512px tall (MAT_H).
+const MAT_H = 512;
+const MAT_W = 515;
+// Stacked (900px and under) the mat is min(45vh, 380px) with 16px of padding: 380 - 32 = 348px for the image
+// (MAT_H_STACKED), and at most 810 - 32 = 778px wide, the column at 900px (MAT_W_STACKED).
+const MAT_H_STACKED = 348;
+const MAT_W_STACKED = 778;
+// On a phone (640px and under) the mat is min(40vh, 320px) with 16px of padding: 320 - 32 = 288px (MAT_H_PHONE),
+// and at most 576 - 32 = 544px wide, the column at 640px (MAT_W_PHONE).
+const MAT_H_PHONE = 288;
+const MAT_W_PHONE = 544;
+// THE ROWS. ROW_H and ROW_H_PHONE are .rows' --row-h, synced by hand: the rows script lays the rows out with
+// justifyRows at that target, which closes a full row at or under it and caps the last row at it (lib/justify.ts),
+// so a photograph is at most ar * --row-h wide, and at most the 1116px column less its 2 x 10px of mat (ROW_W).
+const ROW_H = 280;
+const ROW_H_PHONE = 150;
+const ROW_W = 1096;
+// THE CALLIGRAPHY. .cal img is height-capped, its max-height's px arm 820 (CAL_MAX_H), so a work is at most
+// 820 * ar px wide at any window height: 414 for the 1727x3422 stele, whose 900w (142,128 B) covers the 828 device
+// px DPR 2 asks for, where a `40vw` hint once fetched the 1200w (396,030 B). On a phone it is the column less the
+// block's mat, at most 100vw less 2 x 22px of side and 2 x 16px of padding.
+const CAL_MAX_H = 820;
+// THE WIDTHS, never a native one (the stele's 1727w was a 1342 KB webp on the LCP image). The calligraphy keeps
+// 1200 because a DPR-3 phone at ~346 CSS px asks for ~1038 device px of the stele. The mat reuses both, so it adds
+// no variant to dist: photo-23 on the mat at arrival is the tiles' 900w (a 384px hint, 768 device px at DPR 2).
+const PHOTO_WIDTHS = [300, 600, 900];
+const CAL_WIDTHS = [480, 900, 1200];
+
+const matSizes = (ar: number) =>
+  `(max-width: 640px) ${Math.min(Math.ceil(ar * MAT_H_PHONE), MAT_W_PHONE)}px, `
+  + `(max-width: 900px) ${Math.min(Math.ceil(ar * MAT_H_STACKED), MAT_W_STACKED)}px, ${Math.min(Math.ceil(ar * MAT_H), MAT_W)}px`;
+const rowSizes = (ar: number) =>
+  `(max-width: 640px) ${Math.ceil(ar * ROW_H_PHONE)}px, ${Math.min(Math.ceil(ar * ROW_H), ROW_W)}px`;
+const calSizes = (ar: number) => `(max-width: 640px) calc(100vw - 76px), ${Math.ceil(ar * CAL_MAX_H)}px`;
+
+// What every opener carries: the native webp, its size, the alt and the label's one line.
+const darkData = (w: Work) => ({
+  'data-zoom': w.z.src, 'data-zw': w.z.w, 'data-zh': w.z.h, 'data-alt': w.alt, 'data-line': labelLine(w.fields),
+});
 ---
 <BaseLayout
-  title="An artist by night — Ing Tian"
+  title="Art — Ing Tian"
   description="Calligraphy and photography by Ing Tian (Zeying Tian)."
-  veilLine="an artist by night"
-  veilOnLoad={true}
+  page="paper"
+  veil={false}
 >
-  <main class="art descent is-fluid">
-    <FluidSky variant="descent" />
-    <SkyWash />
-    {/* TOC rail */}
-    <nav class="art-toc" id="art-toc" aria-label="Sections">
-      <ul>
-        <li><a href="#calligraphy" data-target="calligraphy"><span class="rule" aria-hidden="true"></span><span>Calligraphy</span></a></li>
-        <li><a href="#photography" data-target="photography"><span class="rule" aria-hidden="true"></span><span>Photography</span></a></li>
-      </ul>
-    </nav>
-
-    {/* Wall-label placard */}
-    <aside class="placard" id="art-placard" aria-live="polite">
-      <div class="pl-inner">
-        <div class="pl-kicker"></div>
-        <p class="pl-title"></p>
-        <div class="pl-meta"></div>
-        <p class="pl-desc"></p>
-      </div>
-    </aside>
-
+  <main class="art">
     <div class="art-wrap">
       <header class="art-head">
         <a class="back" href="/">← back</a>
-        <h1>An artist by night</h1>
-        <p class="lede">Calligraphy and photographs — seen, as in a quiet room, one at a time.</p>
+        <h1>Art</h1>
       </header>
 
-      <h2 class="seclabel" id="calligraphy">Calligraphy</h2>
-      <div id="cal-host">
-        {calligraphy.map((w, i) => (
-          <div class="cal-block" data-i={i}
-               data-kicker={w.kicker} data-title={w.title} data-meta={w.medium} data-note={w.note}>
-            <figure class:list={["cal", w.treatment]} data-zoom={calZoom[i].src}
-                    data-zw={calZoom[i].w} data-zh={calZoom[i].h} data-alt={w.alt}
-                    role="button" tabindex="0" aria-label={`View ${w.title} — full screen`}>
-              {/* The first work is /art's LCP, so it is eager and high priority (<Image> defaults to lazy);
-                  the rest stay lazy. `widths` never holds the native width: the stele's 1727w was a 1342 KB
-                  webp on this element. `sizes` is calSizes(); the arithmetic is above it. */}
-              <Image src={w.src} alt={w.alt} widths={[480, 900, 1200]}
-                     sizes={calSizes(calZoom[i].w / calZoom[i].h)}
-                     loading={i === 0 ? 'eager' : 'lazy'} fetchpriority={i === 0 ? 'high' : undefined} />
+      <section class="opening" aria-label="Selected works">
+        <div class="words">
+          {/* A phrase is a link to its work's place on the page, so without a script it jumps there. */}
+          <p class="sentence" data-works={phrases.map((x) => x.work).join(',')}>
+            {SENTENCE.map((x) => typeof x === 'string' ? x : (
+              <a class="phrase" href={`#${x.work}`} data-work={x.work} aria-controls="art-mat"
+                 aria-current={x.work === first ? 'true' : undefined}>{x.text}</a>
+            ))}
+          </p>
+          <p class="sr-only" aria-live="polite" data-live></p>
+        </div>
+        <div class="stage" id="art-mat">
+          {matWorks.map((w) => (
+            <figure class:list={['mw', { 'is-on': w.key === first }]} data-work={w.key} hidden={w.key !== first}>
+              <div class="mat">
+                <button type="button" class:list={['mat-btn', w.kind === 'cal' && w.treatment]}
+                        aria-label={`View full screen: ${w.alt}`} {...darkData(w)}>
+                  {/* Only the first work is eager and high priority: it is /art's LCP. */}
+                  <Image src={w.src} alt={w.alt} widths={w.kind === 'photo' ? PHOTO_WIDTHS : CAL_WIDTHS} sizes={matSizes(w.ar)}
+                         loading={w.key === first ? 'eager' : 'lazy'} fetchpriority={w.key === first ? 'high' : undefined}
+                         decoding="async" draggable="false" />
+                </button>
+              </div>
+              <figcaption class="label">
+                {w.fields.title && <span class="l-title">{w.fields.title}</span>}
+                <dl>
+                  {w.kind === 'photo' && w.fields.place && <div><dt>Place</dt><dd>{w.fields.place}</dd></div>}
+                  {w.kind === 'photo' && w.fields.year && <div><dt>Year</dt><dd>{w.fields.year}</dd></div>}
+                  {w.kind === 'cal' && <div><dt>Script</dt><dd>{w.script} · <span lang="zh-Hant">{w.scriptZh}</span></dd></div>}
+                  <div><dt>Medium</dt><dd>{w.fields.medium}</dd></div>
+                </dl>
+              </figcaption>
             </figure>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </section>
 
-      <h2 class="seclabel dark" id="photography">Photography</h2>
-      <div class="photo-rows" id="photo-rows"
-           data-def-kicker={photoDefault.kicker} data-def-title={photoDefault.title} data-def-note={photoDefault.note}>
-        {photography.map((p, i) => (
-          <figure class="tile" data-i={i}
-                  data-ar={(photoZoom[i].w / photoZoom[i].h).toFixed(4)}
-                  data-zoom={photoZoom[i].src}
-                  data-zw={photoZoom[i].w} data-zh={photoZoom[i].h} data-alt={p.alt}
-                  data-title={p.title ?? ''} data-note={p.note ?? ''}
-                  role="button" tabindex="0" aria-label={`View photograph${p.title ? ' — ' + p.title : ''} — full screen`}>
-            {/* `sizes` is per photo, photoSizes(); the arithmetic is above it. EVERY PHOTOGRAPH IS LAZY: the
-                grid starts ~2,100px down, under both calligraphy blocks, and the nine it once fetched eagerly
-                were 754,378 B of the 896,506 B /art loaded first. It costs no CLS: buildRows() lays the rows
-                out from the build-time data-ar, not a decoded image, and the .tile shimmer is the wait. */}
-            <Image src={p.src} alt={p.alt} widths={[300, 600, 900]}
-                   sizes={photoSizes(photoZoom[i].w / photoZoom[i].h)}
-                   loading="lazy" decoding="async" />
-          </figure>
+      <section class="room" id="calligraphy" aria-labelledby="cal-h">
+        <h2 id="cal-h">Calligraphy</h2>
+        {cals.map((w) => (
+          <article class="obj" id={w.key} aria-label={w.title ? undefined : labelLine(w.fields)}>
+            <div class="obj-words">
+              {w.titleZh && <p class="zh" lang="zh-Hant">{w.titleZh}</p>}
+              {w.title && <h3>{w.title}</h3>}
+              <dl>
+                <div><dt>Script</dt><dd>{w.script} · <span lang="zh-Hant">{w.scriptZh}</span></dd></div>
+                <div><dt>Medium</dt><dd>{w.medium}</dd></div>
+                {w.note && <div><dt>Note</dt><dd>{w.note}</dd></div>}
+              </dl>
+            </div>
+            <div class="obj-mat">
+              <button type="button" class:list={['cal', w.treatment]} aria-label={`View full screen: ${w.alt}`} {...darkData(w)}>
+                <Image src={w.src} alt={w.alt} widths={CAL_WIDTHS} sizes={calSizes(w.ar)} loading="lazy" decoding="async" />
+              </button>
+            </div>
+          </article>
         ))}
-      </div>
+      </section>
+
+      <section class="room" id="photographs" aria-labelledby="ph-h">
+        <h2 id="ph-h">Photographs</h2>
+        <p class="count">{photos.length} photographs.</p>
+        <div class="rows">
+          {photos.map((w) => (
+            <div class="tile" id={w.key} style={`--ar:${w.ar.toFixed(4)}`}>
+              <button type="button" class="tile-btn" {...darkData(w)}>
+                <span class="tile-mat">
+                  <Image src={w.src} alt={w.alt} widths={PHOTO_WIDTHS} sizes={rowSizes(w.ar)} loading="lazy" decoding="async" />
+                </span>
+                {(w.title || w.place) && (
+                  <span class="t-cap">{w.title && <span class="t-title">{w.title}</span>}{w.title && w.place && ' · '}{w.place}</span>
+                )}
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <footer class="art-foot"><a class="back" href="/">← back to the descent</a></footer>
     </div>
-
-    {/* Silent deep-zoom lightbox */}
-    <dialog class="lightbox" id="art-lightbox" aria-label="Artwork detail">
-      <button class="lb-close" id="lb-close" aria-label="Close">✕ close</button>
-      <img id="lb-img" src="" alt="" />
-      <p class="lb-hint">scroll to zoom · drag to pan · click to close</p>
-    </dialog>
   </main>
 </BaseLayout>
 
 <style>
-  /* three zones: rail · placard · works. Each zone's left-side clearance was
-     originally an independently-tuned clamp() — they lined up fine at wide
-     viewports but, because the curves grow at different rates (2.4vw vs
-     12vw vs 34vw), crossed and OVERLAPPED in the ~1100–1350px logical-width
-     band (a 14" MacBook Pro's default scaled resolution lands right there
-     even though the panel itself is high-res). Fixed structurally: each
-     zone's position is now `max(<original clamp>, <previous zone's edge> +
-     minimum gap)` — a no-op wherever the original clamp already cleared
-     (so nothing shifts at viewports that already looked right), and a hard
-     floor everywhere else, so the three zones can never overlap at any width.
-     --toc-w is the rail's own intrinsic content width (measured ~124.6px;
-     130px is a rounded, small-buffer constant, not an actual applied width —
-     .art-toc keeps its original auto/shrink-to-fit sizing). */
-  .art { position: relative; z-index: 0; min-height: 100vh;
-    --placard-left: max(clamp(120px, 12vw, 200px), calc(clamp(18px, 2.4vw, 38px) + 130px + 16px));
-    --placard-w: clamp(240px, 20vw, 320px);
-    --content-left: max(clamp(420px, 34vw, 620px), calc(var(--placard-left) + var(--placard-w) + 24px)); }
-  .art-toc { position: fixed; left: clamp(18px, 2.4vw, 38px); top: 50%; transform: translateY(-50%); z-index: 30; }
-  .art-toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
-  .art-toc a { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--font-mono);
-    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; line-height: 1; color: var(--ink-3); opacity: 0.45;
-    transition: opacity 0.3s, color 0.3s; }
-  .art-toc .rule { width: 0; height: 1px; background: currentColor; opacity: 0.55; transition: width 0.4s ease; }
-  .art-toc a.is-active { opacity: 1; color: var(--ink-1); }
-  .art-toc a.is-active .rule { width: 20px; }
-  /* THE DARK HALF OF THE DESCENT. The rail is fixed at the middle of the screen while the sky behind it runs from
-     paper to near-black, so dark ink stops working halfway down: measured at 50% scroll, the ACTIVE label was
-     rgb(22,20,15) on rgb(22,20,15) — ratio 1.0, the section you are in rendered invisible — and the inactive one
-     2.46:1. data-zone is set from the descent fraction behind the rail by the gallery script's existing scroll
-     handler (see scripts/artGallery.ts), the same idea CornerNav uses for itself.
-     In DARK theme the ink ramp is already light top-to-bottom, so this must not apply there — it would paint
-     paper-on-paper. */
-  .art-toc[data-zone='dark'] a { color: var(--paper); }
-  .art-toc[data-zone='dark'] a.is-active { color: var(--paper); opacity: 1; }
-  :global(html[data-theme='dark']) .art-toc[data-zone='dark'] a { color: var(--ink-3); }
-  :global(html[data-theme='dark']) .art-toc[data-zone='dark'] a.is-active { color: var(--ink-1); }
-  @media (hover: hover) { .art-toc a:hover { opacity: 0.85; } }
+  /* THE SHEET is the research routes' register (page="paper"), borrowed: its ground, inks and seal, in both themes.
+     A mat is a faint tone of the sheet's own hairline ink, so it follows the theme with it. */
+  .art { --mat: rgba(var(--hairline-rgb), 0.08); --mat-faint: rgba(var(--hairline-rgb), 0.05); min-height: 100vh; }
+  .art-wrap { max-width: 1240px; margin: 0 auto; padding: 0 clamp(22px, 5vw, 72px); }
+  .art-head { padding: 13vh 0 0; }
+  .back { font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); text-decoration: none; }
+  @media (hover: hover) { .back:hover { color: var(--seal); } }
+  .art h1 { font-family: var(--font-display); font-weight: 500; font-size: clamp(40px, 4.6vw, 60px); line-height: 1.04;
+    letter-spacing: -0.01em; margin-top: 16px; color: var(--ink-1); }
 
-  .placard { position: fixed; left: var(--placard-left);
-    top: 50%; transform: translateY(-50%); width: var(--placard-w); z-index: 20; }
-  .pl-inner { transition: opacity 0.22s ease, transform 0.22s ease; }
-  .placard.fade .pl-inner { opacity: 0; transform: translateY(8px); }
-  .pl-kicker { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-4); }
-  .pl-title { font-family: var(--font-display); font-weight: 500; font-size: 28px; line-height: 1.15; margin: 13px 0 5px; font-variation-settings: 'SOFT' 40; }
-  .pl-meta { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--ink-4); margin-bottom: 16px; }
-  .pl-desc { font-size: 15px; line-height: 1.75; color: var(--ink-3); }
-  .placard.dark .pl-title { color: var(--paper); }
-  .placard.dark .pl-kicker, .placard.dark .pl-meta { color: var(--ink-5); }
-  .placard.dark .pl-desc { color: rgba(239, 233, 221, 0.7); }
+  /* ── THE OPENING: words left, the work right; stacked at 900px and under, the sentence first and the mat under
+     it, so a tap swaps the work just below the line being read and nothing scrolls. ─────────────────── */
+  .opening { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 64px; align-items: start; margin-top: 40px; }
+  .sentence { font-family: var(--font-display); font-weight: 400; font-size: clamp(24px, 2.4vw, 34px); line-height: 1.5;
+    color: var(--ink-1); }
+  .phrase { color: var(--ochre); text-decoration: none; text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+  @media (hover: hover) { .phrase:hover { text-decoration-line: underline; } }
+  /* The current phrase is filled, as the Met marks its own: a seal block with --on-accent text, broken with the line
+     it wraps across. */
+  .phrase[aria-current] { background: var(--ochre); color: var(--on-accent); -webkit-box-decoration-break: clone;
+    box-decoration-break: clone; }
+  .phrase:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; border-radius: 1px; }
+  .stage { display: grid; }
+  .mw { grid-area: 1 / 1; margin: 0; opacity: 0; }
+  .mw.is-on { opacity: 1; }
+  .mat { height: min(62vh, 560px); padding: 24px; background: var(--mat); }
+  .mat-btn { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 0; border: 0;
+    background: none; cursor: zoom-in; }
+  .mat-btn :global(img) { display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; }
+  .mat-btn:focus-visible, .cal:focus-visible, .tile-btn:focus-visible { outline: 2px solid var(--seal); outline-offset: 3px; }
 
-  /* Works column: left edge clears the rail+placard; right edge stays anchored
-     to the viewport (margin-right, no max-width) so on wide monitors the work
-     fills toward the right instead of drifting left of a capped box. */
-  .art-wrap { margin-right: clamp(40px, 7vw, 180px); margin-left: var(--content-left); }
-  .art-head { padding: 13vh 0 5vh; }
-  .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
-  .back:hover { color: var(--seal); }
-  .art h1 { font-family: var(--font-display); font-weight: 500; font-size: clamp(38px, 5vw, 60px); line-height: 1.04;
-    letter-spacing: -0.01em; font-variation-settings: 'SOFT' 60; margin-top: 16px; color: var(--ink-1); }
-  .lede { font-size: 14px; color: var(--ink-3); margin-top: 16px; line-height: 1.7; max-width: 48ch; }
-  .seclabel { font-family: var(--font-mono); font-weight: 400; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase;
-    margin: 7vh 0 3vh; color: var(--ink-4); }
-  .seclabel.dark { color: rgba(239, 233, 221, 0.5); }
+  /* THE LABEL: dry and exact, "Label: value" lines in the body face; the title alone in Georgia. Its min-height is
+     sized for the fullest case (a title and three rows), so a swap moves nothing. */
+  .label { margin-top: 14px; min-height: 7.4em; font-size: 14px; line-height: 1.55; color: var(--ink-3); }
+  .l-title { display: block; font-family: var(--font-display); font-size: 18px; line-height: 1.3; color: var(--ink-1); margin-bottom: 4px; }
+  .art dl > div { display: flex; gap: 0.4em; }
+  .art dt { color: var(--ink-1); font-weight: 600; }
+  .art dt::after { content: ':'; }
+  .art dd { margin: 0; }
 
-  /* calligraphy sits CENTERED in the space between the placard and the viewport's
-     right edge. The works column's left margin (clears the placard) is larger
-     than its right margin, so plain centering drifts right; the negative
-     right-margin re-balances the cal-block against the true available span so
-     the gaps on both sides match. */
-  /* Calligraphy works stack in a column with a real gap between them — the
-     min-height alone gave almost no separation when consecutive works are tall
-     (the image max-height 82vh can exceed the block's 74vh min-height, so two
-     tall works nearly touched). The gap guarantees breathing room regardless. */
-  #cal-host { display: flex; flex-direction: column; gap: clamp(6vh, 9vh, 120px); }
-  .cal-block { min-height: 74vh; display: flex; align-items: center; justify-content: center;
-    margin-right: calc(-1 * clamp(40px, 7vw, 180px)); }
-  .cal { margin: 0; line-height: 0; cursor: zoom-in; }
-  .cal :global(img) { display: block; width: auto; max-width: 100%;
-    max-height: min(82vh, 820px); transition: transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
-  .cal.stele :global(img) { filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.55)); }
-  .cal.paper :global(img) { border: 1px solid rgba(255, 255, 255, 0.16); box-shadow: 0 24px 60px -22px rgba(20, 18, 14, 0.5); }
+  /* ── THE ROOMS ──────────────────────────────────────────────────────────────────────────────────── */
+  .room { margin-top: 120px; padding-top: 28px; border-top: 1px solid rgba(var(--hairline-rgb), 0.3); }
+  .room h2 { font-family: var(--font-display); font-weight: 400; font-size: 28px; line-height: 1.2; color: var(--ink-1); }
+  .count { margin-top: 8px; font-size: 14px; color: var(--ink-3); }
 
-  /* photo grid: SSR fallback = flex-wrap; JS upgrades to exact justified rows */
-  .photo-rows { display: flex; flex-wrap: wrap; gap: 14px; }
-  figure.tile { margin: 0; overflow: hidden; border-radius: 2px; position: relative; cursor: zoom-in;
-    /* loading tone: a warm ink wash (palette only), not a bare grey block */
-    background: var(--ink-2);
-    flex: 1 1 auto; height: 320px; }
-  figure.tile :global(img) { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 0.9s cubic-bezier(0.2,0.7,0.2,1); position: relative; z-index: 1; }
-  /* Gentle fade-in so images don't pop as they decode. JS adds .is-loaded on
-     load (and immediately for already-cached imgs). No-JS / reduced-motion =
-     fully visible, no fade. */
-  @media (prefers-reduced-motion: no-preference) {
-    figure.tile :global(img) { opacity: 0; transition: opacity 0.6s ease, transform 0.9s cubic-bezier(0.2,0.7,0.2,1); }
-    figure.tile.is-loaded :global(img) { opacity: 1; }
+  /* The calligraphy: an object block each, words a 3 : 7 column beside the work on its mat. */
+  .obj { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 7fr); gap: 48px; align-items: start; margin-top: 56px; }
+  .obj-words { font-size: 15px; line-height: 1.6; color: var(--ink-3); }
+  .zh { font-family: var(--font-display); font-size: 18px; color: var(--ink-2); }
+  .obj h3 { font-family: var(--font-display); font-weight: 400; font-size: 28px; line-height: 1.2; color: var(--ink-1); margin: 4px 0 14px; }
+  .obj-words dl { display: grid; gap: 6px; }
+  .obj-mat { display: flex; justify-content: center; padding: 32px; background: var(--mat); }
+  .cal { padding: 0; border: 0; background: none; line-height: 0; cursor: zoom-in; }
+  .cal :global(img) { display: block; width: auto; max-width: 100%; max-height: min(82vh, 820px); }
+  /* No shadow (the Met's rule): the stele's black ground already stands off the pale mat, and a hairline edge keeps
+     it off the dark mat too, as it does the work on paper. */
+  .stele :global(img), .paper :global(img) { border: 1px solid rgba(var(--hairline-rgb), 0.25); }
+
+  /* The photographs: rows of one height, each photograph whole on a faint mat, with at most one clipped line under
+     it. The caption sits outside the row-height arithmetic, so a row with and without captions keeps one image
+     height. With no script each tile is its photograph at --row-h, and the rows wrap ragged; the script justifies
+     them. */
+  .rows { --row-h: 280; --pad: 10px; display: flex; flex-wrap: wrap; column-gap: 16px; row-gap: 28px; margin-top: 28px; }
+  .tile { flex: none; width: calc(var(--ar) * var(--row-h) * 1px + 2 * var(--pad)); }
+  .tile-btn { display: block; width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: zoom-in; }
+  .tile-mat { display: block; padding: var(--pad); background: var(--mat-faint); }
+  .tile-mat :global(img) { display: block; width: 100%; height: auto; aspect-ratio: var(--ar); }
+  .t-cap { display: block; margin-top: 8px; font-size: 13px; line-height: 1.4; color: var(--ink-3); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .t-title { color: var(--ink-1); font-weight: 400; text-underline-offset: 0.18em; }
+  /* A hover underlines the title, where there is one, and dims the photograph a little, by opacity. */
+  @media (hover: hover) {
+    .tile-btn:hover .t-title { text-decoration: underline; }
+    .tile .tile-btn:hover .tile-mat :global(img) { opacity: 0.85; }
   }
-  /* Loading shimmer: a soft highlight sweeps across the placeholder tone so an
-     un-decoded tile reads as "loading", never as a dead grey rectangle. It's a
-     transform-only sweep (no blur), removed the instant the image loads, and is
-     absent under reduced motion (the static ink tone is the finished fallback). */
-  figure.tile::before {
-    content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
-    background: linear-gradient(100deg, transparent 30%, rgba(239,233,221,0.10) 50%, transparent 70%);
-    transform: translateX(-100%);
-  }
-  figure.tile.is-loaded::before { content: none; }
-  @media (prefers-reduced-motion: no-preference) {
-    figure.tile::before { animation: tile-shimmer 1.6s ease-in-out infinite; }
-    @keyframes tile-shimmer {
-      from { transform: translateX(-100%); }
-      to   { transform: translateX(100%); }
-    }
-  }
-  figure.tile::after { content: ""; position: absolute; inset: 0; z-index: 2; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.07); transition: box-shadow 0.4s; pointer-events: none; }
-  .art-foot { padding: 13vh 0 18vh; }
-  .art-foot .back { color: rgba(239, 233, 221, 0.5); }
+  .art-foot { padding: 120px 0 18vh; }
 
-  /* lightbox */
-  .lightbox { border: 0; padding: 0; margin: 0; max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh;
-    background: rgba(16,15,12,0.97); }
-  .lightbox::backdrop { background: rgba(16,15,12,0.97); }
-  .lightbox[open] { display: flex; align-items: center; justify-content: center; }
-  #lb-img { max-width: 94vw; max-height: 94vh; will-change: transform; cursor: grab; transform-origin: 0 0;
-    box-shadow: 0 40px 120px -30px rgba(0,0,0,0.8); }
-  .lb-close { position: fixed; top: 20px; right: 24px; font-family: var(--font-mono); font-size: 13px; color: rgba(239,233,221,0.7);
-    background: none; border: 0; cursor: pointer; }
-  .lb-hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); font-family: var(--font-mono); font-size: 11px;
-    color: rgba(239,233,221,0.5); letter-spacing: 0.06em; pointer-events: none; }
-
-  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-    figure.tile:hover :global(img) { transform: scale(1.06); }
-    figure.tile:hover::after { box-shadow: inset 0 0 0 1px rgba(239,233,221,0.3); }
-    .cal:hover :global(img) { transform: scale(1.035); }
+  @media (max-width: 900px) {
+    .opening, .obj { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    .obj-mat { order: -1; }
+    .mat { height: min(45vh, 380px); padding: 16px; }
   }
-
-  @media (max-width: 1024px) {
-    .art-toc, .placard { display: none; }
-    .art-wrap { margin: 0 auto; max-width: 900px; padding: 0 22px; }
-    /* drop the desktop negative right-margin (it re-balanced against the
-       placard, which is hidden here) — otherwise the stele bleeds off the
-       right edge and the page scrolls horizontally on phones. */
-    .cal-block { min-height: auto; justify-content: center; padding: 5vh 0; margin-right: 0; }
+  @media (max-width: 640px) {
+    .sentence { font-size: 21px; }
+    .mat { height: min(40vh, 320px); padding: 16px; }
+    .obj-mat { padding: 16px; }
+    .rows { --row-h: 150; --pad: 6px; column-gap: 10px; row-gap: 20px; }
   }
 </style>
 
 <script>
-  import '../scripts/artGallery.ts';
+  import { onPageView } from '../scripts/pageView';
+  import { justifyRows } from '../lib/justify';
+
+  onPageView<HTMLElement>('main.art', (main) => {
+    // ── The rows: justified at the stylesheet's --row-h, gap and --pad. A tile is its photograph's ratio times the
+    // row's height, plus its mat; justifyRows takes the mat's padding into the gap and off the width, so every row
+    // fills exactly. Widths are floored to 0.01px so a full row's sum never overflows into a wrap.
+    const rows = main.querySelector<HTMLElement>('.rows');
+    if (!rows) return undefined;
+    const tiles = Array.from(rows.querySelectorAll<HTMLElement>('.tile'));
+    const ars = tiles.map((t) => parseFloat(t.style.getPropertyValue('--ar')) || 1);
+    let lastW = 0;
+    const layout = (): void => {
+      const W = rows.clientWidth;
+      if (!W || W === lastW) return;
+      lastW = W;
+      const cs = getComputedStyle(rows);
+      const H = parseFloat(cs.getPropertyValue('--row-h'));
+      const pad = parseFloat(cs.getPropertyValue('--pad'));
+      const gap = parseFloat(cs.columnGap);
+      justifyRows(ars, W - 2 * pad, H, gap + 2 * pad).forEach((r) => r.indices.forEach((i) => {
+        tiles[i].style.width = `${Math.floor((ars[i] * r.height + 2 * pad) * 100) / 100}px`;
+      }));
+    };
+    layout();
+    const ro = new ResizeObserver(layout);
+    ro.observe(rows);
+    return () => ro.disconnect();
+  });
 </script>

@@ -33,6 +33,9 @@ const pageCss = [
   // last: rule() takes the first match, and the index's miniature re-sizes the series' strokes (`.mini .f-rl`)
   styleOf('index.astro'),
 ].join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
+// /art borrows the register (BaseLayout `page="paper"`): its own scoped <style>, comments stripped.
+const artPage = readFileSync(new URL('../src/pages/art.astro', import.meta.url), 'utf8');
+const artCss = (/^<style>([\s\S]*?)^<\/style>/m.exec(artPage)?.[1] ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
 /** The declarations of the page's rule whose selector is exactly `sel`. */
 function rule(sel: string): string {
   const body = new RegExp(`(?:^|[}\\s])${sel.replace(/[.()[\]*+?^$|\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(pageCss)?.[1];
@@ -77,7 +80,9 @@ describe('the paper palette (tokens.css)', () => {
         for (const k of ['--sheet-ul', '--sheet-band']) expect(rgbaOf(tk[k])[0], k).toEqual(rgbOf(seal));
       });
 
-      // --sheet-mark is text too: a marked symbol in an equation is coloured with it.
+      // --sheet-mark is text too: a marked symbol in an equation is coloured with it. It is --ochre (above), so this
+      // also holds /art's phrases, which are --ochre text on the sheet; the current one, --on-accent on --ochre, is
+      // the nav pill's pair below.
       for (const ink of ['--ink-1', '--ink-2', '--ink-3', '--ink-4', '--sheet-mark']) {
         it(`${ink} clears AA on the sheet`, () => {
           expect(onGround(tk[ink], ground)).toBeGreaterThanOrEqual(AA_BODY);
@@ -168,8 +173,10 @@ describe('the paper palette (tokens.css)', () => {
   }
 
   // In the dark theme --paper is the TEXT colour, so a ground painted with it would turn the sheet light.
-  it("paints no ground with --paper: the research pages' own CSS never reads it", () => {
+  it("paints no ground with --paper: the research pages' own CSS never reads it, nor /art's", () => {
     for (const page of ['[slug].astro', 'index.astro']) expect(styleOf(page).length, `no <style is:global> block in ${page}`).toBeGreaterThan(1000);
     expect(pageCss).not.toMatch(/var\(--paper\b/);
+    expect(artCss.length, 'no <style> block in art.astro').toBeGreaterThan(1000);
+    expect(artCss).not.toMatch(/var\(--paper\b/);
   });
 });

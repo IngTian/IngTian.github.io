@@ -183,7 +183,7 @@ html[data-page='drafting'][data-theme='dark'] {
 }
 
 /* ============================================================
-   PAPER — the research routes' register (BaseLayout `page="paper"`)
+   PAPER — the research routes' register, and /art's, which borrows it (BaseLayout `page="paper"`)
    A still sheet with no sky: warm paper in light, near-black in dark, and SEAL RED AS THE ONLY COLOUR in both. Like
    drafting it overrides the ROLE tokens, so the corner nav and the rail reskin with no edit and the accent (the nav's
    dot, pill and focus ring) becomes the seal.

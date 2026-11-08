@@ -42,8 +42,8 @@ Before committing, all three, in this order: `npm run build` → `npm run typech
 | A paper's **explainer page** | a `.md` in `src/content/papers/` (its record stays in `profile.ts`, its numbers and figures in `src/data/papers/`); it becomes `/research/<slug>`. The syntax is in CLAUDE.md, *Papers are files*. |
 | Résumé, bio, timeline, publications, projects, contact links | `src/data/profile.ts` — typed, cross-referenced by id, and some numbers are computed from it. |
 | The page set (the corner nav) | `src/data/nav.ts` (`PAGES`). |
-| Calligraphy | `src/data/artworks.ts` + images in `src/assets/art/`. |
-| Photographs | files in `src/assets/art/photos/` (auto-globbed); per-photo copy in `src/data/photoNotes.ts`. |
+| Calligraphy | `src/data/artworks.ts` (works + the sentence) + images in `src/assets/art/`. |
+| Photographs | files in `src/assets/art/photos/` (auto-globbed); alt, drafted title and place in `src/data/photoNotes.ts`. |
 | Palette | `src/styles/tokens.css`. The rule and its exceptions are in CLAUDE.md, *Taste rules* and *Themes*. |
 
 ## License

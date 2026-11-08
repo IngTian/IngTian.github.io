@@ -29,11 +29,17 @@ describe('justifyRows', () => {
     });
   });
 
-  it('handles a single item (one row, capped near target)', () => {
+  it('handles a single item (one row, capped at the target)', () => {
     const rows = justifyRows([0.75], 1000, 300, 14);
     expect(rows).toHaveLength(1);
     expect(rows[0].indices).toEqual([0]);
-    expect(rows[0].height).toBeLessThanOrEqual(300 * 1.16);
+    expect(rows[0].height).toBeLessThanOrEqual(300);
+  });
+
+  it('never sets the last row taller than the target', () => {
+    // Unfilled, this row's fill height is (3000 - 14) / 2.25, about 1327px. A 1.16 slack made /art's last
+    // photographs its largest, so the cap is the target itself.
+    expect(justifyRows([0.75, 1.5], 3000, 300, 14).at(-1)!.height).toBe(300);
   });
 
   it('returns no rows for an empty input', () => {

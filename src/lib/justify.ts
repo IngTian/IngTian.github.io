@@ -1,8 +1,8 @@
-// Pure justified-rows packing for the photo grid: greedily fill each row to the
-// container width at ~targetHeight, preserving order, never cropping (each
-// image keeps its true aspect ratio; the row's height is solved so widths +
-// gaps == containerWidth). Mirrors the Flickr/Google "justified layout" idea.
-// Unit-tested; runs client-side on load/resize.
+// Pure justified-rows packing for /art's photographs: greedily fill each row to the container width at
+// ~targetHeight, preserving order, never cropping (each image keeps its true aspect ratio; the row's height is
+// solved so widths + gaps == containerWidth). Mirrors the Flickr/Google "justified layout" idea. No row is ever
+// taller than the target: a full row closes at or below it, and the last, unfilled one is capped at it, with no
+// slack, so the last photographs are never the largest. Unit-tested; runs client-side on load/resize.
 
 export interface JustifiedRow {
   height: number;
@@ -24,7 +24,7 @@ export function justifyRows(
     const gaps = gap * (row.length - 1);
     // height so that sum(ar*h) + gaps == containerWidth  =>  h = (W - gaps) / arSum
     let height = (containerWidth - gaps) / arSum;
-    if (last) height = Math.min(height, targetHeight * 1.16); // don't blow up a lone last row
+    if (last) height = Math.min(height, targetHeight); // an unfilled last row stays at the target
     rows.push({ height, indices: row });
     row = [];
     arSum = 0;
