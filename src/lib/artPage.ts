@@ -40,7 +40,7 @@ export function sentenceProblems(parts: readonly SentencePart[], works: Readonly
 }
 
 /** What a work's label may print. A field is given only when it is known. */
-export interface LabelFields { title?: string; place?: string; year?: string; script?: string; medium: string }
+interface LabelFields { title?: string; place?: string; year?: string; script?: string; medium: string }
 
 /** The known fields, in label order, joined by a middle dot: never a dash or a placeholder for one unknown. */
 export function labelLine(f: LabelFields): string {

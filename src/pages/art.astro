@@ -12,29 +12,28 @@ import {
   CAL_WIDTHS, PHOTO_WIDTHS, calSizes, labelLine, matSizes, phrasesOf, rowSizes, sentenceProblems,
 } from '../lib/artPage';
 
-// EACH WORK'S NATIVE-PIXEL WEBP AND ITS SIZE, from one getImage() call: every work carries it as data-zoom, to be
-// looked at closely (6x), so the pixels stay. It is the native variant <Image> emits anyway for its `src` (18.6 MB a
-// browser with `srcset` never requests), so it adds no file. `w`/`h` give each work its `ar`, which reserves its box
-// before the image decodes (a tile's and a block's --ar, the dark room's data-ar) and sets the three `sizes` hints.
-// They are read off getImage()'s options, never off the ImageMetadata: Astro's import is a Proxy, and reading
-// any property of it but `clone` or `fsPath` keeps the original in dist. Reading `.width`/`.height` kept all
-// 44 JPEGs there (40,525,788 B, referenced by nothing); tests/distSmoke.test.ts fails if an original ships.
+// EACH WORK'S NATIVE-PIXEL WEBP AND ITS RATIO, from one getImage() call. The webp's URL is `zoom`, which every work
+// carries as data-zoom, to be looked at closely (6x), so the pixels stay. It is the native variant <Image> emits
+// anyway for its `src` (18.6 MB a browser with `srcset` never requests), so it adds no file. `ar`, its native width
+// over its height, reserves the work's box before the image decodes (a tile's and a block's --ar, the dark room's
+// data-ar) and sets the three `sizes` hints. The size is read off getImage()'s options, never off the ImageMetadata:
+// Astro's import is a Proxy, and reading any property of it but `clone` or `fsPath` keeps the original in dist.
+// Reading `.width`/`.height` kept all 44 JPEGs there (40,525,788 B, referenced by nothing); tests/distSmoke.test.ts
+// fails if an original ships.
 const zoomOf = async (src: ImageMetadata) => {
   const z = await getImage({ src, format: 'webp' });
   const { width: w, height: h } = z.options;
   if (!w || !h) throw new Error(`getImage() gave no native size for ${z.src}`);
-  return { src: z.src, w, h };
+  return { zoom: z.src, ar: w / h };
 };
 
 // The page's one list of works; a label prints only the fields its record knows (labelLine).
-const photos = await Promise.all(photography.map(async (p) => {
-  const z = await zoomOf(p.src);
-  return { ...p, kind: 'photo' as const, z, ar: z.w / z.h };
-}));
-const cals = await Promise.all(calligraphy.map(async (c) => {
-  const z = await zoomOf(c.src);
-  return { ...c, kind: 'cal' as const, z, ar: z.w / z.h };
-}));
+const photos = await Promise.all(photography.map(async (p) => ({
+  ...p, kind: 'photo' as const, ...(await zoomOf(p.src)),
+})));
+const cals = await Promise.all(calligraphy.map(async (c) => ({
+  ...c, kind: 'cal' as const, ...(await zoomOf(c.src)),
+})));
 const works = [...photos, ...cals];
 type Work = (typeof works)[number];
 const byKey = new Map(works.map((w) => [w.key, w]));
@@ -49,7 +48,7 @@ const first = phrases[0].work;
 
 // What every opener carries: the native webp, its ratio, the alt and the label's one line.
 const darkData = (w: Work) => ({
-  'data-zoom': w.z.src, 'data-ar': w.ar.toFixed(4), 'data-alt': w.alt, 'data-line': labelLine(w),
+  'data-zoom': w.zoom, 'data-ar': w.ar.toFixed(4), 'data-alt': w.alt, 'data-line': labelLine(w),
 });
 ---
 <BaseLayout
