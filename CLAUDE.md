@@ -139,17 +139,17 @@ rather than add.
     (Astro logs it and stores the entry unrendered), so `/writing/<slug>` throws on an unrendered entry.
 - `astro:assets` optimizes gallery images (responsive `widths`, **webp, not avif**: nothing in
   `astro.config.mjs` asks for avif, and `dist` holds none). /art's rules follow, each measured; the arithmetic
-  is beside the code it sets in `pages/art.astro`, above `matSizes()`, `rowSizes()`, `calSizes()` and
-  `zoomOf()`.
+  is beside the code it sets: above `matSizes()`, `rowSizes()` and `calSizes()` in `lib/artPage.ts`, and above
+  `zoomOf()` in `pages/art.astro`.
   - **Never a native width in `widths`.** The stele's 1727w was a 1342 KB webp on the `fetchpriority="high"`
     LCP image. Calligraphy is `[480, 900, 1200]` (`CAL_WIDTHS`), photos `[300, 600, 900]` (`PHOTO_WIDTHS`),
     and the mat reuses the tiles' and blocks' `widths`, so it adds no variant to `dist`.
   - **`sizes` matters as much as `widths`, and it comes from the CSS that sizes the element, not from the
     viewport.** A height-capped work renders at most `820 * ar` CSS px (414 for the stele), so DPR 2 takes the
     900w variant (142,128 B), where a `40vw` hint took 1200w (396,030 B). `tests/artSizes.test.ts` holds
-    `ROW_H`/`ROW_H_PHONE` to the rows' `--row-h`, `CAL_MAX_H` to the calligraphy's cap and the `MAT_H*`
-    constants to the mat's, and sweeps each hint over the layout; `tests/distSmoke.test.ts` weighs the file a
-    browser would choose, reading the device px from the shipped `sizes`.
+    every constant behind the three hints to the rule it mirrors and sweeps each hint the page ships over the
+    layout; `tests/distSmoke.test.ts` weighs the file a browser would choose, reading the device px from the
+    shipped `sizes`.
   - **Only the first mat image is eager** (photo-23's 900w, 181,642 B), with `fetchpriority="high"`; both
     calligraphy works and every photograph are lazy. `tests/distSmoke.test.ts` sums the eager images a DPR-2
     browser picks, at most 300 KB, the first-load goal as the spec measures it. A real first load also fetches
@@ -204,7 +204,7 @@ src/
   data/nav.ts                       # PAGES — the canonical page set (see Navigation)
   data/writing.ts                   # the writing TAXONOMY (KINDS) + buildKinds(), the one seam to the markdown
   data/artworks.ts                  # /art's works, keyed (photo-NN from the file; couplet, poem), + SENTENCE, the page's one sentence; photoNotes.ts holds each photograph's alt, title?, place?{name, confirmed} and year?
-  lib/artPage.ts                    # /art's pure half: the sentence's rules (sentenceProblems over phrasesOf: PHRASES phrases, each a different work that exists, RED_PCT of its words red), a work's label line (labelLine), and the dark room's zoom: zoomAbout (to 6x, about a point), wheelScale (by distance, not per event), isDoubleTap
+  lib/artPage.ts                    # /art's pure half: the sentence's rules (sentenceProblems over phrasesOf: PHRASES phrases, each a different work that exists, RED_PCT of its words red), a work's label line (labelLine), the three sizes hints (matSizes, rowSizes, calSizes) and their constants, and the dark room's zoom: zoomAbout (to 6x, about a point), wheelScale (by distance, not per event), isDoubleTap
   data/{define,desk,making,story}.ts # the homepage explainer's copy + numbers, per slide
   data/{cowGlyph,ruleGlyphs,tickerGlyphs}.ts # pixel-art matrices: the cow's and the slides'
   lib/deck.ts                       # pure deck stops: WHERE the homepage scroll may rest, what's next, and what one wheel event does (wheelAction)
@@ -421,7 +421,8 @@ test's stand-in all read it.
 without the space has been missed before. Classify each hit rather than subtracting a remembered number: a rule;
 prose (comments in `lib/viewport.ts` and `global.css`); `projects/Gallery`'s
 `sizes="(max-width: 640px) 240px, 330px"`, the phone strip's card width, which moves with the strip's block;
-or /art's three `sizes` hints (`matSizes()`, `rowSizes()`, `calSizes()`), which move with its 640px block.
+or /art's three `sizes` hints (`matSizes()`, `rowSizes()`, `calSizes()` in `lib/artPage.ts`), which move with its
+640px block.
 **The wide side is always the negation, `not all and (max-width: 640px)`, never `min-width: 641px`**: a second
 bound leaves a zoomed window 640.5 CSS px wide to neither side, and this grep would miss it.
 `tests/viewport.test.ts` pins the value and fails on any such pair, at any breakpoint in `src`. A prototype

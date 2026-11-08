@@ -331,7 +331,7 @@ describe("/art's image payload, measured on the built output", () => {
   // `widths` of the fetchpriority="high" LCP image, and the array is only a means. This weighs the file a
   // DPR-2 browser would choose, with the device px read from the shipped `sizes`: a hard-coded figure once
   // agreed with a wrong hint. Whether the hint is right is artSizes.test.ts's job; the arithmetic is in
-  // art.astro, above matSizes().
+  // lib/artPage.ts, above matSizes().
   const artHtml = (): string => {
     const p = join(DIST, 'art', 'index.html');
     if (!existsSync(p)) throw new Error('dist/art/index.html missing — run `npm run build`');
@@ -368,7 +368,7 @@ describe("/art's image payload, measured on the built output", () => {
     expect(
       desktopBranch,
       `an /art hint has no px desktop branch — got "${sizes}". A vw bound here means the fluid hint is `
-      + 'back; see the note above matSizes() in art.astro and the pairs pinned in artSizes.test.ts.',
+      + 'back; see the note above matSizes() in lib/artPage.ts and the sweeps in artSizes.test.ts.',
     ).toMatch(/^\d+(\.\d+)?px$/);
     const needed = Math.ceil(parseFloat(desktopBranch) * 2);
     const { w, bytes } = candidates.find((c) => c.w >= needed) ?? candidates[candidates.length - 1];
@@ -386,7 +386,7 @@ describe("/art's image payload, measured on the built output", () => {
       chosen.bytes,
       `the LCP candidate is ${(chosen.bytes / 1024).toFixed(0)} KB (${chosen.w}w). `
       + 'If this jumped, check whether a native image width got back into `widths`, or whether `sizes` went '
-      + 'back to a viewport fraction, in matSizes() in art.astro.',
+      + 'back to a viewport fraction, in matSizes() in lib/artPage.ts.',
     ).toBeLessThan(250 * 1024);
   });
 
@@ -410,7 +410,7 @@ describe("/art's image payload, measured on the built output", () => {
   });
 
   it("reserves each calligraphy work's box at its own ratio, so nothing below it moves as it decodes", () => {
-    // The block's --ar is what its width is computed from before the image arrives (above CAL_MAX_H in art.astro).
+    // The block's --ar is what its width is computed from before the image arrives (above CAL_MAX_H in lib/artPage.ts).
     const cals = [...artHtml().matchAll(/<button\b[^>]*\bclass="cal\b[^>]*>\s*<img\b[^>]*>/g)].map((m) => m[0]);
     expect(cals.length, 'the calligraphy openers on /art').toBe(2);
     for (const c of cals) {
