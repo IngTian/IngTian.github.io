@@ -10,6 +10,7 @@ import {
 import { INTRO_SEEN_KEY } from '../src/lib/introSession';
 import { contact, inProgress, projects, publications, researchInterests, timeline, type Publication } from '../src/data/profile';
 import { PAPER_DATA } from '../src/data/papers';
+import { photoNotes } from '../src/data/photoNotes';
 import {
   type Stop, experienceStops, flattenStops, homeStops, paperPageOwns, paperSections, paperStops, projectSectionId,
   projectStops, researchIndexStops,
@@ -431,6 +432,20 @@ describe("/art's image payload, measured on the built output", () => {
     expect(printed.length).toBeGreaterThan(42);
     expect(printed.filter((s) => /—|Untitled|placeholder|undefined|null/.test(s))).toEqual([]);
     expect(m).toMatch(new RegExp(`>${photoFiles().length} photographs\\.<`));
+  });
+
+  it('drafts a title for every photograph', () => {
+    expect([...builtPage('/art').markup.matchAll(/class="t-title[^"]*"/g)].length).toBe(photoFiles().length);
+  });
+  // Today's alts name these; a guessed place's every part is banned too. A name the owner confirmed may print.
+  const NAMED_TODAY = ['Golden Gate', 'San Francisco', 'Seattle', 'Space Needle', 'Rainier'];
+  it('never prints a place that is not confirmed, on any surface: alt, aria-label, data-alt, data-line, text', () => {
+    const notes = Object.values(photoNotes);
+    const confirmed = notes.flatMap((n) => (n.place?.confirmed ? [n.place.name] : []));
+    const guessed = notes.flatMap((n) => (n.place && !n.place.confirmed ? n.place.name.split(/,\s*/) : []));
+    const banned = [...guessed, ...NAMED_TODAY].filter((n) => !confirmed.some((c) => c.includes(n)));
+    const m = builtPage('/art').markup;
+    expect(banned.filter((n) => m.includes(n))).toEqual([]);
   });
 
   // The lock is on <html>, which no component declares, so art.astro writes it :global (CLAUDE.md, trap 1). Astro 6

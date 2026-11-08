@@ -68,7 +68,7 @@ const p = (text: string, work: WorkKey): Phrase<WorkKey> => ({ text, work });
  */
 export const SENTENCE: SentencePart<WorkKey>[] = [ // 6 phrases, 15 of 46 words red (32.6%)
   'I take photographs — of ', p('a red canoe', 'photo-23'), ' on a turquoise lake, ', p('a bridge tower', 'photo-09'),
-  ' lit against the city, ', p('a heron', 'photo-12'), ' waiting on a stone and ', p('cherry blossoms', 'photo-42'),
+  ' lit against the city, ', p('a heron', 'photo-12'), ' standing on a stone and ', p('cherry blossoms', 'photo-42'),
   ' against a clear sky — and I write calligraphy: ', p('a spring couplet', 'couplet'), ' in clerical script and ',
   p('a poem', 'poem'), ' in running-cursive.',
 ];
