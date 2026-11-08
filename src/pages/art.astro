@@ -537,6 +537,22 @@ const darkData = (w: Work) => ({
         z = zoomAbout(z, z.s * wheelScale(e.deltaY, e.deltaMode), e.clientX - r.left, e.clientY - r.top);
         tf();
       }, { passive: false });
+      // Desktop Safari sends a trackpad pinch as WebKit's gesture events, not as ctrl+wheel, and touch-action does
+      // nothing for a trackpad: unprevented, the pinch zooms the page, bar and all, and it stays zoomed after Escape.
+      // So both are prevented, and the pinch scales the work from the scale it began at, about the cursor. iOS sends
+      // them for a touch pinch too, beside the pointers that already zoom it (below), so with a pointer down they
+      // only prevent. GestureEvent is WebKit's alone and not in lib.dom, so its three fields read here are typed here.
+      // Unverified in Safari when written (no Safari on the machine): one trackpad pinch in the owner's pass is its check.
+      type Gesture = Event & { scale: number; clientX: number; clientY: number };
+      let base = 1;
+      dlg.addEventListener('gesturestart', (e) => { e.preventDefault(); base = z.s; });
+      dlg.addEventListener('gesturechange', (e) => {
+        e.preventDefault();
+        if (pts.size) return;
+        const g = e as Gesture, r = img.getBoundingClientRect();
+        z = zoomAbout(z, base * g.scale, g.clientX - r.left, g.clientY - r.top);
+        tf();
+      });
 
       // ── Pointers, on the whole room but its buttons: two pinch the work about their midpoint, one pans it once it
       // is zoomed, and two taps on the work toggle 1x and 3x. Only the work captures a pointer: one captured on the

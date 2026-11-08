@@ -114,6 +114,14 @@ describe('the paper palette (tokens.css)', () => {
         expect(between(over(hairline, a, ground), ground)).toBeGreaterThanOrEqual(NON_TEXT);
       });
 
+      // /art's phrases are --ochre in a sentence of --ink-1 with no underline at rest, so colour is their only cue
+      // there: WCAG 1.4.1 (G183) asks 3:1 against the words round them. Dark ink-1 was lifted to clear it.
+      it("/art's phrases clear 3:1 against the sentence's ink", () => {
+        expect(decl('.sentence', 'color', artCss)).toBe('var(--ink-1)');
+        expect(decl('.phrase', 'color', artCss)).toBe('var(--ochre)');
+        expect(ratio(tk['--ochre'], tk['--ink-1'])).toBeGreaterThanOrEqual(NON_TEXT);
+      });
+
       it('--on-accent clears AA on the accent (the nav pill on hover)', () => {
         expect(ratio(tk['--on-accent'], tk['--ochre'])).toBeGreaterThanOrEqual(AA_BODY);
       });
