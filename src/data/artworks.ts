@@ -7,14 +7,10 @@ import poemSrc from '../assets/art/running-script-poem.jpg';
 import { photoNotes } from './photoNotes';
 import type { Phrase, SentencePart } from '../lib/artPage';
 
-export type PhotoKey = `photo-${string}`;
-export type CalKey = 'couplet' | 'poem';
-export type WorkKey = PhotoKey | CalKey;
-
 /** `place` is the note's name, and only once the owner has confirmed it. */
-export interface Photo { key: PhotoKey; src: ImageMetadata; alt: string; title?: string; place?: string; year?: string }
+export interface Photo { key: string; src: ImageMetadata; alt: string; title?: string; place?: string; year?: string }
 export interface Calligraphy {
-  key: CalKey; src: ImageMetadata; alt: string; title?: string; titleZh?: string;
+  key: string; src: ImageMetadata; alt: string; title?: string; titleZh?: string;
   script: string; scriptZh: string; medium: string; note?: string; treatment: 'stele' | 'paper';
 }
 
@@ -35,11 +31,11 @@ const photoFiles = import.meta.glob<{ default: ImageMetadata }>(
   { eager: true },
 );
 
-const isPhotoKey = (key: string): key is PhotoKey => key.startsWith('photo-');
-/** The key a photograph's file gives it. A file not named photo-… fails the build, by name. */
-const photoKey = (file: string): PhotoKey => {
+/** The key a photograph's file gives it. A file not named photo-… fails the build, by name: the prefix keeps a
+ *  photograph's id off the page's own (`calligraphy`, `photographs`). */
+const photoKey = (file: string): string => {
   const key = file.replace(/\.jpe?g$/i, '');
-  if (!isPhotoKey(key)) throw new Error(`artworks: ${file} is not named photo-…, so it has no key`);
+  if (!key.startsWith('photo-')) throw new Error(`artworks: ${file} is not named photo-…, so it has no key`);
   return key;
 };
 
@@ -58,15 +54,14 @@ export const photography: Photo[] = Object.keys(photoFiles)
     };
   });
 
-const p = (text: string, work: WorkKey): Phrase<WorkKey> => ({ text, work });
+const p = (text: string, work: string): Phrase => ({ text, work });
 
 /**
  * THE SENTENCE, the page's index, in the owner's first person. Each phrase (set in seal red) is a work, says only what
  * that work shows or what is recorded above, and is the noun alone, its description in ink. The page refuses a
- * sentence that breaks lib/artPage.ts's rules (5-7 phrases, each a different work that exists, 30-40% of its words
- * red), naming the rule.
+ * sentence that breaks a rule in lib/artPage.ts, naming it.
  */
-export const SENTENCE: SentencePart<WorkKey>[] = [ // 6 phrases, 15 of 46 words red (32.6%)
+export const SENTENCE: SentencePart[] = [
   'I take photographs — of ', p('a red canoe', 'photo-23'), ' on a turquoise lake, ', p('a bridge tower', 'photo-09'),
   ' lit against the city, ', p('a heron', 'photo-12'), ' standing on a stone and ', p('cherry blossoms', 'photo-42'),
   ' against a clear sky — and I write calligraphy: ', p('a spring couplet', 'couplet'), ' in clerical script and ',

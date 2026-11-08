@@ -6,15 +6,15 @@
 import { countWords } from './words';
 
 /** A phrase of the sentence, set in red: the words, and the key of the work they bring onto the mat. */
-export interface Phrase<K extends string = string> { text: string; work: K }
+export interface Phrase { text: string; work: string }
 /** The sentence, in order: plain text in ink, and phrases. */
-export type SentencePart<K extends string = string> = string | Phrase<K>;
+export type SentencePart = string | Phrase;
 
-export const RED_SHARE = { min: 0.3, max: 0.4 } as const;
-export const PHRASES = { min: 5, max: 7 } as const;
+const RED_PCT = { min: 30, max: 40 } as const;
+const PHRASES = { min: 5, max: 7 } as const;
 
-export function phrasesOf<K extends string>(parts: readonly SentencePart<K>[]): Phrase<K>[] {
-  return parts.filter((x): x is Phrase<K> => typeof x !== 'string');
+export function phrasesOf(parts: readonly SentencePart[]): Phrase[] {
+  return parts.filter((x): x is Phrase => typeof x !== 'string');
 }
 
 /** Every rule the sentence breaks, each named; [] when it keeps them all. */
@@ -24,15 +24,17 @@ export function sentenceProblems(parts: readonly SentencePart[], works: Readonly
   if (phrases.length < PHRASES.min || phrases.length > PHRASES.max)
     problems.push(`the sentence has ${phrases.length} phrases, not ${PHRASES.min}-${PHRASES.max}`);
   const named = new Map<string, number>();
-  for (const { work } of phrases) {
+  for (const { work } of phrases) named.set(work, (named.get(work) ?? 0) + 1);
+  for (const [work, n] of named) {
     if (!works.has(work)) problems.push(`no such work: ${work}`);
-    named.set(work, (named.get(work) ?? 0) + 1);
+    if (n > 1) problems.push(`the sentence names ${work} ${n === 2 ? 'twice' : `${n} times`}`);
   }
-  for (const [work, n] of named) if (n > 1) problems.push(`the sentence names ${work} ${n === 2 ? 'twice' : `${n} times`}`);
+  // The share is printed with its counts, to a tenth, so a share just outside the band never prints inside it.
   const all = countWords(parts.map((x) => (typeof x === 'string' ? x : x.text)).join(''));
-  const share = all ? countWords(phrases.map((x) => x.text).join(' ')) / all : 0;
-  if (share < RED_SHARE.min || share > RED_SHARE.max)
-    problems.push(`the sentence is ${Math.round(share * 100)}% red, not ${Math.round(RED_SHARE.min * 100)}-${Math.round(RED_SHARE.max * 100)}%`);
+  const red = countWords(phrases.map((x) => x.text).join(' '));
+  const pct = all ? (100 * red) / all : 0;
+  if (pct < RED_PCT.min || pct > RED_PCT.max)
+    problems.push(`the sentence is ${red} of ${all} words red (${pct.toFixed(1)}%), not ${RED_PCT.min}-${RED_PCT.max}%`);
   return problems;
 }
 

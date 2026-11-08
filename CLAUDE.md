@@ -204,7 +204,7 @@ src/
   data/nav.ts                       # PAGES — the canonical page set (see Navigation)
   data/writing.ts                   # the writing TAXONOMY (KINDS) + buildKinds(), the one seam to the markdown
   data/artworks.ts                  # /art's works, keyed (photo-NN from the file; couplet, poem), + SENTENCE, the page's one sentence; photoNotes.ts holds each photograph's alt, title?, place?{name, confirmed} and year?
-  lib/artPage.ts                    # /art's pure half: the sentence's rules (sentenceProblems over phrasesOf: 5-7 phrases, each a different work that exists, 30-40% of its words red), a work's label line (labelLine), and the dark room's zoom: zoomAbout (to 6x, about a point), wheelScale (by distance, not per event), isDoubleTap
+  lib/artPage.ts                    # /art's pure half: the sentence's rules (sentenceProblems over phrasesOf: PHRASES phrases, each a different work that exists, RED_PCT of its words red), a work's label line (labelLine), and the dark room's zoom: zoomAbout (to 6x, about a point), wheelScale (by distance, not per event), isDoubleTap
   data/{define,desk,making,story}.ts # the homepage explainer's copy + numbers, per slide
   data/{cowGlyph,ruleGlyphs,tickerGlyphs}.ts # pixel-art matrices: the cow's and the slides'
   lib/deck.ts                       # pure deck stops: WHERE the homepage scroll may rest, what's next, and what one wheel event does (wheelAction)

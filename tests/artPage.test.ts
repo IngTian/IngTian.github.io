@@ -16,9 +16,13 @@ it('refuses fewer than five phrases', () => expect(msg([...ok.slice(0, 9), ' in 
 it('refuses more than seven', () => expect(sentenceProblems([...ok, ' and ', p('a fan', 'photo-01x'), ' and ', p('a seal', 'photo-02x')],
   new Set([...works, 'photo-01x', 'photo-02x'])).join()).toMatch(/\b8 phrases, not 5-7\b/));
 it('names a phrase whose work does not exist', () => expect(msg(ok.map((x) => typeof x !== 'string' && x.work === 'photo-04' ? p(x.text, 'photo-99') : x))).toMatch(/no such work: photo-99/));
+it('names a missing work once, however often the sentence names it', () => {
+  const twice = ok.map((x) => typeof x !== 'string' && ['photo-03', 'photo-04'].includes(x.work) ? p(x.text, 'photo-99') : x);
+  expect(sentenceProblems(twice, works)).toEqual(['no such work: photo-99', 'the sentence names photo-99 twice']);
+});
 it('names a work the sentence names twice', () => expect(msg(ok.map((x) => typeof x !== 'string' && x.work === 'photo-04' ? p(x.text, 'photo-03') : x))).toMatch(/names photo-03 twice/));
-it('refuses too little red', () => expect(msg([...ok.slice(0, -1), ' in ink, slowly, over many quiet winter evenings.'])).toMatch(/\b29% red, not 30-40%/));
-it('refuses too much red', () => expect(msg(ok.map((x) => typeof x !== 'string' && x.work === 'photo-04' ? p('blossoms of a cherry tree in spring', 'photo-04') : x))).toMatch(/\b45% red, not 30-40%/));
+it('refuses too little red', () => expect(msg([...ok.slice(0, -1), ' in ink, slowly, over many quiet winter evenings.'])).toMatch(/\b11 of 38 words red \(28\.9%\), not 30-40%/));
+it('refuses too much red', () => expect(msg(ok.map((x) => typeof x !== 'string' && x.work === 'photo-04' ? p('blossoms of a cherry tree in spring', 'photo-04') : x))).toMatch(/\b17 of 38 words red \(44\.7%\), not 30-40%/));
 it('prints the known fields only, in label order', () => {
   expect(labelLine({ title: 'Heron on a rock', medium: 'Photograph' })).toBe('Heron on a rock · Photograph');
   expect(labelLine({ medium: 'Photograph' })).toBe('Photograph');
