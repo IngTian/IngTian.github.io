@@ -9,7 +9,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import { Image, getImage } from 'astro:assets';
 import { SENTENCE, calligraphy, photography } from '../data/artworks';
 import {
-  CAL_WIDTHS, PHOTO_WIDTHS, calSizes, labelLine, matSizes, phrasesOf, rowSizes, sentenceProblems, type LabelFields,
+  CAL_WIDTHS, PHOTO_WIDTHS, calSizes, labelLine, matSizes, phrasesOf, rowSizes, sentenceProblems,
 } from '../lib/artPage';
 
 // EACH WORK'S NATIVE-PIXEL WEBP AND ITS SIZE, from one getImage() call: every work carries it as data-zoom, to be
@@ -26,17 +26,14 @@ const zoomOf = async (src: ImageMetadata) => {
   return { src: z.src, w, h };
 };
 
-// The page's one list of works. A label prints only the fields that are known (labelLine): a photograph's medium is
-// 'Photograph', and its title, place and year appear once they exist.
+// The page's one list of works; a label prints only the fields its record knows (labelLine).
 const photos = await Promise.all(photography.map(async (p) => {
   const z = await zoomOf(p.src);
-  const fields: LabelFields = { title: p.title, place: p.place, year: p.year, medium: 'Photograph' };
-  return { ...p, kind: 'photo' as const, fields, z, ar: z.w / z.h };
+  return { ...p, kind: 'photo' as const, z, ar: z.w / z.h };
 }));
 const cals = await Promise.all(calligraphy.map(async (c) => {
   const z = await zoomOf(c.src);
-  const fields: LabelFields = { title: c.title, script: c.script, medium: c.medium };
-  return { ...c, kind: 'cal' as const, fields, z, ar: z.w / z.h };
+  return { ...c, kind: 'cal' as const, z, ar: z.w / z.h };
 }));
 const works = [...photos, ...cals];
 type Work = (typeof works)[number];
@@ -52,7 +49,7 @@ const first = phrases[0].work;
 
 // What every opener carries: the native webp, its size, the alt and the label's one line.
 const darkData = (w: Work) => ({
-  'data-zoom': w.z.src, 'data-zw': w.z.w, 'data-zh': w.z.h, 'data-alt': w.alt, 'data-line': labelLine(w.fields),
+  'data-zoom': w.z.src, 'data-zw': w.z.w, 'data-zh': w.z.h, 'data-alt': w.alt, 'data-line': labelLine(w),
 });
 ---
 <BaseLayout
@@ -92,12 +89,12 @@ const darkData = (w: Work) => ({
                 </button>
               </div>
               <figcaption class="label">
-                {w.fields.title && <span class="l-title">{w.fields.title}</span>}
+                {w.title && <span class="l-title">{w.title}</span>}
                 <dl>
-                  {w.kind === 'photo' && w.fields.place && <div><dt>Place</dt><dd>{w.fields.place}</dd></div>}
-                  {w.kind === 'photo' && w.fields.year && <div><dt>Year</dt><dd>{w.fields.year}</dd></div>}
+                  {w.kind === 'photo' && w.place && <div><dt>Place</dt><dd>{w.place}</dd></div>}
+                  {w.kind === 'photo' && w.year && <div><dt>Year</dt><dd>{w.year}</dd></div>}
                   {w.kind === 'cal' && <div><dt>Script</dt><dd>{w.script} · <span lang="zh-Hant">{w.scriptZh}</span></dd></div>}
-                  <div><dt>Medium</dt><dd>{w.fields.medium}</dd></div>
+                  <div><dt>Medium</dt><dd>{w.medium}</dd></div>
                 </dl>
               </figcaption>
             </figure>
@@ -108,7 +105,7 @@ const darkData = (w: Work) => ({
       <section class="room" id="calligraphy" aria-labelledby="cal-h">
         <h2 id="cal-h">Calligraphy</h2>
         {cals.map((w) => (
-          <article class="obj" id={w.key} aria-label={w.title ? undefined : labelLine(w.fields)}>
+          <article class="obj" id={w.key} aria-label={w.title ? undefined : labelLine(w)}>
             <div class="obj-words">
               {w.titleZh && <p class="zh" lang="zh-Hant">{w.titleZh}</p>}
               {w.title && <h3>{w.title}</h3>}

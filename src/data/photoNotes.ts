@@ -54,7 +54,7 @@ export const photoNotes: Record<string, PhotoNote> = {
     title: 'Two canoeists on a turquoise lake' },
   'photo-24.jpg': { alt: 'A city skyline with a tall saucer-topped tower and a snow-capped mountain in the distance on a clear day',
     title: 'City skyline and a snow-capped peak', place: { name: 'Seattle', confirmed: false } },
-  'photo-25.jpg': { alt: 'Misty mountain hillside with sparse trees and rock face in monochrome grey tones',
+  'photo-25.jpg': { alt: 'A densely wooded mountainside in drifting mist, a bare rock face at its right, in muted grey-green tones',
     title: 'Mist on a wooded hillside' },
   'photo-26.jpg': { alt: 'Green rolling hills with scattered cattle grazing under overcast cloudy sky',
     title: 'Cattle grazing on green hills' },

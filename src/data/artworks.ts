@@ -8,7 +8,9 @@ import { photoNotes } from './photoNotes';
 import type { Phrase, SentencePart } from '../lib/artPage';
 
 /** `place` is the note's name, and only once the owner has confirmed it. */
-export interface Photo { key: string; src: ImageMetadata; alt: string; title?: string; place?: string; year?: string }
+export interface Photo {
+  key: string; src: ImageMetadata; alt: string; title?: string; place?: string; year?: string; medium: string;
+}
 export interface Calligraphy {
   key: string; src: ImageMetadata; alt: string; title?: string; titleZh?: string;
   script: string; scriptZh: string; medium: string; note?: string; treatment: 'stele' | 'paper';
@@ -25,7 +27,8 @@ export const calligraphy: Calligraphy[] = [
 ];
 
 // The photographs, in the order of their files, globbed so a new file is a new photograph. Per-photo copy comes from
-// photoNotes, keyed by file name; a file without an entry gets a generic alt and no label but its medium.
+// photoNotes, keyed by file name. The build refuses a photograph without an entry (its alt is required) and an entry
+// without a photograph, naming each.
 const photoFiles = import.meta.glob<{ default: ImageMetadata }>(
   '../assets/art/photos/*.{jpg,jpeg,JPG,JPEG}',
   { eager: true },
@@ -39,18 +42,23 @@ const photoKey = (file: string): string => {
   return key;
 };
 
+const orphans = Object.keys(photoNotes).filter((f) => !Object.keys(photoFiles).some((p) => p.endsWith(`/${f}`)));
+if (orphans.length) throw new Error(`artworks: photoNotes.ts describes no photograph: ${orphans.join(', ')}`);
+
 export const photography: Photo[] = Object.keys(photoFiles)
   .sort()
   .map((path) => {
     const file = path.split('/').pop() ?? '';
     const meta = photoNotes[file];
+    if (!meta) throw new Error(`artworks: ${file} has no entry in data/photoNotes.ts (an alt, at least)`);
     return {
       key: photoKey(file),
       src: photoFiles[path].default,
-      alt: meta?.alt ?? 'Photograph by Ing Tian',
-      title: meta?.title,
-      place: meta?.place?.confirmed ? meta.place.name : undefined,
-      year: meta?.year,
+      alt: meta.alt,
+      title: meta.title,
+      place: meta.place?.confirmed ? meta.place.name : undefined,
+      year: meta.year,
+      medium: 'Photograph',
     };
   });
 

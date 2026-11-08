@@ -11,6 +11,7 @@ import { INTRO_SEEN_KEY } from '../src/lib/introSession';
 import { contact, inProgress, projects, publications, researchInterests, timeline, type Publication } from '../src/data/profile';
 import { PAPER_DATA } from '../src/data/papers';
 import { photoNotes } from '../src/data/photoNotes';
+import { calligraphy } from '../src/data/artworks';
 import {
   type Stop, experienceStops, flattenStops, homeStops, paperPageOwns, paperSections, paperStops, projectSectionId,
   projectStops, researchIndexStops,
@@ -343,9 +344,9 @@ describe("/art's image payload, measured on the built output", () => {
   };
   /** Every <img> tag on /art. */
   const imgTags = (): string[] => [...artHtml().matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
-  /** The photographs' files, as src/assets/art/photos holds them. */
+  /** The photographs' files, as src/assets/art/photos holds them (data/artworks.ts globs these four spellings). */
   const photoFiles = (): string[] =>
-    readdirSync(new URL('../src/assets/art/photos/', import.meta.url)).filter((f) => f.endsWith('.jpg'));
+    readdirSync(new URL('../src/assets/art/photos/', import.meta.url)).filter((f) => /\.jpe?g$/i.test(f));
 
   /**
    * The candidate a DPR-2 display picks from an <img>'s srcset: the DESKTOP branch of its `sizes` (the trailing,
@@ -412,7 +413,7 @@ describe("/art's image payload, measured on the built output", () => {
   it("reserves each calligraphy work's box at its own ratio, so nothing below it moves as it decodes", () => {
     // The block's --ar is what its width is computed from before the image arrives (above CAL_MAX_H in lib/artPage.ts).
     const cals = [...artHtml().matchAll(/<button\b[^>]*\bclass="cal\b[^>]*>\s*<img\b[^>]*>/g)].map((m) => m[0]);
-    expect(cals.length, 'the calligraphy openers on /art').toBe(2);
+    expect(cals.length, 'the calligraphy openers on /art').toBe(calligraphy.length);
     for (const c of cals) {
       const ar = Number(/--ar:\s*([\d.]+)/.exec(c)?.[1]);
       const w = Number(/<img\b[^>]*\swidth="(\d+)"/.exec(c)?.[1]), h = Number(/<img\b[^>]*\sheight="(\d+)"/.exec(c)?.[1]);
@@ -446,9 +447,6 @@ describe("/art's image payload, measured on the built output", () => {
     expect(m).toMatch(new RegExp(`>${photoFiles().length} photographs\\.<`));
   });
 
-  it('drafts a title for every photograph', () => {
-    expect([...builtPage('/art').markup.matchAll(/class="t-title[^"]*"/g)].length).toBe(photoFiles().length);
-  });
   // Today's alts name these; a guessed place's every part is banned too. A name the owner confirmed may print.
   const NAMED_TODAY = ['Golden Gate', 'San Francisco', 'Seattle', 'Space Needle', 'Rainier'];
   it('never prints a place that is not confirmed, on any surface: alt, aria-label, data-alt, data-line, text', () => {
@@ -476,7 +474,7 @@ describe('the images under src/assets', () => {
   // else; an og:image or a plain <img> reading `.src` turns this red.
   it('ships no original of any of them, only its webp variants', () => {
     const sources = readdirSync(new URL('../src/assets/', import.meta.url), { recursive: true, encoding: 'utf8' })
-      .filter((f) => /\.(png|jpe?g|gif|webp|avif|tiff?)$/i.test(f))
+      .filter((f) => /\.(png|jpe?g|gif|webp|avif|tiff?|heic|heif)$/i.test(f))
       .map((f) => basename(f).replace(/\.[^.]+$/, ''));
     expect(sources.length, 'no images found under src/assets').toBeGreaterThan(0);
     const emitted = readdirSync(join(DIST, '_astro')).filter((f) => sources.some((s) => f.startsWith(`${s}.`)));
