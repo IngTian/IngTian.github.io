@@ -67,7 +67,9 @@ const S = {
   mat: vhCap(decl('', '.mat', 'height')), matPad: num(decl('', '.mat', 'padding')),
   matStacked: vhCap(decl(STACKED, '.mat', 'height')), matPadStacked: num(decl(STACKED, '.mat', 'padding')),
   matPhone: vhCap(decl(PHONE, '.mat', 'height')), matPadPhone: num(decl(PHONE, '.mat', 'padding')),
-  cal: vhCap(decl('', '.cal :global(img)', 'max-height')), objPadPhone: num(decl(PHONE, '.obj-mat', 'padding')),
+  // The block is its work's width at the height cap, min(100%, calc(var(--ar) * <cap>)): the cap is the inner min().
+  cal: vhCap(/^min\(100%, calc\(var\(--ar\) \* (min\([^)]*\))\)\)$/.exec(decl('', '.cal', 'width') ?? '')?.[1]),
+  objPadPhone: num(decl(PHONE, '.obj-mat', 'padding')),
   calInsetPhone: num(/calc\(100vw - (\d+)px\)/.exec(frontmatter)?.[1]),
 };
 
@@ -105,7 +107,7 @@ describe("/art's `sizes` hints", () => {
     // If one fails, the constant and the stylesheet have drifted: change both, in the same commit.
     expect(C.ROW_H, ".rows' --row-h").toBe(S.rowH);
     expect(C.ROW_H_PHONE, ".rows' --row-h at 640px").toBe(S.rowHPhone);
-    expect(C.CAL_MAX_H, ".cal img's max-height, its px arm").toBe(S.cal![1]);
+    expect(C.CAL_MAX_H, ".cal's height cap, its px arm").toBe(S.cal![1]);
     // the mat's image box is its height cap less its padding, above and below (border-box)
     expect(C.MAT_H, ".mat's height cap less 2 x its padding").toBe(S.mat![1] - 2 * S.matPad!);
     expect(C.MAT_H_STACKED, 'the same at 900px').toBe(S.matStacked![1] - 2 * S.matPadStacked!);
@@ -165,6 +167,17 @@ describe("/art's `sizes` hints", () => {
       .toBeLessThanOrEqual(1);
     expect(sweep(range(320, 640), content, S.matPhone!, S.matPadPhone!, c.MAT_H_PHONE, c.MAT_W_PHONE), 'phone')
       .toBeLessThanOrEqual(1);
+  });
+
+  it("reserves each calligraphy work's box from its ratio, before the image decodes", () => {
+    // The block's width comes from --ar and the cap, and the image fills it: an image sized by its own width inside
+    // the shrink-to-fit button is 0px wide until it decodes, which put the photographs ~1,400px higher at first layout,
+    // inside Chrome's lazy-load margin (the note above CAL_MAX_H in art.astro). A max-height on a 100%-wide image would
+    // squash it rather than narrow it, so the cap lives in the width alone.
+    expect(decl('', '.cal :global(img)', 'width'), '.cal img width').toBe('100%');
+    expect(decl('', '.cal :global(img)', 'height'), '.cal img height').toBe('auto');
+    expect(decl('', '.cal :global(img)', 'max-height'), '.cal img max-height').toBeUndefined();
+    expect(artPage, "the block's --ar").toMatch(/class:list=\{\['cal', w\.treatment\]\} style=\{`--ar:\$\{w\.ar\.toFixed\(4\)\}`\}/);
   });
 
   it('never under-declares a calligraphy block, at any viewport or window height', () => {

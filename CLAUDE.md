@@ -153,7 +153,14 @@ rather than add.
   - **Only the first mat image is eager** (photo-23's 900w, 181,642 B), with `fetchpriority="high"`; both
     calligraphy works and every photograph are lazy. `tests/distSmoke.test.ts` sums the eager images a DPR-2
     browser picks, at most 300 KB, the first-load goal as the spec measures it. A real first load also fetches
-    what the browser's lazy-load margin reaches; its goal is 400 KB, measured in the browser.
+    what the browser's lazy-load margin reaches; its goal is 400 KB, measured in the browser: at 1440×900 DPR 2,
+    headless Chrome 157 transferred 399,198 B of images (the mat's photograph, the couplet's 900w and the poem's
+    1080w) and no photograph, as the rows start ~3,070px down.
+  - **A lazy work reserves its box before it decodes**, or everything under it starts higher and the lazy-load
+    margin reaches it. The calligraphy blocks, sized by their images inside shrink-to-fit buttons, were 2px tall
+    at first layout, so the first load also fetched seven photographs (988,428 B in all). A block's width now
+    comes from its work's ratio (`--ar`) at the height cap, as a tile's does; `tests/artSizes.test.ts` holds the
+    rule and `tests/distSmoke.test.ts` each block's ratio.
   - **Read an image's size from `getImage()`, never off its `ImageMetadata`.** The import is a Proxy, and
     reading any property of it but `clone` or `fsPath` keeps the original in `dist`. /art's `.width` and
     `.height` reads kept all 44 JPEGs there (40,525,788 B, 55% of a 74.3 MB artifact, referenced by nothing;

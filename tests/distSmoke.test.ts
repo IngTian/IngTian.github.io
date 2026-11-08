@@ -409,6 +409,18 @@ describe("/art's image payload, measured on the built output", () => {
     expect(arms.filter((a) => !/^\d+px$/.test(a ?? ''))).toEqual([]);
   });
 
+  it("reserves each calligraphy work's box at its own ratio, so nothing below it moves as it decodes", () => {
+    // The block's --ar is what its width is computed from before the image arrives (above CAL_MAX_H in art.astro).
+    const cals = [...artHtml().matchAll(/<button\b[^>]*\bclass="cal\b[^>]*>\s*<img\b[^>]*>/g)].map((m) => m[0]);
+    expect(cals.length, 'the calligraphy openers on /art').toBe(2);
+    for (const c of cals) {
+      const ar = Number(/--ar:\s*([\d.]+)/.exec(c)?.[1]);
+      const w = Number(/<img\b[^>]*\swidth="(\d+)"/.exec(c)?.[1]), h = Number(/<img\b[^>]*\sheight="(\d+)"/.exec(c)?.[1]);
+      expect(w * h, `no width/height on ${c.slice(0, 80)}`).toBeGreaterThan(0);
+      expect(ar, `--ar of ${c.slice(0, 80)}`).toBeCloseTo(w / h, 3);
+    }
+  });
+
   it('serves every lightbox source as a processed webp, not the untouched original', () => {
     // Native pixels, for the 6x zoom, in a webp: the JPEG original cost 0.6-2.2 MB per open (see zoomOf()).
     const zooms = [...artHtml().matchAll(/data-zoom="([^"]+)"/g)].map((m) => m[1]);

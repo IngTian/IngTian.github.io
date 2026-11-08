@@ -71,10 +71,15 @@ const MAT_W_PHONE = 544;
 const ROW_H = 280;
 const ROW_H_PHONE = 150;
 const ROW_W = 1096;
-// THE CALLIGRAPHY. .cal img is height-capped, its max-height's px arm 820 (CAL_MAX_H), so a work is at most
-// 820 * ar px wide at any window height: 414 for the 1727x3422 stele, whose 900w (142,128 B) covers the 828 device
-// px DPR 2 asks for, where a `40vw` hint once fetched the 1200w (396,030 B). On a phone it is the column less the
-// block's mat, at most 100vw less 2 x 22px of side and 2 x 16px of padding.
+// THE CALLIGRAPHY. A block is its work's width at the height cap, min(82vh, 820px), whose px arm is 820 (CAL_MAX_H),
+// and never wider than its mat, so a work is at most 820 * ar px wide at any window height: 414 for the 1727x3422
+// stele, whose 900w (142,128 B) covers the 828 device px DPR 2 asks for, where a `40vw` hint once fetched the 1200w
+// (396,030 B). On a phone it is the column less the block's mat, at most 100vw less 2 x 22px of side and 2 x 16px of
+// padding. That width comes from the work's ratio (--ar), as a tile's does, so the box exists before the image
+// decodes: sized by the image instead, inside its shrink-to-fit button, each work was 0px wide until it arrived, both
+// blocks were 2px tall at first layout, the photographs sat ~1,400px higher than at rest, and Chrome's lazy-load
+// margin fetched the first seven of them with the page: 988,428 B of images transferred at 1440x900 DPR 2, against
+// 399,198 B with the box reserved (the mat's photograph, the couplet's 900w and the poem's 1080w; headless Chrome 157).
 const CAL_MAX_H = 820;
 // THE WIDTHS, never a native one (the stele's 1727w was a 1342 KB webp on the LCP image). The calligraphy keeps
 // 1200 because a DPR-3 phone at ~346 CSS px asks for ~1038 device px of the stele. The mat reuses both, so it adds
@@ -158,7 +163,8 @@ const darkData = (w: Work) => ({
               </dl>
             </div>
             <div class="obj-mat">
-              <button type="button" class:list={['cal', w.treatment]} aria-label={`View full screen: ${w.alt}`} {...darkData(w)}>
+              <button type="button" class:list={['cal', w.treatment]} style={`--ar:${w.ar.toFixed(4)}`}
+                      aria-label={`View full screen: ${w.alt}`} {...darkData(w)}>
                 <Image src={w.src} alt={w.alt} widths={CAL_WIDTHS} sizes={calSizes(w.ar)} loading="lazy" decoding="async" />
               </button>
             </div>
@@ -263,8 +269,12 @@ const darkData = (w: Work) => ({
   .obj h3 { font-family: var(--font-display); font-weight: 400; font-size: 28px; line-height: 1.2; color: var(--ink-1); margin: 4px 0 14px; }
   .obj-words dl { display: grid; gap: 6px; }
   .obj-mat { display: flex; justify-content: center; padding: 32px; background: var(--mat); }
-  .cal { padding: 0; border: 0; background: none; line-height: 0; cursor: zoom-in; }
-  .cal :global(img) { display: block; width: auto; max-width: 100%; max-height: min(82vh, 820px); }
+  /* The block is the work's width at the height cap, from its ratio, and the image fills it, so its box exists before
+     the image decodes (the note above CAL_MAX_H). No max-height on the image: on a 100%-wide one it would squash the
+     work rather than narrow it. */
+  .cal { width: min(100%, calc(var(--ar) * min(82vh, 820px))); padding: 0; border: 0; background: none; line-height: 0;
+    cursor: zoom-in; }
+  .cal :global(img) { display: block; width: 100%; height: auto; }
   /* No shadow (the Met's rule): the stele's black ground already stands off the pale mat, and a hairline edge keeps
      it off the dark mat too, as it does the work on paper. */
   .stele :global(img), .paper :global(img) { border: 1px solid rgba(var(--hairline-rgb), 0.25); }
