@@ -62,10 +62,9 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
     top: 50%;
     transform: translateY(-50%);
     z-index: 30;
-    /* 200px, and the last 10px are load-bearing: the longest label in the data, "University of Toronto" (the PhD
-       institution), needs 151px, and a nested label gets 200 - 30 - 12 = 158. At 190 it rendered as
-       "UNIVERSITY OF TORON…". Widening beats tightening the tracking, which would change the rail's type
-       everywhere to fix one string. */
+    /* 200px, and the last 10px are load-bearing: a nested label gets 200 - 30 - 12 = 158, which writingStops
+       (lib/pageStops.ts) sizes its 18-character cut to. Widening beats tightening the tracking, which would change
+       the rail's type everywhere to fix one string. */
     max-width: 200px;
     padding-left: 30px;
     /* The dash's strength: ink-1 at 55% clears 3:1 as a mark on every rail page's ground (worst computed, 3.21:1
@@ -165,8 +164,8 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
      CSS, so it runs from the first frame with nothing to wait for, and the backwards fill holds each row in its
      from-state through its delay. A CSS animation restarts when its element is rendered again, so a rail hidden at
      1100px and below runs it when it first shows, and a row the script hid (its target stopped rendering) replays its
-     own when it shows again; today no rail page hides a target wider than 1100px. On a page with a veil (/writing,
-     /experience) most of it plays under the veil's wipe. On `/` the rail is off the hero (hideOver), so it plays as the
+     own when it shows again; today no rail page hides a target wider than 1100px. On a page with a veil (/writing)
+     most of it plays under the veil's wipe. On `/` the rail is off the hero (hideOver), so it plays as the
      reader leaves the hero, and again each time they come back down past it. */
   @media (prefers-reduced-motion: no-preference) {
     .side-rail a {

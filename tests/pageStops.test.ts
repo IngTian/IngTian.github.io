@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import {
-  projectStops, projectSectionId, experienceStops, railLabel, homeStops, flattenStops, fragmentId, paperPageOwns, paperSections,
+  projectStops, projectSectionId, experienceSectionId, experienceStops, homeStops, flattenStops, fragmentId, paperPageOwns,
+  paperSections,
   paperStops, researchIndexStops, PAPER_END, type Stop,
 } from '../src/lib/pageStops';
 import { refId } from '../src/lib/paperMarkdown';
-import type { TimelineEntry } from '../src/data/profile';
-import { projects, timeline } from '../src/data/profile';
+import type { Organisation } from '../src/data/profile';
+import { organisations, projects } from '../src/data/profile';
 
 /** Every target in the tree, in document order. */
 function targets(stops: Stop[]): string[] {
@@ -34,87 +35,27 @@ describe('projectStops', () => {
 });
 
 describe('experienceStops', () => {
-  const entry = (over: Partial<TimelineEntry> = {}): TimelineEntry => ({
-    period: '2020', title: 'Role · Somewhere', detail: 'did things', kind: 'work', ...over,
-  });
+  const org = (key: string, rail: string): Organisation => ({ key, name: key, rail, tagline: '', facts: [] });
 
-  it('puts Education before Roles', () => {
-    // The site's identity hierarchy is load-bearing: the incoming PhD must not sit below
-    // nine engineering jobs. Education leading is a requirement, not a preference.
-    const stops = experienceStops([
-      entry({ title: 'Job · TikTok' }),
-      entry({ title: 'PhD · Toronto', kind: 'education' }),
+  it('is one stop per organisation, in its order, then Recognition', () => {
+    expect(experienceStops([org('uoft', 'U of T'), org('ea', 'EA')])).toEqual([
+      { label: 'U of T', target: 'x-uoft' },
+      { label: 'EA', target: 'x-ea' },
+      { label: 'Recognition', target: 'x-recognition' },
     ]);
-    expect(stops.map((s) => s.label)).toEqual(['Education', 'Roles']);
   });
 
-  it('nests each entry under its group', () => {
-    const stops = experienceStops([
-      entry({ title: 'A · Alpha' }),
-      entry({ title: 'B · Beta', kind: 'education' }),
-      entry({ title: 'C · Gamma' }),
-    ]);
-    const edu = stops.find((s) => s.label === 'Education')!;
-    const work = stops.find((s) => s.label === 'Roles')!;
-    expect(edu.children?.map((c) => c.label)).toEqual(['Beta']);
-    expect(work.children?.map((c) => c.label)).toEqual(['Alpha', 'Gamma']);
-  });
-
-  it('keeps each stop pointing at its ORIGINAL index, not its position in the group', () => {
-    // The page renders ids from the unfiltered array, so grouping must not renumber. This is
-    // the /research bug in a new costume: a rail stop pointing at an id nobody emitted.
-    const stops = experienceStops([
-      entry({ title: 'A · Alpha' }),                        // index 0 -> x-0
-      entry({ title: 'B · Beta', kind: 'education' }),      // index 1 -> x-1
-      entry({ title: 'C · Gamma' }),                        // index 2 -> x-2
-    ]);
-    const edu = stops.find((s) => s.label === 'Education')!;
-    const work = stops.find((s) => s.label === 'Roles')!;
-    expect(edu.children?.map((c) => c.target)).toEqual(['x-1']);
-    expect(work.children?.map((c) => c.target)).toEqual(['x-0', 'x-2']);
-  });
-
-  it('omits a group that has no entries', () => {
-    const stops = experienceStops([entry()]);
-    expect(stops.map((s) => s.label)).toEqual(['Roles']);
-  });
-
-  it('returns nothing for an empty timeline', () => {
-    expect(experienceStops([])).toEqual([]);
-  });
-
-  it('emits a unique target for every stop', () => {
-    const all = targets(experienceStops(timeline));
+  it('leads with the incoming PhD, and gives the real record a unique target per stop', () => {
+    // The identity hierarchy is load-bearing: the PhD must not sit below the engineering roles.
+    const stops = experienceStops(organisations);
+    expect(stops[0].target).toBe(experienceSectionId('uoft'));
+    const all = targets(stops);
     expect(new Set(all).size).toBe(all.length);
   });
-});
 
-describe('railLabel', () => {
-  it('keeps the institution, not the job title', () => {
-    // A thin margin cannot hold "Senior Software Engineer · TikTok"; the institution is the
-    // part a reader scans for.
-    expect(railLabel({ period: '', title: 'Senior Software Engineer · TikTok', detail: '', kind: 'work' }))
-      .toBe('TikTok');
-  });
-
-  it('falls back to the whole title when there is no separator', () => {
-    expect(railLabel({ period: '', title: 'Independent', detail: '', kind: 'work' }))
-      .toBe('Independent');
-  });
-
-  it('truncates anything too long for the rail', () => {
-    const label = railLabel({
-      period: '', kind: 'education', detail: '',
-      title: 'Incoming PhD, Operations Research · University of Toronto and Also Somewhere Else',
-    });
-    expect(label.length).toBeLessThanOrEqual(24);
-    expect(label.endsWith('…')).toBe(true);
-  });
-
-  it('never returns an empty label for the real timeline', () => {
-    for (const t of timeline) {
-      expect(railLabel(t).trim().length, t.title).toBeGreaterThan(0);
-    }
+  it("keeps every label within /projects' longest, as the page clears the rail by /projects' padding", () => {
+    const longest = Math.max(...flattenStops(projectStops(projects)).map((s) => s.label.length));
+    for (const s of experienceStops(organisations)) expect(s.label.length, s.label).toBeLessThanOrEqual(longest);
   });
 });
 
