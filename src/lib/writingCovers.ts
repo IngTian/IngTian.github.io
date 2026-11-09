@@ -358,6 +358,20 @@ const COMPUTED = ['allocation', 'contours', 'regression', 'impact', 'tails', 'dr
 export const FIGURES = [...COMPUTED, 'quote'] as const;
 export type Figure = (typeof FIGURES)[number];
 
+/** Each figure's own colours, which a card's cover cross-fades into on hover or keyboard focus (Cover.astro's
+ *  `hover`): its main ink and its secondary ink, per sheet; the faint role is the secondary's wash, and the seal stays
+ *  the seal, the point of the picture. One hue a figure, as /experience gives each organisation its logo's. */
+export const FIGURE_HUES: Record<Figure, { light: { ink: string; mid: string }; dark: { ink: string; mid: string } }> = {
+  allocation: { light: { ink: '#9a5f12', mid: '#c4914a' }, dark: { ink: '#e8b45c', mid: '#b3884a' } },   // amber
+  contours: { light: { ink: '#1d6b66', mid: '#5b9f99' }, dark: { ink: '#63c7bd', mid: '#3f8f88' } },     // teal
+  regression: { light: { ink: '#343f8c', mid: '#707ab6' }, dark: { ink: '#97a1ec', mid: '#6a74b8' } },   // indigo
+  impact: { light: { ink: '#6a3c8c', mid: '#9a77b6' }, dark: { ink: '#c8a2e8', mid: '#9476b6' } },       // plum
+  tails: { light: { ink: '#2e4d6d', mid: '#6c88a4' }, dark: { ink: '#94b6d8', mid: '#66829e' } },        // slate
+  drawdown: { light: { ink: '#2d6b40', mid: '#679e78' }, dark: { ink: '#74d095', mid: '#4f9a6a' } },     // green
+  pipeline: { light: { ink: '#2a5ba5', mid: '#6a8ec4' }, dark: { ink: '#84b4f2', mid: '#5d86c0' } },     // cobalt
+  quote: { light: { ink: '#6a4829', mid: '#9a7855' }, dark: { ink: '#ddb88e', mid: '#a88b68' } },        // sepia
+};
+
 /** The viewBox each surface draws a cover at (components/writing/Cover.astro's `size`): a card, the index's lead, a
  *  piece's banner. */
 export const COVER_SIZES = { card: [400, 250], lead: [640, 400], banner: [1200, 360] } as const;

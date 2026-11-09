@@ -203,7 +203,7 @@ src/
   lib/wealth.ts                     # the one wealth module: growth of $1, CAGR, drawdown, the band of runs, WealthSeries (the prepared series every picture of a run reads; REPRO is RL-BHRP's), scales and ticks — the paper page's figures and /projects' rl-bhrp picture
   lib/words.ts                      # the one word counter (countWords, readingMinutes) + wholeParts, the one rule for what never breaks across a line ("RL-BHRP")
   lib/dates.ts                      # the one date helper: longDate, monthYear (UTC)
-  lib/motionTiming.ts               # the motion module's pure half: every curve (EASE, DRAW, SWEEP, FADE, WITHDRAW) and duration (REVEAL, RAIL, PAPER_PAGE, CARD, ART, EXPERIENCE, MOVE_MAX) the rail, the research routes, /art and /experience move by, stagger and the paper page's batches (highlightDelay, arrowDelay), sweepDurations, mergeLines
+  lib/motionTiming.ts               # the motion module's pure half: every curve (EASE, DRAW, SWEEP, FADE, WITHDRAW) and duration (REVEAL, RAIL, PAPER_PAGE, CARD, ART, EXPERIENCE, WRITING, MOVE_MAX) the rail, the research routes, /art, /experience and /writing move by, stagger and the paper page's batches (highlightDelay, arrowDelay), sweepDurations, mergeLines
   scripts/motion.ts                 # THE ONE MOTION MODULE, its DOM half: play, onceSeen, riseOnceSeen, sweepLines — the rail and both research routes; the reduced-motion gate is inside it
   scripts/pageView.ts               # onPageView(selector, init): starts eleven scripts right after parse, not at window `load` (see Interactivity)
   scripts/beats.ts, lib/beats.ts    # walkBeats: the beat walk the three explainer slides share (timer, freeze on a click or an arrow, the observer at 0.3, the reduced-motion rest, the teardown); arrowBeat, its key map, is the pure half
@@ -216,7 +216,7 @@ src/
   data/writing.ts                   # the writing TAXONOMY (KIND_KEYS, KINDS), CHARTER, SEARCH_FROM + pieces(), the one seam to the markdown (reading time, cover, search text), leadAndRest, neighbours
   pages/writing.astro, writing/[...slug].astro # /writing (the header, the lead, the cards, the search from SEARCH_FROM pieces) and one piece's page
   components/writing/{Cover,PieceCard}.astro   # a cover in its frame (the CSS half of its class contract) and the one card: the grid's, a piece's foot's, and the index's lead
-  lib/writingCovers.ts              # a piece's cover: FIGURES, seven computed and named for what they draw (allocation, contours, regression, impact, tails, drawdown, pipeline) and `quote`, a commonplace book's emblem; coverSvg, figureFor (the frontmatter's, else a computed one by the slug's hash)
+  lib/writingCovers.ts              # a piece's cover: FIGURES, seven computed and named for what they draw (allocation, contours, regression, impact, tails, drawdown, pipeline) and `quote`, a commonplace book's emblem; FIGURE_HUES, each figure's hover colours; coverSvg, figureFor (the frontmatter's, else a computed one by the slug's hash)
   lib/writingSearch.ts              # the /writing search's pure half: fold (case, accents, curly quotes) and shows (a kind, AND-matched words)
   data/artworks.ts                  # /art's works, keyed (photo-NN from the file; couplet, poem), + SENTENCES, the page's sentences in turn order; photoNotes.ts holds each photograph's alt, title?, place?{name, confirmed} and year?
   lib/artPage.ts                    # /art's pure half: each sentence's rules (sentenceProblems over phrasesOf: PHRASES phrases, each a different work that exists, RED_PCT of its words red) and its turn's hold (holdMs), a work's label line (labelLine), the three sizes hints (matSizes, rowSizes, calSizes) and their constants, and the dark room's zoom: zoomAbout (to 6x, about a point), wheelScale (by distance, not per event), isDoubleTap
@@ -341,10 +341,11 @@ it gets the finished page (`tests/distSmoke.test.ts` fails on a hold-back outsid
   at once and `onceSeen` holds nothing back. A teardown finishes every live animation.
   - **Every curve and duration they move by is stated once, in `lib/motionTiming.ts`**, and a script imports it; it
     states /art's two too (`ART`: the mat's swap, which the sentences' turn shares, and a photograph's one fade), and
-    /experience's (`EXPERIENCE`: a mark's cross-fade into its colours and its enlarged mark's fade), though both pages
-    move by CSS transitions and not through `scripts/motion.ts`. A sentence's hold is no move and is not here (*Taste
-    rules*). CSS cannot import them, so `tests/motionTiming.test.ts` reads each transition and animation declaration,
-    shorthand or longhand, in `SideRail.astro`'s, the two research pages', `art.astro`'s and `experience.astro`'s
+    /experience's (`EXPERIENCE`: a mark's cross-fade into its colours and its enlarged mark's fade) and /writing's
+    (`WRITING`: a card's cover crossing into its figure's colours), though those pages move by CSS transitions and not
+    through `scripts/motion.ts`. A sentence's hold is no move and is not here (*Taste rules*). CSS cannot import them,
+    so `tests/motionTiming.test.ts` reads each transition and animation declaration, shorthand or longhand, in
+    `SideRail.astro`'s, the two research pages', `art.astro`'s, `experience.astro`'s and `writing/Cover.astro`'s
     `<style>` blocks and `styles/paper.css`, and holds it to its constant, in order: a literal added there without one
     fails by name. In those scripts and `scripts/motion.ts` it fails a curve written out (`cubic-bezier(`, or a
     keyword such as `'ease-out'`; `'linear'` is no curve), and a number of ms of two digits or more after
@@ -490,7 +491,8 @@ and reverted every time** — do not rebuild it. The phone treatment is *bug fix
     reports "nothing moves when it speaks" while the cow moves: assert the cow's rect for every line.
 - on **/experience**, a panel's three columns become two at 1100px (the work under both) and one at 640px; its
   colours on hover are a pointer's (`(hover: hover)`) or a keyboard focus's;
-- on **/writing**, the cards' three columns become two at 1100px and one at 640px, as do a piece's neighbours; at
+- on **/writing**, the cards' three columns become two at 1100px and one at 640px, a piece's neighbours two across
+  and one at 640px, and a cover's colours on hover are a pointer's or a keyboard focus's; at
   640px the lead sets its cover above its words, the search takes the row, a piece's banner is 2:1 (the slice keeps
   its middle) and its body steps down to 17px; the `/` shortcut's key cap is a pointer's (`(hover: none)` hides it);
 - on **/art**, at 900px and under the sentences come first, their numbers and Pause under them, then the mat, so a
@@ -1080,7 +1082,7 @@ of sky over a full-bleed panel.
   `--c-h*` and `--c-p*`, and Story's two graph-line tones, `--story-line` and `--story-line-soft`. /art's dark
   room, dark in both themes, holds its own inks (`--room*` on `.dark`), held by `tests/paperPalette.test.ts`. Beyond
   those, a component may hold a literal for a drawing of its own (the cow's coat, a logo's colours in
-  `data/experienceMarks.ts`).
+  `data/experienceMarks.ts`, a cover's hues in `lib/writingCovers.ts`).
   - **An undeclared `var()` voids the whole shorthand** (every longhand falls back to its initial, and
     `border-style`'s is `none`): the old /experience's dividers never drew against an undefined `--rule`.
     `tests/cssVars.test.ts` fails on any `var(--x)` without a fallback that
@@ -1099,7 +1101,9 @@ of sky over a full-bleed panel.
   - **One exception to both, the owner's ask** ("add some colors when hovering the icon"): on /experience a panel's
     hover or keyboard focus turns its mark into its logo's own colours, read from the logo file, in either theme (a
     black or navy role takes white on the dark sheet); the independent panel, which has no logo, takes a green of its
-    own (`data/experienceMarks.ts`).
+    own (`data/experienceMarks.ts`). /writing's cards do the same on the owner's ask ("the same kind of hovering
+    effect"): a card's cover fades from the sheet's inks into its figure's own hues (`FIGURE_HUES` in
+    `lib/writingCovers.ts`), one hue a figure, the seal kept as the picture's point.
 - **Motion:** animate only `transform` / `opacity`; NEVER animate `filter: blur` (bake it). ALL motion is gated
   behind `@media (prefers-reduced-motion: no-preference)` via `lib/motion.ts`. The no-motion state must look
   *finished* — it's also the Firefox fallback (`animation-timeline` isn't in Firefox yet), and what a

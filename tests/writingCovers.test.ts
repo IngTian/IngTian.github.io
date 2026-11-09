@@ -1,7 +1,7 @@
 // tests/writingCovers.test.ts
 // The writing covers (lib/writingCovers.ts): computed pictures, held to the class contract the page colours them by.
 import { describe, expect, it } from 'vitest';
-import { COVER_SIZES, FIGURES, coverSvg, figureFor } from '../src/lib/writingCovers';
+import { COVER_SIZES, FIGURES, FIGURE_HUES, coverSvg, figureFor } from '../src/lib/writingCovers';
 
 // The three sizes the pages draw (a card, the index's lead, a piece's banner), as Cover.astro reads them.
 const SIZES = Object.values(COVER_SIZES);
@@ -76,6 +76,17 @@ describe('coverSvg', () => {
         }
       }
     }
+  });
+});
+
+describe('FIGURE_HUES', () => {
+  it('gives every figure its own ink and secondary colour, on the light sheet and the dark', () => {
+    for (const f of FIGURES) {
+      for (const sheet of ['light', 'dark'] as const) {
+        for (const role of ['ink', 'mid'] as const) expect(FIGURE_HUES[f][sheet][role], `${f} ${sheet} ${role}`).toMatch(/^#[0-9a-f]{6}$/);
+      }
+    }
+    expect(new Set(FIGURES.map((f) => FIGURE_HUES[f].light.ink)).size, 'one hue a figure').toBe(FIGURES.length);
   });
 });
 

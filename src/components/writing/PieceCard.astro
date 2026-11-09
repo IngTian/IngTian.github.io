@@ -4,7 +4,9 @@
 // same card at the head of the page: its cover left and its words right, its reading time in the meta line, and a
 // Read button. The title's link covers the card, so the whole card is one target; the lead's Read sits above it.
 // The card carries its kind and its folded words (data-k, data-q) for the index's search (pages/writing.astro).
-// No motion of its own: a hover changes a border and an underline, at once.
+// Its hover, or a keyboard's focus inside it, fades its cover into its figure's own colours (Cover.astro's
+// `hover`, as /experience's panels do their marks), underlines the title and darkens the cover's frame; nothing
+// moves on its own.
 import { KINDS, type Piece } from '../../data/writing';
 import { longDate } from '../../lib/dates';
 import Button from '../Button.astro';
@@ -15,7 +17,7 @@ const { piece: p, lead = false, dir } = Astro.props;
 ---
 {lead ? (
   <article class="wc wc-lead" data-q={p.q} data-k={p.kind}>
-    <Cover figure={p.figure} seed={p.slug} size="lead" />
+    <Cover figure={p.figure} seed={p.slug} size="lead" hover />
     <div class="wc-text">
       <p class="wc-kind">{KINDS[p.kind].label}</p>
       <h2 class="wc-t"><a href={p.href}>{p.title}</a></h2>
@@ -27,7 +29,7 @@ const { piece: p, lead = false, dir } = Astro.props;
 ) : (
   <li class="wc" data-q={p.q} data-k={p.kind}>
     {dir && <p class="wc-dir">{dir}</p>}
-    <Cover figure={p.figure} seed={p.slug} size="card"><span class="wc-min">{p.minutes} min</span></Cover>
+    <Cover figure={p.figure} seed={p.slug} size="card" hover><span class="wc-min">{p.minutes} min</span></Cover>
     <p class="wc-kind">{KINDS[p.kind].label}</p>
     <h2 class="wc-t"><a href={p.href}>{p.title}</a></h2>
     <p class="wc-blurb">{p.blurb}</p>
@@ -53,7 +55,10 @@ const { piece: p, lead = false, dir } = Astro.props;
   @media (hover: hover) {
     .wc:hover :global(.wcv) { border-color: rgba(var(--hairline-rgb), 0.6); }
     .wc:hover .wc-t a { text-decoration: underline 1px; text-underline-offset: 0.16em; }
+    .wc:hover :global(.wcv-hue) { opacity: 1; }
   }
+  /* a keyboard's focus lights the card as a hover does; a click's focus does not */
+  .wc:has(:focus-visible) :global(.wcv-hue) { opacity: 1; }
 
   /* ── the lead: cover left, words right ── */
   .wc-lead { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 48px; align-items: center; }
