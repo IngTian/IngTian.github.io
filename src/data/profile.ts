@@ -50,7 +50,7 @@ export interface Publication {
 export interface Award {
   year?: string;
   title: string;
-  gloss?: string;     // what an abbreviation stands for
+  gloss?: string;     // what an abbreviation stands for, or what the result was
 }
 
 export interface ResearchInterest {
@@ -218,13 +218,14 @@ export const organisations: Organisation[] = [
     ] },
 ];
 
+// Newest first, as the owner's LinkedIn (Honors & awards) records them; COMC's year and score are not on record.
 export const awards: Award[] = [
-  { year: '2021', title: 'IEEExtreme — Top 4 teams in Canada' },
+  { year: '2021', title: 'IEEExtreme 15.0 — Top 4 in Canada' },
   { year: "'21–'22", title: 'Hatch Scholarships ($10k) · McGill' },
   { year: '2020', title: 'Rio Tinto–Richards Evans Exchange Award · McGill' },
+  { year: '2018', title: 'AMC 12 — National Honour Roll', gloss: 'top 5% of entrants, qualified for the AIME' },
+  { year: '2018', title: 'CCC — National top 200', gloss: 'Canadian Computing Competition, University of Waterloo' },
   { title: 'COMC', gloss: 'Canadian Open Mathematics Challenge' },
-  { title: 'CCC', gloss: 'Canadian Computing Competition' },
-  { title: 'AIME', gloss: 'American Invitational Mathematics Examination' },
 ];
 
 // witness's release count: hand-maintained, not fetched at build time (that needs the network); counted 2026-11-02.
