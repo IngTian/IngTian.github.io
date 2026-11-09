@@ -6,6 +6,7 @@
 // header (its kind, title, the blurb as its standfirst, its dates and computed reading time), its cover as a wide
 // banner, the body, and at its foot the pieces either side of it in date order, as the index's cards.
 import { getCollection, render } from 'astro:content';
+import '../../styles/writing.css';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Cover from '../../components/writing/Cover.astro';
 import PieceCard from '../../components/writing/PieceCard.astro';
@@ -27,7 +28,7 @@ const { piece: p, entry, around } = Astro.props;
 const { Content } = await render(entry);
 ---
 <BaseLayout title={`${p.title} — Ing Tian`} description={p.blurb} page="paper" veil={false}>
-  <main class="wp">
+  <main class="wsheet wp">
     <article>
       <header class="wp-head">
         <a class="back" href="/writing">← writing</a>
@@ -40,13 +41,13 @@ const { Content } = await render(entry);
           · {p.minutes} min read
         </p>
       </header>
-      <div class="wp-banner"><Cover figure={p.figure} seed={p.slug} w={1200} h={360} banner /></div>
+      <div class="wp-banner"><Cover figure={p.figure} seed={p.slug} size="banner" /></div>
       <div class="wp-body"><Content /></div>
     </article>
 
     {(around.prev || around.next) && (
       <nav class="wp-around" aria-label="More writing">
-        <ul role="list">
+        <ul class="wgrid" role="list">
           {around.prev && <PieceCard piece={around.prev} dir="← Previous" />}
           {around.next && <PieceCard piece={around.next} dir="Next →" />}
         </ul>
@@ -56,7 +57,7 @@ const { Content } = await render(entry);
 </BaseLayout>
 
 <style>
-  .wp { max-width: 1240px; margin: 0 auto; padding: 15vh clamp(22px, 5vw, 72px) 96px; font-family: var(--font-body); color: var(--ink-2); }
+  /* the column and the cards' grid are styles/writing.css's, shared with the index */
   .back { font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); text-decoration: none; }
   .back:focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; border-radius: 2px; }
   @media (hover: hover) { .back:hover { color: var(--seal); } }
@@ -98,17 +99,19 @@ const { Content } = await render(entry);
   .wp-body :global(img) { display: block; max-width: 100%; height: auto; margin-inline: auto; border-radius: 2px; }
   .wp-body :global(figcaption) { margin-top: 10px; font: 14px/1.5 var(--font-body); color: var(--ink-3); }
 
-  /* A quote is set apart by hairlines, larger and in italic. THE PARAGRAPH STRAIGHT AFTER A QUOTE IS ITS SOURCE, by
-     position rather than by a class, so the markdown stays plain (the favourite quotes are written so): set to the
-     right, on the owner's call, so the eye leaves the quote at its last line and finds the source there. The quote
-     has no margin below, or the source would sit a quote's margin away from it. */
+  /* A quote is set apart by hairlines, larger and in italic. THE PARAGRAPH STRAIGHT AFTER A QUOTE THAT OPENS WITH A
+     NAME IN BOLD IS ITS SOURCE, by position rather than by a class, so the markdown stays plain (the favourite quotes
+     are written so), and prose that carries on after a quote stays prose: set to the right, on the owner's call, so the
+     eye leaves the quote at its last line and finds the source there. The quote has no margin below, or the source
+     would sit a quote's margin away from it. (`:first-child` ignores text, so a paragraph whose first ELEMENT is bold
+     after some words still matches: write a source's name first.) */
   .wp-body :global(blockquote) { margin-top: 1.8em; padding: 0.7em 0; font-size: 22px; line-height: 1.45; font-style: italic;
     color: var(--ink-1); border-block: 1px solid rgba(var(--hairline-rgb), 0.35); text-wrap: balance; }
   .wp-body :global(blockquote p + p) { margin-top: 0.5em; }
-  .wp-body :global(blockquote + p) { margin-top: 0.85em; text-align: right; font: 12px/1.6 var(--font-mono); letter-spacing: 0.04em;
+  .wp-body :global(blockquote + p:has(> strong:first-child)) { margin-top: 0.85em; text-align: right; font: 12px/1.6 var(--font-mono); letter-spacing: 0.04em;
     color: var(--ink-3); }
-  .wp-body :global(blockquote + p::before) { content: '— '; }
-  .wp-body :global(blockquote + p strong) { font-weight: 400; color: var(--ink-1); }
+  .wp-body :global(blockquote + p:has(> strong:first-child)::before) { content: '— '; }
+  .wp-body :global(blockquote + p:has(> strong:first-child) strong) { font-weight: 400; color: var(--ink-1); }
 
   /* Code: Shiki writes its theme as INLINE style (a dark slab and a palette of token colours), and seal red is the
      only colour on the sheet, so a fence goes monochrome; inline style is beaten only by !important. Overflow scrolls
@@ -128,11 +131,12 @@ const { Content } = await render(entry);
   .wp-body :global(:is(th, td):last-child) { padding-right: 0; }
   .wp-body :global(thead th) { font-weight: 600; color: var(--ink-1); border-bottom: 1px solid rgba(var(--hairline-rgb), 0.35); }
 
-  /* Maths is build-time MathML: inline in its paragraph, a display as a direct child (`$$`), which scrolls in its own
-     box. Flush left, not centred: centred in a scroll box, an overflow's left half cannot be reached. */
+  /* Maths is build-time MathML: inline in its paragraph; a display (`$$`) scrolls in its own box wherever it sits, in
+     the body, a list, a quote or a footnote. Flush left, not centred: centred in a scroll box, an overflow's left half
+     cannot be reached. */
   .wp-body :global(math) { color: var(--ink-1); }
-  .wp-body > :global(.katex) { display: block; max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: 0.3em 0; }
-  .wp-body > :global(.katex math) { font-size: 1.1em; }
+  .wp-body :global(.katex:has(> math[display='block'])) { display: block; max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: 0.3em 0; }
+  .wp-body :global(math[display='block']) { font-size: 1.1em; }
 
   /* GFM footnotes: the marks, and the notes under a hairline at the foot, in the page's sans. */
   .wp-body :global(sup) { font-size: 0.7em; line-height: 0; }
@@ -144,12 +148,6 @@ const { Content } = await render(entry);
 
   /* ── the pieces either side: the index's cards (components/writing/PieceCard.astro), on its grid ── */
   .wp-around { margin-top: 96px; padding-top: 28px; border-top: 1px solid rgba(var(--hairline-rgb), 0.3); }
-  .wp-around ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 56px 28px; }
 
-  @media (max-width: 1100px) { .wp-around ul { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 640px) {
-    .wp { padding-top: 12vh; }
-    .wp-body { font-size: 17px; }
-    .wp-around ul { grid-template-columns: minmax(0, 1fr); gap: 44px; }
-  }
+  @media (max-width: 640px) { .wp-body { font-size: 17px; } }
 </style>

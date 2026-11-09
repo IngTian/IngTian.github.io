@@ -1,10 +1,10 @@
 // tests/writingCovers.test.ts
 // The writing covers (lib/writingCovers.ts): computed pictures, held to the class contract the page colours them by.
 import { describe, expect, it } from 'vitest';
-import { FIGURES, coverSvg, figureFor } from '../src/lib/writingCovers';
+import { COVER_SIZES, FIGURES, coverSvg, figureFor } from '../src/lib/writingCovers';
 
-// The three sizes the pages draw: a card, the index's lead, a piece's banner.
-const SIZES = [[400, 250], [640, 400], [1200, 360]] as const;
+// The three sizes the pages draw (a card, the index's lead, a piece's banner), as Cover.astro reads them.
+const SIZES = Object.values(COVER_SIZES);
 const SEEDS = ['favourite-quotes', 'risk-parity-is-not-equal-weights', 'a', 'lookahead-three-ways', 'x-'.repeat(40)];
 
 const elements = (svg: string): string[] => [...svg.matchAll(/<(\w+)\b[^>]*>/g)].map((m) => m[0]);
@@ -70,9 +70,9 @@ describe('coverSvg', () => {
   // is one per piece page.
   it("keeps a card's and the lead's cover under 20 KB, and a banner's under 30 KB", () => {
     for (const f of FIGURES) {
-      for (const [w, h] of SIZES) {
+      for (const [size, [w, h]] of Object.entries(COVER_SIZES)) {
         for (const seed of SEEDS) {
-          expect(coverSvg(f, seed, w, h).length, `${f} ${seed} ${w}x${h}`).toBeLessThan(w === 1200 ? 30_000 : 20_000);
+          expect(coverSvg(f, seed, w, h).length, `${f} ${seed} ${size}`).toBeLessThan(size === 'banner' ? 30_000 : 20_000);
         }
       }
     }

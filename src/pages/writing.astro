@@ -7,6 +7,7 @@
 // IT GROWS BY COUNT WITHOUT CHANGING LAYOUT. 0 pieces: the header and the cow. 1+: the lead (the newest featured
 // piece, else the newest) and the cards of the rest. SEARCH_FROM+ (data/writing.ts): the controls between them, a
 // search over each card's words and a chip per kind. The pieces come through pieces(), the one seam to the markdown.
+import '../styles/writing.css';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PlushCow from '../components/PlushCow.astro';
 import PieceCard from '../components/writing/PieceCard.astro';
@@ -18,10 +19,6 @@ const list = pieces(await getCollection('writing'));
 const n = list.length;
 const { lead, rest } = leadAndRest(list);
 
-// The CHARTER is the header: its first clause the headline, the rest the subtitle, so it is said once.
-const [headline, ...tail] = CHARTER.split(' — ');
-const sub = tail.join(' — ').replace(/^./, (c) => c.toUpperCase());
-
 // A chip per kind that has a piece, with its count at build time; an empty kind has no chip.
 const chips = KIND_KEYS.map((k) => ({ k, ...KINDS[k], count: list.filter((p) => p.kind === k).length })).filter((c) => c.count > 0);
 ---
@@ -31,7 +28,7 @@ const chips = KIND_KEYS.map((k) => ({ k, ...KINDS[k], count: list.filter((p) => 
   page="paper"
   veil={false}
 >
-  <main class="wb">
+  <main class="wsheet wb">
     <header>
       <a class="back" href="/">← back</a>
       <p class="wb-badge">
@@ -40,8 +37,8 @@ const chips = KIND_KEYS.map((k) => ({ k, ...KINDS[k], count: list.filter((p) => 
         </svg>
         Writing
       </p>
-      <h1 class="wb-h1">{headline}.</h1>
-      <p class="wb-sub">{sub}</p>
+      <h1 class="wb-h1">{CHARTER.headline}</h1>
+      <p class="wb-sub">{CHARTER.sub}</p>
     </header>
 
     {/* Nothing published: a cow holding the space, the owner's ruling, rather than a scaffold of what will one day
@@ -78,7 +75,7 @@ const chips = KIND_KEYS.map((k) => ({ k, ...KINDS[k], count: list.filter((p) => 
             </search>
           </div>
         )}
-        <ul class="wb-grid" role="list">
+        <ul class="wgrid" role="list">
           {rest.map((p) => <PieceCard piece={p} />)}
         </ul>
         <p class="wb-none" hidden>No piece matches that search.</p>
@@ -88,7 +85,7 @@ const chips = KIND_KEYS.map((k) => ({ k, ...KINDS[k], count: list.filter((p) => 
 </BaseLayout>
 
 <style>
-  .wb { max-width: 1240px; margin: 0 auto; padding: 15vh clamp(22px, 5vw, 72px) 96px; font-family: var(--font-body); color: var(--ink-2); }
+  /* the column and the cards' grid are styles/writing.css's, shared with the piece page */
   .wb :focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; border-radius: 2px; }
   .back { font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); text-decoration: none; }
   @media (hover: hover) { .back:hover { color: var(--seal); } }
@@ -115,6 +112,9 @@ const chips = KIND_KEYS.map((k) => ({ k, ...KINDS[k], count: list.filter((p) => 
   @media (hover: hover) { .wb-chip:hover { border-color: var(--ink-1); } }
   .wb-chip[aria-pressed='true'] { color: var(--sheet-ground); background: var(--ink-1); border-color: var(--ink-1); }
   .wb-chip[aria-pressed='true'] .wb-c { color: inherit; opacity: 0.7; }
+  /* forced colours replace all three inks above with system colours, so the pressed chip is marked as the rail's
+     current stop is (SideRail.astro): a Highlight edge and an underline */
+  @media (forced-colors: active) { .wb-chip[aria-pressed='true'] { border-color: Highlight; text-decoration: underline; } }
   .wb-search { flex: 0 1 320px; }
   .wb-field { position: relative; display: block; }
   .wb-field input { width: 100%; height: 38px; padding: 0 34px; font: 14px var(--font-body); color: var(--ink-1);
@@ -129,14 +129,10 @@ const chips = KIND_KEYS.map((k) => ({ k, ...KINDS[k], count: list.filter((p) => 
   .wb-status { margin: 8px 0 0; padding-left: 14px; font: 11px/1.4 var(--font-mono); color: var(--ink-3); }
   .wb-none { margin: 8px 0 0; font-size: 16px; color: var(--ink-3); }
 
-  /* ── the cards (components/writing/PieceCard.astro): three columns, two from 1100px down, one on a phone ── */
-  .wb-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 56px 28px; }
-
-  @media (max-width: 1100px) { .wb-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 640px) {
-    .wb { padding-top: 12vh; }
-    .wb-grid { grid-template-columns: minmax(0, 1fr); gap: 44px; }
     .wb-search { flex-basis: 100%; }
+    /* iOS Safari zooms the page into a focused field set under 16px */
+    .wb-field input { font-size: 16px; }
   }
 </style>
 

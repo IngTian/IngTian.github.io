@@ -20,9 +20,9 @@ tagline carry the soul.
 The homepage is the descent. Around it are the **writing routes** — /writing, a base you can search, and
 /writing/&lt;slug&gt; — the **research routes** (/research and /research/&lt;slug&gt;), **/projects**,
 **/experience**, the full record, and **/art**, a quiet museum room for calligraphy and photography. Only `/` and
-the 404 ride the sky; every other route is a register's sheet. Pages that share a sheet share its margin, measure
-and back-link treatment (/writing and its pieces one 1240px column): pages that each guessed their own layout would
-read as several sites. Borrow composition from the neighbouring page rather than inventing it.
+the 404 ride the sky; every other route is a register's sheet. A page and its children share one margin, measure
+and back-link treatment (/writing and its pieces one 1240px column; the research routes `styles/paper.css`'s
+measure): pages that each guessed their own layout would read as several sites. Borrow composition from the neighbouring page rather than inventing it.
 
 **A page may have a register of its own, and two do.** The rule, in the owner's words, for each page's own
 pass: **research serious, academic; art imaginative, romantic; writing imaginative, fun, casual, stylish** —
@@ -43,9 +43,10 @@ pass.
   borrows the sheet and not the measure: no token of its own differs, so there is no `art` register, and it sets its
   own 1240px column (`pages/art.astro`). /experience borrows it the same way, with a 1480px column of wide panels, one
   per organisation, each beside its logo as a pixel mark (`pages/experience.astro`). /writing borrows it too, in
-  sans for the structure (headings, cards, meta) over a Georgia body on a ~68ch line: an index of cards, each with a
-  computed cover (`lib/writingCovers.ts`), in a 1240px column (`pages/writing.astro`), and a piece's page in the same
-  column (*Writing is markdown*). No page-load veil on any of them: on the research and writing routes it would
+  sans for the structure (headings, titles, card text), mono for its meta lines (dates, reading time) and the cards'
+  kind labels, over a Georgia body on a ~68ch line: an index of cards, each with a computed cover
+  (`lib/writingCovers.ts`), in a 1240px column (`styles/writing.css`, which both writing routes import), and a
+  piece's page in the same column (*Writing is markdown*). No page-load veil on any of them: on the research and writing routes it would
   replay on every card click and every way back, and on /art and /experience it is motion that runs on its own.
 
 **What keeps them one site is shared components, not a shared background.** Which kind a component is
@@ -126,8 +127,7 @@ rather than add.
     strict). In `src/`, not `public/`, which would ship them twice.
   - **Their own `--ff-*` variables.** Never point `cssVariable` at `--font-display`/`-body`/`-mono`: those are
     the role tokens, and that collision is what stopped every webfont from loading.
-  - **Fraunces' preload is per page and per style** (`preloadAccent`: `/` the normal, the only page that sets
-    the face today; a writing piece's italic went when /writing moved to the paper sheet). Do not delete it:
+  - **Fraunces' preload is per page** (`preloadAccent`, on `/` alone, the normal style). Do not delete it:
     without it FCP measured 1956 → 2333ms. The reasoning, and the cost of preloading it everywhere, sit at
     BaseLayout's `<Font>`.
 - **Math is typeset at build time as MathML.** The markdown chain (spelled once, in
@@ -186,6 +186,7 @@ math, and those come and go with the slides they serve; `ls` beats this list.
 src/
   styles/{tokens.css, global.css}   # palette + type roles; the .descent gradient, atmosphere washes and the .is-slides slide metrics live in global.css
   styles/paper.css                  # what the two research routes share: the measure (--M --G --N --L --tk) and the wealth figure's series marks
+  styles/writing.css                # what the two writing routes share: the 1240px column (.wsheet) and the cards' grid (.wgrid)
   styles/slides.css                 # the homepage's paper panel, imported by pages/index.astro alone: .slide-paper (the five slides' ground and inks, --panel-*, per theme) and .slide-gutter (the rail's gutter, given back at 1100px)
   layouts/BaseLayout.astro          # head, astro:fonts, meta/OG/JSON-LD, favicons, the page-load veil, CornerNav, ClientRouter
   content.config.ts                 # the two content collections, `writing` and `papers`, their frontmatter schemas and the one isoDate helper
@@ -289,10 +290,10 @@ Every interactive thing is a plain Astro component or page with a bundled `<scri
 that say `<script>` in comments). `scripts/{beats,motion,pageView}.ts` are modules those scripts import.
 
 **Three files break the contract below on purpose, with `is:inline` scripts that must run before first
-paint** (`grep -rn '<script is:inline' src` → 4 in 3 files). A bundled script runs after parse, which is after
+paint** (`grep -rn '<script is:inline' src` → 3 in 3 files). A bundled script runs after parse, which is after
 first paint:
-- `index.astro`'s intro decider and `BaseLayout`'s theme resolver and veil: without them the page paints one
-  state and then flips to another (the finished sky, the wrong theme).
+- `index.astro`'s intro decider and `BaseLayout`'s theme resolver: without them the page paints one state and
+  then flips to another (the finished sky, the wrong theme).
 - `projects.astro`'s boot decider: sets `html.projects-boot` before the banner and gallery parse. It ships
   `shouldBoot`'s own source and owns the boot clock (`data-boot-at`) plus a `BOOT_DEADLINE_MS` failsafe. Every
   rule that hides something under the class says `transition: none`, or a ClientRouter arrival animates the
@@ -572,15 +573,14 @@ and reverted every time** — do not rebuild it. The phone treatment is *bug fix
     see below). A label is three layers of one text, so a mark is a cross-fade of opacities and every state is
     a solid ink (`SideRail.astro`'s header says how, and why the two inks over the label are `aria-hidden`
     generated text). The sheets' numbers are held by `tests/paperPalette.test.ts` and
-    `tests/draftingPalette.test.ts`; no rail page rides the reading sky now (it was measured on /writing, which
-    left the rail and the sky together). On `/` a resting
+    `tests/draftingPalette.test.ts`. On `/` a resting
     label is `--rail-ink` (light `#494339`: 4.96:1 on the tan panels, where `--ink-3` is 3.80, and 4.69:1 on
     the sky at its deepest under the rail; dark `--ink-3`) and the focus ring `--rail-focus` (light `--ink-1`,
     9.32:1 on the tan, where `--ochre` is 1.19; dark `--ochre`), held with the marks and the dash by
     `tests/deckPalette.test.ts` on the panels and on the sky's CSS gradient, its no-WebGL state, down to the
     Interlude's foot with the hero at 1.6 screens (a short window; computed, not measured), the label inks
     also under the static Grain overlay; the last screen is Work's panel. Not held: the live sky a desktop with WebGL draws over that gradient (FluidSky, SkyWash, the
-    `.descent` washes). The descent variant's policy guards against a lighter sky under its paper-coloured text
+    `.descent` washes). The sky's policy guards against a lighter sky under its paper-coloured text
     and lets it darken nearly freely, and a darker sky is the danger to the light theme's dark labels.
   - **Its motion is the rule's: each piece runs once per showing** (the timings are `lib/motionTiming.ts`'s
     `RAIL`; the entrance's duration reaches the CSS as `--row`). The entrance is CSS because a bundled script
@@ -625,7 +625,7 @@ might have lots of writings"*.
 - **`src/content.config.ts`** defines the collection (`glob` loader) and validates frontmatter at **build**
   time, which is why it's a collection rather than `import.meta.glob`: a typo in `kind:` fails `npm run build`
   naming the file, where a glob would render a broken row and ship it. The object is **strict**: a field it does
-  not know (a misspelt `featured`, a `minutes` from before it was computed) fails the build too.
+  not know (a misspelt `featured`, or a `minutes`, which is computed) fails the build too.
 - **The frontmatter contract:**
 
   | field | required | notes |
@@ -660,9 +660,10 @@ might have lots of writings"*.
 - **A cover is computed, never a photograph** (`lib/writingCovers.ts`): real maths on data seeded by the slug,
   drawn only with role and type classes that `components/writing/Cover.astro` colours from the tokens, so it
   re-themes and seal red stays the only colour. It is inline SVG, which is why `tests/writingCovers.test.ts` holds
-  its weight: at hundreds of pieces the index wants pagination or lazy covers (the `ponytail:` note there).
-- **A quote's source is the paragraph straight after it**, styled by position (right-set, in mono) so the
-  markdown stays plain; the favourite quotes are written so.
+  its weight: at hundreds of pieces the index wants pagination or lazy covers (the `ponytail:` note in
+  `lib/writingCovers.ts`).
+- **A quote's source is the paragraph straight after it that opens with the source's name in bold**, styled by
+  position (right-set, in mono) so the markdown stays plain; the favourite quotes are written so.
 
 ## Papers are files
 
@@ -875,16 +876,13 @@ the why; `tests/introTimeline.test.ts` fails on a quiet 150ms window or a beat o
 
 `components/FluidSky.astro` is the sky on two routes: `/` and the 404. The register pages (`/projects`, both
 research routes, both writing routes, /art and /experience) render neither it nor `SkyWash`: each register's ink
-is sized for its own ground (light drafting `--ink-3` over `--reading-grad` measured 3.89:1), and the paper
-register is a still sheet by design. A WebGL canvas: a two-level domain warp over the descent/reading ramps,
-sampled from scroll position, with viscous luminance banding and a warm bloom. `lib/skyShader.ts` holds the GLSL,
-`lib/skyPalette.ts` the ramps, `lib/skyLegibility.ts` the **contrast policy** that keeps text readable over it.
-Two archetypes: `descent` (paper text; the dangerous direction is lighter) and `reading` (dark ink on a luminous
-field; dangerous is darker). **No route rides `reading` since /writing moved to the paper sheet**: the variant,
-its shader branch, its ramps, its policy and `--reading-grad` are kept whole until one sweep deletes them
-together (deleting the token alone would leave the variant without its no-WebGL state). Every page starts at the
-top of the pattern: the shader samples it from `scrollY / vw` alone, and the component takes `variant`, nothing
-else (its warp amplitude follows it).
+is sized for its own ground (light drafting `--ink-3` on a pale sky's lowest tone, `#dcd5cf`, is 3.89:1), and the
+paper register is a still sheet by design. A WebGL canvas: a two-level domain warp over the descent ramp (one per
+theme, the twin of `--descent-grad`), sampled from scroll position, with viscous luminance banding and a warm
+bloom. `lib/skyShader.ts` holds the GLSL, `lib/skyPalette.ts` the ramps, `lib/skyLegibility.ts` the **contrast
+policy** that keeps text readable over it: the text is paper-coloured, so over the content the sky may darken
+nearly freely and may not lighten. Every page starts at the top of the pattern: the shader samples it from
+`scrollY / vw` alone, and the component takes no props.
 
 Two invariants, both about the compositor:
 

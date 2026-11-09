@@ -2,8 +2,8 @@
 // FluidSky: WebGL lifecycle for a domain-warped, scroll-responsive sky canvas.
 //
 // Shader (skyShader.ts) displaces sampling along the gradient; contrast policy
-// (skyLegibility.ts) ensures text legibility. Two archetypes: descent (paper text,
-// dangerous: lighter) and reading (dark ink, dangerous: darker).
+// (skyLegibility.ts) ensures text legibility. Its text is paper-coloured, so the
+// dangerous direction is lighter.
 //
 // INVARIANTS:
 //   1. Canvas is OPAQUE with no mix-blend-mode. A blended full-screen layer forces
@@ -18,17 +18,11 @@
 //
 // A theme change reaches it one way: CornerNav's `theme:change`, which re-inits it
 // (bottom of the script). Nothing here observes the attribute or re-reads it per frame.
-interface Props {
-  /** 'descent' (paper text, dawn→ground) | 'reading' (dark ink, luminous) */
-  variant?: 'descent' | 'reading';
-}
-const { variant = 'descent' } = Astro.props;
 ---
 <canvas
   class="fluid-sky"
   data-fluid-canvas
   aria-hidden="true"
-  data-variant={variant}
 ></canvas>
 
 <style>
@@ -48,7 +42,7 @@ const { variant = 'descent' } = Astro.props;
 <script>
   import { prefersReducedMotion } from '../lib/motion';
   import { VERTEX_SHADER, fragmentShader, SKY_UNIFORMS } from '../lib/skyShader';
-  import { GATES, TINT_BUDGET, NEBULA, NEBULA_CEILING, type SkyVariant } from '../lib/skyLegibility';
+  import { GATES, NEBULA, NEBULA_CEILING } from '../lib/skyLegibility';
   import { rampFor, type Theme } from '../lib/skyPalette';
   import { introProgress } from '../lib/introSession';
   import { introFrame } from '../lib/introTimeline';
@@ -56,8 +50,8 @@ const { variant = 'descent' } = Astro.props;
   const VERT = VERTEX_SHADER;
   const FRAG = fragmentShader();
 
-  // The warp amplitude (the shader's uAmp), one per archetype.
-  const AMP: Record<SkyVariant, number> = { descent: 1.8, reading: 1.35 };
+  // The warp amplitude (the shader's uAmp).
+  const AMP = 1.8;
 
   const teardowns: Array<() => void> = [];
 
@@ -69,7 +63,7 @@ const { variant = 'descent' } = Astro.props;
     });
   }
 
-  function buildRamp(theme: Theme, variant: SkyVariant): HTMLCanvasElement | null {
+  function buildRamp(theme: Theme): HTMLCanvasElement | null {
     const N = 512;
     const c = document.createElement('canvas');
     c.width = 1;
@@ -77,7 +71,7 @@ const { variant = 'descent' } = Astro.props;
     const ctx = c.getContext('2d');
     if (!ctx) return null;
     const g = ctx.createLinearGradient(0, 0, 0, N);
-    for (const [pos, hex] of rampFor(variant, theme)) g.addColorStop(pos, hex);
+    for (const [pos, hex] of rampFor(theme)) g.addColorStop(pos, hex);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 1, N);
     return c;
@@ -118,10 +112,9 @@ const { variant = 'descent' } = Astro.props;
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-    const variant = (cvs.dataset.variant ?? 'descent') as SkyVariant;
     // Read once: a theme change re-inits this canvas (theme:change, at the bottom).
     const theme: Theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
-    const ramp = buildRamp(theme, variant);
+    const ramp = buildRamp(theme);
     if (ramp) {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, ramp);
       gl.uniform1i(U.uRamp, 0);
@@ -129,19 +122,15 @@ const { variant = 'descent' } = Astro.props;
     // Every uniform but the scroll and the viewport's aspect (uYOffset, uYSpan), the page depth, the clock,
     // the intro's flatten and the measured gate top is fixed for this canvas's life, so it is uploaded once;
     // a program keeps its uniforms.
-    gl.uniform1f(U.uAmp, AMP[variant]);
+    gl.uniform1f(U.uAmp, AMP);
     gl.uniform1f(U.uDark, theme === 'dark' ? 1 : 0);
     gl.uniform3f(U.uNebula, NEBULA[0], NEBULA[1], NEBULA[2]);
-    gl.uniform1f(U.uReading, variant === 'reading' ? 1 : 0);
-    gl.uniform1f(U.uGateDark, GATES[variant].dark);
-    gl.uniform1f(U.uGateLight, GATES[variant].light);
-    gl.uniform1f(U.uTintCap, TINT_BUDGET[variant].cap);
-    gl.uniform1f(U.uViscousFloor, TINT_BUDGET[variant].viscousFloor);
+    gl.uniform1f(U.uGateDark, GATES.dark);
+    gl.uniform1f(U.uGateLight, GATES.light);
     gl.uniform1f(U.uNebulaCeiling, NEBULA_CEILING);
     let gateTop = 0.55;
     function measureGate(): void {
-      if (variant === 'reading') { gateTop = 0.0; return; }
-      // Descent pages: find where content starts, i.e. the first element child of <main> that
+      // Find where content starts, i.e. the first element child of <main> that
       // carries text; if there is none, treat the whole page as a reading zone (gateTop = 0.0,
       // the conservative direction — engages the legibility gate everywhere).
       const content = Array.from(document.querySelector('main')?.children ?? [])

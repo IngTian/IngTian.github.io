@@ -34,7 +34,7 @@ const isoDate = (field: string) =>
  * below is validated at BUILD time, so a typo in `kind:` or a missing `date:` fails `npm run build` with the
  * offending file named. The glob alternative would render a broken row instead. CI is the merge gate here, so
  * the difference is between catching it and shipping it. For the same reason the object is STRICT: a field it does
- * not know (a misspelt `featured`, a `minutes` from before it was computed) fails the build rather than being
+ * not know (a misspelt `featured`, or a `minutes`, which is computed) fails the build rather than being
  * dropped in silence.
  */
 const writing = defineCollection({

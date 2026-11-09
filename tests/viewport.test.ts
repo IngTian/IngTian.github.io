@@ -66,7 +66,7 @@ describe('viewport phone gate', () => {
   });
 });
 
-// The one-column breakpoint: at 1100px and below the rail hides and the reading pages fall to one column. A pair of
+// The one-column breakpoint: at 1100px and below the rail hides and the paper pages fall to one column. A pair of
 // bounds (max 1100 / min 1101) leaves the widths between them, which a zoomed or OS-scaled window reaches (1100.8 CSS px
 // is a 1321px window at 120%), to neither layout: there the rail shows and the paper's two columns stand, while its
 // script, asking the other bound, leaves every note unplaced at its block's top.

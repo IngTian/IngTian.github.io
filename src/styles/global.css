@@ -162,9 +162,9 @@ html[data-theme='dark'] .descent::after {
 
 /* ── The fluid sky, shared by every route that renders it ────────────────────
    FluidSky is an OPAQUE canvas, a negative-z child of .descent, that replaces the
-   page's CSS gradient. The gradient (--descent-grad or --reading-grad, each page's
-   own) is the FALLBACK, suppressed only once the script has added .fluid-live after
-   a successful draw, so no WebGL, a phone and a shader failure all keep it.
+   page's CSS gradient. The gradient (--descent-grad) is the FALLBACK, suppressed
+   only once the script has added .fluid-live after a successful draw, so no WebGL,
+   a phone and a shader failure all keep it.
 
    ── CRITICAL: every suppression rule is inside the exact negation of the phone query ──
    `@media (max-width: 640px) { .fluid-sky { display: none } }` can hide the canvas

@@ -1,0 +1,10 @@
+/* What /writing and its pieces share, imported by both pages: the one 1240px column (`.wsheet`) and the cards'
+   grid (`.wgrid`, components/writing/PieceCard.astro's cards), three columns, two from 1100px down, one on a phone. */
+.wsheet { max-width: 1240px; margin: 0 auto; padding: 15vh clamp(22px, 5vw, 72px) 96px; font-family: var(--font-body); color: var(--ink-2); }
+.wgrid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 56px 28px; }
+
+@media (max-width: 1100px) { .wgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .wsheet { padding-top: 12vh; }
+  .wgrid { grid-template-columns: minmax(0, 1fr); gap: 44px; }
+}

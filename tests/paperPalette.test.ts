@@ -33,9 +33,11 @@ const pageCss = [
   // last: rule() takes the first match, and the index's miniature re-sizes the series' strokes (`.mini .f-rl`)
   styleOf('index.astro'),
 ].join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
-// /art borrows the register (BaseLayout `page="paper"`): its own scoped <style>, comments stripped.
-const artPage = readFileSync(new URL('../src/pages/art.astro', import.meta.url), 'utf8');
-const artCss = (/^<style>([\s\S]*?)^<\/style>/m.exec(artPage)?.[1] ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
+/** A file's own scoped <style> (src/<file>), comments stripped. */
+const scopedCss = (file: string): string =>
+  (/^<style>([\s\S]*?)^<\/style>/m.exec(readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8'))?.[1] ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
+// /art borrows the register (BaseLayout `page="paper"`).
+const artCss = scopedCss('pages/art.astro');
 /** The declarations of the page's rule whose selector is exactly `sel` (the first, in `css`). */
 function rule(sel: string, css = pageCss): string {
   const body = new RegExp(`(?:^|[}\\s])${sel.replace(/[.()[\]*+?^$|\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(css)?.[1];
@@ -187,10 +189,11 @@ describe('the paper palette (tokens.css)', () => {
     expect(artCss.length, 'no <style> block in art.astro').toBeGreaterThan(1000);
     expect(artCss).not.toMatch(/var\(--paper\b/);
     for (const file of ['pages/writing.astro', 'pages/writing/[...slug].astro', 'components/writing/PieceCard.astro', 'components/writing/Cover.astro']) {
-      const css = /^<style>([\s\S]*?)^<\/style>/m.exec(readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8'))?.[1] ?? '';
+      const css = scopedCss(file);
       expect(css.length, `no <style> block in ${file}`).toBeGreaterThan(500);
       expect(css, file).not.toMatch(/var\(--paper\b/);
     }
+    expect(readFileSync(new URL('../src/styles/writing.css', import.meta.url), 'utf8'), 'styles/writing.css').not.toMatch(/var\(--paper\b/);
   });
 });
 

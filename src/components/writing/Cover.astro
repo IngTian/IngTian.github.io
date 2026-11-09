@@ -1,14 +1,15 @@
 ---
 // A writing piece's cover in its frame: the computed SVG (lib/writingCovers.ts), coloured here by role and stroked or
-// filled by type, the CSS half of that file's contract. 8:5 for a card and the index's lead; `banner` is a piece's
-// wide one, 10:3, and 2:1 on a phone, where the slice keeps its middle. Anything slotted sits over it (a card's
+// filled by type, the CSS half of that file's contract. `size` is a COVER_SIZES key: 8:5 for a card and the index's
+// lead; `banner` is a piece's wide one, 10:3, and 2:1 on a phone, where the slice keeps its middle. Anything slotted sits over it (a card's
 // reading time). The picture is aria-hidden: it illustrates, and the card's words carry the piece.
-import { coverSvg, type Figure } from '../../lib/writingCovers';
+import { COVER_SIZES, coverSvg, type Figure } from '../../lib/writingCovers';
 
-interface Props { figure: Figure; seed: string; w: number; h: number; banner?: boolean }
-const { figure, seed, w, h, banner = false } = Astro.props;
+interface Props { figure: Figure; seed: string; size: keyof typeof COVER_SIZES }
+const { figure, seed, size } = Astro.props;
+const [w, h] = COVER_SIZES[size];
 ---
-<div class:list={['wcv', { 'wcv-banner': banner }]}><Fragment set:html={coverSvg(figure, seed, w, h)} /><slot /></div>
+<div class:list={['wcv', { 'wcv-banner': size === 'banner' }]}><Fragment set:html={coverSvg(figure, seed, w, h)} /><slot /></div>
 
 <style>
   .wcv { position: relative; aspect-ratio: 8 / 5; overflow: hidden; border-radius: 6px;

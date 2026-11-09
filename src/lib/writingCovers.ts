@@ -318,6 +318,10 @@ function pipeline(r: Rand, b: Box): string {
 export const FIGURES = ['allocation', 'contours', 'regression', 'impact', 'tails', 'drawdown', 'pipeline'] as const;
 export type Figure = (typeof FIGURES)[number];
 
+/** The viewBox each surface draws a cover at (components/writing/Cover.astro's `size`): a card, the index's lead, a
+ *  piece's banner. */
+export const COVER_SIZES = { card: [400, 250], lead: [640, 400], banner: [1200, 360] } as const;
+
 const DRAW: Record<Figure, (r: Rand, b: Box) => string> = { allocation, contours, regression, impact, tails, drawdown, pipeline };
 
 /** The figure a piece's cover draws: the one its frontmatter names, else one picked by its slug's hash. */

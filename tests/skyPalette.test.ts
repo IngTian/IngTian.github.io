@@ -1,43 +1,24 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { rampFor, type RampStop, type Theme } from '../src/lib/skyPalette';
-import { wcagLuminance, contrastRatio, AA_BODY, type SkyVariant } from '../src/lib/skyLegibility';
+import { wcagLuminance } from '../src/lib/skyLegibility';
 
 const hexToRgb = (h: string): [number, number, number] => [
   parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16),
 ];
 
-describe('rampFor — variant selection', () => {
-  it('gives descent and reading DIFFERENT ramps (inverting the choice must fail)', () => {
-    expect(rampFor('descent', 'light')).not.toEqual(rampFor('reading', 'light'));
-    expect(rampFor('descent', 'dark')).not.toEqual(rampFor('reading', 'dark'));
+describe('rampFor', () => {
+  it('sinks to near-black', () => {
+    expect(wcagLuminance(hexToRgb(rampFor('light').at(-1)![1]))).toBeLessThan(0.1);
   });
 
-  it('descent sinks to near-black; reading never does', () => {
-    const descentEnd = wcagLuminance(hexToRgb(rampFor('descent', 'light').at(-1)![1]));
-    const readingEnd = wcagLuminance(hexToRgb(rampFor('reading', 'light').at(-1)![1]));
-    expect(descentEnd).toBeLessThan(0.1);
-    expect(readingEnd).toBeGreaterThan(0.6);
-  });
-
-  it('every reading-light stop clears AA against --ink-3 unmodified', () => {
-    // The reading ramp exists so dark ink stays legible top-to-bottom. If a raw
-    // stop already fails, no downstream guard can save it.
-    const ink3 = wcagLuminance([0x5a, 0x54, 0x4a]);
-    for (const [, hex] of rampFor('reading', 'light')) {
-      expect(contrastRatio(wcagLuminance(hexToRgb(hex)), ink3)).toBeGreaterThanOrEqual(AA_BODY);
-    }
-  });
-
-  it('stops are ordered and span the full 0-1 range in every combination', () => {
-    for (const v of ['descent', 'reading'] as const) {
-      for (const t of ['light', 'dark'] as const) {
-        const stops = rampFor(v, t);
-        expect(stops[0][0]).toBe(0);
-        expect(stops.at(-1)![0]).toBe(1);
-        for (let i = 1; i < stops.length; i++) {
-          expect(stops[i][0]).toBeGreaterThan(stops[i - 1][0]);
-        }
+  it('stops are ordered and span the full 0-1 range in both themes', () => {
+    for (const t of ['light', 'dark'] as const) {
+      const stops = rampFor(t);
+      expect(stops[0][0]).toBe(0);
+      expect(stops.at(-1)![0]).toBe(1);
+      for (let i = 1; i < stops.length; i++) {
+        expect(stops[i][0]).toBeGreaterThan(stops[i - 1][0]);
       }
     }
   });
@@ -46,8 +27,7 @@ describe('rampFor — variant selection', () => {
 /* ============================================================================================
    THE DUPLICATION, ACTUALLY CHECKED.
 
-   skyPalette.ts opens by saying its ramps "mirror --descent-grad and --reading-grad from
-   tokens.css" and that "tests/skyPalette.test.ts asserts the properties that matter so drift is
+   skyPalette.ts opens by saying its ramps "mirror --descent-grad from tokens.css" and that "tests/skyPalette.test.ts asserts the properties that matter so drift is
    caught rather than assumed away". Until this block existed that sentence was false: nothing in
    this file had ever opened tokens.css. Every test above reads the TypeScript copy and would pass
    unchanged if the CSS said something completely different.
@@ -88,7 +68,7 @@ describe('the TS ramps mirror tokens.css — the duplication skyPalette.ts admit
     expect(decl, `--${prop} not found in the ${theme} block of tokens.css`).toBeTruthy();
 
     const parts = decl![1].split(',').map((s) => s.trim()).filter(Boolean);
-    // Drop the leading angle (180deg for the descent, 168deg for reading). Asserting it is present
+    // Drop the leading angle (180deg). Asserting it is present
     // rather than just skipping parts[0] keeps a hand-edited `to bottom` from eating a colour stop.
     expect(parts[0], `--${prop} should start with an explicit angle`).toMatch(/^-?[\d.]+deg$/);
 
@@ -102,26 +82,18 @@ describe('the TS ramps mirror tokens.css — the duplication skyPalette.ts admit
     });
   };
 
-  // The mapping is spelled out per variant because that mapping IS the thing under test: pointing a
-  // variant at the wrong CSS token is one of the ways these two files can disagree.
-  const PROP: Record<SkyVariant, string> = { descent: 'descent-grad', reading: 'reading-grad' };
-
-  for (const variant of ['descent', 'reading'] as const) {
-    for (const theme of ['light', 'dark'] as const) {
-      it(`${variant}/${theme} matches --${PROP[variant]} stop for stop`, () => {
-        const ts = rampFor(variant, theme).map(([o, hex]) => [o, hex.toLowerCase()]);
-        expect(cssStops(theme, PROP[variant])).toEqual(ts);
-      });
-    }
+  for (const theme of ['light', 'dark'] as const) {
+    it(`${theme} matches --descent-grad stop for stop`, () => {
+      const ts = rampFor(theme).map(([o, hex]) => [o, hex.toLowerCase()]);
+      expect(cssStops(theme, 'descent-grad')).toEqual(ts);
+    });
   }
 
   it('parses real stops, so a regex that matched nothing cannot pass as agreement', () => {
     // Two empty arrays are equal. Without this, a change to tokens.css's formatting that broke the
-    // parser above would turn all four comparisons green — the failure mode this whole block was
+    // parser above would turn both comparisons green — the failure mode this whole block was
     // added to close, wearing a different hat.
     expect(cssStops('light', 'descent-grad').length).toBeGreaterThanOrEqual(6);
-    expect(cssStops('light', 'reading-grad').length).toBeGreaterThanOrEqual(3);
     expect(cssStops('dark', 'descent-grad').length).toBeGreaterThanOrEqual(3);
-    expect(cssStops('dark', 'reading-grad').length).toBeGreaterThanOrEqual(3);
   });
 });

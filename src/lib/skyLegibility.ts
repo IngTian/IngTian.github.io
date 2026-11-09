@@ -6,12 +6,9 @@
 // live here, named and tested, rather than as literals in the shader or the component.
 //
 // The governing asymmetry: what threatens text depends on the text's own colour.
-//   descent pages carry PAPER-coloured text -> a LIGHTER sky erases it
-//   reading pages carry DARK INK on pale paper -> a DARKER sky erases it
-// So the two variants restrain opposite directions. Treating them alike is the
-// mistake this module exists to make impossible.
-
-export type SkyVariant = 'descent' | 'reading';
+// The sky's text is PAPER-coloured, so a LIGHTER sky erases it and a darker one
+// does not: the policy restrains the lightward direction and leaves the dark one
+// nearly free.
 
 /** WCAG 2.x relative luminance from sRGB 0-255. */
 export function wcagLuminance(rgb: readonly [number, number, number]): number {
@@ -33,42 +30,10 @@ export const AA_BODY = 4.5;
 /**
  * Per-direction multipliers on the sky's excursion along its palette ramp, over the
  * legibility zone (the shader mixes them in by zone: `mix(1.0, uGateDark, zone)`).
- * The permissive direction stays near 1 so the ink keeps its character; the
- * dangerous direction is clamped.
+ * The text is paper-coloured, so LIGHTWARD is restrained hard; the dark side stays
+ * near 1, nearly free, so the ink keeps its character.
  */
-export const GATES: Record<SkyVariant, { dark: number; light: number }> = {
-  // descent: paper-coloured text, so restrain LIGHTWARD hard; the dark side stays nearly free
-  descent: { dark: 0.75, light: 0.10 },
-  // reading: dark ink, so restrain DARKWARD — but only enough to protect contrast, since
-  // over-clamping here erases the effect on the reading pages entirely
-  reading: { dark: 0.70, light: 0.75 },
-};
-
-/**
- * Bounds on the two stages that darken a reading page's composed colour: the viscous
- * multiply and the subtractive tint.
- *
- * Bounding these rather than the ramp-lookup index is deliberate. The lookup
- * index cannot express what these stages do — they operate on the colour after
- * it leaves the ramp, so a colour darker than any ramp stop is reachable and no
- * cap on the index can prevent it.
- *
- * The reading-page constants are derived from holding WCAG AA (4.5:1) against
- * --ink-3 at the ramp's darkest stop (#dcd5cf). A descent page runs neither stage
- * (the shader reads uTintCap only under `uReading > 0.5`, and uViscousFloor only
- * through `mix(…, uReading)`), so its pair binds nothing.
- */
-export const TINT_BUDGET: Record<SkyVariant, { cap: number; viscousFloor: number }> = {
-  reading: { cap: 0.55, viscousFloor: 0.985 },
-  descent: { cap: 1.0, viscousFloor: 0.86 },
-};
-
-/** The reading tint, the shader's warmTint and coolTint, mixed per pixel and subtracted from
- *  the colour. skyShader.ts interpolates both, so the AA test holds the tint that ships. */
-export const READING_TINT: Record<'warm' | 'cool', readonly [number, number, number]> = {
-  warm: [0.055, 0.042, 0.024],
-  cool: [0.030, 0.033, 0.039],
-};
+export const GATES = { dark: 0.75, light: 0.10 } as const;
 
 /** The cool tint the dark theme's nebula lifts a descent sky with, uploaded as uNebula. */
 export const NEBULA: readonly [number, number, number] = [0.055, 0.105, 0.115];

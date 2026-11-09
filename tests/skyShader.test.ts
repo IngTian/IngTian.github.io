@@ -3,8 +3,7 @@ import { fragmentShader, SKY_UNIFORMS } from '../src/lib/skyShader';
 
 // The shader cannot be executed in vitest (no WebGL), so these are structural
 // guards on the shader source. They assert properties that a mutation would break:
-// uniform list completeness, the archetype guard's presence, the reading tint's
-// direction. They do NOT prove the shader's numerical correctness — that requires
+// uniform list completeness and the legibility guard's presence. They do NOT prove the shader's numerical correctness — that requires
 // a GPU and sampled output.
 
 describe('SKY_UNIFORMS completeness', () => {
@@ -40,43 +39,19 @@ describe('SKY_UNIFORMS completeness', () => {
   });
 });
 
-describe('Archetype guard — reading vs descent inversion', () => {
-  it('is present in the form that inverts on uReading', () => {
+describe('Legibility guard — the hard floor over the reading zone', () => {
+  it('never samples lighter than the gradient over the zone', () => {
     const source = fragmentShader();
 
-    // The guard is the min/max mix construct that inverts the hard floor direction
-    // by archetype. On a descent page (uReading=0), y may never sit lighter than depth;
-    // on a reading page (uReading=1), y may never sit darker than a bounded amount below depth.
-    // Assert the source contains the mix(max(y, depth), min(y, depth), uReading) pattern.
-    // Deleting or flattening it would break the archetype-dependent legibility guarantee.
-    expect(source).toMatch(/mix\(\s*max\(\s*y\s*,\s*depth\s*\)\s*,\s*min\(\s*y\s*,\s*depth\s*\)\s*,\s*uReading\s*\)/);
+    // The text over the sky is paper-coloured, so over the zone y may never sit lighter
+    // (higher on the ramp) than depth: y = mix(y, max(y, depth), zone). Deleting or
+    // flattening it would let the warp lift the sky under the text.
+    expect(source).toMatch(/y = mix\(\s*y\s*,\s*max\(\s*y\s*,\s*depth\s*\)\s*,\s*zone\s*\)/);
   });
 
   it('gates over the zone only: outside it, at zone 0, each multiplier is 1', () => {
     const source = fragmentShader();
     expect(source).toMatch(/mix\(\s*1\.0\s*,\s*uGateDark\s*,\s*zone\s*\)/);
     expect(source).toMatch(/mix\(\s*1\.0\s*,\s*uGateLight\s*,\s*zone\s*\)/);
-  });
-});
-
-describe('Reading tint is SUBTRACTIVE', () => {
-  it('composites the tint with -= or equivalent, never +=', () => {
-    const source = fragmentShader();
-
-    // The reading-page tint is applied in the `if (uReading > 0.5)` block.
-    // Find that block and verify it subtracts from col, never adds. On a pale
-    // reading page, an additive tint would brighten the paper toward the ink and
-    // destroy contrast.
-    const readingBlock = source.match(/if\s*\(\s*uReading\s*>\s*0\.5\s*\)\s*\{[\s\S]*?\n\s*\}/);
-    expect(readingBlock).toBeTruthy();
-
-    if (readingBlock) {
-      const block = readingBlock[0];
-      // The tint is composed via `col -= mix(warmTint, coolTint, pick) * amt`.
-      // Assert the subtraction is present.
-      expect(block).toMatch(/col\s*-=/);
-      // Assert there is NO addition in this block (would invert the direction).
-      expect(block).not.toMatch(/col\s*\+=/);
-    }
   });
 });

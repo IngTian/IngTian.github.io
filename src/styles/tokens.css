@@ -21,9 +21,9 @@
 
   /* Hairline rules (section dividers, table borders) as an R,G,B triple so each
      use sets its own alpha: `border: 1px solid rgba(var(--hairline-rgb), .2)`.
-     Light = ink-3 (#5a544a = 90,84,74), the warm-grey the reading pages used as
-     raw literals. Redefined per theme (dark below) so hairlines re-theme with
-     the palette instead of needing a hand-maintained :global override list. */
+     Light = ink-3 (#5a544a = 90,84,74). Redefined per theme (dark below) so
+     hairlines re-theme with the palette instead of needing a hand-maintained
+     :global override list. */
   --hairline-rgb: 90, 84, 74;
 
 
@@ -42,19 +42,6 @@
     #2a2720 78%,
     #1d1b16 90%,
     #16140f 100%           /* ground: near-black ink */
-  );
-
-  /* Reading-page gradient: holds the luminous range top to bottom, never sinking to
-     the near-black ground, so ink stays legible. Dark twin below. The CSS twin of
-     FluidSky's `reading` ramps (lib/skyPalette.ts), which no route rides since
-     /writing moved to the paper sheet; it goes when that variant does. */
-  --reading-grad: linear-gradient(
-    168deg,
-    #f4efe4 0%,
-    #f1ebe0 24%,
-    #efe6d4 48%,
-    #e7ddce 74%,
-    #dcd5cf 100%
   );
 
   /* NO FONT ROLES HERE: they live in exactly one place, global.css's @theme, built from astro:fonts' --ff-*
@@ -94,10 +81,6 @@ html[data-theme='dark'] {
     #0b0d0f 80%,
     #08090b 100%
   );
-
-  /* Reading-page dark twin: an even charcoal, not the deep void, so the light
-     ink ramp holds contrast the whole way down. */
-  --reading-grad: linear-gradient(168deg, #14171b 0%, #131619 48%, #111417 100%);
 }
 
 /* ============================================================
@@ -173,7 +156,8 @@ html[data-page='drafting'][data-theme='dark'] {
 }
 
 /* ============================================================
-   PAPER — the research routes' register, and /art's and /experience's, which borrow it (BaseLayout `page="paper"`)
+   PAPER — the research routes' register, and /writing's, /art's and /experience's, which borrow it (BaseLayout
+   `page="paper"`)
    A still sheet with no sky: warm paper in light, near-black in dark, and SEAL RED AS THE ONLY COLOUR in both. Like
    drafting it overrides the ROLE tokens, so the corner nav and the rail reskin with no edit and the accent (the nav's
    dot, pill and focus ring) becomes the seal.

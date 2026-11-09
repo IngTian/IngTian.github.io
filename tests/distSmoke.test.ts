@@ -543,8 +543,8 @@ describe("BaseLayout's per-page hooks: /projects is the drafting page, the resea
   });
 
   // Each register's ink is sized for its own ground (tests/draftingPalette.test.ts, tests/paperPalette.test.ts), not
-  // for the reading sky: light drafting --ink-3 over --reading-grad's lower stops measured 4.20 and 3.89. So no
-  // register page paints a sky. The 404 is the control: the sky it keeps is the markup these patterns look for.
+  // for a sky: light drafting --ink-3 (#6a675f) on a pale sky's lower tones, #e7ddce and #dcd5cf, is 4.20 and 3.89:1.
+  // So no register page paints a sky. The 404 is the control: the sky it keeps is the markup these patterns look for.
   it('paints /projects, the research and writing routes, /art and /experience no fluid sky and no sky wash, and the 404 both', () => {
     for (const p of registers()) {
       expect(/class="fluid-sky"/.test(p.markup), `${p.route} renders the fluid-sky canvas`).toBe(false);

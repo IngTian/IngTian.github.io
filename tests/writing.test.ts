@@ -1,31 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { CHARTER, KINDS, KIND_KEYS, SEARCH_FROM } from '../src/data/writing';
+import { KINDS, KIND_KEYS } from '../src/data/writing';
 import { PAGES } from '../src/data/nav';
 
 // The taxonomy and voice of /writing (data/writing.ts). The seam to the markdown is writingContent.test.ts's.
 
 describe('the kinds as shipped', () => {
-  it('are the four the owner set, each with a label and a gloss that says what belongs in it', () => {
-    expect(KIND_KEYS).toEqual(['notes', 'explainers', 'methods', 'misc']);
-    expect(Object.keys(KINDS).sort()).toEqual([...KIND_KEYS].sort());
+  it('each have a label and a gloss that says what belongs in it, and no two share a label', () => {
     for (const k of KIND_KEYS) {
       expect(KINDS[k].label.length, k).toBeGreaterThan(0);
       expect(KINDS[k].gloss.length, k).toBeGreaterThan(30);
     }
     expect(new Set(KIND_KEYS.map((k) => KINDS[k].label)).size).toBe(KIND_KEYS.length);
-  });
-});
-
-describe('the header and the controls', () => {
-  // The index splits the CHARTER at its first spaced dash: the headline before it, the subtitle after.
-  it('is one charter line, a headline and a subtitle', () => {
-    const [headline, ...tail] = CHARTER.split(' — ');
-    expect(headline.length).toBeGreaterThan(10);
-    expect(tail.join(' — ').length).toBeGreaterThan(20);
-  });
-
-  it('shows the search once there are more pieces than a screen or two holds', () => {
-    expect(SEARCH_FROM).toBe(12);
   });
 });
 

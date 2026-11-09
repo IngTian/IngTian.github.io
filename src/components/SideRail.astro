@@ -62,14 +62,12 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
     top: 50%;
     transform: translateY(-50%);
     z-index: 30;
-    /* 200px: a nested label gets 200 - 30 - 12 = 158, and a longer one ends in an ellipsis (below). The last 10px
-       were added for the /writing rail's piece titles; that rail is retired (its search is /writing's navigation), and
-       today's nested labels, /projects' slugs and the homepage's slides, are shorter. */
+    /* 200px: a nested label gets 200 - 30 - 12 = 158; a longer one ends in an ellipsis (below). */
     max-width: 200px;
     padding-left: 30px;
     /* The dash's strength: ink-1 at 55% clears 3:1 as a mark on every rail page's ground (worst computed, 3.21:1
-       on the homepage's light sky at its deepest under the rail; 3.74:1 measured over the light reading sky). tests/deckPalette.test.ts,
-       tests/paperPalette.test.ts and tests/draftingPalette.test.ts hold the panels and the sheets.
+       on the homepage's light sky at its deepest under the rail). tests/deckPalette.test.ts, tests/paperPalette.test.ts
+       and tests/draftingPalette.test.ts hold the panels and the sheets.
        It is the alpha of the dash's colour, not its opacity, so a register can ring the dash with an opaque knockout. */
     --mk: 55%;
   }

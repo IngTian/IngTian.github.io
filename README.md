@@ -39,7 +39,7 @@ Before committing, all three, in this order: `npm run build` → `npm run typech
 
 | What | Where |
 | :--- | :---- |
-| A new **writing piece** | a `.md` in `src/content/writing/` with frontmatter: `title`, `date`, `kind` (`notes`, `explainers`, `methods` or `misc`) and `blurb` (its card's text and its standfirst); optionally `cover` (the figure its cover draws), `updated`, `featured` and `draft`. No code change; it appears on `/writing` as a card and gets its own page. Its reading time and cover are computed. The fields are in CLAUDE.md, *Writing is markdown*. |
+| A new **writing piece** | a `.md` in `src/content/writing/` with frontmatter (the fields are in CLAUDE.md, *Writing is markdown*). No code change; it appears on `/writing` as a card and gets its own page. Its reading time and cover are computed. |
 | A paper's **explainer page** | a `.md` in `src/content/papers/` (its record stays in `profile.ts`, its numbers and figures in `src/data/papers/`); it becomes `/research/<slug>`. The syntax is in CLAUDE.md, *Papers are files*. |
 | Résumé, bio, timeline, publications, projects, contact links | `src/data/profile.ts` — typed, cross-referenced by id, and some numbers are computed from it. On /experience a role names its organisation (`organisations`), whose panel lists it. |
 | /experience's logo marks | `src/data/experienceMarks.ts` — each logo as a 24 x 24 pixel matrix with its colours; a new organisation needs one (the build fails without it, naming it). |

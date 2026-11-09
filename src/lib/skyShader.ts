@@ -1,11 +1,9 @@
 // The fluid sky shader, extracted from FluidSky.astro.
 //
-// Two-level domain warp (Inigo Quilez) over the descent/reading ramps, with
-// viscous luminance banding and a warm bloom. The reading variant adds a
-// subtractive broken-color tint (ink-side only, never lightens). Dark theme
-// becomes a phosphor nebula with stars behind the line.
-
-import { READING_TINT } from './skyLegibility';
+// Two-level domain warp (Inigo Quilez) over the descent ramp, with viscous
+// luminance banding and a warm bloom. The text over it is paper-coloured, so
+// over the content the sky may darken but not lighten. Dark theme becomes a
+// phosphor nebula with stars behind the line.
 
 export const VERTEX_SHADER = `
   attribute vec2 aPos;
@@ -34,9 +32,6 @@ export function fragmentShader(): string {
     uniform float uGateLight;      // multiplier for lightward excursions over the zone
     uniform float uDark;           // 1.0 in the dark theme, 0.0 in light
     uniform vec3  uNebula;         // the cool tint dark theme lifts the ink with
-    uniform float uReading;        // 1.0 on a reading page (dark ink on pale paper)
-    uniform float uTintCap;        // reading-page tint hard ceiling
-    uniform float uViscousFloor;
     uniform float uNebulaCeiling;   // hard bound on the dark nebula's added light
 
     float hash(vec2 p) {
@@ -57,32 +52,21 @@ export function fragmentShader(): string {
     }
 
     void main() {
-      // Time is scaled with the reading variant's y-stretch so scrolling the warp
-      // produces equal apparent motion on both page types. Reading pages keep a small
-      // relative boost since their effect comes from a tint response rather than a
-      // ramp lookup.
-      //
       // 0.80 is the global drift speed, chosen on the real page from a live ladder
       // (0.55 / 0.80 / 1.10 / 1.50 / 2.00): alive without becoming distracting.
       //
       // SPEED is the lever, not amplitude. The displacement is already +/-0.306 of
       // the whole ramp at full strength, and over text the legibility gate reins it
       // in, so more amplitude changes little where text lives and spends itself on
-      // the open sky. Contrast measured FLAT across the speed ladder on both archetypes.
-      float t = uTime * 0.80 * mix(1.0, 1.35, uReading);
+      // the open sky. Contrast measured FLAT across the speed ladder.
+      float t = uTime * 0.80;
 
       // Anisotropic sample space: more frequency DOWN than ACROSS, which stretches
       // the field into drifting strata instead of round blobs. Scaled so one
       // stratum feature fills roughly one viewport (the demo panel was 373x250;
       // this fills ~1440x900, so the multipliers reproduce on-screen feature size).
       float sy = uYOffset + (1.0 - vUv.y) * uYSpan;
-
-      // Reading pages get a finer field so paragraph-scale structure is visible
-      // instead of one uniform smudge per screen. Also stretched in y so a short
-      // page traverses as much field as a long one does.
-      float freqK = mix(1.0, 1.9, uReading);
-      float yStretch = mix(1.0, 1.35, uReading);
-      vec2 p = vec2(vUv.x * 6.2 * freqK, sy * 12.7 * freqK * yStretch);
+      vec2 p = vec2(vUv.x * 6.2, sy * 12.7);
 
       // Two-level domain warp: the original demo's drift terms.
       vec2 q = vec2(fbm(p + 0.09 * t),
@@ -94,15 +78,13 @@ export function fragmentShader(): string {
       // Page depth of this pixel (0 = dawn, 1 = ground).
       float depth = clamp(uDepth0 + (1.0 - vUv.y) * uDepthSpan, 0.0, 1.0);
 
-      // The legibility zone: reading pages are text top-to-bottom so the rules apply
-      // everywhere; descent pages have an open sky above the content so they ramp in
-      // at the boundary.
-      float zone = mix(smoothstep(uGateTop, uGateTop + 0.10, depth), 1.0, uReading);
+      // The legibility zone: the page has an open sky above the content, so the
+      // rules ramp in at the boundary.
+      float zone = smoothstep(uGateTop, uGateTop + 0.10, depth);
 
       // The asymmetric gate: over the reading zone, excursions in the dangerous
-      // direction are clamped while the safe direction stays free. Descent pages
-      // carry paper-coloured text, so a lighter sky erases it and the dark
-      // direction is safe. Reading pages carry dark ink, so the danger is inverted.
+      // direction are clamped while the safe direction stays free. The text is
+      // paper-coloured, so a lighter sky erases it and the dark direction is safe.
       float gateDark  = mix(1.0, uGateDark, zone);
       float gateLight = mix(1.0, uGateLight, zone);
 
@@ -123,24 +105,19 @@ export function fragmentShader(): string {
       float y = clamp(depth + disp, 0.0, 1.0);
 
       // Hard floor over the reading zone: the sampled point may never sit higher
-      // (lighter) on the ramp than the gradient's own value there for descent pages;
-      // may never sit more than a bounded amount darker for reading pages. Chosen
-      // per archetype to protect the text.
-      float guarded = mix(max(y, depth), min(y, depth), uReading);
-      y = mix(y, guarded, zone);
+      // (lighter) on the ramp than the gradient's own value there.
+      y = mix(y, max(y, depth), zone);
 
       vec3 col = texture2D(uRamp, vec2(0.5, y)).rgb;
 
       // Viscous luminance banding straight from the warp field. Over the reading
-      // zone, floored so it cannot darken the paper past the point where contrast
-      // against dark ink would fail.
+      // zone it never lifts the colour (at most 1.0), since lighter is the danger.
       float lum = 0.90 + 0.20 * f;
-      float lumR = mix(lum, 0.86 + 0.14 * f, zone);
-      col *= mix(lumR, max(lumR, uViscousFloor), uReading);
+      col *= mix(lum, 0.86 + 0.14 * f, zone);
 
       // Warm bloom where the warp piles up, faded out over the reading zone since
       // it lightens.
-      col += 0.045 * vec3(0.784, 0.639, 0.416) * smoothstep(0.55, 1.0, length(r)) * (1.0 - zone) * (1.0 - uReading);
+      col += 0.045 * vec3(0.784, 0.639, 0.416) * smoothstep(0.55, 1.0, length(r)) * (1.0 - zone);
 
       // Dark theme: the field adds a cool phosphor/cyan nebular tint lifted by the
       // warp, damped over the reading zone since adding light is the dangerous
@@ -148,7 +125,7 @@ export function fragmentShader(): string {
       // in skyLegibility.NEBULA_CEILING: the lightest dark descent stop plus full
       // nebula clears 4.5:1 against ink-3 even at zone=0, where the damping does
       // not apply. See tests/skyLegibility.test.ts.
-      if (uDark > 0.5 && uReading < 0.5) {
+      if (uDark > 0.5) {
         float glow = smoothstep(0.30, 0.95, f);
         float veins = smoothstep(0.45, 1.0, length(r));
         float lift = (glow * 0.72 + veins * 0.45) * uAmp;
@@ -191,21 +168,6 @@ export function fragmentShader(): string {
         }
       }
 
-      // Reading pages: additive texture (warm/cool broken colour, ink-side only)
-      // because the reading ramp's luminance span is too small for displacement to
-      // reveal anything.
-      if (uReading > 0.5) {
-        float ink = smoothstep(0.40, 0.60, f);
-        float veins = smoothstep(0.50, 0.78, length(r));
-        // The 0.30/0.16 coefficients are the tint's character (ink vs veins response
-        // shape); uTintCap and uViscousFloor are the safety bounds that vary by page.
-        float amt = min(uTintCap, (ink * 0.30 + veins * 0.16) * uAmp);
-        vec3 warmTint = vec3(${READING_TINT.warm.join(', ')});
-        vec3 coolTint = vec3(${READING_TINT.cool.join(', ')});
-        float pick = smoothstep(0.30, 0.70, r.x);
-        col -= mix(warmTint, coolTint, pick) * amt;
-      }
-
       // uFlatten, the intro's first beat: collapse the whole sky toward ONE tone, then let the gradient
       // resolve in (0 = normal sky, 1 = one flat tone). Alpha stays 1.0: the canvas is opaque by invariant.
       //
@@ -225,6 +187,5 @@ export function fragmentShader(): string {
 
 export const SKY_UNIFORMS = [
   'uRamp', 'uAmp', 'uFlatten', 'uTime', 'uYOffset', 'uYSpan', 'uDepth0', 'uDepthSpan',
-  'uGateTop', 'uGateDark', 'uGateLight', 'uDark', 'uNebula', 'uReading',
-  'uTintCap', 'uViscousFloor', 'uNebulaCeiling',
+  'uGateTop', 'uGateDark', 'uGateLight', 'uDark', 'uNebula', 'uNebulaCeiling',
 ] as const;

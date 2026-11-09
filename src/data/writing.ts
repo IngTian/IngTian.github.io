@@ -8,8 +8,7 @@
 //
 // WHAT IT IS FOR, in the owner's terms: the evergreen thinking (research notes, explainers, the trading system's
 // METHOD). Trade calls go to TradingView. Not a listing of everything but "a base you can search … we might have lots
-// of writings": pages/writing.astro grows by count without changing layout (0 pieces is the header and the cow; 1+
-// the lead and the grid; SEARCH_FROM+ the search and the kind chips).
+// of writings": pages/writing.astro says how the index grows by count.
 //
 // ONE AXIS FOR NOW, the kind. A topic axis was prototyped and the owner deferred it: "let's wait on the topics. i
 // dont have much topics yet." A cover is drawn by a figure the piece names, not by a topic (lib/writingCovers.ts).
@@ -32,8 +31,11 @@ export const KINDS: Record<Kind, { label: string; gloss: string }> = {
   misc: { label: 'Misc', gloss: 'What is none of those: a commonplace book of quotes, each with its source, and whatever else is worth keeping.' },
 };
 
-/** What /writing is for, in one line: the index's header, its first clause the headline and the rest the subtitle. */
-export const CHARTER = 'Notes, explainers and methods — the thinking that should still be worth reading in three years. Trade ideas live on TradingView; this is how they are made.';
+/** What /writing is for: the index's header, its headline and its subtitle. */
+export const CHARTER = {
+  headline: 'Notes, explainers and methods.',
+  sub: 'The thinking that should still be worth reading in three years. Trade ideas live on TradingView; this is how they are made.',
+};
 
 /** From this many pieces the index shows its search and kind chips; under it, every piece is on one screen or two. */
 export const SEARCH_FROM = 12;

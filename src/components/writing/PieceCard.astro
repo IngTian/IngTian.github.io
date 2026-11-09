@@ -15,7 +15,7 @@ const { piece: p, lead = false, dir } = Astro.props;
 ---
 {lead ? (
   <article class="wc wc-lead" data-q={p.q} data-k={p.kind}>
-    <Cover figure={p.figure} seed={p.slug} w={640} h={400} />
+    <Cover figure={p.figure} seed={p.slug} size="lead" />
     <div class="wc-text">
       <p class="wc-kind">{KINDS[p.kind].label}</p>
       <h2 class="wc-t"><a href={p.href}>{p.title}</a></h2>
@@ -27,7 +27,7 @@ const { piece: p, lead = false, dir } = Astro.props;
 ) : (
   <li class="wc" data-q={p.q} data-k={p.kind}>
     {dir && <p class="wc-dir">{dir}</p>}
-    <Cover figure={p.figure} seed={p.slug} w={400} h={250}><span class="wc-min">{p.minutes} min</span></Cover>
+    <Cover figure={p.figure} seed={p.slug} size="card"><span class="wc-min">{p.minutes} min</span></Cover>
     <p class="wc-kind">{KINDS[p.kind].label}</p>
     <h2 class="wc-t"><a href={p.href}>{p.title}</a></h2>
     <p class="wc-blurb">{p.blurb}</p>

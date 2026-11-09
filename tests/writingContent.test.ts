@@ -19,11 +19,11 @@ describe('the schema', () => {
   it("takes its kinds from data/writing.ts and its covers from lib/writingCovers.ts, so neither list is retyped", () => {
     expect(src).toMatch(/\bkind: z\.enum\(KIND_KEYS\)/);
     expect(src).toMatch(/\bcover: z\.enum\(FIGURES\)\.optional\(\)/);
-    expect(src).toMatch(/import \{ KIND_KEYS \} from '\.\/data\/writing'/);
-    expect(src).toMatch(/import \{ FIGURES \} from '\.\/lib\/writingCovers'/);
+    expect(src).toMatch(/import \{[^}]*\bKIND_KEYS\b[^}]*\} from '\.\/data\/writing'/);
+    expect(src).toMatch(/import \{[^}]*\bFIGURES\b[^}]*\} from '\.\/lib\/writingCovers'/);
   });
 
-  // The reading time is computed (bodyWords), so the field it replaced is gone, and a stale one fails the build.
+  // The reading time is computed (bodyWords), so `minutes` is no field, and the strict object refuses it.
   it('has no minutes field, and refuses a field it does not know', () => {
     const writing = /const writing = defineCollection\(\{([\s\S]*?)\n\}\);/.exec(src)?.[1] ?? '';
     expect(writing, 'no writing collection in content.config.ts').toContain('z.strictObject(');
