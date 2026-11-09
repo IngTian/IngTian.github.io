@@ -1,7 +1,7 @@
 // PROTOTYPE (throwaway) data for /proto-experience: one panel per organisation, drafted from profile.ts's timeline.
 // Every detail paragraph is the timeline's own text; the new fields (tagline, area, website) are drafts for the
 // owner to correct. A fact is given only when it is on record: no location is guessed.
-import { timeline } from './profile';
+import { awards, timeline } from './profile';
 import { REPRO } from './papers/rl-bhrp';
 
 export interface Fact { label: string; value: string; href?: string }
@@ -77,6 +77,29 @@ export const PANELS: Panel[] = [
       { title: 'B.Eng, Computer Engineering', period: '2019 — 23', detail: detail('B.Eng, Computer Engineering') },
       { title: 'Research Assistant', period: '2021 — 23', detail: detail('Research Assistant · McGill') },
     ] },
+];
+
+/** Each mark's colours on hover, by role, on the light sheet and the dark one: the logo's own colours, read from its
+ *  file by the transcription run (protoExperienceIcons' `brand` wins where it gives one). The independent panel's
+ *  chart, which has no logo, takes a gain green. */
+export type Brand = { light: Partial<Record<'k' | 'm' | 's', string>>; dark: Partial<Record<'k' | 'm' | 's', string>> };
+export const BRAND: Record<string, Brand> = {
+  uoft: { light: { k: '#1e3765' }, dark: { k: '#ffffff' } },
+  independent: { light: { k: '#1a7f4b', m: '#8fd1aa' }, dark: { k: '#5fd394', m: '#2c6b48' } },
+  ea: { light: { s: '#ff4747' }, dark: { s: '#ff4747' } },
+  tiktok: { light: { k: '#000000', m: '#25f4ee', s: '#fe2c55' }, dark: { k: '#ffffff', m: '#25f4ee', s: '#fe2c55' } },
+  ericsson: { light: { k: '#0082f0' }, dark: { k: '#0082f0' } },
+  amazon: { light: { k: '#221f1f', s: '#ff9900' }, dark: { k: '#ffffff', s: '#ff9900' } },
+  mcgill: { light: { s: '#ed1b2f' }, dark: { s: '#ed1b2f' } },
+};
+
+/** Recognition, the record's awards and then the competitions the owner named (COMC, CCC, AIME), whose years and
+ *  results are his to give: a field is printed only when it is known. */
+export const RECOGNITION: { year?: string; title: string; note?: string }[] = [
+  ...awards,
+  { title: 'COMC', note: 'Canadian Open Mathematics Challenge' },
+  { title: 'CCC', note: 'Canadian Computing Competition' },
+  { title: 'AIME', note: 'American Invitational Mathematics Examination' },
 ];
 
 /** The independent panel's mark, which has no logo: RL-BHRP's own wealth path (the paper's reproduction, the

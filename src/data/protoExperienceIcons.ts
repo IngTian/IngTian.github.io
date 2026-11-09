@@ -1,6 +1,7 @@
 // PROTOTYPE (throwaway): each organisation's logo as pixel-art rows, 16 and 24 cells a side, transcribed from
 // its logo file ('.' empty, 'k' ink, 'm' mid-ink, 's' seal) by the transcription run; `source` is the file used.
-export const ICONS: Record<string, { 16: string[]; 24: string[]; source?: string }> = {
+import type { Brand } from './protoExperience';
+export const ICONS: Record<string, { 16: string[]; 24: string[]; 32?: string[]; brand?: Brand; source?: string }> = {
   uoft: {
     source: "https://en.wikipedia.org/wiki/File:Utoronto_coa.svg",
     16: [

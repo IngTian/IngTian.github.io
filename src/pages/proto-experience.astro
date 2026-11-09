@@ -1,16 +1,28 @@
 ---
 // PROTOTYPE (throwaway, claude/experience-proto): /experience as one wide panel per organisation, after the
 // 21st.dev "impact experience" reference — the name, a tagline and the dates; a list of facts; what the work was —
-// with each organisation's logo as a pixel-art mark beside its name, on the paper sheet. The switcher at the foot
-// compares the hover treatment, the type and the icon size. Noindexed by BaseLayout (/proto- path).
+// with each organisation's logo as a pixel-art mark beside its name, on the paper sheet. On hover a mark takes its
+// logo's own colours. The switcher at the foot compares the hover ground, the type and the icon size. Noindexed by
+// BaseLayout (/proto- path).
 import BaseLayout from '../layouts/BaseLayout.astro';
 import SideRail from '../components/SideRail.astro';
-import { awards } from '../data/profile';
-import { PANELS, chartRows } from '../data/protoExperience';
+import { BRAND, PANELS, RECOGNITION, chartRows } from '../data/protoExperience';
 import { ICONS } from '../data/protoExperienceIcons';
 import type { Stop } from '../lib/pageStops';
 
-const rowsOf = (key: string, n: 16 | 24): string[] => (key === 'independent' ? chartRows(n) : ICONS[key]?.[n] ?? []);
+type N = 16 | 24 | 32;
+const SIZES: N[] = [16, 24, 32];
+// A size not transcribed yet falls back to the 24.
+const rowsOf = (key: string, n: N): string[] =>
+  key === 'independent' ? chartRows(n) : ICONS[key]?.[n] ?? ICONS[key]?.[24] ?? [];
+// The brand colours as custom properties on the panel: --b<role> on the light sheet, --b<role>-d on the dark.
+const brandStyle = (key: string): string => {
+  const b = ICONS[key]?.brand ?? BRAND[key];
+  if (!b) return '';
+  return (['k', 'm', 's'] as const).flatMap((r) => [
+    b.light[r] ? `--b${r}:${b.light[r]}` : '', b.dark[r] ? `--b${r}-d:${b.dark[r]}` : '',
+  ]).filter(Boolean).join(';');
+};
 // One <rect> per horizontal run of a colour, so a 24-cell mark is a few dozen rects, not hundreds.
 const runs = (rows: string[]) => rows.flatMap((r, y) => {
   const out: { x: number; y: number; w: number; c: string }[] = [];
@@ -40,19 +52,27 @@ const stops: Stop[] = [
 
       <div class="panels">
         {PANELS.map((p) => (
-          <article class="panel" id={`x-${p.key}`} aria-labelledby={`xn-${p.key}`}>
-            {/* The hover ground: the panel's own mark, cells blown up, and a seal wash; the switcher picks one. */}
-            <svg class="bg-icon" viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true" preserveAspectRatio="xMaxYMid meet">
-              {runs(rowsOf(p.key, 24)).map((r) => <rect class={r.c} x={r.x} y={r.y} width={r.w} height="1" />)}
+          <article class="panel" id={`x-${p.key}`} aria-labelledby={`xn-${p.key}`} style={brandStyle(p.key)}>
+            {/* The hover ground: the panel's own mark in its colours, cells blown up, or a seal wash; the switcher
+                picks one. */}
+            <svg class="bg-icon brand" viewBox={`0 0 ${rowsOf(p.key, 32).length} ${rowsOf(p.key, 32).length}`} shape-rendering="crispEdges"
+                 aria-hidden="true" preserveAspectRatio="xMaxYMid meet">
+              {runs(rowsOf(p.key, 32)).map((r) => <rect class={r.c} x={r.x} y={r.y} width={r.w} height="1" />)}
             </svg>
             <span class="bg-wash" aria-hidden="true"></span>
             <div class="who">
               <div class="mark">
-                {([16, 24] as const).map((n) => (
-                  <svg class={`icon i${n}`} viewBox={`0 0 ${n} ${n}`} shape-rendering="crispEdges" aria-hidden="true">
-                    {runs(rowsOf(p.key, n)).map((r) => <rect class={r.c} x={r.x} y={r.y} width={r.w} height="1" />)}
-                  </svg>
-                ))}
+                {/* Each size twice over: in ink (.mono) and in the logo's colours (.brand), cross-faded on hover. */}
+                {SIZES.map((n) => {
+                  const rows = rowsOf(p.key, n), m = rows.length || n;
+                  return (
+                    <svg class={`icon i${n}`} viewBox={`0 0 ${m} ${m}`} shape-rendering="crispEdges" aria-hidden="true">
+                      {(['mono', 'brand'] as const).map((g) => (
+                        <g class={g}>{runs(rows).map((r) => <rect class={r.c} x={r.x} y={r.y} width={r.w} height="1" />)}</g>
+                      ))}
+                    </svg>
+                  );
+                })}
               </div>
               <h2 id={`xn-${p.key}`}>{p.name}</h2>
               <p class="tag">{p.tagline}</p>
@@ -74,7 +94,7 @@ const stops: Stop[] = [
 
       <section class="recog" id="x-recognition" aria-labelledby="x-recognition-h">
         <h2 id="x-recognition-h">Recognition</h2>
-        <ul>{awards.map((a) => <li><span>{a.year}</span><span>{a.title}</span></li>)}</ul>
+        <ul>{RECOGNITION.map((a) => <li><span>{a.year}</span><span>{a.title}{a.note && <span class="note"> · {a.note}</span>}</span></li>)}</ul>
       </section>
     </div>
 
@@ -89,6 +109,7 @@ const stops: Stop[] = [
       <span>icon</span>
       <button type="button" data-k="icon" data-v="16">16</button>
       <button type="button" data-k="icon" data-v="24">24</button>
+      <button type="button" data-k="icon" data-v="32">32</button>
     </div>
   </main>
 </BaseLayout>
@@ -108,13 +129,26 @@ const stops: Stop[] = [
     padding: 44px 40px; background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 14px; }
   .panel > :not(.bg-icon, .bg-wash) { position: relative; }
 
-  .mark { height: 72px; display: flex; align-items: flex-end; margin-bottom: 18px; }
+  .mark { height: 96px; display: flex; align-items: flex-end; margin-bottom: 18px; }
   .icon { display: none; }
-  :global(html:not([data-xp-icon='24'])) .icon.i16 { display: block; width: 64px; height: 64px; }
-  :global(html[data-xp-icon='24']) .icon.i24 { display: block; width: 72px; height: 72px; }
-  .k { fill: var(--ink-1); }
-  .m { fill: var(--ink-3); }
-  .s { fill: var(--seal); }
+  :global(html[data-xp-icon='16']) .icon.i16 { display: block; width: 64px; height: 64px; }
+  :global(html:not([data-xp-icon='16'], [data-xp-icon='32'])) .icon.i24 { display: block; width: 72px; height: 72px; }
+  :global(html[data-xp-icon='32']) .icon.i32 { display: block; width: 96px; height: 96px; }
+  .mono .k { fill: var(--ink-1); }
+  .mono .m { fill: var(--ink-3); }
+  .mono .s { fill: var(--seal); }
+  /* The logo's own colours, from the panel's --b* (the ink where a role has none). */
+  .brand .k { fill: var(--bk, var(--ink-1)); }
+  .brand .m { fill: var(--bm, var(--ink-3)); }
+  .brand .s { fill: var(--bs, var(--seal)); }
+  :global(html[data-theme='dark']) .brand .k { fill: var(--bk-d, var(--bk, var(--ink-1))); }
+  :global(html[data-theme='dark']) .brand .m { fill: var(--bm-d, var(--bm, var(--ink-3))); }
+  :global(html[data-theme='dark']) .brand .s { fill: var(--bs-d, var(--bs, var(--seal))); }
+  /* On hover the mark cross-fades from ink to its colours, opacity only. */
+  .icon .brand { opacity: 0; }
+  @media (prefers-reduced-motion: no-preference) { .icon g { transition: opacity 320ms ease-out; } }
+  .panel:hover .icon .brand, .panel:focus-within .icon .brand { opacity: 1; }
+  .panel:hover .icon .mono, .panel:focus-within .icon .mono { opacity: 0; }
 
   .who h2 { margin: 0; color: var(--ink-1); line-height: 1.05; }
   .tag { margin: 14px 0 0; font-size: 15px; color: var(--ink-2); }
@@ -139,11 +173,11 @@ const stops: Stop[] = [
   @media (prefers-reduced-motion: no-preference) { .bg-icon, .bg-wash { transition: opacity 420ms ease-out; } }
   @media (hover: hover) {
     :global(html:not([data-xp-hover])) .panel:hover .bg-icon,
-    :global(html[data-xp-hover='icon']) .panel:hover .bg-icon { opacity: 0.09; }
+    :global(html[data-xp-hover='icon']) .panel:hover .bg-icon { opacity: 0.14; }
     :global(html[data-xp-hover='wash']) .panel:hover .bg-wash { opacity: 1; }
   }
   :global(html:not([data-xp-hover])) .panel:focus-within .bg-icon,
-  :global(html[data-xp-hover='icon']) .panel:focus-within .bg-icon { opacity: 0.09; }
+  :global(html[data-xp-hover='icon']) .panel:focus-within .bg-icon { opacity: 0.14; }
   :global(html[data-xp-hover='wash']) .panel:focus-within .bg-wash { opacity: 1; }
 
   /* TYPE: sans is the reference's heavy grotesk in the system UI face; serif is the site's Georgia. */
@@ -158,7 +192,8 @@ const stops: Stop[] = [
   .recog ul { list-style: none; margin: 0; padding: 0; }
   .recog li { display: grid; grid-template-columns: 7.5rem 1fr; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--panel-edge);
     font-size: 15px; color: var(--ink-2); }
-  .recog li span:first-child { font: 13px/1.5 var(--font-mono); color: var(--ink-3); }
+  .recog li > span:first-child { font: 13px/1.5 var(--font-mono); color: var(--ink-3); }
+  .recog .note { color: var(--ink-3); }
 
   @media (max-width: 1100px) {
     .panel { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -179,7 +214,7 @@ const stops: Stop[] = [
 
 <script>
   // The switcher: each button sets data-xp-<key> on <html> and marks itself; ?hover=…&type=…&icon=… preset it.
-  const DEFAULTS: Record<string, string> = { hover: 'icon', type: 'sans', icon: '16' };
+  const DEFAULTS: Record<string, string> = { hover: 'icon', type: 'sans', icon: '24' };
   const init = (): void => {
     const q = new URLSearchParams(location.search);
     const set = (k: string, v: string): void => {
