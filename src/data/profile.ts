@@ -50,7 +50,7 @@ export interface Publication {
 export interface Award {
   year?: string;
   title: string;
-  gloss?: string;     // what an abbreviation stands for, or what the result was
+  gloss?: string;     // what an abbreviation stands for, then anything else on record (who runs it, the result)
 }
 
 export interface ResearchInterest {
@@ -218,7 +218,8 @@ export const organisations: Organisation[] = [
     ] },
 ];
 
-// Newest first, as the owner's LinkedIn (Honors & awards) records them; COMC's year and score are not on record.
+// Newest first, undated last. A selection, the owner's: his LinkedIn (Honors & awards) lists more, left out on his word.
+// COMC's year and score are not on record.
 export const awards: Award[] = [
   { year: '2021', title: 'IEEExtreme 15.0 — Top 4 in Canada' },
   { year: "'21–'22", title: 'Hatch Scholarships ($10k) · McGill' },
