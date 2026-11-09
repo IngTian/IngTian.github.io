@@ -63,7 +63,7 @@ describe('railMarks', () => {
   });
 
   it('lights a parent whose own box misses the band as an ancestor of its current child', () => {
-    // /experience: "Roles" points at its heading, scrolled past; one of its entries is in the band
+    // /: "The field" points at the Interlude, scrolled past; one of its slides is in the band
     expect(railMarks([box(-300, -250), box(150, 500, 0)], VH, 900, DOC))
       .toEqual({ current: [1], ancestors: [0], lead: 1 });
   });

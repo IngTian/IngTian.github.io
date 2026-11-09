@@ -2,21 +2,24 @@
 // /experience's marks: each organisation's logo as a 24 x 24 pixel matrix ('.' empty, 'k' ink, 'm' mid-ink, 's' seal),
 // shown in the paper inks and, on hover, in the logo's own colours (`brand`, by role, on the light sheet and the dark).
 //
-// TRANSCRIBED, NOT DRAWN (the cow's lesson, data/cowGlyph.ts): each was converted from the logo file `source` names,
-// then cleaned by hand against it, and the six were evened out as one set. `s` is exactly where the logo is red,
+// TRANSCRIBED, NOT DRAWN (the cow's lesson, data/cowGlyph.ts): each was converted from the logo file named above it,
+// then cleaned by hand against it, and the logos were evened out as one set. `s` is exactly where the logo is red,
 // orange or pink. `brand` holds the colours read from that file; on the dark sheet a black or navy role takes white,
-// as the brands' own marks do on dark. The independent panel has no logo: its mark is computed from RL-BHRP's wealth
-// path (chartRows in lib/experience.ts), and only its colours are here.
+// as the brands' own marks do on dark. The independent panel has no logo: its rows are computed here from RL-BHRP's
+// wealth path (chartRows in lib/experience.ts), and its colours, with no file to read them from, are a green of its own.
 //
 // The logos are their owners' trademarks, shown to name where the owner worked or studied. University of Toronto's
 // crest is English Wikipedia's fair-use file; Commons has none.
-import type { Brand } from '../lib/experience';
+import { chartRows } from '../lib/experience';
+import { REPRO } from './papers/rl-bhrp';
 
-export interface Mark { rows?: readonly string[]; brand: Brand; source?: string }
+/** A mark's colours by role ('k' ink, 'm' mid-ink, 's' seal), on the light sheet and on the dark one. */
+type Colours = Partial<Record<'k' | 'm' | 's', string>>;
+export interface Mark { rows: readonly string[]; brand: { light: Colours; dark: Colours } }
 
 export const MARKS: Record<string, Mark> = {
+  // source: https://en.wikipedia.org/wiki/File:Utoronto_coa.svg
   uoft: {
-    source: 'https://en.wikipedia.org/wiki/File:Utoronto_coa.svg',
     brand: { light: { k: '#002f65' }, dark: { k: '#ffffff' } },
     rows: [
       '........................',
@@ -45,8 +48,8 @@ export const MARKS: Record<string, Mark> = {
       '........................',
     ],
   },
+  // source: https://commons.wikimedia.org/wiki/File:Electronic-Arts-Logo.svg
   ea: {
-    source: 'https://commons.wikimedia.org/wiki/File:Electronic-Arts-Logo.svg',
     brand: { light: { s: '#ff4747' }, dark: { s: '#ff4747' } },
     rows: [
       '........................',
@@ -75,8 +78,8 @@ export const MARKS: Record<string, Mark> = {
       '........................',
     ],
   },
+  // source: https://en.wikipedia.org/wiki/File:TikTok_logo.svg
   tiktok: {
-    source: 'https://en.wikipedia.org/wiki/File:TikTok_logo.svg',
     brand: { light: { k: '#000000', m: '#00f2ea', s: '#ff004f' }, dark: { k: '#ffffff', m: '#00f2ea', s: '#ff004f' } },
     rows: [
       '........................',
@@ -105,8 +108,8 @@ export const MARKS: Record<string, Mark> = {
       '........................',
     ],
   },
+  // source: https://commons.wikimedia.org/wiki/File:Ericsson_(2018).svg
   ericsson: {
-    source: 'https://commons.wikimedia.org/wiki/File:Ericsson_(2018).svg',
     brand: { light: { k: '#000000' }, dark: { k: '#ffffff' } },
     rows: [
       '........................',
@@ -135,8 +138,8 @@ export const MARKS: Record<string, Mark> = {
       '........................',
     ],
   },
+  // source: https://commons.wikimedia.org/wiki/File:Amazon_icon.svg
   amazon: {
-    source: 'https://commons.wikimedia.org/wiki/File:Amazon_icon.svg',
     brand: { light: { k: '#000000', s: '#ff9900' }, dark: { k: '#ffffff', s: '#ff9900' } },
     rows: [
       '........................',
@@ -165,8 +168,8 @@ export const MARKS: Record<string, Mark> = {
       '........................',
     ],
   },
+  // source: https://commons.wikimedia.org/wiki/File:Mcgill_univ_ca_logo.png
   mcgill: {
-    source: 'https://commons.wikimedia.org/wiki/File:Mcgill_univ_ca_logo.png',
     brand: { light: { s: '#ff3333' }, dark: { s: '#ff3333' } },
     rows: [
       '........................',
@@ -195,5 +198,5 @@ export const MARKS: Record<string, Mark> = {
       '........................',
     ],
   },
-  independent: { brand: {  light: {  k: '#1a7f4b',  m: '#8fd1aa'  },  dark: {  k: '#5fd394',  m: '#2c6b48'  }  }  },
+  independent: { rows: chartRows(REPRO.rl, 24), brand: { light: { k: '#1a7f4b', m: '#8fd1aa' }, dark: { k: '#5fd394', m: '#2c6b48' } } },
 };

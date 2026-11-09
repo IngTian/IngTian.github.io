@@ -46,7 +46,7 @@ export interface Publication {
   bibtex?: string;
 }
 
-/** A field is printed only when it is known. */
+/** A field is given only when it is on record, and printed only then. */
 export interface Award {
   year?: string;
   title: string;
@@ -109,7 +109,7 @@ export const researchInterests: ResearchInterest[] = [
 export const timeline: TimelineEntry[] = [
   { org: 'uoft', role: 'Incoming PhD, Operations Research', period: 'Fall 2027 —', detail: 'Doctoral research in operations research — multi-period portfolio optimization, and the convex-optimization and duality structure beneath it.', kind: 'education' },
   { org: 'ea', role: 'Software Engineer', period: '2026 —', detail: 'Recommendation systems for EA’s AI-driven products — dual-tower retrieval and ranking, end-to-end indexing & serving in Golang, training pipelines in Python over Elasticsearch / vector search, decoupled with Kafka & NATS.', kind: 'work' },
-  { org: 'independent', role: 'Freelance Quantitative Researcher', period: '2023 —', detail: 'Built an end-to-end quant trading system (Forex, commodities, indices via OANDA) with a collaborator — signal research in Python, execution engine in Golang, deployed on AWS (ECS, SageMaker). Authored the RL-BHRP portfolio-construction paper (arXiv:2508.11856).', kind: 'work' },
+  { org: 'independent', role: 'Freelance Quantitative Researcher', period: '2023 —', detail: 'Built an end-to-end quant trading system (Forex, commodities, indices via OANDA) with a collaborator — signal research in Python, execution engine in Golang, deployed on AWS (ECS, SageMaker). Authored the RL-BHRP portfolio-construction paper.', kind: 'work' },
   { org: 'tiktok', role: 'Senior Software Engineer', period: '2023 — 25', detail: 'ML systems for ads (Exceptional review — top rating). Built a dual-tower vision pipeline with billion-scale vector search (Faiss) tracking $200M in creative spend, and a C++ / gRPC ad-signature service sustaining 50k QPS for real-time delivery.', kind: 'work' },
   { org: 'ericsson', role: 'SWE Co-op', period: '2022 — 23', detail: 'JAMScript NodeCache for node discovery in IoT; a C++ mobility simulator; one-shot ML models detecting malicious smart contracts from time-series data.', kind: 'work' },
   { org: 'amazon', role: 'SDE Intern', period: '2022', detail: 'A fulfillment-data archiving and visual-analysis service — SNS transformed via Lambda, landed in S3 through Firehose, queried with Athena for QuickSight dashboards.', kind: 'work' },
@@ -171,8 +171,9 @@ export const publications: Publication[] = [
   },
 ];
 
-// The organisations, in /experience's order: research first, then engineering, newest first, then the degree. A fact
-// is given only when it is on record, so no location is guessed.
+// The organisations, in /experience's order: the incoming PhD, then research, then engineering newest first, then the
+// B.Eng (the identity hierarchy, CLAUDE.md Identity & voice). A fact is given only when it is on record, so no
+// location is guessed.
 const rlBhrp = publications.find((p) => p.slug === 'rl-bhrp');
 if (!rlBhrp?.arxivId) throw new Error('profile: the rl-bhrp record has no arXiv id');
 export const organisations: Organisation[] = [
@@ -217,7 +218,6 @@ export const organisations: Organisation[] = [
     ] },
 ];
 
-// The competitions' years and results are the owner's to give; each prints once set.
 export const awards: Award[] = [
   { year: '2021', title: 'IEEExtreme — Top 4 teams in Canada' },
   { year: "'21–'22", title: 'Hatch Scholarships ($10k) · McGill' },

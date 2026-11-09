@@ -2,26 +2,20 @@
 // /experience's pure half: an organisation's span from its roles' periods, the independent panel's mark (RL-BHRP's
 // wealth path as cells, since it has no logo), and a mark's rows as runs of one colour, one <rect> each. Pure.
 
-/** A mark's colours by role ('k' ink, 'm' mid-ink, 's' seal), on the light sheet and on the dark one. */
-export interface Brand {
-  light: Partial<Record<'k' | 'm' | 's', string>>;
-  dark: Partial<Record<'k' | 'm' | 's', string>>;
-}
-
 /**
  * The span of an organisation's roles, written as the timeline writes a period ("2023 — 25", "2026 —"): the earliest
- * start to the latest end, open if any role is. One role's period is returned as written ("Fall 2027 —").
+ * start to the latest end, open if any role is. One role's period is returned as written ("Fall 2027 —"). A period in
+ * any other form ("2024 — present", an en dash) is refused, naming it, rather than misread.
  */
 export function orgPeriod(periods: readonly string[]): string {
-  if (periods.length === 1) return periods[0];
   const spans = periods.map((p) => {
-    const m = /(\d{4})(?:\s*—\s*(\d{2,4})?)?/.exec(p);
-    if (!m) throw new Error(`orgPeriod: no year in "${p}"`);
+    const m = /^(?:[A-Z][a-z]+ )?(\d{4})(?: —(?: (\d{2}|\d{4}))?)?$/.exec(p);
+    if (!m) throw new Error(`orgPeriod: cannot read "${p}" (write 2021, 2023 — 25, 2023 — or Fall 2027 —)`);
     const start = Number(m[1]);
-    const open = /—\s*$/.test(p);
-    const end = open ? Infinity : m[2] ? (m[2].length === 2 ? Math.floor(start / 100) * 100 + Number(m[2]) : Number(m[2])) : start;
+    const end = p.endsWith('—') ? Infinity : m[2] ? (m[2].length === 2 ? Math.floor(start / 100) * 100 + Number(m[2]) : Number(m[2])) : start;
     return { start, end };
   });
+  if (periods.length === 1) return periods[0];
   const start = Math.min(...spans.map((s) => s.start));
   const end = Math.max(...spans.map((s) => s.end));
   if (end === Infinity) return `${start} —`;

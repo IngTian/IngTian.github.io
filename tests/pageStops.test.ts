@@ -45,10 +45,6 @@ describe('experienceStops', () => {
     ]);
   });
 
-  it('spells a panel id from its organisation, not its place', () => {
-    expect(experienceSectionId('tiktok')).toBe('x-tiktok');
-  });
-
   it('leads with the incoming PhD, and gives the real record a unique target per stop', () => {
     // The identity hierarchy is load-bearing: the PhD must not sit below the engineering roles.
     const stops = experienceStops(organisations);
@@ -57,7 +53,7 @@ describe('experienceStops', () => {
     expect(new Set(all).size).toBe(all.length);
   });
 
-  it('keeps every label as short as /projects\' longest, which the page\'s rail clearance is the same as', () => {
+  it("keeps every label within /projects' longest, as the page clears the rail by /projects' padding", () => {
     const longest = Math.max(...flattenStops(projectStops(projects)).map((s) => s.label.length));
     for (const s of experienceStops(organisations)) expect(s.label.length, s.label).toBeLessThanOrEqual(longest);
   });

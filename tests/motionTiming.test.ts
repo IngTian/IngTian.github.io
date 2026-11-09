@@ -45,7 +45,7 @@ describe("a paper page's batches", () => {
   });
 });
 
-// Every curve and duration the rail, the research routes and /art move by is lib/motionTiming's. Their scripts import
+// Every curve and duration the rail, the research routes, /art and /experience move by is lib/motionTiming's. Their scripts import
 // it; their CSS cannot, so each motion declaration in it, shorthand or longhand, is held here to the constant it
 // carries, in source order, and a literal added without one fails by name. The research routes' shared sheet
 // (styles/paper.css) moves nothing.

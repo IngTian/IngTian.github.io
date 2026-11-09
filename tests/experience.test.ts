@@ -20,8 +20,10 @@ describe('orgPeriod', () => {
   it('stays open while any role is', () => {
     expect(orgPeriod(['2026 —', '2023 — 25'])).toBe('2023 —');
   });
-  it('refuses a period with no year', () => {
-    expect(() => orgPeriod(['soon', '2020'])).toThrow(/no year/);
+  it('refuses a period in any other form, naming it, rather than misreading it', () => {
+    expect(() => orgPeriod(['soon', '2020'])).toThrow(/cannot read "soon"/);
+    expect(() => orgPeriod(['2024 — present', '2021'])).toThrow(/cannot read/);
+    expect(() => orgPeriod(['2023–25'])).toThrow(/cannot read/);
   });
 });
 
@@ -64,7 +66,7 @@ describe("the record and its marks agree", () => {
 
   it('every mark is 24 x 24 in the four roles, neither noise nor a block', () => {
     for (const [key, m] of Object.entries(MARKS)) {
-      const rows = m.rows ?? chartRows(REPRO.rl, 24);
+      const { rows } = m;
       expect(rows.length, key).toBe(24);
       expect(rows.every((r) => r.length === 24 && /^[.kms]+$/.test(r)), key).toBe(true);
       const share = coverage(compileGlyph(rows));
@@ -75,7 +77,7 @@ describe("the record and its marks agree", () => {
 
   it('gives every role a mark uses a colour on both sheets', () => {
     for (const [key, m] of Object.entries(MARKS)) {
-      const used = new Set((m.rows ?? chartRows(REPRO.rl, 24)).join('').replace(/\./g, ''));
+      const used = new Set(m.rows.join('').replace(/\./g, ''));
       for (const r of used) {
         for (const sheet of ['light', 'dark'] as const) {
           expect(m.brand[sheet][r as 'k' | 'm' | 's'], `${key} ${sheet} ${r}`).toMatch(/^#[0-9a-f]{6}$/);

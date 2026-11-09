@@ -196,7 +196,7 @@ src/
   lib/wealth.ts                     # the one wealth module: growth of $1, CAGR, drawdown, the band of runs, WealthSeries (the prepared series every picture of a run reads; REPRO is RL-BHRP's), scales and ticks — the paper page's figures and /projects' rl-bhrp picture
   lib/words.ts                      # the one word counter (countWords, readingMinutes) + wholeParts, the one rule for what never breaks across a line ("RL-BHRP")
   lib/dates.ts                      # the one date helper: longDate, monthYear (UTC)
-  lib/motionTiming.ts               # the motion module's pure half: every curve (EASE, DRAW, SWEEP, FADE, WITHDRAW) and duration (REVEAL, RAIL, PAPER_PAGE, CARD, ART, MOVE_MAX) the rail, the research routes and /art move by, stagger and the paper page's batches (highlightDelay, arrowDelay), sweepDurations, mergeLines
+  lib/motionTiming.ts               # the motion module's pure half: every curve (EASE, DRAW, SWEEP, FADE, WITHDRAW) and duration (REVEAL, RAIL, PAPER_PAGE, CARD, ART, EXPERIENCE, MOVE_MAX) the rail, the research routes, /art and /experience move by, stagger and the paper page's batches (highlightDelay, arrowDelay), sweepDurations, mergeLines
   scripts/motion.ts                 # THE ONE MOTION MODULE, its DOM half: play, onceSeen, riseOnceSeen, sweepLines — the rail and both research routes; the reduced-motion gate is inside it
   scripts/pageView.ts               # onPageView(selector, init): starts ten scripts right after parse, not at window `load` (see Interactivity)
   scripts/beats.ts, lib/beats.ts    # walkBeats: the beat walk the three explainer slides share (timer, freeze on a click or an arrow, the observer at 0.3, the reduced-motion rest, the teardown); arrowBeat, its key map, is the pure half
@@ -226,7 +226,7 @@ src/
   lib/{justify,pixels,cowSpeech,knowledge,equations}.ts
   sections/{Heights,Interlude,Choice,Rules,Solve,Story,Work}.astro   # the homepage, in scroll order — all of sections/
   components/Deck.astro             # the deck's event plumbing (homepage only)
-  components/FluidSky.astro         # the WebGL sky canvas — on 5 routes (/projects, the two research routes and /art omit it)
+  components/FluidSky.astro         # the WebGL sky canvas — the routes it is on are listed in *The fluid sky*
   components/SkyWash.astro          # woven warm/cold broken-color wash over the sky — CSS + a small script
   components/TerrainHero.astro      # the hero's terrain canvas (Heights only)
   components/DescentPath.astro      # the career descent graph (inside Story)
@@ -475,8 +475,8 @@ and reverted every time** — do not rebuild it. The phone treatment is *bug fix
     summary, so a wrapping line does not move it and its hop does not cover the summary; the measurements are
     in `projects.astro`'s comment on the 1179px block. A probe that watches the gallery and not the cow
     reports "nothing moves when it speaks" while the cow moves: assert the cow's rect for every line.
-- on **/experience**, a panel's three columns become two at 1100px (the work under both) and one at 640px; a
-  mark keeps its 72px, and its colours on hover are a pointer's (`(hover: hover)`) or a keyboard focus's;
+- on **/experience**, a panel's three columns become two at 1100px (the work under both) and one at 640px; its
+  colours on hover are a pointer's (`(hover: hover)`) or a keyboard focus's;
 - on **/art**, at 900px and under the sentences come first, their numbers and Pause under them, then the mat, so a
   tap swaps the work just below the line being read, and a block's work sits above its words. At 640px a sentence
   is 21px, the mat is `min(40vh, 320px)` (so its top is on the first screen at 390×844; computed, not measured),
@@ -881,8 +881,8 @@ Two themes, driven by `html[data-theme]` (absent = light, `'dark'` = terminal ga
   for text ON the accent chip — the accent is a light color in both themes) and `--descent-grad` (the whole
   sky, redefined wholesale per theme).
 - **A page can override the ROLE tokens, per theme, from `html[data-page]`** (BaseLayout's `page` prop). Two
-  registers do: `page="drafting"` (/projects) and `page="paper"` (both research routes, and /art, which borrows
-  it). Each has two blocks in `tokens.css`, `html[data-page='…']` and `…[data-theme='dark']`, that re-declare
+  registers do: `page="drafting"` (/projects) and `page="paper"` (both research routes, and /art and /experience,
+  which borrow it). Each has two blocks in `tokens.css`, `html[data-page='…']` and `…[data-theme='dark']`, that re-declare
   `--paper`, the ink ramp, `--ochre` (→ the seal), `--on-accent`, `--hairline-rgb` and `--bg` (= the sheet, so
   the body and overscroll show paper), plus the register's own tokens. That is how the shared nav, rail,
   button anatomy and cow reskin with no edit. **Both theme blocks declare every token**: `[data-page]` and
@@ -1038,7 +1038,7 @@ of sky over a full-bleed panel.
 ## Taste rules (these define the look — hold the line)
 
 - **Palette discipline:** the shared palette is the tokens in `tokens.css` (paper, ink-1..5, ochre, indigo,
-  seal, plus the derived `--hairline-rgb` and `--rule`); under a page register, its own tokens and its overrides
+  seal, plus the derived `--hairline-rgb`); under a page register, its own tokens and its overrides
   of the role tokens (/projects' eight `--draft-*` and two knockouts, the research routes' eight `--sheet-*`;
   *Themes*); and on `/`, which is not a register, `--rail-ink` and `--rail-focus` (*Navigation*), the six
   `--panel-*` of `styles/slides.css` (the five paper panels' ground and inks per theme), Choice's chart colours
@@ -1047,8 +1047,8 @@ of sky over a full-bleed panel.
   those, a component may hold a literal for a drawing of its own (the cow's coat, a logo's colours in
   `data/experienceMarks.ts`).
   - **An undeclared `var()` voids the whole shorthand** (every longhand falls back to its initial, and
-    `border-style`'s is `none`): the old /experience's dividers never drew against an undefined `--rule`, which is now
-    `rgba(var(--hairline-rgb), 0.32)`. `tests/cssVars.test.ts` fails on any `var(--x)` without a fallback that
+    `border-style`'s is `none`): the old /experience's dividers never drew against an undefined `--rule`.
+    `tests/cssVars.test.ts` fails on any `var(--x)` without a fallback that
     nothing declares, reading stylesheets, inline `style="--l:0"` attributes and runtime
     `el.style.setProperty()` (`sections/Rules.astro` sets `--len` and `--i`). Nothing else catches it: the
     build accepts it, `astro check` and `tsc` do not read CSS, and a missing border looks like a design choice.
@@ -1060,8 +1060,11 @@ of sky over a full-bleed panel.
     ground). The IT seal itself is drawn on no page; it is the favicon and the OG card.
   - **The registers have no emerald**: /projects' palette and the paper one (the research routes, /art and
     /experience) set `--ochre` to the seal in both themes, so seal red is the only saturated colour on them in dark
-    too. **One exception, the owner's ask** ("add some colors when hovering the icon"): on /experience a panel's hover
-    or focus turns its mark into its logo's own colours, read from the logo file (`data/experienceMarks.ts`).
+    too.
+  - **One exception to both, the owner's ask** ("add some colors when hovering the icon"): on /experience a panel's
+    hover or keyboard focus turns its mark into its logo's own colours, read from the logo file, in either theme (a
+    black or navy role takes white on the dark sheet); the independent panel, which has no logo, takes a green of its
+    own (`data/experienceMarks.ts`).
 - **Motion:** animate only `transform` / `opacity`; NEVER animate `filter: blur` (bake it). ALL motion is gated
   behind `@media (prefers-reduced-motion: no-preference)` via `lib/motion.ts`. The no-motion state must look
   *finished* — it's also the Firefox fallback (`animation-timeline` isn't in Firefox yet), and what a

@@ -1,11 +1,10 @@
 ---
-// /experience — the full record, one wide panel per organisation: its mark, name, tagline and span; its roles and
-// facts; what the work was. The incoming PhD leads, then research, then engineering newest first, then the degree:
-// the site's identity hierarchy is load-bearing (CLAUDE.md, Identity & voice). It borrows the paper register
-// (page="paper", as /art does): no sky, no veil.
+// /experience — the full record, one wide panel per organisation, in `organisations`' order (profile.ts says why): its
+// mark, name, tagline and span; its roles and facts; what the work was. It borrows the paper register (page="paper",
+// as /art does): no sky, no veil.
 //
 // Each mark is the organisation's logo as pixel cells (data/experienceMarks.ts), drawn in the sheet's inks; a
-// panel's hover or focus cross-fades it into the logo's own colours and fades the same mark in, enlarged, behind
+// panel's hover or keyboard focus cross-fades it into the logo's own colours and fades the same mark in, enlarged, behind
 // the panel. Both are CSS, by opacity (EXPERIENCE in lib/motionTiming.ts); the page has no script.
 //
 // The facts come from data/profile.ts (organisations, and the timeline's roles, which name their organisation),
@@ -14,22 +13,22 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import SideRail from '../components/SideRail.astro';
 import { awards, organisations, timeline } from '../data/profile';
 import { MARKS } from '../data/experienceMarks';
-import { REPRO } from '../data/papers/rl-bhrp';
-import { chartRows, orgPeriod, runs } from '../lib/experience';
+import { orgPeriod, runs } from '../lib/experience';
 import { experienceSectionId, experienceStops } from '../lib/pageStops';
 
-const N = 24;
 const panels = organisations.map((o) => {
   const roles = timeline.filter((t) => t.org === o.key);
   if (!roles.length) throw new Error(`experience: ${o.key} has no role in the timeline`);
   const mark = MARKS[o.key];
   if (!mark) throw new Error(`experience: ${o.key} has no mark in data/experienceMarks.ts`);
-  const rows = mark.rows ?? chartRows(REPRO.rl, N);
-  // The logo's colours as custom properties: --b<role> on the light sheet, --b<role>-d on the dark.
-  const brand = (['k', 'm', 's'] as const)
-    .flatMap((r) => [mark.brand.light[r] && `--b${r}:${mark.brand.light[r]}`, mark.brand.dark[r] && `--b${r}-d:${mark.brand.dark[r]}`])
-    .filter(Boolean).join(';');
-  return { ...o, roles, period: orgPeriod(roles.map((r) => r.period)), cells: runs(rows), n: rows.length, brand };
+  // The logo's colours as custom properties: --b<role> on the light sheet, --b<role>-d on the dark (every role a mark
+  // uses has both: tests/experience.test.ts).
+  const brand = (Object.keys(mark.brand.light) as ('k' | 'm' | 's')[])
+    .map((r) => `--b${r}:${mark.brand.light[r]};--b${r}-d:${mark.brand.dark[r]}`).join(';');
+  return {
+    ...o, id: experienceSectionId(o.key), roles, period: orgPeriod(roles.map((r) => r.period)),
+    cells: runs(mark.rows), n: mark.rows.length, brand,
+  };
 });
 const orphans = timeline.filter((t) => !organisations.some((o) => o.key === t.org));
 if (orphans.length) throw new Error(`experience: no organisation for ${orphans.map((t) => `${t.role} (${t.org})`).join(', ')}`);
@@ -51,7 +50,7 @@ if (orphans.length) throw new Error(`experience: no organisation for ${orphans.m
 
       <div class="panels">
         {panels.map((p) => (
-          <article class="panel" id={experienceSectionId(p.key)} aria-labelledby={`${experienceSectionId(p.key)}-name`} style={p.brand}>
+          <article class="panel" id={p.id} aria-labelledby={`${p.id}-name`} style={p.brand}>
             <svg class="ground brand" viewBox={`0 0 ${p.n} ${p.n}`} shape-rendering="crispEdges" aria-hidden="true"
                  preserveAspectRatio="xMaxYMid meet">
               {p.cells.map((r) => <rect class={r.c} x={r.x} y={r.y} width={r.w} height="1" />)}
@@ -63,7 +62,7 @@ if (orphans.length) throw new Error(`experience: no organisation for ${orphans.m
                   <g class={g}>{p.cells.map((r) => <rect class={r.c} x={r.x} y={r.y} width={r.w} height="1" />)}</g>
                 ))}
               </svg>
-              <h2 id={`${experienceSectionId(p.key)}-name`}>{p.name}</h2>
+              <h2 id={`${p.id}-name`}>{p.name}</h2>
               <p class="tag">{p.tagline}</p>
               <p class="when">{p.period}</p>
             </div>
@@ -105,10 +104,10 @@ if (orphans.length) throw new Error(`experience: no organisation for ${orphans.m
 </BaseLayout>
 
 <style>
-  .xp { min-height: 100vh; --panel: rgba(var(--hairline-rgb), 0.045); --panel-edge: rgba(var(--hairline-rgb), 0.16); }
+  .xp { min-height: 100vh; --xp-ground: rgba(var(--hairline-rgb), 0.045); --xp-edge: rgba(var(--hairline-rgb), 0.16); }
   .xp-wrap { max-width: 1480px; margin: 0 auto; padding: 13vh clamp(22px, 5vw, 72px) 14vh; }
-  /* Clears SideRail where it shows (it hides at 1100px and below), as /projects does: the rail's longest labels
-     here ("Independent", "Recognition") are as long as /projects' "The workshop". */
+  /* Clears SideRail where it shows (it hides at 1100px and below) by /projects' padding, so no label here may be
+     longer than /projects' longest (tests/pageStops.test.ts holds it). */
   @media not all and (max-width: 1100px) { .xp-wrap { padding-left: clamp(190px, 13vw, 230px); } }
   .back { font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); text-decoration: none; }
   @media (hover: hover) { .back:hover { color: var(--seal); } }
@@ -122,7 +121,7 @@ if (orphans.length) throw new Error(`experience: no organisation for ${orphans.m
   .panels { display: grid; gap: 8px; margin-top: 56px; }
   .panel { position: relative; overflow: hidden; display: grid; gap: 40px;
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.15fr) minmax(0, 1.9fr);
-    padding: 44px 40px; background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 14px; }
+    padding: 44px 40px; background: var(--xp-ground); border: 1px solid var(--xp-edge); border-radius: 14px; }
   .panel > :not(.ground) { position: relative; }
 
   /* A mark is 24 cells at 3px. */
@@ -130,13 +129,13 @@ if (orphans.length) throw new Error(`experience: no organisation for ${orphans.m
   .ink .k { fill: var(--ink-1); }
   .ink .m { fill: var(--ink-3); }
   .ink .s { fill: var(--seal); }
-  /* The logo's colours, from the panel's --b* (the sheet's ink where a role has none). */
-  .brand .k { fill: var(--bk, var(--ink-1)); }
-  .brand .m { fill: var(--bm, var(--ink-3)); }
-  .brand .s { fill: var(--bs, var(--seal)); }
-  :global(html[data-theme='dark']) .brand .k { fill: var(--bk-d, var(--bk, var(--ink-1))); }
-  :global(html[data-theme='dark']) .brand .m { fill: var(--bm-d, var(--bm, var(--ink-3))); }
-  :global(html[data-theme='dark']) .brand .s { fill: var(--bs-d, var(--bs, var(--seal))); }
+  /* The logo's colours, from the panel's --b* (light) and --b*-d (dark). */
+  .brand .k { fill: var(--bk); }
+  .brand .m { fill: var(--bm); }
+  .brand .s { fill: var(--bs); }
+  :global(html[data-theme='dark']) .brand .k { fill: var(--bk-d); }
+  :global(html[data-theme='dark']) .brand .m { fill: var(--bm-d); }
+  :global(html[data-theme='dark']) .brand .s { fill: var(--bs-d); }
 
   .who h2 { margin: 0; font: 700 clamp(30px, 2.6vw, 44px)/1.05 var(--font-body); letter-spacing: -0.02em; color: var(--ink-1); }
   .tag { margin: 14px 0 0; font-size: 15px; color: var(--ink-2); }
@@ -147,35 +146,34 @@ if (orphans.length) throw new Error(`experience: no organisation for ${orphans.m
   .facts dt { font-size: 14px; color: var(--ink-3); }
   .facts dd { margin: 0; font-size: 14.5px; font-weight: 600; color: var(--ink-1); }
   .facts a { color: inherit; text-underline-offset: 3px; }
-  @media (hover: hover) { .facts a:hover { color: var(--seal); } }
+  @media (hover: hover) { .facts a:hover { text-decoration-color: var(--seal); } }
   .facts a:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
 
   .what p { margin: 0 0 14px; max-width: 62ch; font-size: 15.5px; line-height: 1.62; color: var(--ink-2); }
   .what p:last-child { margin-bottom: 0; }
   .what strong { font-weight: 600; color: var(--ink-1); }
 
-  /* ── THE HOVER, opacity only, on a pointer's hover or a keyboard's focus inside the panel: the mark cross-fades
-     from ink into its colours (EXPERIENCE.mark), and the enlarged mark fades in behind the panel's right side
-     (EXPERIENCE.ground). Under reduced motion both change at once. */
+  /* ── THE HOVER, opacity only, on a pointer's hover or a keyboard's focus inside the panel: the mark's colours fade
+     in over its ink (EXPERIENCE.mark), and the enlarged mark fades in behind the panel's right side
+     (EXPERIENCE.ground), at 0.09 so --ink-3 text over a black or white mark keeps 4.5:1. Under reduced motion both
+     change at once. */
   .mark .brand { opacity: 0; }
   .ground { position: absolute; right: -4%; top: -12%; height: 124%; width: auto; aspect-ratio: 1; opacity: 0; pointer-events: none; }
   @media (prefers-reduced-motion: no-preference) {
     .mark g { transition: opacity 320ms ease-out; }
     .ground { transition: opacity 420ms ease-out; }
   }
-  .panel:focus-within .mark .brand { opacity: 1; }
-  .panel:focus-within .mark .ink { opacity: 0; }
-  .panel:focus-within .ground { opacity: 0.14; }
+  .panel:has(:focus-visible) .mark .brand { opacity: 1; }
+  .panel:has(:focus-visible) .ground { opacity: 0.09; }
   @media (hover: hover) {
     .panel:hover .mark .brand { opacity: 1; }
-    .panel:hover .mark .ink { opacity: 0; }
-    .panel:hover .ground { opacity: 0.14; }
+    .panel:hover .ground { opacity: 0.09; }
   }
 
   .recog { margin-top: 12vh; max-width: 900px; }
   .recog h2 { margin: 0 0 12px; font: 12px/1 var(--font-mono); letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); }
   .recog ul { list-style: none; margin: 0; padding: 0; }
-  .recog li { display: grid; grid-template-columns: 7.5rem 1fr; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--panel-edge);
+  .recog li { display: grid; grid-template-columns: 7.5rem 1fr; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--xp-edge);
     font-size: 15px; color: var(--ink-2); }
   .recog .year { font: 13px/1.5 var(--font-mono); color: var(--ink-3); }
   .recog .gloss { color: var(--ink-3); }
