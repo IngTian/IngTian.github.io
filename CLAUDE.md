@@ -873,10 +873,20 @@ Two themes, driven by `html[data-theme]` (absent = light, `'dark'` = terminal ga
   (`TerrainHero.astro` picks a `TerrainRamp` + walker palette off `data-theme`; dark is the cyan-blue
   **"Glacier"** ramp, `TERRAIN_TERMINAL` in `lib/terrain.ts` — not green, which is the sky's and the accent's),
   the **fluid sky** (`skyPalette`/`skyShader` switch to a phosphor nebula with stars behind the line), the
-  **SkyWash** + `.descent::before/::after` washes (raw rgba — dark nearly kills the warm Monet strokes), the
-  **hero legibility halo** (paper→dark veil), the **homepage panels' paper ground** (`styles/slides.css`, per
-  theme) and the **corner-nav glass** (forced dark-frost in dark). The research routes' figures are not among
-  them: their SVG is drawn from CSS classes that read the paper tokens.
+  **SkyWash** + `.descent::before/::after` washes (raw rgba; dark hides SkyWash outright, as its light strokes
+  are a lift on the night ground that 8 bits band into rings — the dark intro's "two big bubbles" — and hides
+  `::before`, whose green haze read as a glow round the nav, keeping only `::after`'s fog), the **hero
+  legibility halo** (a paper lift in light; in dark a band on a phone and nothing on a desktop, where its `--bg`
+  oval drew a ringed blob behind the name on the intro's near-flat first beat, and the light text clears AA
+  without it once the identity line drops its `/90` there; `Heights.astro` has the numbers), the **homepage
+  panels' paper ground** (`styles/slides.css`, per theme) and the **corner-nav glass** (forced dark-frost in
+  dark). The research routes' figures are not among them: their SVG is drawn from CSS classes that read the
+  paper tokens. `tests/distSmoke.test.ts` holds the three dark hides.
+- **A theme override never beats an animation of the same property.** Animation declarations outrank normal
+  (non-`!important`) ones, so a dark `opacity` on an element whose keyframes animate `opacity` is dead while
+  motion is on: SkyWash's dark per-stroke opacities never applied with motion on, from the dark theme's first
+  commit; the intro's flat first beat made the result visible. Hide the layer (`display: none`), never override
+  the animated value (`tests/distSmoke.test.ts` holds SkyWash to it).
 - **Default + persistence:** an inline no-FOUC head script in `BaseLayout` resolves the theme *before first
   paint* — explicit `localStorage.theme` first, else `prefers-color-scheme`. The toggle (a real `<button>` in
   `CornerNav`, sun/moon by action) writes `localStorage`, flips the attribute live, and dispatches
@@ -1043,8 +1053,8 @@ of sky over a full-bleed panel.
     restored scroll), and what waits runs at the latest after `MOTION_LIMIT_MS` on screen. Under reduced
     motion each is its finished state at once.
   - **Everything older is not held to it yet, and this is the list known, not a guarantee**: the hero
-    terrain, the fluid sky, the drafting field, SkyWash's three breathe loops and the `.descent::before/::after`
-    drifts run for as long as they are on screen; `/`'s `.scroll-cue` bobs forever in the foreground
+    terrain, the fluid sky, the drafting field, SkyWash's three breathe loops (light theme only) and the
+    `.descent::before/::after` drifts (`::before`'s light only) run for as long as they are on screen; `/`'s `.scroll-cue` bobs forever in the foreground
     (`Heights.astro`); and the three explainer slides (Choice, Rules, Solve) cycle their beats for as long as
     the slide is on screen, until a beat is clicked (`scripts/beats.ts`). That is the site's older pattern and
     a known gap against 2.2.2, not a precedent for new motion in the reading area.

@@ -448,6 +448,44 @@ describe("BaseLayout's per-page hooks: /projects is the drafting page, the resea
     expect(/class="sky-wash"/.test(markup), '/writing lost the SkyWash layer').toBe(true);
   });
 
+  // The wash's paper-coloured strokes are a lift on the night ground, banded into rings (the dark intro's "two big
+  // bubbles"), so the dark theme hides the whole layer. Not a per-stroke opacity: the breathe's keyframes set
+  // opacity, an animation outranks a normal rule, and the dark per-stroke overrides that stood here never applied.
+  it('hides the sky wash in the dark theme, as a layer, with no per-stroke dark override to lose to the breathe', () => {
+    const css = shippedCss(pages());
+    const hide = /html\[data-theme=dark\] \.sky-wash\[[^\]]+\]\{display:none\}/.exec(css);
+    expect(hide?.[0], 'the dark theme no longer hides .sky-wash').toBeDefined();
+    // at the top level, not in a media block: inside `prefers-reduced-motion: no-preference` it would leave a reduced-
+    // motion dark reader the strokes at full strength, with no override at all
+    const before = css.slice(0, hide!.index);
+    expect(before.split('{').length - before.split('}').length, 'the dark .sky-wash hide sits inside a block').toBe(0);
+    // and nothing styles a stroke in dark, directly or through the layer's `> div`
+    expect(/\[data-theme=dark\] \.sky-(?:warm|cool|sun|wash\[[^\]]+\]>)/.exec(css)?.[0], 'a dark rule on a stroke, which its breathe overrides').toBeUndefined();
+  });
+
+  // The same artefact twice more, the dark intro's "faint blob": the hero's --bg halo (a dark oval with a ring edge
+  // behind the name) and .descent::before's green haze (a glow round the nav). Dark hides both. With no halo the
+  // identity line clears 4.5:1 only at full --ink-3 (Heights.astro has the numbers), so that colour is held with the
+  // hide; and the phone's dark band must still re-show the layer, as its `display: block` outranks the hide.
+  it('hides the hero halo and the upper-sky haze in the dark theme, and keeps the phone band', () => {
+    const css = shippedCss(pages());
+    const depth = (i: number): number => { const b = css.slice(0, i); return b.split('{').length - b.split('}').length; };
+    for (const [re, what] of [
+      [/html\[data-theme=dark\] \.hero-legibility\[[^\]]+\]\{display:none\}/, 'the dark hero-halo hide'],
+      [/html\[data-theme=dark\] \.hero-id\[[^\]]+\]\{color:var\(--ink-3\)\}/, "the identity line's full dark ink"],
+      [/html\[data-theme=dark\] \.descent:{1,2}before\{display:none\}/, 'the dark upper-sky hide'],
+    ] as const) {
+      const m = re.exec(css);
+      expect(m?.[0], `${what} is gone`).toBeDefined();
+      expect(depth(m!.index), `${what} sits inside a block`).toBe(0);
+    }
+    const band = /#heights\[[^\]]+\] \.hero-legibility\[[^\]]+\]\{display:block[;}]/.exec(css);
+    expect(band?.[0], 'the phone band no longer re-shows the hero-halo layer').toBeDefined();
+    expect(depth(band!.index), 'the phone band left its media block').toBe(1);
+    expect(/\[data-theme=dark\] (?:\.hero-legibility\[[^\]]+\]|\.descent:{1,2}before)\{[^}]*background/.exec(css)?.[0],
+      'a dark rule paints a hidden layer again').toBeUndefined();
+  });
+
   // The dot is on every page under a door: its own link's ("page"), or on a page under one (/research/<slug>,
   // /writing/<slug>) its section's ("true"). No other link is marked.
   it('marks the page you are on in the corner nav, or the section it is under', () => {
