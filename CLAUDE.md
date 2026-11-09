@@ -17,31 +17,33 @@ indigo dusk → grey ink → near-black ground). You don't navigate between sect
 Swiss-minimal structure carries the weight; the sky, the math-generative terrain hero, and one editorial
 tagline carry the soul.
 
-The homepage is the descent. Around it are the **reading pages** — /writing, /writing/&lt;slug&gt;, /experience
-— the **research routes** (/research and /research/&lt;slug&gt;), **/projects**, and **/art**, a quiet museum
-room for calligraphy and photography. Every route except /projects, the two research routes and /art rides the
-same sky, and the reading pages share one margin, one measure and one back-link treatment: pages that each
-guessed their own layout would read as several sites. Borrow composition from the neighbouring page rather than
-inventing it.
+The homepage is the descent. Around it are the **reading pages** — /writing and /writing/&lt;slug&gt; — the
+**research routes** (/research and /research/&lt;slug&gt;), **/projects**, **/experience**, the full record, and
+**/art**, a quiet museum room for calligraphy and photography. Every route except /projects, the two research
+routes, /experience and /art rides the same sky, and the reading pages share one margin, one measure and one
+back-link treatment: pages that each guessed their own layout would read as several sites. Borrow composition
+from the neighbouring page rather than inventing it.
 
 **A page may have a register of its own, and two do.** The rule, in the owner's words, for each page's own
 pass: **research serious, academic; art imaginative, romantic; writing imaginative, fun, casual, stylish** —
-and /projects *"techy… pure tech and engineering."* /projects, the research routes and /art have had their
-passes; /writing has not, and until a page gets its pass it keeps the current look.
+and /projects *"techy… pure tech and engineering."* /experience's, in the owner's words, was *"mostly a display
+and taste issue"*. /projects, the research routes, /art and /experience have had their passes; /writing has not,
+and until a page gets its pass it keeps the current look.
 - **/projects, the drafting register** (`page="drafting"`). A drafting sheet instead of the sky — isolines of
   a drifting Gaussian-mixture field, ticks and probe readouts, seal red the only colour
   (`components/projects/DraftingField.astro`) — with its own measure (a 1500px main, the rail's column on the
   left and, from 1180px, the cow's on the right).
-- **The research routes, the paper register** (`page="paper"`), **and /art, which borrows it.** A still sheet
-  with no sky and no SkyWash — warm paper in light, near-black in dark, seal red the only colour in both — set
-  like a paper on the research routes: a Georgia body (18px, growing to 19px by 1780px) on a ~77-character
-  line, numbered section heads, margin notes, booktabs tables, hairline rules, ink for structure. Their measure
-  is `styles/paper.css`'s, which both routes import: a reading column (`--M`, 604 → 664px between 1100 and
-  1780px) and a notes column (`--N`) a gap (`--G`) apart, centred in the space right of the rail; an index card
-  spans both. /art borrows the sheet and not the measure: no token of its own differs, so there is no `art`
-  register, and it sets its own 1240px column (`pages/art.astro`). No page-load veil on any of the three: on the
-  research routes it would replay on every card click and every "← all research", and on /art it is motion that
-  runs on its own.
+- **The research routes, the paper register** (`page="paper"`), **and /art and /experience, which borrow it.** A still
+  sheet with no sky and no SkyWash — warm paper in light, near-black in dark, seal red the only colour in both — set
+  like a paper on the research routes: a Georgia body (18px, growing to 19px by 1780px) on a ~77-character line,
+  numbered section heads, margin notes, booktabs tables, hairline rules, ink for structure. Their measure is
+  `styles/paper.css`'s, which both routes import: a reading column (`--M`, 604 → 664px between 1100 and 1780px) and a
+  notes column (`--N`) a gap (`--G`) apart, centred in the space right of the rail; an index card spans both. /art
+  borrows the sheet and not the measure: no token of its own differs, so there is no `art` register, and it sets its
+  own 1240px column (`pages/art.astro`). /experience borrows it the same way, with a 1480px column of wide panels, one
+  per organisation, each beside its logo as a pixel mark (`pages/experience.astro`). No page-load veil on any of the
+  four: on the research routes it would replay on every card click and every "← all research", and on /art and
+  /experience it is motion that runs on its own.
 
 **What keeps them one site is shared components, not a shared background.** Which kind a component is
 decides how a page may change it:
@@ -200,7 +202,9 @@ src/
   scripts/beats.ts, lib/beats.ts    # walkBeats: the beat walk the three explainer slides share (timer, freeze on a click or an arrow, the observer at 0.3, the reduced-motion rest, the teardown); arrowBeat, its key map, is the pure half
   data/papers/{index,rl-bhrp}.ts    # PAPER_DATA (values, figures, the homepage line, thumb); RL-BHRP's Table 2, window, reproduction series, and VALUES — every figure its prose prints, as the string it prints
   lib/mathml.ts                     # the one MathML letter fix: fixMathVariants for lib/equations.ts, rehypeMathVariants for every .md
-  data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline, publications, projects + inProgress, awards, contact
+  data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline (roles, each naming its organisation), publications, organisations, projects + inProgress, awards, contact
+  data/experienceMarks.ts           # /experience's marks: each organisation's logo as a 24 x 24 pixel matrix, transcribed from the logo file it names, with the logo's colours by role; the independent panel's is computed
+  lib/experience.ts                 # /experience's pure half: orgPeriod (an organisation's span from its roles), chartRows (the independent panel's mark, from RL-BHRP's wealth), runs (a mark's rows as rects)
   data/nav.ts                       # PAGES — the canonical page set (see Navigation)
   data/writing.ts                   # the writing TAXONOMY (KINDS) + buildKinds(), the one seam to the markdown
   data/artworks.ts                  # /art's works, keyed (photo-NN from the file; couplet, poem), + SENTENCES, the page's sentences in turn order; photoNotes.ts holds each photograph's alt, title?, place?{name, confirmed} and year?
@@ -256,7 +260,7 @@ tools/vendor-projects.mjs           # the ONLY thing that touches the network, r
 | `/writing` | the writing shelf — kinds, each listing its markdown pieces |
 | `/writing/<slug>` | one piece, rendered from `src/content/writing/<slug>.md` |
 | `/projects` | every notable project, on its own drafting register: the terminal header and its boot, the gallery, selected work, the workshop |
-| `/experience` | the timeline — education and roles |
+| `/experience` | the full record: one panel per organisation, its logo as a pixel mark, its roles, facts and work; then Recognition; on the paper sheet |
 | `/art` | sentences taking turns, whose seal-red phrases bring a work onto a mat; the calligraphy as object blocks; every photograph in justified rows; on the paper sheet |
 | `/404` | the not-found page (noindex, no canonical) |
 
@@ -322,18 +326,18 @@ it gets the finished page (`tests/distSmoke.test.ts` fails on a hold-back outsid
   element's own CSS, `onceSeen`/`riseOnceSeen` reveal what is first seen, `sweepLines` draws a highlight line
   by line. The reduced-motion gate is inside it, not in the callers: under it `play` lands on its last frame
   at once and `onceSeen` holds nothing back. A teardown finishes every live animation.
-  - **Every curve and duration they move by is stated once, in `lib/motionTiming.ts`**, and a script imports
-    it; it states /art's two too (`ART`: the mat's swap, which the sentences' turn shares, and a photograph's
-    one fade), though /art moves by CSS transitions and not through `scripts/motion.ts`. A sentence's hold is no
-    move and is not here (*Taste rules*). CSS cannot import them, so `tests/motionTiming.test.ts`
-    reads each transition and animation declaration, shorthand or longhand, in `SideRail.astro`'s, the two
-    research pages' and `art.astro`'s `<style>` blocks and `styles/paper.css`, and holds it to its constant, in
-    order: a literal added there without one fails by name. In those scripts and `scripts/motion.ts` it fails
-    a curve written out (`cubic-bezier(`, or a keyword such as `'ease-out'`; `'linear'` is no curve), and a
-    number of ms of two digits or more after `duration:`/`delay:`/`step:`/`max:`/`total:` or as a
-    `later()`/`setTimeout()` delay. It does not see a literal in any other stylesheet, or a duration a script
-    builds some other way. The rail's entrance duration reaches the CSS as `--row` on the nav, beside `--gap`,
-    as the frontmatter's stagger is computed from it.
+  - **Every curve and duration they move by is stated once, in `lib/motionTiming.ts`**, and a script imports it; it
+    states /art's two too (`ART`: the mat's swap, which the sentences' turn shares, and a photograph's one fade), and
+    /experience's (`EXPERIENCE`: a mark's cross-fade into its colours and its enlarged mark's fade), though both pages
+    move by CSS transitions and not through `scripts/motion.ts`. A sentence's hold is no move and is not here (*Taste
+    rules*). CSS cannot import them, so `tests/motionTiming.test.ts` reads each transition and animation declaration,
+    shorthand or longhand, in `SideRail.astro`'s, the two research pages', `art.astro`'s and `experience.astro`'s
+    `<style>` blocks and `styles/paper.css`, and holds it to its constant, in order: a literal added there without one
+    fails by name. In those scripts and `scripts/motion.ts` it fails a curve written out (`cubic-bezier(`, or a
+    keyword such as `'ease-out'`; `'linear'` is no curve), and a number of ms of two digits or more after
+    `duration:`/`delay:`/`step:`/`max:`/`total:` or as a `later()`/`setTimeout()` delay. It does not see a literal in
+    any other stylesheet, or a duration a script builds some other way. The rail's entrance duration reaches the CSS
+    as `--row` on the nav, beside `--gap`, as the frontmatter's stagger is computed from it.
 
 ## The homepage — the deck
 
@@ -471,6 +475,8 @@ and reverted every time** — do not rebuild it. The phone treatment is *bug fix
     summary, so a wrapping line does not move it and its hop does not cover the summary; the measurements are
     in `projects.astro`'s comment on the 1179px block. A probe that watches the gallery and not the cow
     reports "nothing moves when it speaks" while the cow moves: assert the cow's rect for every line.
+- on **/experience**, a panel's three columns become two at 1100px (the work under both) and one at 640px; a
+  mark keeps its 72px, and its colours on hover are a pointer's (`(hover: hover)`) or a keyboard focus's;
 - on **/art**, at 900px and under the sentences come first, their numbers and Pause under them, then the mat, so a
   tap swaps the work just below the line being read, and a block's work sits above its words. At 640px a sentence
   is 21px, the mat is `min(40vh, 320px)` (so its top is on the first screen at 390×844; computed, not measured),
@@ -552,7 +558,7 @@ and reverted every time** — do not rebuild it. The phone treatment is *bug fix
     a solid ink (`SideRail.astro`'s header says how, and why the two inks over the label are `aria-hidden`
     generated text). The sheets' numbers are held by `tests/paperPalette.test.ts` and
     `tests/draftingPalette.test.ts`; over the reading sky they were measured on screen (inactive labels 5.53 /
-    5.74 on /writing and 5.54 / 5.63 on /experience, light / dark; the dash at least 3.74:1). On `/` a resting
+    5.74 on /writing, light / dark; the dash at least 3.74:1). On `/` a resting
     label is `--rail-ink` (light `#494339`: 4.96:1 on the tan panels, where `--ink-3` is 3.80, and 4.69:1 on
     the sky at its deepest under the rail; dark `--ink-3`) and the focus ring `--rail-focus` (light `--ink-1`,
     9.32:1 on the tan, where `--ochre` is 1.19; dark `--ochre`), held with the marks and the dash by
@@ -834,8 +840,8 @@ the why; `tests/introTimeline.test.ts` fails on a quiet 150ms window or a beat o
 
 ## The fluid sky
 
-`components/FluidSky.astro` is the sky on five routes: `/`, `/writing`, `/writing/<slug>`, `/experience` and the
-404. The register pages (`/projects`, both research routes and /art) render neither it nor `SkyWash`: each
+`components/FluidSky.astro` is the sky on four routes: `/`, `/writing`, `/writing/<slug>` and the 404. The
+register pages (`/projects`, both research routes, /art and /experience) render neither it nor `SkyWash`: each
 register's ink is sized for its own ground (light drafting `--ink-3` over `--reading-grad` measured 3.89:1), and
 the paper register is a still sheet by design. A WebGL canvas: a two-level domain warp over the descent/reading
 ramps, sampled from scroll position, with viscous luminance banding and a warm bloom. `lib/skyShader.ts` holds the
@@ -1038,9 +1044,10 @@ of sky over a full-bleed panel.
   `--panel-*` of `styles/slides.css` (the five paper panels' ground and inks per theme), Choice's chart colours
   `--c-h*` and `--c-p*`, and Story's two graph-line tones, `--story-line` and `--story-line-soft`. /art's dark
   room, dark in both themes, holds its own inks (`--room*` on `.dark`), held by `tests/paperPalette.test.ts`. Beyond
-  those, a component may hold a literal for a drawing of its own (the cow's coat, /experience's timeline dots).
+  those, a component may hold a literal for a drawing of its own (the cow's coat, a logo's colours in
+  `data/experienceMarks.ts`).
   - **An undeclared `var()` voids the whole shorthand** (every longhand falls back to its initial, and
-    `border-style`'s is `none`): /experience's dividers never drew against an undefined `--rule`, which is now
+    `border-style`'s is `none`): the old /experience's dividers never drew against an undefined `--rule`, which is now
     `rgba(var(--hairline-rgb), 0.32)`. `tests/cssVars.test.ts` fails on any `var(--x)` without a fallback that
     nothing declares, reading stylesheets, inline `style="--l:0"` attributes and runtime
     `el.style.setProperty()` (`sections/Rules.astro` sets `--len` and `--i`). Nothing else catches it: the
@@ -1051,8 +1058,10 @@ of sky over a full-bleed panel.
     of dark mode (the owner chose it seeing both this and a "night descent" variant live). Do NOT "fix" it back
     to ochre. Seal red stays the brand colour in both themes (`--seal`, brightened to `#e0574a` on the dark
     ground). The IT seal itself is drawn on no page; it is the favicon and the OG card.
-  - **The registers have no emerald**: /projects' palette and the paper one (the research routes and /art) set
-    `--ochre` to the seal in both themes, so seal red is the only saturated colour on them in dark too.
+  - **The registers have no emerald**: /projects' palette and the paper one (the research routes, /art and
+    /experience) set `--ochre` to the seal in both themes, so seal red is the only saturated colour on them in dark
+    too. **One exception, the owner's ask** ("add some colors when hovering the icon"): on /experience a panel's hover
+    or focus turns its mark into its logo's own colours, read from the logo file (`data/experienceMarks.ts`).
 - **Motion:** animate only `transform` / `opacity`; NEVER animate `filter: blur` (bake it). ALL motion is gated
   behind `@media (prefers-reduced-motion: no-preference)` via `lib/motion.ts`. The no-motion state must look
   *finished* — it's also the Firefox fallback (`animation-timeline` isn't in Firefox yet), and what a

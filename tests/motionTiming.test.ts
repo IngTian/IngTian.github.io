@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { MOTION_LIMIT_MS } from '../src/lib/motion';
 import {
-  ART, CARD, DRAW, EASE, FADE, MOVE_MAX, PAPER_PAGE, RAIL, REVEAL, SWEEP, WITHDRAW, arrowDelay, highlightDelay, mergeLines,
+  ART, CARD, DRAW, EASE, EXPERIENCE, FADE, MOVE_MAX, PAPER_PAGE, RAIL, REVEAL, SWEEP, WITHDRAW, arrowDelay, highlightDelay, mergeLines,
   stagger, sweepDurations,
 } from '../src/lib/motionTiming';
 
@@ -20,7 +20,7 @@ describe('the curves', () => {
 
 describe('the durations', () => {
   it('end every move within 2s, the longest a figure drawing itself', () => {
-    const all = [REVEAL, RAIL, PAPER_PAGE, CARD, ART].flatMap((g) => Object.values(g));
+    const all = [REVEAL, RAIL, PAPER_PAGE, CARD, ART, EXPERIENCE].flatMap((g) => Object.values(g));
     expect(Math.max(...all)).toBe(PAPER_PAGE.draw);
     expect(MOVE_MAX).toBe(2000);
     expect(PAPER_PAGE.draw).toBeLessThanOrEqual(MOVE_MAX);
@@ -93,6 +93,13 @@ describe('the code that moves things', () => {
     expect(moves(css('pages/art.astro'))).toEqual([
       `opacity ${ART.swap}ms ${FADE}`,
       `opacity ${ART.tileFade}ms ${FADE}`,
+    ]);
+  });
+
+  it("holds /experience's CSS to EXPERIENCE and FADE: the mark's cross-fade, then the enlarged mark's", () => {
+    expect(moves(css('pages/experience.astro'))).toEqual([
+      `opacity ${EXPERIENCE.mark}ms ${FADE}`,
+      `opacity ${EXPERIENCE.ground}ms ${FADE}`,
     ]);
   });
 

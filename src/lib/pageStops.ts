@@ -8,7 +8,7 @@
 // repeated id is resolved to its first match by getElementById and by a #fragment,
 // so every link naming it lands on the first section.
 
-import type { Project, TimelineEntry } from '../data/profile';
+import type { Organisation, Project } from '../data/profile';
 import {
   type WritingKind, sorted as sortedEntries, kindSectionId, entrySectionId,
 } from '../data/writing';
@@ -95,49 +95,25 @@ export function paperPageOwns(id: string): boolean {
   return PAPER_PAGE_IDS.has(id) || id.startsWith('ref-');
 }
 
-/** Experience section id — one speller, so rail and page cannot disagree. */
-export function experienceSectionId(index: number): string {
-  return `x-${index}`;
+/** An organisation's panel id on /experience — one speller, so rail and page cannot disagree. Keyed by the
+ *  organisation, not its place, so `/experience#x-tiktok` keeps pointing at TikTok when one is added above it. */
+export function experienceSectionId(key: string): string {
+  return `x-${key}`;
 }
 
-/**
- * The /experience rail: two groups, roles and education, each with its entries nested.
- *
- * Grouped rather than flat because the timeline mixes two KINDS and the
- * site's identity hierarchy is load-bearing — education carries the incoming PhD, which
- * must not be buried among nine jobs. The rail's two parents point at their group headings;
- * the leaves point at individual entries.
- */
-export function experienceStops(timeline: readonly TimelineEntry[]): Stop[] {
-  const group = (kind: TimelineEntry['kind']) =>
-    timeline
-      .map((t, i) => ({ t, i }))
-      .filter(({ t }) => t.kind === kind)
-      .map(({ t, i }) => ({ label: railLabel(t), target: experienceSectionId(i) }));
-
-  const stops: Stop[] = [];
-  const education = group('education');
-  const work = group('work');
-  // Education first, so the incoming PhD is the first thing the rail offers.
-  if (education.length) stops.push({ label: 'Education', target: 'x-education', children: education });
-  if (work.length) stops.push({ label: 'Roles', target: 'x-roles', children: work });
-  return stops;
-}
-
-/** A rail label short enough to fit a thin margin: the institution, not the whole title.
- *  Titles read "Senior Software Engineer · TikTok"; the rail wants "TikTok". */
-export function railLabel(entry: TimelineEntry): string {
-  const parts = entry.title.split('·').map((s) => s.trim());
-  const tail = parts.length > 1 ? parts[parts.length - 1] : parts[0];
-  return tail.length > 24 ? `${tail.slice(0, 23)}…` : tail;
+/** The /experience rail: one stop per organisation, in the page's order (the incoming PhD first), then Recognition. */
+export function experienceStops(organisations: readonly Organisation[]): Stop[] {
+  return [
+    ...organisations.map((o) => ({ label: o.rail, target: experienceSectionId(o.key) })),
+    { label: 'Recognition', target: 'x-recognition' },
+  ];
 }
 
 /**
  * The /writing rail: one group per KIND, its pieces nested underneath.
  *
- * Same shape as /experience — a page that mixes kinds gets a group per kind — and for the same reason: the
- * distinction between a research note and an essay is the page's whole organising idea, so the rail should
- * carry it rather than flatten it.
+ * A page that mixes kinds gets a group per kind: the distinction between a research note and an essay is the page's
+ * whole organising idea, so the rail should carry it rather than flatten it.
  *
  * An EMPTY kind still gets its stop, because the page still renders its heading and its "nothing here yet"
  * line: the section genuinely exists, so the stop points at something.
