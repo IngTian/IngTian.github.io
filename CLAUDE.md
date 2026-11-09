@@ -155,8 +155,8 @@ rather than add.
     the spec measures it. A real first load also fetches what the lazy-load margin reaches, both calligraphy works
     and none of the rows' photographs, which start ~3,070px down. Its goal is 400 KB, which the same file holds as
     a model (the eager work and every calligraphy work a DPR-2 browser picks) and a browser measured once (the pass
-    is above `CAL_MAX_H` in `lib/artPage.ts`). The first phrase of the sentence picks the eager work, so a heavier
-    one there is what fails it.
+    is above `CAL_MAX_H` in `lib/artPage.ts`). The first sentence's first phrase picks the eager work, so a
+    heavier one there is what fails it.
   - **A lazy work reserves its box before it decodes**, or everything under it starts higher and the lazy-load
     margin fetches it: a calligraphy block's width comes from its work's ratio (`--ar`) at the height cap, as a
     tile's does, and the dark room's image takes the same ratio. The bug it fixed is above `CAL_MAX_H`;
@@ -203,8 +203,8 @@ src/
   data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline, publications, projects + inProgress, awards, contact
   data/nav.ts                       # PAGES — the canonical page set (see Navigation)
   data/writing.ts                   # the writing TAXONOMY (KINDS) + buildKinds(), the one seam to the markdown
-  data/artworks.ts                  # /art's works, keyed (photo-NN from the file; couplet, poem), + SENTENCE, the page's one sentence; photoNotes.ts holds each photograph's alt, title?, place?{name, confirmed} and year?
-  lib/artPage.ts                    # /art's pure half: the sentence's rules (sentenceProblems over phrasesOf: PHRASES phrases, each a different work that exists, RED_PCT of its words red), a work's label line (labelLine), the three sizes hints (matSizes, rowSizes, calSizes) and their constants, and the dark room's zoom: zoomAbout (to 6x, about a point), wheelScale (by distance, not per event), isDoubleTap
+  data/artworks.ts                  # /art's works, keyed (photo-NN from the file; couplet, poem), + SENTENCES, the page's three sentences in turn order; photoNotes.ts holds each photograph's alt, title?, place?{name, confirmed} and year?
+  lib/artPage.ts                    # /art's pure half: each sentence's rules (sentenceProblems over phrasesOf: PHRASES phrases, each a different work that exists, RED_PCT of its words red) and its turn's hold (holdMs), a work's label line (labelLine), the three sizes hints (matSizes, rowSizes, calSizes) and their constants, and the dark room's zoom: zoomAbout (to 6x, about a point), wheelScale (by distance, not per event), isDoubleTap
   data/{define,desk,making,story}.ts # the homepage explainer's copy + numbers, per slide
   data/{cowGlyph,ruleGlyphs,tickerGlyphs}.ts # pixel-art matrices: the cow's and the slides'
   lib/deck.ts                       # pure deck stops: WHERE the homepage scroll may rest, what's next, and what one wheel event does (wheelAction)
@@ -257,7 +257,7 @@ tools/vendor-projects.mjs           # the ONLY thing that touches the network, r
 | `/writing/<slug>` | one piece, rendered from `src/content/writing/<slug>.md` |
 | `/projects` | every notable project, on its own drafting register: the terminal header and its boot, the gallery, selected work, the workshop |
 | `/experience` | the timeline — education and roles |
-| `/art` | one sentence whose seal-red phrases bring a work onto a mat; the calligraphy as object blocks; every photograph in justified rows; on the paper sheet |
+| `/art` | three sentences, taking turns, whose seal-red phrases bring a work onto a mat; the calligraphy as object blocks; every photograph in justified rows; on the paper sheet |
 | `/404` | the not-found page (noindex, no canonical) |
 
 **Prototype routes: none today** (git holds the retired ones). A `src/pages/proto-<name>.astro` page exists to
@@ -323,8 +323,9 @@ it gets the finished page (`tests/distSmoke.test.ts` fails on a hold-back outsid
   by line. The reduced-motion gate is inside it, not in the callers: under it `play` lands on its last frame
   at once and `onceSeen` holds nothing back. A teardown finishes every live animation.
   - **Every curve and duration they move by is stated once, in `lib/motionTiming.ts`**, and a script imports
-    it; it states /art's two too (`ART`: the mat's swap and a photograph's one fade), though /art moves by CSS
-    transitions and not through `scripts/motion.ts`. CSS cannot import them, so `tests/motionTiming.test.ts`
+    it; it states /art's two too (`ART`: the mat's swap, which the sentences' turn shares, and a photograph's
+    one fade), though /art moves by CSS transitions and not through `scripts/motion.ts`. A sentence's hold is no
+    move and is not here (*Taste rules*). CSS cannot import them, so `tests/motionTiming.test.ts`
     reads each transition and animation declaration, shorthand or longhand, in `SideRail.astro`'s, the two
     research pages' and `art.astro`'s `<style>` blocks and `styles/paper.css`, and holds it to its constant, in
     order: a literal added there without one fails by name. In those scripts and `scripts/motion.ts` it fails
@@ -1065,6 +1066,13 @@ of sky over a full-bleed panel.
     `idleLines()` unprompted lines per page view (`lib/cowTalk.ts`: two, none on a phone or under reduced
     motion), the rest a press away. `tests/cowTalk.test.ts` adds up what it does unasked from PlushCow's
     transition and hop literals and `TYPE_MS`, ~3.4s, and holds it under the limit.
+  - **One exception, the owner's call (2026-11-08): /art's three sentences take turns** for as long as the page is
+    open, each for its words at 200 a minute (`holdMs` in `lib/artPage.ts`, ~15s), by the mat's cross-fade. It is
+    held to 2.2.2 by the criterion's own terms, a way to stop it: Pause, and a number, which shows that sentence and
+    stays. The pointer on the words holds a turn, a work taken (a phrase or the mat, clicked or focused) stops the
+    turns until Play, and under reduced motion they never start. A turn is not read by the live region.
+    `tests/distSmoke.test.ts` holds each sentence's hold and the Pause to the built page. It is not a precedent:
+    the rule above stands for anything else new.
   - **The research routes and the rail are held to it, and to 2s per animation.** What moves there unasked
     moves once per showing (on `/` the rail's entrance replays each time the rail reappears below the hero),
     by `transform` and `opacity` (the rail's entrance in CSS, the rest through `scripts/motion.ts`), and ends

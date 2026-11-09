@@ -1,4 +1,4 @@
-// /art's works, each by a stable key, and the one sentence that indexes them. A photograph's key is its file's name
+// /art's works, each by a stable key, and the sentences that index them. A photograph's key is its file's name
 // (photo-07.jpg is 'photo-07'), a calligraphy's is named, never an index. A field is given only when it is known:
 // the page prints what is here and nothing in place of what is not (lib/artPage.ts, labelLine).
 import type { ImageMetadata } from 'astro';
@@ -65,13 +65,30 @@ export const photography: Photo[] = Object.keys(photoFiles)
 const p = (text: string, work: string): Phrase => ({ text, work });
 
 /**
- * THE SENTENCE, the page's index, in the owner's first person. Each phrase (set in seal red) is a work, says only what
- * that work shows or what is recorded above, and is the noun alone, its description in ink. The page refuses a
- * sentence that breaks a rule in lib/artPage.ts, naming it.
+ * THE SENTENCES, the page's index, in the owner's first person, taking turns in this order: plain, lyrical, wry. Each
+ * phrase (set in seal red) is a work, says only what that work shows or what is recorded above, and is the noun
+ * alone, its description in ink. The first sentence's first work is the one on the mat at arrival, /art's LCP image,
+ * so it is the one the first-load budget weighs. The page refuses a sentence that breaks a rule in lib/artPage.ts,
+ * naming it.
  */
-export const SENTENCE: SentencePart[] = [
-  'I take photographs — of ', p('a red canoe', 'photo-23'), ' on a turquoise lake, ', p('a bridge tower', 'photo-09'),
-  ' lit against the city, ', p('a heron', 'photo-12'), ' standing on a stone and ', p('cherry blossoms', 'photo-42'),
-  ' against a clear sky — and I write calligraphy: ', p('a spring couplet', 'couplet'), ' in clerical script and ',
-  p('a poem', 'poem'), ' in running-cursive.',
+export const SENTENCES: SentencePart[][] = [
+  [
+    'I take photographs — of ', p('a red canoe', 'photo-23'), ' on a turquoise lake, ',
+    p('a bridge tower', 'photo-09'), ' lit against the city, ', p('a heron', 'photo-12'), ' standing on a stone and ',
+    p('cherry blossoms', 'photo-42'), ' against a clear sky — and I write calligraphy: ',
+    p('a spring couplet', 'couplet'), ' in clerical script and ', p('a poem', 'poem'), ' in running-cursive.',
+  ],
+  [
+    'Outdoors, light does a brush’s work — ', p('a mountainside', 'photo-25'), ' erased by mist, ',
+    p('a crescent moon', 'photo-06'), ' early over the sea, ', p('white water', 'photo-35'),
+    ' writing on mossy stone, ', p('a sailboat', 'photo-41'),
+    ' on hammered silver — and with the brush itself I write ', p('a poem', 'poem'), ' in running hand and ',
+    p('a spring couplet', 'couplet'), '.',
+  ],
+  [
+    'Calligraphy is slow and a camera is quick, so beside ', p('a spring couplet', 'couplet'), ' and ',
+    p('a poem', 'poem'), ' in running-cursive I keep ', p('a steam engine', 'photo-08'), ' still at work, ',
+    p('a landscape', 'photo-38'), ' gone to streaks at speed, ', p('plush cows', 'photo-18'),
+    ' posing at a monument and ', p('one plush cow', 'photo-30'), ' looking over the real thing.',
+  ],
 ];

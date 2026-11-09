@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import {
-  DOUBLE_TAP, ZOOM, isDoubleTap, labelLine, sentenceProblems, wheelScale, zoomAbout, type SentencePart,
+  DOUBLE_TAP, ZOOM, holdMs, isDoubleTap, labelLine, sentenceProblems, wheelScale, zoomAbout, type SentencePart,
 } from '../src/lib/artPage';
 
 const works = new Set(['photo-01', 'photo-02', 'photo-03', 'photo-04', 'couplet', 'poem']);
@@ -10,6 +10,10 @@ const ok: SentencePart[] = ['I keep ', p('a canoe', 'photo-01'), ' on a still la
   ' lit at night, ', p('a heron', 'photo-03'), ' on a stone, ', p('blossoms', 'photo-04'),
   ' in the sky, and I write ', p('a couplet', 'couplet'), ' and ', p('a poem', 'poem'), ' in ink.'];
 const msg = (parts: SentencePart[]) => sentenceProblems(parts, works).join('; ');
+
+it('holds a sentence for its words at 200 a minute, phrases counted with the ink', () => {
+  expect(holdMs(ok)).toBe(32 * 300);
+});
 
 it('accepts six phrases at a third red', () => expect(sentenceProblems(ok, works)).toEqual([]));
 it('refuses fewer than five phrases', () => expect(msg([...ok.slice(0, 9), ' in ink.'])).toMatch(/\b4 phrases, not 5-7\b/));

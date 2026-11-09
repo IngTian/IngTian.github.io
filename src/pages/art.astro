@@ -1,14 +1,15 @@
 ---
-// /art, "The sentence", on a still sheet: one sentence in the owner's voice whose seal-red phrases each bring a work
-// onto the mat beside it, then the calligraphy as object blocks, then every photograph in justified rows; any work
-// opens full screen in the dark room. It borrows the research routes' paper register (page="paper"): no sky, no
-// veil, no rail, and nothing moves on its own but a photograph's one fade as it arrives. The works and the sentence
-// are data/artworks.ts; the sentence's rules, the label line and the three `sizes` hints are lib/artPage.ts.
+// /art, "The sentence", on a still sheet: three sentences in the owner's voice, taking turns, whose seal-red phrases
+// each bring a work onto the mat beside them, then the calligraphy as object blocks, then every photograph in
+// justified rows; any work opens full screen in the dark room. It borrows the research routes' paper register
+// (page="paper"): no sky, no veil, no rail. Two things move on their own: a photograph's one fade as it arrives, and
+// the sentences' turns, which a reader can pause (WCAG 2.2.2) and which stop once a work is taken. The works and the
+// sentences are data/artworks.ts; their rules and holds, the label line and the three `sizes` hints are lib/artPage.ts.
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { Image, getImage } from 'astro:assets';
-import { SENTENCE, calligraphy, photography } from '../data/artworks';
+import { SENTENCES, calligraphy, photography } from '../data/artworks';
 import {
-  CAL_WIDTHS, PHOTO_WIDTHS, calSizes, labelLine, matSizes, phrasesOf, rowSizes, sentenceProblems,
+  CAL_WIDTHS, PHOTO_WIDTHS, calSizes, holdMs, labelLine, matSizes, phrasesOf, rowSizes, sentenceProblems,
 } from '../lib/artPage';
 
 // EACH WORK'S NATIVE-PIXEL WEBP AND ITS RATIO, from one getImage() call. The webp's URL is `zoom`, which every work
@@ -37,13 +38,16 @@ const works = [...photos, ...cals];
 type Work = (typeof works)[number];
 const byKey = new Map(works.map((w) => [w.key, w]));
 
-// The sentence's rules (lib/artPage.ts): a sentence that breaks one fails the build here, naming it.
-const problems = sentenceProblems(SENTENCE, new Set(byKey.keys()));
-if (problems.length) throw new Error(`art: ${problems.join('; ')}`);
-// The mat holds each work the sentence names, in its order; the first phrase's work is on it at arrival.
-const phrases = phrasesOf(SENTENCE);
-const matWorks = phrases.flatMap((x) => byKey.get(x.work) ?? []);
-const first = phrases[0].work;
+// The sentences' rules (lib/artPage.ts): a sentence that breaks one fails the build here, naming it.
+SENTENCES.forEach((s, i) => {
+  const problems = sentenceProblems(s, new Set(byKey.keys()));
+  if (problems.length) throw new Error(`art, sentence ${i + 1}: ${problems.join('; ')}`);
+});
+// The mat holds each work the sentences name, once, in their order; the first sentence's first work is on it at
+// arrival.
+const matWorks = [...new Set(SENTENCES.flatMap((s) => phrasesOf(s).map((x) => x.work)))]
+  .flatMap((k) => byKey.get(k) ?? []);
+const first = phrasesOf(SENTENCES[0])[0].work;
 
 // What every opener carries: the native webp, its ratio, the alt and the label's one line.
 const darkData = (w: Work) => ({
@@ -65,13 +69,27 @@ const darkData = (w: Work) => ({
 
       <section class="opening" aria-label="Selected works">
         <div class="words">
-          {/* A phrase is a link to its work's place on the page, so without a script it jumps there. */}
-          <p class="sentence">
-            {SENTENCE.map((x) => typeof x === 'string' ? x : (
-              <a class="phrase" href={`#${x.work}`} data-work={x.work} aria-controls="art-mat"
-                 aria-current={x.work === first ? 'true' : undefined}>{x.text}</a>
+          {/* A phrase is a link to its work's place on the page, so without a script it jumps there. The sentences
+              share one cell, so the column is the tallest's height and nothing under it moves at a turn; the ones
+              not shown are inert, out of the tab order and the accessibility tree. */}
+          <div class="sentences">
+            {SENTENCES.map((s, i) => (
+              <p class:list={['sentence', { 'is-on': i === 0 }]} data-hold={holdMs(s)} inert={i !== 0}>
+                {s.map((x) => typeof x === 'string' ? x : (
+                  <a class="phrase" href={`#${x.work}`} data-work={x.work} aria-controls="art-mat"
+                     aria-current={i === 0 && x.work === first ? 'true' : undefined}>{x.text}</a>
+                ))}
+              </p>
             ))}
-          </p>
+          </div>
+          {/* Shown by the script, which is what makes them work. */}
+          <div class="turns" role="group" aria-label="Sentences" hidden>
+            {SENTENCES.map((_, i) => (
+              <button type="button" data-turn={i} aria-label={`Sentence ${i + 1}`}
+                      aria-current={i === 0 ? 'true' : undefined}>{i + 1}</button>
+            ))}
+            <button type="button" class="turns-play" hidden>Pause</button>
+          </div>
           <p class="sr-only" aria-live="polite" data-live></p>
         </div>
         <div class="stage" id="art-mat">
@@ -193,6 +211,18 @@ const darkData = (w: Work) => ({
   .mw.is-on { opacity: 1; }
   /* The swap's cross-fade, ART.swap (lib/motionTiming.ts): the script hides the work it replaces after it. */
   @media (prefers-reduced-motion: no-preference) { .mw { transition: opacity 300ms ease-out; } }
+  /* The sentences take turns in one cell, by the mat's cross-fade (ART.swap). */
+  .sentences { display: grid; }
+  .sentences .sentence { grid-area: 1 / 1; opacity: 0; }
+  .sentences .sentence.is-on { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) { .sentences .sentence { transition: opacity 300ms ease-out; } }
+  /* The turns' controls: the numbers, the shown one in seal, and Pause. 32px squares, over the 24px WCAG 2.5.8 asks. */
+  .turns { display: flex; align-items: center; gap: 2px; margin: 20px 0 0 -8px; font: 12px/1 var(--font-mono); }
+  .turns button { min-width: 32px; height: 32px; padding: 0 8px; font: inherit; color: var(--ink-3); background: none;
+    border: 0; cursor: pointer; }
+  .turns button[aria-current] { color: var(--ochre); text-decoration: underline; text-underline-offset: 4px; }
+  .turns .turns-play { margin-left: 10px; }
+  .turns button:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
   .mat { height: min(62vh, 560px); padding: 24px; background: var(--mat); }
   .mat-btn { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 0; border: 0;
     background: none; cursor: zoom-in; }
@@ -350,7 +380,7 @@ const darkData = (w: Work) => ({
         if (a.dataset.work === cur) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
       });
     };
-    const swap = (key: string): void => {
+    const swap = (key: string, say = true): void => {
       const next = figs.get(key), prev = figs.get(cur);
       if (!next) return;
       // Any swap still waiting is dropped, and every work but the shown one and this one leaves the mat.
@@ -370,8 +400,8 @@ const darkData = (w: Work) => ({
         next.classList.add('is-on');
         if (prev) prev.inert = true;
         next.inert = false;
-        // The polite live region reads the shown work's description.
-        if (live) live.textContent = next.querySelector<HTMLElement>('.mat-btn')?.dataset.alt ?? '';
+        // The polite live region reads the shown work's description, when the reader asked for it: a turn is not read.
+        if (live && say) live.textContent = next.querySelector<HTMLElement>('.mat-btn')?.dataset.alt ?? '';
         const hide = (): void => { if (prev && cur !== prev.dataset.work) prev.hidden = true; };
         if (reduce) hide(); else timers.push(window.setTimeout(hide, ART.swap));
       });
@@ -381,6 +411,50 @@ const darkData = (w: Work) => ({
       a.addEventListener('click', (e) => { e.preventDefault(); swap(key); });
       a.addEventListener('focus', () => swap(key));
     });
+
+    // ── The turns: each sentence is shown for its data-hold (holdMs), then the next, its first work brought onto
+    // the mat. It is motion that starts on its own and lasts past five seconds, so WCAG 2.2.2 asks for a way to stop
+    // it: Pause, and a number, which shows that sentence and stays. The pointer resting on the words holds the
+    // turn, and a work taken (a phrase or the mat, clicked or focused) stops the turns until Play, so a turn never
+    // hides what the reader is on. Under reduced motion they never start, and Pause is hidden; the numbers still work.
+    const sentences = Array.from(main.querySelectorAll<HTMLElement>('.sentence'));
+    const turns = main.querySelector<HTMLElement>('.turns');
+    const nums = Array.from(main.querySelectorAll<HTMLButtonElement>('[data-turn]'));
+    const play = main.querySelector<HTMLButtonElement>('.turns-play');
+    const opening = main.querySelector<HTMLElement>('.opening');
+    if (turns && play && opening && sentences.length > 1) {
+      let shown = 0, timer = 0, held = false, playing = !reduce;
+      const show = (i: number, say: boolean): void => {
+        shown = i;
+        sentences.forEach((s, k) => { s.classList.toggle('is-on', k === i); s.inert = k !== i; });
+        nums.forEach((b, k) => {
+          if (k === i) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+        });
+        const lead = sentences[i].querySelector<HTMLElement>('.phrase')?.dataset.work;
+        if (lead) swap(lead, say);
+      };
+      const arm = (): void => {
+        clearTimeout(timer);
+        if (!playing || held) return;
+        const next = (): void => { show((shown + 1) % sentences.length, false); arm(); };
+        timer = window.setTimeout(next, Number(sentences[shown].dataset.hold));
+        timers.push(timer);
+      };
+      const setPlaying = (p: boolean): void => { playing = p; play.textContent = p ? 'Pause' : 'Play'; arm(); };
+      turns.hidden = false;
+      play.hidden = reduce;
+      play.addEventListener('click', () => setPlaying(!playing));
+      nums.forEach((b, k) => b.addEventListener('click', () => { setPlaying(false); show(k, true); }));
+      const take = (e: Event): void => {
+        if (e.target instanceof Element && e.target.closest('.phrase, .mat-btn')) setPlaying(false);
+      };
+      opening.addEventListener('focusin', take);
+      opening.addEventListener('click', take);
+      const words = main.querySelector<HTMLElement>('.words');
+      words?.addEventListener('pointerenter', () => { held = true; arm(); });
+      words?.addEventListener('pointerleave', () => { held = false; arm(); });
+      arm();
+    }
 
     // ── The dark room: a list of works (each opener carries data-zoom and the rest), stepped through by prev/next and
     // the arrow keys, with the label line under the work. Escape is the dialog's own.
@@ -434,8 +508,8 @@ const darkData = (w: Work) => ({
         }
       };
       const step = (d: number): void => { if (list.length > 1) { at = (at + d + list.length) % list.length; show(); } };
-      // What each opener steps through: the mat, the sentence's works in its order (the mat's figures are rendered in
-      // it); a block, both calligraphy works; a tile, every photograph.
+      // What each opener steps through: the mat, every work the sentences name, in their order (the mat's figures are
+      // rendered in it); a block, both calligraphy works; a tile, every photograph.
       for (const sel of ['.mat-btn', '.cal', '.tile-btn']) {
         const els = Array.from(main.querySelectorAll<HTMLElement>(sel));
         els.forEach((b) => b.addEventListener('click', () => openList(els, b)));

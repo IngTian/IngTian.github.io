@@ -1,8 +1,9 @@
 // src/lib/artPage.ts
-// /art's pure half: the rules the page's one sentence keeps (5-7 phrases in seal red, each naming a different work
-// that exists, 30-40% of its words red, counted by countWords), a work's label line, the three `sizes` hints and the
-// constants under them, and the dark room's zoom arithmetic (zoomAbout, wheelScale, isDoubleTap). The page throws on
-// any problem, so a sentence that breaks a rule fails the build by name. Pure.
+// /art's pure half: the rules each of the page's sentences keeps (5-7 phrases in seal red, each naming a different
+// work that exists, 30-40% of its words red, counted by countWords) and how long each holds its turn (holdMs), a
+// work's label line, the three `sizes` hints and the constants under them, and the dark room's zoom arithmetic
+// (zoomAbout, wheelScale, isDoubleTap). The page throws on any problem, so a sentence that breaks a rule fails the
+// build by name. Pure.
 import { countWords } from './words';
 
 /** A phrase of the sentence, set in red: the words, and the key of the work they bring onto the mat. */
@@ -12,6 +13,9 @@ export type SentencePart = string | Phrase;
 
 const RED_PCT = { min: 30, max: 40 } as const;
 const PHRASES = { min: 5, max: 7 } as const;
+
+const wordsOf = (parts: readonly SentencePart[]): number =>
+  countWords(parts.map((x) => (typeof x === 'string' ? x : x.text)).join(''));
 
 export function phrasesOf(parts: readonly SentencePart[]): Phrase[] {
   return parts.filter((x): x is Phrase => typeof x !== 'string');
@@ -30,13 +34,19 @@ export function sentenceProblems(parts: readonly SentencePart[], works: Readonly
     if (n > 1) problems.push(`the sentence names ${work} ${n === 2 ? 'twice' : `${n} times`}`);
   }
   // The share is printed with its counts, to a tenth, so a share just outside the band never prints inside it.
-  const all = countWords(parts.map((x) => (typeof x === 'string' ? x : x.text)).join(''));
+  const all = wordsOf(parts);
   const red = countWords(phrases.map((x) => x.text).join(' '));
   const pct = all ? (100 * red) / all : 0;
   if (pct < RED_PCT.min || pct > RED_PCT.max) {
     problems.push(`the sentence is ${red} of ${all} words red (${pct.toFixed(1)}%), not ${RED_PCT.min}-${RED_PCT.max}%`);
   }
   return problems;
+}
+
+/** How long a sentence is shown before the next takes its turn: its words at 200 a minute, so a longer one is given
+ *  longer (the three are ~50 words, ~15s). */
+export function holdMs(parts: readonly SentencePart[]): number {
+  return wordsOf(parts) * 300;
 }
 
 /** What a work's label may print. A field is given only when it is known. */

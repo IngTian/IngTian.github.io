@@ -11,7 +11,8 @@ import { INTRO_SEEN_KEY } from '../src/lib/introSession';
 import { contact, inProgress, projects, publications, researchInterests, timeline, type Publication } from '../src/data/profile';
 import { PAPER_DATA } from '../src/data/papers';
 import { photoNotes } from '../src/data/photoNotes';
-import { calligraphy } from '../src/data/artworks';
+import { SENTENCES, calligraphy } from '../src/data/artworks';
+import { holdMs } from '../src/lib/artPage';
 import {
   type Stop, experienceStops, flattenStops, homeStops, paperPageOwns, paperSections, paperStops, projectSectionId,
   projectStops, researchIndexStops,
@@ -387,9 +388,9 @@ describe("/art's image payload, measured on the built output", () => {
     expect(
       chosen.bytes,
       `the LCP candidate is ${(chosen.bytes / 1024).toFixed(0)} KB (${chosen.w}w). `
-      + "If this jumped, check whether SENTENCE's first phrase (data/artworks.ts) now names a heavier work, whether "
-      + 'a native image width got back into `widths`, or whether `sizes` went back to a viewport fraction, in '
-      + 'matSizes() in lib/artPage.ts.',
+      + "If this jumped, check whether the first sentence's first phrase (data/artworks.ts) now names a heavier "
+      + 'work, whether a native image width got back into `widths`, or whether `sizes` went back to a viewport '
+      + 'fraction, in matSizes() in lib/artPage.ts.',
     ).toBeLessThan(250 * 1024);
   });
 
@@ -408,8 +409,9 @@ describe("/art's image payload, measured on the built output", () => {
     // By URL: when the couplet leads, its mat and its block both pick its 900w, one file fetched once.
     const files = new Map([...eager, ...cal].map((t) => { const p = pickAt2x(t); return [p.url, p.bytes] as const; }));
     const total = [...files.values()].reduce((s, b) => s + b, 0);
-    expect(total, `${total} B: ${[...files.keys()].map((u) => basename(u)).join(', ')}. The usual cause is SENTENCE's `
-      + 'first phrase (data/artworks.ts) naming a heavier work: lead with a lighter one, or re-measure in a browser.')
+    expect(total, `${total} B: ${[...files.keys()].map((u) => basename(u)).join(', ')}. The usual cause is the first `
+      + "sentence's first phrase (data/artworks.ts) naming a heavier work: lead with a lighter one, or re-measure in a "
+      + 'browser.')
       .toBeLessThanOrEqual(400 * 1024);
   });
 
@@ -480,6 +482,15 @@ describe("/art's image payload, measured on the built output", () => {
   // that moves onto an element of the page, carries [data-astro-cid-…] or loses `html:has(` and fails here.
   it('locks the scroll behind the dark room with an unscoped rule', () => {
     expect(shippedCss([builtPage('/art')])).toMatch(/(?:^|[}\s,])html:has\(dialog\.dark\[open\]\)\{overflow:hidden\}/);
+  });
+
+  // The sentences take turns on their own for longer than five seconds, which WCAG 2.2.2 allows only with a way to
+  // pause them: each ships in its order with its hold (holdMs), and Pause ships with them.
+  it('ships each sentence with its hold, and a Pause for the turns', () => {
+    const m = builtPage('/art').markup;
+    const holds = [...m.matchAll(/<p class="sentence\b[^"]*"[^>]*\bdata-hold="(\d+)"/g)].map((x) => Number(x[1]));
+    expect(holds).toEqual(SENTENCES.map((s) => holdMs(s)));
+    expect(m).toMatch(/<button\b[^>]*\bclass="turns-play"[^>]*>Pause<\/button>/);
   });
 });
 
