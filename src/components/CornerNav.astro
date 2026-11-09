@@ -27,7 +27,7 @@ import { PAGES } from '../data/nav';
 interface Props {
   /** 'scroll' = flip text color by the descent fraction behind the nav (home,
    *  the one page that rides the gradient). 'light' = pin to dark text (pages
-   *  that stay pale in light theme, e.g. /writing). Only affects the LIGHT
+   *  that stay pale in light theme, e.g. /projects). Only affects the LIGHT
    *  theme; dark is always light text. */
   navZone?: 'scroll' | 'light';
 }
@@ -441,7 +441,7 @@ const items: Item[] = [
     const descent = document.querySelector<HTMLElement>('.descent');
 
     // Zone = which LIGHT-theme text color the nav uses. Two modes:
-    //  - 'light': pinned dark text (pages that stay pale — /writing). Set once.
+    //  - 'light': pinned dark text (pages that stay pale — /projects). Set once.
     //  - 'scroll': flip dark→paper by the descent fraction behind the nav (home,
     //    the one page that rides the full dawn→night gradient). Needs a .descent el.
     // (Dark theme forces light text via CSS regardless of this attribute.)

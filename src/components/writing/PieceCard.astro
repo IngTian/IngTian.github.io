@@ -1,0 +1,69 @@
+---
+// One writing piece as a card, the one card every surface of /writing shows: the index's grid, and a piece's
+// neighbours at its foot (`dir`, the line above the card that says which way it is). `lead` is the index's lead, the
+// same card at the head of the page: its cover left and its words right, its reading time in the meta line, and a
+// Read button. The title's link covers the card, so the whole card is one target; the lead's Read sits above it.
+// The card carries its kind and its folded words (data-k, data-q) for the index's search (pages/writing.astro).
+// No motion of its own: a hover changes a border and an underline, at once.
+import { KINDS, type Piece } from '../../data/writing';
+import { longDate } from '../../lib/dates';
+import Button from '../Button.astro';
+import Cover from './Cover.astro';
+
+interface Props { piece: Piece; lead?: boolean; dir?: string }
+const { piece: p, lead = false, dir } = Astro.props;
+---
+{lead ? (
+  <article class="wc wc-lead" data-q={p.q} data-k={p.kind}>
+    <Cover figure={p.figure} seed={p.slug} w={640} h={400} />
+    <div class="wc-text">
+      <p class="wc-kind">{KINDS[p.kind].label}</p>
+      <h2 class="wc-t"><a href={p.href}>{p.title}</a></h2>
+      <p class="wc-blurb">{p.blurb}</p>
+      <p class="wc-meta"><time datetime={p.date}>{longDate(p.date)}</time> · {p.minutes} min read</p>
+      <Button href={p.href} skin="paper" arrow class="wc-read">Read</Button>
+    </div>
+  </article>
+) : (
+  <li class="wc" data-q={p.q} data-k={p.kind}>
+    {dir && <p class="wc-dir">{dir}</p>}
+    <Cover figure={p.figure} seed={p.slug} w={400} h={250}><span class="wc-min">{p.minutes} min</span></Cover>
+    <p class="wc-kind">{KINDS[p.kind].label}</p>
+    <h2 class="wc-t"><a href={p.href}>{p.title}</a></h2>
+    <p class="wc-blurb">{p.blurb}</p>
+    <p class="wc-meta"><time datetime={p.date}>{longDate(p.date)}</time></p>
+  </li>
+)}
+
+<style>
+  .wc { position: relative; }
+  .wc-dir { margin: 0 0 12px; font: 11px/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  .wc-min { position: absolute; left: 10px; top: 10px; padding: 5px 8px; font: 11px/1 var(--font-mono); color: var(--ink-2);
+    background: var(--sheet-ground); border: 1px solid rgba(var(--hairline-rgb), 0.3); border-radius: 999px; }
+  .wc-kind { margin: 16px 0 0; font: 11px/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  .wc-t { margin: 10px 0 0; font: 700 20px/1.25 var(--font-body); letter-spacing: -0.02em; color: var(--ink-1); text-wrap: balance; }
+  .wc-t a { color: inherit; text-decoration: none; }
+  /* the title's link covers the card; its focus ring is the card's */
+  .wc-t a::after { content: ''; position: absolute; inset: 0; z-index: 1; }
+  .wc-t a:focus-visible { outline: none; }
+  .wc:has(.wc-t a:focus-visible) { outline: 2px solid var(--ochre); outline-offset: 10px; border-radius: 6px; }
+  .wc-blurb { margin: 8px 0 0; font-size: 15px; line-height: 1.5; color: var(--ink-3);
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+  .wc-meta { margin: 12px 0 0; font: 12px/1.4 var(--font-mono); color: var(--ink-3); }
+  @media (hover: hover) {
+    .wc:hover :global(.wcv) { border-color: rgba(var(--hairline-rgb), 0.6); }
+    .wc:hover .wc-t a { text-decoration: underline 1px; text-underline-offset: 0.16em; }
+  }
+
+  /* ── the lead: cover left, words right ── */
+  .wc-lead { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 48px; align-items: center; }
+  .wc-lead .wc-kind { margin-top: 0; }
+  .wc-lead .wc-t { margin-top: 16px; font-size: clamp(28px, 3vw, 40px); line-height: 1.1; }
+  .wc-lead .wc-blurb { margin-top: 14px; max-width: 32em; font-size: 17px; line-height: 1.55; color: var(--ink-2);
+    display: block; overflow: visible; text-wrap: pretty; }
+  .wc-lead .wc-meta { margin-top: 16px; }
+  .wc-lead :global(.wc-read) { z-index: 2; margin-top: 24px; }
+  /* the search's miss: a lead that does not match dims and goes inert in place, so nothing under the cursor moves */
+  .wc-lead.is-out { opacity: 0.32; }
+  @media (max-width: 640px) { .wc-lead { grid-template-columns: minmax(0, 1fr); gap: 24px; } }
+</style>

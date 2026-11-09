@@ -1,70 +1,116 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { KINDS, buildKinds, sorted, totalEntries } from '../src/data/writing';
+import { KINDS, bodyWords, leadAndRest, neighbours, pieces, type WritingEntry } from '../src/data/writing';
+import { FIGURES, figureFor } from '../src/lib/writingCovers';
 
 /**
- * The seam between the taxonomy (TypeScript) and the pieces (markdown files).
- *
- * Both failures guarded here are SILENT: a piece whose `kind` no section declares simply never renders, and a
- * mis-grouped entry appears under the wrong heading. Neither throws, neither fails the build, and neither is
- * visible unless you happen to look at the right page.
+ * The seam between the taxonomy (TypeScript) and the pieces (markdown files): pieces() in data/writing.ts, which
+ * every surface that shows a piece reads. What it gets wrong, it gets wrong everywhere at once, and silently: a draft
+ * published, a reading time typed by nobody, two pages that disagree on which piece is newest.
  */
-describe('writing content seam', () => {
-  const entry = (kind: string, slug: string, date = '2026-01-01') => ({
-    slug,
-    title: slug,
-    date,
-    blurb: 'b',
-    kind,
+const entry = (id: string, date: string, over: Partial<WritingEntry['data']> = {}, html = '<p>A few words here.</p>'): WritingEntry => ({
+  id, data: { title: id, date, kind: 'misc', blurb: `What ${id} says.`, ...over }, rendered: { html },
+});
+
+describe('the schema', () => {
+  // Read as text: content.config.ts imports `astro:content`, a virtual module vitest cannot load.
+  const src = readFileSync(new URL('../src/content.config.ts', import.meta.url), 'utf8');
+
+  it("takes its kinds from data/writing.ts and its covers from lib/writingCovers.ts, so neither list is retyped", () => {
+    expect(src).toMatch(/\bkind: z\.enum\(KIND_KEYS\)/);
+    expect(src).toMatch(/\bcover: z\.enum\(FIGURES\)\.optional\(\)/);
+    expect(src).toMatch(/import \{ KIND_KEYS \} from '\.\/data\/writing'/);
+    expect(src).toMatch(/import \{ FIGURES \} from '\.\/lib\/writingCovers'/);
   });
 
-  it('keeps the schema enum and the kind keys in step', () => {
-    // Read content.config.ts as text rather than importing it: it imports `astro:content`, a virtual module
-    // that only exists inside an Astro build, so vitest cannot load it. Parsing the enum is less elegant than
-    // importing it and it catches the thing that actually goes wrong — someone adds a kind to one file and not
-    // the other.
-    const src = readFileSync(new URL('../src/content.config.ts', import.meta.url), 'utf8');
-    const enumMatch = /kind:\s*z\.enum\(\[([^\]]+)\]\)/.exec(src);
-    expect(enumMatch, 'could not find the kind enum in content.config.ts').toBeTruthy();
-    const schemaKinds = [...enumMatch![1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
-    expect(schemaKinds).toEqual(KINDS.map((k) => k.key).sort());
+  // The reading time is computed (bodyWords), so the field it replaced is gone, and a stale one fails the build.
+  it('has no minutes field, and refuses a field it does not know', () => {
+    const writing = /const writing = defineCollection\(\{([\s\S]*?)\n\}\);/.exec(src)?.[1] ?? '';
+    expect(writing, 'no writing collection in content.config.ts').toContain('z.strictObject(');
+    expect(writing).not.toMatch(/\bminutes:/);
   });
+});
 
-  it('groups entries under their declared kind', () => {
-    const built = buildKinds([entry('misc', 'a'), entry('essays', 'b'), entry('misc', 'c')]);
-    const byKey = Object.fromEntries(built.map((k) => [k.key, k.entries.map((e) => e.slug)]));
-    expect(byKey.misc).toEqual(['a', 'c']);
-    expect(byKey.essays).toEqual(['b']);
-    expect(byKey.notes).toEqual([]);
-  });
-
-  it('drops the kind field from the entries it emits', () => {
-    // The kind is the grouping key, not a property of the piece — leaving it on would let a template render a
-    // section heading from an entry and quietly disagree with the section it sits in.
-    const [first] = buildKinds([entry('misc', 'a')]).find((k) => k.key === 'misc')!.entries;
-    expect(first).not.toHaveProperty('kind');
-    expect(first.slug).toBe('a');
-  });
-
-  it('preserves taxonomy order and keeps empty kinds, so a section still announces itself', () => {
-    const built = buildKinds([entry('misc', 'a')]);
-    expect(built.map((k) => k.key)).toEqual(KINDS.map((k) => k.key));
-    expect(built.every((k) => typeof k.empty === 'string' && k.empty.length > 0)).toBe(true);
-  });
-
-  it('ignores an entry whose kind no section declares, rather than throwing', () => {
-    // A piece can only reach buildKinds after passing the schema's enum, so this is belt and braces — but the
-    // failure mode if it ever happened must be a missing row, not a broken build of the whole site.
-    const built = buildKinds([entry('nonexistent', 'x'), entry('misc', 'a')]);
-    expect(totalEntries(built)).toBe(1);
-  });
-
-  it('leaves ordering to sorted(), newest first', () => {
-    const built = buildKinds([
-      entry('misc', 'old', '2020-01-01'),
-      entry('misc', 'new', '2026-08-15'),
+describe('pieces', () => {
+  it('drops drafts and orders the rest newest first, two on one day by slug', () => {
+    const list = pieces([
+      entry('old', '2025-03-01'), entry('b', '2026-07-01'), entry('draft', '2027-01-01', { draft: true }),
+      entry('a', '2026-07-01'), entry('mid', '2026-01-01'),
     ]);
-    const quotes = built.find((k) => k.key === 'misc')!;
-    expect(sorted(quotes).map((e) => e.slug)).toEqual(['new', 'old']);
+    expect(list.map((p) => p.slug)).toEqual(['a', 'b', 'mid', 'old']);
+  });
+
+  it('builds what the pages read: the href, the figure, the folded search text, featured as a boolean', () => {
+    const [p] = pieces([entry('risk-parity', '2026-01-01', { title: 'Why risk parity isn’t “equal”', kind: 'explainers', cover: 'tails' })]);
+    expect(p.href).toBe('/writing/risk-parity');
+    expect(p.figure).toBe('tails');
+    expect(p.featured).toBe(false);
+    expect(p.q).toContain("why risk parity isn't \"equal\"");
+    expect(p.q).toContain(KINDS.explainers.label.toLowerCase());
+    expect(p.q).toContain('what risk-parity says.');
+  });
+
+  it("gives a piece with no cover its slug's figure", () => {
+    const [p] = pieces([entry('favourite-quotes', '2026-08-15')]);
+    expect(FIGURES).toContain(p.figure);
+    expect(p.figure).toBe(figureFor('favourite-quotes'));
+  });
+
+  // Printed only when it says something new, so a page prints `updated` as it is.
+  it('keeps `updated` only when it differs from `date`', () => {
+    const [same, later] = pieces([
+      entry('same', '2026-01-02', { updated: '2026-01-02' }), entry('later', '2026-01-01', { updated: '2026-03-01' }),
+    ]);
+    expect(same.updated).toBeUndefined();
+    expect(later.updated).toBe('2026-03-01');
+  });
+
+  it('computes the reading time from the body, never under a minute', () => {
+    const words = (k: number) => `<p>${'word '.repeat(k)}</p>`;
+    const [short, long] = pieces([entry('short', '2026-02-01', {}, words(3)), entry('long', '2026-01-01', {}, words(2300))]);
+    expect(short.minutes).toBe(1);
+    expect(long.minutes).toBe(10);
+  });
+
+  // A markdown plugin's throw leaves an entry unrendered rather than failing the build; this fails it, by name.
+  it('throws, naming the file, on an entry that did not render', () => {
+    expect(() => pieces([{ ...entry('broken', '2026-01-01'), rendered: undefined, filePath: 'src/content/writing/broken.md' }]))
+      .toThrow(/src\/content\/writing\/broken\.md did not render/);
+  });
+});
+
+describe('bodyWords', () => {
+  it('counts the text a reader reads, maths left out, an entity neither a word nor a break', () => {
+    const math = '<span class="katex"><math><semantics><mi>x</mi><annotation encoding="application/x-tex">x + y</annotation></semantics></math></span>';
+    expect(bodyWords(`<h2>Two words</h2><p>Over ${math} the <em>real</em> line, don&#x27;t &#x26; go.</p>`)).toBe(8);
+  });
+});
+
+describe('leadAndRest', () => {
+  const list = pieces([entry('new', '2026-03-01'), entry('star', '2026-02-01', { featured: true }), entry('old', '2026-01-01')]);
+
+  it('leads with the newest featured piece, and keeps the rest newest first', () => {
+    const { lead, rest } = leadAndRest(list);
+    expect(lead?.slug).toBe('star');
+    expect(rest.map((p) => p.slug)).toEqual(['new', 'old']);
+  });
+
+  it('leads with the newest piece when none is featured, and with nothing when there is none', () => {
+    const plain = pieces([entry('new', '2026-03-01'), entry('old', '2026-01-01')]);
+    expect(leadAndRest(plain).lead?.slug).toBe('new');
+    expect(leadAndRest(plain).rest.map((p) => p.slug)).toEqual(['old']);
+    expect(leadAndRest([])).toEqual({ lead: undefined, rest: [] });
+  });
+});
+
+describe('neighbours', () => {
+  const list = pieces([entry('c', '2026-03-01'), entry('b', '2026-02-01'), entry('a', '2026-01-01')]);
+
+  it('is the newer piece before and the older after, each only where it exists, never wrapping', () => {
+    expect(neighbours(list, 'b')).toEqual({ prev: list[0], next: list[2] });
+    expect(neighbours(list, 'c')).toEqual({ prev: undefined, next: list[1] });
+    expect(neighbours(list, 'a')).toEqual({ prev: list[1], next: undefined });
+    expect(neighbours(list.slice(0, 1), 'c')).toEqual({ prev: undefined, next: undefined });
+    expect(neighbours(list, 'none')).toEqual({});
   });
 });

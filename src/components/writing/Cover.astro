@@ -1,0 +1,27 @@
+---
+// A writing piece's cover in its frame: the computed SVG (lib/writingCovers.ts), coloured here by role and stroked or
+// filled by type, the CSS half of that file's contract. 8:5 for a card and the index's lead; `banner` is a piece's
+// wide one, 10:3, and 2:1 on a phone, where the slice keeps its middle. Anything slotted sits over it (a card's
+// reading time). The picture is aria-hidden: it illustrates, and the card's words carry the piece.
+import { coverSvg, type Figure } from '../../lib/writingCovers';
+
+interface Props { figure: Figure; seed: string; w: number; h: number; banner?: boolean }
+const { figure, seed, w, h, banner = false } = Astro.props;
+---
+<div class:list={['wcv', { 'wcv-banner': banner }]}><Fragment set:html={coverSvg(figure, seed, w, h)} /><slot /></div>
+
+<style>
+  .wcv { position: relative; aspect-ratio: 8 / 5; overflow: hidden; border-radius: 6px;
+    background: rgba(var(--hairline-rgb), 0.05); border: 1px solid rgba(var(--hairline-rgb), 0.3); }
+  .wcv-banner { aspect-ratio: 10 / 3; }
+  .wcv :global(.cover) { display: block; width: 100%; height: 100%; }
+  .wcv :global(.cv-ink) { --c: var(--ink-1); }
+  .wcv :global(.cv-mid) { --c: var(--ink-3); }
+  .wcv :global(.cv-seal) { --c: var(--seal); }
+  .wcv :global(.cv-faint) { --c: rgba(var(--hairline-rgb), 0.22); }
+  /* What every stroke shares, said once here rather than on each element: its width does not scale with the slice */
+  .wcv :global(.cv-s) { fill: none; stroke: var(--c, var(--ink-1)); vector-effect: non-scaling-stroke;
+    stroke-linejoin: round; stroke-linecap: round; }
+  .wcv :global(.cv-f) { fill: var(--c, var(--ink-1)); stroke: none; }
+  @media (max-width: 640px) { .wcv-banner { aspect-ratio: 2 / 1; } }
+</style>

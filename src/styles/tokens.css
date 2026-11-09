@@ -44,9 +44,10 @@
     #16140f 100%           /* ground: near-black ink */
   );
 
-  /* Reading-page gradient (/writing and its pieces): holds
-     the luminous range top to bottom, never sinking to the near-black ground, so
-     ink stays legible. Dark twin below. */
+  /* Reading-page gradient: holds the luminous range top to bottom, never sinking to
+     the near-black ground, so ink stays legible. Dark twin below. The CSS twin of
+     FluidSky's `reading` ramps (lib/skyPalette.ts), which no route rides since
+     /writing moved to the paper sheet; it goes when that variant does. */
   --reading-grad: linear-gradient(
     168deg,
     #f4efe4 0%,

@@ -25,7 +25,7 @@ interface Props {
    *  - 'scroll' (default): flip dark→paper by the descent fraction behind it
    *    (home rides the full dawn→night gradient; a page with no .descent gets 'light').
    *  - 'light': pin to dark text — for pages that stay pale top-to-bottom in
-   *    light theme (/writing is a reading page and never sinks to dark).
+   *    light theme (/projects' drafting sheet never sinks to dark).
    * In DARK theme the text is always light regardless, so this only matters
    * for the light theme.
    */
@@ -40,7 +40,8 @@ interface Props {
    * ONE STYLE, BECAUSE THE TWO FILES ARE SEPARATE AND BOTH ARE BIG: normal is 36,560 B and italic 45,624 B,
    * and a preload is a high-priority fetch whether or not a rule on the page ever matches the face.
    * `/` renders only the normal (Work.astro's `.wk-item-name`, weight 500); its italic `.wk-promise` shows
-   * only while /writing has no piece. Every Fraunces rule on `/writing/<slug>` is italic.
+   * only while /writing has no piece. No other page sets text in the face (a writing piece's italic did, until
+   * /writing moved to the paper sheet), so no page asks for the italic today.
    */
   preloadAccent?: 'normal' | 'italic';
   /**
@@ -149,8 +150,8 @@ const personLd = {
         FRAUNCES' PRELOAD IS PER PAGE. Not deleted: a page that uses the face downloads it anyway, and without
         the preload it is discovered late (FCP 1956 -> 2333ms, three production-build runs, both styles
         preloaded against none; the one-style preload has not been measured on its own). Not everywhere
-        either: only sections/Work.astro and writing/[...slug].astro use it (`grep -rln -- --font-accent src`
-        also lists global.css and this file), and preloading it on the other routes would fetch 82,184 bytes
+        either: only sections/Work.astro uses it (`grep -rln -- --font-accent src` also lists global.css and
+        this file), so only `/` preloads it, and preloading it on the other routes would fetch 82,184 bytes
         at the highest priority for a face nothing there asks for. The @font-face block is never gated, so
         --ff-fraunces resolves everywhere; only the <link rel=preload> is, narrowed to the one style a page
         shows (Astro's filterPreloads takes variant predicates).

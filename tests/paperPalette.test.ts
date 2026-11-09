@@ -181,11 +181,16 @@ describe('the paper palette (tokens.css)', () => {
   }
 
   // In the dark theme --paper is the TEXT colour, so a ground painted with it would turn the sheet light.
-  it("paints no ground with --paper: the research pages' own CSS never reads it, nor /art's", () => {
+  it("paints no ground with --paper: the research pages' own CSS never reads it, nor /art's, nor /writing's", () => {
     for (const page of ['[slug].astro', 'index.astro']) expect(styleOf(page).length, `no <style is:global> block in ${page}`).toBeGreaterThan(1000);
     expect(pageCss).not.toMatch(/var\(--paper\b/);
     expect(artCss.length, 'no <style> block in art.astro').toBeGreaterThan(1000);
     expect(artCss).not.toMatch(/var\(--paper\b/);
+    for (const file of ['pages/writing.astro', 'pages/writing/[...slug].astro', 'components/writing/PieceCard.astro', 'components/writing/Cover.astro']) {
+      const css = /^<style>([\s\S]*?)^<\/style>/m.exec(readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8'))?.[1] ?? '';
+      expect(css.length, `no <style> block in ${file}`).toBeGreaterThan(500);
+      expect(css, file).not.toMatch(/var\(--paper\b/);
+    }
   });
 });
 

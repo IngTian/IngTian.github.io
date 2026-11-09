@@ -62,9 +62,9 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
     top: 50%;
     transform: translateY(-50%);
     z-index: 30;
-    /* 200px, and the last 10px are load-bearing: a nested label gets 200 - 30 - 12 = 158, which writingStops
-       (lib/pageStops.ts) sizes its 18-character cut to. Widening beats tightening the tracking, which would change
-       the rail's type everywhere to fix one string. */
+    /* 200px: a nested label gets 200 - 30 - 12 = 158, and a longer one ends in an ellipsis (below). The last 10px
+       were added for the /writing rail's piece titles; that rail is retired (its search is /writing's navigation), and
+       today's nested labels, /projects' slugs and the homepage's slides, are shorter. */
     max-width: 200px;
     padding-left: 30px;
     /* The dash's strength: ink-1 at 55% clears 3:1 as a mark on every rail page's ground (worst computed, 3.21:1
@@ -164,9 +164,9 @@ const gap = stagger(1, flat.length, { step: RAIL.rowStep, total: RAIL.enter - RA
      CSS, so it runs from the first frame with nothing to wait for, and the backwards fill holds each row in its
      from-state through its delay. A CSS animation restarts when its element is rendered again, so a rail hidden at
      1100px and below runs it when it first shows, and a row the script hid (its target stopped rendering) replays its
-     own when it shows again; today no rail page hides a target wider than 1100px. On a page with a veil (/writing)
-     most of it plays under the veil's wipe. On `/` the rail is off the hero (hideOver), so it plays as the
-     reader leaves the hero, and again each time they come back down past it. */
+     own when it shows again; today no rail page hides a target wider than 1100px. `/` is the one rail page with a
+     veil, and its rail is off the hero (hideOver), so it plays as the reader leaves the hero, not under the veil's
+     wipe, and again each time they come back down past it. */
   @media (prefers-reduced-motion: no-preference) {
     .side-rail a {
       animation: side-rail-enter var(--row) cubic-bezier(.2,.7,.2,1) backwards;
