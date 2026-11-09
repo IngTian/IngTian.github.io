@@ -50,7 +50,7 @@ export interface Publication {
 export interface Award {
   year?: string;
   title: string;
-  gloss?: string;     // what an abbreviation stands for
+  gloss?: string;     // what an abbreviation stands for, then anything else on record (who runs it, the result)
 }
 
 export interface ResearchInterest {
@@ -218,13 +218,15 @@ export const organisations: Organisation[] = [
     ] },
 ];
 
+// Newest first, undated last. A selection, the owner's: his LinkedIn (Honors & awards) lists more, left out on his word.
+// COMC's year and score are not on record.
 export const awards: Award[] = [
-  { year: '2021', title: 'IEEExtreme — Top 4 teams in Canada' },
+  { year: '2021', title: 'IEEExtreme 15.0 — Top 4 in Canada' },
   { year: "'21–'22", title: 'Hatch Scholarships ($10k) · McGill' },
   { year: '2020', title: 'Rio Tinto–Richards Evans Exchange Award · McGill' },
+  { year: '2018', title: 'AIME', gloss: 'American Invitational Mathematics Examination' },
+  { year: '2018', title: 'CCC — National top 200', gloss: 'Canadian Computing Competition, University of Waterloo' },
   { title: 'COMC', gloss: 'Canadian Open Mathematics Challenge' },
-  { title: 'CCC', gloss: 'Canadian Computing Competition' },
-  { title: 'AIME', gloss: 'American Invitational Mathematics Examination' },
 ];
 
 // witness's release count: hand-maintained, not fetched at build time (that needs the network); counted 2026-11-02.
@@ -323,5 +325,5 @@ export const contact = {
   github: { label: 'GitHub', href: 'https://github.com/IngTian', external: true },
   email: { label: 'Email', href: 'mailto:zeying.tian@mail.mcgill.ca', external: false },
   cv: { label: 'CV', href: '/cv.pdf', external: true },
-  linkedin: { label: 'LinkedIn', href: 'https://www.linkedin.com/in/ing-tian-1b2610149/', external: true },
+  linkedin: { label: 'LinkedIn', href: 'https://www.linkedin.com/in/zeying-tian-1b2610149/', external: true },
 } as const satisfies Record<string, { label: string; href: string; external: boolean }>;
