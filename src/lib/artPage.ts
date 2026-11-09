@@ -14,9 +14,6 @@ export type SentencePart = string | Phrase;
 const RED_PCT = { min: 30, max: 40 } as const;
 const PHRASES = { min: 5, max: 7 } as const;
 
-const wordsOf = (parts: readonly SentencePart[]): number =>
-  countWords(parts.map((x) => (typeof x === 'string' ? x : x.text)).join(''));
-
 export function phrasesOf(parts: readonly SentencePart[]): Phrase[] {
   return parts.filter((x): x is Phrase => typeof x !== 'string');
 }
@@ -34,7 +31,7 @@ export function sentenceProblems(parts: readonly SentencePart[], works: Readonly
     if (n > 1) problems.push(`the sentence names ${work} ${n === 2 ? 'twice' : `${n} times`}`);
   }
   // The share is printed with its counts, to a tenth, so a share just outside the band never prints inside it.
-  const all = wordsOf(parts);
+  const all = countWords(parts.map((x) => (typeof x === 'string' ? x : x.text)).join(''));
   const red = countWords(phrases.map((x) => x.text).join(' '));
   const pct = all ? (100 * red) / all : 0;
   if (pct < RED_PCT.min || pct > RED_PCT.max) {
@@ -44,9 +41,9 @@ export function sentenceProblems(parts: readonly SentencePart[], works: Readonly
 }
 
 /** How long a sentence is shown before the next takes its turn: its words at 200 a minute, so a longer one is given
- *  longer (the three are ~50 words, ~15s). */
-export function holdMs(parts: readonly SentencePart[]): number {
-  return wordsOf(parts) * 300;
+ *  longer (50 words hold 15s). */
+export function holdMs(text: string): number {
+  return countWords(text) * 300;
 }
 
 /** What a work's label may print. A field is given only when it is known. */

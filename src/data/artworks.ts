@@ -65,11 +65,10 @@ export const photography: Photo[] = Object.keys(photoFiles)
 const p = (text: string, work: string): Phrase => ({ text, work });
 
 /**
- * THE SENTENCES, the page's index, in the owner's first person, taking turns in this order: plain, lyrical, wry. Each
- * phrase (set in seal red) is a work, says only what that work shows or what is recorded above, and is the noun
- * alone, its description in ink. The first sentence's first work is the one on the mat at arrival, /art's LCP image,
- * so it is the one the first-load budget weighs. The page refuses a sentence that breaks a rule in lib/artPage.ts,
- * naming it.
+ * THE SENTENCES, the page's index, in the owner's first person, taking turns in this order. Each phrase (set in seal
+ * red) is a work, says only what that work shows or what is recorded above, and is the noun alone, its description
+ * in ink. The first sentence's first work is the one on the mat at arrival, /art's LCP image, so it is the one the
+ * first-load budget weighs. The page refuses a sentence that breaks a rule in lib/artPage.ts, naming it.
  */
 export const SENTENCES: SentencePart[][] = [
   [

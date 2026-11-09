@@ -89,9 +89,8 @@ describe('the code that moves things', () => {
     ]);
   });
 
-  it("holds /art's CSS to ART and FADE: the mat's swap, the sentences' turn, a photograph's one fade", () => {
+  it("holds /art's CSS to ART and FADE: the mat's swap and the sentences' turn, then a photograph's one fade", () => {
     expect(moves(css('pages/art.astro'))).toEqual([
-      `opacity ${ART.swap}ms ${FADE}`,
       `opacity ${ART.swap}ms ${FADE}`,
       `opacity ${ART.tileFade}ms ${FADE}`,
     ]);

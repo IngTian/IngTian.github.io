@@ -203,7 +203,7 @@ src/
   data/profile.ts                   # ALL résumé content: name, roles, rolesSub, phd, bio, researchInterests, timeline, publications, projects + inProgress, awards, contact
   data/nav.ts                       # PAGES — the canonical page set (see Navigation)
   data/writing.ts                   # the writing TAXONOMY (KINDS) + buildKinds(), the one seam to the markdown
-  data/artworks.ts                  # /art's works, keyed (photo-NN from the file; couplet, poem), + SENTENCES, the page's three sentences in turn order; photoNotes.ts holds each photograph's alt, title?, place?{name, confirmed} and year?
+  data/artworks.ts                  # /art's works, keyed (photo-NN from the file; couplet, poem), + SENTENCES, the page's sentences in turn order; photoNotes.ts holds each photograph's alt, title?, place?{name, confirmed} and year?
   lib/artPage.ts                    # /art's pure half: each sentence's rules (sentenceProblems over phrasesOf: PHRASES phrases, each a different work that exists, RED_PCT of its words red) and its turn's hold (holdMs), a work's label line (labelLine), the three sizes hints (matSizes, rowSizes, calSizes) and their constants, and the dark room's zoom: zoomAbout (to 6x, about a point), wheelScale (by distance, not per event), isDoubleTap
   data/{define,desk,making,story}.ts # the homepage explainer's copy + numbers, per slide
   data/{cowGlyph,ruleGlyphs,tickerGlyphs}.ts # pixel-art matrices: the cow's and the slides'
@@ -257,7 +257,7 @@ tools/vendor-projects.mjs           # the ONLY thing that touches the network, r
 | `/writing/<slug>` | one piece, rendered from `src/content/writing/<slug>.md` |
 | `/projects` | every notable project, on its own drafting register: the terminal header and its boot, the gallery, selected work, the workshop |
 | `/experience` | the timeline — education and roles |
-| `/art` | three sentences, taking turns, whose seal-red phrases bring a work onto a mat; the calligraphy as object blocks; every photograph in justified rows; on the paper sheet |
+| `/art` | sentences taking turns, whose seal-red phrases bring a work onto a mat; the calligraphy as object blocks; every photograph in justified rows; on the paper sheet |
 | `/404` | the not-found page (noindex, no canonical) |
 
 **Prototype routes: none today** (git holds the retired ones). A `src/pages/proto-<name>.astro` page exists to
@@ -471,11 +471,11 @@ and reverted every time** — do not rebuild it. The phone treatment is *bug fix
     summary, so a wrapping line does not move it and its hop does not cover the summary; the measurements are
     in `projects.astro`'s comment on the 1179px block. A probe that watches the gallery and not the cow
     reports "nothing moves when it speaks" while the cow moves: assert the cow's rect for every line.
-- on **/art**, at 900px and under the sentence comes first with the mat directly under it, so a tap swaps the
-  work just below the line being read, and a block's work sits above its words. At 640px the sentence is 21px,
-  the mat is `min(40vh, 320px)` (so its top is on the first screen at 390×844; computed, not measured), and rows
-  are 150px; the dark room's bar takes two rows, the line (up to two lines) and the count, then the squares; the
-  work is centred in the band between the close strip and the bar.
+- on **/art**, at 900px and under the sentences come first, their numbers and Pause under them, then the mat, so a
+  tap swaps the work just below the line being read, and a block's work sits above its words. At 640px a sentence
+  is 21px, the mat is `min(40vh, 320px)` (so its top is on the first screen at 390×844; computed, not measured),
+  and rows are 150px; the dark room's bar takes two rows, the line (up to two lines) and the count, then the
+  squares; the work is centred in the band between the close strip and the bar.
 
 ## Navigation & structure
 
@@ -1066,13 +1066,10 @@ of sky over a full-bleed panel.
     `idleLines()` unprompted lines per page view (`lib/cowTalk.ts`: two, none on a phone or under reduced
     motion), the rest a press away. `tests/cowTalk.test.ts` adds up what it does unasked from PlushCow's
     transition and hop literals and `TYPE_MS`, ~3.4s, and holds it under the limit.
-  - **One exception, the owner's call (2026-11-08): /art's three sentences take turns** for as long as the page is
-    open, each for its words at 200 a minute (`holdMs` in `lib/artPage.ts`, ~15s), by the mat's cross-fade. It is
-    held to 2.2.2 by the criterion's own terms, a way to stop it: Pause, and a number, which shows that sentence and
-    stays. The pointer on the words holds a turn, a work taken (a phrase or the mat, clicked or focused) stops the
-    turns until Play, and under reduced motion they never start. A turn is not read by the live region.
-    `tests/distSmoke.test.ts` holds each sentence's hold and the Pause to the built page. It is not a precedent:
-    the rule above stands for anything else new.
+  - **One exception, the owner's call (2026-11-08): /art's sentences take turns** for as long as the page is open,
+    each for its words at 200 a minute (`holdMs` in `lib/artPage.ts`). It is held to 2.2.2 by the criterion's own
+    terms, a way to stop it: Pause, and the numbers; what else holds or stops a turn is the turns' comment in
+    `pages/art.astro`. `tests/distSmoke.test.ts` holds the Pause to the built page. It is not a precedent.
   - **The research routes and the rail are held to it, and to 2s per animation.** What moves there unasked
     moves once per showing (on `/` the rail's entrance replays each time the rail reappears below the hero),
     by `transform` and `opacity` (the rail's entrance in CSS, the rest through `scripts/motion.ts`), and ends

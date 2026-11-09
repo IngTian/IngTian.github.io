@@ -11,8 +11,7 @@ import { INTRO_SEEN_KEY } from '../src/lib/introSession';
 import { contact, inProgress, projects, publications, researchInterests, timeline, type Publication } from '../src/data/profile';
 import { PAPER_DATA } from '../src/data/papers';
 import { photoNotes } from '../src/data/photoNotes';
-import { SENTENCES, calligraphy } from '../src/data/artworks';
-import { holdMs } from '../src/lib/artPage';
+import { calligraphy } from '../src/data/artworks';
 import {
   type Stop, experienceStops, flattenStops, homeStops, paperPageOwns, paperSections, paperStops, projectSectionId,
   projectStops, researchIndexStops,
@@ -485,11 +484,10 @@ describe("/art's image payload, measured on the built output", () => {
   });
 
   // The sentences take turns on their own for longer than five seconds, which WCAG 2.2.2 allows only with a way to
-  // pause them: each ships in its order with its hold (holdMs), and Pause ships with them.
-  it('ships each sentence with its hold, and a Pause for the turns', () => {
+  // pause them, so Pause ships with them.
+  it('ships a Pause for the turns', () => {
     const m = builtPage('/art').markup;
-    const holds = [...m.matchAll(/<p class="sentence\b[^"]*"[^>]*\bdata-hold="(\d+)"/g)].map((x) => Number(x[1]));
-    expect(holds).toEqual(SENTENCES.map((s) => holdMs(s)));
+    expect(m.match(/<p class="sentence\b/g)?.length, 'the sentences that take turns').toBeGreaterThan(1);
     expect(m).toMatch(/<button\b[^>]*\bclass="turns-play"[^>]*>Pause<\/button>/);
   });
 });

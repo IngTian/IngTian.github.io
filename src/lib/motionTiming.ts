@@ -58,8 +58,8 @@ export function arrowDelay(k: number, n: number): number {
  *  `underlineOut`; its miniature redraws over `redraw`. */
 export const CARD = { lift: 260, frame: 200, underline: 320, underlineStep: 110, underlineOut: 200, redraw: 750 } as const;
 
-/** /art (pages/art.astro): a phrase's work cross-fades onto the mat over `swap`, once it has decoded; a photograph
- *  not yet loaded when the page's script starts fades in once over `tileFade`. */
+/** /art (pages/art.astro): a phrase's work cross-fades onto the mat over `swap`, once it has decoded, as a sentence
+ *  does into its turn; a photograph not yet loaded when the page's script starts fades in once over `tileFade`. */
 export const ART = { swap: 300, tileFade: 600 } as const;
 
 /**

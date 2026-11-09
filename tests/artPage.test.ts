@@ -11,8 +11,8 @@ const ok: SentencePart[] = ['I keep ', p('a canoe', 'photo-01'), ' on a still la
   ' in the sky, and I write ', p('a couplet', 'couplet'), ' and ', p('a poem', 'poem'), ' in ink.'];
 const msg = (parts: SentencePart[]) => sentenceProblems(parts, works).join('; ');
 
-it('holds a sentence for its words at 200 a minute, phrases counted with the ink', () => {
-  expect(holdMs(ok)).toBe(32 * 300);
+it('holds a sentence for its words at 200 a minute', () => {
+  expect(holdMs('a red canoe on a turquoise lake')).toBe(7 * 300);
 });
 
 it('accepts six phrases at a third red', () => expect(sentenceProblems(ok, works)).toEqual([]));
