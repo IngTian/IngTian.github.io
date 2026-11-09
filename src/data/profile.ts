@@ -223,7 +223,7 @@ export const awards: Award[] = [
   { year: '2021', title: 'IEEExtreme 15.0 — Top 4 in Canada' },
   { year: "'21–'22", title: 'Hatch Scholarships ($10k) · McGill' },
   { year: '2020', title: 'Rio Tinto–Richards Evans Exchange Award · McGill' },
-  { year: '2018', title: 'AIME', gloss: 'American Invitational Mathematics Examination, qualified through the AMC 12 National Honour Roll (top 5%)' },
+  { year: '2018', title: 'AIME', gloss: 'American Invitational Mathematics Examination' },
   { year: '2018', title: 'CCC — National top 200', gloss: 'Canadian Computing Competition, University of Waterloo' },
   { title: 'COMC', gloss: 'Canadian Open Mathematics Challenge' },
 ];
