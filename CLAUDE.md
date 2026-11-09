@@ -44,10 +44,11 @@ pass.
   own 1240px column (`pages/art.astro`). /experience borrows it the same way, with a 1480px column of wide panels, one
   per organisation, each beside its logo as a pixel mark (`pages/experience.astro`). /writing borrows it too, in
   sans for the structure (headings, titles, card text), mono for its meta lines (dates, reading time) and the cards'
-  kind labels, over a Georgia body on a ~68ch line: an index of cards, each with a computed cover
-  (`lib/writingCovers.ts`), in a 1240px column (`styles/writing.css`, which both writing routes import), and a
-  piece's page in the same column (*Writing is markdown*). No page-load veil on any of them: on the research and writing routes it would
-  replay on every card click and every way back, and on /art and /experience it is motion that runs on its own.
+  kind labels, over a Georgia body: an index of cards, each with a computed cover (`lib/writingCovers.ts`), in a
+  1240px column (`styles/writing.css`, which both writing routes import), and a piece in one 680px reading column, its
+  head, banner, body and neighbours on the same two edges (*Writing is markdown*). No page-load veil on any of them: on
+  the research and writing routes it would replay on every card click and every way back, and on /art and /experience
+  it is motion that runs on its own.
 
 **What keeps them one site is shared components, not a shared background.** Which kind a component is
 decides how a page may change it:
@@ -215,7 +216,7 @@ src/
   data/writing.ts                   # the writing TAXONOMY (KIND_KEYS, KINDS), CHARTER, SEARCH_FROM + pieces(), the one seam to the markdown (reading time, cover, search text), leadAndRest, neighbours
   pages/writing.astro, writing/[...slug].astro # /writing (the header, the lead, the cards, the search from SEARCH_FROM pieces) and one piece's page
   components/writing/{Cover,PieceCard}.astro   # a cover in its frame (the CSS half of its class contract) and the one card: the grid's, a piece's foot's, and the index's lead
-  lib/writingCovers.ts              # a piece's computed cover: seven FIGURES named for what they draw (allocation, contours, regression, impact, tails, drawdown, pipeline), coverSvg, figureFor (the frontmatter's, else the slug's hash)
+  lib/writingCovers.ts              # a piece's cover: FIGURES, seven computed and named for what they draw (allocation, contours, regression, impact, tails, drawdown, pipeline) and `quote`, a commonplace book's emblem; coverSvg, figureFor (the frontmatter's, else a computed one by the slug's hash)
   lib/writingSearch.ts              # the /writing search's pure half: fold (case, accents, curly quotes) and shows (a kind, AND-matched words)
   data/artworks.ts                  # /art's works, keyed (photo-NN from the file; couplet, poem), + SENTENCES, the page's sentences in turn order; photoNotes.ts holds each photograph's alt, title?, place?{name, confirmed} and year?
   lib/artPage.ts                    # /art's pure half: each sentence's rules (sentenceProblems over phrasesOf: PHRASES phrases, each a different work that exists, RED_PCT of its words red) and its turn's hold (holdMs), a work's label line (labelLine), the three sizes hints (matSizes, rowSizes, calSizes) and their constants, and the dark room's zoom: zoomAbout (to 6x, about a point), wheelScale (by distance, not per event), isDoubleTap
@@ -634,7 +635,7 @@ might have lots of writings"*.
   | `date` | yes | `YYYY-MM-DD`. Unquoted YAML dates are fine — YAML parses `2026-08-15` into a Date object, so the schema accepts a string *or* a `Date` and normalises. |
   | `kind` | yes | enum: `notes` \| `explainers` \| `methods` \| `misc` (Notes, Explainers, Methods, Misc), `data/writing.ts`' `KIND_KEYS`, which the schema imports. The favourite quotes are `misc`. |
   | `blurb` | yes | one or two sentences: the card's text on the index, and the piece's standfirst under its title. |
-  | `cover` | no | the figure its cover draws: `allocation` \| `contours` \| `regression` \| `impact` \| `tails` \| `drawdown` \| `pipeline` (`lib/writingCovers.ts`' `FIGURES`). Absent, the slug's hash picks one, the same on every build. |
+  | `cover` | no | the figure its cover draws: `allocation` \| `contours` \| `regression` \| `impact` \| `tails` \| `drawdown` \| `pipeline` \| `quote` (`lib/writingCovers.ts`' `FIGURES`). Absent, the slug's hash picks a computed one, the same on every build; `quote`, the one picture of a kind rather than a computation, only by name (the quotes do). |
   | `updated` | no | when the piece last **gained** something. |
   | `featured` | no | leads the index (the newest featured piece; without one, the newest). |
   | `draft` | no | committed but unpublished: no card, no page. |

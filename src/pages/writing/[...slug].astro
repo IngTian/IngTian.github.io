@@ -57,13 +57,15 @@ const { Content } = await render(entry);
 </BaseLayout>
 
 <style>
-  /* the column and the cards' grid are styles/writing.css's, shared with the index */
+  /* The sheet's padding and the cards' grid are styles/writing.css's, shared with the index. A piece reads in ONE
+     column, 680px (about 68 characters of the body's Georgia), its head, banner, body and neighbours on the same two
+     edges: a banner the index's width over a narrower body left the sheet empty to the body's right. */
+  .wp { max-width: calc(680px + 2 * clamp(22px, 5vw, 72px)); }
   .back { font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); text-decoration: none; }
   .back:focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; border-radius: 2px; }
   @media (hover: hover) { .back:hover { color: var(--seal); } }
 
   /* ── the header ── */
-  .wp-head { max-width: 820px; }
   .wp-kind { display: inline-block; margin: 28px 0 0; padding: 4px 9px; font-size: 12px; font-weight: 500; line-height: 1;
     color: var(--ink-2); border: 1px solid rgba(var(--hairline-rgb), 0.35); border-radius: 999px; }
   .wp-h1 { margin: 18px 0 0; font: 800 clamp(36px, 4.6vw, 60px)/1.04 var(--font-body); letter-spacing: -0.03em; color: var(--ink-1);
@@ -73,10 +75,10 @@ const { Content } = await render(entry);
   .wp-banner { margin-top: 40px; }
 
   /* ── the body. <Content /> carries no scope attribute, so every rule reaches it through :global, under .wp-body
-     (CLAUDE.md, Astro trap 1). Georgia, the sheet's reading face, on a ~68ch measure; the headings are the page's sans.
+     (CLAUDE.md, Astro trap 1). Georgia, the sheet's reading face, on the column's measure; the headings are the page's sans.
      Tailwind's preflight zeroes every margin and strips list markers, so a markdown element with no rule here is
      undifferentiated text, not a browser default. ── */
-  .wp-body { max-width: 68ch; margin-top: 48px; font: 18px/1.65 var(--font-display); color: var(--ink-2); }
+  .wp-body { margin-top: 48px; font: 18px/1.65 var(--font-display); color: var(--ink-2); }
   .wp-body > :global(* + *) { margin-top: 1.1em; }
   .wp-body :global(h2) { margin-top: 2em; font: 700 24px/1.25 var(--font-body); letter-spacing: -0.015em; color: var(--ink-1); }
   .wp-body :global(h3) { margin-top: 1.7em; font: 700 19px/1.3 var(--font-body); letter-spacing: -0.01em; color: var(--ink-1); }
@@ -148,6 +150,9 @@ const { Content } = await render(entry);
 
   /* ── the pieces either side: the index's cards (components/writing/PieceCard.astro), on its grid ── */
   .wp-around { margin-top: 96px; padding-top: 28px; border-top: 1px solid rgba(var(--hairline-rgb), 0.3); }
+  /* the neighbours, two across in the column, one on a phone */
+  .wp-around .wgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 640px) { .wp-around .wgrid { grid-template-columns: minmax(0, 1fr); } }
 
   @media (max-width: 640px) { .wp-body { font-size: 17px; } }
 </style>

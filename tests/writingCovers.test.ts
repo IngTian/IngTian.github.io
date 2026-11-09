@@ -84,7 +84,7 @@ describe('figureFor', () => {
     for (const f of FIGURES) expect(figureFor('any-slug', f)).toBe(f);
   });
 
-  it('picks a figure for any slug, the same one each time, and every figure for some slug', () => {
+  it('picks a computed figure for any slug, the same one each time, every one for some slug, and never quote', () => {
     const picked = new Set<string>();
     for (let i = 0; i < 200; i++) {
       const slug = `piece-${i}`;
@@ -93,6 +93,7 @@ describe('figureFor', () => {
       picked.add(figureFor(slug));
     }
     expect(figureFor('')).toBeDefined();
-    expect([...picked].sort()).toEqual([...FIGURES].sort());
+    // quote is the commonplace book's emblem, a piece's only by naming it (the quotes do)
+    expect([...picked].sort()).toEqual(FIGURES.filter((f) => f !== 'quote').sort());
   });
 });

@@ -1,6 +1,6 @@
 // src/lib/writingCovers.ts
-// A writing piece's cover: a computed picture, never a photograph. Seven FIGURES, each named for what it draws, not
-// for a topic, and each real maths run on seeded data (mulberry32 from lib/scenario.ts, seeded by a 32-bit FNV-1a
+// A writing piece's cover: a computed picture, never a photograph. Eight FIGURES, each named for what it draws, not
+// for a topic. Seven are real maths run on seeded data (mulberry32 from lib/scenario.ts, seeded by a 32-bit FNV-1a
 // hash of the slug), so the same slug draws the same picture on every build, and nothing on it means less than it
 // appears to:
 //   allocation  a rebalanced allocation: 3-5 weights as a stacked area, drifting with seeded returns between
@@ -17,11 +17,14 @@
 //               faint, the worst (peak to trough, and its depth) in seal.
 //   pipeline    a layered DAG of tasks, each box as wide as its seeded duration; the critical path (the longest by
 //               total duration, by dynamic programming) in seal.
+// The eighth, quote, is the one picture of its KIND rather than a computation, for a collection of others' words: a
+// commonplace book's page, ruled, a few lines of writing and an attribution, and a pair of opening quotation marks in
+// seal. A piece gets it only by naming it.
 // The contours plane is one function per seed, seen through a window of the cover's aspect, so a card and its
 // banner show the same landscape and the descent stays perpendicular to the isolines.
 //
 // A piece names its figure in its frontmatter (`cover`, content.config.ts's enum of FIGURES); without one, figureFor
-// picks one by the slug's hash, so the choice is the file's and never a code change.
+// picks a computed one by the slug's hash, so the choice is the file's and never a code change.
 //
 // CONTRACT for the CSS that colours it (components/writing/Cover.astro): every drawn element carries one ROLE
 // class, cv-ink (main ink), cv-mid (secondary ink), cv-seal (the one accent, used sparingly: the point of the
@@ -314,19 +317,56 @@ function pipeline(r: Rand, b: Box): string {
   return edges + seal + boxes;
 }
 
-/** The figures a cover can draw, each named for what it draws; content.config.ts's `cover` enum is this list. */
-export const FIGURES = ['allocation', 'contours', 'regression', 'impact', 'tails', 'drawdown', 'pipeline'] as const;
+// ── quote: a commonplace book's page — the one figure that is a picture of its kind, not a computation ──────
+/** One opening quotation mark, a "6": its ball at (cx, cy), radius R, and its tail rising to the upper right. */
+const mark = (cx: number, cy: number, R: number): string => {
+  const P = (x: number, y: number) => `${n1(cx + x * R)} ${n1(cy + y * R)}`;
+  return dot('seal', cx, cy, R)
+    + `<path class="cv-seal cv-f" d="M${P(-1, 0)}Q${P(-1.05, -1.9)} ${P(0.75, -2.55)}Q${P(-0.35, -1.75)} ${P(-0.1, -0.85)}Z"/>`;
+};
+function quote(r: Rand, b: Box): string {
+  const R = Math.round(Math.min((b.B - b.T) * 0.15, (b.R - b.L) * 0.055) * 10) / 10;
+  const x1 = b.L + 1.05 * R, x2 = x1 + 2.5 * R, cy = b.T + 2.6 * R;
+  const gap = Math.max(14, (b.B - b.T) / 7), amp = Math.min(1.6, gap * 0.1), phase = r() * 6.28;
+  let rules = '', ink = '';
+  const rows: number[] = [];
+  for (let y = b.T + gap * 0.9; y <= b.B + 0.01; y += gap) rows.push(y);
+  rows.forEach((y, k) => {
+    rules += line('faint', [[b.L, y], [b.R, y]], 1.25);
+    const last = k === rows.length - 1, base = y - gap * 0.3;
+    if (last) {   // the attribution: a dash and a name, right-aligned on the last rule
+      const w = (b.R - b.L) * between(r, 0.14, 0.22), x0 = b.R - w;
+      ink += line('mid', [[x0 - gap * 0.9, base], [x0 - gap * 0.35, base]], 1.5) + line('ink', [[x0, base], [b.R, base]], 1.5);
+      return;
+    }
+    if (k === rows.length - 2) return;   // a blank line before it
+    // a line of writing: after the marks while the rows run beside them, the full width below them; the paragraph's
+    // last line short
+    const x0 = base < cy + R + gap * 0.35 ? x2 + 1.7 * R : b.L;
+    const x9 = x0 + (b.R - x0) * (k === rows.length - 3 ? between(r, 0.3, 0.55) : between(r, 0.72, 0.97));
+    const p: Pt[] = [];
+    for (let x = x0; x <= x9; x += 6) p.push([x, base - amp * Math.sin(x * 0.11 + phase + k)]);
+    if (p.length > 1) ink += line('mid', p, 1.5);
+  });
+  return rules + ink + mark(x1, cy, R) + mark(x2, cy, R);
+}
+
+/** The figures a piece without a `cover` is given by its slug: the computed ones. */
+const COMPUTED = ['allocation', 'contours', 'regression', 'impact', 'tails', 'drawdown', 'pipeline'] as const;
+/** Every figure a cover can draw, each named for what it draws; content.config.ts's `cover` enum is this list.
+ *  `quote` only where a piece asks for it: it is an emblem of a collection of others' words, not a computation. */
+export const FIGURES = [...COMPUTED, 'quote'] as const;
 export type Figure = (typeof FIGURES)[number];
 
 /** The viewBox each surface draws a cover at (components/writing/Cover.astro's `size`): a card, the index's lead, a
  *  piece's banner. */
 export const COVER_SIZES = { card: [400, 250], lead: [640, 400], banner: [1200, 360] } as const;
 
-const DRAW: Record<Figure, (r: Rand, b: Box) => string> = { allocation, contours, regression, impact, tails, drawdown, pipeline };
+const DRAW: Record<Figure, (r: Rand, b: Box) => string> = { allocation, contours, regression, impact, tails, drawdown, pipeline, quote };
 
-/** The figure a piece's cover draws: the one its frontmatter names, else one picked by its slug's hash. */
+/** The figure a piece's cover draws: the one its frontmatter names, else a computed one picked by its slug's hash. */
 export function figureFor(slug: string, cover?: Figure): Figure {
-  return cover ?? FIGURES[hash(slug) % FIGURES.length];
+  return cover ?? COMPUTED[hash(slug) % COMPUTED.length];
 }
 
 /** A cover as an SVG string, viewBox 0 0 w h, seeded by `seed` (the slug), drawn only with the contract's classes. */
