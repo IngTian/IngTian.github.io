@@ -1,0 +1,136 @@
+---
+// PROTOTYPE, direction "Stream": one piece, conversational and light. A plain column at the index's left edge (so
+// nothing moves between the two), the kind's marker and the facts above the title, the standfirst as the lead, the body
+// in the system face with Georgia for structure, and the seal's end mark on its last paragraph. At its foot, the
+// entries either side of it in the stream: a short note has no page, so its link is its post on the index.
+import { PIECES, type Kind, type Piece, type SAMPLE } from '../../data/protoWriting';
+import { longDate } from '../../lib/dates';
+
+interface Props { piece: typeof SAMPLE }
+const { piece } = Astro.props;
+
+const one = (k: Kind) => k.slice(0, -1);
+const href = (p: Piece) => (p.short ? `/writing#w-${p.slug}` : `/writing/${p.slug}`);
+// PIECES is newest first: the entry above this one is later, the one below earlier.
+const i = PIECES.findIndex((p) => p.slug === piece.slug);
+const later = i > 0 ? PIECES[i - 1] : undefined;
+const earlier = i >= 0 ? PIECES[i + 1] : undefined;
+const near = [
+  { dir: 'earlier', p: earlier, label: '← Earlier', none: 'Nothing earlier. The stream starts here.' },
+  { dir: 'later', p: later, label: 'Later →', none: 'Nothing later yet. This is the newest entry.' },
+];
+---
+<article class="st sp">
+  <header class="sp-head">
+    <a class="back" href="/writing">← writing</a>
+    <p class="sp-meta">
+      <span class="sp-tag"><i class:list={['mk', `mk--${piece.kind}`]} aria-hidden="true"></i>{one(piece.kind)}</span>
+      <time datetime={piece.date}>{longDate(piece.date)}</time>
+      <span>{piece.minutes} min</span>
+    </p>
+    <h1>{piece.title}</h1>
+    <p class="sp-lead">{piece.standfirst}</p>
+  </header>
+
+  <div class="sp-body"><Fragment set:html={piece.html} /></div>
+
+  <nav class="sp-near" aria-label="Nearby in the stream">
+    <p class="sp-near-h" aria-hidden="true">Nearby in the stream</p>
+    <div class="sp-near-row">
+      {near.map((n) => n.p ? (
+        <a class:list={['sp-n', `sp-n--${n.dir}`]} href={href(n.p)}>
+          <span class="sp-n-dir">{n.label}</span>
+          <span class="sp-n-t">{n.p.title}</span>
+          <span class="sp-n-m"><i class:list={['mk', `mk--${n.p.kind}`]} aria-hidden="true"></i>{one(n.p.kind)} · {longDate(n.p.date)}</span>
+        </a>
+      ) : (
+        <p class:list={['sp-n', 'sp-n--none', `sp-n--${n.dir}`]}>{n.none}</p>
+      ))}
+    </div>
+  </nav>
+
+  <footer class="sp-foot"><a class="back" href="/writing">← back to the stream</a></footer>
+</article>
+
+<style>
+  /* The index's column, so the back link and the title do not move from one to the other. */
+  .st { max-width: 1120px; margin: 0 auto; padding: 14vh clamp(20px, 5vw, 72px) 0; box-sizing: border-box; }
+  @media not all and (max-width: 1100px) { .st { padding-left: clamp(190px, 13vw, 230px); } }
+
+  .back { font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); text-decoration: none; }
+  @media (hover: hover) { .back:hover { color: var(--seal); } }
+  .back:focus-visible, .sp-n:focus-visible { outline: 2px solid var(--seal); outline-offset: 3px; border-radius: 1px; }
+
+  .mk { display: inline-block; width: 0; height: 0; margin-right: 8px; border: 3.5px solid currentColor; vertical-align: 0.08em; }
+  .mk--notes { border-radius: 50%; }
+  .mk--explainers { transform: rotate(45deg) scale(0.88); }
+
+  /* ── THE HEAD ── */
+  .sp-head { max-width: 44rem; }
+  .sp-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 26px 0 0;
+    font: 11.5px/1.4 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); }
+  .sp-tag { color: var(--ink-2); }
+  .sp h1 { margin: 12px 0 0; max-width: 22ch; font: 500 clamp(34px, 4.4vw, 52px)/1.08 var(--font-display); letter-spacing: -0.01em;
+    color: var(--ink-1); text-wrap: balance; }
+  .sp-lead { margin: 22px 0 0; max-width: 34em; font: 400 clamp(19px, 1.8vw, 23px)/1.5 var(--font-display); color: var(--ink-2);
+    text-wrap: pretty; }
+
+  /* ── THE BODY: set:html, so every rule reaches it through :global (Astro trap 1). ── */
+  .sp-body { max-width: 40rem; margin-top: 44px; padding-top: 30px; border-top: 1px solid rgba(var(--hairline-rgb), 0.22);
+    font-size: 17px; line-height: 1.72; color: var(--ink-2); }
+  .sp-body > :global(* + *) { margin-top: 1.1em; }
+  .sp-body :global(h2) { margin-top: 2.2em; font: 500 clamp(23px, 2.2vw, 27px)/1.2 var(--font-display); color: var(--ink-1); }
+  .sp-body :global(h3) { margin-top: 1.9em; font: italic 400 clamp(18px, 1.7vw, 20px)/1.3 var(--font-accent); color: var(--ink-1); }
+  .sp-body :global(h2 + *), .sp-body :global(h3 + *) { margin-top: 0.6em; }
+  .sp-body :global(strong) { font-weight: 600; color: var(--ink-1); }
+  .sp-body :global(em) { font-style: italic; color: var(--ink-1); }
+  .sp-body :global(math) { color: var(--ink-1); }
+  .sp-body :global(ul) { padding-left: 1.3em; list-style: '–  '; }
+  .sp-body :global(li + li) { margin-top: 0.45em; }
+  .sp-body :global(li::marker) { color: var(--ink-3); }
+
+  /* A display: flush left and scrolling on its own, never widening the page; display-sized fractions. */
+  .sp-body :global(.w-eq) { margin: 1.5em 0; padding: 0.2em 0 0.2em 1.2em; max-width: 100%; overflow-x: auto; overflow-y: hidden; }
+  .sp-body :global(.w-eq math) { font-size: 1.15em; math-style: normal; }
+
+  /* An aside: the one accent on the page, a rule beside a note the reader may skip. */
+  .sp-body :global(.w-note) { padding: 2px 0 2px 16px; border-left: 2px solid var(--ochre); font-size: 14.5px; line-height: 1.62;
+    color: var(--ink-3); }
+
+  /* A pull quote: the loudest thing in the column, a hanging mark in the accent. */
+  .sp-body :global(blockquote) { position: relative; margin: 1.8em 0; padding-left: 1.1em;
+    font: 400 clamp(21px, 2.2vw, 25px)/1.42 var(--font-display); color: var(--ink-1); text-wrap: balance; }
+  .sp-body :global(blockquote::before) { content: '\201C'; position: absolute; left: -0.3em; top: -0.12em; font-size: 2.4em; line-height: 1;
+    color: var(--ochre); }
+
+  /* The end mark: the seal, on the last paragraph before the source (or the last one). */
+  .sp-body :global(p:has(+ .w-src)::after), .sp-body :global(p:not(.w-src):last-child::after) { content: ''; display: inline-block;
+    margin-left: 0.4em; border: 0.24em solid var(--seal); vertical-align: 0.05em; }
+  .sp-body :global(.w-src) { margin-top: 2.4em; font-size: 13px; line-height: 1.6; color: var(--ink-3); }
+
+  /* ── NEARBY ── */
+  .sp-near { max-width: 44rem; margin-top: 12vh; }
+  .sp-near-h { margin: 0 0 12px; font: 11px/1.4 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
+  .sp-near-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 32px; }
+  .sp-n { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 16px 0 0; border-top: 1px solid rgba(var(--hairline-rgb), 0.3);
+    text-decoration: none; }
+  .sp-n--later { text-align: right; align-items: flex-end; }
+  .sp-n-dir, .sp-n-m { font: 11.5px/1.4 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); }
+  .sp-n-t { font: 500 19px/1.3 var(--font-display); color: var(--ink-1); text-wrap: pretty; }
+  .sp-n--none { font: italic 400 16px/1.45 var(--font-accent); color: var(--ink-3); }
+  @media (hover: hover) {
+    .sp-n:hover .sp-n-t { text-decoration: underline 1px var(--seal); text-underline-offset: 4px; }
+    .sp-n--earlier:hover .sp-n-dir { color: var(--seal); transform: translateX(-4px); }
+    .sp-n--later:hover .sp-n-dir { color: var(--seal); transform: translateX(4px); }
+  }
+  @media (prefers-reduced-motion: no-preference) { .sp-n-dir { transition: transform 160ms ease-out, color 160ms ease-out; } }
+
+  .sp-foot { padding: 8vh 0 16vh; }
+
+  @media (max-width: 640px) {
+    .st { padding-top: 12vh; }
+    .sp-body { font-size: 16px; }
+    .sp-near-row { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+    .sp-n--later { text-align: left; align-items: flex-start; }
+  }
+</style>

@@ -1,0 +1,212 @@
+---
+// /proto-writing, direction "Contents": /writing as the contents page of a small, well-set quarterly.
+//
+// The pieces fall into issues by the calendar quarter they were written in, named for its season (January – March is
+// winter, so an issue never straddles a year). The kinds are departments: the running head over every entry, and a
+// filter that is radios and :has(), no script. The newest piece leads, large, its blurb set as a standfirst. A short
+// note is printed whole where it is listed and has no page. The big numerals are each piece's ordinal, the first piece
+// ever written being 01, so the newest one's number is the count.
+import type { Kind, Piece } from '../../data/protoWriting';
+import { CHARTER, KINDS } from '../../data/protoWriting';
+import PlushCow from '../PlushCow.astro';
+import { COW_LINES_WRITING } from '../../data/cowGlyph';
+
+interface Props { pieces: Piece[] }
+const { pieces } = Astro.props;
+
+const QUARTERS: [string, string][] = [
+  ['Winter', 'January – March'], ['Spring', 'April – June'], ['Summer', 'July – September'], ['Autumn', 'October – December'],
+];
+const quarterOf = (d: string) => QUARTERS[Math.floor((Number(d.slice(5, 7)) - 1) / 3)];
+const issueName = (d: string) => `${quarterOf(d)[0]} ${d.slice(0, 4)}`;
+const day = (d: string) =>
+  new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const plural = (k: number, w: string) => `${k} ${w}${k === 1 ? '' : 's'}`;
+// PROTOTYPE: every title opens the one sample piece in the switcher (a full load, so the switcher's script reads the
+// query). In production it is `/writing/${p.slug}`.
+const href = '/proto-writing?dir=contents&view=piece';
+
+const n = pieces.length;
+type Entry = Piece & { no: string };
+const issues: { name: string; months: string; entries: Entry[] }[] = [];
+pieces.forEach((p, i) => {
+  const name = issueName(p.date);
+  const entry = { ...p, no: String(n - i).padStart(2, '0') };
+  const last = issues[issues.length - 1];
+  if (last?.name === name) last.entries.push(entry);
+  else issues.push({ name, months: quarterOf(p.date)[1], entries: [entry] });
+});
+const depts = (Object.keys(KINDS) as Kind[])
+  .map((k) => ({ key: k, ...KINDS[k], count: pieces.filter((p) => p.kind === k).length }))
+  .filter((d) => d.count > 0);
+// One radio group per instance: the prototype renders this index three times on one page.
+const group = `ci-dept-${n}`;
+---
+<div class="ci">
+  <header class="ci-head">
+    <a class="back" href="/">← back</a>
+    {n > 0 && (
+      <p class="ci-run"><span>Ing Tian</span><span>{plural(n, 'piece')} since {issueName(pieces[n - 1].date)}</span></p>
+    )}
+    <div class="ci-mast">
+      <h1>Writing</h1>
+      <div class="ci-side">
+        {n > 0 && <p class="ci-sub">Contents</p>}
+        <p class="ci-charter">{CHARTER}</p>
+      </div>
+    </div>
+  </header>
+
+  {n === 0 ? (
+    <div class="ci-cow">
+      <PlushCow size="large" lines={COW_LINES_WRITING} label="A cow, holding the space until something is written here. Press it." />
+    </div>
+  ) : (
+    <>
+      <div class="ci-depts" role="radiogroup" aria-label="Departments">
+        <span class="ci-depts-h" aria-hidden="true">Departments</span>
+        <label><input type="radio" name={group} value="all" checked /><span>All</span> <span class="ci-c">{n}</span></label>
+        {depts.map((d) => (
+          <label><input type="radio" name={group} value={d.key} /><span>{d.label}</span> <span class="ci-c">{d.count}</span></label>
+        ))}
+      </div>
+      {depts.map((d) => <p class="ci-gloss" data-kind={d.key}>{d.gloss}</p>)}
+
+      {issues.map((iss, ii) => (
+        <section class="ci-issue">
+          <header class="ci-issue-h">
+            <h2>{iss.name}</h2>
+            <p>{iss.months}</p>
+          </header>
+          <ol class="ci-list">
+            {iss.entries.map((p, j) => (
+              <li class:list={['ci-e', { 'ci-lead': ii === 0 && j === 0, 'ci-short': !!p.short }]} data-kind={p.kind}>
+                <p class="ci-eh">
+                  <span class="ci-no" aria-hidden="true">{p.no}</span>
+                  <span class="ci-rule" aria-hidden="true"></span>
+                  <span class="ci-k">{KINDS[p.kind].label}{ii === 0 && j === 0 && <span class="ci-latest"> · Latest</span>}</span>
+                </p>
+                {p.short ? (
+                  <div class="ci-note"><h3>{p.title}.</h3> <p>{p.short}</p></div>
+                ) : (
+                  <>
+                    <h3 class="ci-t"><a href={href} data-astro-reload>{p.title}</a></h3>
+                    <p class="ci-b">{p.blurb}</p>
+                  </>
+                )}
+                <p class="ci-m">
+                  <time datetime={p.date}>{day(p.date)}</time> · {p.short ? 'in full' : `${p.minutes} min`}
+                  {ii === 0 && j === 0 && !p.short && <span class="ci-arrow" aria-hidden="true">→</span>}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
+    </>
+  )}
+</div>
+
+<style>
+  .ci { max-width: 1400px; margin: 0 auto; padding: 13vh clamp(22px, 5vw, 72px) 14vh; }
+  /* Clears SideRail where it shows, as /experience does: the real /writing has a rail. */
+  @media not all and (max-width: 1100px) { .ci { padding-left: clamp(190px, 13vw, 230px); } }
+
+  .back { font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); text-decoration: none; }
+  @media (hover: hover) { .back:hover { color: var(--seal); } }
+
+  /* ── THE MASTHEAD: a running head over a rule, the name huge, "Contents" and the charter beside it, the charter's
+     last line on the name's baseline. */
+  .ci-run { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 24px; margin: 28px 0 0;
+    padding-bottom: 10px; border-bottom: 1px solid var(--ink-1);
+    font: 11px/1.3 var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
+  .ci-mast { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end;
+    align-items: last baseline; gap: 20px 56px; margin-top: clamp(22px, 3.5vh, 40px); }
+  .ci-mast h1 { margin: 0 0 0 -0.04em; font: 400 clamp(76px, 12vw, 184px)/0.8 var(--font-display);
+    letter-spacing: -0.045em; color: var(--ink-1); }
+  .ci-side { flex: 0 1 26rem; min-width: min(100%, 17rem); }
+  .ci-sub { margin: 0 0 12px; font: italic 400 clamp(26px, 2.6vw, 38px)/1 var(--font-accent); color: var(--seal); }
+  .ci-charter { margin: 0; max-width: 46ch; font-size: 15.5px; line-height: 1.6; color: var(--ink-2); }
+
+  .ci-cow { margin-top: clamp(24px, 5vh, 56px); }
+
+  /* ── THE DEPARTMENTS: a radio group, one at a time; the checked one is underlined in seal and shows its gloss. */
+  .ci-depts { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 22px; margin-top: clamp(40px, 7vh, 72px);
+    padding: 8px 0; border-top: 1px solid var(--ink-1); border-bottom: 1px solid rgba(var(--hairline-rgb), 0.35);
+    font: 11.5px/1.2 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; }
+  .ci-depts-h { margin-right: 6px; color: var(--ink-3); }
+  .ci-depts label { position: relative; padding: 8px 0 7px; color: var(--ink-3); cursor: pointer; }
+  .ci-depts input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; }
+  .ci-depts label:has(:checked) { color: var(--ink-1); box-shadow: inset 0 -2px 0 var(--seal); }
+  .ci-depts label:has(:focus-visible) { outline: 2px solid var(--seal); outline-offset: 3px; }
+  @media (hover: hover) { .ci-depts label:hover { color: var(--ink-1); } }
+  .ci-c { margin-left: 2px; color: var(--ink-3); }
+  .ci-gloss { display: none; margin: 18px 0 0; max-width: 40em; font: italic 400 clamp(17px, 1.5vw, 20px)/1.45 var(--font-accent);
+    color: var(--ink-2); }
+
+  /* The filter. ponytail: one block per kind, written out; a fourth kind in KINDS needs its block here. */
+  .ci:has(input[value='notes']:checked) .ci-e:not([data-kind='notes']),
+  .ci:has(input[value='notes']:checked) .ci-issue:not(:has([data-kind='notes'])) { display: none; }
+  .ci:has(input[value='notes']:checked) .ci-gloss[data-kind='notes'] { display: block; }
+  .ci:has(input[value='explainers']:checked) .ci-e:not([data-kind='explainers']),
+  .ci:has(input[value='explainers']:checked) .ci-issue:not(:has([data-kind='explainers'])) { display: none; }
+  .ci:has(input[value='explainers']:checked) .ci-gloss[data-kind='explainers'] { display: block; }
+  .ci:has(input[value='methods']:checked) .ci-e:not([data-kind='methods']),
+  .ci:has(input[value='methods']:checked) .ci-issue:not(:has([data-kind='methods'])) { display: none; }
+  .ci:has(input[value='methods']:checked) .ci-gloss[data-kind='methods'] { display: block; }
+
+  /* ── AN ISSUE: a heavy rule, the season in the accent italic, its months in mono. */
+  .ci-issue { margin-top: clamp(52px, 9vh, 96px); border-top: 2px solid var(--ink-1); }
+  .ci-issue-h { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 16px;
+    padding-top: 12px; }
+  .ci-issue-h h2 { margin: 0; font: italic 400 clamp(28px, 2.8vw, 40px)/1.1 var(--font-accent); color: var(--ink-1); }
+  .ci-issue-h p { margin: 0; font: 11px/1.3 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-3); }
+
+  .ci-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(36px, 5.5vh, 56px) clamp(32px, 4.5vw, 80px);
+    margin: clamp(26px, 4vh, 40px) 0 0; padding: 0; list-style: none; }
+
+  /* ── AN ENTRY: its numeral, a hairline on the numeral's baseline (an empty grid item's baseline is its bottom edge),
+     its department; then the title, the blurb, the date and length. The whole entry is the link. */
+  .ci-e { position: relative; }
+  .ci-eh { display: grid; grid-template-columns: auto minmax(16px, 1fr) auto; align-items: baseline; column-gap: 14px; margin: 0; }
+  .ci-no { font: 400 clamp(38px, 3.4vw, 50px)/0.8 var(--font-display); letter-spacing: -0.02em; color: var(--ink-4); }
+  .ci-rule { height: 1px; background: rgba(var(--hairline-rgb), 0.4); }
+  .ci-k { font: 10.5px/1 var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--seal); }
+  .ci-latest { color: var(--ink-3); }
+  .ci-t { margin: 14px 0 0; font: 400 clamp(20px, 1.75vw, 25px)/1.22 var(--font-display); letter-spacing: -0.005em;
+    color: var(--ink-1); text-wrap: pretty; }
+  .ci-t a { color: inherit; text-decoration: underline 1px transparent; text-underline-offset: 0.18em; }
+  .ci-t a::after { content: ''; position: absolute; inset: 0; }
+  .ci-t a:focus-visible { outline: 2px solid var(--seal); outline-offset: 3px; }
+  .ci-b { margin: 8px 0 0; max-width: 48ch; font-size: 14.5px; line-height: 1.6; color: var(--ink-3); }
+  .ci-m { margin: 12px 0 0; font: 11px/1.3 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  @media (hover: hover) {
+    .ci-e:not(.ci-short):hover .ci-no { color: var(--seal); }
+    .ci-e:not(.ci-short):hover .ci-t a { text-decoration-color: var(--seal); }
+  }
+
+  /* A short note, printed whole: a run-in head and the note in the display serif, a size up from a blurb. */
+  .ci-note { margin-top: 14px; font: 400 clamp(17px, 1.35vw, 19px)/1.5 var(--font-display); color: var(--ink-2); }
+  .ci-note h3, .ci-note p { display: inline; margin: 0; }
+  .ci-note h3 { font: inherit; font-weight: 700; color: var(--ink-1); }
+
+  /* ── THE LEAD: the same entry, set large. Its numeral in seal, its blurb a standfirst. */
+  .ci-lead { grid-column: 1 / -1; }
+  .ci-lead .ci-no { font-size: clamp(110px, 14vw, 216px); letter-spacing: -0.045em; color: var(--seal); }
+  .ci-lead .ci-t { max-width: 17em; margin-top: 18px; font-size: clamp(34px, 4.4vw, 64px); line-height: 1.02;
+    letter-spacing: -0.022em; text-wrap: balance; }
+  .ci-lead .ci-b { max-width: 34em; margin-top: 16px; font: italic 400 clamp(19px, 1.8vw, 25px)/1.42 var(--font-accent);
+    color: var(--ink-2); }
+  .ci-lead .ci-m { margin-top: 18px; }
+  .ci-arrow { display: inline-block; margin-left: 8px; }
+  @media (prefers-reduced-motion: no-preference) { .ci-arrow { transition: transform 200ms ease-out; } }
+  @media (hover: hover) { .ci-lead:hover .ci-arrow { transform: translateX(4px); } }
+
+  @media (max-width: 640px) {
+    .ci-mast h1 { font-size: clamp(60px, 21vw, 104px); }
+    .ci-list { grid-template-columns: minmax(0, 1fr); }
+    .ci-lead .ci-no { font-size: clamp(96px, 32vw, 150px); }
+    .ci-depts { gap: 0 18px; }
+  }
+</style>

@@ -1,0 +1,105 @@
+---
+// PROTOTYPE (throwaway, claude/writing-proto): /writing's framework and register, three directions side by side.
+// Every direction renders the same sample pieces (data/protoWriting.ts) at 0, 3 and 24 pieces, and the same sample
+// piece; the switcher at the foot picks the direction, the count, the view (the index or a piece) and the ground
+// (the reading sky or the paper sheet). Noindexed by BaseLayout (/proto- path).
+import BaseLayout from '../layouts/BaseLayout.astro';
+import FluidSky from '../components/FluidSky.astro';
+import SkyWash from '../components/SkyWash.astro';
+import { PIECES, SAMPLE } from '../data/protoWriting';
+import NotebookIndex from '../components/proto-writing/NotebookIndex.astro';
+import NotebookPiece from '../components/proto-writing/NotebookPiece.astro';
+import ContentsIndex from '../components/proto-writing/ContentsIndex.astro';
+import ContentsPiece from '../components/proto-writing/ContentsPiece.astro';
+import StreamIndex from '../components/proto-writing/StreamIndex.astro';
+import StreamPiece from '../components/proto-writing/StreamPiece.astro';
+
+const DIRS = [
+  { key: 'notebook', name: 'Notebook', Index: NotebookIndex, Piece: NotebookPiece },
+  { key: 'contents', name: 'Contents', Index: ContentsIndex, Piece: ContentsPiece },
+  { key: 'stream', name: 'Stream', Index: StreamIndex, Piece: StreamPiece },
+];
+const COUNTS = [0, 3, 24];
+---
+<BaseLayout title="Writing (prototype) — Ing Tian" description="Prototype of /writing." veil={false}>
+  <main class="pw descent is-fluid">
+    <FluidSky variant="reading" />
+    <SkyWash />
+    <p class="pw-note">Prototype — every piece here is a sample; none exists yet.</p>
+    {DIRS.map((d) => (
+      <div class="pw-dir" data-dir={d.key}>
+        {COUNTS.map((n) => (
+          <div class="pw-view" data-view="index" data-count={n}><d.Index pieces={PIECES.slice(0, n)} /></div>
+        ))}
+        <div class="pw-view" data-view="piece"><d.Piece piece={SAMPLE} /></div>
+      </div>
+    ))}
+
+    <div class="pw-bar" role="group" aria-label="Prototype options">
+      <span>direction</span>
+      {DIRS.map((d) => <button type="button" data-k="dir" data-v={d.key}>{d.name}</button>)}
+      <span>pieces</span>
+      {COUNTS.map((n) => <button type="button" data-k="count" data-v={String(n)}>{n}</button>)}
+      <span>view</span>
+      <button type="button" data-k="view" data-v="index">index</button>
+      <button type="button" data-k="view" data-v="piece">piece</button>
+      <span>ground</span>
+      <button type="button" data-k="ground" data-v="sky">sky</button>
+      <button type="button" data-k="ground" data-v="sheet">sheet</button>
+    </div>
+  </main>
+</BaseLayout>
+
+<style>
+  .pw { position: relative; z-index: 0; min-height: 100vh; background: var(--reading-grad); padding-bottom: 96px; }
+  .pw-note { position: relative; z-index: 2; margin: 0; padding: 10px 16px; text-align: center; font: 12px/1.4 var(--font-mono);
+    color: var(--ink-3); }
+  .pw-dir, .pw-view { display: none; position: relative; z-index: 1; }
+  :global(html[data-w-dir='notebook']) .pw-dir[data-dir='notebook'],
+  :global(html[data-w-dir='contents']) .pw-dir[data-dir='contents'],
+  :global(html[data-w-dir='stream']) .pw-dir[data-dir='stream'] { display: block; }
+  :global(html[data-w-view='piece']) .pw-view[data-view='piece'],
+  :global(html[data-w-view='index'][data-w-count='0']) .pw-view[data-view='index'][data-count='0'],
+  :global(html[data-w-view='index'][data-w-count='3']) .pw-view[data-view='index'][data-count='3'],
+  :global(html[data-w-view='index'][data-w-count='24']) .pw-view[data-view='index'][data-count='24'] { display: block; }
+  /* The sheet: the paper register's tokens (set on <html> by the script) and no sky. */
+  :global(html[data-w-ground='sheet']) .pw { background: var(--bg); }
+  :global(html[data-w-ground='sheet']) .pw :global(.fluid-sky), :global(html[data-w-ground='sheet']) .pw :global(.sky-wash) { display: none; }
+
+  .pw-bar { position: fixed; z-index: 60; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; flex-wrap: wrap;
+    align-items: center; justify-content: center; gap: 2px; max-width: calc(100vw - 24px); padding: 4px;
+    font: 12px/1 var(--font-mono); color: var(--ink-3); background: var(--paper, #f4efe4);
+    border: 1px solid rgba(var(--hairline-rgb), 0.3); border-radius: 8px; }
+  :global(html[data-theme='dark']) .pw-bar { background: #15140f; }
+  .pw-bar span { padding: 0 6px 0 12px; }
+  .pw-bar button { font: inherit; color: var(--ink-2); background: none; border: 0; padding: 8px 9px; border-radius: 5px; cursor: pointer; }
+  .pw-bar button[aria-pressed='true'] { background: var(--seal); color: #fff8f0; }
+</style>
+
+<script>
+  // Each option is data-w-<key> on <html>; ?dir=…&count=…&view=…&ground=… preset them. The sheet also puts the paper
+  // register on <html> (data-page="paper"), as BaseLayout would.
+  const DEFAULTS: Record<string, string> = { dir: 'notebook', count: '24', view: 'index', ground: 'sky' };
+  const init = (): void => {
+    const q = new URLSearchParams(location.search);
+    const html = document.documentElement;
+    const set = (k: string, v: string): void => {
+      html.setAttribute(`data-w-${k}`, v);
+      if (k === 'ground') { if (v === 'sheet') html.dataset.page = 'paper'; else delete html.dataset.page; }
+      document.querySelectorAll<HTMLButtonElement>(`.pw-bar [data-k="${k}"]`)
+        .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+    };
+    for (const k of Object.keys(DEFAULTS)) set(k, q.get(k) ?? DEFAULTS[k]);
+    document.querySelectorAll<HTMLButtonElement>('.pw-bar button')
+      .forEach((b) => b.addEventListener('click', () => { set(b.dataset.k ?? '', b.dataset.v ?? ''); scrollTo(0, 0); }));
+    // No sample piece has a page: a piece's link opens the sample piece, and "← writing" the index, in place.
+    document.querySelector('main.pw')?.addEventListener('click', (e) => {
+      const a = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>('a[href^="/writing"]') : null;
+      if (!a) return;
+      e.preventDefault();
+      set('view', a.getAttribute('href') === '/writing' ? 'index' : 'piece');
+      scrollTo(0, 0);
+    });
+  };
+  init();
+</script>
