@@ -8,7 +8,7 @@ import {
   INTRO_DURATION_MS, INTRO_DUR_MIN_MS, INTRO_DUR_MAX_MS,
 } from '../src/lib/introTimeline';
 import { INTRO_SEEN_KEY } from '../src/lib/introSession';
-import { contact, inProgress, projects, publications, researchInterests, timeline, type Publication } from '../src/data/profile';
+import { contact, inProgress, organisations, projects, publications, researchInterests, type Publication } from '../src/data/profile';
 import { PAPER_DATA } from '../src/data/papers';
 import { photoNotes } from '../src/data/photoNotes';
 import { calligraphy } from '../src/data/artworks';
@@ -508,30 +508,30 @@ describe('the images under src/assets', () => {
   });
 });
 
-describe("BaseLayout's per-page hooks: /projects is the drafting page, the research routes and /art the paper page", () => {
+describe("BaseLayout's per-page hooks: /projects is the drafting page, the research routes, /art and /experience the paper page", () => {
   // `page` puts `data-page` on <html>, the scope tokens.css hangs a register's palette from (and, on `/`, 'deck',
-  // the rail's resting ink); /art borrows 'paper', as no token of its own differs. `veil={false}` drops the descent
+  // the rail's resting ink); /art and /experience borrow 'paper', as no token of their own differs. `veil={false}` drops the descent
   // veil — on /projects because its boot is its entrance, on the research routes because the veil would replay on
-  // every card click and every way back, holding the text ~1.1s, and on /art because it is motion that runs on its
-  // own. Both are props, so what this guards is a default changing under every other route.
+  // every card click and every way back, holding the text ~1.1s, and on /art and /experience because it is motion that
+  // runs on its own. Both are props, so what this guards is a default changing under every other route.
   // Read from `markup` (scripts stripped): the veil's own inline script names `[data-veil]` on every page.
   const veilEl = /<div\b[^>]*\sdata-veil\b/;
   const pageOf = (markup: string): string | undefined => /<html\b[^>]*\sdata-page="([^"]*)"/.exec(markup)?.[1];
   const isResearch = (route: string): boolean => route === '/research' || route.startsWith('/research/');
   const research = (): Page[] => pages().filter((p) => isResearch(p.route));
 
-  it('marks /projects as drafting, every research route and /art as paper, / as deck, and no other route at all', () => {
+  it('marks /projects as drafting, every research route, /art and /experience as paper, / as deck, and no other route', () => {
     expect(research().length, 'no research route was built').toBeGreaterThan(0);
     const want = (route: string): string | undefined => route === '/projects' ? 'drafting'
-      : isResearch(route) || route === '/art' ? 'paper' : route === '/' ? 'deck' : undefined;
+      : isResearch(route) || route === '/art' || route === '/experience' ? 'paper' : route === '/' ? 'deck' : undefined;
     const wrong = pages().filter((p) => pageOf(p.markup) !== want(p.route))
       .map((p) => `${p.route}: data-page=${pageOf(p.markup) ?? '(none)'}`);
     expect(wrong).toEqual([]);
   });
 
   // `.test()` rather than `toMatch` so a failure names the defect instead of printing the whole page.
-  it('renders /projects, the research routes and /art no veil, and /writing its veil', () => {
-    for (const p of [projectsPage(), ...research(), builtPage('/art')]) {
+  it('renders /projects, the research routes, /art and /experience no veil, and /writing its veil', () => {
+    for (const p of [projectsPage(), ...research(), builtPage('/art'), builtPage('/experience')]) {
       expect(veilEl.test(p.markup), `${p.route} renders a [data-veil] element`).toBe(false);
     }
     expect(veilEl.test(builtPage('/writing').markup), '/writing lost its [data-veil] element').toBe(true);
@@ -540,8 +540,8 @@ describe("BaseLayout's per-page hooks: /projects is the drafting page, the resea
   // Each register's ink is sized for its own ground (tests/draftingPalette.test.ts, tests/paperPalette.test.ts), not
   // for the reading sky: light drafting --ink-3 over --reading-grad's lower stops measured 4.20 and 3.89. So no
   // register page paints a sky. /writing is the control: the sky it keeps is the markup these patterns look for.
-  it('paints /projects, the research routes and /art no fluid sky and no sky wash, and /writing both', () => {
-    for (const p of [projectsPage(), ...research(), builtPage('/art')]) {
+  it('paints /projects, the research routes, /art and /experience no fluid sky and no sky wash, and /writing both', () => {
+    for (const p of [projectsPage(), ...research(), builtPage('/art'), builtPage('/experience')]) {
       expect(/class="fluid-sky"/.test(p.markup), `${p.route} renders the fluid-sky canvas`).toBe(false);
       expect(/class="sky-wash"/.test(p.markup), `${p.route} renders the SkyWash layer`).toBe(false);
     }
@@ -680,7 +680,7 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
   it("nests the links as the page's Stop tree does, at every depth", async () => {
     const strip = (xs: Item[]) => xs.map(({ target, label, depth }) => ({ target, label, depth }));
     expect(strip(itemsOf(projectsPage()))).toEqual(flat(projectStops(projects)));
-    expect(strip(itemsOf(builtPage('/experience')))).toEqual(flat(experienceStops(timeline)));
+    expect(strip(itemsOf(builtPage('/experience')))).toEqual(flat(experienceStops(organisations)));
     expect(strip(itemsOf(builtPage('/research/rl-bhrp')))).toEqual(flat(paperStops((await paperRender('rl-bhrp')).report.sections)));
     expect(strip(itemsOf(builtPage('/research')))).toEqual(flat(researchIndexStops()));
     expect(strip(itemsOf(builtPage('/')))).toEqual(flat(homeStops()));

@@ -1,11 +1,23 @@
 import { paperValue } from './papers/rl-bhrp';
 
+/** One role. Its organisation's panel on /experience lists it; the homepage's descent graph matches its period. */
 export interface TimelineEntry {
+  org: string;        // its organisation's key in `organisations`
+  role: string;       // the role alone; the organisation is the panel's
   period: string;
-  title: string;
-  sub?: string;       // optional second line under the title (e.g. employer / arrangement)
   detail: string;
-  kind: 'work' | 'education';
+  kind: 'work' | 'education';   // a degree is listed as a Degree, a job as a Position
+}
+
+/** A row of an organisation's facts on /experience. */
+export interface Fact { label: string; value: string; href?: string }
+/** An organisation, one panel on /experience. Its roles are the timeline's entries that name it. */
+export interface Organisation {
+  key: string;        // the panel's id (x-<key>) and its mark's key in data/experienceMarks.ts
+  name: string;
+  rail: string;       // the rail's bookmark
+  tagline: string;
+  facts: Fact[];      // after the roles, which the page lists first
 }
 
 export interface Author { name: string; affiliation?: string }
@@ -34,9 +46,11 @@ export interface Publication {
   bibtex?: string;
 }
 
+/** A field is given only when it is on record, and printed only then. */
 export interface Award {
-  year: string;
+  year?: string;
   title: string;
+  gloss?: string;     // what an abbreviation stands for
 }
 
 export interface ResearchInterest {
@@ -93,15 +107,15 @@ export const researchInterests: ResearchInterest[] = [
 ];
 
 export const timeline: TimelineEntry[] = [
-  { period: 'Fall 2027 —', title: 'Incoming PhD, Operations Research · University of Toronto', sub: 'Advised by Prof. Roy H. Kwon', detail: 'Doctoral research in operations research — multi-period portfolio optimization, and the convex-optimization and duality structure beneath it.', kind: 'education' },
-  { period: '2026 —', title: 'Software Engineer · Electronic Arts', sub: 'Contracted via Hatch Innovations Canada', detail: 'Recommendation systems for EA’s AI-driven products — dual-tower retrieval and ranking, end-to-end indexing & serving in Golang, training pipelines in Python over Elasticsearch / vector search, decoupled with Kafka & NATS.', kind: 'work' },
-  { period: '2023 —', title: 'Freelance Quantitative Researcher · Independent', detail: 'Built an end-to-end quant trading system (Forex, commodities, indices via OANDA) with a collaborator — signal research in Python, execution engine in Golang, deployed on AWS (ECS, SageMaker). Authored the RL-BHRP portfolio-construction paper (arXiv:2508.11856).', kind: 'work' },
-  { period: '2023 — 25', title: 'Senior Software Engineer · TikTok', detail: 'ML systems for ads (Exceptional review — top rating). Built a dual-tower vision pipeline with billion-scale vector search (Faiss) tracking $200M in creative spend, and a C++ / gRPC ad-signature service sustaining 50k QPS for real-time delivery.', kind: 'work' },
-  { period: '2022 — 23', title: 'SWE Co-op · Ericsson AI Lab (GAIA)', detail: 'JAMScript NodeCache for node discovery in IoT; a C++ mobility simulator; one-shot ML models detecting malicious smart contracts from time-series data.', kind: 'work' },
-  { period: '2022', title: 'SDE Intern · Amazon', detail: 'A fulfillment-data archiving and visual-analysis service — SNS transformed via Lambda, landed in S3 through Firehose, queried with Athena for QuickSight dashboards.', kind: 'work' },
-  { period: '2021 — 23', title: 'Research Assistant · McGill', detail: 'Compiler research on JAMScript under Prof. Maheswaran — Ohm-based parser translating to C/JS, CFG grammar for ES6, side-effect & control-flow analysis.', kind: 'work' },
-  { period: '2021', title: 'SDE Intern · TikTok', sub: 'Shanghai, China', detail: "Modeled the landing page's structure in TypeScript ahead of a later refactor, and helped ship the interim download page — $1M/day in revenue.", kind: 'work' },
-  { period: '2019 — 23', title: 'B.Eng, Computer Engineering · McGill', detail: "CGPA 3.99 · Dean's Honour List · Full Scholarship.", kind: 'education' },
+  { org: 'uoft', role: 'Incoming PhD, Operations Research', period: 'Fall 2027 —', detail: 'Doctoral research in operations research — multi-period portfolio optimization, and the convex-optimization and duality structure beneath it.', kind: 'education' },
+  { org: 'ea', role: 'Software Engineer', period: '2026 —', detail: 'Recommendation systems for EA’s AI-driven products — dual-tower retrieval and ranking, end-to-end indexing & serving in Golang, training pipelines in Python over Elasticsearch / vector search, decoupled with Kafka & NATS.', kind: 'work' },
+  { org: 'independent', role: 'Freelance Quantitative Researcher', period: '2023 —', detail: 'Built an end-to-end quant trading system (Forex, commodities, indices via OANDA) with a collaborator — signal research in Python, execution engine in Golang, deployed on AWS (ECS, SageMaker). Authored the RL-BHRP portfolio-construction paper.', kind: 'work' },
+  { org: 'tiktok', role: 'Senior Software Engineer', period: '2023 — 25', detail: 'ML systems for ads (Exceptional review — top rating). Built a dual-tower vision pipeline with billion-scale vector search (Faiss) tracking $200M in creative spend, and a C++ / gRPC ad-signature service sustaining 50k QPS for real-time delivery.', kind: 'work' },
+  { org: 'ericsson', role: 'SWE Co-op', period: '2022 — 23', detail: 'JAMScript NodeCache for node discovery in IoT; a C++ mobility simulator; one-shot ML models detecting malicious smart contracts from time-series data.', kind: 'work' },
+  { org: 'amazon', role: 'SDE Intern', period: '2022', detail: 'A fulfillment-data archiving and visual-analysis service — SNS transformed via Lambda, landed in S3 through Firehose, queried with Athena for QuickSight dashboards.', kind: 'work' },
+  { org: 'mcgill', role: 'Research Assistant', period: '2021 — 23', detail: 'Compiler research on JAMScript under Prof. Maheswaran — Ohm-based parser translating to C/JS, CFG grammar for ES6, side-effect & control-flow analysis.', kind: 'work' },
+  { org: 'tiktok', role: 'SDE Intern', period: '2021', detail: "Modeled the landing page's structure in TypeScript ahead of a later refactor, and helped ship the interim download page — $1M/day in revenue.", kind: 'work' },
+  { org: 'mcgill', role: 'B.Eng, Computer Engineering', period: '2019 — 23', detail: "CGPA 3.99 · Dean's Honour List · Full Scholarship.", kind: 'education' },
 ];
 
 // Newest first. Each record is what every surface listing a paper reads: the /research cards, the homepage
@@ -157,10 +171,60 @@ export const publications: Publication[] = [
   },
 ];
 
+// The organisations, in /experience's order: the incoming PhD, then research, then engineering newest first, then the
+// B.Eng (the identity hierarchy, CLAUDE.md Identity & voice). A fact is given only when it is on record, so no
+// location is guessed.
+const rlBhrp = publications.find((p) => p.slug === 'rl-bhrp');
+if (!rlBhrp?.arxivId) throw new Error('profile: the rl-bhrp record has no arXiv id');
+export const organisations: Organisation[] = [
+  { key: 'uoft', name: 'University of Toronto', rail: 'U of T', tagline: 'Operations research',
+    facts: [
+      { label: 'Advisor', value: 'Prof. Roy H. Kwon' },
+      { label: 'Field', value: 'Portfolio optimization' },
+      { label: 'Location', value: 'Toronto' },
+      { label: 'Website', value: 'utoronto.ca', href: 'https://www.utoronto.ca' },
+    ] },
+  { key: 'independent', name: 'Independent', rail: 'Independent', tagline: 'Systematic trading research',
+    facts: [
+      { label: 'Markets', value: 'Forex, commodities, indices' },
+      { label: 'Paper', value: `arXiv:${rlBhrp.arxivId}`, href: `/research/${rlBhrp.slug}` },
+    ] },
+  { key: 'ea', name: 'Electronic Arts', rail: 'EA', tagline: 'Interactive entertainment',
+    facts: [
+      { label: 'Contract', value: 'via Hatch Innovations Canada' },
+      { label: 'Area', value: 'Recommendation systems' },
+      { label: 'Website', value: 'ea.com', href: 'https://www.ea.com' },
+    ] },
+  { key: 'tiktok', name: 'TikTok', rail: 'TikTok', tagline: 'Short-form video',
+    facts: [
+      { label: 'Area', value: 'ML systems for ads' },
+      { label: 'Location', value: 'Shanghai, China (2021)' },
+      { label: 'Website', value: 'tiktok.com', href: 'https://www.tiktok.com' },
+    ] },
+  { key: 'ericsson', name: 'Ericsson', rail: 'Ericsson', tagline: 'Telecommunications',
+    facts: [
+      { label: 'Team', value: 'AI Lab (GAIA)' },
+      { label: 'Website', value: 'ericsson.com', href: 'https://www.ericsson.com' },
+    ] },
+  { key: 'amazon', name: 'Amazon', rail: 'Amazon', tagline: 'E-commerce and cloud',
+    facts: [
+      { label: 'Area', value: 'Fulfillment data' },
+      { label: 'Website', value: 'amazon.com', href: 'https://www.amazon.com' },
+    ] },
+  { key: 'mcgill', name: 'McGill University', rail: 'McGill', tagline: 'Computer engineering',
+    facts: [
+      { label: 'Location', value: 'Montreal' },
+      { label: 'Website', value: 'mcgill.ca', href: 'https://www.mcgill.ca' },
+    ] },
+];
+
 export const awards: Award[] = [
   { year: '2021', title: 'IEEExtreme — Top 4 teams in Canada' },
   { year: "'21–'22", title: 'Hatch Scholarships ($10k) · McGill' },
   { year: '2020', title: 'Rio Tinto–Richards Evans Exchange Award · McGill' },
+  { title: 'COMC', gloss: 'Canadian Open Mathematics Challenge' },
+  { title: 'CCC', gloss: 'Canadian Computing Competition' },
+  { title: 'AIME', gloss: 'American Invitational Mathematics Examination' },
 ];
 
 // witness's release count: hand-maintained, not fetched at build time (that needs the network); counted 2026-11-02.

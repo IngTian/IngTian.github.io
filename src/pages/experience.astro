@@ -1,95 +1,99 @@
 ---
-// /experience — the full record of roles and education.
+// /experience — the full record, one wide panel per organisation, in `organisations`' order (profile.ts says why): its
+// mark, name, tagline and span; its roles and facts; what the work was. It borrows the paper register (page="paper",
+// as /art does): no sky, no veil.
 //
-// WHY THIS PAGE EXISTS: the homepage carries a CURATED "Selected experience" (3-5 entries,
-// the portfolio-design norm); this is the complete list for a reader who wants it. It is
-// also the destination a pod panel points at, which had been linking to a 404.
+// Each mark is the organisation's logo as pixel cells (data/experienceMarks.ts), drawn in the sheet's inks; a
+// panel's hover or keyboard focus cross-fades it into the logo's own colours and fades the same mark in, enlarged, behind
+// the panel. Both are CSS, by opacity (EXPERIENCE in lib/motionTiming.ts); the page has no script.
 //
-// Content comes entirely from data/profile.ts — editing the site's facts means editing data,
-// never this component.
-//
-// EDUCATION LEADS. The site's identity hierarchy is load-bearing: quant/mathematician first,
-// engineering second. The incoming PhD must not be buried under nine engineering roles, so
-// education is the first group on the page and the first stop on the rail.
+// The facts come from data/profile.ts (organisations, and the timeline's roles, which name their organisation),
+// so editing the record means editing data, never this page.
 import BaseLayout from '../layouts/BaseLayout.astro';
-import FluidSky from '../components/FluidSky.astro';
-import SkyWash from '../components/SkyWash.astro';
 import SideRail from '../components/SideRail.astro';
-import { timeline, awards } from '../data/profile';
-import { experienceStops, experienceSectionId } from '../lib/pageStops';
+import { awards, organisations, timeline } from '../data/profile';
+import { MARKS } from '../data/experienceMarks';
+import { orgPeriod, runs } from '../lib/experience';
+import { experienceSectionId, experienceStops } from '../lib/pageStops';
 
-const stops = experienceStops(timeline);
-// Index is preserved from the ORIGINAL array so the rail's ids match the rendered ids —
-// filtering into groups after indexing, never before.
-const indexed = timeline.map((t, i) => ({ entry: t, id: experienceSectionId(i) }));
-const education = indexed.filter(({ entry }) => entry.kind === 'education');
-const roles = indexed.filter(({ entry }) => entry.kind === 'work');
+const panels = organisations.map((o) => {
+  const roles = timeline.filter((t) => t.org === o.key);
+  if (!roles.length) throw new Error(`experience: ${o.key} has no role in the timeline`);
+  const mark = MARKS[o.key];
+  if (!mark) throw new Error(`experience: ${o.key} has no mark in data/experienceMarks.ts`);
+  // The logo's colours as custom properties: --b<role> on the light sheet, --b<role>-d on the dark (every role a mark
+  // uses has both: tests/experience.test.ts).
+  const brand = (Object.keys(mark.brand.light) as ('k' | 'm' | 's')[])
+    .map((r) => `--b${r}:${mark.brand.light[r]};--b${r}-d:${mark.brand.dark[r]}`).join(';');
+  return {
+    ...o, id: experienceSectionId(o.key), roles, period: orgPeriod(roles.map((r) => r.period)),
+    cells: runs(mark.rows), n: mark.rows.length, brand,
+  };
+});
+const orphans = timeline.filter((t) => !organisations.some((o) => o.key === t.org));
+if (orphans.length) throw new Error(`experience: no organisation for ${orphans.map((t) => `${t.role} (${t.org})`).join(', ')}`);
 ---
 <BaseLayout
   title="Experience — Ing Tian"
   description="The full record — roles and education. Incoming PhD in Operations Research at the University of Toronto; quantitative research and ML systems at Electronic Arts, TikTok, Amazon and Ericsson AI Lab."
-  veilLine="the long way round"
-  veilOnLoad={true}
-  navZone="light"
+  page="paper"
+  veil={false}
 >
-  <main class="experience descent is-fluid">
-    <FluidSky variant="reading" />
-    <SkyWash />
-
-    <SideRail stops={stops} />
-
-    <div class="xp-block">
+  <main class="xp">
+    <SideRail stops={experienceStops(organisations)} />
+    <div class="xp-wrap">
       <header class="xp-head">
         <a class="back" href="/">← back</a>
         <h1>Experience</h1>
-        <p class="lede">
-          The full record. Research first, engineering second — the order they matter in,
-          not the order they happened.
-        </p>
+        <p class="lede">The full record. Research first, engineering second — the order they matter in, not the order they happened.</p>
       </header>
 
-      <section class="xp-group" aria-labelledby="x-education">
-        <h2 class="xp-group-title" id="x-education">Education</h2>
-        <ol class="spine">
-          {education.map(({ entry, id }, i) => (
-            <li class={`node${i === 0 ? ' node-flag' : ''}`} id={id}>
-              <span class="dot" aria-hidden="true"></span>
-              <p class="xp-period">{entry.period}</p>
-              <div class="xp-body">
-                <h3 class="xp-title">{entry.title}</h3>
-                {entry.sub && <p class="xp-sub">{entry.sub}</p>}
-                <p class="xp-detail">{entry.detail}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </section>
+      <div class="panels">
+        {panels.map((p) => (
+          <article class="panel" id={p.id} aria-labelledby={`${p.id}-name`} style={p.brand}>
+            <svg class="ground brand" viewBox={`0 0 ${p.n} ${p.n}`} shape-rendering="crispEdges" aria-hidden="true"
+                 preserveAspectRatio="xMaxYMid meet">
+              {p.cells.map((r) => <rect class={r.c} x={r.x} y={r.y} width={r.w} height="1" />)}
+            </svg>
+            <div class="who">
+              {/* The mark twice over, in the sheet's inks (.ink) and in the logo's colours (.brand), cross-faded. */}
+              <svg class="mark" viewBox={`0 0 ${p.n} ${p.n}`} shape-rendering="crispEdges" aria-hidden="true">
+                {(['ink', 'brand'] as const).map((g) => (
+                  <g class={g}>{p.cells.map((r) => <rect class={r.c} x={r.x} y={r.y} width={r.w} height="1" />)}</g>
+                ))}
+              </svg>
+              <h2 id={`${p.id}-name`}>{p.name}</h2>
+              <p class="tag">{p.tagline}</p>
+              <p class="when">{p.period}</p>
+            </div>
+            <dl class="facts">
+              {p.roles.map((r) => (
+                <div>
+                  <dt>{r.kind === 'education' ? 'Degree' : 'Position'}</dt>
+                  <dd>{r.role}{p.roles.length > 1 && `, ${r.period}`}</dd>
+                </div>
+              ))}
+              {p.facts.map((f) => (
+                <div>
+                  <dt>{f.label}</dt>
+                  <dd>{f.href
+                    ? <a href={f.href} {...(f.href.startsWith('http') ? { target: '_blank', rel: 'noopener' } : {})}>{f.value}</a>
+                    : f.value}</dd>
+                </div>
+              ))}
+            </dl>
+            <div class="what">
+              {p.roles.map((r) => <p>{p.roles.length > 1 && <strong>{r.role}. </strong>}{r.detail}</p>)}
+            </div>
+          </article>
+        ))}
+      </div>
 
-      <section class="xp-group" aria-labelledby="x-roles">
-        <h2 class="xp-group-title" id="x-roles">Roles</h2>
-        <ol class="spine">
-          {roles.map(({ entry, id }) => (
-            <li class="node" id={id}>
-              <span class="dot" aria-hidden="true"></span>
-              <p class="xp-period">{entry.period}</p>
-              <div class="xp-body">
-                <h3 class="xp-title">{entry.title}</h3>
-                {entry.sub && <p class="xp-sub">{entry.sub}</p>}
-                <p class="xp-detail">{entry.detail}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section class="xp-group" aria-labelledby="x-recognition">
-        <h2 class="xp-group-title" id="x-recognition">Recognition</h2>
-        <ul class="xp-awards">
+      <section class="recog" id="x-recognition" aria-labelledby="x-recognition-h">
+        <h2 id="x-recognition-h">Recognition</h2>
+        <ul>
           {awards.map((a) => (
-            <li>
-              <span class="xp-award-year">{a.year}</span>
-              <span class="xp-award-title">{a.title}</span>
-            </li>
+            <li><span class="year">{a.year}</span><span>{a.title}{a.gloss && <span class="gloss"> · {a.gloss}</span>}</span></li>
           ))}
         </ul>
       </section>
@@ -100,139 +104,87 @@ const roles = indexed.filter(({ entry }) => entry.kind === 'work');
 </BaseLayout>
 
 <style>
-  /* The spine dots sit ON the page ground, so they need its tone as a flat colour (a
-     gradient cannot fill a 9px circle convincingly). Sampled from --reading-grad's mid stop
-     per theme, declared here rather than invented as a global token. */
-  .experience { --dot-fill: #efe9e0; position: relative; z-index: 0; min-height: 100vh; }
-  :global(html[data-theme='dark']) .experience { --dot-fill: #131619; }
+  .xp { min-height: 100vh; --xp-ground: rgba(var(--hairline-rgb), 0.045); --xp-edge: rgba(var(--hairline-rgb), 0.16); }
+  .xp-wrap { max-width: 1480px; margin: 0 auto; padding: 13vh clamp(22px, 5vw, 72px) 14vh; }
+  /* Clears SideRail where it shows (it hides at 1100px and below) by /projects' padding, so no label here may be
+     longer than /projects' longest (tests/pageStops.test.ts holds it). */
+  @media not all and (max-width: 1100px) { .xp-wrap { padding-left: clamp(190px, 13vw, 230px); } }
+  .back { font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); text-decoration: none; }
+  @media (hover: hover) { .back:hover { color: var(--seal); } }
+  /* The reference's heavy grotesk, in the system UI face: no webfont. */
+  .xp-head h1 { margin: 18px 0 0; font: 800 clamp(56px, 8vw, 120px)/0.95 var(--font-body); letter-spacing: -0.035em;
+    text-transform: uppercase; color: var(--ink-1); }
+  .lede { margin: 18px 0 0; max-width: 52ch; font-size: 16px; line-height: 1.6; color: var(--ink-3); }
 
-  /* A READING page, so it uses the shared --reading-grad token (tokens.css) rather than the
-     descent's sky: dark ink on a luminous ground in light theme, an even charcoal in dark.
-     Shared with /writing and /writing/<slug> so the reading pages stay one system. */
-  .experience.descent { background: var(--reading-grad); }
+  /* ── THE PANELS: the organisation, its facts, what the work was, in three columns; two at 1100px and under (the
+     work under both), one at 640px. */
+  .panels { display: grid; gap: 8px; margin-top: 56px; }
+  .panel { position: relative; overflow: hidden; display: grid; gap: 40px;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.15fr) minmax(0, 1.9fr);
+    padding: 44px 40px; background: var(--xp-ground); border: 1px solid var(--xp-edge); border-radius: 14px; }
+  .panel > :not(.ground) { position: relative; }
 
-  /* Same composition as /writing — the same 34% left margin and the same 860px cap on the
-     measure, so the reading pages read as a system instead of three guesses. */
-  .xp-block {
-    position: relative; z-index: 1;
-    margin-left: 34%;
-    max-width: 860px;
-    padding: 14vh 7vw 18vh 0;
-  }
-  @media (max-width: 1100px) {
-    .xp-block { margin-left: 0; padding: 12vh 7vw 16vh; }
-  }
+  /* A mark is 24 cells at 3px. */
+  .mark { display: block; width: 72px; height: 72px; margin-bottom: 18px; }
+  .ink .k { fill: var(--ink-1); }
+  .ink .m { fill: var(--ink-3); }
+  .ink .s { fill: var(--seal); }
+  /* The logo's colours, from the panel's --b* (light) and --b*-d (dark). */
+  .brand .k { fill: var(--bk); }
+  .brand .m { fill: var(--bm); }
+  .brand .s { fill: var(--bs); }
+  :global(html[data-theme='dark']) .brand .k { fill: var(--bk-d); }
+  :global(html[data-theme='dark']) .brand .m { fill: var(--bm-d); }
+  :global(html[data-theme='dark']) .brand .s { fill: var(--bs-d); }
 
-  .back {
-    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.16em;
-    text-transform: uppercase; color: var(--ink-4); text-decoration: none;
-  }
-  .back:hover { color: var(--ink-2); }
+  .who h2 { margin: 0; font: 700 clamp(30px, 2.6vw, 44px)/1.05 var(--font-body); letter-spacing: -0.02em; color: var(--ink-1); }
+  .tag { margin: 14px 0 0; font-size: 15px; color: var(--ink-2); }
+  .when { margin: 6px 0 0; font: 13px/1.4 var(--font-mono); color: var(--ink-3); }
 
-  .xp-head h1 {
-    font-family: var(--font-display); font-size: clamp(34px, 5vw, 54px);
-    font-weight: 300; color: var(--ink-1); margin: 18px 0 0; line-height: 1.05;
-  }
-  .lede {
-    font-size: 16px; line-height: 1.7; color: var(--ink-3);
-    max-width: 46ch; margin: 14px 0 0;
-  }
+  .facts { margin: 6px 0 0; display: grid; gap: 14px; align-content: start; }
+  .facts > div { display: grid; grid-template-columns: 7.5rem 1fr; gap: 12px; }
+  .facts dt { font-size: 14px; color: var(--ink-3); }
+  .facts dd { margin: 0; font-size: 14.5px; font-weight: 600; color: var(--ink-1); }
+  .facts a { color: inherit; text-underline-offset: 3px; }
+  @media (hover: hover) { .facts a:hover { text-decoration-color: var(--seal); } }
+  .facts a:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
 
-  .xp-group { margin-top: 12vh; }
-  .xp-group-title {
-    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em;
-    text-transform: uppercase; color: var(--ink-4);
-    padding-bottom: 10px; border-bottom: 1px solid var(--rule);
-    margin: 0 0 8px;
-  }
+  .what p { margin: 0 0 14px; max-width: 62ch; font-size: 15.5px; line-height: 1.62; color: var(--ink-2); }
+  .what p:last-child { margin-bottom: 0; }
+  .what strong { font-weight: 600; color: var(--ink-1); }
 
-  /* ── The descent spine, carried over from the homepage's Selected experience.
-     A single vertical thread with one node per entry; the first education node gets the
-     indigo hollow ring that marks a flagship. The homepage version is tuned for the dark
-     descent (paper at 0.22 alpha over --bg); this is a READING page with dark ink on a
-     luminous ground, so the thread uses `rgba(var(--hairline-rgb), 0.32)` and the nodes use the local
-     `--dot-fill`. Same mark, correct contrast — a copy-paste would have drawn a near-white thread on cream
-     and vanished.
-       This paragraph used to name `--rule` and `--reading-bg`. Neither existed: `--reading-bg` still does
-     not, and `--rule` was referenced by two `border-bottom` rules below that consequently never drew
-     anything (see its definition in tokens.css). Stated here because a comment naming two tokens, one of
-     which is load-bearing-but-absent, is how that bug survived. ── */
-  .spine { position: relative; margin-left: 6px; list-style: none; padding: 0; }
-  .spine::before {
-    content: ""; position: absolute; left: 5px; top: 8px; bottom: 8px; width: 1px;
-    background: linear-gradient(
-      180deg, transparent,
-      rgba(var(--hairline-rgb), 0.32) 8%, rgba(var(--hairline-rgb), 0.32) 92%, transparent
-    );
+  /* ── THE HOVER, opacity only, on a pointer's hover or a keyboard's focus inside the panel: the mark's colours fade
+     in over its ink (EXPERIENCE.mark), and the enlarged mark fades in behind the panel's right side
+     (EXPERIENCE.ground), at 0.09 so --ink-3 text over a black or white mark keeps 4.5:1. Under reduced motion both
+     change at once. */
+  .mark .brand { opacity: 0; }
+  .ground { position: absolute; right: -4%; top: -12%; height: 124%; width: auto; aspect-ratio: 1; opacity: 0; pointer-events: none; }
+  @media (prefers-reduced-motion: no-preference) {
+    .mark g { transition: opacity 320ms ease-out; }
+    .ground { transition: opacity 420ms ease-out; }
   }
-  .node {
-    position: relative; display: grid; grid-template-columns: 8.5rem 1fr; gap: 0 24px;
-    padding: 0 0 30px 26px;
-  }
-  .node:last-child { padding-bottom: 6px; }
-  /* The dot's fill must match the page GROUND, not --paper: on a reading page --paper is the
-     near-white text colour in dark theme, so filling with it would punch a bright hole in
-     the thread. --ink-1 inverts correctly per theme, and the page ground is --reading-grad,
-     so the fill samples the gradient's mid instead. */
-  .node .dot {
-    position: absolute; left: 1px; top: 9px; width: 9px; height: 9px; border-radius: 50%;
-    background: var(--dot-fill);
-    border: 1px solid rgba(var(--hairline-rgb), 0.45);
-  }
-  /* Flagship node — the incoming PhD. A HOLLOW INDIGO RING at 10px with a 2px border, the
-     same MEASURED proportions as the homepage: at 9px a 1.5px border rounds down to 1px,
-     leaving the ring at ~40% of the disc so the hue stops registering at all. The seal stays
-     reserved for the brand mark. */
-  .node-flag .dot {
-    width: 10px; height: 10px; left: 0.5px; top: 8px;
-    background: color-mix(in oklab, var(--indigo) 22%, var(--dot-fill));
-    border: 2px solid var(--indigo);
-  }
-  .node-flag { padding-bottom: 38px; }
-
-  @media (max-width: 640px) {
-    .node { grid-template-columns: 1fr; gap: 6px; }
+  .panel:has(:focus-visible) .mark .brand { opacity: 1; }
+  .panel:has(:focus-visible) .ground { opacity: 0.09; }
+  @media (hover: hover) {
+    .panel:hover .mark .brand { opacity: 1; }
+    .panel:hover .ground { opacity: 0.09; }
   }
 
-  .xp-period {
-    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em;
-    color: var(--ink-4); margin: 4px 0 0; white-space: nowrap;
-  }
-  .xp-title {
-    font-family: var(--font-display); font-size: 19px; font-weight: 400;
-    color: var(--ink-1); margin: 0; line-height: 1.35;
-  }
-  .xp-sub {
-    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em;
-    color: var(--ink-4); margin: 5px 0 0;
-  }
-  .xp-detail {
-    font-size: 14.5px; line-height: 1.72; color: var(--ink-3);
-    margin: 9px 0 0; max-width: 62ch;
-  }
-
-  .xp-awards { list-style: none; margin: 0; padding: 0; }
-  .xp-awards li {
-    display: grid; grid-template-columns: 8.5rem 1fr; gap: 0 24px;
-    padding: 15px 0; border-bottom: 1px solid var(--rule);
-  }
-  .xp-awards li:last-child { border-bottom: 0; }
-  .xp-award-year {
-    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--ink-4);
-  }
-  .xp-award-title { font-size: 14.5px; color: var(--ink-2); }
-
-  /* THE AWARDS LIST COLLAPSES ON PHONES TOO, and it was simply missed when .node got the same treatment — an
-     identical `8.5rem 1fr` grid, the same problem, only one of them fixed. Measured at 320px: the year column
-     held 136px of mostly empty space while the award wrapped into the remaining 115px at about fourteen
-     characters a line ("Rio Tinto– / Richards Evans / Exchange Award / · McGill"). The year reads perfectly well
-     above its award, which is exactly what the timeline nodes beside it already do.
-     PLACED AFTER THE BASE RULE, because the .node collapse lives in a media block ABOVE it and putting this
-     there did nothing — measured, still "136px 115.219px". Same source-order trap as the Toc and the Story
-     figure; this file interleaves its queries, so an override has to come after what it overrides. */
-  @media (max-width: 640px) {
-    .xp-awards li { grid-template-columns: 1fr; gap: 4px; }
-  }
-
+  .recog { margin-top: 12vh; max-width: 900px; }
+  .recog h2 { margin: 0 0 12px; font: 12px/1 var(--font-mono); letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); }
+  .recog ul { list-style: none; margin: 0; padding: 0; }
+  .recog li { display: grid; grid-template-columns: 7.5rem 1fr; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--xp-edge);
+    font-size: 15px; color: var(--ink-2); }
+  .recog .year { font: 13px/1.5 var(--font-mono); color: var(--ink-3); }
+  .recog .gloss { color: var(--ink-3); }
   .xp-foot { margin-top: 14vh; }
+
+  @media (max-width: 1100px) {
+    .panel { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .what { grid-column: 1 / -1; }
+  }
+  @media (max-width: 640px) {
+    .panel { grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 28px 22px; }
+    .facts > div, .recog li { grid-template-columns: 6rem 1fr; }
+  }
 </style>
