@@ -45,9 +45,9 @@ const htmlFiles = (dir: string, out: string[] = []): string[] => {
  * Not tidiness — correctness. BaseLayout inlines a JSON-LD block and a theme bootstrap, and a naive
  * href/img scan over the raw file would pick up URL strings and selectors out of JavaScript and
  * report them as links the page offers. The flip side, worth stating because it bounds what a dist
- * spec can promise: nodes a script CREATES at runtime are not here either. The /art photo grid is
- * built by scripts/artGallery.ts, so its <img>s are only covered to the extent the build emits
- * them. Rendered-output tests see rendered output; they are not a browser.
+ * spec can promise: nodes a script CREATES at runtime are not here either, nor what a script sets on
+ * the nodes it finds (the widths /art's rows script gives its tiles). Rendered-output tests see
+ * rendered output; they are not a browser.
  */
 const stripNonMarkup = (html: string): string =>
   html

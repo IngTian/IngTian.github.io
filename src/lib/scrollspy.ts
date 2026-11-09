@@ -1,7 +1,6 @@
-// Shared scrollspy core: "which section is the reader in?", pure and unit-tested. Two rails ask it: the /art rail
-// (scripts/artGallery.ts) uses activeStopIndex directly; SideRail, the rail of every other page that has one, uses
-// railMarks, which falls back to it. Each call site keeps its own thin DOM wrapper (measuring boxes, toggling
-// classes); only the decision lives here.
+// Shared scrollspy core: "which section is the reader in?", pure and unit-tested. SideRail, the site's one rail,
+// asks it through railMarks, which falls back to activeStopIndex. SideRail keeps the thin DOM wrapper (measuring
+// boxes, toggling classes); only the decision lives here.
 
 const REFERENCE_LINE_RATIO = 0.4; // active = last stop whose top crossed 40% down the viewport
 const BOTTOM_EPSILON = 2;         // px slack for "scrolled to the very bottom"

@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { MOTION_LIMIT_MS } from '../src/lib/motion';
 import {
-  CARD, DRAW, EASE, FADE, MOVE_MAX, PAPER_PAGE, RAIL, REVEAL, SWEEP, WITHDRAW, arrowDelay, highlightDelay, mergeLines, stagger,
-  sweepDurations,
+  ART, CARD, DRAW, EASE, FADE, MOVE_MAX, PAPER_PAGE, RAIL, REVEAL, SWEEP, WITHDRAW, arrowDelay, highlightDelay, mergeLines,
+  stagger, sweepDurations,
 } from '../src/lib/motionTiming';
 
 describe('the curves', () => {
@@ -20,7 +20,7 @@ describe('the curves', () => {
 
 describe('the durations', () => {
   it('end every move within 2s, the longest a figure drawing itself', () => {
-    const all = [REVEAL, RAIL, PAPER_PAGE, CARD].flatMap((g) => Object.values(g));
+    const all = [REVEAL, RAIL, PAPER_PAGE, CARD, ART].flatMap((g) => Object.values(g));
     expect(Math.max(...all)).toBe(PAPER_PAGE.draw);
     expect(MOVE_MAX).toBe(2000);
     expect(PAPER_PAGE.draw).toBeLessThanOrEqual(MOVE_MAX);
@@ -45,8 +45,8 @@ describe("a paper page's batches", () => {
   });
 });
 
-// Every curve and duration the rail and the research routes move by is lib/motionTiming's. Their scripts import it;
-// their CSS cannot, so each motion declaration in it, shorthand or longhand, is held here to the constant it
+// Every curve and duration the rail, the research routes and /art move by is lib/motionTiming's. Their scripts import
+// it; their CSS cannot, so each motion declaration in it, shorthand or longhand, is held here to the constant it
 // carries, in source order, and a literal added without one fails by name. The research routes' shared sheet
 // (styles/paper.css) moves nothing.
 describe('the code that moves things', () => {
@@ -89,6 +89,13 @@ describe('the code that moves things', () => {
     ]);
   });
 
+  it("holds /art's CSS to ART and FADE: the mat's swap and the sentences' turn, then a photograph's one fade", () => {
+    expect(moves(css('pages/art.astro'))).toEqual([
+      `opacity ${ART.swap}ms ${FADE}`,
+      `opacity ${ART.tileFade}ms ${FADE}`,
+    ]);
+  });
+
   // A curve by name counts as a curve; `linear` is none, and on an animation whose keyframes carry their own easing
   // it leaves them theirs. A number of ms is a number of ms however it is written: in a sum, a choice, a timer.
   it('states no curve or duration in a script: each reads one from lib/motionTiming', () => {
@@ -97,6 +104,7 @@ describe('the code that moves things', () => {
       'components/SideRail.astro': scripts('components/SideRail.astro'),
       'pages/research/[slug].astro': scripts('pages/research/[slug].astro'),
       'pages/research/index.astro': scripts('pages/research/index.astro'),
+      'pages/art.astro': scripts('pages/art.astro'),
     };
     const own = new RegExp([
       String.raw`cubic-bezier\(`,

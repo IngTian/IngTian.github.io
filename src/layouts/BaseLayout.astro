@@ -13,16 +13,17 @@ interface Props {
   /** Play the veil on a FRESH load of this page? (Transitions always play it.) */
   veilOnLoad?: boolean;
   /** Render the veil? `false` emits no `[data-veil]`, so nothing plays it — for a page whose own entrance
-   *  replaces it (/projects' boot), or that a reader moves in and out of too often to hold back (/research). */
+   *  replaces it (/projects' boot), that a reader moves in and out of too often to hold back (/research), or where
+   *  it would be motion that runs on its own (/art). */
   veil?: boolean;
   /** Sets `data-page` on <html>; tokens.css re-skins the role tokens from it ('drafting' is /projects, 'paper' the
-   *  research routes, 'deck' the homepage, whose block sets only the rail's resting ink). ClientRouter copies
-   *  <html>'s attributes, so it leaves with the page. */
+   *  research routes and /art, 'deck' the homepage, whose block sets only the rail's resting ink). ClientRouter
+   *  copies <html>'s attributes, so it leaves with the page. */
   page?: 'drafting' | 'paper' | 'deck';
   /**
    * How the corner nav picks its (light-theme) text color:
    *  - 'scroll' (default): flip dark→paper by the descent fraction behind it
-   *    (home & /art ride the full dawn→night gradient).
+   *    (home rides the full dawn→night gradient; a page with no .descent gets 'light').
    *  - 'light': pin to dark text — for pages that stay pale top-to-bottom in
    *    light theme (/writing is a reading page and never sinks to dark).
    * In DARK theme the text is always light regardless, so this only matters
@@ -182,6 +183,7 @@ const personLd = {
         Pages opt in on a fresh load with veilOnLoad (`grep veilOnLoad src/pages`);
         /projects renders none (veil={false}): its boot is its entrance. Nor does
         /research: the veil would replay on every card click and every way back.
+        Nor does /art, where the veil would be motion that runs on its own.
 
         `/` does not opt in on a fresh load: its first open is the hero's own intro
         (CLAUDE.md, "The first-open intro"), the content arriving rather than a layer

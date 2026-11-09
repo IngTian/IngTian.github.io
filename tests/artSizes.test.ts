@@ -1,137 +1,184 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { justifyRows } from '../src/lib/justify';
+import {
+  CAL_MAX_H, CAL_WIDTHS, MAT_H, MAT_H_PHONE, MAT_H_STACKED, MAT_W, MAT_W_PHONE, MAT_W_STACKED, PHOTO_WIDTHS, ROW_H,
+  ROW_H_PHONE, ROW_W, calSizes, matSizes, rowSizes,
+} from '../src/lib/artPage';
 
 /**
- * /art's `sizes` hints have to describe a layout decided in other files: the photo grid's by the
- * `justifyRows(ars, W, 340, 14)` call in scripts/artGallery.ts, the calligraphy's by a CSS height cap. A
- * viewport-fraction hint over-fetched in both (the arithmetic is in art.astro, above photoSizes() and
- * calSizes()), so each hand-synced constant is held to what it mirrors. Read as TEXT: artGallery.ts touches
- * `document` at module scope and art.astro is a component, so neither can be imported.
+ * /art's `sizes` hints describe a layout its stylesheet decides: the rows' height (`--row-h`, which the rows script
+ * hands to justifyRows), the mat's height cap and the calligraphy's. Each hint is built from constants in
+ * lib/artPage.ts (matSizes(), rowSizes(), calSizes(); the arithmetic is beside them), so each constant is held here
+ * to the CSS it mirrors, and each hint the page ships is swept over the layout: the worst rendered / hinted width is
+ * at most 1, so a hint can only ever cost bytes, never sharpness. The stylesheet is read as TEXT: the page is a
+ * component and cannot be imported.
  */
 
-const gallery = readFileSync(new URL('../src/scripts/artGallery.ts', import.meta.url), 'utf8');
 const artPage = readFileSync(new URL('../src/pages/art.astro', import.meta.url), 'utf8');
+const css = (/^<style>([\s\S]*?)^<\/style>/m.exec(artPage)?.[1] ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
 
-/** The `justifyRows(ars, W, 340, 14)` call that lays the grid out. */
-const layoutCall = /justifyRows\(\s*ars\s*,\s*W\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*\)/.exec(gallery);
+/** The stylesheet by top-level `@media` block: '' is everything outside one, else the block's query. */
+const scopes = new Map<string, string>([['', '']]);
+for (let i = 0; i < css.length;) {
+  const at = css.indexOf('@media', i);
+  scopes.set('', scopes.get('') + css.slice(i, at < 0 ? css.length : at));
+  if (at < 0) break;
+  const open = css.indexOf('{', at);
+  let j = open;
+  for (let depth = 0; j < css.length; j++) if (css[j] === '{') depth++; else if (css[j] === '}' && --depth === 0) break;
+  const query = css.slice(at + '@media'.length, open).trim();
+  scopes.set(query, (scopes.get(query) ?? '') + css.slice(open + 1, j));
+  i = j + 1;
+}
+const PHONE = '(max-width: 640px)';
+const STACKED = '(max-width: 900px)';
 
-/** The two constants art.astro derives its hint from. */
-const hintTarget = /PHOTO_ROW_TARGET_H\s*=\s*(\d+(?:\.\d+)?)/.exec(artPage);
-const hintSlack = /PHOTO_LAST_ROW_SLACK\s*=\s*(\d+(?:\.\d+)?)/.exec(artPage);
+/** A declaration of the rule whose whole selector is `sel`, in one scope: never the first match in the file. */
+const decl = (scope: string, sel: string, prop: string): string | undefined => {
+  const esc = sel.replace(/[.()[\]*+?^$|\\:]/g, '\\$&');
+  const body = new RegExp(`(?:^|\\})\\s*${esc}\\s*\\{([^}]*)\\}`).exec(scopes.get(scope) ?? '')?.[1];
+  return body && new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`).exec(body)?.[1].trim();
+};
+const num = (v?: string): number | undefined => (v && /^\d+(\.\d+)?(px)?$/.test(v) ? parseFloat(v) : undefined);
+/** `min(62vh, 560px)` as its two arms, [0.62, 560]. */
+const vhCap = (v?: string): [number, number] | undefined => {
+  const m = /^min\(\s*(\d+(?:\.\d+)?)vh\s*,\s*(\d+(?:\.\d+)?)px\s*\)$/.exec(v ?? '');
+  return m ? [Number(m[1]) / 100, Number(m[2])] : undefined;
+};
 
-describe('/art photo `sizes` hint', () => {
-  it('finds the layout call and the hint constants at all', () => {
-    // If either regex stops matching, the rest of this spec would pass vacuously — which is exactly the
-    // failure mode a text-based test has to rule out first.
-    expect(layoutCall, 'justifyRows(ars, W, …) call in src/scripts/artGallery.ts').not.toBeNull();
-    expect(hintTarget, 'PHOTO_ROW_TARGET_H in src/pages/art.astro').not.toBeNull();
-    expect(hintSlack, 'PHOTO_LAST_ROW_SLACK in src/pages/art.astro').not.toBeNull();
+/** The px of one arm of a shipped hint, by index into its comma-separated list (-1, the desktop arm, last). */
+const arm = (s: string, i: number): number => parseFloat(s.split(', ').at(i)!.split(' ').at(-1)!);
+const S = {
+  rowH: num(decl('', '.rows', '--row-h')), rowPad: num(decl('', '.rows', '--pad')), rowGap: num(decl('', '.rows', 'column-gap')),
+  rowHPhone: num(decl(PHONE, '.rows', '--row-h')), rowPadPhone: num(decl(PHONE, '.rows', '--pad')),
+  rowGapPhone: num(decl(PHONE, '.rows', 'column-gap')),
+  openingGap: num(decl('', '.opening', 'gap')),
+  mat: vhCap(decl('', '.mat', 'height')), matPad: num(decl('', '.mat', 'padding')),
+  matStacked: vhCap(decl(STACKED, '.mat', 'height')), matPadStacked: num(decl(STACKED, '.mat', 'padding')),
+  matPhone: vhCap(decl(PHONE, '.mat', 'height')), matPadPhone: num(decl(PHONE, '.mat', 'padding')),
+  // The block is its work's width at the height cap, min(100%, calc(var(--ar) * <cap>)): the cap is the inner min().
+  cal: vhCap(/^min\(100%, calc\(var\(--ar\) \* (min\([^)]*\))\)\)$/.exec(decl('', '.cal', 'width') ?? '')?.[1]),
+  objPadPhone: num(decl(PHONE, '.obj-mat', 'padding')),
+  calInsetPhone: num(/calc\(100vw - (\d+)px\)/.exec(calSizes(1))?.[1]),
+};
+
+// The column the sweeps lay out in: .art-wrap's `max-width: 1240px` and `padding: 0 clamp(22px, 5vw, 72px)`
+// (border-box), and .opening's `minmax(0, 1fr) minmax(0, 1.15fr)`, whose second column holds the mat. The first
+// test holds each to the stylesheet.
+const COLUMN = 1240;
+const side = (vw: number): number => Math.min(72, Math.max(22, 0.05 * vw));
+const content = (vw: number): number => Math.min(COLUMN, vw) - 2 * side(vw);
+const MAT_SHARE = 1.15 / 2.15;
+
+const range = (from: number, to: number, step = 1): number[] =>
+  [...Array.from({ length: Math.floor((to - from) / step) + 1 }, (_, i) => from + i * step), to];
+// The ratios the photographs ship (9:16, 3:4, 1807:2400 and their transposes), repeated, rather than read from
+// src/assets, so adding a photograph cannot fail this; the mat also holds the stele (1727x3422) and the poem
+// (1080x1440).
+const PHOTO_ARS = [0.5625, 0.75, 1807 / 2400, 2400 / 1807, 4 / 3, 16 / 9];
+const REPEATED = Array.from({ length: 42 }, (_, i) => PHOTO_ARS[i % PHOTO_ARS.length]);
+const CAL_ARS = [1727 / 3422, 1080 / 1440];
+const MAT_ARS = [...PHOTO_ARS, ...CAL_ARS];
+const VH = range(500, 2200, 11);
+/** The column's widest, 1116px at vw = 1240 (side 62), not at the 1240 cap's far side. */
+const PEAK = Math.max(...range(320, 3000).map(content));
+
+describe("/art's `sizes` hints", () => {
+  it('finds every rule the constants mirror', () => {
+    // If any of these stops matching, every sweep below would run on undefined and pass or fail for no reason.
+    for (const [k, v] of Object.entries(S)) expect(v, `${k} in src/pages/art.astro`).toBeDefined();
+    expect(decl('', '.art-wrap', 'max-width'), '.art-wrap max-width').toBe(`${COLUMN}px`);
+    expect(decl('', '.art-wrap', 'padding'), '.art-wrap padding').toBe('0 clamp(22px, 5vw, 72px)');
+    expect(decl('', '.opening', 'grid-template-columns'), '.opening columns').toBe('minmax(0, 1fr) minmax(0, 1.15fr)');
   });
 
-  it('computes the hint from the SAME target row height the grid is laid out with', () => {
-    // If this fails: artGallery.ts's justifyRows target and art.astro's PHOTO_ROW_TARGET_H have drifted.
-    // Change both, in the same commit.
-    expect(Number(hintTarget![1])).toBe(Number(layoutCall![1]));
+  it('holds each constant to the CSS it mirrors', () => {
+    // If one fails, the constant and the stylesheet have drifted: change both, in the same commit.
+    expect(ROW_H, ".rows' --row-h").toBe(S.rowH);
+    expect(ROW_H_PHONE, ".rows' --row-h at 640px").toBe(S.rowHPhone);
+    expect(CAL_MAX_H, ".cal's height cap, its px arm").toBe(S.cal![1]);
+    // the mat's image box is its height cap less its padding, above and below (border-box)
+    expect(MAT_H, ".mat's height cap less 2 x its padding").toBe(S.mat![1] - 2 * S.matPad!);
+    expect(MAT_H_STACKED, 'the same at 900px').toBe(S.matStacked![1] - 2 * S.matPadStacked!);
+    expect(MAT_H_PHONE, 'the same at 640px').toBe(S.matPhone![1] - 2 * S.matPadPhone!);
+    // The width caps, from the column at its widest (PEAK) and at each block's own widest. The sweeps below cannot
+    // see ROW_W: no shipped ratio is wide enough (3.84:1 at 280px) for a tile to reach it.
+    expect(ROW_W, 'the widest column less 2 x the tile pad').toBe(PEAK - 2 * S.rowPad!);
+    expect(MAT_W, "the mat's widest column less 2 x its padding")
+      .toBe(Math.ceil((PEAK - S.openingGap!) * MAT_SHARE - 2 * S.matPad!));
+    expect(MAT_W_STACKED, 'the column at 900px less 2 x the padding').toBe(content(900) - 2 * S.matPadStacked!);
+    expect(MAT_W_PHONE, 'the column at 640px less 2 x the padding').toBe(content(640) - 2 * S.matPadPhone!);
   });
 
-  it('uses justifyRows\' own final-row slack, not an invented number', () => {
-    // 1.16 is the `targetHeight * 1.16` clamp inside justifyRows' flush(last) — the one path that can make a
-    // row TALLER than the target, and therefore the one that sets the real upper bound on a tile's width.
-    const justify = readFileSync(new URL('../src/lib/justify.ts', import.meta.url), 'utf8');
-    expect(justify).toContain(`targetHeight * ${hintSlack![1]}`);
+  it('ships each kind of work in its own widths, on the mat too, and states them once', () => {
+    // 1200 stays for the calligraphy: a DPR-3 phone at ~346 CSS px asks for ~1038 device px of the stele. No native
+    // width, ever: the stele's 1727w was a 1342 KB webp on the LCP image.
+    expect(PHOTO_WIDTHS).toEqual([300, 600, 900]);
+    expect(CAL_WIDTHS).toEqual([480, 900, 1200]);
+    expect(artPage).not.toContain('widths={[');
   });
 
-  it('keeps the hint an upper bound on the rendered tile width at every container width', () => {
-    // The claim the hint makes is `tileWidth <= ar * target * slack`, for every photo, at every width. It is
-    // provable from justifyRows (non-final rows close at or below the target; the final row is clamped), but
-    // the layout is the thing that must hold, so run the real function over the real aspect ratios.
-    //
-    // The ratios are the six the gallery actually ships (9:16, 3:4, 1807:2400 and their transposes), listed
-    // here rather than read from src/assets so adding a photograph cannot fail this test.
-    const ars = [0.5625, 0.75, 1807 / 2400, 2400 / 1807, 4 / 3, 16 / 9];
-    const target = Number(layoutCall![1]);
-    const gap = Number(layoutCall![2]);
-    const slack = Number(hintSlack![1]);
-    const repeated = Array.from({ length: 42 }, (_, i) => ars[i % ars.length]);
+  it("never under-declares a photograph in the rows, the last row included", () => {
+    // The rows script calls justifyRows(ars, W - 2 x pad, --row-h, gap + 2 x pad), and a tile's image is ar x h.
+    const sweep = (Ws: number[], target: number, pad: number, gap: number, hint: (ar: number) => number): number => {
+      let worst = 0;
+      for (const W of Ws) for (const row of justifyRows(REPEATED, W - 2 * pad, target, gap + 2 * pad)) {
+        for (const i of row.indices) worst = Math.max(worst, (REPEATED[i] * row.height) / hint(REPEATED[i]));
+      }
+      return worst;
+    };
+    const desktop = sweep(range(260, PEAK, 7), S.rowH!, S.rowPad!, S.rowGap!, (ar) => arm(rowSizes(ar), -1));
+    const phone = sweep(range(content(320), content(640)), S.rowHPhone!, S.rowPadPhone!, S.rowGapPhone!,
+      (ar) => arm(rowSizes(ar), 0));
+    expect(desktop, 'desktop').toBeLessThanOrEqual(1);
+    expect(phone, 'phone').toBeLessThanOrEqual(1);
+  });
 
-    let worst = 0;
-    for (let W = 260; W <= 3000; W += 7) {
-      for (const row of justifyRows(repeated, W, target, gap)) {
-        for (const i of row.indices) {
-          const rendered = repeated[i] * row.height;
-          const hinted = Math.ceil(repeated[i] * target * slack);
-          worst = Math.max(worst, rendered / hinted);
+  it('never under-declares a work on the mat, at any viewport or window height', () => {
+    // The image is whole inside the mat's padding: at most its column wide and its height cap tall.
+    const sweep = (
+      vws: number[], colOf: (vw: number) => number, [f, cap]: [number, number], pad: number, i: number,
+    ): number => {
+      let worst = 0;
+      for (const ar of MAT_ARS) {
+        const hint = arm(matSizes(ar), i);
+        for (const vw of vws) for (const vh of VH) {
+          worst = Math.max(worst, Math.min(colOf(vw) - 2 * pad, ar * (Math.min(f * vh, cap) - 2 * pad)) / hint);
         }
       }
-    }
-    // <= 1 means the hint never asks for a smaller variant than the tile is painted at, so this can only
-    // ever cost bytes, never sharpness.
-    expect(worst).toBeLessThanOrEqual(1);
+      return worst;
+    };
+    const desktopCol = (vw: number): number => (content(vw) - S.openingGap!) * MAT_SHARE;
+    expect(sweep(range(901, 3000, 7), desktopCol, S.mat!, S.matPad!, -1), 'desktop').toBeLessThanOrEqual(1);
+    expect(sweep(range(641, 900), content, S.matStacked!, S.matPadStacked!, 1), 'stacked').toBeLessThanOrEqual(1);
+    expect(sweep(range(320, 640), content, S.matPhone!, S.matPadPhone!, 0), 'phone').toBeLessThanOrEqual(1);
   });
 
-  it('still leaves the <=1024px branch fluid, where the px bound goes loose', () => {
-    // Below 1024px .art-wrap is a centred max-width:900px column, narrow enough that a row can no longer
-    // reach the target height, so the structural bound over-states a phone tile by ~35% and quantises up a
-    // variant. Deliberately unchanged — see the note above photoSizes() in art.astro.
-    expect(artPage).toContain('(max-width:1024px) 45vw,');
-  });
-});
-
-/**
- * The calligraphy hint is `ceil(ar * CAL_MAX_H)` px, and CAL_MAX_H is the px arm of `.cal :global(img)`'s
- * max-height in art.astro's own <style> block: a hand-synced pair, so a drift fails here rather than quietly
- * re-inflating /art's LCP (a `40vw` hint once fetched 396,030 B where 142,128 B covers it; see calSizes()).
- */
-describe('/art calligraphy `sizes` hint', () => {
-  const calMaxH = /CAL_MAX_H\s*=\s*(\d+(?:\.\d+)?)/.exec(artPage);
-  /** The CSS cap the constant mirrors, `max-height: min(82vh, 820px)`, read from the stylesheet alone so that a
-   *  comment above it cannot stand in for the rule. */
-  const cssCap = /max-height:\s*min\(\s*\d+(?:\.\d+)?vh\s*,\s*(\d+(?:\.\d+)?)px\s*\)/.exec(artPage.slice(artPage.indexOf('<style')));
-
-  it('finds both halves of the pair at all', () => {
-    // Same guard as above: if either regex stops matching, every assertion below would pass vacuously.
-    expect(calMaxH, 'CAL_MAX_H in src/pages/art.astro').not.toBeNull();
-    expect(cssCap, '`max-height: min(..vh, ..px)` in art.astro\'s <style>').not.toBeNull();
+  it("reserves each calligraphy work's box from its ratio, before the image decodes", () => {
+    // The block's width comes from --ar and the cap, and the image fills it: an image sized by its own width inside
+    // the shrink-to-fit button is 0px wide until it decodes, which put the photographs ~1,400px higher at first
+    // layout, inside Chrome's lazy-load margin (the note above CAL_MAX_H in lib/artPage.ts). A max-height on a
+    // 100%-wide image would squash it rather than narrow it, so the cap lives in the width alone.
+    expect(decl('', '.cal :global(img)', 'width'), '.cal img width').toBe('100%');
+    expect(decl('', '.cal :global(img)', 'height'), '.cal img height').toBe('auto');
+    expect(decl('', '.cal :global(img)', 'max-height'), '.cal img max-height').toBeUndefined();
+    expect(artPage, "the block's --ar").toMatch(/class:list=\{\['cal', w\.treatment\]\} style=\{`--ar:\$\{w\.ar\.toFixed\(4\)\}`\}/);
   });
 
-  it('derives the hint from the SAME px cap the CSS applies', () => {
-    // If this fails: CAL_MAX_H and `.cal :global(img)`'s max-height have drifted. Change both, same commit.
-    expect(Number(calMaxH![1])).toBe(Number(cssCap![1]));
-  });
-
-  it('hints a px bound, not a viewport fraction, on the desktop branch', () => {
-    // The specific regression this file now blocks. `40vw` must never come back: it describes a fluid width
-    // this element does not have, and it is the reason the LCP stayed 2.8x heavier than it needed to be
-    // through the release that "fixed" it.
-    expect(artPage).toContain('calSizes(calZoom[i].w / calZoom[i].h)');
-    expect(artPage).not.toContain('(max-width:1024px) 80vw, 40vw');
-  });
-
-  it('never under-declares, at any viewport or window height', () => {
-    // The hint's claim is `renderedWidth <= ceil(ar * CAL_MAX_H)`. The rendered width is
-    // `min(containerWidth, min(0.82 * vh, CAL_MAX_H) * ar)`, so the cap arm alone is a structural ceiling —
-    // but the arithmetic is asserted over a real sweep rather than argued, because the argued version is what
-    // was wrong last time.
-    const cap = Number(calMaxH![1]);
-    const ars = [1727 / 3422, 2400 / 1807]; // the two works that ship: the tall stele and the wider poem
+  it('never under-declares a calligraphy block, at any viewport or window height', () => {
+    // Height-capped, so at most ar x the cap wide in any container; on a phone, the column less the block's mat.
+    const [f, cap] = S.cal!;
     let worst = 0;
-    for (const ar of ars) {
-      const hinted = Math.ceil(ar * cap);
-      for (let vh = 560; vh <= 2160; vh += 11) {
-        for (let container = 300; container <= 3000; container += 13) {
-          const rendered = Math.min(container, Math.min(0.82 * vh, cap) * ar);
-          worst = Math.max(worst, rendered / hinted);
-        }
+    for (const ar of CAL_ARS) {
+      const hint = arm(calSizes(ar), -1);
+      for (let vh = 560; vh <= 2160; vh += 11) for (let container = 300; container <= 3000; container += 13) {
+        worst = Math.max(worst, Math.min(container, Math.min(f * vh, cap) * ar) / hint);
       }
     }
-    // <= 1 means the hint can only ever cost bytes, never sharpness — the same bar the photo grid is held to.
-    expect(worst).toBeLessThanOrEqual(1);
-  });
-
-  it('keeps 1200 in widths, because a DPR-3 phone really does need it', () => {
-    // The mobile branch stays fluid (80vw), and on a 390px phone at DPR 3 the stele asks for ~1038 device px.
-    // Dropping the 1200w candidate to "match" the desktop bound would make the phone the blurry one.
-    expect(artPage).toContain('widths={[480, 900, 1200]}');
+    expect(worst, 'desktop').toBeLessThanOrEqual(1);
+    for (const vw of range(320, 640)) {
+      expect(content(vw) - 2 * S.objPadPhone!, `phone at ${vw}px`).toBeLessThanOrEqual(vw - S.calInsetPhone!);
+    }
   });
 });

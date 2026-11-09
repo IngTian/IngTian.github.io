@@ -1,284 +1,693 @@
 ---
+// /art, on a still sheet: sentences in the owner's voice, taking turns, whose seal-red phrases each bring a work
+// onto the mat beside them, then the calligraphy as object blocks, then every photograph in justified rows; any
+// work opens full screen in the dark room. It borrows the research routes' paper register (page="paper"): no sky,
+// no veil, no rail. Two things move on their own: a photograph's one fade as it arrives, and the sentences' turns,
+// which a reader can pause (WCAG 2.2.2) and which stop once a work is taken. The works and the sentences are
+// data/artworks.ts; their rules and holds, the label line and the three `sizes` hints are lib/artPage.ts.
 import BaseLayout from '../layouts/BaseLayout.astro';
-import FluidSky from '../components/FluidSky.astro';
 import { Image, getImage } from 'astro:assets';
-import { calligraphy, photography, photoDefault } from '../data/artworks';
-import SkyWash from '../components/SkyWash.astro';
+import { SENTENCES, calligraphy, photography } from '../data/artworks';
+import {
+  CAL_WIDTHS, PHOTO_WIDTHS, calSizes, labelLine, matSizes, phrasesOf, rowSizes, sentenceProblems,
+} from '../lib/artPage';
 
-// ── /art's image bytes. The rules are CLAUDE.md's (Stack); the arithmetic is here, beside the code it sets.
-//
-// THE PHOTO HINT. scripts/artGallery.ts lays the grid out with `justifyRows(ars, W, 340, 14)`, which closes a
-// row once its height would fall to or below 340 and clamps the final, unfilled row to 340 * 1.16. A tile is
-// `ar * rowHeight` wide, so `ar * 340 * 1.16` bounds it at any viewport: nothing in it scales with vw. At
-// 1440/DPR 2 a `30vw` hint picked the 900w variant for all 42 photos, 6,007,600 B; these bounds select
-// 3,128,936 (47.9% less), within 2.4% of the per-tile optimum (3,056,032), and never under-declare from 260 to
-// 3000px wide (worst actual/hint 0.9993). The two constants are synced by hand: tests/artSizes.test.ts holds
-// them to that call and to justify.ts's `targetHeight * 1.16`.
-// The <=1024px branch stays 45vw. There .art-wrap is a centred 900px column that a row cannot fill at the
-// target height, so the px bound goes loose (a 390px phone's portrait tile is ~166px against 222) and
-// quantises up a variant: it measured +325,556 B at DPR 2 and +3,204,220 at DPR 3.
-const PHOTO_ROW_TARGET_H = 340;   // justifyRows' targetHeight — every non-final row closes at or below it
-const PHOTO_LAST_ROW_SLACK = 1.16; // justifyRows' cap on the final, unfilled row
-const photoSizes = (ar: number) =>
-  `(max-width:1024px) 45vw, ${Math.ceil(ar * PHOTO_ROW_TARGET_H * PHOTO_LAST_ROW_SLACK)}px`;
-
-// THE CALLIGRAPHY HINT. `.cal :global(img)` is height-capped (width auto, max-width 100%, a max-height whose px
-// arm is 820), so a tall work renders at most 820 * ar CSS px at any window height: 414 for the 1727x3422
-// stele, at most 413.8 measured over 13 viewports from 1024 to 3840 wide. A `40vw` hint declared 512-1536 and
-// made DPR 2 fetch the 1200w variant (396,030 B) where 900w (142,128 B) covers the 828 device px needed.
-// `widths` stays [480, 900, 1200]: a DPR-3 phone at ~346 CSS px needs ~1038. The <=1024px branch stays 80vw,
-// where max-width binds. CAL_MAX_H mirrors the stylesheet's 820, and tests/artSizes.test.ts fails on drift.
-const CAL_MAX_H = 820; // the px arm of `.cal :global(img)`'s max-height
-const calSizes = (ar: number) => `(max-width:1024px) 80vw, ${Math.ceil(ar * CAL_MAX_H)}px`;
-
-// THE LIGHTBOX AND EACH WORK'S SIZE, from one getImage() call: a webp at NATIVE pixels, which artGallery.ts
-// zooms to 6x, so the pixels stay. It is the native variant <Image> emits anyway for its `src` (18.6 MB a
-// browser with `srcset` never requests), so it adds no file. `w`/`h` are data-zw/data-zh, which reserve the
-// lightbox's box before the image decodes, and they feed data-ar and the two hints above.
-// They are read off getImage()'s options, never off the ImageMetadata: Astro's import is a Proxy, and reading
-// any property of it but `clone` or `fsPath` keeps the original in dist. Reading `.width`/`.height` kept all
-// 44 JPEGs there (40,525,788 B, referenced by nothing); tests/distSmoke.test.ts fails if an original ships.
+// EACH WORK'S NATIVE-PIXEL WEBP AND ITS RATIO, from one getImage() call. The webp's URL is `zoom`, which every work
+// carries as data-zoom, to be looked at closely (6x), so the pixels stay. It is the native variant <Image> emits
+// anyway for its `src` (18.6 MB a browser with `srcset` never requests), so it adds no file. `ar`, its native width
+// over its height, reserves the work's box before the image decodes (a tile's and a block's --ar, the dark room's
+// data-ar) and sets the three `sizes` hints. The size is read off getImage()'s options, never off the ImageMetadata:
+// Astro's import is a Proxy, and reading any property of it but `clone` or `fsPath` keeps the original in dist.
+// Reading `.width`/`.height` kept all 44 JPEGs there (40,525,788 B, referenced by nothing); tests/distSmoke.test.ts
+// fails if an original ships.
 const zoomOf = async (src: ImageMetadata) => {
   const z = await getImage({ src, format: 'webp' });
   const { width: w, height: h } = z.options;
   if (!w || !h) throw new Error(`getImage() gave no native size for ${z.src}`);
-  return { src: z.src, w, h };
+  return { zoom: z.src, ar: w / h };
 };
-const calZoom = await Promise.all(calligraphy.map((w) => zoomOf(w.src)));
-const photoZoom = await Promise.all(photography.map((p) => zoomOf(p.src)));
+
+// The page's one list of works; a label prints only the fields its record knows (labelLine).
+const photos = await Promise.all(photography.map(async (p) => ({
+  ...p, kind: 'photo' as const, ...(await zoomOf(p.src)),
+})));
+const cals = await Promise.all(calligraphy.map(async (c) => ({
+  ...c, kind: 'cal' as const, ...(await zoomOf(c.src)),
+})));
+const works = [...photos, ...cals];
+type Work = (typeof works)[number];
+const byKey = new Map(works.map((w) => [w.key, w]));
+
+// The sentences' rules (lib/artPage.ts): a sentence that breaks one fails the build here, naming it.
+const keys = new Set(byKey.keys());
+const problems = SENTENCES.flatMap((s, i) => sentenceProblems(s, keys).map((x) => `sentence ${i + 1}: ${x}`));
+if (problems.length) throw new Error(`art: ${problems.join('; ')}`);
+// The mat holds each work the sentences name, once, in their order; the first sentence's first work is on it at
+// arrival.
+const matWorks = [...new Set(SENTENCES.flatMap((s) => phrasesOf(s).map((x) => x.work)))]
+  .flatMap((k) => byKey.get(k) ?? []);
+const first = phrasesOf(SENTENCES[0])[0].work;
+
+// What every opener carries: the native webp, its ratio, the alt and the label's one line.
+const darkData = (w: Work) => ({
+  'data-zoom': w.zoom, 'data-ar': w.ar.toFixed(4), 'data-alt': w.alt, 'data-line': labelLine(w),
+});
 ---
 <BaseLayout
-  title="An artist by night — Ing Tian"
+  title="Art — Ing Tian"
   description="Calligraphy and photography by Ing Tian (Zeying Tian)."
-  veilLine="an artist by night"
-  veilOnLoad={true}
+  page="paper"
+  veil={false}
 >
-  <main class="art descent is-fluid">
-    <FluidSky variant="descent" />
-    <SkyWash />
-    {/* TOC rail */}
-    <nav class="art-toc" id="art-toc" aria-label="Sections">
-      <ul>
-        <li><a href="#calligraphy" data-target="calligraphy"><span class="rule" aria-hidden="true"></span><span>Calligraphy</span></a></li>
-        <li><a href="#photography" data-target="photography"><span class="rule" aria-hidden="true"></span><span>Photography</span></a></li>
-      </ul>
-    </nav>
-
-    {/* Wall-label placard */}
-    <aside class="placard" id="art-placard" aria-live="polite">
-      <div class="pl-inner">
-        <div class="pl-kicker"></div>
-        <p class="pl-title"></p>
-        <div class="pl-meta"></div>
-        <p class="pl-desc"></p>
-      </div>
-    </aside>
-
+  <main class="art">
     <div class="art-wrap">
       <header class="art-head">
         <a class="back" href="/">← back</a>
-        <h1>An artist by night</h1>
-        <p class="lede">Calligraphy and photographs — seen, as in a quiet room, one at a time.</p>
+        <h1>Art</h1>
       </header>
 
-      <h2 class="seclabel" id="calligraphy">Calligraphy</h2>
-      <div id="cal-host">
-        {calligraphy.map((w, i) => (
-          <div class="cal-block" data-i={i}
-               data-kicker={w.kicker} data-title={w.title} data-meta={w.medium} data-note={w.note}>
-            <figure class:list={["cal", w.treatment]} data-zoom={calZoom[i].src}
-                    data-zw={calZoom[i].w} data-zh={calZoom[i].h} data-alt={w.alt}
-                    role="button" tabindex="0" aria-label={`View ${w.title} — full screen`}>
-              {/* The first work is /art's LCP, so it is eager and high priority (<Image> defaults to lazy);
-                  the rest stay lazy. `widths` never holds the native width: the stele's 1727w was a 1342 KB
-                  webp on this element. `sizes` is calSizes(); the arithmetic is above it. */}
-              <Image src={w.src} alt={w.alt} widths={[480, 900, 1200]}
-                     sizes={calSizes(calZoom[i].w / calZoom[i].h)}
-                     loading={i === 0 ? 'eager' : 'lazy'} fetchpriority={i === 0 ? 'high' : undefined} />
-            </figure>
+      <section class="opening" aria-label="Selected works">
+        <div class="words">
+          {/* A phrase is a link to its work's place on the page, so without a script it jumps there. The sentences
+              share one cell, so the column is the tallest's height and nothing under it moves at a turn; the ones
+              not shown are inert, out of the tab order and the accessibility tree. */}
+          <div class="sentences">
+            {SENTENCES.map((s, i) => (
+              <p class:list={['sentence', { 'is-on': i === 0 }]} inert={i !== 0}>
+                {s.map((x) => typeof x === 'string' ? x : (
+                  <a class="phrase" href={`#${x.work}`} data-work={x.work} aria-controls="art-mat"
+                     aria-current={x.work === first ? 'true' : undefined}>{x.text}</a>
+                ))}
+              </p>
+            ))}
           </div>
-        ))}
-      </div>
+          {/* There from first paint, so nothing under them moves when the script starts; CSS hides them where no
+              script will work them. Only when there are turns to take. */}
+          {SENTENCES.length > 1 && (
+            <div class="turns" role="group" aria-label="Sentences">
+              {SENTENCES.map((_, i) => (
+                <button type="button" data-turn={i} aria-label={`Sentence ${i + 1}`}
+                        aria-current={i === 0 ? 'true' : undefined}>{i + 1}</button>
+              ))}
+              <button type="button" class="turns-play">Pause</button>
+            </div>
+          )}
+          <p class="sr-only" aria-live="polite" data-live></p>
+        </div>
+        <div class="stage" id="art-mat">
+          {matWorks.map((w) => (
+            <figure class:list={['mw', { 'is-on': w.key === first }]} data-work={w.key} hidden={w.key !== first}>
+              <div class="mat">
+                <button type="button" class:list={['mat-btn', w.kind === 'cal' && w.treatment]}
+                        aria-label={`View full screen: ${w.alt}`} {...darkData(w)}>
+                  {/* Only the first work is eager and high priority: it is /art's LCP. */}
+                  <Image src={w.src} alt={w.alt} widths={w.kind === 'photo' ? PHOTO_WIDTHS : CAL_WIDTHS} sizes={matSizes(w.ar)}
+                         loading={w.key === first ? 'eager' : 'lazy'} fetchpriority={w.key === first ? 'high' : undefined}
+                         decoding="async" draggable="false" />
+                </button>
+              </div>
+              <figcaption class="label">
+                {w.title && <span class="l-title">{w.title}</span>}
+                <dl>
+                  {w.kind === 'photo' && w.place && <div><dt>Place</dt><dd>{w.place}</dd></div>}
+                  {w.kind === 'photo' && w.year && <div><dt>Year</dt><dd>{w.year}</dd></div>}
+                  {w.kind === 'cal' && <div><dt>Script</dt><dd>{w.script} · <span lang="zh-Hant">{w.scriptZh}</span></dd></div>}
+                  <div><dt>Medium</dt><dd>{w.medium}</dd></div>
+                </dl>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
 
-      <h2 class="seclabel dark" id="photography">Photography</h2>
-      <div class="photo-rows" id="photo-rows"
-           data-def-kicker={photoDefault.kicker} data-def-title={photoDefault.title} data-def-note={photoDefault.note}>
-        {photography.map((p, i) => (
-          <figure class="tile" data-i={i}
-                  data-ar={(photoZoom[i].w / photoZoom[i].h).toFixed(4)}
-                  data-zoom={photoZoom[i].src}
-                  data-zw={photoZoom[i].w} data-zh={photoZoom[i].h} data-alt={p.alt}
-                  data-title={p.title ?? ''} data-note={p.note ?? ''}
-                  role="button" tabindex="0" aria-label={`View photograph${p.title ? ' — ' + p.title : ''} — full screen`}>
-            {/* `sizes` is per photo, photoSizes(); the arithmetic is above it. EVERY PHOTOGRAPH IS LAZY: the
-                grid starts ~2,100px down, under both calligraphy blocks, and the nine it once fetched eagerly
-                were 754,378 B of the 896,506 B /art loaded first. It costs no CLS: buildRows() lays the rows
-                out from the build-time data-ar, not a decoded image, and the .tile shimmer is the wait. */}
-            <Image src={p.src} alt={p.alt} widths={[300, 600, 900]}
-                   sizes={photoSizes(photoZoom[i].w / photoZoom[i].h)}
-                   loading="lazy" decoding="async" />
-          </figure>
+      <section class="room" id="calligraphy" aria-labelledby="cal-h">
+        <h2 id="cal-h">Calligraphy</h2>
+        {cals.map((w) => (
+          <article class="obj" id={w.key} aria-label={w.title ? undefined : labelLine(w)}>
+            <div class="obj-words">
+              {w.titleZh && <p class="zh" lang="zh-Hant">{w.titleZh}</p>}
+              {w.title && <h3>{w.title}</h3>}
+              <dl>
+                <div><dt>Script</dt><dd>{w.script} · <span lang="zh-Hant">{w.scriptZh}</span></dd></div>
+                <div><dt>Medium</dt><dd>{w.medium}</dd></div>
+                {w.note && <div><dt>Note</dt><dd>{w.note}</dd></div>}
+              </dl>
+            </div>
+            <div class="obj-mat">
+              <button type="button" class:list={['cal', w.treatment]} style={`--ar:${w.ar.toFixed(4)}`}
+                      aria-label={`View full screen: ${w.alt}`} {...darkData(w)}>
+                <Image src={w.src} alt={w.alt} widths={CAL_WIDTHS} sizes={calSizes(w.ar)} loading="lazy" decoding="async" />
+              </button>
+            </div>
+          </article>
         ))}
-      </div>
+      </section>
+
+      <section class="room" id="photographs" aria-labelledby="ph-h">
+        <h2 id="ph-h">Photographs</h2>
+        <p class="count">{photos.length} photographs.</p>
+        <div class="rows">
+          {photos.map((w) => (
+            <div class="tile" id={w.key} style={`--ar:${w.ar.toFixed(4)}`}>
+              <button type="button" class="tile-btn" {...darkData(w)}>
+                <span class="tile-mat">
+                  <Image src={w.src} alt={w.alt} widths={PHOTO_WIDTHS} sizes={rowSizes(w.ar)} loading="lazy" decoding="async" />
+                </span>
+                {(w.title || w.place) && (
+                  <span class="t-cap">{w.title && <span class="t-title">{w.title}</span>}{w.title && w.place && ' · '}{w.place}</span>
+                )}
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <footer class="art-foot"><a class="back" href="/">← back to the descent</a></footer>
     </div>
 
-    {/* Silent deep-zoom lightbox */}
-    <dialog class="lightbox" id="art-lightbox" aria-label="Artwork detail">
-      <button class="lb-close" id="lb-close" aria-label="Close">✕ close</button>
-      <img id="lb-img" src="" alt="" />
-      <p class="lb-hint">scroll to zoom · drag to pan · click to close</p>
+    {/* The dark room: one work full screen, opened by any work's button. Its src, alt, line and count are the
+        script's, from the opener's data-*. */}
+    <dialog class="dark" aria-label="The dark room: one work, full screen" aria-describedby="art-dark-line">
+      <button type="button" class="d-btn d-close" aria-label="Close">✕</button>
+      <img class="d-img" alt="" draggable="false" />
+      <div class="d-bar">
+        <p class="d-line" id="art-dark-line"></p>
+        <span class="d-count" aria-hidden="true"></span>
+        <div class="d-ctl">
+          <button type="button" class="d-btn" data-zoom-by="out" aria-label="Zoom out">−</button>
+          <button type="button" class="d-btn" data-zoom-by="in" aria-label="Zoom in">+</button>
+          <button type="button" class="d-btn" data-step="-1" aria-label="Previous work">←</button>
+          <button type="button" class="d-btn" data-step="1" aria-label="Next work">→</button>
+          <button type="button" class="d-btn d-info" aria-pressed="true" aria-label="Show the label">i</button>
+        </div>
+      </div>
     </dialog>
   </main>
 </BaseLayout>
 
 <style>
-  /* three zones: rail · placard · works. Each zone's left-side clearance was
-     originally an independently-tuned clamp() — they lined up fine at wide
-     viewports but, because the curves grow at different rates (2.4vw vs
-     12vw vs 34vw), crossed and OVERLAPPED in the ~1100–1350px logical-width
-     band (a 14" MacBook Pro's default scaled resolution lands right there
-     even though the panel itself is high-res). Fixed structurally: each
-     zone's position is now `max(<original clamp>, <previous zone's edge> +
-     minimum gap)` — a no-op wherever the original clamp already cleared
-     (so nothing shifts at viewports that already looked right), and a hard
-     floor everywhere else, so the three zones can never overlap at any width.
-     --toc-w is the rail's own intrinsic content width (measured ~124.6px;
-     130px is a rounded, small-buffer constant, not an actual applied width —
-     .art-toc keeps its original auto/shrink-to-fit sizing). */
-  .art { position: relative; z-index: 0; min-height: 100vh;
-    --placard-left: max(clamp(120px, 12vw, 200px), calc(clamp(18px, 2.4vw, 38px) + 130px + 16px));
-    --placard-w: clamp(240px, 20vw, 320px);
-    --content-left: max(clamp(420px, 34vw, 620px), calc(var(--placard-left) + var(--placard-w) + 24px)); }
-  .art-toc { position: fixed; left: clamp(18px, 2.4vw, 38px); top: 50%; transform: translateY(-50%); z-index: 30; }
-  .art-toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
-  .art-toc a { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--font-mono);
-    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; line-height: 1; color: var(--ink-3); opacity: 0.45;
-    transition: opacity 0.3s, color 0.3s; }
-  .art-toc .rule { width: 0; height: 1px; background: currentColor; opacity: 0.55; transition: width 0.4s ease; }
-  .art-toc a.is-active { opacity: 1; color: var(--ink-1); }
-  .art-toc a.is-active .rule { width: 20px; }
-  /* THE DARK HALF OF THE DESCENT. The rail is fixed at the middle of the screen while the sky behind it runs from
-     paper to near-black, so dark ink stops working halfway down: measured at 50% scroll, the ACTIVE label was
-     rgb(22,20,15) on rgb(22,20,15) — ratio 1.0, the section you are in rendered invisible — and the inactive one
-     2.46:1. data-zone is set from the descent fraction behind the rail by the gallery script's existing scroll
-     handler (see scripts/artGallery.ts), the same idea CornerNav uses for itself.
-     In DARK theme the ink ramp is already light top-to-bottom, so this must not apply there — it would paint
-     paper-on-paper. */
-  .art-toc[data-zone='dark'] a { color: var(--paper); }
-  .art-toc[data-zone='dark'] a.is-active { color: var(--paper); opacity: 1; }
-  :global(html[data-theme='dark']) .art-toc[data-zone='dark'] a { color: var(--ink-3); }
-  :global(html[data-theme='dark']) .art-toc[data-zone='dark'] a.is-active { color: var(--ink-1); }
-  @media (hover: hover) { .art-toc a:hover { opacity: 0.85; } }
+  /* THE SHEET is the research routes' register (page="paper"), borrowed: its ground, inks and seal, in both themes.
+     A mat is a faint tone of the sheet's own hairline ink, so it follows the theme with it. */
+  .art { --mat: rgba(var(--hairline-rgb), 0.08); --mat-faint: rgba(var(--hairline-rgb), 0.05); min-height: 100vh; }
+  .art-wrap { max-width: 1240px; margin: 0 auto; padding: 0 clamp(22px, 5vw, 72px); }
+  .art-head { padding: 13vh 0 0; }
+  .back { font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); text-decoration: none; }
+  @media (hover: hover) { .back:hover { color: var(--seal); } }
+  .art h1 { font-family: var(--font-display); font-weight: 500; font-size: clamp(40px, 4.6vw, 60px); line-height: 1.04;
+    letter-spacing: -0.01em; margin-top: 16px; color: var(--ink-1); }
 
-  .placard { position: fixed; left: var(--placard-left);
-    top: 50%; transform: translateY(-50%); width: var(--placard-w); z-index: 20; }
-  .pl-inner { transition: opacity 0.22s ease, transform 0.22s ease; }
-  .placard.fade .pl-inner { opacity: 0; transform: translateY(8px); }
-  .pl-kicker { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-4); }
-  .pl-title { font-family: var(--font-display); font-weight: 500; font-size: 28px; line-height: 1.15; margin: 13px 0 5px; font-variation-settings: 'SOFT' 40; }
-  .pl-meta { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--ink-4); margin-bottom: 16px; }
-  .pl-desc { font-size: 15px; line-height: 1.75; color: var(--ink-3); }
-  .placard.dark .pl-title { color: var(--paper); }
-  .placard.dark .pl-kicker, .placard.dark .pl-meta { color: var(--ink-5); }
-  .placard.dark .pl-desc { color: rgba(239, 233, 221, 0.7); }
+  /* ── THE OPENING: words left, the work right; stacked at 900px and under, the shown sentence first, its numbers
+     under it, then the mat, so a tap swaps the work just below the line being read and nothing scrolls. ──── */
+  .opening { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 64px; align-items: start; margin-top: 40px; }
+  .sentence { font-family: var(--font-display); font-weight: 400; font-size: clamp(24px, 2.4vw, 34px); line-height: 1.5;
+    color: var(--ink-1); }
+  .phrase { color: var(--ochre); text-decoration: none; text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+  @media (hover: hover) { .phrase:hover { text-decoration-line: underline; } }
+  /* The current phrase is filled, as the Met marks its own: a seal block with --on-accent text, broken with the line
+     it wraps across. */
+  .phrase[aria-current] { background: var(--ochre); color: var(--on-accent); -webkit-box-decoration-break: clone;
+    box-decoration-break: clone; }
+  .phrase:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; border-radius: 1px; }
+  /* The turns' controls: the numbers, the shown one in seal, then Pause; each at least 32px a side (WCAG 2.5.8: 24).
+     Hidden where no script works them, and Pause where reduced motion leaves no turns to pause. */
+  .turns { display: flex; align-items: center; gap: 2px; margin: 20px 0 0 -8px; font: 12px/1 var(--font-mono); }
+  .turns button { min-width: 32px; height: 32px; padding: 0 8px; font: inherit; color: var(--ink-3); background: none;
+    border: 0; cursor: pointer; }
+  .turns button[aria-current] { color: var(--ochre); text-decoration: underline; text-underline-offset: 4px; }
+  .turns .turns-play { margin-left: 10px; }
+  .turns button:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
+  @media (scripting: none) { .turns { display: none; } }
+  @media (prefers-reduced-motion: reduce) { .turns-play { display: none; } }
+  /* The mat's works and the sentences each stack in one cell, the shown one .is-on, by one cross-fade, ART.swap
+     (lib/motionTiming.ts): the script hides a work it replaces after it, and a sentence not shown is inert. */
+  .stage, .sentences { display: grid; }
+  .mw, .sentence { grid-area: 1 / 1; margin: 0; opacity: 0; }
+  .mw.is-on, .sentence.is-on { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) { .mw, .sentence { transition: opacity 300ms ease-out; } }
+  .mat { height: min(62vh, 560px); padding: 24px; background: var(--mat); }
+  .mat-btn { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 0; border: 0;
+    background: none; cursor: zoom-in; }
+  .mat-btn :global(img) { display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; }
+  .mat-btn:focus-visible, .cal:focus-visible, .tile-btn:focus-visible { outline: 2px solid var(--seal); outline-offset: 3px; }
 
-  /* Works column: left edge clears the rail+placard; right edge stays anchored
-     to the viewport (margin-right, no max-width) so on wide monitors the work
-     fills toward the right instead of drifting left of a capped box. */
-  .art-wrap { margin-right: clamp(40px, 7vw, 180px); margin-left: var(--content-left); }
-  .art-head { padding: 13vh 0 5vh; }
-  .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
-  .back:hover { color: var(--seal); }
-  .art h1 { font-family: var(--font-display); font-weight: 500; font-size: clamp(38px, 5vw, 60px); line-height: 1.04;
-    letter-spacing: -0.01em; font-variation-settings: 'SOFT' 60; margin-top: 16px; color: var(--ink-1); }
-  .lede { font-size: 14px; color: var(--ink-3); margin-top: 16px; line-height: 1.7; max-width: 48ch; }
-  .seclabel { font-family: var(--font-mono); font-weight: 400; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase;
-    margin: 7vh 0 3vh; color: var(--ink-4); }
-  .seclabel.dark { color: rgba(239, 233, 221, 0.5); }
+  /* THE LABEL: dry and exact, "Label: value" lines in the body face; the title alone in Georgia. Its min-height is
+     sized for the fullest case (a title and three rows), so a swap moves nothing. */
+  .label { margin-top: 14px; min-height: 7.4em; font-size: 14px; line-height: 1.55; color: var(--ink-3); }
+  .l-title { display: block; font-family: var(--font-display); font-size: 18px; line-height: 1.3; color: var(--ink-1); margin-bottom: 4px; }
+  .art dl > div { display: flex; gap: 0.4em; }
+  .art dt { color: var(--ink-1); font-weight: 600; }
+  .art dt::after { content: ':'; }
+  .art dd { margin: 0; }
 
-  /* calligraphy sits CENTERED in the space between the placard and the viewport's
-     right edge. The works column's left margin (clears the placard) is larger
-     than its right margin, so plain centering drifts right; the negative
-     right-margin re-balances the cal-block against the true available span so
-     the gaps on both sides match. */
-  /* Calligraphy works stack in a column with a real gap between them — the
-     min-height alone gave almost no separation when consecutive works are tall
-     (the image max-height 82vh can exceed the block's 74vh min-height, so two
-     tall works nearly touched). The gap guarantees breathing room regardless. */
-  #cal-host { display: flex; flex-direction: column; gap: clamp(6vh, 9vh, 120px); }
-  .cal-block { min-height: 74vh; display: flex; align-items: center; justify-content: center;
-    margin-right: calc(-1 * clamp(40px, 7vw, 180px)); }
-  .cal { margin: 0; line-height: 0; cursor: zoom-in; }
-  .cal :global(img) { display: block; width: auto; max-width: 100%;
-    max-height: min(82vh, 820px); transition: transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
-  .cal.stele :global(img) { filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.55)); }
-  .cal.paper :global(img) { border: 1px solid rgba(255, 255, 255, 0.16); box-shadow: 0 24px 60px -22px rgba(20, 18, 14, 0.5); }
+  /* ── THE ROOMS ──────────────────────────────────────────────────────────────────────────────────── */
+  .room { margin-top: 120px; padding-top: 28px; border-top: 1px solid rgba(var(--hairline-rgb), 0.3); }
+  .room h2 { font-family: var(--font-display); font-weight: 400; font-size: 28px; line-height: 1.2; color: var(--ink-1); }
+  .count { margin-top: 8px; font-size: 14px; color: var(--ink-3); }
 
-  /* photo grid: SSR fallback = flex-wrap; JS upgrades to exact justified rows */
-  .photo-rows { display: flex; flex-wrap: wrap; gap: 14px; }
-  figure.tile { margin: 0; overflow: hidden; border-radius: 2px; position: relative; cursor: zoom-in;
-    /* loading tone: a warm ink wash (palette only), not a bare grey block */
-    background: var(--ink-2);
-    flex: 1 1 auto; height: 320px; }
-  figure.tile :global(img) { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 0.9s cubic-bezier(0.2,0.7,0.2,1); position: relative; z-index: 1; }
-  /* Gentle fade-in so images don't pop as they decode. JS adds .is-loaded on
-     load (and immediately for already-cached imgs). No-JS / reduced-motion =
-     fully visible, no fade. */
-  @media (prefers-reduced-motion: no-preference) {
-    figure.tile :global(img) { opacity: 0; transition: opacity 0.6s ease, transform 0.9s cubic-bezier(0.2,0.7,0.2,1); }
-    figure.tile.is-loaded :global(img) { opacity: 1; }
+  /* The calligraphy: an object block each, words a 3 : 7 column beside the work on its mat. */
+  .obj { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 7fr); gap: 48px; align-items: start; margin-top: 56px; }
+  .obj-words { font-size: 15px; line-height: 1.6; color: var(--ink-3); }
+  .zh { font-family: var(--font-display); font-size: 18px; color: var(--ink-2); }
+  .obj h3 { font-family: var(--font-display); font-weight: 400; font-size: 28px; line-height: 1.2; color: var(--ink-1); margin: 4px 0 14px; }
+  .obj-words dl { display: grid; gap: 6px; }
+  .obj-mat { display: flex; justify-content: center; padding: 32px; background: var(--mat); }
+  /* The block is the work's width at the height cap, from its ratio, and the image fills it, so its box exists before
+     the image decodes (the note above CAL_MAX_H in lib/artPage.ts). No max-height on the image: on a 100%-wide one
+     it would squash the work rather than narrow it. */
+  .cal { width: min(100%, calc(var(--ar) * min(82vh, 820px))); padding: 0; border: 0; background: none; line-height: 0;
+    cursor: zoom-in; }
+  .cal :global(img) { display: block; width: 100%; height: auto; }
+  /* No shadow (the Met's rule): the stele's black ground already stands off the pale mat, and a hairline edge keeps
+     it off the dark mat too, as it does the work on paper. */
+  .stele :global(img), .paper :global(img) { border: 1px solid rgba(var(--hairline-rgb), 0.25); }
+
+  /* The photographs: rows of one height, each photograph whole on a faint mat, with at most one clipped line under
+     it. The caption sits outside the row-height arithmetic, so a row with and without captions keeps one image
+     height. With no script each tile is its photograph at --row-h, and the rows wrap ragged; the script justifies
+     them. */
+  .rows { --row-h: 280; --pad: 10px; display: flex; flex-wrap: wrap; column-gap: 16px; row-gap: 28px; margin-top: 28px; }
+  .tile { flex: none; width: calc(var(--ar) * var(--row-h) * 1px + 2 * var(--pad)); }
+  .tile-btn { display: block; width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: zoom-in; }
+  .tile-mat { display: block; padding: var(--pad); background: var(--mat-faint); }
+  .tile-mat :global(img) { display: block; width: 100%; height: auto; aspect-ratio: var(--ar); }
+  /* A photograph fades in once, over ART.tileFade: the script marks a tile whose image has not loaded when it starts
+     data-pending, and drops the mark on load or error. An image already loaded is not held, so it never flips; one
+     still arriving, even partly painted, is held and fades in. The hold is screen-only, so a printout gets every
+     photograph, and a held image's transition is none in every medium, so a printout's dropping of the hold is a
+     snap rather than a fade it prints at 0. */
+  @media (prefers-reduced-motion: no-preference) { .tile-mat :global(img) { transition: opacity 600ms ease-out; } }
+  .tile[data-pending] .tile-mat :global(img) { transition: none; }
+  @media screen and (prefers-reduced-motion: no-preference) { .tile[data-pending] .tile-mat :global(img) { opacity: 0; } }
+  .t-cap { display: block; margin-top: 8px; font-size: 13px; line-height: 1.4; color: var(--ink-3); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .t-title { color: var(--ink-1); font-weight: 400; text-underline-offset: 0.18em; }
+  /* A hover underlines the title, where there is one, and dims the photograph a little, by opacity. */
+  @media (hover: hover) {
+    .tile-btn:hover .t-title { text-decoration: underline; }
+    .tile .tile-btn:hover .tile-mat :global(img) { opacity: 0.85; }
   }
-  /* Loading shimmer: a soft highlight sweeps across the placeholder tone so an
-     un-decoded tile reads as "loading", never as a dead grey rectangle. It's a
-     transform-only sweep (no blur), removed the instant the image loads, and is
-     absent under reduced motion (the static ink tone is the finished fallback). */
-  figure.tile::before {
-    content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
-    background: linear-gradient(100deg, transparent 30%, rgba(239,233,221,0.10) 50%, transparent 70%);
-    transform: translateX(-100%);
-  }
-  figure.tile.is-loaded::before { content: none; }
-  @media (prefers-reduced-motion: no-preference) {
-    figure.tile::before { animation: tile-shimmer 1.6s ease-in-out infinite; }
-    @keyframes tile-shimmer {
-      from { transform: translateX(-100%); }
-      to   { transform: translateX(100%); }
-    }
-  }
-  figure.tile::after { content: ""; position: absolute; inset: 0; z-index: 2; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.07); transition: box-shadow 0.4s; pointer-events: none; }
-  .art-foot { padding: 13vh 0 18vh; }
-  .art-foot .back { color: rgba(239, 233, 221, 0.5); }
+  .art-foot { padding: 120px 0 18vh; }
 
-  /* lightbox */
-  .lightbox { border: 0; padding: 0; margin: 0; max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh;
-    background: rgba(16,15,12,0.97); }
-  .lightbox::backdrop { background: rgba(16,15,12,0.97); }
-  .lightbox[open] { display: flex; align-items: center; justify-content: center; }
-  #lb-img { max-width: 94vw; max-height: 94vh; will-change: transform; cursor: grab; transform-origin: 0 0;
-    box-shadow: 0 40px 120px -30px rgba(0,0,0,0.8); }
-  .lb-close { position: fixed; top: 20px; right: 24px; font-family: var(--font-mono); font-size: 13px; color: rgba(239,233,221,0.7);
-    background: none; border: 0; cursor: pointer; }
-  .lb-hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); font-family: var(--font-mono); font-size: 11px;
-    color: rgba(239,233,221,0.5); letter-spacing: 0.06em; pointer-events: none; }
-
-  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-    figure.tile:hover :global(img) { transform: scale(1.06); }
-    figure.tile:hover::after { box-shadow: inset 0 0 0 1px rgba(239,233,221,0.3); }
-    .cal:hover :global(img) { transform: scale(1.035); }
+  @media (max-width: 900px) {
+    .opening, .obj { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    .obj-mat { order: -1; }
+    .mat { height: min(45vh, 380px); padding: 16px; }
+  }
+  @media (max-width: 640px) {
+    .sentence { font-size: 21px; }
+    .mat { height: min(40vh, 320px); padding: 16px; }
+    .obj-mat { padding: 16px; }
+    .rows { --row-h: 150; --pad: 6px; column-gap: 10px; row-gap: 20px; }
   }
 
-  @media (max-width: 1024px) {
-    .art-toc, .placard { display: none; }
-    .art-wrap { margin: 0 auto; max-width: 900px; padding: 0 22px; }
-    /* drop the desktop negative right-margin (it re-balanced against the
-       placard, which is hidden here) — otherwise the stele bleeds off the
-       right edge and the page scrolls horizontally on phones. */
-    .cal-block { min-height: auto; justify-content: center; padding: 5vh 0; margin-right: 0; }
+  /* ── THE DARK ROOM: an empty dark dialog, the work as large as fits, small square controls. It is #0a0a0c in both
+     themes, so its inks are its own, declared here once and read by every room rule (tests/paperPalette.test.ts
+     measures them on it). The page behind it does not scroll while it is open: the lock is on <html>, which no
+     component declares, so it is written :global (trap 1). Astro 6 leaves it unscoped either way, measured, and
+     tests/distSmoke.test.ts holds the shipped rule. ─────────────────────────────────────────────────────── */
+  :global(html:has(dialog.dark[open])) { overflow: hidden; }
+  .dark { --room: #0a0a0c; --room-ink: rgba(239, 233, 221, 0.8); --room-ink-2: rgba(239, 233, 221, 0.6);
+    --room-edge: rgba(239, 233, 221, 0.45); --room-edge-hover: rgba(239, 233, 221, 0.85); --room-focus: #e0574a;
+    --d-bar: 56px;
+    border: 0; padding: 0; margin: 0; width: 100vw; height: 100dvh; max-width: 100vw; max-height: 100dvh;
+    background: var(--room); color: var(--room-ink); overflow: hidden;
+    /* The whole room, so a pinch that starts off the work (on the ground or the bar) never zooms the page. */
+    touch-action: none; }
+  .dark::backdrop { background: #0a0a0c; }
+  /* The dialog is a container, not a control: a tap on the work focuses it, and the browser's ring would frame the
+     whole room. Its controls keep their own (.d-btn:focus-visible). */
+  .dark:focus { outline: none; }
+  /* The work is centred in the band between the close button's 56px strip and the bar, so a tall work never runs
+     under either, however unequal the two are (56 and 104 on a phone). */
+  .dark[open] { display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 56px 0 var(--d-bar); }
+  /* The box is the work's ratio, set as --ar by the script, so it exists before the image decodes, as a tile's does;
+     its width is capped where its height reaches the band, so max-height never binds. Not width/height attributes:
+     preflight's height: auto beats that hint, and a definite width over an auto height under a max-height squashes
+     the work (CSS2.2 §10.7; the stele drew 3.17x too wide). Nor width: auto, which falls to 300x150 until the image
+     decodes and then jumps. Before any --ar both var() declarations are invalid, so the max-* rules alone apply. */
+  .d-img { aspect-ratio: var(--ar); width: min(calc(100vw - 32px), calc((100dvh - 56px - var(--d-bar)) * var(--ar)));
+    max-width: calc(100vw - 32px); max-height: calc(100dvh - 56px - var(--d-bar)); transform-origin: 0 0; cursor: grab;
+    will-change: transform; }
+  .d-btn { width: 44px; height: 44px; flex: none; border: 1px solid var(--room-edge); background: var(--room);
+    color: var(--room-ink); font: 15px/1 var(--font-mono); cursor: pointer; }
+  @media (hover: hover) { .d-btn:hover { border-color: var(--room-edge-hover); } }
+  .d-btn:focus-visible { outline: 2px solid var(--room-focus); outline-offset: 2px; }
+  .d-close { position: fixed; top: 6px; left: 16px; z-index: 2; }
+  /* The bar is a solid strip of the room's ground, so a zoomed work passes under it and never under the line. */
+  .d-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 8px;
+    height: var(--d-bar); padding: 0 16px; background: var(--room); }
+  .d-line { flex: 1; min-width: 0; font-size: 13px; line-height: 1.4; color: var(--room-ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dark[data-line-off] .d-line { visibility: hidden; }
+  .d-count { font: 12px/1 var(--font-mono); color: var(--room-ink-2); margin-right: 4px; }
+  .d-ctl { display: flex; gap: 8px; }
+  .d-info[aria-pressed='false'] { color: var(--room-ink-2); }
+  /* On a phone the bar takes two rows: the line, wrapped to at most two lines, with the count beside it, then the
+     squares at the right. Five 44px squares and four 8px gaps are 252px, inside a 320px screen's 288; two 13px/1.4
+     lines (36.4) + the 8px row gap + 44 + 2 x 6px of padding are 100.4px, inside the 104. */
+  @media (max-width: 640px) {
+    .dark { --d-bar: 104px; }
+    .d-bar { flex-wrap: wrap; align-content: center; padding: 6px 16px; row-gap: 8px; }
+    .d-line { flex: 1 1 0; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+      line-clamp: 2; }
+    .d-ctl { flex-basis: 100%; justify-content: flex-end; }
   }
 </style>
 
 <script>
-  import '../scripts/artGallery.ts';
+  import { onPageView } from '../scripts/pageView';
+  import { justifyRows } from '../lib/justify';
+  import { prefersReducedMotion } from '../lib/motion';
+  import { ART } from '../lib/motionTiming';
+  import {
+    DOUBLE_TAP, ZOOM, holdMs, isDoubleTap, wheelScale, zoomAbout, type Tap, type Zoom,
+  } from '../lib/artPage';
+
+  const LINE_KEY = 'art.dark-line';
+  // The keys that zoom, by the factor each zooms by: 0 resets, as zoomAbout fits the work at any scale up to 1.
+  const KEY_ZOOM = new Map([['+', ZOOM.key], ['=', ZOOM.key], ['-', 1 / ZOOM.key], ['_', 1 / ZOOM.key], ['0', 0]]);
+
+  onPageView<HTMLElement>('main.art', (main) => {
+    const reduce = prefersReducedMotion();
+    const timers: number[] = [];
+
+    // ── The opening: a phrase, clicked or focused, brings its work onto the mat. The new work is decoded first, so
+    // the cross-fade never fades in an empty mat; a later phrase supersedes a swap still waiting.
+    const phrases = Array.from(main.querySelectorAll<HTMLAnchorElement>('.phrase'));
+    const figs = new Map(Array.from(main.querySelectorAll<HTMLElement>('.mw')).map((f) => [f.dataset.work ?? '', f]));
+    const live = main.querySelector<HTMLElement>('[data-live]');
+    let cur = main.querySelector<HTMLElement>('.mw.is-on')?.dataset.work ?? '';
+    let seq = 0;
+    // aria-current="true" or none: an empty value would read as false.
+    const current = (el: Element, on: boolean): void => {
+      if (on) el.setAttribute('aria-current', 'true'); else el.removeAttribute('aria-current');
+    };
+    const swap = (key: string, say = true): void => {
+      const next = figs.get(key), prev = figs.get(cur);
+      if (!next) return;
+      // Any swap still waiting is dropped, and every work but the shown one and this one leaves the mat.
+      const t = ++seq;
+      figs.forEach((f, k) => { if (k !== cur && k !== key) { f.hidden = true; f.classList.remove('is-on'); } });
+      if (key === cur) return;
+      // Unseen until it is decoded, and out of reach while unseen.
+      next.inert = true;
+      next.hidden = false;
+      const img = next.querySelector('img');
+      if (img) img.loading = 'eager';
+      (img ? img.decode() : Promise.resolve()).catch(() => {}).then(() => {
+        if (t !== seq) return;
+        cur = key;
+        phrases.forEach((a) => current(a, a.dataset.work === cur));
+        prev?.classList.remove('is-on');
+        next.classList.add('is-on');
+        if (prev) prev.inert = true;
+        next.inert = false;
+        // The polite live region reads the shown work's description, when the reader asked for it: a turn is not read.
+        if (live && say) live.textContent = next.querySelector<HTMLElement>('.mat-btn')?.dataset.alt ?? '';
+        const hide = (): void => { if (prev && cur !== prev.dataset.work) prev.hidden = true; };
+        if (reduce) hide(); else timers.push(window.setTimeout(hide, ART.swap));
+      });
+    };
+    phrases.forEach((a) => {
+      const key = a.dataset.work ?? '';
+      a.addEventListener('click', (e) => { e.preventDefault(); swap(key); });
+      a.addEventListener('focus', () => swap(key));
+    });
+
+    // ── The turns: each sentence is shown for its words (holdMs), then the next, its first work brought onto the
+    // mat. It is motion that starts on its own and lasts past five seconds, so WCAG 2.2.2 asks for a way to stop
+    // it: Pause, and a number, which shows that sentence and stays. The pointer resting on the words holds the
+    // turn, and a work taken (a phrase or the mat, clicked or focused) stops the turns until Play, so a turn never
+    // hides what the reader is on. Under reduced motion they never start, and Pause is hidden; the numbers still work.
+    const sentences = Array.from(main.querySelectorAll<HTMLElement>('.sentence'));
+    const nums = Array.from(main.querySelectorAll<HTMLButtonElement>('[data-turn]'));
+    // The controls are rendered only when there is more than one sentence.
+    const play = main.querySelector<HTMLButtonElement>('.turns-play');
+    if (play) {
+      let shown = 0, timer = 0, held = false, playing = !reduce;
+      const show = (i: number, say: boolean): void => {
+        shown = i;
+        sentences.forEach((s, k) => { s.classList.toggle('is-on', k === i); s.inert = k !== i; });
+        nums.forEach((b, k) => current(b, k === i));
+        const lead = sentences[i].querySelector<HTMLElement>('.phrase')?.dataset.work;
+        if (lead) swap(lead, say);
+      };
+      const arm = (): void => {
+        clearTimeout(timer);
+        if (!playing || held) return;
+        const next = (): void => { show((shown + 1) % sentences.length, false); arm(); };
+        timer = window.setTimeout(next, holdMs(sentences[shown].textContent ?? ''));
+        timers.push(timer);
+      };
+      const setPlaying = (p: boolean): void => { playing = p; play.textContent = p ? 'Pause' : 'Play'; arm(); };
+      play.addEventListener('click', () => setPlaying(!playing));
+      nums.forEach((b, k) => b.addEventListener('click', () => { setPlaying(false); show(k, true); }));
+      const take = (e: Event): void => {
+        if (e.target instanceof Element && e.target.closest('.phrase, .mat-btn')) setPlaying(false);
+      };
+      main.addEventListener('focusin', take);
+      main.addEventListener('click', take);
+      const words = main.querySelector<HTMLElement>('.words');
+      words?.addEventListener('pointerenter', () => { held = true; arm(); });
+      words?.addEventListener('pointerleave', () => { held = false; arm(); });
+      setPlaying(playing);
+    }
+
+    // ── The dark room: a list of works (each opener carries data-zoom and the rest), stepped through by prev/next and
+    // the arrow keys, with the label line under the work. Escape is the dialog's own.
+    const dlg = main.querySelector<HTMLDialogElement>('dialog.dark');
+    const img = dlg?.querySelector<HTMLImageElement>('.d-img');
+    if (dlg && img) {
+      let list: HTMLElement[] = [];
+      let at = 0;
+      let opener: HTMLElement | null = null;
+      // The zoom, translate(x, y) scale(s) about the image's top-left: every open and every step starts at 1x, with
+      // no pointer down and no tap before it. Every zoom goes through zoomAbout (lib/artPage.ts), then tf().
+      let z: Zoom = { x: 0, y: 0, s: 1 };
+      // The pointers down, by id: where each is now, where it went down, whether that was on the work, and whether it
+      // ever took part in a pinch. `last` is the previous tap, for a double-tap.
+      const pts = new Map<number, { x: number; y: number; x0: number; y0: number; onImg: boolean; multi: boolean }>();
+      let last: Tap | null = null;
+      const tf = (): void => { img.style.transform = `translate(${z.x}px,${z.y}px) scale(${z.s})`; };
+      const show = (): void => {
+        const el = list[at];
+        if (!el) return;
+        // The box is the work's ratio before it decodes (.d-img's rule says how).
+        img.style.setProperty('--ar', el.dataset.ar ?? '');
+        // BLANK IT FIRST, before the new src and before showModal(): set in the same tick over the old one, the
+        // browser keeps painting the PREVIOUS work until the new one arrives, so every open after the first showed the
+        // wrong work for the length of its fetch. No src paints nothing, which is honest, and the box from --ar keeps
+        // that from shifting anything. Not `opacity: 0`: nothing the reader came for rests invisible, and a failed
+        // decode would leave the room blank for good.
+        img.removeAttribute('src');
+        img.alt = el.dataset.alt ?? '';
+        z = { x: 0, y: 0, s: 1 };
+        tf();
+        pts.clear();
+        last = null;
+        img.src = el.dataset.zoom ?? '';
+        const line = dlg.querySelector('.d-line');
+        if (line) line.textContent = el.dataset.line ?? '';
+        const count = dlg.querySelector('.d-count');
+        if (count) count.textContent = list.length > 1 ? `${at + 1} / ${list.length}` : '';
+        dlg.querySelectorAll<HTMLElement>('[data-step]').forEach((b) => { b.hidden = list.length < 2; });
+      };
+      const openList = (els: HTMLElement[], el: HTMLElement): void => {
+        list = els;
+        if (!list.length) return;
+        at = Math.max(0, list.indexOf(el));
+        show();
+        if (!dlg.open) {
+          // Safari does not focus a clicked button, so the opener is the element clicked unless focus is elsewhere.
+          const a = document.activeElement;
+          opener = a instanceof HTMLElement && a !== document.body ? a : el;
+          dlg.showModal();
+        }
+      };
+      const step = (d: number): void => { if (list.length > 1) { at = (at + d + list.length) % list.length; show(); } };
+      // What each opener steps through: the mat, every work the sentences name, in their order (the mat's figures are
+      // rendered in it); a block, both calligraphy works; a tile, every photograph.
+      for (const sel of ['.mat-btn', '.cal', '.tile-btn']) {
+        const els = Array.from(main.querySelectorAll<HTMLElement>(sel));
+        els.forEach((b) => b.addEventListener('click', () => openList(els, b)));
+      }
+      // The label line, hidden or shown, is remembered for the session.
+      const info = dlg.querySelector<HTMLElement>('.d-info');
+      const setLine = (shown: boolean): void => {
+        dlg.toggleAttribute('data-line-off', !shown);
+        info?.setAttribute('aria-pressed', String(shown));
+        try { sessionStorage.setItem(LINE_KEY, shown ? 'on' : 'off'); } catch { /* private mode: not remembered */ }
+      };
+      let stored: string | null = null;
+      try { stored = sessionStorage.getItem(LINE_KEY); } catch { /* private mode */ }
+      setLine(stored !== 'off');
+      info?.addEventListener('click', () => setLine(dlg.hasAttribute('data-line-off')));
+      dlg.querySelector('.d-close')?.addEventListener('click', () => dlg.close());
+      dlg.querySelectorAll<HTMLElement>('[data-step]').forEach((b) => b.addEventListener('click', () => step(Number(b.dataset.step))));
+      // The ground closes it, and nothing else. A click goes to the nearest common ancestor of where the pointer went
+      // down and where it came up, so a press that begins on the work or the bar and ends on the ground is a click on
+      // the dialog too: only one that also began on the ground closes it, and only as a tap (the pointers, below).
+      let downOnGround = false;
+      dlg.addEventListener('pointerdown', (e) => { downOnGround = e.target === dlg; });
+      dlg.addEventListener('click', (e) => { if (downOnGround && e.target === dlg) dlg.close(); });
+      // Focus goes back to what opened it.
+      dlg.addEventListener('close', () => { img.removeAttribute('src'); opener?.focus({ preventScroll: true }); opener = null; });
+      // ── The zoom, to ZOOM.max. The keys and the squares zoom about the image's centre as fitted, the middle of the
+      // room, however far the work is panned: zoomAbout's point is from the transformed top-left, which the pan has
+      // moved by (z.x, z.y). The wheel, a gesture and a double-tap zoom about a point on the screen (zoomAt).
+      const zoomBy = (f: number): void => {
+        z = zoomAbout(z, z.s * f, img.offsetWidth / 2 - z.x, img.offsetHeight / 2 - z.y);
+        tf();
+      };
+      const zoomAt = (s: number, cx: number, cy: number): void => {
+        const r = img.getBoundingClientRect();
+        z = zoomAbout(z, s, cx - r.left, cy - r.top);
+        tf();
+      };
+      dlg.querySelectorAll<HTMLElement>('[data-zoom-by]').forEach((b) => b.addEventListener('click', () => {
+        zoomBy(b.dataset.zoomBy === 'in' ? ZOOM.key : 1 / ZOOM.key);
+      }));
+      dlg.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+        // With a modifier it is the browser's own zoom, which stays the reader's.
+        const f = KEY_ZOOM.get(e.key);
+        if (f === undefined || e.ctrlKey || e.metaKey || e.altKey) return;
+        e.preventDefault();
+        zoomBy(f);
+      });
+      // The wheel zooms about the cursor, by distance (wheelScale). Not passive, so a trackpad pinch's ctrl+wheel
+      // never zooms the page.
+      dlg.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        zoomAt(z.s * wheelScale(e.deltaY, e.deltaMode), e.clientX, e.clientY);
+      }, { passive: false });
+      // Desktop Safari sends a trackpad pinch as WebKit's gesture events, not as ctrl+wheel, and touch-action does
+      // nothing for a trackpad: unprevented, the pinch zooms the page, bar and all, and it stays zoomed after Escape.
+      // So both are prevented, and each change scales the work by its own step of the gesture's scale, about the
+      // cursor, so a clamp at 1x or 6x leaves no dead zone. iOS sends them for a touch pinch too, beside the pointers
+      // that already zoom it (below), so with a pointer down they only prevent. GestureEvent is WebKit's alone and not
+      // in lib.dom, so its three fields read here are typed here. Unverified in Safari when written (no Safari on the
+      // machine): one trackpad pinch in the owner's pass is its check.
+      type Gesture = Event & { scale: number; clientX: number; clientY: number };
+      let gScale = 1;
+      dlg.addEventListener('gesturestart', (e) => { e.preventDefault(); gScale = 1; });
+      dlg.addEventListener('gesturechange', (e) => {
+        e.preventDefault();
+        const g = e as Gesture;
+        if (!pts.size) zoomAt(z.s * g.scale / gScale, g.clientX, g.clientY);
+        gScale = g.scale || gScale;
+      });
+
+      // ── Pointers, on the whole room but its buttons: two pinch the work about their midpoint, one pans it once it
+      // is zoomed, and two taps on the work toggle 1x and 3x. Only the work captures a pointer: one captured on the
+      // dialog would retarget its click there and close the room on every tap.
+      // The pinch's last reading, the two pointers' distance and midpoint, re-read on every down, up and move: each
+      // move scales by its own step, so a clamp at 1x or 6x leaves no dead zone, and lifting one finger of two pans on
+      // with no jump.
+      let pinch = { dist: 1, x: 0, y: 0 };
+      const pair = (): { dist: number; x: number; y: number } => {
+        const [a, b] = pts.values();
+        return { dist: Math.hypot(b.x - a.x, b.y - a.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      };
+      const rebase = (): void => {
+        if (pts.size < 2) return;
+        pinch = pair();
+        pts.forEach((p) => { p.multi = true; });
+        last = null;
+      };
+      dlg.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || (e.target instanceof Element && e.target.closest('button'))) return;
+        const onImg = e.target === img;
+        if (onImg) img.setPointerCapture(e.pointerId);
+        pts.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, onImg, multi: false });
+        rebase();
+      });
+      dlg.addEventListener('pointermove', (e) => {
+        const p = pts.get(e.pointerId);
+        if (!p) return;
+        const dx = e.clientX - p.x, dy = e.clientY - p.y;
+        p.x = e.clientX;
+        p.y = e.clientY;
+        if (pts.size > 1) {
+          // Pan by the midpoint's movement, then scale about where it now is: the point of the work that was under
+          // the fingers stays under them. After the pan the top-left has moved as far as the midpoint has, so the
+          // point, from the moved top-left, is the old midpoint from the old one. Two pointers within a pixel of each
+          // other have no distance to scale by (a reading of 0 would snap the work to 1x, and a step from one under a
+          // pixel would jump it to 6x), so a step either end of which reads under 1px only pans.
+          const q = pair(), r = img.getBoundingClientRect();
+          const k = q.dist >= 1 && pinch.dist >= 1 ? q.dist / pinch.dist : 1;
+          z = zoomAbout({ x: z.x + q.x - pinch.x, y: z.y + q.y - pinch.y, s: z.s }, z.s * k,
+            pinch.x - r.left, pinch.y - r.top);
+          pinch = q;
+          tf();
+        } else if (z.s > 1) {
+          z = { x: z.x + dx, y: z.y + dy, s: z.s };
+          tf();
+        }
+      });
+      const up = (e: PointerEvent): void => {
+        const p = pts.get(e.pointerId);
+        if (!p) return;
+        pts.delete(e.pointerId);
+        // A tap is a pointer that never pinched and went up within DOUBLE_TAP.px of where it went down. Anything else
+        // was a drag or a pinch, which does not close the room even when it began and ended on the ground.
+        const tap = e.type === 'pointerup' && !p.multi && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < DOUBLE_TAP.px;
+        if (!tap) downOnGround = false;
+        else if (p.onImg) {
+          const t = { t: e.timeStamp, x: e.clientX, y: e.clientY };
+          if (isDoubleTap(last, t)) {
+            zoomAt(z.s > 1 ? 1 : ZOOM.toggle, t.x, t.y);
+            last = null;
+          } else last = t;
+        }
+        rebase();
+      };
+      dlg.addEventListener('pointerup', up);
+      dlg.addEventListener('pointercancel', up);
+    }
+
+    // Leaving drops a swap still decoding, clears every timer (the next turn, and those that hide a replaced work),
+    // and closes the dark room, which releases the scroll lock (its :has() stops matching).
+    const stop = (): void => { seq += 1; timers.forEach((t) => clearTimeout(t)); if (dlg?.open) dlg.close(); };
+
+    // ── The rows: justified at the stylesheet's --row-h, gap and --pad. A tile is its photograph's ratio times the
+    // row's height, plus its mat; justifyRows takes the mat's padding into the gap and off the width, so every row
+    // fills exactly. Widths are floored to 0.01px so a full row's sum never overflows into a wrap. W is the fractional
+    // width (.rows has no padding or border): clientWidth rounds, and a column 921.6px wide (1024px window) read as 922
+    // overflowed every row by ~0.4px, wrapping its last tile.
+    const rows = main.querySelector<HTMLElement>('.rows');
+    if (!rows) return stop;
+    const tiles = Array.from(rows.querySelectorAll<HTMLElement>('.tile'));
+    const ars = tiles.map((t) => parseFloat(t.style.getPropertyValue('--ar')) || 1);
+    let lastW = 0;
+    const layout = (): void => {
+      const W = rows.getBoundingClientRect().width;
+      if (!W || W === lastW) return;
+      lastW = W;
+      const cs = getComputedStyle(rows);
+      const H = parseFloat(cs.getPropertyValue('--row-h'));
+      const pad = parseFloat(cs.getPropertyValue('--pad'));
+      const gap = parseFloat(cs.columnGap);
+      justifyRows(ars, W - 2 * pad, H, gap + 2 * pad).forEach((r) => r.indices.forEach((i) => {
+        tiles[i].style.width = `${Math.floor((ars[i] * r.height + 2 * pad) * 100) / 100}px`;
+      }));
+    };
+    layout();
+    const ro = new ResizeObserver(layout);
+    ro.observe(rows);
+
+    // ── The one fade: a tile whose image has not arrived when this starts is held (data-pending) until it loads or
+    // errors, then fades in over ART.tileFade. An image already loaded is not held, so it never flips.
+    tiles.forEach((t) => {
+      const img = t.querySelector('img');
+      if (!img || (img.complete && img.naturalWidth > 0)) return;
+      t.setAttribute('data-pending', '');
+      const done = (): void => t.removeAttribute('data-pending');
+      img.addEventListener('load', done, { once: true });
+      img.addEventListener('error', done, { once: true });
+    });
+
+    return () => { ro.disconnect(); stop(); };
+  });
 </script>

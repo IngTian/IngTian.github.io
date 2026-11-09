@@ -1,8 +1,9 @@
-// The pure half of the motion module (scripts/motion.ts): the curves and the durations every move on the rail and
-// the research routes is made of, the one stagger formula and the paper page's batches made with it, and the
+// The pure half of the motion module (scripts/motion.ts): the curves and the durations every move on the rail, the
+// research routes and /art is made of, the one stagger formula and the paper page's batches made with it, and the
 // arithmetic of a sweep laid along a run of text.
 // Pure so it can be specified; the DOM half only measures and plays. CSS cannot import these, so
-// tests/motionTiming.test.ts holds every curve and duration the rail's and the research routes' CSS states to them.
+// tests/motionTiming.test.ts holds every curve and duration the rail's, the research routes' and /art's CSS states
+// to them.
 
 /** Every move: a quick start and a long settle. */
 export const EASE = 'cubic-bezier(.2,.7,.2,1)';
@@ -56,6 +57,10 @@ export function arrowDelay(k: number, n: number): number {
  *  its title's underline draws in over `underline`, a line `underlineStep` after the one above, and withdraws over
  *  `underlineOut`; its miniature redraws over `redraw`. */
 export const CARD = { lift: 260, frame: 200, underline: 320, underlineStep: 110, underlineOut: 200, redraw: 750 } as const;
+
+/** /art (pages/art.astro): a phrase's work cross-fades onto the mat over `swap`, once it has decoded, as a sentence
+ *  does into its turn; a photograph not yet loaded when the page's script starts fades in once over `tileFade`. */
+export const ART = { swap: 300, tileFade: 600 } as const;
 
 /**
  * The delay of item `i` of `n` entering together: `step` apart; closer when that would start the last item after

@@ -755,12 +755,8 @@ import { STORY_CODA } from '../data/story';
     const onReplay = () => animate();
     replay?.addEventListener('click', onReplay);
 
-    // 160ms, which is what every other resize debounce on the site uses — Deck.astro:279,
-    // TerrainHero.astro:420, CornerNav.astro:554, FluidSky.astro:350, artGallery.ts:82. This was the lone
-    // 140, with nothing recording why, while TerrainHero's own comment asserts "the same 160ms the Deck,
-    // FluidSky and DescentPath already use". Twenty milliseconds on a resize debounce is imperceptible; a
-    // sixth value that makes a sibling's comment false is not free, because the next reader has to work out
-    // which of the two is the intended one.
+    // 160ms, the site's one resize debounce: a second value would leave the next reader to work out which is
+    // intended.
     let resizeT = 0;
     const onResize = () => {
       window.clearTimeout(resizeT);

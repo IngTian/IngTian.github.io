@@ -1,68 +1,93 @@
+// /art's works, each by a stable key, and the sentences that index them. A photograph's key is its file's name
+// (photo-07.jpg is 'photo-07'), a calligraphy's is named, never an index. A field is given only when it is known:
+// the page prints what is here and nothing in place of what is not (lib/artPage.ts, labelLine).
 import type { ImageMetadata } from 'astro';
 import steleSrc from '../assets/art/spring-couplet-stele.jpg';
 import poemSrc from '../assets/art/running-script-poem.jpg';
 import { photoNotes } from './photoNotes';
+import type { Phrase, SentencePart } from '../lib/artPage';
 
-export type ArtCategory = 'Calligraphy' | 'Photography';
-
-export interface Artwork {
-  src: ImageMetadata;
-  alt: string;
-  category: ArtCategory;
-  kicker?: string;
-  title?: string;
-  medium?: string;
-  note?: string;
-  treatment?: 'stele' | 'paper';
+/** `place` is the note's name, and only once the owner has confirmed it. */
+export interface Photo {
+  key: string; src: ImageMetadata; alt: string; title?: string; place?: string; year?: string; medium: string;
+}
+export interface Calligraphy {
+  key: string; src: ImageMetadata; alt: string; title?: string; titleZh?: string;
+  script: string; scriptZh: string; medium: string; note?: string; treatment: 'stele' | 'paper';
 }
 
-export const calligraphy: Artwork[] = [
-  {
-    src: steleSrc,
-    alt: 'A Spring Festival couplet in clerical script, white characters set against dark stone',
-    category: 'Calligraphy',
-    kicker: 'Calligraphy · 隸書',
-    title: 'Spring Couplet',
-    medium: 'clerical script · ink on paper, set as stele',
-    note: '', // Ing to provide
-    treatment: 'stele',
-  },
-  {
-    src: poemSrc,
-    alt: 'A poem in running-cursive script, black ink on paper, signed with a red seal',
-    category: 'Calligraphy',
-    kicker: 'Calligraphy · 行草',
-    title: 'Untitled',
-    medium: 'running-cursive script · ink on paper',
-    note: '', // Ing to provide
-    treatment: 'paper',
-  },
+// The couplet is stele-STYLE: ink on paper, recomposed white on black, never claimed as a rubbing or as stone. The
+// poem has no title on record, and neither work has its note yet: each is the owner's to give.
+export const calligraphy: Calligraphy[] = [
+  { key: 'couplet', src: steleSrc, title: 'Spring Couplet', titleZh: '春聯', script: 'Clerical script', scriptZh: '隸書',
+    medium: 'Ink on paper, set as stele', treatment: 'stele',
+    alt: 'A Spring Festival couplet in clerical script, white characters on a black ground, recomposed in the manner of a stele' },
+  { key: 'poem', src: poemSrc, script: 'Running-cursive script', scriptZh: '行草', medium: 'Ink on paper', treatment: 'paper',
+    alt: 'A poem in running-cursive script, black ink on paper, signed with a red seal' },
 ];
 
-// Photos: glob the assets dir, sort by filename for stable order. Per-photo
-// title/note/alt come from photoNotes (keyed by filename); any file without an
-// entry falls back to a generic alt and the default placard.
+// The photographs, in the order of their files, globbed so a new file is a new photograph. Per-photo copy comes from
+// photoNotes, keyed by file name. The build refuses a photograph without an entry (its alt is required) and an entry
+// without a photograph, naming each.
 const photoFiles = import.meta.glob<{ default: ImageMetadata }>(
   '../assets/art/photos/*.{jpg,jpeg,JPG,JPEG}',
   { eager: true },
 );
 
-export const photography: Artwork[] = Object.keys(photoFiles)
+/** The key a photograph's file gives it. A file not named photo-… fails the build, by name: the prefix keeps a
+ *  photograph's id off the page's own (`calligraphy`, `photographs`). */
+const photoKey = (file: string): string => {
+  const key = file.replace(/\.jpe?g$/i, '');
+  if (!key.startsWith('photo-')) throw new Error(`artworks: ${file} is not named photo-…, so it has no key`);
+  return key;
+};
+
+const orphans = Object.keys(photoNotes).filter((f) => !Object.keys(photoFiles).some((p) => p.endsWith(`/${f}`)));
+if (orphans.length) throw new Error(`artworks: photoNotes.ts describes no photograph: ${orphans.join(', ')}`);
+
+export const photography: Photo[] = Object.keys(photoFiles)
   .sort()
   .map((path) => {
     const file = path.split('/').pop() ?? '';
     const meta = photoNotes[file];
+    if (!meta) throw new Error(`artworks: ${file} has no entry in data/photoNotes.ts (an alt, at least)`);
     return {
+      key: photoKey(file),
       src: photoFiles[path].default,
-      alt: meta?.alt ?? 'Photograph by Ing Tian',
-      category: 'Photography' as const,
-      title: meta?.title,
-      note: meta?.note,
+      alt: meta.alt,
+      title: meta.title,
+      place: meta.place?.confirmed ? meta.place.name : undefined,
+      year: meta.year,
+      medium: 'Photograph',
     };
   });
 
-export const photoDefault = {
-  kicker: 'Photography',
-  title: `${photography.length} photographs`,
-  note: 'Hover a photograph to read its note. Click any work to look closely.',
-};
+const p = (text: string, work: string): Phrase => ({ text, work });
+
+/**
+ * THE SENTENCES, the page's index, in the owner's first person, taking turns in this order. Each phrase (set in seal
+ * red) is a work, says only what that work shows or what is recorded above, and is the noun alone, its description
+ * in ink. The first sentence's first work is the one on the mat at arrival, /art's LCP image, so it is the one the
+ * first-load budget weighs. The page refuses a sentence that breaks a rule in lib/artPage.ts, naming it.
+ */
+export const SENTENCES: SentencePart[][] = [
+  [
+    'I take photographs — of ', p('a red canoe', 'photo-23'), ' on a turquoise lake, ',
+    p('a bridge tower', 'photo-09'), ' lit against the city, ', p('a heron', 'photo-12'), ' standing on a stone and ',
+    p('cherry blossoms', 'photo-42'), ' against a clear sky — and I write calligraphy: ',
+    p('a spring couplet', 'couplet'), ' in clerical script and ', p('a poem', 'poem'), ' in running-cursive.',
+  ],
+  [
+    'Outdoors, light does a brush’s work — ', p('a mountainside', 'photo-25'), ' erased by mist, ',
+    p('a crescent moon', 'photo-06'), ' early over the sea, ', p('white water', 'photo-35'),
+    ' writing on mossy stone, ', p('a sailboat', 'photo-41'),
+    ' on hammered silver — and with the brush itself I write ', p('a poem', 'poem'), ' in running hand and ',
+    p('a spring couplet', 'couplet'), '.',
+  ],
+  [
+    'Calligraphy is slow and a camera is quick, so beside ', p('a spring couplet', 'couplet'), ' and ',
+    p('a poem', 'poem'), ' in running-cursive I keep ', p('a steam engine', 'photo-08'), ' still at work, ',
+    p('a landscape', 'photo-38'), ' gone to streaks at speed, ', p('plush cows', 'photo-18'),
+    ' posing at a monument and ', p('one plush cow', 'photo-30'), ' looking over the real thing.',
+  ],
+];
