@@ -1,0 +1,273 @@
+---
+// PROTOTYPE (throwaway): /writing as a base you can search, on the paper sheet, after the 21st.dev "blog-3"
+// reference. It grows by count without changing layout: 0 pieces is the header and the cow; 1+ adds the lead (the
+// newest piece) and the grid of the rest; 12+ adds the controls (topic chips and a search) between them.
+import type { Piece, Topic } from '../../data/protoWriting';
+import { CHARTER, KINDS, TOPICS } from '../../data/protoWriting';
+import { coverSvg } from '../../lib/protoCovers';
+import { longDate } from '../../lib/dates';
+import PlushCow from '../PlushCow.astro';
+import Button from '../Button.astro';
+import { COW_LINES_WRITING } from '../../data/cowGlyph';
+
+interface Props { pieces: Piece[] }
+const { pieces } = Astro.props;
+
+const SEARCH_FROM = 12;
+const n = pieces.length;
+const [lead, ...rest] = pieces;
+
+// The CHARTER is the header: its first clause the headline, the rest the subtitle, so it is said once.
+const [headline, ...tail] = CHARTER.split(' — ');
+const sub = tail.join(' — ').replace(/^./, (c) => c.toUpperCase());
+
+// What a search matches: the words a reader sees on the card, lower-cased, curly quotes folded to straight ones so
+// "isn't" finds "isn’t" (the script folds the query the same way).
+const fold = (s: string): string => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
+const q = (p: Piece): string => fold([p.title, p.blurb, KINDS[p.kind].label, ...p.topics.map((t) => TOPICS[t].label)].join(' '));
+
+const chips = (Object.keys(TOPICS) as Topic[])
+  .map((t) => ({ t, label: TOPICS[t].label, count: pieces.filter((p) => p.topics.includes(t)).length }))
+  .filter((c) => c.count > 0);
+---
+<div class="wb">
+  <header class="wb-head">
+    <a class="back" href="/">← back</a>
+    <p class="wb-badge">
+      <svg viewBox="0 0 10 12" width="10" height="12" aria-hidden="true" focusable="false">
+        <path d="M1.5 1h7v10L5 8.4 1.5 11z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+      </svg>
+      Writing
+    </p>
+    <h1 class="wb-h1">{headline}.</h1>
+    <p class="wb-sub">{sub}</p>
+  </header>
+
+  {n === 0 && (
+    <div class="wb-cow">
+      <PlushCow size="large" lines={COW_LINES_WRITING} label="A cow, holding the space until something is written here. Press it." />
+    </div>
+  )}
+
+  {lead && (
+    <article class="wb-lead" data-q={q(lead)} data-t={lead.topics.join(' ')}>
+      <div class="wb-cv wb-cv--lead"><Fragment set:html={coverSvg(lead.topics[0], lead.slug, 640, 400)} /></div>
+      <div class="wb-lead-text">
+        <p class="wb-kicker">
+          <span class="wb-kind">{KINDS[lead.kind].label}</span>
+          {lead.topics.map((t) => <span class="wb-pill">{TOPICS[t].label}</span>)}
+        </p>
+        <h2 class="wb-t wb-lead-title"><a href={`/writing/${lead.slug}`}>{lead.title}</a></h2>
+        <p class="wb-lead-blurb">{lead.blurb}</p>
+        <p class="wb-meta"><time datetime={lead.date}>{longDate(lead.date)}</time> · {lead.minutes} min read</p>
+        <Button href={`/writing/${lead.slug}`} skin="paper" arrow class="wb-read">Read</Button>
+      </div>
+    </article>
+  )}
+
+  {n > 1 && (
+    <section class="wb-more" aria-label="More writing">
+      {n >= SEARCH_FROM && (
+        <div class="wb-ctl">
+          <div class="wb-chips" role="group" aria-label="Topics">
+            <button type="button" class="wb-chip" data-topic="all" aria-pressed="true">All <span class="wb-c">{n}</span></button>
+            {chips.map((c) => (
+              <button type="button" class="wb-chip" data-topic={c.t} aria-pressed="false">{c.label} <span class="wb-c">{c.count}</span></button>
+            ))}
+          </div>
+          <search class="wb-search">
+            <label class="wb-field">
+              <span class="sr-only">Search the writing</span>
+              <svg class="wb-glass" viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" focusable="false">
+                <circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" stroke-width="1.3" />
+                <path d="M9.4 9.4L13 13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+              </svg>
+              <input type="search" placeholder={`Search ${n} pieces`} autocomplete="off" spellcheck="false" />
+              <kbd class="wb-kbd" aria-hidden="true">/</kbd>
+            </label>
+            <p class="wb-status" role="status">{n} of {n}</p>
+          </search>
+        </div>
+      )}
+
+      <ul class="wb-grid" role="list">
+        {rest.map((p) => (
+          <li class="wb-card" data-q={q(p)} data-t={p.topics.join(' ')}>
+            <div class="wb-cv">
+              <Fragment set:html={coverSvg(p.topics[0], p.slug, 400, 250)} />
+              <span class="wb-min">{p.minutes} min</span>
+            </div>
+            <p class="wb-kicker"><span class="wb-kind">{KINDS[p.kind].label}</span><span class="wb-pill">{TOPICS[p.topics[0]].label}</span></p>
+            <h2 class="wb-t wb-title"><a href={`/writing/${p.slug}`}>{p.title}</a></h2>
+            <p class="wb-blurb">{p.blurb}</p>
+            <p class="wb-meta"><time datetime={p.date}>{longDate(p.date)}</time></p>
+          </li>
+        ))}
+      </ul>
+      <p class="wb-none" hidden>No piece matches that search.</p>
+    </section>
+  )}
+</div>
+
+<style>
+  .wb { max-width: 1240px; margin: 0 auto; padding: 15vh clamp(22px, 5vw, 72px) 96px; font-family: var(--font-body); color: var(--ink-2); }
+  .wb :focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; border-radius: 2px; }
+  .back { font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); text-decoration: none; }
+  @media (hover: hover) { .back:hover { color: var(--seal); } }
+
+  /* ── the header: the badge, the headline, the subtitle ── */
+  .wb-badge { display: inline-flex; align-items: center; gap: 8px; margin: 28px 0 0; padding: 6px 12px;
+    font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-1);
+    border: 1px solid rgba(var(--hairline-rgb), 0.4); border-radius: 999px; }
+  .wb-h1 { margin: 18px 0 0; max-width: 15em; font-family: var(--font-body); font-weight: 800; font-size: clamp(40px, 5.4vw, 72px);
+    line-height: 1; letter-spacing: -0.035em; color: var(--ink-1); text-wrap: balance; }
+  .wb-sub { margin: 20px 0 0; max-width: 36em; font-size: 19px; line-height: 1.5; color: var(--ink-3); text-wrap: pretty; }
+  .wb-cow { margin-top: clamp(24px, 5vh, 56px); }
+
+  /* ── the type switch: the reference's heavy grotesk by default, Georgia for headline and titles on 'serif' ── */
+  .wb-t { margin: 0; font-family: var(--font-body); font-weight: 700; letter-spacing: -0.02em; color: var(--ink-1); text-wrap: balance; }
+  .wb-t a { color: inherit; text-decoration: none; }
+  :global(html[data-w-type='serif']) .wb-h1,
+  :global(html[data-w-type='serif']) .wb-t { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.01em; }
+
+  /* ── covers: computed SVG (lib/protoCovers.ts), coloured here by role, stroked or filled by type ── */
+  .wb-cv { position: relative; aspect-ratio: 8 / 5; overflow: hidden; border-radius: 6px;
+    background: rgba(var(--hairline-rgb), 0.05); border: 1px solid rgba(var(--hairline-rgb), 0.3); }
+  .wb-cv :global(.cover) { display: block; width: 100%; height: 100%; }
+  .wb-cv :global(.cv-ink) { --c: var(--ink-1); }
+  .wb-cv :global(.cv-mid) { --c: var(--ink-3); }
+  .wb-cv :global(.cv-seal) { --c: var(--seal); }
+  .wb-cv :global(.cv-faint) { --c: rgba(var(--hairline-rgb), 0.22); }
+  .wb-cv :global(.cv-s) { fill: none; stroke: var(--c, var(--ink-1)); }
+  .wb-cv :global(.cv-f) { fill: var(--c, var(--ink-1)); stroke: none; }
+  .wb-min { position: absolute; left: 10px; top: 10px; padding: 5px 8px; font: 11px/1 var(--font-mono); color: var(--ink-2);
+    background: var(--sheet-ground); border: 1px solid rgba(var(--hairline-rgb), 0.3); border-radius: 999px; }
+
+  .wb-kicker { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .wb-kind { margin-right: 2px; font: 11px/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  .wb-pill { padding: 4px 9px; font-size: 12px; font-weight: 500; line-height: 1; color: var(--ink-2);
+    border: 1px solid rgba(var(--hairline-rgb), 0.35); border-radius: 999px; }
+  .wb-meta { margin: 0; font: 12px/1.4 var(--font-mono); color: var(--ink-3); }
+
+  /* ── the lead: cover left, words right; the title's link covers the card, and Read sits above it ── */
+  .wb-lead { position: relative; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 48px;
+    align-items: center; margin-top: 64px; }
+  .wb-lead-title { margin-top: 16px; font-size: clamp(28px, 3vw, 40px); line-height: 1.1; }
+  .wb-lead-blurb { margin: 14px 0 0; max-width: 32em; font-size: 17px; line-height: 1.55; text-wrap: pretty; }
+  .wb-lead .wb-meta { margin-top: 16px; }
+  .wb-lead :global(.wb-read) { z-index: 2; margin-top: 24px; }
+  .wb-lead.is-out { opacity: 0.32; }
+
+  .wb-t a::after { content: ''; position: absolute; inset: 0; z-index: 1; }
+  .wb-t a:focus-visible { outline: none; }
+  .wb-lead:has(.wb-t a:focus-visible), .wb-card:has(.wb-t a:focus-visible) {
+    outline: 2px solid var(--ochre); outline-offset: 10px; border-radius: 6px; }
+  @media (hover: hover) {
+    .wb-lead:hover .wb-cv, .wb-card:hover .wb-cv { transform: translateY(-3px); border-color: rgba(var(--hairline-rgb), 0.6); }
+    .wb-lead:hover .wb-t a, .wb-card:hover .wb-t a { text-decoration: underline 1px; text-underline-offset: 0.16em; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .wb-cv { transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.3, 1); }
+    .wb-lead { transition: opacity 0.2s; }
+  }
+
+  /* ── the controls (12+): chips, then the search; without a script they do nothing, so they do not show ── */
+  .wb-more { margin-top: 72px; padding-top: 28px; border-top: 1px solid rgba(var(--hairline-rgb), 0.3); }
+  .wb-ctl { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px 32px; margin-bottom: 36px; }
+  @media (scripting: none) { .wb-ctl { display: none; } }
+  .wb-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .wb-chip { height: 34px; padding: 0 14px; font: 500 13px/1 var(--font-body); color: var(--ink-2); background: none; cursor: pointer;
+    border: 1px solid rgba(var(--hairline-rgb), 0.4); border-radius: 999px; }
+  .wb-c { margin-left: 4px; font: 11px/1 var(--font-mono); color: var(--ink-3); }
+  @media (hover: hover) { .wb-chip:hover { border-color: var(--ink-1); } }
+  .wb-chip[aria-pressed='true'] { color: var(--sheet-ground); background: var(--ink-1); border-color: var(--ink-1); }
+  .wb-chip[aria-pressed='true'] .wb-c { color: inherit; opacity: 0.7; }
+  .wb-search { flex: 0 1 320px; }
+  .wb-field { position: relative; display: block; }
+  .wb-field input { box-sizing: border-box; width: 100%; height: 38px; padding: 0 34px; font: 14px var(--font-body); color: var(--ink-1);
+    background: var(--sheet-ground); border: 1px solid rgba(var(--hairline-rgb), 0.4); border-radius: 999px; }
+  .wb-field input::placeholder { color: var(--ink-3); }
+  .wb-field input:focus-visible { outline-offset: 2px; border-radius: 999px; }
+  .wb-glass { position: absolute; left: 13px; top: 12px; color: var(--ink-3); pointer-events: none; }
+  .wb-kbd { position: absolute; right: 12px; top: 10px; padding: 2px 6px; font: 11px/1 var(--font-mono); color: var(--ink-3);
+    border: 1px solid rgba(var(--hairline-rgb), 0.35); border-radius: 4px; pointer-events: none; }
+  .wb-field input:focus ~ .wb-kbd, .wb-field input:not(:placeholder-shown) ~ .wb-kbd { opacity: 0; }
+  @media (hover: none) { .wb-kbd { display: none; } }
+  .wb-status { margin: 8px 0 0; padding-left: 14px; font: 11px/1.4 var(--font-mono); color: var(--ink-3); }
+  .wb-none { margin: 8px 0 0; font-size: 16px; color: var(--ink-3); }
+
+  /* ── the grid: the cover on top, then the kind and topic, the title, three lines of blurb, the date ── */
+  .wb-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 56px 28px; }
+  .wb-card { position: relative; }
+  .wb-card .wb-kicker { margin-top: 16px; }
+  .wb-title { margin-top: 10px; font-size: 20px; line-height: 1.25; }
+  .wb-blurb { margin: 8px 0 0; font-size: 15px; line-height: 1.5; color: var(--ink-3);
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+  .wb-card .wb-meta { margin-top: 12px; }
+
+  @media (max-width: 1100px) { .wb-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 900px) { .wb-lead { grid-template-columns: minmax(0, 1fr); gap: 24px; } }
+  @media (max-width: 640px) {
+    .wb { padding-top: 12vh; }
+    .wb-grid { grid-template-columns: minmax(0, 1fr); gap: 44px; }
+    .wb-search { flex-basis: 100%; }
+  }
+</style>
+
+<script>
+  // The filter: a chip picks a topic, the search AND-matches its words as substrings of each piece's data-q; the
+  // status reads "k of N". A lead that does not match dims and goes inert in place, so the controls under the
+  // reader's cursor never jump. Esc clears; "/" focuses the search unless focus is already in a field.
+  import { onPageView } from '../../scripts/pageView';
+
+  const fold = (s: string): string => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
+
+  onPageView<HTMLElement>('.wb-ctl', (ctl) => {
+    const root = ctl.closest('.wb');
+    const maybeInput = ctl.querySelector<HTMLInputElement>('input[type="search"]');
+    const maybeStatus = ctl.querySelector<HTMLElement>('[role="status"]');
+    const maybeNone = root?.querySelector<HTMLElement>('.wb-none');
+    if (!root || !maybeInput || !maybeStatus || !maybeNone) return undefined;
+    const input = maybeInput, status = maybeStatus, none = maybeNone;
+    const items = [...root.querySelectorAll<HTMLElement>('[data-q]')];
+    const chips = [...ctl.querySelectorAll<HTMLButtonElement>('[data-topic]')];
+    let topic = 'all';
+
+    const apply = (): void => {
+      const terms = fold(input.value).split(/\s+/).filter(Boolean);
+      let k = 0;
+      for (const el of items) {
+        const ok = (topic === 'all' || (el.dataset.t ?? '').split(' ').includes(topic))
+          && terms.every((t) => (el.dataset.q ?? '').includes(t));
+        if (el.classList.contains('wb-lead')) { el.classList.toggle('is-out', !ok); el.inert = !ok; }
+        else el.hidden = !ok;
+        if (ok) k += 1;
+      }
+      status.textContent = `${k} of ${items.length}`;
+      none.hidden = k > 0;
+    };
+    const pick = (t: string): void => {
+      topic = t;
+      for (const c of chips) c.setAttribute('aria-pressed', String(c.dataset.topic === t));
+      apply();
+    };
+
+    const ac = new AbortController();
+    input.addEventListener('input', apply);
+    for (const c of chips) c.addEventListener('click', () => pick(c.dataset.topic ?? 'all'));
+    ctl.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || (!input.value && topic === 'all')) return;
+      e.preventDefault();
+      input.value = '';
+      pick('all');
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey || !input.getClientRects().length) return;
+      const t = e.target;
+      if (t instanceof HTMLElement && (t.isContentEditable || t.closest('input, textarea, select'))) return;
+      e.preventDefault();
+      input.focus();
+    }, { signal: ac.signal });
+    return () => ac.abort();
+  });
+</script>

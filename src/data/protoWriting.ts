@@ -14,17 +14,30 @@ export const KINDS: Record<Kind, { label: string; gloss: string }> = {
   methods: { label: 'Methods', gloss: 'How the trading system is built and tested: the method, never the call.' },
 };
 
+/** The subjects, the second axis (the research: kind x topic, both closed, as Tao's and AQR's archives), each with
+ *  the arXiv area it maps to. The chips filter by these, and a piece's cover is drawn from its first one. */
+export type Topic = 'portfolio' | 'optimization' | 'estimation' | 'execution' | 'risk' | 'backtesting' | 'systems';
+export const TOPICS: Record<Topic, { label: string; arxiv?: string; gloss: string }> = {
+  portfolio: { label: 'Portfolio', arxiv: 'q-fin.PM', gloss: 'Allocation: how much of what, and when to change it.' },
+  optimization: { label: 'Optimization', arxiv: 'math.OC', gloss: 'The convex and dynamic machinery under the allocation.' },
+  estimation: { label: 'Estimation', arxiv: 'q-fin.ST', gloss: 'Means, covariances, regimes — and how wrong they are.' },
+  execution: { label: 'Execution', arxiv: 'q-fin.TR', gloss: 'What a trade costs, and how it is placed.' },
+  risk: { label: 'Risk', arxiv: 'q-fin.RM', gloss: 'Volatility, drawdowns, tails, and spending a risk budget.' },
+  backtesting: { label: 'Backtesting', gloss: 'Testing a strategy without fooling yourself.' },
+  systems: { label: 'Systems', gloss: 'The software a strategy runs on.' },
+};
+
 export interface Piece {
-  slug: string; title: string; kind: Kind; date: string; blurb: string; minutes: number;
+  slug: string; title: string; kind: Kind; topics: Topic[]; date: string; blurb: string; minutes: number;
   /** A short note, read in full where it is listed (a stream may show it whole); no page of its own needed. */
   short?: string;
 }
 
-const p = (slug: string, kind: Kind, date: string, minutes: number, title: string, blurb: string, short?: string): Piece =>
+const p = (slug: string, kind: Kind, date: string, minutes: number, title: string, blurb: string, short?: string) =>
   ({ slug, kind, date, minutes, title, blurb, short });
 
 /** Newest first. */
-export const PIECES: Piece[] = [
+const RAW = [
   p('risk-parity-is-not-equal-weights', 'explainers', '2028-10-02', 9, 'Why risk parity isn’t “equal weights”', 'Equal weights spend most of the risk budget on the most volatile asset. Risk parity spends it evenly, and the difference is one line of algebra.'),
   p('lookahead-three-ways', 'methods', '2028-09-14', 12, 'Where my backtest lied: three kinds of lookahead', 'A close used before it closed, a universe chosen with hindsight, and a parameter tuned on the test set.'),
   p('covariance-has-more-parameters', 'notes', '2028-08-30', 1, 'More parameters than data', 'A sample covariance of 500 stocks over 60 months.',
@@ -53,6 +66,26 @@ export const PIECES: Piece[] = [
   p('boyd-chapter-five', 'notes', '2027-05-18', 15, 'Reading Boyd & Vandenberghe, chapter 5', 'Where duality earns its keep: weak and strong duality, Slater’s condition, and the portfolio problems that meet it.'),
   p('randomness-of-a-strategy', 'methods', '2027-04-26', 9, 'Testing a strategy against its own randomness', 'Shuffle the signal, keep the costs: if the shuffled runs do as well, the edge was the costs’ shape.'),
 ];
+
+// Each sample's subjects, one to three, the first drawing its cover.
+const TOPIC_OF: Record<string, Topic[]> = {
+  'risk-parity-is-not-equal-weights': ['risk', 'portfolio'], 'lookahead-three-ways': ['backtesting'],
+  'covariance-has-more-parameters': ['estimation'], 'multi-period-is-not-repeated': ['portfolio', 'optimization'],
+  'duality-in-one-picture': ['optimization'], 'slippage-on-my-fills': ['execution'],
+  'kwon-robust-models': ['portfolio', 'estimation'], 'walk-forward-honestly': ['backtesting'],
+  'the-curse-counted': ['optimization'], 'transaction-costs-couple-time': ['execution', 'portfolio'],
+  'reproducing-rl-bhrp': ['backtesting', 'portfolio'], 'mpc-as-a-policy': ['optimization', 'portfolio'],
+  'what-regime-means': ['estimation'], 'go-execution-engine': ['systems', 'execution'],
+  'bellman-lattice-limits': ['optimization'], 'square-root-impact': ['execution'],
+  'first-regime-model-overfit': ['estimation', 'backtesting'], 'fixed-point-three-ways': ['risk', 'optimization'],
+  'estimator-not-stocks': ['estimation', 'risk'], 'convexity-why-easy': ['optimization'], 'audit-trail': ['systems'],
+  'notebook-to-service': ['systems'], 'boyd-chapter-five': ['optimization'], 'randomness-of-a-strategy': ['backtesting'],
+};
+export const PIECES: Piece[] = RAW.map((x) => {
+  const topics = TOPIC_OF[x.slug];
+  if (!topics) throw new Error(`protoWriting: no topics for ${x.slug}`);
+  return { ...x, topics };
+});
 
 const eq = (tex: string): string => `<div class="w-eq">${inlineMath(tex)}</div>`;
 
