@@ -12,10 +12,9 @@
 // theme from styles/slides.css: an editorial paper surface, full-bleed, with the sky visible above and
 // below it. That is also the elegant thing the owner picked out about the light theme.
 //
-// THE PROSE'S NUMBERS ARE TYPED BY HAND, in data/story.ts ("nine roles, four companies", "fifty thousand
-// requests a second", "eight times across eight years"), and no test reads them. One is a figure about the
-// invented field rather than the career ("a thousandth"), the kind STORY_FIGURES was deleted for; it is
-// flagged there for the owner.
+// THE PROSE'S NUMBERS, in data/story.ts: the jobs and the years they span are counted from profile.ts' timeline,
+// and "hundreds of times smaller" glosses the invented field, held by tests/trajectory.test.ts. "Four companies"
+// and "fifty thousand requests a second" are typed, and no test reads them.
 //
 // THE PANEL NOW WRAPS THE GRAPH TOO. The owner: "in the descent one climb section, you might want to
 // completely turn off the fluid background and use the paper editorial background." That is one
@@ -74,17 +73,12 @@ import { STORY } from '../data/story';
 </section>
 
 <style>
-  /* Full-bleed, so the paper panel is a surface the page passes through rather than a card sitting
-     on the sky. No vertical padding: the panel itself must reach the section's edges, or a band of
-     sky shows above and below it and the "turn the fluid off here" reads as a floating card.
+  /* Full-bleed as a block: <main> has no inline padding, so the section already spans the page, and a 100vw
+     width would overhang a classic scrollbar by half its width. No vertical padding: the panel itself must
+     reach the section's edges, or a band of sky shows above and below it and reads as a floating card.
      z-index lifts it over the SkyWash and .descent::after washes (both z-index:-1), so the fluid is
      completely hidden behind this slide rather than tinting the paper. */
-  .story {
-    position: relative;
-    z-index: 1;
-    width: 100vw;
-    margin-left: calc(50% - 50vw);
-  }
+  .story { position: relative; z-index: 1; }
 
   .story-paper {
     /* The graph's lines, which only DescentPath draws, per theme beside the panel's inks (styles/slides.css).

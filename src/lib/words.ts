@@ -1,6 +1,7 @@
 // src/lib/words.ts
-// The one word counter, for reading times, and what must not break across a line. A word is a whitespace-separated
-// token with a Latin letter or a digit in it, so "$2.20" counts and a dash or a lone "=" does not.
+// The one word counter, for reading times; a count as prose writes it; and what must not break across a line. A word
+// is a whitespace-separated token with a Latin letter or a digit in it, so "$2.20" counts and a dash or a lone "="
+// does not.
 
 export function countWords(text: string): number {
   return text.split(/\s+/).filter((t) => /[A-Za-z0-9]/.test(t)).length;
@@ -12,6 +13,12 @@ const WPM = 230;
 export function readingMinutes(words: number): number {
   return Math.max(1, Math.round(words / WPM));
 }
+
+const NUMBER = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+/** A count as prose writes it: in words to twelve, in figures past. */
+export const inWords = (n: number) => NUMBER[n] ?? String(n);
+/** The same text with its first letter capitalised, for a count that opens a sentence. */
+export const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
 // What reads as one word, so a line never breaks inside it: a browser may break after any hyphen, and "RL-" at the
 // end of one line and "BHRP" at the start of the next is two words to a reader. A hyphenated word led by an acronym

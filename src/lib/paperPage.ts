@@ -4,12 +4,9 @@
 // margin notes, and what a wealth figure's readout (RL-BHRP's Figure 2) reads, says and tells a reader it does. The
 // page measures, paints and prints; this decides. Pure.
 import { longDate, monthYear } from './dates';
+import { cap, inWords as count } from './words';
 
-const NUMBER = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
 const ORDINAL = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth', 'eleventh', 'twelfth'];
-/** A count as prose writes it: in words to twelve, in figures past. */
-const count = (n: number) => NUMBER[n] ?? String(n);
-const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
 /** A line of the prose the page writes: text, and dates (YYYY-MM-DD) the page prints as a <time>
  *  (components/research/PaperLine). */

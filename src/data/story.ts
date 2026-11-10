@@ -10,6 +10,13 @@
 //
 // Content lives here rather than in the component because every other fact on this site lives in
 // data/ — editing what the page says should never mean editing markup.
+import { timeline } from './profile';
+import { cap, inWords } from '../lib/words';
+
+/** The jobs, counted from the timeline rather than typed: its work entries, so a degree is not a role. */
+const JOBS = timeline.filter((r) => r.kind === 'work');
+/** The calendar years they span: from the first one's start to the year the site is built, as a role is still open. */
+const YEARS = new Date().getUTCFullYear() - Math.min(...JOBS.map((r) => parseInt(r.period, 10))) + 1;
 
 export interface StoryColumn {
   /** Small mono kicker. */
@@ -28,14 +35,14 @@ export const STORY: StoryColumn[] = [
     kicker: 'The local minimum',
     lead: 'Most of my career has been spent as a full-stack engineer, and I was good at it.',
     body: [
-      'Nine roles, four companies, systems that held at fifty thousand requests a second. ' +
+      `${cap(inWords(JOBS.length))} roles, four companies, systems that held at fifty thousand requests a second. ` +
       'By every visible measure that is a good place to stand, and the field around it is flat: ' +
       'every direction out looks like more of the same, slightly worse.',
-      // FLAGGED FOR THE OWNER: "a thousandth" is a typed measurement of the invented field, the kind of
-      // figure STORY_FIGURES (below) was deleted for. Nothing computes or tests it.
+      // "Hundreds" is true only at the basin's floor, where the gradient is zero and any multiple holds; averaged
+      // over the basin it is nearer ten. tests/trajectory.test.ts holds the floor stop to it, as a lower bound.
       'That flatness is the trap, and it is measurable rather than poetic. In the engineering ' +
       'basin the surface bends almost equally in every direction, so no step tells you much — ' +
-      'the gradient there is a thousandth of what it is on the research side. Years can pass ' +
+      'the gradient there is hundreds of times smaller than on the research side. Years can pass ' +
       'without a signal strong enough to argue with.',
     ],
   },
@@ -44,7 +51,7 @@ export const STORY: StoryColumn[] = [
     lead: 'What I learned by moving was not the shape of the landscape. It was the shape of my own preferences.',
     body: [
       'The modelling half of every job held my attention and the plumbing did not. Written down ' +
-      'once, that is a sentence about taste. Written down eight times across eight years, it is ' +
+      `once, that is a sentence about taste. Written down ${inWords(JOBS.length)} times across ${inWords(YEARS)} years, it is ` +
       'data — and the direction it points is mathematics, structured argument, and problems where ' +
       'the feedback is direct enough to be worth arguing with.',
       'A gradient method cannot leave a basin; it has no move that goes uphill. So leaving was ' +

@@ -201,7 +201,7 @@ src/
   lib/paperPage.ts                  # the paper page's pure half: the prose its frontmatter writes (authorRole, givenFirst, listed, referenceNote, Line + lineText), note stacking, the readout's month, step, point names, spoken line and instructions (readoutLabel)
   components/research/PaperLine.astro # one line of a paper page's own prose: names kept whole (wholeParts), dates as <time>
   lib/wealth.ts                     # the one wealth module: growth of $1, CAGR, drawdown, the band of runs, WealthSeries (the prepared series every picture of a run reads; REPRO is RL-BHRP's), scales and ticks — the paper page's figures and /projects' rl-bhrp picture
-  lib/words.ts                      # the one word counter (countWords, readingMinutes) + wholeParts, the one rule for what never breaks across a line ("RL-BHRP")
+  lib/words.ts                      # the one word counter (countWords, readingMinutes), a count as prose writes it (inWords, cap) + wholeParts, the one rule for what never breaks across a line ("RL-BHRP")
   lib/dates.ts                      # the one date helper: longDate, monthYear (UTC)
   lib/motionTiming.ts               # the motion module's pure half: every curve (EASE, DRAW, SWEEP, FADE, WITHDRAW) and duration (REVEAL, RAIL, PAPER_PAGE, CARD, ART, EXPERIENCE, WRITING, MOVE_MAX) the rail, the research routes, /art, /experience and /writing move by, stagger and the paper page's batches (highlightDelay, arrowDelay), sweepDurations, mergeLines
   scripts/motion.ts                 # THE ONE MOTION MODULE, its DOM half: play, onceSeen, riseOnceSeen, sweepLines — the rail and both research routes; the reduced-motion gate is inside it
@@ -220,7 +220,7 @@ src/
   lib/writingSearch.ts              # the /writing search's pure half: fold (case, accents, curly quotes) and shows (a kind, AND-matched words)
   data/artworks.ts                  # /art's works, keyed (photo-NN from the file; couplet, poem), + SENTENCES, the page's sentences in turn order; photoNotes.ts holds each photograph's alt, title?, place?{name, confirmed} and year?
   lib/artPage.ts                    # /art's pure half: each sentence's rules (sentenceProblems over phrasesOf: PHRASES phrases, each a different work that exists, RED_PCT of its words red) and its turn's hold (holdMs), a work's label line (labelLine), the three sizes hints (matSizes, rowSizes, calSizes) and their constants, and the dark room's zoom: zoomAbout (to 6x, about a point), wheelScale (by distance, not per event), isDoubleTap
-  data/{define,desk,making,story}.ts # the homepage explainer's copy + numbers, per slide
+  data/{define,desk,story}.ts       # the homepage explainer's copy + numbers, per slide
   data/{cowGlyph,ruleGlyphs,tickerGlyphs}.ts # pixel-art matrices: the cow's and the slides'
   lib/deck.ts                       # pure deck stops: WHERE the homepage scroll may rest, what's next, and what one wheel event does (wheelAction)
   lib/pageStops.ts                  # pure Stop trees: one tree per page drives BOTH its rail and its section ids; + fragmentId, the one decode of a URL fragment
@@ -982,7 +982,7 @@ Two themes, driven by `html[data-theme]` (absent = light, `'dark'` = terminal ga
    - **The cheap check is in `dist`, not in review.** Parse every `X[data-astro-cid-N]` fragment out of
      `dist/_astro/*.css` and assert some element in `dist` carries that hash *and* that tag/class (an attribute
      value may hold a `>`: the terrain canvas's `data-bubbles` and Grain's data-URI style do). It is a tool to
-     run, not a test: `Work.astro`'s empty-writing branch never renders while a piece is published, and its
+     run, not a test: /writing's empty state (the cow) never renders while a piece is published, and its
      dead fragments look exactly like a bug.
 2. **At equal specificity, SOURCE ORDER decides.** Put an override **after** the rule it overrides. A phone
    override placed above the desktop rule it was meant to beat has shipped here more than once.
@@ -1116,7 +1116,9 @@ of sky over a full-bleed panel.
     keyboard-focused (`videoPlays()` in `lib/galleryLayout.ts`); and the cow says the greeting and at most
     `idleLines()` unprompted lines per page view (`lib/cowTalk.ts`: two, none on a phone or under reduced
     motion), the rest a press away. `tests/cowTalk.test.ts` adds up what it does unasked from PlushCow's
-    transition and hop literals and `TYPE_MS`, ~3.4s, and holds it under the limit.
+    transition and hop literals and `TYPE_MS`, ~3.4s, and holds it under the limit. On `/`, Story's descent
+    walk runs 4s once its slide is on screen and its coda fades in over 0.9s at the latest as it ends;
+    `tests/motionLimit.test.ts` adds the two literals from `DescentPath.astro` against the limit.
   - **One exception, the owner's call (2026-11-08): /art's sentences take turns** for as long as the page is open,
     each for its words at 200 a minute (`holdMs` in `lib/artPage.ts`). It is held to 2.2.2 by the criterion's own
     terms, a way to stop it: Pause, and the numbers; what else holds or stops a turn is the turns' comment in

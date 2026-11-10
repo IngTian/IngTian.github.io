@@ -5,7 +5,7 @@
 // lib/galleryLayout.ts' videoPlays() and the cow's is lib/cowTalk.ts' idleLines(), each in its own spec; this holds
 // the limit and the cursor, which is CSS, so its literals are read from the stylesheet the way artSizes pins CAL_MAX_H.
 // It also holds the paper page's margin-note backstop, a pending state whose end is a CSS delay, to the same limit
-// scripts/motion.ts' reveals end by.
+// scripts/motion.ts' reveals end by, and Story's descent walk on /, which starts once its slide is on screen.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { MOTION_LIMIT_MS } from '../src/lib/motion';
@@ -46,5 +46,18 @@ describe("the margin notes' backstop (research/[slug].astro)", () => {
     expect(Number(held![1])).toBe(MOTION_LIMIT_MS);
     expect(src).toMatch(/@keyframes mn-unheld \{ to \{ visibility: visible; \} \}/);
     expect(src, 'place() marks a note placed').toContain("classList.add('is-placed')");
+  });
+});
+
+describe("Story's descent walk (DescentPath.astro)", () => {
+  const src = readFileSync(new URL('../src/components/DescentPath.astro', import.meta.url), 'utf8');
+
+  it('ends, coda fade included, inside the limit', () => {
+    const walk = /const DURATION_MS = (\d+);/.exec(src);
+    const coda = /\.dp-coda \{[^}]*transition: opacity ([\d.]+)s/.exec(src);
+    expect(walk, "the walk's `DURATION_MS`").not.toBeNull();
+    expect(coda, "the coda's `transition: opacity …s`").not.toBeNull();
+    // The coda shows on discovery, which can come as late as the walk's last frame: count both in full.
+    expect(Number(walk![1]) + Number(coda![1]) * 1000).toBeLessThanOrEqual(MOTION_LIMIT_MS);
   });
 });
