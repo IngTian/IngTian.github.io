@@ -54,7 +54,7 @@ const bootDecider = `(function () {
   } catch (e) { /* storage that throws means play (above); anything else, the finished page — never a broken one */ }
 })();`;
 ---
-<BaseLayout title="Projects — Ing Tian" description={description} page="drafting" veil={false} navZone="light" preloadMono>
+<BaseLayout title="Projects — Ing Tian" description={description} page="drafting" veil={false} preloadMono>
   <script is:inline set:html={bootDecider} />
   {/* The rail before the field, so the rail's script runs first and its first marks land inside its entrance: the
       field's init (a whole frame of isolines) is the longest on the page. */}

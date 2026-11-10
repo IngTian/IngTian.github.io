@@ -2,7 +2,9 @@ import { defineCollection } from 'astro:content';
 import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
 import { publications } from './data/profile';
+import { KIND_KEYS } from './data/writing';
 import { PAPERS_DIR } from './lib/paperMarkdown/names';
+import { FIGURES } from './lib/writingCovers';
 
 /**
  * An ISO date, normalised to YYYY-MM-DD: every date in every collection is one of these.
@@ -25,25 +27,32 @@ const isoDate = (field: string) =>
  * some markdown notes i have. My favorite quotes is just a markdown file."
  *
  * So a new piece is a FILE, not a code change: drop a .md into src/content/writing/, give it frontmatter, and
- * it appears on /writing under its kind and gets its own page at /writing/<slug>. data/writing.ts keeps only
- * the taxonomy — what the kinds ARE and what belongs in each — which is editorial copy rather than content.
+ * it appears on /writing and gets its own page at /writing/<slug>. data/writing.ts keeps the taxonomy — what the
+ * kinds ARE and what belongs in each, which is editorial copy rather than content — and `pieces()`, the one seam.
  *
  * WHY A COLLECTION AND NOT import.meta.glob, which this repo already uses for the gallery's images: the schema
  * below is validated at BUILD time, so a typo in `kind:` or a missing `date:` fails `npm run build` with the
  * offending file named. The glob alternative would render a broken row instead. CI is the merge gate here, so
- * the difference is between catching it and shipping it.
+ * the difference is between catching it and shipping it. For the same reason the object is STRICT: a field it does
+ * not know (a misspelt `featured`, or a `minutes`, which is computed) fails the build rather than being
+ * dropped in silence.
  */
 const writing = defineCollection({
   loader: glob({ base: './src/content/writing', pattern: '**/*.md' }),
-  schema: z.object({
+  schema: z.strictObject({
     title: z.string(),
     date: isoDate('date'),
     /**
-     * Which section of /writing this belongs to. An ENUM rather than a free string, so a misspelled kind is a
-     * build error instead of a piece that silently belongs to no section and never renders.
-     * Must stay in step with the keys in data/writing.ts — there is a test asserting exactly that.
+     * Which kind of /writing this is (its chip, and its label on the card). An ENUM rather than a free string, so
+     * a misspelled kind is a build error instead of a piece that silently belongs to no kind. The list is
+     * data/writing.ts's KIND_KEYS, so the schema and the taxonomy cannot disagree.
      */
-    kind: z.enum(['notes', 'essays', 'explainers', 'misc']),
+    kind: z.enum(KIND_KEYS),
+    /**
+     * The figure its cover draws (lib/writingCovers.ts's FIGURES, each named for what it draws). Optional: without
+     * one, the slug's hash picks a figure, the same on every build.
+     */
+    cover: z.enum(FIGURES).optional(),
     /**
      * When the piece last GAINED SOMETHING. Optional, and meant to stay optional.
      *
@@ -59,11 +68,10 @@ const writing = defineCollection({
      * identical ones.
      */
     updated: isoDate('updated').optional(),
-    /** One or two sentences: what it argues, in plain language. Shown on the index, not on the piece. */
+    /** One or two sentences: what it argues, in plain language. The card's text on the index, and the piece's
+     *  standfirst under its title. (Its reading time is not a field: it is computed from the body.) */
     blurb: z.string(),
-    /** Rough reading time. Omit rather than guess — the index only prints it when it is real. */
-    minutes: z.number().int().positive().optional(),
-    /** Marks a piece worth leading with, if a kind ever holds many. */
+    /** Leads the index (the newest featured piece does; without one, the newest piece). */
     featured: z.boolean().optional(),
     /**
      * Unfinished work can be committed without appearing. Worth having from the first file rather than added

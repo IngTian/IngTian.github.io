@@ -1,0 +1,49 @@
+---
+// A writing piece's cover in its frame: the computed SVG (lib/writingCovers.ts), coloured here by role and stroked or
+// filled by type, the CSS half of that file's contract. `size` is a COVER_SIZES key: 8:5 for a card and the index's
+// lead; `banner` is a piece's wide one, 10:3, and 2:1 on a phone, where the slice keeps its middle. Anything slotted
+// sits over it (a card's reading time). The picture is aria-hidden: it illustrates, and the card's words carry it.
+//
+// `hover`: the cover a card shows, drawn twice in one frame, in the sheet's inks and over them in its figure's own
+// colours (FIGURE_HUES), which the card fades in on its hover or keyboard focus (PieceCard.astro), by opacity
+// (WRITING.cover in lib/motionTiming.ts), as /experience's marks take their logos' colours. The two copies are the
+// same markup, so they cost the wire almost nothing; a banner, which nothing hovers, is drawn once.
+import { COVER_SIZES, FIGURE_HUES, coverSvg, type Figure } from '../../lib/writingCovers';
+
+interface Props { figure: Figure; seed: string; size: keyof typeof COVER_SIZES; hover?: boolean }
+const { figure, seed, size, hover = false } = Astro.props;
+const [w, h] = COVER_SIZES[size];
+const svg = coverSvg(figure, seed, w, h);
+const { light, dark } = FIGURE_HUES[figure];
+const hues = `--h-ink:${light.ink};--h-mid:${light.mid};--h-ink-d:${dark.ink};--h-mid-d:${dark.mid}`;
+---
+<div class:list={['wcv', { 'wcv-banner': size === 'banner' }]} style={hover ? hues : undefined}>
+  <Fragment set:html={svg} />
+  {hover && <div class="wcv-hue" aria-hidden="true"><Fragment set:html={svg} /></div>}
+  <slot />
+</div>
+
+<style>
+  .wcv { position: relative; aspect-ratio: 8 / 5; overflow: hidden; border-radius: 6px;
+    background: rgba(var(--hairline-rgb), 0.05); border: 1px solid rgba(var(--hairline-rgb), 0.3); }
+  .wcv-banner { aspect-ratio: 10 / 3; }
+  .wcv :global(.cover) { display: block; width: 100%; height: 100%; }
+  .wcv :global(.cv-ink) { --c: var(--ink-1); }
+  .wcv :global(.cv-mid) { --c: var(--ink-3); }
+  .wcv :global(.cv-seal) { --c: var(--seal); }
+  .wcv :global(.cv-faint) { --c: rgba(var(--hairline-rgb), 0.22); }
+  /* What every stroke shares, said once here rather than on each element: its width does not scale with the slice */
+  .wcv :global(.cv-s) { fill: none; stroke: var(--c, var(--ink-1)); vector-effect: non-scaling-stroke;
+    stroke-linejoin: round; stroke-linecap: round; }
+  .wcv :global(.cv-f) { fill: var(--c, var(--ink-1)); stroke: none; }
+  /* the colour copy, over the ink one: the figure's hues by role, the seal kept; the card fades it in */
+  .wcv-hue { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+  .wcv-hue :global(.cv-ink) { --c: var(--h-ink); }
+  .wcv-hue :global(.cv-mid) { --c: var(--h-mid); }
+  .wcv-hue :global(.cv-faint) { --c: color-mix(in srgb, var(--h-mid) 32%, transparent); }
+  :global(html[data-theme='dark']) .wcv-hue :global(.cv-ink) { --c: var(--h-ink-d); }
+  :global(html[data-theme='dark']) .wcv-hue :global(.cv-mid) { --c: var(--h-mid-d); }
+  :global(html[data-theme='dark']) .wcv-hue :global(.cv-faint) { --c: color-mix(in srgb, var(--h-mid-d) 32%, transparent); }
+  @media (prefers-reduced-motion: no-preference) { .wcv-hue { transition: opacity 320ms ease-out; } }
+  @media (max-width: 640px) { .wcv-banner { aspect-ratio: 2 / 1; } }
+</style>

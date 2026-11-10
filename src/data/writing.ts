@@ -1,159 +1,115 @@
 // src/data/writing.ts
-// THE WRITING SHELF — essays, notes and explainers, kept apart from the papers.
+// THE WRITING SHELF: its taxonomy and voice, and the one seam between them and the pieces, which are markdown files
+// in src/content/writing/.
 //
-// The owner: "you might want pages that is expandable to contain research projects, we will have writings and
-// more in the future."
+// WHY A SEPARATE ROUTE from /research: a paper is co-authored, dated, citable and has results; a post is one person
+// thinking out loud, revisable the day after it ships. Filed together, the informal writing borrows the paper's
+// authority. The owner chose the split for that reason; /research stays papers-only.
 //
-// WHY A SEPARATE ROUTE rather than more sections on /research. A paper and a blog post are different objects
-// with different contracts: one is co-authored, dated, citable and has results; the other is one person
-// thinking out loud and can be revised the day after it ships. Filing them together forces one page to hold
-// two voices, and the usual outcome is that the informal writing quietly borrows the paper's authority. The
-// owner chose the split for that reason; /research stays papers-only.
+// WHAT IT IS FOR, in the owner's terms: the evergreen thinking (research notes, explainers, the trading system's
+// METHOD). Trade calls go to TradingView. Not a listing of everything but "a base you can search … we might have lots
+// of writings": pages/writing.astro says how the index grows by count.
 //
-// EXPANDABLE BY CONSTRUCTION. The page renders KINDS, and a kind is a data entry — adding a third or fourth
-// (talks, teaching, a reading log) is an edit to KINDS below, not a new component. The rail follows the same
-// tree, so structure and navigation cannot drift apart. This is the shape /research already uses for papers.
-//
-// EMPTY KINDS ARE SHOWN, with a "nothing here yet" line, on the owner's choice. It states intent — the shelf
-// exists and is going to fill — and it is honest in a way a silently-missing section is not: a reader can see
-// what this page is FOR before there is anything on it. The moment a kind has an entry the line disappears,
-// with no code change.
+// ONE AXIS FOR NOW, the kind. A topic axis was prototyped and the owner deferred it: "let's wait on the topics. i
+// dont have much topics yet." A cover is drawn by a figure the piece names, not by a topic (lib/writingCovers.ts).
 
-export interface WritingEntry {
-  /** Slug, used as the DOM id and (later) as the route to the piece itself. */
+import { readingMinutes, countWords } from '../lib/words';
+import { figureFor, type Figure } from '../lib/writingCovers';
+import { fold } from '../lib/writingSearch';
+
+/** The kinds, in the order the chips show them. content.config.ts's `kind` enum is this list, so the schema and the
+ *  taxonomy cannot disagree. */
+export const KIND_KEYS = ['notes', 'explainers', 'methods', 'misc'] as const;
+export type Kind = (typeof KIND_KEYS)[number];
+
+/** What each kind is called, and the line that says what belongs in it (a chip's title). */
+export const KINDS: Record<Kind, { label: string; gloss: string }> = {
+  notes: { label: 'Notes', gloss: 'Working notes from the PhD reading: derivations, dead ends, what turned out to matter.' },
+  explainers: { label: 'Explainers', gloss: 'One idea made legible, with the mathematics left in.' },
+  methods: { label: 'Methods', gloss: 'How the trading system is built and tested: the method, never the call.' },
+  // The favourite quotes live here ("Keep in /writing for now"): a commonplace book is none of the three above.
+  misc: { label: 'Misc', gloss: 'What is none of those: a commonplace book of quotes, each with its source, and whatever else is worth keeping.' },
+};
+
+/** What /writing is for: the index's header, its headline and its subtitle. */
+export const CHARTER = {
+  headline: 'Notes, explainers and methods.',
+  sub: 'The thinking that should still be worth reading in three years. Trade ideas live on TradingView; this is how they are made.',
+};
+
+/** From this many pieces the index shows its search and kind chips; under it, every piece is on one screen or two. */
+export const SEARCH_FROM = 12;
+
+/** A published piece, as every surface that shows one reads it (the index, a piece's page, the homepage's appendix). */
+export interface Piece {
   slug: string;
+  href: string;
   title: string;
-  /** ISO date, so ordering is unambiguous and the page can format it as it likes. */
+  kind: Kind;
+  /** YYYY-MM-DD. */
   date: string;
-  /** ISO date the piece last GAINED something. Absent when it has not changed since publication; the pages
-   *  render it only when it differs from `date`, so an untouched piece shows one date, not two identical. */
+  /** YYYY-MM-DD the piece last GAINED something; absent unless it differs from `date`, so a page prints it as it is. */
   updated?: string;
-  /** One or two sentences: what it argues, in plain language. */
+  /** One or two sentences: the card's text and the piece's standfirst. */
   blurb: string;
-  /** Rough reading time in minutes. Omitted when it would be a guess. */
-  minutes?: number;
-  /** Where it lives. Absent = written but not yet published anywhere. */
-  href?: string;
-  /** Marks a piece worth leading with, if a kind ever holds many. */
-  featured?: boolean;
+  /** Computed from the body (bodyWords), never typed. */
+  minutes: number;
+  figure: Figure;
+  featured: boolean;
+  /** What the search matches: the words a reader sees on the card (title, blurb, kind), folded. */
+  q: string;
 }
 
-export interface WritingKind {
-  /** Stable key, also the section's DOM id prefix. */
-  key: string;
-  /** Section heading. */
-  label: string;
-  /** Short label for the rail — the margin is ~11px mono and cannot take a heading. */
-  railLabel: string;
-  /** One line on what belongs in this kind, so the distinction is stated rather than implied. */
-  gloss: string;
-  /** Shown in place of the list while the kind is empty. Specific to the kind: a generic
-   *  "coming soon" reads as filler, whereas naming what is coming reads as a plan. */
-  empty: string;
-  entries: WritingEntry[];
+/** An entry of the `writing` collection, narrowed to what the seam reads. */
+export interface WritingEntry {
+  id: string;
+  filePath?: string;
+  data: {
+    title: string; date: string; kind: Kind; blurb: string;
+    updated?: string; featured?: boolean; draft?: boolean; cover?: Figure;
+  };
+  rendered?: { html: string };
+}
+
+/** The words a reader reads in a rendered body (lib/words' countWords over its text), maths left out: a display or
+ *  an inline formula is read as symbols, not as words. */
+export function bodyWords(html: string): number {
+  // An entity is dropped, not spaced: inside a word (don&#x27;t) it would split it, and alone (&#x26;) it is no word.
+  return countWords(html.replace(/<math\b[\s\S]*?<\/math>/g, ' ').replace(/<[^>]*>/g, ' ').replace(/&[#\w]+;/g, ''));
 }
 
 /**
- * The kinds, in the order the page presents them.
- *
- * Notes lead essays deliberately: the notes are the ones that will actually appear first (they are a
- * by-product of the research, not a separate project), and a page whose first section is the emptiest one
- * reads as abandoned.
+ * THE SEAM: the collection's entries as the published pieces, newest first (two on one day by slug), drafts dropped.
+ * Every page that shows a piece reads it from here, so they agree on what exists, its order and its reading time.
+ * A markdown plugin's throw does not fail the build (Astro logs it and stores the entry unrendered), so an entry
+ * with no render throws here, naming its file.
  */
-export const KINDS: WritingKind[] = [
-  {
-    key: 'notes',
-    label: 'Research notes',
-    railLabel: 'Notes',
-    gloss:
-      'Working notes from the multi-period portfolio optimization research — derivations, dead ends, and the things that turned out to matter.',
-    empty:
-      'The first notes will come out of the PhD reading: multi-period formulations, and where the convex-optimization view stops being enough.',
-    entries: [],
-  },
-  {
-    key: 'essays',
-    label: 'Essays',
-    railLabel: 'Essays',
-    gloss:
-      'Longer pieces on quantitative finance and the engineering underneath it — written to be read by someone outside the field.',
-    empty:
-      'Nothing here yet. The queue starts with why multi-period optimization is harder than repeating a single-period solve.',
-    entries: [],
-  },
-  {
-    key: 'explainers',
-    label: 'Explainers',
-    railLabel: 'Explainers',
-    gloss:
-      'One idea, made legible — the same job the homepage slides do, at more length and with the mathematics left in.',
-    empty:
-      'Nothing here yet. The homepage explainer is the prototype; these would be the full-length versions of its three slides.',
-    entries: [],
-  },
-  /**
-   * The fourth kind, and the file above anticipated it: "a fourth kind (talks, teaching, a reading log) is a
-   * data edit". A quote collection is none of notes, essays or explainers — it is not an argument, it is a
-   * commonplace book — so filing it under one of those would have made that section's gloss untrue.
-   *
-   * MISCELLANEOUS, NOT "QUOTES", on the owner's call: "having only one quote doc under quotes is weird." He is
-   * right, and the fault is scale rather than taxonomy — a section whose name promises a genre and holds one
-   * file reads as an unfinished shelf. A section named for the leftovers holds one honestly, and holds the
-   * reading log and the talk notes later without being renamed. If quotes ever outgrow it, THAT is the moment
-   * to promote them to their own kind, which is a data edit.
-   */
-  {
-    key: 'misc',
-    label: 'Miscellaneous',
-    railLabel: 'Misc',
-    gloss:
-      'The shelf for things that are not papers, essays or explainers — quote collections, reading notes, whatever else is worth keeping. Kept honest by exactness: anything quoted here carries its source.',
-    // Long enough to name what belongs here, because a test enforces that — and the test is right. "Nothing
-    // here yet" was the first thing written in this slot and it is exactly the filler the rule exists to catch.
-    empty:
-      'Nothing here yet. The first entries are lines about risk and regime change — what markets do when they stop ignoring the fundamentals — each kept with its source so it can be checked.',
-    entries: [],
-  },
-];
-
-/**
- * Fill the taxonomy above with entries that came from markdown.
- *
- * THE SPLIT THIS ENFORCES: KINDS is editorial copy — what a section IS and what belongs in it — and stays in
- * TypeScript because it is site voice, not content. The pieces themselves are files in src/content/writing/,
- * so writing a new one is never a code change. This function is the only seam between the two.
- *
- * Returns the same WritingKind shape the page and lib/pageStops already consume, deliberately: nothing
- * downstream needs to learn that content moved, so the rail, the sorting and their tests are untouched.
- * Kinds with no files keep their `empty` copy and still render as a section, which is what makes an
- * announced-but-unwritten section read as a plan rather than an omission.
- */
-export function buildKinds(
-  entries: readonly (WritingEntry & { kind: string })[],
-  taxonomy: readonly WritingKind[] = KINDS,
-): WritingKind[] {
-  return taxonomy.map((k) => ({
-    ...k,
-    entries: entries.filter((e) => e.kind === k.key).map(({ kind: _kind, ...rest }) => rest),
-  }));
+export function pieces(entries: readonly WritingEntry[]): Piece[] {
+  return entries
+    .filter((e) => !e.data.draft)
+    .map((e): Piece => {
+      if (!e.rendered) throw new Error(`${e.filePath ?? e.id} did not render; its error is logged above`);
+      const { title, date, kind, blurb, updated, featured, cover } = e.data;
+      return {
+        slug: e.id, href: `/writing/${e.id}`, title, kind, date, blurb,
+        updated: updated && updated !== date ? updated : undefined,
+        minutes: readingMinutes(bodyWords(e.rendered.html)),
+        figure: figureFor(e.id, cover),
+        featured: featured ?? false,
+        q: fold([title, blurb, KINDS[kind].label].join(' ')),
+      };
+    })
+    .sort((a, b) => (a.date !== b.date ? (a.date < b.date ? 1 : -1) : a.slug < b.slug ? -1 : 1));
 }
 
-/** Entries of a kind, newest first. Sorting here rather than in the page keeps the page dumb. */
-export function sorted(kind: WritingKind): WritingEntry[] {
-  return [...kind.entries].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+/** The index's lead, the newest `featured` piece or else the newest, and the rest, newest first. */
+export function leadAndRest(list: readonly Piece[]): { lead?: Piece; rest: Piece[] } {
+  const lead = list.find((p) => p.featured) ?? list[0];
+  return { lead, rest: list.filter((p) => p !== lead) };
 }
 
-/** Total pieces across every kind — what decides whether the page has any content at all. */
-export function totalEntries(kinds: readonly WritingKind[] = KINDS): number {
-  return kinds.reduce((n, k) => n + k.entries.length, 0);
-}
-
-/** Section DOM id for a kind. One speller, so the rail and the page cannot disagree. */
-export function kindSectionId(key: string): string {
-  return `w-${key}`;
-}
-
-/** Entry DOM id. Prefixed by its kind so two kinds may hold the same slug. */
-export function entrySectionId(kindKey: string, slug: string): string {
-  return `w-${kindKey}-${slug}`;
+/** A piece's neighbours in date order: the newer one before it and the older one after it, each where it exists. */
+export function neighbours(list: readonly Piece[], slug: string): { prev?: Piece; next?: Piece } {
+  const i = list.findIndex((p) => p.slug === slug);
+  return i < 0 ? {} : { prev: list[i - 1], next: list[i + 1] };
 }

@@ -9,9 +9,6 @@
 // so every link naming it lands on the first section.
 
 import type { Organisation, Project } from '../data/profile';
-import {
-  type WritingKind, sorted as sortedEntries, kindSectionId, entrySectionId,
-} from '../data/writing';
 
 export interface Stop {
   label: string;
@@ -107,30 +104,6 @@ export function experienceStops(organisations: readonly Organisation[]): Stop[] 
     ...organisations.map((o) => ({ label: o.rail, target: experienceSectionId(o.key) })),
     { label: 'Recognition', target: 'x-recognition' },
   ];
-}
-
-/**
- * The /writing rail: one group per KIND, its pieces nested underneath.
- *
- * A page that mixes kinds gets a group per kind: the distinction between a research note and an essay is the page's
- * whole organising idea, so the rail should carry it rather than flatten it.
- *
- * An EMPTY kind still gets its stop, because the page still renders its heading and its "nothing here yet"
- * line: the section genuinely exists, so the stop points at something.
- */
-export function writingStops(kinds: readonly WritingKind[]): Stop[] {
-  return kinds.map((k) => {
-    const children = sortedEntries(k).map((e) => ({
-      // 18, not 22: a nested label gets 158px of the rail's 200 (its 30px dash gutter and 12px indent out), and
-      // 22 characters of 10px mono at 0.12em tracking take 158.4px. SideRail clips with an ellipsis as a backstop,
-      // but the tree should hand it something that fits rather than relying on the fallback.
-      label: e.title.length > 18 ? `${e.title.slice(0, 17)}…` : e.title,
-      target: entrySectionId(k.key, e.slug),
-    }));
-    return children.length
-      ? { label: k.railLabel, target: kindSectionId(k.key), children }
-      : { label: k.railLabel, target: kindSectionId(k.key) };
-  });
 }
 
 /**

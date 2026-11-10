@@ -2,7 +2,8 @@
 // The shared button: one ANATOMY (size, label, arrow, press, focus ring, and the keyboard and a11y
 // behaviour a real <a>/<button> already has) with a per-page SKIN on top. Buttons are page-own — each page gets
 // its own look when it is designed — so ANOTHER PAGE ADDS A SKIN HERE, NOT A NEW BUTTON: a `skin` value and one
-// `.btn--<skin>` block below the anatomy. Today: /projects' sticker, and the research routes' paper.
+// `.btn--<skin>` block below the anatomy. Today: /projects' sticker, and the paper sheet's paper (the research
+// routes, /writing).
 //
 // An <a> when there is an href, a <button type="button"> when there is not. Anything else passed (target, rel,
 // data-*) lands on that element. The arrow is an SVG, because the mono face's latin subset has no ↗ glyph.
@@ -66,8 +67,9 @@ const Tag = href ? 'a' : 'button';
     .btn--sticker, .btn--sticker::after { transition: transform 0.22s cubic-bezier(0.3, 1.6, 0.5, 1); }
   }
 
-  /* THE PAPER — the research routes' skin, on their sheet: a hairline box in the sheet's own ground, ink-1 type, the
-     edge going to ink on hover. Quiet on purpose; a page for papers has no use for a button that asks to be pressed.
+  /* THE PAPER — the paper sheet's skin (the research routes' Copy BibTeX, /writing's Read): a hairline box in the
+     sheet's own ground, ink-1 type, the edge going to ink on hover. Quiet on purpose; a sheet for papers and notes
+     has no use for a button that asks to be pressed.
      The ground is --sheet-ground, never --paper (in the dark theme that is the TEXT colour). Only the anatomy's press
      moves. The resting edge is under 3:1 on the sheet (1.86:1 light, 2.73:1 dark), and that is not a 1.4.11 failure:
      the label, ink-1, is what identifies the control, and WCAG does not require a text button's boundary to show. */

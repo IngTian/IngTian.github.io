@@ -24,15 +24,6 @@
 import { contact } from '../data/profile';
 import { PAGES } from '../data/nav';
 
-interface Props {
-  /** 'scroll' = flip text color by the descent fraction behind the nav (home,
-   *  the one page that rides the gradient). 'light' = pin to dark text (pages
-   *  that stay pale in light theme, e.g. /writing). Only affects the LIGHT
-   *  theme; dark is always light text. */
-  navZone?: 'scroll' | 'light';
-}
-const { navZone = 'scroll' } = Astro.props;
-
 // The current route, normalised without a trailing slash, so aria-current marks the page you are on.
 const current = Astro.url.pathname.replace(/\/+$/, '') || '/';
 
@@ -62,7 +53,7 @@ const items: Item[] = [
   },
 ];
 ---
-<nav class="cnav" aria-label="Site navigation, contact and profiles" data-cnav data-nav-mode={navZone}>
+<nav class="cnav" aria-label="Site navigation, contact and profiles" data-cnav>
   {/* PHONE MENU BUTTON — visible only on a phone (the mobile block in <style>). A real <button> with
       aria-expanded/aria-controls so the disclosure is announced; at every other width it is display:none,
       and so out of the tab order and the a11y tree. */}
@@ -440,13 +431,6 @@ const items: Item[] = [
     const nav = maybeNav;
     const descent = document.querySelector<HTMLElement>('.descent');
 
-    // Zone = which LIGHT-theme text color the nav uses. Two modes:
-    //  - 'light': pinned dark text (pages that stay pale — /writing). Set once.
-    //  - 'scroll': flip dark→paper by the descent fraction behind the nav (home,
-    //    the one page that rides the full dawn→night gradient). Needs a .descent el.
-    // (Dark theme forces light text via CSS regardless of this attribute.)
-    const mode = nav.dataset.navMode === 'light' ? 'light' : 'scroll';
-
     let onScroll: (() => void) | null = null;
     // Hoisted to the teardown's scope, not the branch's: the re-measure listener and the content observer must
     // be removable, or every View Transition would stack another observer on the same <main>.
@@ -454,7 +438,10 @@ const items: Item[] = [
     // Declared OUT here, beside onResize, because the teardown that clears it runs in this scope.
     let navResizeTimer = 0;
     let zoneRO: ResizeObserver | null = null;
-    if (mode === 'light' || !descent) {
+    // Zone = which LIGHT-theme text color the nav uses (dark theme forces light text via CSS regardless). A page
+    // with no .descent (every page but / and the 404) pins dark text; on one, it flips dark→paper by the descent
+    // fraction behind the nav.
+    if (!descent) {
       nav.dataset.zone = 'light';
     } else {
 

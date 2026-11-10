@@ -1,402 +1,158 @@
 ---
-// /writing/<slug> — ONE ROUTE FOR EVERY PIECE, now and later.
+// /writing/<slug> — ONE ROUTE FOR EVERY PIECE. The owner: "i want the writing to be flexible… My favorite quotes is
+// just a markdown file." A new piece is a .md in src/content/writing/ and gets a page here for free.
 //
-// The owner: "i want the writing to be flexible… My favorite quotes is just a markdown file." So this file is
-// the last page anyone has to write for the writing section: a new piece is a .md in src/content/writing/ and
-// it gets a page here for free.
-//
-// Composition is borrowed from /writing rather than invented: same left margin, same measure, same reading
-// gradient, same back link. That page's own note is the reason — "two reading pages that each guessed their own
-// margins would read as two sites" — and a piece and its index disagreeing would be the same fault at
-// smaller scale.
+// On the paper sheet, as /writing is (page="paper", no veil, no sky), with the index's margin and back link: the
+// header (its kind, title, the blurb as its standfirst, its dates and computed reading time), its cover as a wide
+// banner, the body, and at its foot the pieces either side of it in date order, as the index's cards.
 import { getCollection, render } from 'astro:content';
+import '../../styles/writing.css';
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import FluidSky from '../../components/FluidSky.astro';
-import SkyWash from '../../components/SkyWash.astro';
-import { KINDS, kindSectionId } from '../../data/writing';
+import Cover from '../../components/writing/Cover.astro';
+import PieceCard from '../../components/writing/PieceCard.astro';
+import { KINDS, neighbours, pieces } from '../../data/writing';
 import { longDate } from '../../lib/dates';
 
 export async function getStaticPaths() {
-  // Drafts get no page, matching the index. Committing an unfinished note must not publish it.
-  const entries = (await getCollection('writing')).filter((e) => !e.data.draft);
-  return entries.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+  // Drafts get no page, as on the index: pieces() drops them (and throws on an entry that did not render).
+  const entries = await getCollection('writing');
+  const list = pieces(entries);
+  const byId = new Map(entries.map((e) => [e.id, e]));
+  return list.map((piece) => ({
+    params: { slug: piece.slug },
+    props: { piece, entry: byId.get(piece.slug)!, around: neighbours(list, piece.slug) },
+  }));
 }
 
-const { entry } = Astro.props;
-// A markdown plugin's throw (the MathML letter fix's, on a letter Unicode has no form for) does not fail the
-// build: Astro logs it and stores the entry unrendered, which would ship an empty piece. So the page fails.
-if (!entry.rendered) throw new Error(`${entry.filePath ?? entry.id} did not render; its error is logged above`);
+const { piece: p, entry, around } = Astro.props;
 const { Content } = await render(entry);
-
-// The kind's label, so the piece says which section it belongs to and links back to it. Falls back to the raw
-// key, which cannot happen while the schema's enum and KINDS agree — and a test asserts they do.
-const kind = KINDS.find((k) => k.key === entry.data.kind);
-const written = longDate(entry.data.date);
-// Null unless the piece has actually gained something since it was published — the schema allows `updated` to
-// equal `date`, and printing the same date twice would be noise rather than information.
-const updatedLong =
-  entry.data.updated && entry.data.updated !== entry.data.date ? longDate(entry.data.updated) : null;
 ---
-{/* preloadAccent: a piece renders Fraunces in exactly three places — `.prose h3`, `.prose em` and
-     `.prose figcaption` — so the italic can be on screen before it is discovered. The index at /writing has
-     no accent rule and does not opt in. See the note next to <Font> in BaseLayout for why the preload is per
-     page rather than global or gone. Not `.prose blockquote`: that rule is `var(--font-display)`, Georgia,
-     which downloads nothing, and the quote styling here is Georgia and mono alone.
-     ONLY THE ITALIC FILE IS PRELOADED: all three rules are `font-style: italic`, so the 36,560 B normal file
-     would be fetched on the critical path for no selector here. The @font-face block is untouched, so a
-     non-italic accent rule would still render, discovered normally rather than preloaded. */}
-<BaseLayout
-  title={`${entry.data.title} — Ing Tian`}
-  description={entry.data.blurb}
-  veilLine="a thinker in the margins"
-  veilOnLoad={true}
-  navZone="light"
-  preloadAccent="italic"
->
-  <main class="piece descent is-fluid">
-    <FluidSky variant="reading" />
-    <SkyWash />
-
-    <div class="piece-block">
-      <header class="piece-head">
+<BaseLayout title={`${p.title} — Ing Tian`} description={p.blurb} page="paper" veil={false}>
+  <main class="wsheet wp">
+    <article>
+      <header class="wp-head">
         <a class="back" href="/writing">← writing</a>
-        <p class="piece-kicker">
-          {/* kindSectionId(), NOT the raw kind key. This link used to be `/writing#misc` and landed nowhere:
-              /writing prefixes every section id with `w-` (that helper exists so "the rail and the page cannot
-              disagree", and this page was the third party that did). A fragment that matches no id fails
-              silently — the browser just leaves you at the top of /writing — which is why it shipped. One
-              speller, imported, so it cannot drift again. */}
-          <a href={`/writing#${kindSectionId(entry.data.kind)}`}>{kind?.label ?? entry.data.kind}</a>
-          <span aria-hidden="true">·</span>
-          <time datetime={entry.data.date}>{written}</time>
-          {/* Only when it says something new. A piece written once and never touched shows one date; a running
-              collection says so, which is the whole reason the field exists. */}
-          {updatedLong && (
-            <><span aria-hidden="true">·</span><span>updated <time datetime={entry.data.updated}>{updatedLong}</time></span></>
-          )}
-          {entry.data.minutes && <><span aria-hidden="true">·</span><span>{entry.data.minutes} min</span></>}
+        <p class="wp-kind">{KINDS[p.kind].label}</p>
+        <h1 class="wp-h1">{p.title}</h1>
+        <p class="wp-stand">{p.blurb}</p>
+        <p class="wp-meta">
+          <time datetime={p.date}>{longDate(p.date)}</time>
+          {p.updated && <Fragment> · updated <time datetime={p.updated}>{longDate(p.updated)}</time></Fragment>}
+          · {p.minutes} min read
         </p>
-        <h1>{entry.data.title}</h1>
       </header>
+      <div class="wp-banner"><Cover figure={p.figure} seed={p.slug} size="banner" /></div>
+      <div class="wp-body"><Content /></div>
+    </article>
 
-      {/* The markdown, styled by .prose below. Nothing here knows what the piece contains — that is the point. */}
-      <div class="prose"><Content /></div>
-
-      <footer class="piece-foot">
-        <a class="back" href="/writing">← writing</a>
-        <a class="back" href="/">← the descent</a>
-      </footer>
-    </div>
+    {(around.prev || around.next) && (
+      <nav class="wp-around" aria-label="More writing">
+        <ul class="wgrid" role="list">
+          {around.prev && <PieceCard piece={around.prev} dir="← Previous" />}
+          {around.next && <PieceCard piece={around.next} dir="Next →" />}
+        </ul>
+      </nav>
+    )}
   </main>
 </BaseLayout>
 
 <style>
-  .piece { position: relative; z-index: 0; min-height: 100vh; }
-  .piece.descent { background: var(--reading-grad); }
+  /* The sheet's padding and the cards' grid are styles/writing.css's, shared with the index. A piece reads in ONE
+     column, 680px (about 68 characters of the body's Georgia), its head, banner, body and neighbours on the same two
+     edges: a banner the index's width over a narrower body left the sheet empty to the body's right. */
+  .wp { max-width: calc(680px + 2 * clamp(22px, 5vw, 72px)); }
+  .back { font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); text-decoration: none; }
+  .back:focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; border-radius: 2px; }
+  @media (hover: hover) { .back:hover { color: var(--seal); } }
 
-  .piece-block {
-    width: min(64%, 860px);
-    margin-left: 34%;
-    margin-right: clamp(24px, 4vw, 90px);
-    box-sizing: border-box;
-  }
-  .piece-head { padding: 14vh 0 4vh; }
-  .back {
-    font-family: var(--font-mono); font-size: 12px; color: var(--ink-3);
-    text-decoration: none; letter-spacing: 0.04em;
-  }
-  .back:hover { color: var(--seal); }
-  .piece-kicker {
-    display: flex; gap: 10px; align-items: baseline; margin-top: 22px;
-    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.16em;
-    text-transform: uppercase; color: var(--ink-4);
-  }
-  .piece-kicker a { color: var(--ink-3); text-decoration: none; }
-  .piece-kicker a:hover { color: var(--seal); }
-  .piece h1 {
-    font-family: var(--font-display); font-weight: 500; font-size: clamp(34px, 4.4vw, 52px);
-    line-height: 1.06; letter-spacing: -0.01em; font-variation-settings: 'SOFT' 60;
-    margin-top: 14px; color: var(--ink-1); text-wrap: balance;
-  }
+  /* ── the header ── */
+  .wp-kind { display: inline-block; margin: 28px 0 0; padding: 4px 9px; font-size: 12px; font-weight: 500; line-height: 1;
+    color: var(--ink-2); border: 1px solid rgba(var(--hairline-rgb), 0.35); border-radius: 999px; }
+  .wp-h1 { margin: 18px 0 0; font: 800 clamp(36px, 4.6vw, 60px)/1.04 var(--font-body); letter-spacing: -0.03em; color: var(--ink-1);
+    text-wrap: balance; }
+  .wp-stand { margin: 18px 0 0; max-width: 34em; font-size: 20px; line-height: 1.5; color: var(--ink-3); text-wrap: pretty; }
+  .wp-meta { margin: 18px 0 0; font: 12px/1.4 var(--font-mono); color: var(--ink-3); }
+  .wp-banner { margin-top: 40px; }
 
-  /* The prose style lives in the is:global block below, and it HAS to. See the note there. */
+  /* ── the body. <Content /> carries no scope attribute, so every rule reaches it through :global, under .wp-body
+     (CLAUDE.md, Astro trap 1). Georgia, the sheet's reading face, on the column's measure; the headings are the page's sans.
+     Tailwind's preflight zeroes every margin and strips list markers, so a markdown element with no rule here is
+     undifferentiated text, not a browser default. ── */
+  .wp-body { margin-top: 48px; font: 18px/1.65 var(--font-display); color: var(--ink-2); }
+  .wp-body > :global(* + *) { margin-top: 1.1em; }
+  .wp-body :global(h2) { margin-top: 2em; font: 700 24px/1.25 var(--font-body); letter-spacing: -0.015em; color: var(--ink-1); }
+  .wp-body :global(h3) { margin-top: 1.7em; font: 700 19px/1.3 var(--font-body); letter-spacing: -0.01em; color: var(--ink-1); }
+  .wp-body :global(h4) { margin-top: 1.7em; font: 12px/1.4 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-3); }
+  .wp-body :global(em) { font-style: italic; }
+  .wp-body :global(strong) { font-weight: 700; color: var(--ink-1); }
+  /* a link keeps the body's ink and is told apart by its underline, as on the research routes */
+  .wp-body :global(a) { color: inherit; text-decoration: underline 1px; text-decoration-color: var(--sheet-link);
+    text-underline-offset: 0.18em; }
+  .wp-body :global(a:focus-visible) { outline: 2px solid var(--ochre); outline-offset: 2px; border-radius: 2px; }
+  @media (hover: hover) { .wp-body :global(a:hover) { color: var(--seal); } }
+  .wp-body :global(ul) { padding-left: 1.3em; list-style: disc; }
+  .wp-body :global(ol) { padding-left: 1.3em; list-style: decimal; }
+  .wp-body :global(ul ul) { list-style: circle; }
+  .wp-body :global(ol ol) { list-style: lower-alpha; }
+  .wp-body :global(li + li), .wp-body :global(li > :is(ul, ol)) { margin-top: 0.4em; }
+  .wp-body :global(li::marker) { color: var(--ink-3); }
+  .wp-body :global(hr) { margin-block: 2.4em; border: 0; border-top: 1px solid rgba(var(--hairline-rgb), 0.35); }
+  .wp-body :global(img) { display: block; max-width: 100%; height: auto; margin-inline: auto; border-radius: 2px; }
+  .wp-body :global(figcaption) { margin-top: 10px; font: 14px/1.5 var(--font-body); color: var(--ink-3); }
 
-  .piece-foot { display: flex; gap: 20px; padding: 8vh 0 12vh; }
+  /* A quote is set apart by hairlines, larger and in italic. THE PARAGRAPH STRAIGHT AFTER A QUOTE THAT OPENS WITH A
+     NAME IN BOLD IS ITS SOURCE, by position rather than by a class, so the markdown stays plain (the favourite quotes
+     are written so), and prose that carries on after a quote stays prose: set to the right, on the owner's call, so the
+     eye leaves the quote at its last line and finds the source there. The quote has no margin below, or the source
+     would sit a quote's margin away from it. (`:first-child` ignores text, so a paragraph whose first ELEMENT is bold
+     after some words still matches: write a source's name first.) */
+  .wp-body :global(blockquote) { margin-top: 1.8em; padding: 0.7em 0; font-size: 22px; line-height: 1.45; font-style: italic;
+    color: var(--ink-1); border-block: 1px solid rgba(var(--hairline-rgb), 0.35); text-wrap: balance; }
+  .wp-body :global(blockquote p + p) { margin-top: 0.5em; }
+  .wp-body :global(blockquote + p:has(> strong:first-child)) { margin-top: 0.85em; text-align: right; font: 12px/1.6 var(--font-mono); letter-spacing: 0.04em;
+    color: var(--ink-3); }
+  .wp-body :global(blockquote + p:has(> strong:first-child)::before) { content: '— '; }
+  .wp-body :global(blockquote + p:has(> strong:first-child) strong) { font-weight: 400; color: var(--ink-1); }
 
-  /* Narrow: the 34% left margin is a desktop composition — it leaves a 12ch measure at 390px.
-     1100px AND THE SAME COLLAPSE AS /writing: at 1100px and below the margin goes (it matches /writing's, where
-     it clears SideRail, which hides at the same width) and the column re-centres as a 760px block. Identical numbers mean the
-     reading column does not move when you go from the index to a piece, at any width — a different breakpoint
-     or a different collapse throws it sideways on a title's click. The top padding is /writing's at every width
-     for the same reason, so the headline does not move vertically either. */
-  @media (max-width: 1100px) {
-    .piece-block { width: auto; margin: 0 auto; padding: 0 24px; max-width: 760px; }
-  }
-</style>
+  /* Code: Shiki writes its theme as INLINE style (a dark slab and a palette of token colours), and seal red is the
+     only colour on the sheet, so a fence goes monochrome; inline style is beaten only by !important. Overflow scrolls
+     inside the block, never the page. */
+  .wp-body :global(code) { padding: 1px 5px; font: 0.86em var(--font-mono); background: rgba(var(--hairline-rgb), 0.1); border-radius: 3px; }
+  .wp-body :global(pre) { max-width: 100%; overflow-x: auto; padding: 14px 16px; font: 13px/1.6 var(--font-mono); tab-size: 2;
+    border: 1px solid rgba(var(--hairline-rgb), 0.3); border-radius: 4px;
+    background: rgba(var(--hairline-rgb), 0.06) !important; color: var(--ink-2) !important; }
+  .wp-body :global(pre span) { color: inherit !important; }
+  .wp-body :global(pre code) { padding: 0; font: inherit; background: none; }
 
-{/* ── THE PROSE STYLE, AND IT MUST BE is:global. NOT a preference — the first version of this was a scoped
-     block and NONE of it applied, which is why the owner saw a wall with no spacing and a quote that did not
-     read as a quote. Astro scoped styles rewrite every selector with a [data-astro-cid-…] attribute, and the
-     elements <Content /> emits are generated from markdown at build time, so they carry no such attribute.
-     `.prose blockquote` became `.prose[cid] blockquote[cid]` and matched nothing. The repo's own guide warns
-     about this attribute changing specificity; it also silently changes what a selector can REACH.
-     Everything below is nested under .prose so going global cannot leak into the rest of the site. */}
-<style is:global>
-  /* Measure is 62ch. The block is 860px wide, which at 16px is about 110 characters — a line length nobody
-     finishes. */
-  .prose { max-width: 62ch; color: var(--ink-2); font-size: 16px; line-height: 1.75; }
-  .prose > * + * { margin-top: 1.15em; }
-  .prose > :first-child { margin-top: 0; }
-  .prose h2 {
-    font-family: var(--font-display); font-weight: 500; color: var(--ink-1);
-    font-size: clamp(22px, 2.2vw, 28px); line-height: 1.2; margin-top: 2.4em;
-  }
-  .prose h3 {
-    font-family: var(--font-accent); font-style: italic; color: var(--ink-1);
-    font-size: clamp(18px, 1.7vw, 21px); margin-top: 2em;
-  }
-  .prose a { color: var(--ink-1); text-decoration: none; box-shadow: inset 0 -1px 0 0 var(--ochre); }
-  .prose a:hover { color: var(--seal); }
-  .prose strong { color: var(--ink-1); font-weight: 500; }
-  .prose em { font-family: var(--font-accent); font-style: italic; }
-  .prose code {
-    font-family: var(--font-mono); font-size: 0.88em;
-    background: color-mix(in oklab, var(--ink-5) 14%, transparent); padding: 1px 5px; border-radius: 3px;
-  }
-  .prose ul, .prose ol { padding-left: 1.4em; }
-  .prose li + li { margin-top: 0.4em; }
-  .prose hr { border: 0; border-top: 1px solid var(--ink-5); margin: 2.6em 0; opacity: 0.5; }
+  /* A table scrolls in its own box rather than widening the page; a column's GFM alignment (`align`) is kept. */
+  .wp-body :global(table) { display: block; width: max-content; max-width: 100%; overflow-x: auto; border-collapse: collapse;
+    font: 15px/1.45 var(--font-body); font-variant-numeric: tabular-nums; border-block: 1px solid rgba(var(--hairline-rgb), 0.6); }
+  .wp-body :global(:is(th, td)) { min-width: 8ch; padding: 6px 16px 6px 0; vertical-align: baseline; }
+  .wp-body :global(:is(th, td):not([align])) { text-align: left; }
+  .wp-body :global(:is(th, td):last-child) { padding-right: 0; }
+  .wp-body :global(thead th) { font-weight: 600; color: var(--ink-1); border-bottom: 1px solid rgba(var(--hairline-rgb), 0.35); }
 
-  /* ── A QUOTE HAS TO LOOK LIKE A QUOTE. The owner: "i cant even read sometimes… to be a quote."
-     The earlier attempt was a size bump and a left rule, which is what a callout looks like, not what a
-     quotation looks like. This is a pull-quote: a hanging opening mark in ochre doing the announcing, the words
-     in the display serif large enough to be the loudest thing in the column, and the attribution set as a
-     separate register underneath — mono, small, em-dashed — so the eye never has to work out where the quote
-     stops and the source begins.
-     The mark HANGS in the left margin (negative offset inside padding that clears it) rather than sitting
-     inline, so the quote's own first line stays flush with the prose above it and the block still reads as part
-     of the column. Generous space above and below makes each quote a unit, which is what a collection needs. */
-  .prose blockquote {
-    position: relative;
-    margin-top: 2.6em;
-    padding-left: 2.6ch;
-    font-family: var(--font-display);
-    font-size: clamp(21px, 2.5vw, 27px);
-    line-height: 1.42;
-    letter-spacing: -0.008em;
-    color: var(--ink-1);
-    text-wrap: pretty;
-  }
-  .prose blockquote::before {
-    content: '\201C';
-    position: absolute;
-    left: -0.28ch;
-    top: -0.06em;
-    font-family: var(--font-display);
-    font-size: 2.5em;
-    line-height: 1;
-    color: var(--ochre);
-    opacity: 0.5;
-  }
-  .prose blockquote p { margin: 0; }
-  .prose blockquote p + p { margin-top: 0.5em; }
+  /* Maths is build-time MathML: inline in its paragraph; a display (`$$`) scrolls in its own box wherever it sits, in
+     the body, a list, a quote or a footnote. Flush left, not centred: centred in a scroll box, an overflow's left half
+     cannot be reached. */
+  .wp-body :global(math) { color: var(--ink-1); }
+  .wp-body :global(.katex:has(> math[display='block'])) { display: block; max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: 0.3em 0; }
+  .wp-body :global(math[display='block']) { font-size: 1.1em; }
 
-  /* THE PARAGRAPH IMMEDIATELY AFTER A QUOTE IS ITS SOURCE, styled by position rather than by a class, so the
-     markdown stays a plain .md with nothing to remember and still renders correctly anywhere else. */
-  /* SET TO THE RIGHT, on the owner's call — the convention for an attribution under a pull-quote, and it also
-     does the work the em dash was doing alone: the eye leaves the quote at its last line, bottom-right, and the
-     source is already there instead of back at the left margin where a new paragraph would start.
-     `margin-left: auto` on a max-width box is what pushes it to the column's right edge; text-align alone would
-     right-align the words inside a box still sitting on the left. */
-  .prose blockquote + p {
-    margin-top: 0.85em;
-    margin-left: auto;
-    max-width: 52ch;
-    text-align: right;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    letter-spacing: 0.04em;
-    line-height: 1.65;
-    color: var(--ink-4);
-  }
-  .prose blockquote + p::before { content: '— '; color: var(--ink-5); }
-  .prose blockquote + p strong { color: var(--ink-2); font-weight: 400; }
+  /* GFM footnotes: the marks, and the notes under a hairline at the foot, in the page's sans. */
+  .wp-body :global(sup) { font-size: 0.7em; line-height: 0; }
+  .wp-body :global([data-footnote-ref]) { padding-inline: 1px; text-decoration: none; }
+  .wp-body :global(.footnotes) { margin-top: 3em; padding-top: 14px; font: 15px/1.55 var(--font-body); color: var(--ink-3);
+    border-top: 1px solid rgba(var(--hairline-rgb), 0.35); }
+  .wp-body :global(.footnotes li + li) { margin-top: 0.5em; }
+  .wp-body :global([data-footnote-backref]) { text-decoration: none; }
 
-  /* ══ THE REST OF MARKDOWN ═══════════════════════════════════════════════════════════════════════════════
-     Everything above styles a paragraph, two heading levels, a link, a half-styled list and a quote — which is
-     roughly what the first piece happened to contain. The kinds this shelf was built for promise "derivations"
-     and "the mathematics left in", yet a table, a code fence, an image, a figure, a fourth-level heading, a
-     list's own markers and an equation had not one rule between them. Several were not merely unstyled but
-     actively broken (each note says
-     how), so what follows is repair rather than polish. Two rules of the road for anything added later:
-       · it belongs in THIS global block, never the scoped one above — see the note at the top of this style;
-       · Tailwind's preflight zeroes `margin`, `padding` and `border` on EVERY element and strips list markers,
-         so a markdown element with no rule here renders as undifferentiated text, not as a browser default. */
+  /* ── the pieces either side: the index's cards (components/writing/PieceCard.astro), on its grid ── */
+  .wp-around { margin-top: 96px; padding-top: 28px; border-top: 1px solid rgba(var(--hairline-rgb), 0.3); }
+  /* the neighbours, two across in the column, one on a phone */
+  .wp-around .wgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 640px) { .wp-around .wgrid { grid-template-columns: minmax(0, 1fr); } }
 
-  /* ── TABLE, AND THE PAGE MUST NEVER SCROLL SIDEWAYS BECAUSE OF ONE.
-     Four columns of numbers are wider than a 62ch measure, and a plain <table> insists on at least its own
-     min-content width: it overhangs the column, the overhang widens the DOCUMENT, and a phone gets a horizontal
-     scrollbar on the whole page — every other line of prose then slides sideways under the thumb while you try
-     to read the table. `display: block` + `overflow-x: auto` makes the table its own scroll container (its rows
-     re-wrap into an anonymous table box inside, so it still lays out as a table), so the worst case is a table
-     you drag instead of a page that will not hold still.
-     `width: max-content` capped at 100% lets a two-column table stay its own narrow width instead of stretching
-     across the measure.
-     The cells' `min-width` is what decides between wrapping and scrolling, and it is the interesting part: with
-     no floor, auto table layout squeezes columns until "Max drawdown" is one word per line, which is unreadable
-     in a different way; with a floor the table wraps gently while the columns stay legible, and only starts
-     scrolling once even that is impossible. 8ch is about where a signed number stops breaking. */
-  .prose table {
-    display: block;
-    width: max-content;
-    max-width: 100%;
-    overflow-x: auto;
-    border-collapse: collapse;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    line-height: 1.5;
-  }
-  /* Hairlines through --hairline-rgb, so they re-theme with the palette instead of needing a dark-mode override
-     list — and stated as `1px solid <colour>` in full because preflight's `border: 0 solid` means a border with
-     only a colour draws nothing. */
-  .prose th, .prose td {
-    min-width: 8ch;
-    padding: 7px 16px 7px 0;
-    text-align: left;
-    vertical-align: baseline;
-    border-bottom: 1px solid rgba(var(--hairline-rgb), 0.12);
-  }
-  .prose th:last-child, .prose td:last-child { padding-right: 0; }
-  .prose td { color: var(--ink-2); font-variant-numeric: tabular-nums; }
-  .prose thead th {
-    color: var(--ink-4); font-weight: 400; font-size: 9.5px;
-    letter-spacing: 0.06em; text-transform: uppercase;
-    border-bottom: 1px solid rgba(var(--hairline-rgb), 0.3);
-  }
-  /* A leading <th> in a body row names the row rather than labelling a column, so it reads as a label, not as
-     another cell of data. */
-  .prose tbody th { color: var(--ink-1); font-weight: 500; }
-  .prose tbody tr:last-child th, .prose tbody tr:last-child td { border-bottom: 0; }
-
-  /* ── CODE FENCE: SHIKI'S PALETTE, OVERRULED.
-     Astro highlights fences with Shiki's github-dark theme and writes it as INLINE STYLE —
-     `<pre style="background-color:#24292e;color:#e1e4e8">` plus a `style="color:#F97583"` on every token span.
-     On a pale reading page that is a blue-black slab full of pink, purple and cyan: a second entire palette, on
-     a site whose only saturated colour in the light theme is the seal. Inline style cannot be beaten by
-     specificity, which is the whole reason `!important` appears here and the only place it does.
-     Code therefore goes monochrome, deliberately: there is no syntax-colour language in this palette to map
-     Shiki's tokens onto, and quiet ink on a paper-tone panel is exactly what the inline `code` chip above
-     already is. If coloured syntax is ever wanted, the fix is a `markdown.shikiConfig` theme built from the
-     tokens in astro.config.mjs — not more `!important` here.
-     Astro already puts `overflow-x: auto` and `tabindex="0"` on the <pre>, so a long line scrolls inside the
-     block and the scroll region is reachable from the keyboard; `max-width: 100%` is what keeps that overflow
-     off the document, the same job it does for the table. */
-  .prose pre {
-    max-width: 100%;
-    overflow-x: auto;
-    padding: 14px 16px;
-    border: 1px solid rgba(var(--hairline-rgb), 0.14);
-    border-radius: 4px;
-    background: color-mix(in oklab, var(--ink-5) 18%, transparent) !important;
-    color: var(--ink-2) !important;
-    font-size: 12.5px;
-    line-height: 1.6;
-    tab-size: 2;
-  }
-  .prose pre span { color: inherit !important; }
-  /* The inline chip must not double up inside a fence: `.prose code` gives every <code> a tinted background and
-     padding, and a fence IS a <code> inside the <pre> — so a fence was getting a chip drawn around a panel. */
-  .prose pre code {
-    background: none; padding: 0; border-radius: 0;
-    font-size: inherit; color: inherit;
-  }
-
-  /* ── MATH. remark-math + rehype-katex (output: 'mathml') emit `<span class="katex"><math>…</math></span>`:
-     inline math inside its paragraph, DISPLAY math as a direct child of .prose. That structure is what
-     `.prose > .katex` keys off — the two cases are told apart by where they sit, because with MathML output
-     rehype hands us no class that distinguishes them.
-     Two real faults, not just missing polish. The wrapper span is INLINE, so a display equation took no space
-     above or below it (`.prose > * + *` margins do nothing to an inline box) and sat glued to the paragraph
-     that introduced it; and a wide equation had nothing stopping it from overhanging the measure and widening
-     the page, exactly like the table. Making the wrapper a block fixes the first and lets `overflow-x` fix the
-     second.
-     NOT centred, deliberately: `text-align: center` inside a scroll container throws the overflow to BOTH sides
-     and the left half becomes unreachable, because scrollLeft cannot go negative — a long derivation would lose
-     its opening term with no way to scroll back to it. Flush left, scrolls right. */
-  .prose > .katex {
-    display: block;
-    max-width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-    margin-bottom: 0.75em;   /* + the 1.15em the next element already carries = matched air below and above */
-  }
-  .prose > .katex:not(:first-child) { margin-top: 1.9em; }
-  /* Colour is stated rather than inherited, and this is a choice, not a repair: MathML does inherit `color`, but
-     /research sets its equations at --ink-1 against body copy at --ink-2 because an equation is the subject of
-     the sentence around it, not an aside — and pinning the value means no UA sheet gets a vote.
-     font-family is deliberately LEFT ALONE. The UA's `font-family: math` is what supplies stretchy glyphs —
-     tall parentheses, radicals, summation limits — and forcing the display serif here (as the FactorFan pill
-     does for its one short line) would break exactly the constructs a derivation is made of. */
-  .prose math { color: var(--ink-1); }
-  .prose > .katex math { font-size: 1.15em; }   /* a step above the prose, as on /research */
-
-  /* ── IMAGE. Preflight already gives every <img> `max-width: 100%; height: auto; display: block`, and this
-     restates it because prose images are the one place that has to be true whatever else changes: a markdown
-     image pointing at a local file goes through astro:assets, which writes intrinsic width/height ATTRIBUTES
-     onto the tag, and `height: auto` is what keeps such an image in proportion once max-width shrinks it.
-     Centred in the measure and never wider than it — an overhanging image widens the document just as a table
-     does. */
-  .prose img {
-    display: block; max-width: 100%; height: auto;
-    margin-left: auto; margin-right: auto; border-radius: 2px;
-  }
-
-  /* ── FIGURE + CAPTION. Markdown emits a figure only when the piece writes the HTML by hand, which is exactly
-     when a caption matters, so the caption gets its own register: the accent italic the prose already uses for
-     `em`, small and at --ink-4, so it reads as the author's aside about the image rather than as body copy that
-     happens to sit under it. A figure gets more air than a paragraph because it is a unit. */
-  .prose > figure:not(:first-child) { margin-top: 2.2em; }
-  .prose figcaption {
-    margin-top: 10px;
-    font-family: var(--font-accent); font-style: italic;
-    font-size: 13px; line-height: 1.55; color: var(--ink-4);
-  }
-
-  /* ── H4. h2 is the display serif and h3 the accent italic, so a fourth level cannot be one more size step —
-     at reading scale there is nothing left between an 18px italic and body copy. It changes REGISTER instead,
-     to the small mono label every other meta line on this page is set in. Preflight resets headings to
-     `font-size: inherit; font-weight: inherit`, so with no rule an h4 is indistinguishable from a paragraph. */
-  .prose h4 {
-    font-family: var(--font-mono); font-weight: 400;
-    font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--ink-3); margin-top: 2.2em;
-  }
-
-  /* ── LISTS, WHOSE MARKERS WERE MISSING ALTOGETHER. Preflight sets `ol, ul, menu { list-style: none }`, so the
-     rule further up — which only set padding-left — produced indented lines with no bullets and no numbers: a
-     nested list read as a paragraph that had been pushed right, with nothing to show what nested under what.
-     Restated per level, disc → circle → square (and decimal → alpha → roman), so depth is visible rather than
-     implied, with markers at --ink-4 so structure is legible without the bullets shouting over the words. */
-  .prose ul { list-style: disc; }
-  .prose ol { list-style: decimal; }
-  .prose ul ul { list-style: circle; }
-  .prose ul ul ul { list-style: square; }
-  .prose ol ol { list-style: lower-alpha; }
-  .prose ol ol ol { list-style: lower-roman; }
-  .prose li::marker { color: var(--ink-4); }
-  /* A nested list lives inside its parent <li>, where `.prose > * + *` cannot reach it and preflight has zeroed
-     its margins — so without this the child list starts hard against the line that introduces it. A shallower
-     indent than the top level is the usual convention, and it keeps a three-deep list inside the measure. */
-  .prose li > ul, .prose li > ol { margin-top: 0.4em; padding-left: 1.2em; }
-
-  /* On a phone the hanging mark would sit outside the text column, so it comes inside and the quote loses the
-     hang rather than the margin. */
-  @media (max-width: 640px) {
-    .prose blockquote { padding-left: 2ch; }
-    .prose blockquote::before { left: -0.1ch; font-size: 2.1em; }
-    /* The attribution stays right-set on a phone too — at 390px a 52ch box is wider than the column, so it
-       fills the width and the right alignment is what keeps it reading as a source line rather than as the
-       next paragraph. */
-    .prose blockquote + p { max-width: none; }
-  }
+  @media (max-width: 640px) { .wp-body { font-size: 17px; } }
 </style>

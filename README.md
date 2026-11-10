@@ -6,7 +6,8 @@ Operations Research PhD at the University of Toronto, full-stack SDE/MLE. Live a
 
 The homepage is a vertical scroll *down* one continuous "Monet sky" — *"The Descent"* — paged one slide per
 gesture like a deck. Around it are **/research** (the papers, each opening its page here or its publisher's),
-**/writing**, **/projects**, **/experience** and **/art**, a quiet museum room for calligraphy and photography.
+**/writing** (notes, explainers and methods, as a base you can search), **/projects**, **/experience** and
+**/art**, a quiet museum room for calligraphy and photography.
 
 > **[CLAUDE.md](./CLAUDE.md) is the guide**: the stack, the layout, the design rules, the traps that have each
 > shipped a bug here, and what has already been built and rejected. Read it before changing anything. This
@@ -38,7 +39,7 @@ Before committing, all three, in this order: `npm run build` → `npm run typech
 
 | What | Where |
 | :--- | :---- |
-| A new **writing piece** | a `.md` in `src/content/writing/` with frontmatter. No code change; it appears on `/writing` and gets its own page. |
+| A new **writing piece** | a `.md` in `src/content/writing/` with frontmatter (the fields are in CLAUDE.md, *Writing is markdown*). No code change; it appears on `/writing` as a card and gets its own page. Its reading time and cover are computed. |
 | A paper's **explainer page** | a `.md` in `src/content/papers/` (its record stays in `profile.ts`, its numbers and figures in `src/data/papers/`); it becomes `/research/<slug>`. The syntax is in CLAUDE.md, *Papers are files*. |
 | Résumé, bio, timeline, publications, projects, contact links | `src/data/profile.ts` — typed, cross-referenced by id, and some numbers are computed from it. On /experience a role names its organisation (`organisations`), whose panel lists it. |
 | /experience's logo marks | `src/data/experienceMarks.ts` — each logo as a 24 x 24 pixel matrix with its colours; a new organisation needs one (the build fails without it, naming it). |

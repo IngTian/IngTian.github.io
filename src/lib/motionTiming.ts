@@ -1,9 +1,9 @@
 // The pure half of the motion module (scripts/motion.ts): the curves and the durations every move on the rail, the
-// research routes, /art and /experience is made of, the one stagger formula and the paper page's batches made with
-// it, and the arithmetic of a sweep laid along a run of text.
+// research routes, /art, /experience and /writing is made of, the one stagger formula and the paper page's batches
+// made with it, and the arithmetic of a sweep laid along a run of text.
 // Pure so it can be specified; the DOM half only measures and plays. CSS cannot import these, so
-// tests/motionTiming.test.ts holds every curve and duration the rail's, the research routes', /art's and
-// /experience's CSS states to them.
+// tests/motionTiming.test.ts holds every curve and duration the rail's, the research routes', /art's, /experience's and
+// /writing's covers' CSS states to them.
 
 /** Every move: a quick start and a long settle. */
 export const EASE = 'cubic-bezier(.2,.7,.2,1)';
@@ -65,6 +65,10 @@ export const ART = { swap: 300, tileFade: 600 } as const;
 /** /experience (pages/experience.astro): on a panel's hover or focus its mark cross-fades from ink into its logo's
  *  colours over `mark`, and its enlarged mark fades in behind the panel over `ground`. */
 export const EXPERIENCE = { mark: 320, ground: 420 } as const;
+
+/** /writing (components/writing/Cover.astro): on a card's hover or keyboard focus its cover cross-fades from ink into
+ *  its figure's colours over `cover`. */
+export const WRITING = { cover: 320 } as const;
 
 /**
  * The delay of item `i` of `n` entering together: `step` apart; closer when that would start the last item after

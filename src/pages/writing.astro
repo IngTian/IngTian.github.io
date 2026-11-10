@@ -1,231 +1,194 @@
 ---
-// /writing — essays, research notes and explainers.
+// /writing — the writing as a base you can search, not a listing of everything. The owner: "a base you can search …
+// we might have lots of writings". On the paper sheet, as the research routes are ("the background should be
+// cleaner and more or less like the research panel feeling"): page="paper", no veil, no sky and no rail, since the
+// search is its navigation. Sans for the structure, the owner's pick of the two prototyped ("i like sans").
 //
-// The owner: "you might want pages that is expandable to contain research projects, we will have writings and
-// more in the future." A separate route from /research, on their choice: a paper and a post are different
-// objects with different contracts, and filing them together lets informal writing borrow the paper's
-// authority. /research stays papers-only.
-//
-// EXPANDABLE BY CONSTRUCTION. The page renders whatever KINDS data/writing.ts declares, and each kind renders
-// whatever entries it holds — so a fourth kind (talks, teaching, a reading log) is a data edit, and the first
-// essay is a data edit. There is nothing to lay out again.
-//
-// Composition is deliberately shared: /writing/<slug> has the same margin, measure and gradient (it has no rail).
-// Two reading pages that each guessed their own margins would read as two sites.
+// IT GROWS BY COUNT WITHOUT CHANGING LAYOUT. 0 pieces: the header and the cow. 1+: the lead (the newest featured
+// piece, else the newest) and the cards of the rest. SEARCH_FROM+ (data/writing.ts): the controls between them, a
+// search over each card's words and a chip per kind. The pieces come through pieces(), the one seam to the markdown.
+import '../styles/writing.css';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PlushCow from '../components/PlushCow.astro';
-import FluidSky from '../components/FluidSky.astro';
-import SkyWash from '../components/SkyWash.astro';
-import SideRail from '../components/SideRail.astro';
+import PieceCard from '../components/writing/PieceCard.astro';
 import { getCollection } from 'astro:content';
-import { KINDS, buildKinds, sorted, totalEntries, kindSectionId, entrySectionId } from '../data/writing';
+import { CHARTER, KINDS, KIND_KEYS, SEARCH_FROM, leadAndRest, pieces } from '../data/writing';
 import { COW_LINES_WRITING } from '../data/cowGlyph';
-import { writingStops } from '../lib/pageStops';
-import { longDate } from '../lib/dates';
 
-// THE PIECES COME FROM MARKDOWN; the kinds stay in data/writing.ts. Drafts are dropped here rather than
-// filtered in the template, so nothing downstream — the rail, the count, the sections — can disagree about
-// what exists. Sorting stays in sorted() where it already lives and is already tested.
-const entries = (await getCollection('writing'))
-  .filter((e) => !e.data.draft)
-  .map((e) => ({
-    slug: e.id,
-    title: e.data.title,
-    date: e.data.date,
-    updated: e.data.updated,
-    blurb: e.data.blurb,
-    minutes: e.data.minutes,
-    featured: e.data.featured,
-    kind: e.data.kind,
-    href: `/writing/${e.id}`,
-  }));
+const list = pieces(await getCollection('writing'));
+const n = list.length;
+const { lead, rest } = leadAndRest(list);
 
-const kinds = buildKinds(entries, KINDS);
-const stops = writingStops(kinds);
-const total = totalEntries(kinds);
-
+// A chip per kind that has a piece, with its count at build time; an empty kind has no chip.
+const chips = KIND_KEYS.map((k) => ({ k, ...KINDS[k], count: list.filter((p) => p.kind === k).length })).filter((c) => c.count > 0);
 ---
 <BaseLayout
   title="Writing — Ing Tian"
-  description="Essays, research notes and explainers by Ing Tian (Zeying Tian) on multi-period portfolio optimization, quantitative finance, and the engineering underneath it."
-  veilLine="a thinker in the margins"
-  veilOnLoad={true}
-  navZone="light"
+  description="Notes, explainers and methods by Ing Tian (Zeying Tian): working notes from the PhD reading in multi-period portfolio optimization, single ideas with the mathematics left in, and how a trading system is built and tested."
+  page="paper"
+  veil={false}
 >
-  <main class="writing descent is-fluid">
-    <FluidSky variant="reading" />
-    <SkyWash />
+  <main class="wsheet wb">
+    <header>
+      <a class="back" href="/">← back</a>
+      <p class="wb-badge">
+        <svg viewBox="0 0 10 12" width="10" height="12" aria-hidden="true" focusable="false">
+          <path d="M1.5 1h7v10L5 8.4 1.5 11z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+        </svg>
+        Writing
+      </p>
+      <h1 class="wb-h1">{CHARTER.headline}</h1>
+      <p class="wb-sub">{CHARTER.sub}</p>
+    </header>
 
-    {/* NO RAIL WHEN THERE IS NOTHING TO POINT AT. The kind sections only render once something is published,
-        so rendering the rail unconditionally would leave a column of anchors pointing at ids that do not
-        exist. */}
-    {total > 0 && <SideRail stops={stops} />}
-
-    <div class="writing-block">
-      <header class="writing-head">
-        <a class="back" href="/">← back</a>
-        <h1>Writing</h1>
-        <p class="lede">
-          Notes and essays on multi-period portfolio optimization and the engineering underneath it. The papers
-          live on <a class="inline-link" href="/research">research</a>; this is the thinking around them —
-          shorter, less formal, and revisable.
-        </p>
-        {total === 0 && (
-          /* THE HONEST OPENING. One line, and then a cow. */
-          <p class="state">
-            <span class="state-mark" aria-hidden="true"></span>
-            Nothing published yet.
-          </p>
-        )}
-      </header>
-
-      {/* ── EMPTY: A COW, NOT A SCAFFOLD.
-          The owner: "instead of scaffolding something that doesn't exist yet, let's just put that big cow
-          there." Right — three sections each promising what will one day fill them is three apologies and no
-          content, and it makes the page look abandoned rather than early. A cow holding the space is honest
-          about there being nothing here, and better company.
-          The structure is not lost: the moment data/writing.ts holds one entry, the kind sections below render
-          exactly as before and the cow steps aside. Nothing to lay out again. */}
-      {total === 0 && (
-        <div class="writing-cow">
-          <PlushCow
-            size="large"
-            lines={COW_LINES_WRITING}
-            label="A cow, holding the space until something is written here. Press it."
-          />
-        </div>
-      )}
-
-      <div class="kind-list" hidden={total === 0}>
-        {kinds.map((kind) => (
-          <section class="kind" id={kindSectionId(kind.key)} aria-labelledby={`${kindSectionId(kind.key)}-h`}>
-            <header class="kind-head">
-              <h2 id={`${kindSectionId(kind.key)}-h`} class="kind-title">{kind.label}</h2>
-              <p class="kind-gloss">{kind.gloss}</p>
-            </header>
-
-            {kind.entries.length === 0 ? (
-              /* A kind names WHAT is coming rather than saying "coming soon": a specific plan reads as a plan,
-                 a generic promise reads as filler. Copy lives in data/writing.ts with the kind. */
-              <p class="kind-empty">{kind.empty}</p>
-            ) : (
-              <ol class="piece-list">
-                {sorted(kind).map((e) => (
-                  <li class="piece" id={entrySectionId(kind.key, e.slug)}>
-                    <p class="piece-meta">
-                      <time datetime={e.date}>{longDate(e.date)}</time>
-                      {e.updated && e.updated !== e.date && (
-                        <span class="piece-upd">updated <time datetime={e.updated}>{longDate(e.updated)}</time></span>
-                      )}
-                      {e.minutes && <span class="piece-mins">{e.minutes} min</span>}
-                    </p>
-                    <h3 class="piece-title">
-                      {/* Unpublished pieces render as plain text, never as a link to nowhere. */}
-                      {e.href ? <a href={e.href}>{e.title}</a> : e.title}
-                    </h3>
-                    <p class="piece-blurb">{e.blurb}</p>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
-        ))}
+    {/* Nothing published: a cow holding the space, the owner's ruling, rather than a scaffold of what will one day
+        fill it. */}
+    {n === 0 && (
+      <div class="wb-cow">
+        <PlushCow size="large" lines={COW_LINES_WRITING} label="A cow, holding the space until something is written here. Press it." />
       </div>
+    )}
 
-      <footer class="writing-foot"><a class="back" href="/">← back to the descent</a></footer>
-    </div>
+    {lead && <PieceCard piece={lead} lead />}
+
+    {rest.length > 0 && (
+      <section class="wb-more" aria-label="More writing">
+        {n >= SEARCH_FROM && (
+          <div class="wb-ctl">
+            <div class="wb-chips" role="group" aria-label="Kinds">
+              <button type="button" class="wb-chip" data-kind="all" aria-pressed="true">All <span class="wb-c">{n}</span></button>
+              {chips.map((c) => (
+                <button type="button" class="wb-chip" data-kind={c.k} aria-pressed="false" title={c.gloss}>{c.label} <span class="wb-c">{c.count}</span></button>
+              ))}
+            </div>
+            <search class="wb-search">
+              <label class="wb-field">
+                <span class="sr-only">Search the writing</span>
+                <svg class="wb-glass" viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" focusable="false">
+                  <circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" stroke-width="1.3" />
+                  <path d="M9.4 9.4L13 13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                </svg>
+                <input type="search" placeholder={`Search ${n} pieces`} autocomplete="off" spellcheck="false" />
+                <kbd class="wb-kbd" aria-hidden="true">/</kbd>
+              </label>
+              <p class="wb-status" role="status">{n} of {n}</p>
+            </search>
+          </div>
+        )}
+        <ul class="wgrid" role="list">
+          {rest.map((p) => <PieceCard piece={p} />)}
+        </ul>
+        <p class="wb-none" hidden>No piece matches that search.</p>
+      </section>
+    )}
   </main>
 </BaseLayout>
 
 <style>
-  .writing { position: relative; z-index: 0; min-height: 100vh; }
+  /* the column and the cards' grid are styles/writing.css's, shared with the piece page */
+  .wb :focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; border-radius: 2px; }
+  .back { font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-3); text-decoration: none; }
+  @media (hover: hover) { .back:hover { color: var(--seal); } }
 
-  /* Shared reading gradient — the same token /writing/<slug> uses, so the reading pages that ride the sky stay one
-     system rather than two guesses. */
-  .writing.descent { background: var(--reading-grad); }
+  /* ── the header: the badge, the headline, the subtitle ── */
+  .wb-badge { display: inline-flex; align-items: center; gap: 8px; margin: 28px 0 0; padding: 6px 12px;
+    font: 12px/1 var(--font-mono); letter-spacing: 0.04em; color: var(--ink-1);
+    border: 1px solid rgba(var(--hairline-rgb), 0.4); border-radius: 999px; }
+  .wb-h1 { margin: 18px 0 0; max-width: 15em; font: 800 clamp(40px, 5.4vw, 72px)/1 var(--font-body);
+    letter-spacing: -0.035em; color: var(--ink-1); text-wrap: balance; }
+  .wb-sub { margin: 20px 0 0; max-width: 36em; font-size: 19px; line-height: 1.5; color: var(--ink-3); text-wrap: pretty; }
+  .wb-cow { margin-top: clamp(24px, 5vh, 56px); }
+  .wb > :global(.wc-lead) { margin-top: 64px; }
 
-  .writing-cow { margin: clamp(10px, 2vh, 26px) 0 clamp(20px, 4vh, 48px); }
+  /* ── the controls (SEARCH_FROM+): chips, then the search. Without a script they do nothing, so they do not show,
+     and every card does. ── */
+  .wb-more { margin-top: 72px; padding-top: 28px; border-top: 1px solid rgba(var(--hairline-rgb), 0.3); }
+  .wb-ctl { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px 32px; margin-bottom: 36px; }
+  @media (scripting: none) { .wb-ctl { display: none; } }
+  .wb-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .wb-chip { height: 34px; padding: 0 14px; font: 500 13px/1 var(--font-body); color: var(--ink-2); background: none; cursor: pointer;
+    border: 1px solid rgba(var(--hairline-rgb), 0.4); border-radius: 999px; }
+  .wb-c { margin-left: 4px; font: 11px/1 var(--font-mono); color: var(--ink-3); }
+  @media (hover: hover) { .wb-chip:hover { border-color: var(--ink-1); } }
+  .wb-chip[aria-pressed='true'] { color: var(--sheet-ground); background: var(--ink-1); border-color: var(--ink-1); }
+  .wb-chip[aria-pressed='true'] .wb-c { color: inherit; opacity: 0.7; }
+  /* forced colours replace all three inks above with system colours, so the pressed chip is marked as the rail's
+     current stop is (SideRail.astro): a Highlight edge and an underline */
+  @media (forced-colors: active) { .wb-chip[aria-pressed='true'] { border-color: Highlight; text-decoration: underline; } }
+  .wb-search { flex: 0 1 320px; }
+  .wb-field { position: relative; display: block; }
+  .wb-field input { width: 100%; height: 38px; padding: 0 34px; font: 14px var(--font-body); color: var(--ink-1);
+    background: var(--sheet-ground); border: 1px solid rgba(var(--hairline-rgb), 0.4); border-radius: 999px; }
+  .wb-field input::placeholder { color: var(--ink-3); }
+  .wb-field input:focus-visible { outline-offset: 2px; border-radius: 999px; }
+  .wb-glass { position: absolute; left: 13px; top: 12px; color: var(--ink-3); pointer-events: none; }
+  .wb-kbd { position: absolute; right: 12px; top: 10px; padding: 2px 6px; font: 11px/1 var(--font-mono); color: var(--ink-3);
+    border: 1px solid rgba(var(--hairline-rgb), 0.35); border-radius: 4px; pointer-events: none; }
+  .wb-field input:focus ~ .wb-kbd, .wb-field input:not(:placeholder-shown) ~ .wb-kbd { opacity: 0; }
+  @media (hover: none) { .wb-kbd { display: none; } }
+  .wb-status { margin: 8px 0 0; padding-left: 14px; font: 11px/1.4 var(--font-mono); color: var(--ink-3); }
+  .wb-none { margin: 8px 0 0; font-size: 16px; color: var(--ink-3); }
 
-  .writing-block {
-    width: min(64%, 860px);
-    margin-left: 34%;
-    margin-right: clamp(24px, 4vw, 90px);
-    box-sizing: border-box;
-  }
-
-  .writing-head { padding: 14vh 0 5vh; }
-  .back { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.04em; }
-  .back:hover { color: var(--seal); }
-  .writing h1 {
-    font-family: var(--font-display); font-weight: 500; font-size: clamp(38px, 5vw, 58px);
-    line-height: 1.04; letter-spacing: -0.01em; font-variation-settings: 'SOFT' 60; margin-top: 16px; color: var(--ink-1);
-  }
-  .lede { font-size: 14px; color: var(--ink-3); margin-top: 16px; line-height: 1.7; max-width: 54ch; }
-  .inline-link { color: var(--ink-2); text-decoration: none; box-shadow: inset 0 -1px 0 0 var(--ochre); }
-  .inline-link:hover { color: var(--ink-1); }
-
-  /* The page-state line. An ochre tick rather than an icon: the site has no icon language on reading pages,
-     and a bare sentence at this size reads as body copy rather than as status. */
-  .state {
-    display: flex; align-items: baseline; gap: 9px;
-    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.02em; line-height: 1.6;
-    color: var(--ink-3); margin-top: 26px; max-width: 56ch;
-  }
-  .state-mark {
-    flex: none; width: 5px; height: 5px; border-radius: 50%;
-    background: var(--ochre); transform: translateY(-2px);
-  }
-
-  .kind-list { display: grid; gap: clamp(38px, 6vh, 68px); }
-  /* Offset so a jumped-to section is not glued to the viewport's top edge. */
-  .kind { scroll-margin-top: 12vh; }
-  .kind-head { border-top: 1px solid var(--ink-5); padding-top: 18px; }
-  .kind-title {
-    font-family: var(--font-display); font-weight: 500; font-size: clamp(21px, 2.4vw, 29px);
-    line-height: 1.15; letter-spacing: -0.01em; color: var(--ink-1); margin: 0;
-  }
-  .kind-gloss { font-size: 13.5px; line-height: 1.65; color: var(--ink-3); margin: 10px 0 0; max-width: 58ch; }
-
-  /* The empty state is DESIGNED, per the project's rule that loading and empty states are never left default.
-     Italic display type at reading size, indented behind a hairline — it reads as an author's note about what
-     is coming, which is what it is. */
-  .kind-empty {
-    font-family: var(--font-display); font-style: italic;
-    font-size: 14.5px; line-height: 1.7; color: var(--ink-3);
-    margin: 18px 0 0; padding-left: 16px; border-left: 1px solid var(--ochre);
-    max-width: 56ch;
-  }
-
-  .piece-list { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 26px; }
-  .piece { scroll-margin-top: 12vh; }
-  .piece-meta {
-    display: flex; gap: 12px; align-items: baseline;
-    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--ink-4); margin: 0 0 6px;
-  }
-  .piece-mins::before { content: '·'; margin-right: 12px; }
-  /* Same register as the reading time: a fact about the piece, not part of its title. */
-  .piece-upd::before { content: '·'; margin-right: 12px; }
-  .piece-title {
-    font-family: var(--font-display); font-weight: 500; font-size: clamp(17px, 1.7vw, 21px);
-    line-height: 1.25; color: var(--ink-1); margin: 0;
-  }
-  .piece-title a { color: inherit; text-decoration: none; box-shadow: inset 0 -1px 0 0 var(--ochre); }
-  .piece-title a:hover { color: var(--ink-2); }
-  .piece-blurb { font-size: 13.5px; line-height: 1.7; color: var(--ink-3); margin: 8px 0 0; max-width: 58ch; }
-
-  .writing-foot { padding: 10vh 0 16vh; }
-
-  /* Narrow: the rail hides itself at the same 1100px breakpoint SideRail uses, so the column re-centers at the
-     reading measure rather than keeping a margin for a rail that is gone. */
-  @media (max-width: 1100px) {
-    .writing-cow { margin: clamp(10px, 2vh, 26px) 0 clamp(20px, 4vh, 48px); }
-
-  .writing-block { width: auto; margin: 0 auto; padding: 0 24px; max-width: 760px; }
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .kind { animation: writing-in 0.7s ease both; }
-    @keyframes writing-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  @media (max-width: 640px) {
+    .wb-search { flex-basis: 100%; }
+    /* iOS Safari zooms the page into a focused field set under 16px */
+    .wb-field input { font-size: 16px; }
   }
 </style>
+
+<script>
+  // The filter (SEARCH_FROM+ pieces): a chip picks a kind, the search AND-matches its words as substrings of each
+  // card's data-q (lib/writingSearch's shows), and the status reads "k of N". A lead that does not match dims and goes
+  // inert in place, so the controls under the reader's cursor never jump. Esc clears; "/" focuses the search unless
+  // focus is already in a field. Through onPageView, so it answers the first keystroke before window `load`.
+  import { onPageView } from '../scripts/pageView';
+  import { shows } from '../lib/writingSearch';
+
+  onPageView<HTMLElement>('.wb-ctl', (ctl) => {
+    const root = ctl.closest('.wb');
+    const maybeInput = ctl.querySelector<HTMLInputElement>('input[type="search"]');
+    const maybeStatus = ctl.querySelector<HTMLElement>('[role="status"]');
+    const maybeNone = root?.querySelector<HTMLElement>('.wb-none');
+    if (!root || !maybeInput || !maybeStatus || !maybeNone) return undefined;
+    const input = maybeInput, status = maybeStatus, none = maybeNone;
+    const items = [...root.querySelectorAll<HTMLElement>('[data-q]')];
+    const chips = [...ctl.querySelectorAll<HTMLButtonElement>('[data-kind]')];
+    let kind = 'all';
+
+    const apply = (): void => {
+      let k = 0;
+      for (const el of items) {
+        const ok = shows(el.dataset.q ?? '', el.dataset.k ?? '', input.value, kind);
+        if (el.classList.contains('wc-lead')) { el.classList.toggle('is-out', !ok); el.inert = !ok; }
+        else el.hidden = !ok;
+        if (ok) k += 1;
+      }
+      status.textContent = `${k} of ${items.length}`;
+      none.hidden = k > 0;
+    };
+    const pick = (next: string): void => {
+      kind = next;
+      for (const c of chips) c.setAttribute('aria-pressed', String(c.dataset.kind === next));
+      apply();
+    };
+
+    input.addEventListener('input', apply);
+    for (const c of chips) c.addEventListener('click', () => pick(c.dataset.kind ?? 'all'));
+    ctl.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || (!input.value && kind === 'all')) return;
+      e.preventDefault();
+      input.value = '';
+      pick('all');
+    });
+    // The one listener outside the swapped <body>: the rest leave with it.
+    const ac = new AbortController();
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey || !input.getClientRects().length) return;
+      const t = e.target;
+      if (t instanceof HTMLElement && (t.isContentEditable || t.closest('input, textarea, select'))) return;
+      e.preventDefault();
+      input.focus();
+    }, { signal: ac.signal });
+    return () => ac.abort();
+  });
+</script>

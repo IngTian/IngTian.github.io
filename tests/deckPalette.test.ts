@@ -51,7 +51,7 @@ const underGrain = (ink: string, g: RGB): number => {
 
 /** The descent sky from the top down to `depth`: every ramp stop above it, and the ramp at it. */
 function skyTo(theme: Theme, depth: number): RGB[] {
-  const ramp = rampFor('descent', theme);
+  const ramp = rampFor(theme);
   const out = ramp.filter(([at]) => at <= depth).map(([, hex]) => rgbOf(hex));
   const i = ramp.findIndex(([at]) => at > depth);
   const [a, ca] = ramp[i - 1], [b, cb] = ramp[i];

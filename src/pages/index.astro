@@ -33,7 +33,7 @@ const FLAT_AT = { light: 0.04, dark: 0.55 } as const;
 /** Sample a ramp at `at`, interpolating between its two bracketing stops. */
 const rampAt = (theme: 'light' | 'dark') => {
   const at = FLAT_AT[theme];
-  const stops = rampFor('descent', theme);
+  const stops = rampFor(theme);
   let lo = stops[0], hi = stops[stops.length - 1];
   for (const st of stops) {
     if (st[0] <= at && st[0] >= lo[0]) lo = st;
@@ -60,13 +60,13 @@ const introVars = {
      put this preload back (FCP 1956 -> 2333ms without any, three runs on a production build, measured when
      both styles were preloaded; the normal style alone has not been measured). See the note next to <Font>
      in BaseLayout. */}
-<BaseLayout veilLine="a researcher by day" veilOnLoad={false} preloadAccent="normal" page="deck">
+<BaseLayout preloadAccent page="deck">
   {/* THE INTRO IS DECIDED HERE, BEFORE FIRST PAINT, and that timing is the whole point.
       `--descent-grad` is the sky's base layer and its no-WebGL state, and it holds the FINISHED colours,
       so left to the canvas the real sky showed for ~300ms and then snapped flat: warm → flat → warm (the
       owner: "renders to our normal stuff and suddenly goes blank"). A bundled `<script>` runs after parse,
       after first paint; `is:inline` runs before anything below it paints, as BaseLayout's theme resolver
-      and veil do. `define:vars` single-sources the constants from lib/, so only the decision expression
+      does. `define:vars` single-sources the constants from lib/, so only the decision expression
       is written here, and `introSession()` reads what it publishes: one decider.
       THE HERO TEXT IS DELIBERATELY NOT HELD: the H1 is this page's measured LCP element (CLAUDE.md,
       the `?seq=1` spike). Want sequencing? Shorten the intro; do not pause the LCP. */}
@@ -106,7 +106,7 @@ const introVars = {
        the clearance that keeps the fixed corner nav off their headlines. Only the homepage's main carries
        it, and the deck disengages under reduced motion and on phones. */}
   <main class="descent is-fluid is-slides">
-    <FluidSky variant="descent" />
+    <FluidSky />
     <SkyWash />
     <Heights />
     <Interlude />
@@ -138,6 +138,6 @@ const introVars = {
   <SideRail stops={homeStops()} hideOver="heights" />
   <Grain />
   {/* One gesture = one slide. Behaviour lives in lib/deck.ts (pure, tested); this only attaches the
-       listeners, and only on the homepage — the reading pages stay free-scrolling. */}
+       listeners, and only on the homepage — every other page stays free-scrolling. */}
   <Deck />
 </BaseLayout>

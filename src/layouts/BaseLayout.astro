@@ -8,41 +8,25 @@ import { name, roles, contact } from '../data/profile';
 interface Props {
   title?: string;
   description?: string;
-  /** Line shown on the descent veil for this page. */
-  veilLine?: string;
-  /** Play the veil on a FRESH load of this page? (Transitions always play it.) */
-  veilOnLoad?: boolean;
   /** Render the veil? `false` emits no `[data-veil]`, so nothing plays it — for a page whose own entrance
-   *  replaces it (/projects' boot), that a reader moves in and out of too often to hold back (/research), or where
-   *  it would be motion that runs on its own (/art, /experience). */
+   *  replaces it (/projects' boot), that a reader moves in and out of too often to hold back (/research, /writing),
+   *  or where it would be motion that runs on its own (/art, /experience). */
   veil?: boolean;
   /** Sets `data-page` on <html>; tokens.css re-skins the role tokens from it ('drafting' is /projects, 'paper' the
-   *  research routes, /art and /experience, 'deck' the homepage, whose block sets only the rail's resting ink). ClientRouter
-   *  copies <html>'s attributes, so it leaves with the page. */
+   *  research and writing routes, /art and /experience, 'deck' the homepage, whose block sets only the rail's resting
+   *  ink). ClientRouter copies <html>'s attributes, so it leaves with the page. */
   page?: 'drafting' | 'paper' | 'deck';
-  /**
-   * How the corner nav picks its (light-theme) text color:
-   *  - 'scroll' (default): flip dark→paper by the descent fraction behind it
-   *    (home rides the full dawn→night gradient; a page with no .descent gets 'light').
-   *  - 'light': pin to dark text — for pages that stay pale top-to-bottom in
-   *    light theme (/writing is a reading page and never sinks to dark).
-   * In DARK theme the text is always light regardless, so this only matters
-   * for the light theme.
-   */
-  navZone?: 'scroll' | 'light';
   /** Set on non-content routes (404): emit robots=noindex and skip canonical. A /proto- route gets it without asking. */
   noindex?: boolean;
   /**
-   * The style of the accent face (Fraunces) THIS page sets text in, to preload: `'normal'` or `'italic'`;
-   * unset, nothing is preloaded. See the long note next to <Font> below for why this is a per-page decision
-   * rather than a global one — and why the answer is not "just drop the preload".
+   * Preload the accent face (Fraunces) in its normal style, for the one page that sets text in it: `/`
+   * (Work.astro's `.wk-item-name`, weight 500). See the long note next to <Font> below for why this is a
+   * per-page decision rather than a global one — and why the answer is not "just drop the preload".
    *
-   * ONE STYLE, BECAUSE THE TWO FILES ARE SEPARATE AND BOTH ARE BIG: normal is 36,560 B and italic 45,624 B,
-   * and a preload is a high-priority fetch whether or not a rule on the page ever matches the face.
-   * `/` renders only the normal (Work.astro's `.wk-item-name`, weight 500); its italic `.wk-promise` shows
-   * only while /writing has no piece. Every Fraunces rule on `/writing/<slug>` is italic.
+   * ONE STYLE, BECAUSE EACH FILE IS BIG: normal is 36,560 B and italic 45,624 B, and a preload is a
+   * high-priority fetch whether or not a rule on the page ever matches the face.
    */
-  preloadAccent?: 'normal' | 'italic';
+  preloadAccent?: boolean;
   /**
    * Preload JetBrains Mono for a page whose first screen is set in it (/projects: the listing is its mobile LCP).
    * Discovered late, Lighthouse counts it render-blocking; preloaded, mobile FCP 1,732 -> 1,435ms for identical bytes.
@@ -53,13 +37,10 @@ interface Props {
 const {
   title = 'Ing Tian — Quant Researcher · Portfolio Optimization',
   description = 'Ing Tian (Zeying Tian) — quant researcher in portfolio optimization and incoming Operations Research PhD at the University of Toronto. Also a full-stack software and ML engineer. Toronto.',
-  veilLine = 'a researcher by day',
-  veilOnLoad = false,
   veil = true,
   page,
-  navZone = 'scroll',
   noindex: noindexProp = false,
-  preloadAccent,
+  preloadAccent = false,
   preloadMono = false,
 } = Astro.props;
 
@@ -149,18 +130,18 @@ const personLd = {
         FRAUNCES' PRELOAD IS PER PAGE. Not deleted: a page that uses the face downloads it anyway, and without
         the preload it is discovered late (FCP 1956 -> 2333ms, three production-build runs, both styles
         preloaded against none; the one-style preload has not been measured on its own). Not everywhere
-        either: only sections/Work.astro and writing/[...slug].astro use it (`grep -rln -- --font-accent src`
-        also lists global.css and this file), and preloading it on the other routes would fetch 82,184 bytes
+        either: only sections/Work.astro uses it (`grep -rln -- --font-accent src` also lists global.css and
+        this file), so only `/` preloads it, and preloading it on the other routes would fetch 82,184 bytes
         at the highest priority for a face nothing there asks for. The @font-face block is never gated, so
-        --ff-fraunces resolves everywhere; only the <link rel=preload> is, narrowed to the one style a page
-        shows (Astro's filterPreloads takes variant predicates).
+        --ff-fraunces resolves everywhere; only the <link rel=preload> is, narrowed to the normal style, the
+        one `/` shows (Astro's filterPreloads takes variant predicates).
 
         TAILWIND READS COMMENTS. Its scanner harvests utility candidates from source text without parsing it,
         so a bare utility class named in a comment here ships its CSS on every page (the accent family's
         dashless name once did). Name the CSS variable, with its dashes, or describe it. */}
     <Font
       cssVariable="--ff-fraunces"
-      preload={preloadAccent ? [{ style: preloadAccent }] : false}
+      preload={preloadAccent ? [{ style: 'normal' }] : false}
     />
     <Font cssVariable="--ff-jetbrains" preload={preloadMono} />
     <ClientRouter />
@@ -170,32 +151,23 @@ const personLd = {
     <slot />
     {/* Persistent top-right nav + theme toggle — global (all pages), so contact
         actions and the light/dark switch are always reachable. Rendered here
-        (not per-page) means it survives View Transitions as part of the shell.
-        navZone tells it how to pick light-theme text color per page. */}
-    <CornerNav navZone={navZone} />
+        (not per-page) means it survives View Transitions as part of the shell. */}
+    <CornerNav />
     {/* "The Descent" loader: a night veil covering the page wipes DOWNWARD off
-        the bottom to reveal it. It plays on EVERY client-side navigation into a
+        the bottom to reveal it. It plays on client-side navigation only, into a
         page that renders one (the after-swap listener at the bottom of this
-        file, in both directions), and on a fresh load only when the destination
-        opts in via veilOnLoad. Each page carries its own line. transform/opacity
-        only; gated behind prefers-reduced-motion (finished state = uncovered page).
+        file, in both directions), never on a fresh load: `/`'s first open is the
+        hero's own intro (CLAUDE.md, "The first-open intro"), the content arriving
+        rather than a layer over the document. transform/opacity only; gated behind
+        prefers-reduced-motion (finished state = uncovered page).
 
-        Pages opt in on a fresh load with veilOnLoad (`grep veilOnLoad src/pages`);
-        /projects renders none (veil={false}): its boot is its entrance. Nor does
-        /research: the veil would replay on every card click and every way back.
-        Nor do /art and /experience, where the veil would be motion that runs on its own.
-
-        `/` does not opt in on a fresh load: its first open is the hero's own intro
-        (CLAUDE.md, "The first-open intro"), the content arriving rather than a layer
-        over the document. */}
+        /projects renders none (veil={false}): its boot is its entrance. Nor do
+        /research and /writing: the veil would replay on every card click and every
+        way back. Nor do /art and /experience, where the veil would be motion that
+        runs on its own. */}
     {veil && (
-      <div
-        class="descent-veil"
-        aria-hidden="true"
-        data-veil
-        data-veil-on-load={veilOnLoad ? 'true' : 'false'}
-      >
-        <span class="descent-veil__line">{veilLine}</span>
+      <div class="descent-veil" aria-hidden="true" data-veil>
+        <span class="descent-veil__line">a researcher by day</span>
       </div>
     )}
   </body>
@@ -260,33 +232,14 @@ const personLd = {
   }
 </style>
 
-<script is:inline>
-  // Synchronous (parses before first paint) so a fresh opted-in load covers
-  // with NO flash. `__descentVeilInit` (on window, which survives view
-  // transitions) tells a fresh load apart from a transition re-run, so this and
-  // the after-swap listener below never double-fire.
-  (function () {
-    function play() {
-      var v = document.querySelector('[data-veil]');
-      if (!v) return;
-      v.classList.remove('is-playing');
-      void v.offsetWidth; // restart the animation
-      v.classList.add('is-playing');
-    }
-    window.__descentVeilPlay = play;
-    if (!window.__descentVeilInit) {
-      window.__descentVeilInit = true; // first load only
-      var v = document.querySelector('[data-veil]');
-      if (v && v.dataset.veilOnLoad === 'true') play();
-    }
-    // else: a transition re-run — the after-swap listener handles it.
-  })();
-</script>
-
 <script>
   // Persists across view transitions (module scripts run once). Plays the
   // destination page's veil on every client-side navigation (both directions).
   document.addEventListener('astro:after-swap', () => {
-    (window as unknown as { __descentVeilPlay?: () => void }).__descentVeilPlay?.();
+    const v = document.querySelector<HTMLElement>('[data-veil]');
+    if (!v) return;
+    v.classList.remove('is-playing');
+    void v.offsetWidth; // restart the animation
+    v.classList.add('is-playing');
   });
 </script>

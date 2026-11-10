@@ -508,46 +508,51 @@ describe('the images under src/assets', () => {
   });
 });
 
-describe("BaseLayout's per-page hooks: /projects is the drafting page, the research routes, /art and /experience the paper page", () => {
+describe("BaseLayout's per-page hooks: /projects is the drafting page, the research and writing routes, /art and /experience the paper page", () => {
   // `page` puts `data-page` on <html>, the scope tokens.css hangs a register's palette from (and, on `/`, 'deck',
-  // the rail's resting ink); /art and /experience borrow 'paper', as no token of their own differs. `veil={false}` drops the descent
-  // veil — on /projects because its boot is its entrance, on the research routes because the veil would replay on
-  // every card click and every way back, holding the text ~1.1s, and on /art and /experience because it is motion that
-  // runs on its own. Both are props, so what this guards is a default changing under every other route.
+  // the rail's resting ink); /writing, /art and /experience borrow 'paper', as no token of their own differs.
+  // `veil={false}` drops the descent veil — on /projects because its boot is its entrance, on the research and writing
+  // routes because the veil would replay on every card click and every way back, holding the text ~1.1s, and on /art
+  // and /experience because it is motion that runs on its own. Both are props, so what this guards is a default
+  // changing under every other route.
   // Read from `markup` (scripts stripped): the veil's own inline script names `[data-veil]` on every page.
   const veilEl = /<div\b[^>]*\sdata-veil\b/;
   const pageOf = (markup: string): string | undefined => /<html\b[^>]*\sdata-page="([^"]*)"/.exec(markup)?.[1];
   const isResearch = (route: string): boolean => route === '/research' || route.startsWith('/research/');
+  const isWriting = (route: string): boolean => route === '/writing' || route.startsWith('/writing/');
+  const isPaper = (route: string): boolean => isResearch(route) || isWriting(route) || route === '/art' || route === '/experience';
   const research = (): Page[] => pages().filter((p) => isResearch(p.route));
+  const registers = (): Page[] => pages().filter((p) => p.route === '/projects' || isPaper(p.route));
 
-  it('marks /projects as drafting, every research route, /art and /experience as paper, / as deck, and no other route', () => {
+  it('marks /projects as drafting, every research and writing route, /art and /experience as paper, / as deck, and no other route', () => {
     expect(research().length, 'no research route was built').toBeGreaterThan(0);
+    expect(pages().some((p) => p.route.startsWith('/writing/')), 'no writing piece was built').toBe(true);
     const want = (route: string): string | undefined => route === '/projects' ? 'drafting'
-      : isResearch(route) || route === '/art' || route === '/experience' ? 'paper' : route === '/' ? 'deck' : undefined;
+      : isPaper(route) ? 'paper' : route === '/' ? 'deck' : undefined;
     const wrong = pages().filter((p) => pageOf(p.markup) !== want(p.route))
       .map((p) => `${p.route}: data-page=${pageOf(p.markup) ?? '(none)'}`);
     expect(wrong).toEqual([]);
   });
 
   // `.test()` rather than `toMatch` so a failure names the defect instead of printing the whole page.
-  it('renders /projects, the research routes, /art and /experience no veil, and /writing its veil', () => {
-    for (const p of [projectsPage(), ...research(), builtPage('/art'), builtPage('/experience')]) {
+  it('renders /projects, the research and writing routes, /art and /experience no veil, and the 404 its veil', () => {
+    for (const p of registers()) {
       expect(veilEl.test(p.markup), `${p.route} renders a [data-veil] element`).toBe(false);
     }
-    expect(veilEl.test(builtPage('/writing').markup), '/writing lost its [data-veil] element').toBe(true);
+    expect(veilEl.test(builtPage('/404.html').markup), 'the 404 lost its [data-veil] element').toBe(true);
   });
 
   // Each register's ink is sized for its own ground (tests/draftingPalette.test.ts, tests/paperPalette.test.ts), not
-  // for the reading sky: light drafting --ink-3 over --reading-grad's lower stops measured 4.20 and 3.89. So no
-  // register page paints a sky. /writing is the control: the sky it keeps is the markup these patterns look for.
-  it('paints /projects, the research routes, /art and /experience no fluid sky and no sky wash, and /writing both', () => {
-    for (const p of [projectsPage(), ...research(), builtPage('/art'), builtPage('/experience')]) {
+  // for a sky: light drafting --ink-3 (#6a675f) on a pale sky's lower tones, #e7ddce and #dcd5cf, is 4.20 and 3.89:1.
+  // So no register page paints a sky. The 404 is the control: the sky it keeps is the markup these patterns look for.
+  it('paints /projects, the research and writing routes, /art and /experience no fluid sky and no sky wash, and the 404 both', () => {
+    for (const p of registers()) {
       expect(/class="fluid-sky"/.test(p.markup), `${p.route} renders the fluid-sky canvas`).toBe(false);
       expect(/class="sky-wash"/.test(p.markup), `${p.route} renders the SkyWash layer`).toBe(false);
     }
-    const { markup } = builtPage('/writing');
-    expect(/class="fluid-sky"/.test(markup), '/writing lost the fluid-sky canvas').toBe(true);
-    expect(/class="sky-wash"/.test(markup), '/writing lost the SkyWash layer').toBe(true);
+    const { markup } = builtPage('/404.html');
+    expect(/class="fluid-sky"/.test(markup), 'the 404 lost the fluid-sky canvas').toBe(true);
+    expect(/class="sky-wash"/.test(markup), 'the 404 lost the SkyWash layer').toBe(true);
   });
 
   // The wash's paper-coloured strokes are a lift on the night ground, banded into rings (the dark intro's "two big
@@ -641,8 +646,9 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
   const flat = (stops: readonly Stop[], depth = 0): { target: string; label: string; depth: number }[] =>
     stops.flatMap((s) => [{ target: s.target, label: s.label, depth }, ...flat(s.children ?? [], depth + 1)]);
 
-  it('is on /, /experience, /projects, /research, /research/rl-bhrp and /writing', () => {
-    expect(railPages().map((p) => p.route).sort()).toEqual(['/', '/experience', '/projects', '/research', '/research/rl-bhrp', '/writing']);
+  // Not /writing: its search is its navigation.
+  it('is on /, /experience, /projects, /research and /research/rl-bhrp', () => {
+    expect(railPages().map((p) => p.route).sort()).toEqual(['/', '/experience', '/projects', '/research', '/research/rl-bhrp']);
   });
 
   // The homepage's rail stays off its hero (SideRail's hideOver): a script marks it passed, and until then a plain
@@ -684,7 +690,7 @@ describe('SideRail — one rail, shipped the same way on every page that has it'
     expect(strip(itemsOf(builtPage('/research/rl-bhrp')))).toEqual(flat(paperStops((await paperRender('rl-bhrp')).report.sections)));
     expect(strip(itemsOf(builtPage('/research')))).toEqual(flat(researchIndexStops()));
     expect(strip(itemsOf(builtPage('/')))).toEqual(flat(homeStops()));
-    expect(new Set(itemsOf(builtPage('/writing')).map((i) => i.depth))).toEqual(new Set([0, 1]));
+    expect(flat(homeStops()).some((s) => s.depth > 0), "the homepage's tree no longer nests, so no page checks a nested row").toBe(true);
   });
 
   // CLAUDE.md, Motion: only transform and opacity animate, so the dash never grows by `width` (which would push the

@@ -69,7 +69,7 @@ describe('railMarks', () => {
   });
 
   it('never lets a parent whose box CONTAINS a current child lead, however much of the band it fills', () => {
-    // /writing: a kind's section holds its pieces, so both overlap the band and both are current
+    // /projects: "Selected" holds its projects' rows, so both overlap the band and both are current
     const m = railMarks([box(-400, 3000), box(500, 900, 0)], VH, 900, DOC);
     expect(m.current).toEqual([0, 1]);
     expect(m.ancestors).toEqual([]);
