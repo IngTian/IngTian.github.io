@@ -201,7 +201,7 @@ src/
   lib/paperPage.ts                  # the paper page's pure half: the prose its frontmatter writes (authorRole, givenFirst, listed, referenceNote, Line + lineText), note stacking, the readout's month, step, point names, spoken line and instructions (readoutLabel)
   components/research/PaperLine.astro # one line of a paper page's own prose: names kept whole (wholeParts), dates as <time>
   lib/wealth.ts                     # the one wealth module: growth of $1, CAGR, drawdown, the band of runs, WealthSeries (the prepared series every picture of a run reads; REPRO is RL-BHRP's), scales and ticks — the paper page's figures and /projects' rl-bhrp picture
-  lib/words.ts                      # the one word counter (countWords, readingMinutes) + wholeParts, the one rule for what never breaks across a line ("RL-BHRP")
+  lib/words.ts                      # the one word counter (countWords, readingMinutes), a count as prose writes it (inWords, cap) + wholeParts, the one rule for what never breaks across a line ("RL-BHRP")
   lib/dates.ts                      # the one date helper: longDate, monthYear (UTC)
   lib/motionTiming.ts               # the motion module's pure half: every curve (EASE, DRAW, SWEEP, FADE, WITHDRAW) and duration (REVEAL, RAIL, PAPER_PAGE, CARD, ART, EXPERIENCE, WRITING, MOVE_MAX) the rail, the research routes, /art, /experience and /writing move by, stagger and the paper page's batches (highlightDelay, arrowDelay), sweepDurations, mergeLines
   scripts/motion.ts                 # THE ONE MOTION MODULE, its DOM half: play, onceSeen, riseOnceSeen, sweepLines — the rail and both research routes; the reduced-motion gate is inside it

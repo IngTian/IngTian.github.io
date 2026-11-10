@@ -697,9 +697,8 @@ import { STORY_CODA } from '../data/story';
       // 1150ms for eight stops read as "the whole path just appeared" — the eye cannot follow ~140ms
       // per leg. This is a WALK: it has to be slow enough to see one stop arrive after another, and
       // now the surface is being discovered as it goes, so the pacing carries information rather
-      // than just decoration. It starts on its own, so WCAG 2.2.2's five seconds hold it, and the coda's
-      // 0.9s fade can start as late as the walk's end: tests/motionLimit.test.ts adds the two. Seven legs at
-      // ~570ms each still read as one stop arriving after another.
+      // than just decoration. It starts on its own, so WCAG 2.2.2's five seconds hold it, coda fade included
+      // (tests/motionLimit.test.ts).
       const DURATION_MS = 4000;
       const t0 = performance.now();
       reveal = 0;
@@ -735,8 +734,8 @@ import { STORY_CODA } from '../data/story';
       // stays — those ARE the real waypoints — and so does the discovery line, which is the point of the
       // whole device and is a statement rather than a measurement.
       // WRITTEN ONLY WHEN IT CHANGES, and the reason is accessibility before performance. `markStops()` runs
-      // from every rAF step of the reveal, so this assigned innerHTML ~385 times per walk for **9
-      // distinct strings** — 376 of those writes byte-identical to the frame before. On a plain element that
+      // from every rAF step of the reveal, so this assigned innerHTML once a frame, hundreds of times a walk, for
+      // **9 distinct strings**, nearly all byte-identical to the frame before. On a plain element that
       // is just wasted parses; this element is `aria-live="polite"`, so every write is a candidate
       // announcement and a screen reader was being handed the same sentence hundreds of times.
       const next = found
