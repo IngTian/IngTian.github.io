@@ -131,38 +131,16 @@ export function nextStop(
 }
 
 /**
- * How long one slide transition takes, in ms.
- *
- * 650, and the number came from the owner's own screen recording rather than taste. Measured on that clip
- * (578 frames at 55.8fps), the browser's native smooth scroll finished a slide in about 500ms — but spent the
- * first ~35ms going from a standstill to nearly peak velocity. A launch that fast is what he described as "the
- * sudden change of slides instead of a smooth transition": the eye reads an instant departure and a soft
- * arrival, which is the opposite shape from the one that feels deliberate.
- * A little longer than native, because an ease-IN spends time at low velocity at the start; at 500ms with this
- * curve the middle has to move faster than the native scroll did to cover the same distance.
+ * How long one slide transition takes, in ms, and its curve (DECK_EASE). Both are the owner's, by feel, between two
+ * ends he judged on his own screen recordings:
+ * - Native smooth scroll finished a slide in about 500ms but went from a standstill to nearly peak velocity in the
+ *   first ~35ms (578 frames at 55.8fps): "the sudden change of slides instead of a smooth transition".
+ * - The easeInOutCubic over 650ms that replaced it was measured on his 2026-11-10 recording to the frame (a 630-670ms
+ *   fit, nothing off it by a 144 Hz frame's travel) and read as sluggish: 1.5% of the slide by 100ms, full speed only
+ *   at 324ms.
+ * He picked this one from four tried live on the page (`?deck=`, retired): 13% by 100ms, full speed at 150ms.
  */
-export const DECK_TWEEN_MS = 650;
-
-/**
- * Symmetric ease for the deck's scroll — slow, fast, slow.
- *
- * WHY WE OWN THE ANIMATION AT ALL. `window.scrollTo({ behavior: 'smooth' })` hands the curve to the browser,
- * and the browser's curve is front-loaded (see DECK_TWEEN_MS). It is also uncancellable: there is no API to
- * stop an in-flight native smooth scroll, which is why two overlapping transitions showed up in the recording
- * as a double lurch — the second scroll began while the first was still running and the position jumped.
- * A rAF tween fixes both: the shape is ours, and cancelling is one cancelAnimationFrame.
- *
- * easeInOutCubic, deliberately, not a spring or a bezier with overshoot: this is a page moving to a resting
- * position that the reader chose, and overshoot on a full-viewport scroll reads as sloppiness rather than
- * bounce. Symmetric so departure and arrival feel like the same gesture.
- *
- * Pure and clamped, so it is unit-testable and cannot be handed a progress value outside [0, 1] by a frame
- * that arrives late.
- */
-export function easeInOutCubic(t: number): number {
-  const p = t <= 0 ? 0 : t >= 1 ? 1 : t;
-  return p < 0.5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2;
-}
+export const DECK_TWEEN_MS = 500;
 
 /** CSS's cubic-bezier(x1, y1, x2, y2) as a function of progress, clamped to [0, 1]; x is solved by bisection. */
 export function cubicBezier(x1: number, y1: number, x2: number, y2: number): (t: number) => number {
@@ -177,18 +155,19 @@ export function cubicBezier(x1: number, y1: number, x2: number, y2: number): (t:
 }
 
 /**
- * PROTOTYPE, 2026-11-10, retired when the owner picks one: `?deck=` on / chooses the tween's curve and length, so
- * they are judged by feel on his trackpad. His recording measured today's curve exactly (a 650ms fit, no frame off
- * it by more than one 144 Hz frame's travel) and showed what reads as sluggish: 1.5% of the slide by 100ms, full
- * speed only at 324ms. The other end, native smooth scroll at full speed within ~35ms, was "sudden" (DECK_TWEEN_MS).
- * By 100ms / full speed at: a 1.5% / 324ms, b 13% / 150ms, c 18% / 131ms, d 25% / 115ms.
+ * The deck's scroll curve: off at once from a standstill, then a long soft landing (DECK_TWEEN_MS says why).
+ *
+ * WHY WE OWN THE ANIMATION AT ALL. `window.scrollTo({ behavior: 'smooth' })` hands the curve to the browser,
+ * and the browser's curve is front-loaded (see DECK_TWEEN_MS). It is also uncancellable: there is no API to
+ * stop an in-flight native smooth scroll, which is why two overlapping transitions showed up in the recording
+ * as a double lurch — the second scroll began while the first was still running and the position jumped.
+ * A rAF tween fixes both: the shape is ours, and cancelling is one cancelAnimationFrame.
+ *
+ * A bezier with no overshoot, not a spring: this is a page moving to a resting position the reader chose, and
+ * overshoot on a full-viewport scroll reads as sloppiness rather than bounce. Clamped, so a frame that arrives
+ * late cannot hand it a progress outside [0, 1].
  */
-export const DECK_TRIALS: Record<string, { ms: number; ease: (t: number) => number }> = {
-  a: { ms: DECK_TWEEN_MS, ease: easeInOutCubic },
-  b: { ms: 500, ease: cubicBezier(0.4, 0, 0.2, 1) },
-  c: { ms: 550, ease: cubicBezier(0.3, 0, 0.2, 1) },
-  d: { ms: 550, ease: cubicBezier(0.25, 0.1, 0.25, 1) },
-};
+export const DECK_EASE = cubicBezier(0.4, 0, 0.2, 1);
 
 /** Wheel travel, in px, a gesture must cover before it moves a slide: less is a brush of the trackpad. */
 export const WHEEL_THRESHOLD = 18;
