@@ -1078,7 +1078,8 @@ of sky over a full-bleed panel.
   seal, plus the derived `--hairline-rgb`); under a page register, its own tokens and its overrides
   of the role tokens (/projects' eight `--draft-*` and two knockouts, the research routes' eight `--sheet-*`;
   *Themes*); and on `/`, which is not a register, `--rail-ink` and `--rail-focus` (*Navigation*), the six
-  `--panel-*` of `styles/slides.css` (the five paper panels' ground and inks per theme), Choice's chart colours
+  `--panel-*` of `styles/slides.css` (the five paper panels' ground and inks per theme, every text ink held to 4.5:1 on
+  the panel and under the Grain by `tests/deckPalette.test.ts`), Choice's chart colours
   `--c-h*` and `--c-p*`, and Story's two graph-line tones, `--story-line` and `--story-line-soft`. /art's dark
   room, dark in both themes, holds its own inks (`--room*` on `.dark`), held by `tests/paperPalette.test.ts`. Beyond
   those, a component may hold a literal for a drawing of its own (the cow's coat, a logo's colours in
