@@ -1116,7 +1116,9 @@ of sky over a full-bleed panel.
     keyboard-focused (`videoPlays()` in `lib/galleryLayout.ts`); and the cow says the greeting and at most
     `idleLines()` unprompted lines per page view (`lib/cowTalk.ts`: two, none on a phone or under reduced
     motion), the rest a press away. `tests/cowTalk.test.ts` adds up what it does unasked from PlushCow's
-    transition and hop literals and `TYPE_MS`, ~3.4s, and holds it under the limit.
+    transition and hop literals and `TYPE_MS`, ~3.4s, and holds it under the limit. On `/`, Story's descent
+    walk runs 4s once its slide is on screen and its coda fades in over 0.9s at the latest as it ends;
+    `tests/motionLimit.test.ts` adds the two literals from `DescentPath.astro` against the limit.
   - **One exception, the owner's call (2026-11-08): /art's sentences take turns** for as long as the page is open,
     each for its words at 200 a minute (`holdMs` in `lib/artPage.ts`). It is held to 2.2.2 by the criterion's own
     terms, a way to stop it: Pause, and the numbers; what else holds or stops a turn is the turns' comment in

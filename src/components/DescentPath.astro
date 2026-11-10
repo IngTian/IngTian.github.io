@@ -697,8 +697,10 @@ import { STORY_CODA } from '../data/story';
       // 1150ms for eight stops read as "the whole path just appeared" — the eye cannot follow ~140ms
       // per leg. This is a WALK: it has to be slow enough to see one stop arrive after another, and
       // now the surface is being discovered as it goes, so the pacing carries information rather
-      // than just decoration.
-      const DURATION_MS = 6400;
+      // than just decoration. It starts on its own, so WCAG 2.2.2's five seconds hold it, and the coda's
+      // 0.9s fade can start as late as the walk's end: tests/motionLimit.test.ts adds the two. Seven legs at
+      // ~570ms each still read as one stop arriving after another.
+      const DURATION_MS = 4000;
       const t0 = performance.now();
       reveal = 0;
       // Smootherstep: zero velocity AND zero acceleration at both ends, so the walk starts without a
@@ -733,7 +735,7 @@ import { STORY_CODA } from '../data/story';
       // stays — those ARE the real waypoints — and so does the discovery line, which is the point of the
       // whole device and is a statement rather than a measurement.
       // WRITTEN ONLY WHEN IT CHANGES, and the reason is accessibility before performance. `markStops()` runs
-      // from every rAF step of the 6.4s reveal, so this assigned innerHTML ~385 times per walk for **9
+      // from every rAF step of the reveal, so this assigned innerHTML ~385 times per walk for **9
       // distinct strings** — 376 of those writes byte-identical to the frame before. On a plain element that
       // is just wasted parses; this element is `aria-live="polite"`, so every write is a candidate
       // announcement and a screen reader was being handed the same sentence hundreds of times.
@@ -772,7 +774,7 @@ import { STORY_CODA } from '../data/story';
     // one leg in. Measured: 7 of 8 stops stayed dimmed. Now: no negative margin, plus a direct
     // visibility check at init for the case where it is ALREADY on screen before the observer runs.
     // THRESHOLD 0.55, not 0.25, because the deck arrives here deliberately. At 0.25 the walk began
-    // while the smooth scroll was still travelling, so roughly the first quarter of the 6.4s reveal
+    // while the smooth scroll was still travelling, so roughly the first quarter of the reveal
     // played off-screen and the slide came to rest showing "stop 1/8" — the reader lands on a graph
     // that looks half-drawn instead of watching it draw. Requiring most of the stage to be on screen
     // means the walk starts once the slide has actually arrived. Free scrolling still triggers it
