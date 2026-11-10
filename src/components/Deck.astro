@@ -25,7 +25,7 @@
 // TerrainHero and DescentPath.
 ---
 <script>
-  import { deckStops, nextStop, wheelStep, easeInOutCubic, DECK_TWEEN_MS, QUIET_STREAM, type DeckSlide, type WheelStream } from '../lib/deck';
+  import { deckStops, nextStop, wheelStep, DECK_TRIALS, QUIET_STREAM, type DeckSlide, type WheelStream } from '../lib/deck';
   import { prefersReducedMotion } from '../lib/motion';
   import { isPhone, PHONE_QUERY } from '../lib/viewport';
 
@@ -123,6 +123,9 @@
     let tweenDest = NaN;
     const midTween = (e: Event): void => { if (raf && Math.abs(window.scrollY - tweenDest) > 1) e.stopImmediatePropagation(); };
 
+    // PROTOTYPE: the owner's `?deck=` trial (DECK_TRIALS, lib/deck.ts); today's tween without one.
+    const trial = DECK_TRIALS[new URLSearchParams(location.search).get('deck') ?? ''] ?? DECK_TRIALS.a;
+
     function tweenTo(dest: number): void {
       cancelTween();
       const from = window.scrollY;
@@ -132,8 +135,8 @@
       if (Math.abs(dist) < 2) { window.scrollTo({ top: dest, behavior: 'instant' }); release(); return; }
       const t0 = performance.now();
       const step = (now: number): void => {
-        const p = Math.min(1, (now - t0) / DECK_TWEEN_MS);
-        window.scrollTo({ top: Math.round(from + dist * easeInOutCubic(p)), behavior: 'instant' });
+        const p = Math.min(1, (now - t0) / trial.ms);
+        window.scrollTo({ top: Math.round(from + dist * trial.ease(p)), behavior: 'instant' });
         // FluidSky draws on this, at the scroll the frame is painted at: its own rAF runs before this one in a
         // frame, so on its loop alone the sky trailed the page by a frame's travel, tens of px mid-slide.
         window.dispatchEvent(new Event('deck:step'));

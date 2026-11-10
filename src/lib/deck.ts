@@ -164,6 +164,32 @@ export function easeInOutCubic(t: number): number {
   return p < 0.5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2;
 }
 
+/** CSS's cubic-bezier(x1, y1, x2, y2) as a function of progress, clamped to [0, 1]; x is solved by bisection. */
+export function cubicBezier(x1: number, y1: number, x2: number, y2: number): (t: number) => number {
+  const at = (a: number, b: number, s: number) => 3 * (1 - s) ** 2 * s * a + 3 * (1 - s) * s * s * b + s ** 3;
+  return (t) => {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    let lo = 0, hi = 1, s = t;
+    for (let i = 0; i < 40; i++) { s = (lo + hi) / 2; if (at(x1, x2, s) < t) lo = s; else hi = s; }
+    return at(y1, y2, s);
+  };
+}
+
+/**
+ * PROTOTYPE, 2026-11-10, retired when the owner picks one: `?deck=` on / chooses the tween's curve and length, so
+ * they are judged by feel on his trackpad. His recording measured today's curve exactly (a 650ms fit, no frame off
+ * it by more than one 144 Hz frame's travel) and showed what reads as sluggish: 1.5% of the slide by 100ms, full
+ * speed only at 324ms. The other end, native smooth scroll at full speed within ~35ms, was "sudden" (DECK_TWEEN_MS).
+ * By 100ms / full speed at: a 1.5% / 324ms, b 13% / 150ms, c 18% / 131ms, d 25% / 115ms.
+ */
+export const DECK_TRIALS: Record<string, { ms: number; ease: (t: number) => number }> = {
+  a: { ms: DECK_TWEEN_MS, ease: easeInOutCubic },
+  b: { ms: 500, ease: cubicBezier(0.4, 0, 0.2, 1) },
+  c: { ms: 550, ease: cubicBezier(0.3, 0, 0.2, 1) },
+  d: { ms: 550, ease: cubicBezier(0.25, 0.1, 0.25, 1) },
+};
+
 /** Wheel travel, in px, a gesture must cover before it moves a slide: less is a brush of the trackpad. */
 export const WHEEL_THRESHOLD = 18;
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deckStops, nextStop, wheelAction, wheelStep, WHEEL_THRESHOLD, QUIET_STREAM, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide, type WheelStream } from '../src/lib/deck';
+import { deckStops, nextStop, wheelAction, wheelStep, WHEEL_THRESHOLD, QUIET_STREAM, easeInOutCubic, cubicBezier, DECK_TRIALS, DECK_TWEEN_MS, type DeckSlide, type WheelStream } from '../src/lib/deck';
 
 // A REPRESENTATIVE mixed-height page, not today's: the homepage's geometry as measured in Chrome at 1700x1050
 // when the deck was built, six slides in an earlier order (the labels name them). What it holds is the mix of
@@ -415,5 +415,30 @@ describe('wheelStep', () => {
     const atEnd = wheelStep(QUIET_STREAM, 40, 0, false, STOPS, 4000);
     expect(atEnd.action).toBe('pass');
     expect(atEnd.next).toEqual(QUIET_STREAM);
+  });
+});
+
+// THE CURVE TRIALS (PROTOTYPE, ?deck= on /): what DECK_TRIALS' comment quotes is held to the curves themselves.
+describe('cubicBezier and the deck trials', () => {
+  it("is CSS's cubic-bezier: clamped, monotonic, and ease's known midpoint", () => {
+    const ease = cubicBezier(0.25, 0.1, 0.25, 1);
+    expect(ease(0)).toBe(0);
+    expect(ease(1)).toBe(1);
+    expect(ease(-1)).toBe(0);
+    expect(ease(2)).toBe(1);
+    expect(ease(0.5)).toBeCloseTo(0.8024, 3);
+    for (let i = 1; i <= 100; i++) expect(ease(i / 100)).toBeGreaterThanOrEqual(ease((i - 1) / 100));
+  });
+
+  it('moves each trial as far by 100ms, and peaks as early, as its comment says', () => {
+    const quoted: Record<string, [number, number]> = { a: [1.5, 324], b: [13, 150], c: [18, 131], d: [25, 115] };
+    for (const [k, { ms, ease }] of Object.entries(DECK_TRIALS)) {
+      expect(ms, k).toBeGreaterThanOrEqual(450);
+      expect(ms, k).toBeLessThanOrEqual(900);
+      let peakAt = 0, peak = 0;
+      for (let t = 0; t < ms; t++) { const v = ease((t + 1) / ms) - ease(t / ms); if (v > peak) { peak = v; peakAt = t; } }
+      expect(100 * ease(100 / ms), `${k} by 100ms`).toBeCloseTo(quoted[k][0], 0);
+      expect(Math.abs(peakAt - quoted[k][1]), `${k} peak at`).toBeLessThanOrEqual(2);
+    }
   });
 });
