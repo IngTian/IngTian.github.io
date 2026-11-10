@@ -391,7 +391,9 @@ const bubbles = JSON.stringify([
         // frame instead of snapping to full breath.
         if (visible && !running) { running = true; last = 0; breathFrom = 0; rafId = requestAnimationFrame(loop); }
         else if (!visible && running) { running = false; cancelAnimationFrame(rafId); }
-      }, { threshold: 0 });
+        // -1px at the top: the deck rests the Interlude with the hero's bottom exactly on the screen's top, which an
+        // edge-touching canvas counts as intersecting at threshold 0, so the loop painted an unseen hero at ~30fps.
+      }, { threshold: 0, rootMargin: '-1px 0px 0px 0px' });
       io.observe(cvs);
     }
 

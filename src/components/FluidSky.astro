@@ -158,11 +158,18 @@
     let mVw = Math.max(1, window.innerWidth);
     let mVh = Math.max(1, window.innerHeight);
     let mDocH = Math.max(1, document.documentElement.scrollHeight);
+    // WHERE THE SKY STOPS SHOWING: on /, the paper panels run opaque from the first to the page's foot, so once the
+    // first one's top is a viewport above the screen's, no sky pixel can be seen and a draw is GPU spent on nothing.
+    // The viewport of margin keeps a layout shift since the last measure from hiding a sky that shows. /404 has none.
+    let skyEnd = Infinity;
     function measureLayout(): void {
       mVw = Math.max(1, window.innerWidth);
       mVh = Math.max(1, window.innerHeight);
       mDocH = Math.max(1, document.documentElement.scrollHeight);
+      const panel = document.querySelector('.slide-paper');
+      skyEnd = panel ? panel.getBoundingClientRect().top + window.scrollY + mVh : Infinity;
     }
+    measureLayout();
     // AN ACCUMULATED CLOCK, NOT WALL TIME SINCE INIT, because the loop stops on `visibilitychange` and wall
     // time does not: a tab left for two minutes would come back with the warp teleported to another phase.
     // The per-frame delta is clamped to 50ms so a long stall advances the warp by one frame, not the stall.
@@ -211,11 +218,24 @@
     cvs.closest('.descent')?.classList.add('fluid-live');
     const reduce = prefersReducedMotion();
     let rafId = 0, running = false, last = 0, scrolling = false;
+    // THE DECK'S TWEEN SCROLLS IN ITS OWN rAF, after this loop's in each frame, so this loop would read the scroll
+    // a frame late. While the deck steps (`deck:step`, components/Deck.astro), the sky draws on its step instead, and
+    // this loop skips the one frame after each step: one draw a frame in either order, and a scroll that follows a
+    // cancelled slide is drawn at once.
+    let stepped = false;
+    const shows = () => window.scrollY < skyEnd;
     function loop(now: number): void {
       const budget = scrolling ? 0 : 32;
-      if (now - last >= budget) { draw(now); last = now; }
+      if (stepped) stepped = false;
+      else if (now - last >= budget && shows()) { draw(now); last = now; }
       rafId = requestAnimationFrame(loop);
     }
+    const onDeckStep = () => {
+      stepped = true;
+      const now = performance.now();
+      if (running && shows()) { draw(now); last = now; }
+    };
+    window.addEventListener('deck:step', onDeckStep);
     function start(): void {
       if (running || reduce || document.hidden) return;
       // `lastNow = 0` so the first frame after a resume contributes nothing to uTimeSec. The 50ms clamp in
@@ -273,6 +293,7 @@
       cvs.removeEventListener('webglcontextlost', onLost as EventListener);
       cvs.removeEventListener('webglcontextrestored', onRestored);
       window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('deck:step', onDeckStep);
       window.removeEventListener('resize', onResize);
       cvs.closest('.descent')?.classList.remove('fluid-live');
       gl.deleteTexture(tex);

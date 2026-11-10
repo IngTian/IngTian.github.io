@@ -168,25 +168,88 @@ export function easeInOutCubic(t: number): number {
 export const WHEEL_THRESHOLD = 18;
 
 /**
- * What the deck does with one wheel event: 'start' a slide, 'swallow' it (preventDefault, move nothing), or
- * 'pass' it to the browser's own scroll.
+ * What the deck does with a gesture's travel once nothing holds it: 'start' a slide, 'swallow' the event
+ * (preventDefault, move nothing), or 'pass' it to the browser's own scroll. wheelStep decides when that is.
  *
- * - `live`: a slide is moving, the gesture that started it is still streaming, or the browser is running a
- *   jump the deck did not start (a rail link, an #anchor). Everything is swallowed then, so leftover momentum
- *   cannot advance a slide the reader did not ask for, and a wheel during a jump cannot cut it short.
  * - `travel`: the gesture's travel so far, this event included, signed. Under the threshold it is swallowed,
  *   NOT passed: Chrome lets a gesture's events be cancelled only if its first one was. Measured on a phased
  *   trackpad gesture when the deck passed a small opener: [6.2px cancelable, 70 not, 43.1 not, 30.7 not], so
  *   the rest of the gesture, momentum included, scrolled natively under the deck's tween.
  * - At an end (no stop in travel's direction) it passes, so the page's ends never feel locked.
  */
-export function wheelAction(
-  travel: number,
-  live: boolean,
-  stops: readonly number[],
-  y: number,
-): 'start' | 'swallow' | 'pass' {
-  if (live) return 'swallow';
+export function wheelAction(travel: number, stops: readonly number[], y: number): 'start' | 'swallow' | 'pass' {
   if (nextStop(stops, y, travel > 0 ? 1 : -1) === null) return 'pass';
   return Math.abs(travel) < WHEEL_THRESHOLD ? 'swallow' : 'start';
+}
+
+/** A wheel stream counts as ended after this much silence. */
+export const WHEEL_QUIET_MS = 160;
+
+/** The frame an event's rate is measured per: a 120 Hz trackpad's event interval. */
+const FRAME_MS = 1000 / 120;
+
+/** How many times the last event an event must be, in rate and in size, to read as a new gesture inside a stream.
+ *  The measured opener jumps about 11x; a drag whose events wander by up to ±60% stays under 4x from one to the next. */
+const JUMP = 4;
+
+/** What the deck remembers of the wheel events before this one (times are event timeStamps, ms). */
+export interface WheelStream {
+  /** An opener's travel while it is still under the threshold. */
+  travel: number;
+  /** The last event that was not passed to the browser. */
+  lastAt: number;
+  /** The last event's rate (px per FRAME_MS) and its size (deltaY), signed. */
+  rate: number;
+  delta: number;
+  /** Events have kept coming since a slide started: what arrives is that gesture's drag or momentum. */
+  tail: boolean;
+}
+
+export const QUIET_STREAM: WheelStream = { travel: 0, lastAt: -Infinity, rate: 0, delta: 0, tail: false };
+
+/**
+ * One wheel event through the stream, in event time: what the deck does with it, and what the stream becomes.
+ * `busy` is a slide moving, or a jump the deck did not start (a rail link, an #anchor): everything is swallowed
+ * then, so leftover momentum cannot advance a slide nobody asked for and a wheel cannot cut a jump short.
+ *
+ * ONE GESTURE IS ONE SLIDE, AND A NEW FLICK IS HEARD. A gesture outlasts its slide: a drag keeps going, and macOS
+ * sends a flick's inertia for a second or more, small events about once a frame, all swallowed (they must be:
+ * wheelAction's note). Holding the deck until they stop made a second flick, made as the slide landed, read as more
+ * of the first one: the deck answered late. So once the slide has landed, while events keep coming (`tail`), only
+ * a JUMP starts a slide: at threshold rate, and JUMP times the last event in rate AND in size. A new flick opens
+ * with one ([6.2, 70, …], about 11x in both); inertia only decays and a drag drifts. Rate is per FRAME_MS of the
+ * time since the last event, because Chrome sums the events it queued while the page was busy into one, whose size
+ * jumps but whose rate keeps the stream's; size, because the first event after a gap reads slow by rate, and the
+ * normal one after it would jump by rate alone. From quiet, an opener's events add up, so a slow drag and a mouse
+ * notch still move a slide.
+ * Not heard: a swipe that builds up gradually, or a slow drag, begun while the last one's inertia is still
+ * arriving. Without a phase on wheel events it cannot be told from a drag that slows; it is heard once quiet.
+ * ponytail: JUMP is a heuristic on the one measured opener; if a real trackpad shows a stray or a missed slide,
+ * record its wheel deltas and tune it.
+ */
+export function wheelStep(
+  s: WheelStream,
+  deltaY: number,
+  at: number,
+  busy: boolean,
+  stops: readonly number[],
+  y: number,
+): { action: 'start' | 'swallow' | 'pass'; dir: 1 | -1; next: WheelStream } {
+  const rate = (deltaY * FRAME_MS) / Math.max(FRAME_MS, at - s.lastAt);
+  const seen = { lastAt: at, rate, delta: deltaY };
+  if (busy) return { action: 'swallow', dir: deltaY > 0 ? 1 : -1, next: { ...seen, travel: 0, tail: true } };
+  const quiet = at - s.lastAt >= WHEEL_QUIET_MS;
+  if (s.tail && !quiet) {
+    const jump = Math.abs(rate) >= WHEEL_THRESHOLD
+      && Math.abs(rate) >= JUMP * Math.abs(s.rate) && Math.abs(deltaY) >= JUMP * Math.abs(s.delta);
+    const action = jump ? wheelAction(rate, stops, y) : 'swallow';
+    const dir = deltaY > 0 ? 1 : -1;
+    if (action === 'pass') return { action, dir, next: { ...s, travel: 0 } };
+    return { action, dir, next: { ...seen, travel: 0, tail: true } };
+  }
+  const travel = quiet ? deltaY : s.travel + deltaY;
+  const action = wheelAction(travel, stops, y);
+  const dir = travel > 0 ? 1 : -1;
+  if (action === 'pass') return { action, dir, next: { ...s, travel: 0 } };
+  return { action, dir, next: { ...seen, travel: action === 'start' ? 0 : travel, tail: action === 'start' } };
 }

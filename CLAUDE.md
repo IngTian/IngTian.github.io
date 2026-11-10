@@ -222,7 +222,7 @@ src/
   lib/artPage.ts                    # /art's pure half: each sentence's rules (sentenceProblems over phrasesOf: PHRASES phrases, each a different work that exists, RED_PCT of its words red) and its turn's hold (holdMs), a work's label line (labelLine), the three sizes hints (matSizes, rowSizes, calSizes) and their constants, and the dark room's zoom: zoomAbout (to 6x, about a point), wheelScale (by distance, not per event), isDoubleTap
   data/{define,desk,story}.ts       # the homepage explainer's copy + numbers, per slide
   data/{cowGlyph,ruleGlyphs,tickerGlyphs}.ts # pixel-art matrices: the cow's and the slides'
-  lib/deck.ts                       # pure deck stops: WHERE the homepage scroll may rest, what's next, and what one wheel event does (wheelAction)
+  lib/deck.ts                       # pure deck stops: WHERE the homepage scroll may rest, what's next, and what one wheel event does (wheelStep, over wheelAction)
   lib/pageStops.ts                  # pure Stop trees: one tree per page drives BOTH its rail and its section ids; + fragmentId, the one decode of a URL fragment
   lib/viewport.ts                   # PHONE_MAX_WIDTH = 640, its PHONE_QUERY + isPhone() — the one phone gate; WIDE_QUERY, the wide layout past 1100px
   lib/motion.ts                     # prefersReducedMotion() — the one motion gate; MOTION_LIMIT_MS, WCAG 2.2.2's five seconds
@@ -418,12 +418,21 @@ scroll guides you to the next slide. It's not a free scroll."*
     the wheel until 300ms after the jump's last scroll event. Not on `scrollend`: each of the tween's instant
     steps fires one, which ended the hold a frame after the click. Measured without this: a rail click 250ms
     into a PageDown rested on the deck's target with the hash set to the link's (4 of 4), and a wheel during
-    the jump started a slide from mid-flight. `wheelAction` in `lib/deck.ts` is the decision, specified; the
+    the jump started a slide from mid-flight. `wheelStep`'s `busy` in `lib/deck.ts` is the decision, specified; the
     wiring shows only in a browser.
   - **A small wheel event is swallowed, not passed**, while a stop lies that way: Chrome lets a gesture's
     events be cancelled only if its first one was, and a trackpad gesture opens at 5–6px, under the 18px
     `WHEEL_THRESHOLD`. Passing the opener left the rest of the gesture, momentum included, scrolling natively
     under the tween. A gesture starts a slide once its travel reaches the threshold.
+  - **One gesture is one slide, and a new flick is heard.** Holding the deck until a flick's inertia stopped (small
+    events once a frame for a second or more) made a second flick, made as the slide landed, read as more of the
+    first: the deck answered late. Now, once the slide has landed, while events keep coming, only a jump starts a
+    slide: at threshold rate and 4x the last event in rate and in size (rate, because Chrome sums the events it
+    queued while the page was busy into one; size, because the event after a gap reads slow by rate). Inertia
+    decays, a drag drifts, and a new flick opens with a jump. Not heard: a swipe that builds up gradually, begun
+    while the last one's inertia still arrives (wheel events carry no phase to tell it from a slowing drag).
+    `wheelStep` in `lib/deck.ts` is the rule, replayed in `tests/deck.test.ts` on modelled flicks, merges, drags,
+    gaps and second flicks at 120 and 60 Hz.
 - **It does not engage under reduced motion, and it does not engage on a phone.** Both fall back to an
   ordinary free scroll, which is a *finished* state.
 
@@ -895,8 +904,13 @@ Two invariants, both about the compositor:
    also dropped on resize-to-hidden and on GL context loss.
 
 Perf: viewport-sized (scroll is a uniform), half internal resolution, ~30fps idle and **every rAF tick while
-scrolling**, paused on tab-hide, skipped on phones. The CSS `--descent-grad` gradient stays underneath as the
-base and the no-WebGL state.
+scrolling**, paused on tab-hide, skipped on phones, and not drawn once the screen's top is a viewport past the first
+paper panel's top (Choice's): the panels run opaque to the page's foot, so none of it can be seen there. It still
+draws behind Choice itself, the viewport of margin kept for a layout shift since the last measure. The CSS
+`--descent-grad` gradient stays underneath as the base and the no-WebGL state.
+- **During a deck slide the sky draws on the deck's step** (`deck:step`, dispatched after each `scrollTo`), not
+  on its own loop: the deck's rAF runs after the sky's in a frame, so the loop read the scroll a frame late and
+  the sky trailed the page by a frame's travel, the same dragging feel as below, on `/` alone.
 
 **THE SCROLLING BUDGET IS 0. DO NOT "OPTIMISE" IT.** A 16ms cap halved the draws and made `/` and `/art`
 *"stucky as hell"*: a half-rate background under full-rate content reads as the background dragging, worst on

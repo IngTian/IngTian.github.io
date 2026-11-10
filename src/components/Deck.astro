@@ -25,7 +25,7 @@
 // TerrainHero and DescentPath.
 ---
 <script>
-  import { deckStops, nextStop, wheelAction, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide } from '../lib/deck';
+  import { deckStops, nextStop, wheelStep, easeInOutCubic, DECK_TWEEN_MS, QUIET_STREAM, type DeckSlide, type WheelStream } from '../lib/deck';
   import { prefersReducedMotion } from '../lib/motion';
   import { isPhone, PHONE_QUERY } from '../lib/viewport';
 
@@ -75,23 +75,21 @@
     // ── Gesture coalescing.
     // A trackpad flick is dozens of wheel events; a mouse notch is one. Without coalescing, a flick
     // would advance a dozen slides. After a gesture is honoured, further wheel events are swallowed
-    // until the stream goes quiet — which is also what stops momentum from queueing up jumps.
+    // while the slide moves, and after it only a jump starts another (wheelStep, lib/deck.ts) — which is also what
+    // stops momentum from queueing up jumps.
     // THE LOCK IS HELD UNTIL THE SLIDE ANIMATION FINISHES, not until the wheel stream goes quiet.
     // An earlier version cleared it after 140ms of silence, which measured as a bug: a 14-event
     // trackpad flick jumped from the top of the page to the bottom (0 → 6302, every slide at once),
     // because events still arriving during the transition each triggered another advance. (That transition was a
     // ~500ms native smooth scroll then; it is now our own 650ms tween — see tweenTo. The coalescing logic is
     // unchanged, and the reason it exists is unchanged with it.)
-    // Two conditions must BOTH hold before another gesture is honoured — the animation has settled at
-    // its target, AND the wheel stream has gone quiet, so leftover momentum cannot advance a slide the
-    // reader did not ask for.
+    // Two conditions must BOTH hold before another gesture is honoured — the animation has settled at its target,
+    // AND the event is a new gesture: from quiet, or a jump out of the stream still arriving, so leftover momentum
+    // cannot advance a slide the reader did not ask for. wheelStep (lib/deck.ts) says what a jump is, and why.
     let animating = false;
     let target: number | null = null;
-    let quietTimer = 0;
     let animTimer = 0;
-    let streamLive = false;
-    let travel = 0;            // a gesture's travel while it is still under the threshold (wheelAction)
-    const QUIET_MS = 160;      // stream considered ended after this much silence
+    let stream: WheelStream = QUIET_STREAM;
     const ANIM_MAX_MS = 900;   // hard release. Now a pure belt-and-braces: our tween is 650ms and calls
                                // release() itself on its last frame, so this only fires if a frame never
                                // arrives (a backgrounded tab). It stays because losing the lock forever
@@ -118,16 +116,27 @@
       if (raf) { cancelAnimationFrame(raf); raf = 0; }
     }
 
+    // ASTRO'S ROUTER SAVES THE SCROLL ON EVERY `scrollend` (history.replaceState), and each instant step fires one,
+    // so a slide was a history write a frame. Mid-tween they stop here, before the router's window listener, all but
+    // the one at the destination: the step that reaches it is usually not the last (the last scrolls nothing and fires
+    // none), so the landing must be let through whichever step lands, or Back would restore the slide before it.
+    let tweenDest = NaN;
+    const midTween = (e: Event): void => { if (raf && Math.abs(window.scrollY - tweenDest) > 1) e.stopImmediatePropagation(); };
+
     function tweenTo(dest: number): void {
       cancelTween();
       const from = window.scrollY;
       const dist = dest - from;
+      tweenDest = dest;
       // Already there (or within rounding): do not spend 650ms animating nothing.
       if (Math.abs(dist) < 2) { window.scrollTo({ top: dest, behavior: 'instant' }); release(); return; }
       const t0 = performance.now();
       const step = (now: number): void => {
         const p = Math.min(1, (now - t0) / DECK_TWEEN_MS);
         window.scrollTo({ top: Math.round(from + dist * easeInOutCubic(p)), behavior: 'instant' });
+        // FluidSky draws on this, at the scroll the frame is painted at: its own rAF runs before this one in a
+        // frame, so on its loop alone the sky trailed the page by a frame's travel, tens of px mid-slide.
+        window.dispatchEvent(new Event('deck:step'));
         if (p < 1) {
           raf = requestAnimationFrame(step);
         } else {
@@ -157,22 +166,14 @@
       // Let anything scrollable in its own right (a code block, a table's own box) scroll itself.
       if (isInnerScrollable(e.target, e.deltaY)) return;
 
-      // Was a gesture ALREADY live before this event? Captured before the stream is re-armed below,
-      // because the test that matters is "is this event a continuation" — re-arming first would make
-      // every event look like a continuation of itself. Mid-animation, mid-gesture or mid-jump, the event
-      // is swallowed: this is what makes one flick equal one slide. The rules are wheelAction's (lib/deck.ts).
-      const live = animating || streamLive || yielding;
-      travel = live ? 0 : travel + e.deltaY;
-      const action = wheelAction(travel, live, stops, Math.round(window.scrollY));
-      if (action === 'pass') { travel = 0; return; }   // at an end — let the browser scroll normally
+      // Mid-animation or mid-jump the event is swallowed, and after a slide only a new gesture starts one: this is
+      // what makes one flick equal one slide. At an end it passes, so the browser scrolls normally. The rules are
+      // wheelStep's (lib/deck.ts).
+      const { action, dir, next } = wheelStep(stream, e.deltaY, e.timeStamp, animating || yielding, stops, Math.round(window.scrollY));
+      stream = next;
+      if (action === 'pass') return;
       e.preventDefault();
-
-      // Track the stream: a new gesture is only possible once this goes quiet. A small opener is held as
-      // travel, not as a stream, or the rest of its own gesture would be swallowed as a continuation.
-      window.clearTimeout(quietTimer);
-      quietTimer = window.setTimeout(() => { streamLive = false; travel = 0; }, QUIET_MS);
-      if (action === 'start') { go(travel > 0 ? 1 : -1); travel = 0; }
-      if (action === 'start' || live) streamLive = true;
+      if (action === 'start') go(dir);
     }
 
     /** True when the event started inside an element that can still scroll in this direction. */
@@ -254,7 +255,7 @@
     // short, so the click landed nowhere while the hash said it had: the deck's tween, whose next instant
     // scrollTo cancels the browser's smooth scroll (a rail click 250ms into a PageDown missed 4 of 4), and a
     // wheel during the jump, taken as a new gesture and tweened from mid-flight. So the deck drops its slide
-    // and swallows the wheel (wheelAction's `live`) while it holds, below. A key press still moves a slide:
+    // and swallows the wheel (wheelStep's `busy`) while it holds, below. A key press still moves a slide:
     // it is the reader's, where a wheel tail is often momentum.
     let yielding = false;
     let yieldTimer = 0;
@@ -298,6 +299,7 @@
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('popstate', onNavigate);
     window.addEventListener('hashchange', onNavigate);
+    window.addEventListener('scrollend', midTween, { capture: true });
 
     return () => {
       window.removeEventListener('wheel', onWheel);
@@ -308,7 +310,7 @@
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('popstate', onNavigate);
       window.removeEventListener('hashchange', onNavigate);
-      window.clearTimeout(quietTimer);
+      window.removeEventListener('scrollend', midTween, { capture: true });
       window.clearTimeout(resizeTimer);
       window.clearTimeout(animTimer);
       window.clearTimeout(yieldTimer);
