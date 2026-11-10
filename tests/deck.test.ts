@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deckStops, nextStop, wheelAction, WHEEL_THRESHOLD, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide } from '../src/lib/deck';
+import { deckStops, nextStop, wheelAction, wheelStep, WHEEL_THRESHOLD, QUIET_STREAM, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide, type WheelStream } from '../src/lib/deck';
 
 // A REPRESENTATIVE mixed-height page, not today's: the homepage's geometry as measured in Chrome at 1700x1050
 // when the deck was built, six slides in an earlier order (the labels name them). What it holds is the mix of
@@ -297,28 +297,123 @@ describe('deck transition easing', () => {
 });
 
 /**
- * ONE WHEEL EVENT. The wiring (popstate and hashchange set the deck yielding; the tween is cancelled) can only be
- * seen in a browser; this holds the decision every wheel event goes through.
+ * ONE GESTURE'S TRAVEL, once nothing holds the deck. The wiring (popstate and hashchange set the deck yielding; the
+ * tween is cancelled) can only be seen in a browser; wheelStep, below, is the whole rule over a stream.
  */
 describe('wheelAction', () => {
   const STOPS = [0, 1000, 2000];
 
-  it('never starts a slide while one is live: moving, still streaming, or a jump the deck did not start', () => {
-    for (const travel of [-400, -6, 6, 40, 400]) {
-      for (const y of [0, 1000, 2000]) expect(wheelAction(travel, true, STOPS, y)).toBe('swallow');
-    }
-  });
-
   it('swallows a gesture under the threshold rather than passing it, so the rest of it stays cancelable', () => {
-    expect(wheelAction(6, false, STOPS, 1000)).toBe('swallow');
-    expect(wheelAction(-6, false, STOPS, 1000)).toBe('swallow');
-    expect(wheelAction(WHEEL_THRESHOLD - 0.1, false, STOPS, 1000)).toBe('swallow');
-    expect(wheelAction(WHEEL_THRESHOLD, false, STOPS, 1000)).toBe('start');
-    expect(wheelAction(-WHEEL_THRESHOLD, false, STOPS, 1000)).toBe('start');
+    expect(wheelAction(6, STOPS, 1000)).toBe('swallow');
+    expect(wheelAction(-6, STOPS, 1000)).toBe('swallow');
+    expect(wheelAction(WHEEL_THRESHOLD - 0.1, STOPS, 1000)).toBe('swallow');
+    expect(wheelAction(WHEEL_THRESHOLD, STOPS, 1000)).toBe('start');
+    expect(wheelAction(-WHEEL_THRESHOLD, STOPS, 1000)).toBe('start');
   });
 
   it("passes at an end, small or not, so the page's ends never feel locked", () => {
-    for (const travel of [6, 40]) expect(wheelAction(travel, false, STOPS, 2000)).toBe('pass');
-    for (const travel of [-6, -40]) expect(wheelAction(travel, false, STOPS, 0)).toBe('pass');
+    for (const travel of [6, 40]) expect(wheelAction(travel, STOPS, 2000)).toBe('pass');
+    for (const travel of [-6, -40]) expect(wheelAction(travel, STOPS, 0)).toBe('pass');
+  });
+});
+
+// THE STREAM, replayed in event time. A flick is the measured opener [6.2, 70, 43.1, 30.7] at 120 Hz and then macOS's
+// inertia: events once an interval, decaying exponentially (450ms) from the opener's last, for ~1.8s; at 60 Hz the
+// same motion arrives as events of twice the size. Chrome's merges are modelled as it makes them: the events it
+// queued while the page was busy, summed into one stamped with the last one's time. These are models of a trackpad,
+// not recordings; what they hold is the deck's contract: one gesture moves one slide, and the next one is heard.
+describe('wheelStep', () => {
+  const STOPS = [0, 1000, 2000, 3000, 4000];
+  type Ev = [at: number, dy: number];
+
+  const flick = (t0: number, { sign = 1, hz = 120, strength = 1 } = {}): Ev[] => {
+    const dt = 1000 / hz, k = strength * (120 / hz);
+    const evs: Ev[] = [6.2, 70, 43.1, 30.7].map((dy, i) => [t0 + i * dt, sign * dy * k]);
+    for (let i = 1; ; i++) {
+      const dy = 30.7 * k * Math.exp(-(i * dt) / 450);
+      if (dy < 0.5) break;
+      evs.push([t0 + (3 + i) * dt, sign * dy]);
+    }
+    return evs;
+  };
+
+  /** The `n` events from `from` on, summed into one at the last one's time: what Chrome sends after a stall. */
+  const merged = (evs: Ev[], from: number, n: number): Ev[] => {
+    const i = evs.findIndex(([at]) => at >= from);
+    if (i < 0 || i + n > evs.length) return evs;
+    const part = evs.slice(i, i + n);
+    return [...evs.slice(0, i), [part[n - 1][0], part.reduce((a, [, dy]) => a + dy, 0)], ...evs.slice(i + n)];
+  };
+
+  /** Each event's time when it started a slide; the deck is busy for the tween after each. */
+  const starts = (evs: Ev[]): number[] => {
+    let s: WheelStream = QUIET_STREAM;
+    let busyUntil = -Infinity;
+    const out: number[] = [];
+    for (const [at, dy] of [...evs].sort((a, b) => a[0] - b[0])) {
+      const r = wheelStep(s, dy, at, at < busyUntil, STOPS, 2000);
+      s = r.next;
+      if (r.action === 'start') { out.push(at); busyUntil = at + DECK_TWEEN_MS; }
+    }
+    return out;
+  };
+
+  it('starts one slide per flick, however long and hard its momentum runs', () => {
+    for (const hz of [120, 60]) for (const strength of [1, 2]) for (const sign of [1, -1]) {
+      expect(starts(flick(0, { sign, hz, strength })), `${hz} Hz, ${strength}x, ${sign}`).toHaveLength(1);
+    }
+  });
+
+  it("starts no slide from a tail Chrome merged while the page was busy", () => {
+    for (const hz of [120, 60]) for (const strength of [1, 2]) for (const n of [2, 3, 4, 6]) {
+      for (let from = 600; from <= 1400; from += 100) {
+        expect(starts(merged(flick(0, { hz, strength }), from, n)), `${hz} Hz, ${strength}x, ${n} merged at ${from}`).toHaveLength(1);
+      }
+    }
+  });
+
+  it('moves one slide for one long drag, however its speed wanders', () => {
+    const drag = (hz: number, f: (i: number) => number): Ev[] =>
+      Array.from({ length: Math.round((1.5 * hz)) }, (_, i) => [i * (1000 / hz), f(i)] as Ev);
+    expect(starts(drag(120, (i) => 14 + 8 * Math.sin(i / 7)))).toHaveLength(1);
+    expect(starts(drag(60, (i) => 16 + 6 * Math.sin(i / 4)))).toHaveLength(1);
+    // A drag whose events wander ±50% from one to the next (7, 21, 7, …): 3x apart, never a jump.
+    expect(starts(drag(120, (i) => (i % 2 ? 21 : 7)))).toHaveLength(1);
+    // Lifting off after a long drag: its last finger event, a gap (Chromium waits up to 100ms for momentum), then
+    // inertia. The first inertia event reads slow by rate; the next is its normal size, not a jump.
+    const finger: Ev[] = drag(120, (i) => (i < 102 ? 12 : 22)).slice(0, 120);
+    const t = finger[finger.length - 1][0] + 33;
+    const inertia: Ev[] = Array.from({ length: 200 }, (_, i) => [t + i * (1000 / 120), 22 * Math.exp(-(i * 1000 / 120) / 450)] as Ev);
+    expect(starts([...finger, ...inertia])).toHaveLength(1);
+  });
+
+  it("honours a second flick made as the slide lands, while the first one's momentum is still arriving", () => {
+    // Touching the pad stops the inertia. Holding the deck until the inertia stopped swallowed these flicks whole,
+    // and a firm first flick's inertia is still at threshold rate after the slide lands.
+    for (const strength of [1, 2, 3]) for (const [hz, second] of [[120, 700], [120, 800], [120, 900], [60, 900], [60, 1200]]) {
+      const evs = [...flick(0, { hz, strength }).filter(([at]) => at < second), ...flick(second, { hz })];
+      expect(starts(evs), `${hz} Hz, ${strength}x first, second at ${second}`).toHaveLength(2);
+    }
+  });
+
+  it('still lets a slow drag add up from quiet, and a mouse notch start at once', () => {
+    const slow: Ev[] = [3, 4, 4, 3, 4, 4].map((dy, i) => [i * 16, dy]);
+    expect(starts(slow)).toEqual([64]);   // 3 + 4 + 4 + 3 + 4 = 18
+    // Notches 300ms apart: the second lands mid-tween and is swallowed; one after the tween starts again.
+    expect(starts([[0, 100], [300, 100], [1000, 100]])).toEqual([0, 1000]);
+  });
+
+  it('reads a jump in rate and in size, so neither a merge nor a gap fakes one, and passes at an end', () => {
+    const F = 1000 / 120;
+    const tail = (rate: number, delta: number): WheelStream => ({ travel: 0, lastAt: 0, rate, delta, tail: true });
+    // Chrome summed three 8px events into one: its size jumps, its rate does not.
+    expect(wheelStep(tail(8, 8), 24, 3 * F, false, STOPS, 2000).action).toBe('swallow');
+    // The event after a 33ms gap read 5.5 by rate; the next, its normal 22px, jumps by rate alone.
+    expect(wheelStep(tail(5.5, 22), 22, F, false, STOPS, 2000).action).toBe('swallow');
+    // A new flick's opener jumps in both.
+    expect(wheelStep(tail(6.2, 6.2), 70, F, false, STOPS, 2000).action).toBe('start');
+    const atEnd = wheelStep(QUIET_STREAM, 40, 0, false, STOPS, 4000);
+    expect(atEnd.action).toBe('pass');
+    expect(atEnd.next).toEqual(QUIET_STREAM);
   });
 });
