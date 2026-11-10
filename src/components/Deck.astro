@@ -25,7 +25,7 @@
 // TerrainHero and DescentPath.
 ---
 <script>
-  import { deckStops, nextStop, wheelStep, DECK_EASE, DECK_TWEEN_MS, QUIET_STREAM, type DeckSlide, type WheelStream } from '../lib/deck';
+  import { deckStops, nextStop, wheelStep, easeInOutCubic, DECK_TWEEN_MS, QUIET_STREAM, type DeckSlide, type WheelStream } from '../lib/deck';
   import { prefersReducedMotion } from '../lib/motion';
   import { isPhone, PHONE_QUERY } from '../lib/viewport';
 
@@ -81,7 +81,7 @@
     // An earlier version cleared it after 140ms of silence, which measured as a bug: a 14-event
     // trackpad flick jumped from the top of the page to the bottom (0 → 6302, every slide at once),
     // because events still arriving during the transition each triggered another advance. (That transition was a
-    // ~500ms native smooth scroll then; it is now our own tween — see tweenTo. The coalescing logic is
+    // ~500ms native smooth scroll then; it is now our own 650ms tween — see tweenTo. The coalescing logic is
     // unchanged, and the reason it exists is unchanged with it.)
     // Two conditions must BOTH hold before another gesture is honoured — the animation has settled at its target,
     // AND the event is a new gesture: from quiet, or a jump out of the stream still arriving, so leftover momentum
@@ -90,7 +90,7 @@
     let target: number | null = null;
     let animTimer = 0;
     let stream: WheelStream = QUIET_STREAM;
-    const ANIM_MAX_MS = 900;   // hard release. Now a pure belt-and-braces: our tween is 500ms and calls
+    const ANIM_MAX_MS = 900;   // hard release. Now a pure belt-and-braces: our tween is 650ms and calls
                                // release() itself on its last frame, so this only fires if a frame never
                                // arrives (a backgrounded tab). It stays because losing the lock forever
                                // would leave the deck permanently deaf to gestures.
@@ -128,12 +128,12 @@
       const from = window.scrollY;
       const dist = dest - from;
       tweenDest = dest;
-      // Already there (or within rounding): do not spend a tween animating nothing.
+      // Already there (or within rounding): do not spend 650ms animating nothing.
       if (Math.abs(dist) < 2) { window.scrollTo({ top: dest, behavior: 'instant' }); release(); return; }
       const t0 = performance.now();
       const step = (now: number): void => {
         const p = Math.min(1, (now - t0) / DECK_TWEEN_MS);
-        window.scrollTo({ top: Math.round(from + dist * DECK_EASE(p)), behavior: 'instant' });
+        window.scrollTo({ top: Math.round(from + dist * easeInOutCubic(p)), behavior: 'instant' });
         // FluidSky draws on this, at the scroll the frame is painted at: its own rAF runs before this one in a
         // frame, so on its loop alone the sky trailed the page by a frame's travel, tens of px mid-slide.
         window.dispatchEvent(new Event('deck:step'));

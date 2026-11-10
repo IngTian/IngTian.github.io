@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deckStops, nextStop, wheelAction, wheelStep, WHEEL_THRESHOLD, QUIET_STREAM, cubicBezier, DECK_EASE, DECK_TWEEN_MS, type DeckSlide, type WheelStream } from '../src/lib/deck';
+import { deckStops, nextStop, wheelAction, wheelStep, WHEEL_THRESHOLD, QUIET_STREAM, easeInOutCubic, DECK_TWEEN_MS, type DeckSlide, type WheelStream } from '../src/lib/deck';
 
 // A REPRESENTATIVE mixed-height page, not today's: the homepage's geometry as measured in Chrome at 1700x1050
 // when the deck was built, six slides in an earlier order (the labels name them). What it holds is the mix of
@@ -247,42 +247,50 @@ describe('a mixed-height page (HOME)', () => {
 });
 
 /**
- * THE TRANSITION CURVE, the owner's pick between the two ends he judged on his own screen recordings: native smooth
- * scroll, near peak velocity within ~35ms of standstill ("the sudden change of slides"), and an easeInOutCubic over
- * 650ms that covered 1.5% of a slide by 100ms (sluggish). These hold what places it between them, not the formula.
+ * THE TRANSITION CURVE. The deck stopped using `behavior: 'smooth'` because the browser's curve is
+ * front-loaded — measured on the owner's own screen recording (578 frames at 55.8fps), a slide reached
+ * near-peak velocity within ~35ms of standstill, which is what he described as "the sudden change of slides
+ * instead of a smooth transition". These assert the properties that make the replacement feel deliberate,
+ * rather than restating the formula back to itself.
  */
 describe('deck transition easing', () => {
-  const at = (ms: number) => DECK_EASE(ms / DECK_TWEEN_MS);
+  it('starts and ends exactly at the endpoints, so a slide lands on its stop', () => {
+    expect(easeInOutCubic(0)).toBe(0);
+    expect(easeInOutCubic(1)).toBe(1);
+  });
 
-  it('starts and ends exactly at the endpoints, and clamps the progress a late frame pushes out of range', () => {
-    // Unclamped, a late frame would scroll PAST the stop and snap back.
-    expect(DECK_EASE(0)).toBe(0);
-    expect(DECK_EASE(1)).toBe(1);
-    expect(DECK_EASE(1.4)).toBe(1);
-    expect(DECK_EASE(-0.2)).toBe(0);
+  it('clamps out-of-range progress instead of overshooting', () => {
+    // A frame can arrive late, making elapsed/duration exceed 1. Unclamped, the page would scroll PAST the
+    // stop and snap back — the exact artefact this change exists to remove.
+    expect(easeInOutCubic(1.4)).toBe(1);
+    expect(easeInOutCubic(-0.2)).toBe(0);
+  });
+
+  it('is symmetric — the departure and the arrival are the same gesture', () => {
+    for (const t of [0.1, 0.25, 0.4, 0.49]) {
+      expect(easeInOutCubic(t) + easeInOutCubic(1 - t)).toBeCloseTo(1, 10);
+    }
+  });
+
+  it('EASES IN: the opening tenth of the time covers only a few percent of the distance', () => {
+    // This is the whole point of the change. The native curve spent its velocity ramp in the first ~7% of the
+    // duration; this covers under 5% of the DISTANCE in the first 10% of the time, so the slide leaves gently.
+    expect(easeInOutCubic(0.1)).toBeLessThan(0.05);
+    expect(easeInOutCubic(0.5)).toBeCloseTo(0.5, 10);
   });
 
   it('never moves backwards', () => {
-    for (let i = 1; i <= 100; i++) expect(DECK_EASE(i / 100)).toBeGreaterThanOrEqual(DECK_EASE((i - 1) / 100));
-  });
-
-  it('leaves from a standstill but is under way at once: over a tenth of the slide by 100ms', () => {
-    expect(at(50)).toBeLessThan(0.05);
-    expect(at(100)).toBeGreaterThan(0.1);
-  });
-
-  it('reaches full speed well after the native ~35ms and long before the old 324ms', () => {
-    let peakAt = 0, peak = 0;
-    for (let ms = 0; ms < DECK_TWEEN_MS; ms++) { const v = at(ms + 1) - at(ms); if (v > peak) { peak = v; peakAt = ms; } }
-    expect(peakAt).toBeGreaterThan(100);
-    expect(peakAt).toBeLessThan(200);
-  });
-
-  it("is CSS's cubic-bezier: ease's known midpoint", () => {
-    expect(cubicBezier(0.25, 0.1, 0.25, 1)(0.5)).toBeCloseTo(0.8024, 3);
+    let prev = -1;
+    for (let i = 0; i <= 100; i++) {
+      const v = easeInOutCubic(i / 100);
+      expect(v).toBeGreaterThanOrEqual(prev);
+      prev = v;
+    }
   });
 
   it('keeps the duration long enough to read as motion and short enough not to feel slow', () => {
+    // 650ms: a little longer than the ~500ms native scroll it replaced, because an ease-in spends the opening
+    // frames at low velocity and the same distance has to be covered in the middle.
     expect(DECK_TWEEN_MS).toBeGreaterThanOrEqual(450);
     expect(DECK_TWEEN_MS).toBeLessThanOrEqual(900);
   });
@@ -409,4 +417,3 @@ describe('wheelStep', () => {
     expect(atEnd.next).toEqual(QUIET_STREAM);
   });
 });
-
