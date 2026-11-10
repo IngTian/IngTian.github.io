@@ -171,9 +171,6 @@ const items: Item[] = [
     border: 1px solid rgba(184, 177, 161, 0.18);
     box-shadow: 0 2px 14px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
-  /* the light text should stay light in the top zone under the dark theme */
-  :global(html[data-theme='dark']) .cnav a,
-  :global(html[data-theme='dark']) .cnav .toggle { color: var(--ink-1); }
 
   .cnav li { display: flex; }
 
@@ -303,8 +300,9 @@ const items: Item[] = [
 
   @media (hover: hover) {
     .cnav a:hover .pill, .cnav .toggle:hover .pill { opacity: 1; transform: scale(1); }
-    .cnav a:hover, .cnav .toggle:hover { color: var(--on-accent); }   /* dark ink reads on the accent */
-    .cnav[data-zone="dark"] a:hover, .cnav[data-zone="dark"] .toggle:hover { color: var(--on-accent); }
+    /* --on-accent on the pill, in every zone and theme. It ties the dark zone's resting colour on specificity and
+       wins by coming later, so no theme or zone colour rule may out-rank it. */
+    .cnav a:hover, .cnav .toggle:hover { color: var(--on-accent); }
     .cnav a:hover .content, .cnav .toggle:hover .content { animation: cnav-nudge 0.32s ease; }
   }
   .cnav a:focus-visible, .cnav .toggle:focus-visible { outline: none; color: var(--on-accent); }
@@ -438,7 +436,7 @@ const items: Item[] = [
     // Declared OUT here, beside onResize, because the teardown that clears it runs in this scope.
     let navResizeTimer = 0;
     let zoneRO: ResizeObserver | null = null;
-    // Zone = which LIGHT-theme text color the nav uses (dark theme forces light text via CSS regardless). A page
+    // Zone = which text colour the nav uses (in the dark theme both are light, from the flipped tokens). A page
     // with no .descent (every page but / and the 404) pins dark text; on one, it flips dark→paper by the descent
     // fraction behind the nav.
     if (!descent) {

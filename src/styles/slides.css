@@ -12,16 +12,20 @@
 
    The ground and inks are the panel's own, never the global ramp (--paper, --ink-*): --paper is the sky's text
    colour, and the ramp's light inks, chosen for the dark sky, vanish on the tan. DescentPath's canvas reads them
-   too. PlushCow's dark bubble repeats --panel-bg as a literal, because a cow can sit on no panel (/404). */
+   too. PlushCow's dark bubble repeats --panel-bg as a literal, because a cow can sit on no panel (/404).
+
+   Every ink below but the edge is text, much of it small, so each clears 4.5:1 on its ground, under the homepage's Grain too
+   (tests/deckPalette.test.ts). The faint tier sits close to the soft one because the tan leaves little room under
+   the ink: light faint is the rail's resting ink, #494339. */
 .slide-paper {
   --panel-bg: #c4b7a1; --panel-edge: rgba(74,66,54,0.26); --panel-ink: #1f1b14;
-  --panel-soft: #423b30; --panel-faint: #6a6153; --panel-accent: #7c5522;
+  --panel-soft: #423b30; --panel-faint: #494339; --panel-accent: #5f4019;
   background: var(--panel-bg);
   border-top: 1px solid var(--panel-edge); border-bottom: 1px solid var(--panel-edge);
 }
 html[data-theme='dark'] .slide-paper {
   --panel-bg: #14161a; --panel-edge: rgba(184,177,161,0.14); --panel-ink: #dce1dc;
-  --panel-soft: #a8b0a9; --panel-faint: #6d746e; --panel-accent: #7fc9a0;
+  --panel-soft: #a8b0a9; --panel-faint: #7c847c; --panel-accent: #7fc9a0;
 }
 
 /* Clears the fixed rail (SideRail), whose widest label ends at x=145 at most (lib/pageStops' homeStops has the

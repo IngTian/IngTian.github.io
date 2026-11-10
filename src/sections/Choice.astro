@@ -290,15 +290,16 @@ const allBeats = [...BEATS, BEAT4];
 <style>
   .ch { position: relative; z-index: 1; }
   .ch-paper {
-    /* Four holding colours, from the palette only: the accent, two ink tones, and the indigo. No new hues —
+    /* Four holding colours, from the palette only: an ochre (in light #7c5522, lighter than --panel-accent, which is
+       darkened for 4.5:1 text; a fill needs 3:1), two ink tones, and the indigo. No new hues —
        the site allows exactly one saturated colour in light theme and it is the seal, which is reserved. */
     --c-h0: #7c5522; --c-h1: #9a8353; --c-h2: #5d6472; --c-h3: #b9a880;
     /* FOUR POLICY colours, separate from the holding colours — the last beat draws ways of DECIDING, not
        things owned, and reusing the holding ramp made two policies share a hue (in dark, h0 and h1 are both
        emerald, so the winner and the chaser drew as one line). Only the subject carries the accent; the other
        three are ink tones separated by lightness. */
-    /* p2 is the LEVERED book and must not be the accent — it was literally #7c5522, the same value
-       --panel-accent resolves to in light, so two of the five curves drew in one colour. A desaturated plum is a
+    /* p2 is the LEVERED book and must not share the subject's colour — it was literally #7c5522, then the
+       light --panel-accent, so two of the five curves drew in one colour. A desaturated plum is a
        distinct hue that still holds the palette's rule (the seal stays the only saturated colour). */
     --c-p0: #4a5464; --c-p1: #3a3428; --c-p2: #5d4a5e; --c-p3: #6e6555; --c-p4: var(--panel-accent);
     padding: clamp(28px, 3.6vh, 56px) 0;
@@ -357,7 +358,8 @@ const allBeats = [...BEATS, BEAT4];
     :global(html.define-js) .ch-beat:hover { opacity: 0.72; }
     :global(html.define-js) .ch-beat.is-on:hover { opacity: 1; }
   }
-  .ch-beat:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 3px; opacity: 1; }
+  /* Prefixed as the dimming is, or the dimming out-ranks it and a beat reached by Tab draws its ring at 0.3. */
+  .ch-beat:focus-visible, :global(html.define-js) .ch-beat:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 3px; opacity: 1; }
   @media (prefers-reduced-motion: no-preference) {
     .ch-beat { transition: opacity .5s ease, border-color .5s ease; }
   }

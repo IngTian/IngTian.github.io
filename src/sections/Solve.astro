@@ -218,7 +218,7 @@ const badPeriods = WORLD.tilt.map((t, i) => ({ t, i })).filter(({ t }) => t < 0)
   }
   .so-term:hover { opacity: 0.72; }
   .so-term[aria-pressed='true'] { opacity: 1; border-top-color: var(--panel-accent); }
-  .so-term:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 3px; }
+  .so-term:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 3px; opacity: 1; }
   @media (prefers-reduced-motion: no-preference) {
     .so-term { transition: opacity 200ms ease, border-color 200ms ease; }
   }

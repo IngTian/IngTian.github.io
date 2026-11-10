@@ -1,5 +1,5 @@
 // tests/deckPalette.test.ts
-// THE HOMEPAGE'S RAIL INK — `html[data-page='deck']` in tokens.css.
+// THE HOMEPAGE'S RAIL INK — `html[data-page='deck']` in tokens.css — and, at the foot, the panels' own text inks.
 //
 // The homepage's rail (SideRail) is fixed, and the page moves under it: off the hero (hideOver), it sits over the
 // Interlude's sky and then over the five opaque paper panels; the last, Work's, fills the page's last screen, as
@@ -125,4 +125,34 @@ describe("the homepage's rail ink (tokens.css)", () => {
     expect(ratio(tokens(':root')['--ink-3'], PANEL.light)).toBeLessThan(AA_BODY);
     expect(ratio(tokens(':root')['--ochre'], PANEL.light)).toBeLessThan(3);
   });
+});
+
+// The panels' own inks, on the same ground and under the same Grain as the rail. Every --panel-* written as a hex but
+// the ground is text (the edge, a hairline, is an rgba), so each is measured here; the list below fails by name on an
+// ink added or lost, or on a parse that finds none.
+describe("the panels' text inks (styles/slides.css)", () => {
+  const css = readFileSync(new URL('../src/styles/slides.css', import.meta.url), 'utf8');
+  const inks = (sel: string): Record<string, string> => Object.fromEntries(
+    [...(css.split(`${sel} {`)[1] ?? '').split('}')[0].matchAll(/(--panel-[\w-]+):\s*(#[0-9a-f]{6})/gi)]
+      .map((m) => [m[1], m[2]]).filter(([k]) => k !== '--panel-bg'));
+
+  for (const [theme, sel] of [['light', '.slide-paper'], ['dark', "html[data-theme='dark'] .slide-paper"]] as const) {
+    describe(theme, () => {
+      const ink = inks(sel), ground = rgbOf(PANEL[theme]);
+
+      it('clears 4.5:1 on the panel, under the Grain too, for every text ink', () => {
+        expect(Object.keys(ink).sort()).toEqual(['--panel-accent', '--panel-faint', '--panel-ink', '--panel-soft']);
+        for (const [k, hex] of Object.entries(ink)) {
+          expect(onGround(hex, ground), `${k} ${hex}`).toBeGreaterThanOrEqual(AA_BODY);
+          expect(underGrain(hex, ground), `${k} ${hex} under the Grain`).toBeGreaterThanOrEqual(AA_BODY);
+        }
+      });
+
+      it('keeps its tiers in order: ink, then soft, then faint', () => {
+        const r = (k: string) => ratio(ink[k], PANEL[theme]);
+        expect(r('--panel-ink')).toBeGreaterThan(r('--panel-soft'));
+        expect(r('--panel-soft')).toBeGreaterThan(r('--panel-faint'));
+      });
+    });
+  }
 });
