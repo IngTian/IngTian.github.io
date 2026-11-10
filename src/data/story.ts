@@ -10,6 +10,11 @@
 //
 // Content lives here rather than in the component because every other fact on this site lives in
 // data/ — editing what the page says should never mean editing markup.
+import { timeline } from './profile';
+import { cap, inWords } from '../lib/words';
+
+/** The roles, counted from the timeline rather than typed: its work entries, so a degree is not a role. */
+const ROLES = cap(inWords(timeline.filter((r) => r.kind === 'work').length));
 
 export interface StoryColumn {
   /** Small mono kicker. */
@@ -28,14 +33,14 @@ export const STORY: StoryColumn[] = [
     kicker: 'The local minimum',
     lead: 'Most of my career has been spent as a full-stack engineer, and I was good at it.',
     body: [
-      'Nine roles, four companies, systems that held at fifty thousand requests a second. ' +
+      `${ROLES} roles, four companies, systems that held at fifty thousand requests a second. ` +
       'By every visible measure that is a good place to stand, and the field around it is flat: ' +
       'every direction out looks like more of the same, slightly worse.',
-      // FLAGGED FOR THE OWNER: "a thousandth" is a typed measurement of the invented field, the kind of
-      // figure STORY_FIGURES (below) was deleted for. Nothing computes or tests it.
+      // "Hundreds" is a gloss, not a figure (a printed "260x" reads as a claim about a career; see the foot of this
+      // file). tests/trajectory.test.ts holds it to the graph's field: the basin floor against the research side.
       'That flatness is the trap, and it is measurable rather than poetic. In the engineering ' +
       'basin the surface bends almost equally in every direction, so no step tells you much — ' +
-      'the gradient there is a thousandth of what it is on the research side. Years can pass ' +
+      'the gradient there is hundreds of times smaller than on the research side. Years can pass ' +
       'without a signal strong enough to argue with.',
     ],
   },

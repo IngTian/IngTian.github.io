@@ -6,8 +6,9 @@
 
 import { describe, it, expect } from 'vitest';
 import { WAYPOINTS, settle, distinctBasins, barrier, trajectoryFacts } from '../src/lib/trajectory';
-import { field, RANGE } from '../src/lib/terrain';
+import { field, grad, RANGE } from '../src/lib/terrain';
 import { timeline } from '../src/data/profile';
+import { STORY } from '../src/data/story';
 
 describe('the field supports the story', () => {
   const f = trajectoryFacts();
@@ -111,5 +112,19 @@ describe('the declared waypoints', () => {
   it('uses each timeline period at most once', () => {
     const seen = WAYPOINTS.map((w) => w.period);
     expect(new Set(seen).size).toBe(seen.length);
+  });
+});
+
+describe("Story's prose (data/story.ts) against the field", () => {
+  const prose = STORY.flatMap((c) => c.body).join(' ');
+  const slope = (w: { x: number; y: number }) => Math.hypot(...grad(w.x, w.y));
+
+  it('"hundreds of times smaller": the basin floor against the research side, measured', () => {
+    const floor = Math.min(...WAYPOINTS.filter((w) => w.phase === 'basin').map(slope));
+    const research = Math.min(...WAYPOINTS.filter((w) => w.phase === 'descent').map(slope));
+    expect(prose).toContain('hundreds of times smaller');
+    // 260x today. Under 200 is not "hundreds"; 1000 and over is a thousandth, the figure this replaced.
+    expect(research / floor).toBeGreaterThanOrEqual(200);
+    expect(research / floor).toBeLessThan(1000);
   });
 });

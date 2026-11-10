@@ -14,7 +14,6 @@ import { STATUS_LABEL, publications, projects, appendixProjects, type Publicatio
 import { PAPER_DATA } from '../data/papers';
 import { monthYear } from '../lib/dates';
 import { wholeParts } from '../lib/words';
-import { WRITINGS_PROMISE, WRITINGS_TOPICS } from '../data/making';
 import { KINDS, pieces } from '../data/writing';
 import PlushCow from '../components/PlushCow.astro';
 
@@ -23,8 +22,7 @@ const shownProjects = appendixProjects(projects);
 // ── THE WRITING COLUMN IS DERIVED, NOT PROMISED: a hand-written "coming" state once told visitors there was
 // no writing while a piece was live in the nav. pieces() (data/writing.ts) is EXACTLY what src/pages/writing.astro
 // reads, drafts dropped and newest first, so the two pages cannot disagree, and the next piece is still just a
-// file. The `coming` state below is correct when the folder is genuinely empty. Newest first, not featured-first:
-// `featured` picks /writing's lead and does not reorder the shelf.
+// file. Newest first, not featured-first: `featured` picks /writing's lead and does not reorder the shelf.
 const writings = pieces(await getCollection('writing'));
 
 // Two rows, matching the projects column: this slide points, it does not enumerate.
@@ -65,36 +63,18 @@ const lineFor = (p: Publication) => {
           <a class="wk-link" href="/research">Read the research<span class="wk-arrow" aria-hidden="true">→</span></a>
         </div>
 
-        {/* WRITINGS: whatever is actually published, and a promise ONLY while nothing is.
-             Two states, and which one renders is decided by src/content/writing/ rather than by an editor
-             remembering to come back here. Published pieces get the same treatment as the papers and the
-             projects — name, one line, a real link — because that is this slide's whole contract: every row is
-             a thing the reader can go and check. No count and no "1 piece" tag: this panel is written without
-             counts on purpose (see the file header), and the rows themselves are the better answer to "how
-             much is there". */}
+        {/* WRITINGS: whatever is published, the same treatment as the papers and the projects (name, one line, a
+             real link), because every row here is a thing the reader can go and check. With nothing published the
+             column is its kicker and its link, and /writing holds that space with the cow. */}
         <div class="wk-col">
-          <div class="wk-col-head">
-            <p class="wk-col-kicker">Writing</p>
-            {writings.length === 0 && <span class="wk-tag">coming</span>}
-          </div>
-          {writings.length === 0 ? (
-            <Fragment>
-              <p class="wk-promise">{WRITINGS_PROMISE}</p>
-              <ul class="wk-topics">
-                {WRITINGS_TOPICS.slice(0, 3).map((t) => <li>{t}</li>)}
-              </ul>
-            </Fragment>
-          ) : (
-            <Fragment>
-              {shownWritings.map((w) => (
-                <div class="wk-item">
-                  <p class="wk-item-name">{w.title}</p>
-                  <p class="wk-item-line">{KINDS[w.kind].label} · {monthYear(w.date)}</p>
-                </div>
-              ))}
-              <a class="wk-link" href="/writing">Read the writing<span class="wk-arrow" aria-hidden="true">→</span></a>
-            </Fragment>
-          )}
+          <p class="wk-col-kicker">Writing</p>
+          {shownWritings.map((w) => (
+            <div class="wk-item">
+              <p class="wk-item-name">{w.title}</p>
+              <p class="wk-item-line">{KINDS[w.kind].label} · {monthYear(w.date)}</p>
+            </div>
+          ))}
+          <a class="wk-link" href="/writing">Read the writing<span class="wk-arrow" aria-hidden="true">→</span></a>
         </div>
 
         {/* PROJECTS: last, and briefest — for a quant reader this is supporting evidence. */}
@@ -121,10 +101,7 @@ const lineFor = (p: Publication) => {
 </section>
 
 <style>
-  .wk {
-    position: relative; z-index: 1;
-    width: 100vw; margin-left: calc(50% - 50vw);
-  }
+  .wk { position: relative; z-index: 1; }
   .wk-paper { padding: clamp(52px, 7.4vh, 104px) 0; }
 
   /* BIGGER THROUGHOUT, on the owner's note ("the work is okay. fonts can be bigger"). The slide had the
@@ -148,16 +125,9 @@ const lineFor = (p: Publication) => {
     .wk-col + .wk-col { border-left: 0; padding-left: 0; padding-top: 4vh; border-top: 1px solid var(--panel-edge); }
   }
 
-  .wk-col-head { display: flex; align-items: baseline; gap: 10px; }
   .wk-col-kicker {
     font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.22em;
     text-transform: uppercase; color: var(--panel-accent); margin: 0 0 20px;
-  }
-  .wk-col-head .wk-col-kicker { margin-bottom: 20px; }
-  .wk-tag {
-    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
-    color: var(--panel-faint);
-    border: 1px solid var(--panel-edge); border-radius: 2px; padding: 3px 7px;
   }
 
   .wk-item { margin: 0 0 clamp(18px, 2.2vh, 26px); }
@@ -171,22 +141,6 @@ const lineFor = (p: Publication) => {
   .wk-item-line {
     font-size: clamp(13.5px, 1vw, 15px); line-height: 1.58; color: var(--panel-faint);
     margin: 6px 0 0; max-width: 40ch;
-  }
-
-  .wk-promise {
-    /* An italic editorial line, which is where a characterful serif reads as voice rather than as mannerism. */
-    font-family: var(--font-accent); font-style: italic;
-    font-size: clamp(17px, 1.4vw, 21px); line-height: 1.45;
-    color: var(--panel-ink); margin: 0; max-width: 34ch;
-  }
-  .wk-topics { list-style: none; margin: clamp(16px, 2vh, 22px) 0 0; padding: 0; display: grid; gap: 9px; }
-  .wk-topics li {
-    font-size: clamp(13.5px, 1vw, 15px); line-height: 1.55; color: var(--panel-soft);
-    padding-left: 16px; position: relative; max-width: 40ch;
-  }
-  .wk-topics li::before {
-    content: ""; position: absolute; left: 0; top: 0.62em;
-    width: 7px; height: 1px; background: var(--panel-accent); opacity: 0.7;
   }
 
   /* RIGHT EDGE, NOT CENTRED — the owner picked this from six real renders. Centring was the version he called

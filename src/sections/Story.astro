@@ -74,17 +74,12 @@ import { STORY } from '../data/story';
 </section>
 
 <style>
-  /* Full-bleed, so the paper panel is a surface the page passes through rather than a card sitting
-     on the sky. No vertical padding: the panel itself must reach the section's edges, or a band of
-     sky shows above and below it and the "turn the fluid off here" reads as a floating card.
+  /* Full-bleed as a block: <main> has no inline padding, so the section already spans the page, and a 100vw
+     width would overhang a classic scrollbar by half its width. No vertical padding: the panel itself must
+     reach the section's edges, or a band of sky shows above and below it and reads as a floating card.
      z-index lifts it over the SkyWash and .descent::after washes (both z-index:-1), so the fluid is
      completely hidden behind this slide rather than tinting the paper. */
-  .story {
-    position: relative;
-    z-index: 1;
-    width: 100vw;
-    margin-left: calc(50% - 50vw);
-  }
+  .story { position: relative; z-index: 1; }
 
   .story-paper {
     /* The graph's lines, which only DescentPath draws, per theme beside the panel's inks (styles/slides.css).
