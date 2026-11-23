@@ -25,4 +25,4 @@ A running collection. No commentary — if a line needs me to explain it, it has
 
 > If you're incompetent you have to be honest, and if you're crooked you have to be clever.
 
-**Sir Desmond Glazebrook** — *Yes, Prime Minister*.
+**Sir Desmond Glazebrook** — *Yes, Prime Minister*, "A Conflict of Interest".
