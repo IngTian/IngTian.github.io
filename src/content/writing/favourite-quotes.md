@@ -1,7 +1,7 @@
 ---
 title: Favourite quotes
 date: 2026-08-15
-updated: 2026-11-02
+updated: 2026-11-23
 kind: misc
 cover: quote
 blurb: Lines I keep coming back to, mostly about risk, regimes, and the gap between a model and the world it is supposed to describe.
@@ -22,3 +22,7 @@ A running collection. No commentary — if a line needs me to explain it, it has
 > More is learned from one's errors than from one's successes.
 
 **Primo Levi**
+
+> If you're incompetent you have to be honest, and if you're crooked you have to be clever.
+
+**Sir Desmond Glazebrook** — *Yes, Prime Minister*.

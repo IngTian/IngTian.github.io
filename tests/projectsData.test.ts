@@ -44,12 +44,12 @@ describe('the project records', () => {
   });
 
   it('computes the counts the summary line prints', () => {
-    // "7 shipped · 2 on PyPI · 1 on npm · 29 releases of witness · CI on 5 of 7" — from the records.
+    // "7 shipped · 2 on PyPI · 1 on npm · 33 releases of witness · CI on 5 of 7" — from the records.
     expect(projects.filter((p) => p.visibility === 'public' || p.visibility === 'private')).toHaveLength(7);
     expect(projects.filter((p) => p.registry === 'pypi')).toHaveLength(2);
     expect(projects.filter((p) => p.registry === 'npm')).toHaveLength(1);
     expect(projects.filter((p) => p.ci)).toHaveLength(5);
-    expect(WITNESS_RELEASES).toBe(29);
+    expect(WITNESS_RELEASES).toBe(33);
   });
 
   // ONE SOURCE: a chip typed as '29 releases' beside the count drifted from it — a bump moved the summary line and

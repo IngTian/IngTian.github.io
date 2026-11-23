@@ -229,8 +229,8 @@ export const awards: Award[] = [
   { title: 'COMC', gloss: 'Canadian Open Mathematics Challenge' },
 ];
 
-// witness's release count: hand-maintained, not fetched at build time (that needs the network); counted 2026-11-02.
-export const WITNESS_RELEASES = 29;
+// witness's release count: hand-maintained, not fetched at build time (that needs the network); counted 2026-11-23.
+export const WITNESS_RELEASES = 33;
 
 // Every notable project, in VALUE order: the selected (quant) tier first, then the workshop of personal tools.
 // Records, not prose, because they render in many shapes — the ls listing, the gallery, a row or a card, the
@@ -255,11 +255,11 @@ export const projects: Project[] = [
   },
   {
     slug: 'trading-desk', name: 'trading-desk', tier: 'selected', kind: 'tool',
-    idea: 'A trading book in the terminal that gets P&L right across currencies and refuses to record a state that contradicts itself.',
-    short: "a trading book that can't contradict itself",
-    // ~300, not the spec's ~270: at trading-desk 1e60108 pytest collects 323, of which test_book.py's 24 skip
-    // without a book — so CI runs 299. The README states no count.
-    proof: ['on PyPI', '~300 tests'],
+    idea: 'A trading record an agent keeps over MCP: each trade filed under the strategy version that allowed it, and checked against its rules.',
+    short: 'a trading record an agent keeps',
+    // No test count, as daylogs has no release count: 0.9.0 to 0.11.0 landed in one day (2026-11-22), and a count
+    // that moves that fast is false between edits.
+    proof: ['on PyPI', 'Claude Code plugin'],
     visibility: 'public', registry: 'pypi', ci: true,
   },
   {

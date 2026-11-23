@@ -252,7 +252,7 @@ src/
   lib/projectsListing.ts            # the header's `ls -l` lines and the summary counts, computed from the records
   lib/projectsBoot.ts               # the boot: shouldBoot (WHETHER — shipped as source by projects.astro's is:inline decider) + bootSteps/bootState (WHAT, at each ms)
   lib/{cowTalk,galleryLayout}.ts    # when the /projects cow talks and which line; the fan's poses + the one click rule every project surface shares
-  lib/{positioning,projectVisuals}.ts # offchart's percentile, ported; the four COMPUTED pictures as SVG strings, coloured only by CSS variables
+  lib/{positioning,projectVisuals}.ts # offchart's percentile, ported; the five COMPUTED pictures as SVG strings, coloured only by CSS variables
   data/{cowLines,projectVisuals}.ts # the /projects cow's lines (stored as PAIRS); which picture each project shows
   data/vendor/*.ts                  # GENERATED — the computed pictures' inputs and the paper page's reproduction series, with provenance in each header. Do not edit; re-run the tool
 tests/*.test.ts                     # vitest — every pure lib module, the data/route invariants, the content seam
