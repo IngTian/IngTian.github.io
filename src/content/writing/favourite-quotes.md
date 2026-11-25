@@ -1,7 +1,7 @@
 ---
 title: Favourite quotes
 date: 2026-08-15
-updated: 2026-11-23
+updated: 2026-11-24
 kind: misc
 cover: quote
 blurb: Lines I keep coming back to, mostly about risk, regimes, and the gap between a model and the world it is supposed to describe.
@@ -26,3 +26,7 @@ A running collection. No commentary — if a line needs me to explain it, it has
 > If you're incompetent you have to be honest, and if you're crooked you have to be clever.
 
 **Sir Desmond Glazebrook** — *Yes, Prime Minister*, "A Conflict of Interest".
+
+> There's no crying in baseball!
+
+**Jimmy Dugan** (Tom Hanks) — *A League of Their Own*, 1992.
