@@ -1,14 +1,14 @@
 // tools/vendor-projects.mjs — run BY HAND, never by the build: `node tools/vendor-projects.mjs [part ...]`.
-// With no part it re-vendors everything; name parts (rl-bhrp, offchart, witness, macboot, binaries) to re-vendor
-// only those, so fixing one file does not also pull every other source's newest data.
+// With no part it re-vendors everything; name parts (rl-bhrp, offchart, witness, macboot, trading-desk, binaries)
+// to re-vendor only those, so fixing one file does not also pull every other source's newest data.
 //
 // /projects' pictures come from each project's own output, vendored into this repo with their provenance. This
 // script is the only place the network is used for them (the font lesson in CLAUDE.md: a build that fetches
 // fails when the far end changes). It resolves each source repo's HEAD to a commit, fetches the files AT that
 // commit, and writes:
-//   - src/data/vendor/{rlBhrpWealth,offchartPositioning,witnessFacets,macbootSections}.ts, each headed by its
-//     source URL, commit, fetch date and this command;
-//   - two raster captures into src/assets/projects/ (served through astro:assets as webp);
+//   - src/data/vendor/{rlBhrpWealth,offchartPositioning,witnessFacets,macbootSections,tradingDeskChecks}.ts, each
+//     headed by its source URL, commit, fetch date and this command;
+//   - daylogs' raster capture into src/assets/projects/ (served through astro:assets as webp);
 //   - manifold's two screensaver GIFs as MP4s into public/projects/ (the GIFs are deleted: they are 1.0-1.2 MB
 //     each and a video is not an image), each MP4's first frame beside the captures as that theme's still, plus
 //     src/assets/projects/SOURCES.txt, the binaries' provenance.
@@ -264,6 +264,27 @@ function macboot() {
   ]);
 }
 
+// ── trading-desk: its README's check of one trade ─────────────────────────────────────────────────────────────
+
+function tradingDesk() {
+  const repo = 'trading-desk', path = 'README.md', sha = headOf(repo);
+  const text = fileAt(repo, sha, path).toString('utf8');
+  // The first fenced block of three or more `rule  verdict  detail` lines: the desk's reply to a check_only trade.
+  const row = /^(\S+) +(\S+) {2,}(\S.*)$/;
+  const block = [...text.matchAll(/^```\n([\s\S]*?)\n```$/gm)].map((m) => m[1].split('\n'))
+    .find((ls) => ls.length >= 3 && ls.every((l) => row.test(l)));
+  if (!block) fail(`${path}: no fenced block of "rule  verdict  detail" lines`);
+  const rows = block.map((l) => l.match(row).slice(1, 4));
+  if (!rows.every((r) => r.every((c) => DRAWABLE.test(c)))) fail(`${path}: a character the mono subset cannot draw`);
+  return writeModule('tradingDeskChecks.ts', 'tradingDeskChecks', '{ rows: [string, string, string][] }', { rows }, [
+    `source:  ${blobUrl(repo, sha, path)}`,
+    `commit:  ${sha}`,
+    '',
+    'The README\'s check of one trade before entry (`trade` with `check_only`), [rule, verdict, detail] per line,',
+    'as the desk replied to the session the README ran end to end.',
+  ]);
+}
+
 // ── the binaries: captures and manifold's motion ─────────────────────────────────────────────────────────────
 
 /** Frames vendored whole, the motto under the clock included. The filter only evens the frame, which yuv420p requires. */
@@ -280,7 +301,6 @@ function binaries() {
   };
   const written = [];
   for (const [repo, path, name] of [
-    ['trading-desk', 'assets/dashboard.png', 'trading-desk-dashboard.png'],
     ['daylogs', 'assets/body.png', 'daylogs-body.png'],
   ]) {
     const out = join(ASSETS, name);
@@ -320,7 +340,7 @@ function binaries() {
 
 // ── run ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
-const ALL = { 'rl-bhrp': rlBhrp, offchart, witness, macboot, binaries };
+const ALL = { 'rl-bhrp': rlBhrp, offchart, witness, macboot, 'trading-desk': tradingDesk, binaries };
 // Own names only: `in` also accepts inherited ones (`toString`), which matched no part and exited 0 having written nothing.
 for (const p of PARTS) if (!Object.hasOwn(ALL, p)) fail(`no part "${p}"; the parts are ${Object.keys(ALL).join(', ')}`);
 for (const d of [VENDOR, ASSETS, PUBLIC]) mkdirSync(d, { recursive: true });

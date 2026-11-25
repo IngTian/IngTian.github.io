@@ -1,5 +1,5 @@
 // src/lib/projectVisuals.ts
-// THE COMPUTED PICTURES on /projects — for the four projects whose picture is their own output rather than a
+// THE COMPUTED PICTURES on /projects — for the five projects whose picture is their own output rather than a
 // screenshot, drawn at build time from data vendored with its provenance (src/data/vendor, written by
 // tools/vendor-projects.mjs; rl-bhrp's as data/papers/rl-bhrp.ts derives REPRO from it, the one series both
 // pages draw). Each returns an SVG string, 350x220, coloured ONLY through CSS variables, so one
@@ -9,11 +9,12 @@
 // - numbers come only from the vendored data (rl-bhrp's: REPRO), never the paper's Table 2 beside it;
 // - text is --ink-1/--ink-3 on --draft-ph, in the mono subset;
 // - `meet`, never `slice` (workshop thumbs run 1.75:1 to 3.6:1);
-// - the gallery's three draw nothing below FLOOR;
+// - the gallery's four draw nothing below FLOOR;
 // - each svg is role=img with an aria-label built from its printed values.
 // Pure: returns markup, touches no DOM.
 import type { macbootSections } from '../data/vendor/macbootSections';
 import type { offchartPositioning } from '../data/vendor/offchartPositioning';
+import type { tradingDeskChecks } from '../data/vendor/tradingDeskChecks';
 import type { witnessFacets } from '../data/vendor/witnessFacets';
 import { expandingPercentile, shareOf } from './positioning';
 import { linearScale, nudgeLabels, type WealthSeries } from './wealth';
@@ -28,7 +29,7 @@ const pts = (xy: readonly [number, number][]) => xy.map(([x, y]) => `${r1(x)},${
 
 /** The lowest y a gallery picture draws at. The gallery's name tag covers the band below it at the left — from
  *  y≈179 on the 240x160 phone card, ≈192 on the 330x220 one, out to x≈122 for an 8-letter name; the test derives
- *  that footprint from the tag's CSS and holds every mark and word of the three clear of it. */
+ *  that footprint from the tag's CSS and holds every mark and word of the four clear of it. */
 const FLOOR = 176;
 
 function svg(label: string, body: string): string {
@@ -41,6 +42,15 @@ const tspan = (x: number, y: number | null, s: string, { fill = INK, size = 10 }
   `<tspan x="${r1(x)}"${y === null ? '' : ` y="${r1(y)}"`} style="fill:${fill};font-size:${size}px">${esc(s)}</tspan>`;
 const text = (x: number, y: number, s: string, { fill = INK, size = 10, anchor }: TextStyle = {}) =>
   `<text x="${r1(x)}" y="${r1(y)}"${anchor ? ` text-anchor="${anchor}"` : ''} style="fill:${fill};font-size:${size}px">${esc(s)}</text>`;
+
+/** `s` cut to `max` characters with an ellipsis: after its last clause or list item (", " or "; ") that keeps
+ *  half the room, else after a word — never mid-word. */
+function clip(s: string, max: number): string {
+  if (s.length <= max) return s;
+  const clause = Math.max(s.lastIndexOf(', ', max - 1), s.lastIndexOf('; ', max - 1));
+  const cut = clause >= max / 2 ? clause : s.lastIndexOf(' ', max - 1);
+  return `${s.slice(0, cut > 0 ? cut : max - 1)}…`;
+}
 
 // ── rl-bhrp ─────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -149,20 +159,8 @@ export function facetsSvg(d: typeof witnessFacets): string {
 
 // ── macboot ─────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** `s` cut to `max` characters at a ", " item boundary, with an ellipsis — whole items or nothing. */
-function fit(s: string, max: number): string {
-  if (s.length <= max) return s;
-  const items = s.split(', ');
-  let out = items[0];
-  for (const it of items.slice(1)) {
-    if (`${out}, ${it}`.length + 1 > max) break;
-    out += `, ${it}`;
-  }
-  return out.length + 1 <= max ? `${out}…` : `${s.slice(0, max - 1)}…`;
-}
-
-/** A real excerpt of macboot's README: its table of sections, one row each. The third column is shortened at
- *  an item boundary to the 33 characters of 9px mono (5.4 units each) the picture has room for. */
+/** A real excerpt of macboot's README: its table of sections, one row each. The third column is clipped to the
+ *  33 characters of 9px mono (5.4 units each) the picture has room for. */
 export function sectionsSvg(d: typeof macbootSections): string {
   const { rows } = d;
   const step = rows.length > 1 ? Math.min(16, (190 - 62) / (rows.length - 1)) : 0;
@@ -174,7 +172,30 @@ export function sectionsSvg(d: typeof macbootSections): string {
     ...rows.map(([sec, category, what], i) => `<text style="fill:${INK};font-size:9px">`
       + tspan(16, 62 + i * step, `§${sec}`, { fill: DIM, size: 9 })
       + tspan(34, null, category, { size: 9 })
-      + tspan(154, null, fit(what, 33), { fill: DIM, size: 9 })
+      + tspan(154, null, clip(what, 33), { fill: DIM, size: 9 })
+      + '</text>'),
+  ].join(''));
+}
+
+// ── trading-desk ────────────────────────────────────────────────────────────────────────────────────────────
+
+/** A real excerpt of trading-desk's README: the desk's check of one trade before entry, a rule a row with its
+ *  verdict and detail. Columns sit from the data's widest entries at 8px mono (4.8 units a character); a detail is
+ *  clipped to the room left before x=340, and the label carries it whole. No row sits below FLOOR. */
+export function checksSvg(d: typeof tradingDeskChecks): string {
+  const { rows } = d;
+  const ch = 4.8, wide = (i: number) => Math.max(...rows.map((r) => r[i].length)) * ch + 5.4;
+  const x2 = 16 + wide(0), x3 = x2 + wide(1), max = Math.floor((340 - x3) / ch);
+  const step = rows.length > 1 ? Math.min(14, (FLOOR - 62) / (rows.length - 1)) : 0;
+  const label = `trading-desk's README: one trade checked against ${rows.length} rules before entry: `
+    + `${rows.map(([rule, verdict, detail]) => `${rule.replace(/_/g, ' ')} ${verdict}, ${detail}`).join('; ')}.`;
+  return svg(label, [
+    text(16, 28, 'trading-desk / README.md', { size: 10.5 }),
+    text(16, 42, `one trade, checked before entry: ${rows.length} rules`, { fill: DIM, size: 9 }),
+    ...rows.map(([rule, verdict, detail], i) => `<text style="fill:${INK};font-size:8px">`
+      + tspan(16, 62 + i * step, rule, { size: 8 })
+      + tspan(x2, null, verdict, { size: 8 })
+      + tspan(x3, null, clip(detail, max), { fill: DIM, size: 8 })
       + '</text>'),
   ].join(''));
 }

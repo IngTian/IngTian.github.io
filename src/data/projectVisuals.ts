@@ -1,9 +1,9 @@
 // src/data/projectVisuals.ts
-// Each project's picture on /projects. Four are COMPUTED from the project's own output (lib/projectVisuals.ts,
-// over src/data/vendor; rl-bhrp's through REPRO, the series the paper page draws); three are real captures, vendored into src/assets/projects by tools/vendor-projects.mjs
-// with their provenance in src/assets/projects/SOURCES.txt.
+// Each project's picture on /projects. Five are COMPUTED from the project's own output (lib/projectVisuals.ts,
+// over src/data/vendor; rl-bhrp's through REPRO, the series the paper page draws); two are real captures, vendored
+// into src/assets/projects by tools/vendor-projects.mjs with their provenance in src/assets/projects/SOURCES.txt.
 //
-// trading-desk and daylogs have only a dark capture, shown in BOTH themes — never CSS-inverted, the "derived"
+// daylogs has only a dark capture, shown in BOTH themes — never CSS-inverted, the "derived"
 // light look the owner ruled out (spec section 6). manifold has a capture per theme: each still is the first
 // frame of that theme's MP4, so it is also that video's poster — the swap to motion shows no jump, a light-theme
 // reader never sees a dark still turn light, and reduced motion keeps a real frame. The MP4s sit in public/
@@ -13,11 +13,11 @@ import type { ImageMetadata } from 'astro';
 import daylogsBody from '../assets/projects/daylogs-body.png';
 import manifoldDark from '../assets/projects/manifold-saver-dark.png';
 import manifoldLight from '../assets/projects/manifold-saver-light.png';
-import tradingDeskDashboard from '../assets/projects/trading-desk-dashboard.png';
-import { facetsSvg, positioningSvg, sectionsSvg, wealthSvg } from '../lib/projectVisuals';
+import { checksSvg, facetsSvg, positioningSvg, sectionsSvg, wealthSvg } from '../lib/projectVisuals';
 import { REPRO } from './papers/rl-bhrp';
 import { macbootSections } from './vendor/macbootSections';
 import { offchartPositioning } from './vendor/offchartPositioning';
+import { tradingDeskChecks } from './vendor/tradingDeskChecks';
 import { witnessFacets } from './vendor/witnessFacets';
 
 /** A capture's `alt` is hand-written; a computed svg labels itself (lib/projectVisuals.ts). */
@@ -28,11 +28,7 @@ export type ProjectVisual =
 const VISUALS: Record<string, ProjectVisual> = {
   'rl-bhrp': { kind: 'svg', svg: wealthSvg(REPRO) },
   offchart: { kind: 'svg', svg: positioningSvg(offchartPositioning) },
-  'trading-desk': {
-    kind: 'image', dark: tradingDeskDashboard,
-    alt: 'trading-desk\'s dashboard in a terminal: a book\'s net worth against what went in, its return split into '
-      + 'realised, unrealised, income and currency, then its holdings and cash flows.',
-  },
+  'trading-desk': { kind: 'svg', svg: checksSvg(tradingDeskChecks) },
   witness: { kind: 'svg', svg: facetsSvg(witnessFacets) },
   daylogs: {
     kind: 'image', dark: daylogsBody,

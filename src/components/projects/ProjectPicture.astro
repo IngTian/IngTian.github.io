@@ -3,10 +3,10 @@
 // thumb): the computed svg inline, or the capture as responsive webp. Fills its container, cropped by
 // `object-fit: cover` (the svgs frame themselves to fit — lib/projectVisuals.ts).
 //
-// A capture with a light version (manifold) renders both, and CSS shows the one for the theme. trading-desk and
-// daylogs have only a dark capture, shown in both themes and never CSS-inverted (spec section 6).
+// A capture with a light version (manifold) renders both, and CSS shows the one for the theme. daylogs
+// has only a dark capture, shown in both themes and never CSS-inverted (spec section 6).
 //
-// WIDTHS stop well short of the two large captures' native widths (1600, 1400): the largest box is a workshop
+// WIDTHS stop well short of the large capture's native width (daylogs', 1400): the largest box is a workshop
 // thumb, ~460 CSS px, so 1000 covers it at DPR 2. manifold's stills are only 520 wide, so Astro drops the widths
 // past that and serves 400 and the whole 520 (14 KB). The gallery card (330) and the hover preview (360) pick
 // the same variant at a given DPR — 800 at DPR 2 — so the preview reuses the file the gallery already fetched.

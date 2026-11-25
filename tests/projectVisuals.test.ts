@@ -9,11 +9,12 @@ import { visualFor } from '../src/data/projectVisuals';
 import { macbootSections } from '../src/data/vendor/macbootSections';
 import { REPRO } from '../src/data/papers/rl-bhrp';
 import { offchartPositioning } from '../src/data/vendor/offchartPositioning';
+import { tradingDeskChecks } from '../src/data/vendor/tradingDeskChecks';
 import { rlBhrpWealth } from '../src/data/vendor/rlBhrpWealth';
 import { witnessFacets } from '../src/data/vendor/witnessFacets';
 import { GALLERY_ORDER } from '../src/lib/galleryLayout';
 import { expandingPercentile, shareOf } from '../src/lib/positioning';
-import { facetsSvg, positioningSvg, sectionsSvg, wealthSvg } from '../src/lib/projectVisuals';
+import { checksSvg, facetsSvg, positioningSvg, sectionsSvg, wealthSvg } from '../src/lib/projectVisuals';
 import { band, cumulative, pointwiseMedian } from '../src/lib/wealth';
 
 const unescape = (s: string) =>
@@ -81,6 +82,7 @@ const ALL = {
   positioningSvg: positioningSvg(offchartPositioning),
   facetsSvg: facetsSvg(witnessFacets),
   sectionsSvg: sectionsSvg(macbootSections),
+  checksSvg: checksSvg(tradingDeskChecks),
 };
 
 describe('every computed picture', () => {
@@ -146,8 +148,8 @@ describe('the gallery\'s name tag covers nothing', () => {
   // The computed pictures among the gallery's six (macboot is a workshop card only), read from the gallery's own
   // order so a card added to it is held to the tag rule too.
   const GALLERY_SVGS = GALLERY_ORDER.filter((s) => visualFor(s).kind === 'svg');
-  it('finds the three computed pictures in the gallery', () => {
-    expect(GALLERY_SVGS).toEqual(['rl-bhrp', 'offchart', 'witness']);
+  it('finds the four computed pictures in the gallery', () => {
+    expect(GALLERY_SVGS).toEqual(['rl-bhrp', 'trading-desk', 'offchart', 'witness']);
   });
 
   /** The tag's box in the picture's own units: the svg fills the card inside its border, framed by `meet`. */
@@ -342,11 +344,31 @@ describe('sectionsSvg (macboot)', () => {
   });
 });
 
+describe('checksSvg (trading-desk)', () => {
+  const rows = texts(ALL.checksSvg).filter((t) => t.length === 3);
+
+  it('has one row per rule the README checked, its rule and verdict verbatim', () => {
+    expect(rows).toHaveLength(tradingDeskChecks.rows.length);
+    rows.forEach((r, i) => expect(r.slice(0, 2)).toEqual(tradingDeskChecks.rows[i].slice(0, 2)));
+  });
+
+  it('clips a long detail after a clause or a word, never mid-word, and names every detail whole', () => {
+    rows.forEach((r, i) => {
+      const full = tradingDeskChecks.rows[i][2];
+      expect(label(ALL.checksSvg)).toContain(full);
+      if (r[2] === full) return;
+      expect(r[2].endsWith('…')).toBe(true);
+      expect(full.startsWith(r[2].slice(0, -1))).toBe(true);
+      expect(full.slice(r[2].length - 1)).toMatch(/^[,;]? /);
+    });
+  });
+});
+
 describe('visualFor', () => {
-  it('gives every project a picture: computed for the four with output, captures for the rest', () => {
+  it('gives every project a picture: computed for the five with output, captures for the rest', () => {
     const kinds = Object.fromEntries(projects.map((p) => [p.slug, visualFor(p.slug).kind]));
     expect(kinds).toEqual({
-      'rl-bhrp': 'svg', offchart: 'svg', 'trading-desk': 'image', witness: 'svg',
+      'rl-bhrp': 'svg', offchart: 'svg', 'trading-desk': 'svg', witness: 'svg',
       daylogs: 'image', manifold: 'image', macboot: 'svg',
     });
   });
